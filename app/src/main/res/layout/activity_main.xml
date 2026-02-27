@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- AppBar with Toolbar (Windows-style menu bar) -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            android:elevation="4dp"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            app:title="LocationMapApp" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Map fills remaining space below toolbar -->
+    <org.osmdroid.views.MapView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+    <!-- Custom zoom slider (right edge, vertically centered) -->
+    <LinearLayout
+        android:id="@+id/zoomSliderContainer"
+        android:layout_width="48dp"
+        android:layout_height="280dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="4dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:elevation="8dp">
+
+        <!-- Zoom IN button (+) -->
+        <TextView
+            android:id="@+id/btnZoomIn"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/zoom_button_bg"
+            android:text="+"
+            android:textColor="@android:color/white"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Track area with bubble -->
+        <FrameLayout
+            android:id="@+id/zoomTrackArea"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp">
+
+            <!-- Vertical track line -->
+            <View
+                android:id="@+id/zoomTrackLine"
+                android:layout_width="4dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/zoom_slider_track" />
+
+            <!-- Zoom level bubble (positioned programmatically) -->
+            <TextView
+                android:id="@+id/zoomBubble"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:minWidth="36dp"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/zoom_bubble_bg"
+                android:text="14"
+                android:textColor="@android:color/white"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:elevation="2dp" />
+
+        </FrameLayout>
+
+        <!-- Zoom OUT button (-) -->
+        <TextView
+            android:id="@+id/btnZoomOut"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/zoom_button_bg"
+            android:text="−"
+            android:textColor="@android:color/white"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+    <!-- FAB speed dial container (bottom-right) -->
+    <LinearLayout
+        android:id="@+id/fabMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="72dp"
+        android:orientation="vertical"
+        android:gravity="end"
+        android:visibility="gone" />
+
+    <!-- Main FAB trigger -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabMain"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:src="@android:drawable/ic_menu_add"
+        app:tint="@android:color/white" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

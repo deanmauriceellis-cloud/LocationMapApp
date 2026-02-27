@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/menu_utility.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Binary: record GPS breadcrumb trail -->
+    <item
+        android:id="@+id/menu_util_record_gps"
+        android:title="Record GPS Travel Coordinates"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Button: launch story-builder website with stored coordinates -->
+    <item
+        android:id="@+id/menu_util_build_story"
+        android:title="Build Travel Story…"
+        app:showAsAction="never" />
+
+    <!-- Button: launch analysis website for today's travels -->
+    <item
+        android:id="@+id/menu_util_analyze_today"
+        android:title="Analyze Today's Travels…"
+        app:showAsAction="never" />
+
+    <!-- Button: detect anomalies in recorded movements -->
+    <item
+        android:id="@+id/menu_util_anomalies"
+        android:title="Show Travel Anomalies…"
+        app:showAsAction="never" />
+
+    <!-- Button: email GPX file of recorded coordinates -->
+    <item
+        android:id="@+id/menu_util_email_gpx"
+        android:title="Email GPS Coordinates (GPX)…"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_util_divider" style="@style/Widget.AppCompat.ActionBar.TabBar"/>
+
+    <!-- Debug log viewer (existing feature surfaced here) -->
+    <item
+        android:id="@+id/menu_util_debug_log"
+        android:title="Debug Log Viewer"
+        app:showAsAction="never" />
+
+    <!-- GPS mode toggle (existing feature) -->
+    <item
+        android:id="@+id/menu_util_gps_mode"
+        android:title="GPS / Manual Location Mode"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+</menu>

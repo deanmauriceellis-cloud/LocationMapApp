@@ -1,0 +1,496 @@
+package com.example.locationmapapp.ui.menu
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.PopupMenu
+import androidx.appcompat.widget.Toolbar
+import com.example.locationmapapp.R
+import com.example.locationmapapp.ui.MainViewModel
+import com.example.locationmapapp.util.DebugLogger
+import com.google.android.material.slider.Slider
+
+/**
+ * AppBarMenuManager  — v1.5
+ *
+ * Owns all toolbar / drop-down menu logic:
+ *   • Inflates six top-level menu-bar items (GPS Alerts, Transit, CAMs, Radar, POI, Utility).
+ *   • Each item opens a PopupMenu with checkable binary items and slider-launched dialogs.
+ *   • Binary state is persisted to SharedPreferences; checkmarks are synced each time a
+ *     popup opens so they always reflect the stored value.
+ *   • All events are forwarded through [MenuEventListener] — zero business logic here.
+ *
+ * Two-phase wiring pattern (preserves pre-inflation safety):
+ *   Phase 1 — setupToolbarMenus()   called from onCreate()              (no menu items yet)
+ *   Phase 2 — onMenuInflated(menu)  called from onCreateOptionsMenu()   (items now exist)
+ */
+class AppBarMenuManager(
+    private val context:           Context,
+    private val toolbar:           Toolbar,
+    private val viewModel:         MainViewModel,
+    private val menuEventListener: MenuEventListener
+) {
+
+    private val TAG = "AppBarMenuManager"
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    var radarUpdateMinutes: Int
+        get() = prefs.getInt(PREF_RADAR_FREQ, DEFAULT_RADAR_FREQ_MIN)
+        set(v) { prefs.edit().putInt(PREF_RADAR_FREQ, v).apply() }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PHASE 1 — called from onCreate (no menu items exist yet)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fun setupToolbarMenus() {
+        DebugLogger.i(TAG, "setupToolbarMenus() — deferring click wiring until onMenuInflated()")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PHASE 2 — called from onCreateOptionsMenu AFTER menuInflater.inflate()
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fun onMenuInflated(menu: Menu) {
+        DebugLogger.i(TAG, "onMenuInflated() — ${menu.size()} top-level items")
+        toolbar.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "Top-bar click: '${item.title}' id=0x${item.itemId.toString(16)}")
+            when (item.itemId) {
+                R.id.menu_top_gps_alerts -> { showGpsAlertsMenu(toolbar); true }
+                R.id.menu_top_transit    -> { showTransitMenu(toolbar);    true }
+                R.id.menu_top_cams       -> { showCamsMenu(toolbar);       true }
+                R.id.menu_top_radar      -> { showRadarMenu(toolbar);      true }
+                R.id.menu_top_poi        -> { showPoiMenu(toolbar);        true }
+                R.id.menu_top_utility    -> { showUtilityMenu(toolbar);    true }
+                else -> {
+                    DebugLogger.w(TAG, "No sub-menu for id=0x${item.itemId.toString(16)}")
+                    false
+                }
+            }
+        }
+        DebugLogger.i(TAG, "Toolbar click listener wired")
+    }
+
+    // =========================================================================
+    // GPS ALERTS
+    // =========================================================================
+
+    private fun showGpsAlertsMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_gps_alerts)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "GPS Alerts: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_weather_alerts ->
+                    toggleBinary(item, PREF_WEATHER_ALERTS) { menuEventListener.onWeatherAlertsToggled(it) }
+
+                R.id.menu_weather_banner ->
+                    toggleBinary(item, PREF_WEATHER_BANNER) { menuEventListener.onWeatherBannerToggled(it) }
+
+                R.id.menu_highway_alerts ->
+                    toggleBinary(item, PREF_HWY_ALERTS) { menuEventListener.onHighwayAlertsToggled(it) }
+
+                R.id.menu_highway_alerts_frequency ->
+                    showSliderDialog("Highway Alert Frequency (min)", 1, 5,
+                        prefs.getInt(PREF_HWY_ALERT_FREQ, 3)) { v ->
+                        prefs.edit().putInt(PREF_HWY_ALERT_FREQ, v).apply()
+                        menuEventListener.onHighwayAlertsFrequencyChanged(v)
+                    }
+
+                R.id.menu_traffic_speed ->
+                    toggleBinary(item, PREF_TRAFFIC_SPEED) { menuEventListener.onTrafficSpeedToggled(it) }
+
+                R.id.menu_traffic_speed_frequency ->
+                    showSliderDialog("Speed Info Frequency (min)", 1, 5,
+                        prefs.getInt(PREF_TRAFFIC_SPEED_FREQ, 3)) { v ->
+                        prefs.edit().putInt(PREF_TRAFFIC_SPEED_FREQ, v).apply()
+                        menuEventListener.onTrafficSpeedFrequencyChanged(v)
+                    }
+
+                R.id.menu_metar_display ->
+                    toggleBinary(item, PREF_METAR_DISPLAY) { menuEventListener.onMetarDisplayToggled(it) }
+
+                R.id.menu_metar_frequency ->
+                    showSliderDialog("METAR Update Frequency (min)", 1, 10,
+                        prefs.getInt(PREF_METAR_FREQ, 5)) { v ->
+                        prefs.edit().putInt(PREF_METAR_FREQ, v).apply()
+                        menuEventListener.onMetarFrequencyChanged(v)
+                    }
+
+                else -> {
+                    DebugLogger.w(TAG, "GPS Alerts: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("gps_alerts_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu,
+            R.id.menu_weather_alerts to PREF_WEATHER_ALERTS,
+            R.id.menu_weather_banner to PREF_WEATHER_BANNER,
+            R.id.menu_highway_alerts to PREF_HWY_ALERTS,
+            R.id.menu_traffic_speed  to PREF_TRAFFIC_SPEED,
+            R.id.menu_metar_display  to PREF_METAR_DISPLAY
+        )
+        popup.show()
+    }
+
+    // =========================================================================
+    // PUBLIC TRANSIT
+    // =========================================================================
+
+    private fun showTransitMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_transit)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "Transit: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_mbta_trains ->
+                    toggleBinary(item, PREF_MBTA_TRAINS) { menuEventListener.onMbtaTrainsToggled(it) }
+
+                R.id.menu_mbta_trains_frequency ->
+                    showSliderDialog("Commuter Rail Frequency (sec)", 30, 300,
+                        prefs.getInt(PREF_MBTA_TRAINS_FREQ, 60)) { v ->
+                        prefs.edit().putInt(PREF_MBTA_TRAINS_FREQ, v).apply()
+                        menuEventListener.onMbtaTrainsFrequencyChanged(v)
+                    }
+
+                R.id.menu_mbta_subway ->
+                    toggleBinary(item, PREF_MBTA_SUBWAY) { menuEventListener.onMbtaSubwayToggled(it) }
+
+                R.id.menu_mbta_subway_frequency ->
+                    showSliderDialog("Subway Frequency (sec)", 30, 300,
+                        prefs.getInt(PREF_MBTA_SUBWAY_FREQ, 60)) { v ->
+                        prefs.edit().putInt(PREF_MBTA_SUBWAY_FREQ, v).apply()
+                        menuEventListener.onMbtaSubwayFrequencyChanged(v)
+                    }
+
+                R.id.menu_mbta_buses ->
+                    toggleBinary(item, PREF_MBTA_BUSES) { menuEventListener.onMbtaBusesToggled(it) }
+
+                R.id.menu_mbta_buses_frequency ->
+                    showSliderDialog("Bus Frequency (sec)", 30, 300,
+                        prefs.getInt(PREF_MBTA_BUSES_FREQ, 60)) { v ->
+                        prefs.edit().putInt(PREF_MBTA_BUSES_FREQ, v).apply()
+                        menuEventListener.onMbtaBusesFrequencyChanged(v)
+                    }
+
+                R.id.menu_national_alerts ->
+                    toggleBinary(item, PREF_NAT_ALERTS) { menuEventListener.onNationalAlertsToggled(it) }
+
+                R.id.menu_national_alerts_frequency ->
+                    showSliderDialog("Emergency Alert Frequency (min)", 1, 15,
+                        prefs.getInt(PREF_NAT_ALERTS_FREQ, 5)) { v ->
+                        prefs.edit().putInt(PREF_NAT_ALERTS_FREQ, v).apply()
+                        menuEventListener.onNationalAlertsFrequencyChanged(v)
+                    }
+
+                else -> {
+                    DebugLogger.w(TAG, "Transit: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("transit_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu,
+            R.id.menu_mbta_trains     to PREF_MBTA_TRAINS,
+            R.id.menu_mbta_subway     to PREF_MBTA_SUBWAY,
+            R.id.menu_mbta_buses      to PREF_MBTA_BUSES,
+            R.id.menu_national_alerts to PREF_NAT_ALERTS
+        )
+        popup.show()
+    }
+
+    // =========================================================================
+    // CAMERAS
+    // =========================================================================
+
+    private fun showCamsMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_cams)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "CAMs: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_traffic_cams ->
+                    toggleBinary(item, PREF_TRAFFIC_CAMS) { menuEventListener.onTrafficCamsToggled(it) }
+
+                R.id.menu_cams_more ->
+                    menuEventListener.onCamsMoreRequested()
+
+                else -> {
+                    DebugLogger.w(TAG, "CAMs: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("cams_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu, R.id.menu_traffic_cams to PREF_TRAFFIC_CAMS)
+        popup.show()
+    }
+
+    // =========================================================================
+    // RADAR
+    // =========================================================================
+
+    private fun showRadarMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_radar)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "Radar: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_radar_toggle ->
+                    toggleBinary(item, PREF_RADAR_ON) { menuEventListener.onRadarToggled(it) }
+
+                R.id.menu_radar_visibility ->
+                    showSliderDialog("Radar Visibility (0–100)", 0, 100,
+                        prefs.getInt(PREF_RADAR_VISIBILITY, 70)) { v ->
+                        prefs.edit().putInt(PREF_RADAR_VISIBILITY, v).apply()
+                        menuEventListener.onRadarVisibilityChanged(v)
+                    }
+
+                R.id.menu_radar_frequency ->
+                    showSliderDialog("Radar Update (minutes)", 5, 15,
+                        radarUpdateMinutes) { v ->
+                        radarUpdateMinutes = v
+                        menuEventListener.onRadarFrequencyChanged(v)
+                    }
+
+                else -> {
+                    DebugLogger.w(TAG, "Radar: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("radar_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu, R.id.menu_radar_toggle to PREF_RADAR_ON)
+        popup.show()
+    }
+
+    // =========================================================================
+    // POINTS OF INTEREST
+    // =========================================================================
+
+    private fun showPoiMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_poi)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "POI: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_poi_transit_access ->
+                    toggleBinary(item, PREF_POI_TRANSIT)     { menuEventListener.onPoiLayerToggled(PoiLayerId.TRANSIT_ACCESS, it) }
+
+                R.id.menu_poi_restaurants ->
+                    toggleBinary(item, PREF_POI_RESTAURANTS) { menuEventListener.onPoiLayerToggled(PoiLayerId.RESTAURANTS, it) }
+
+                R.id.menu_poi_gas_stations ->
+                    toggleBinary(item, PREF_POI_GAS)         { menuEventListener.onPoiLayerToggled(PoiLayerId.GAS_STATIONS, it) }
+
+                R.id.menu_poi_civic ->
+                    toggleBinary(item, PREF_POI_CIVIC)       { menuEventListener.onPoiLayerToggled(PoiLayerId.CIVIC, it) }
+
+                R.id.menu_poi_parks ->
+                    toggleBinary(item, PREF_POI_PARKS)       { menuEventListener.onPoiLayerToggled(PoiLayerId.PARKS, it) }
+
+                R.id.menu_poi_earthquakes ->
+                    toggleBinary(item, PREF_POI_EARTHQUAKES) { menuEventListener.onPoiLayerToggled(PoiLayerId.EARTHQUAKES, it) }
+
+                else -> {
+                    DebugLogger.w(TAG, "POI: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("poi_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu,
+            R.id.menu_poi_transit_access to PREF_POI_TRANSIT,
+            R.id.menu_poi_restaurants    to PREF_POI_RESTAURANTS,
+            R.id.menu_poi_gas_stations   to PREF_POI_GAS,
+            R.id.menu_poi_civic          to PREF_POI_CIVIC,
+            R.id.menu_poi_parks          to PREF_POI_PARKS,
+            R.id.menu_poi_earthquakes    to PREF_POI_EARTHQUAKES
+        )
+        popup.show()
+    }
+
+    // =========================================================================
+    // UTILITY
+    // =========================================================================
+
+    private fun showUtilityMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_utility)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "Utility: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_util_record_gps ->
+                    toggleBinary(item, PREF_RECORD_GPS) { menuEventListener.onGpsRecordingToggled(it) }
+
+                R.id.menu_util_build_story   -> menuEventListener.onBuildStoryRequested()
+                R.id.menu_util_analyze_today -> menuEventListener.onAnalyzeTodayRequested()
+                R.id.menu_util_anomalies     -> menuEventListener.onTravelAnomaliesRequested()
+                R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
+                R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
+
+                R.id.menu_util_gps_mode ->
+                    toggleBinary(item, PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
+
+                else -> {
+                    DebugLogger.w(TAG, "Utility: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("utility_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu,
+            R.id.menu_util_record_gps to PREF_RECORD_GPS,
+            R.id.menu_util_gps_mode   to PREF_GPS_MODE
+        )
+        popup.show()
+    }
+
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    /**
+     * Inflate [menuRes] into a PopupMenu anchored to [anchor].
+     * Forces the icon/checkbox column visible via reflection so checkmarks render.
+     */
+    private fun buildPopup(anchor: View, menuRes: Int): PopupMenu {
+        val popup = PopupMenu(context, anchor)
+        popup.inflate(menuRes)
+
+        // Reflection hack to force the icon gutter visible — without this,
+        // android:checkable items show no visible tick on many OEM ROMs.
+        try {
+            val field = popup.javaClass.getDeclaredField("mPopup")
+            field.isAccessible = true
+            val helper = field.get(popup)
+            helper.javaClass.getMethod("setForceShowIcon", Boolean::class.java)
+                .invoke(helper, true)
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "setForceShowIcon reflection failed: ${e.javaClass.simpleName}")
+        }
+        return popup
+    }
+
+    /**
+     * Flip a boolean pref, update the menu item's checked state, notify caller.
+     * Returns the NEW state.
+     */
+    private fun toggleBinary(
+        item:     MenuItem,
+        prefKey:  String,
+        onChanged: (Boolean) -> Unit
+    ) {
+        val newState = !prefs.getBoolean(prefKey, false)
+        prefs.edit().putBoolean(prefKey, newState).apply()
+        item.isChecked = newState
+        DebugLogger.i(TAG, "toggleBinary '$prefKey' → $newState  ('${item.title}')")
+        onChanged(newState)
+    }
+
+    /**
+     * Read each pref key and apply its stored boolean as the checked state on the
+     * corresponding menu item. Call this immediately after inflate and before show().
+     */
+    private fun syncCheckStates(menu: Menu, vararg pairs: Pair<Int, String>) {
+        pairs.forEach { (id, prefKey) ->
+            val item = menu.findItem(id)
+            if (item != null) {
+                item.isChecked = prefs.getBoolean(prefKey, false)
+            } else {
+                DebugLogger.w(TAG, "syncCheckStates: findItem(0x${id.toString(16)}) null — check R.id vs menu XML")
+            }
+        }
+    }
+
+    /**
+     * Show a modal dialog containing a Material [Slider] and an OK/Cancel button pair.
+     * [onConfirm] receives the chosen integer value only on OK.
+     */
+    private fun showSliderDialog(
+        title:     String,
+        min:       Int,
+        max:       Int,
+        current:   Int,
+        onConfirm: (Int) -> Unit
+    ) {
+        DebugLogger.i(TAG, "showSliderDialog '$title' min=$min max=$max current=$current")
+        val slider = Slider(context).apply {
+            valueFrom = min.toFloat()
+            valueTo   = max.toFloat()
+            value     = current.toFloat().coerceIn(min.toFloat(), max.toFloat())
+            stepSize  = 1f
+            setPadding(48, 32, 48, 16)
+        }
+        val label = TextView(context).apply {
+            text     = "Value: $current"
+            textSize = 14f
+            setPadding(48, 8, 48, 0)
+        }
+        slider.addOnChangeListener { _, v, _ -> label.text = "Value: ${v.toInt()}" }
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(label)
+            addView(slider)
+        }
+
+        AlertDialog.Builder(context)
+            .setTitle(title)
+            .setView(container)
+            .setPositiveButton("OK")     { _, _ -> onConfirm(slider.value.toInt()) }
+            .setNegativeButton("Cancel") { _, _ -> /* dismiss */ }
+            .show()
+    }
+
+    // =========================================================================
+    // PREFERENCE KEY CONSTANTS
+    // =========================================================================
+
+    companion object {
+
+        const val PREFS_NAME = "app_bar_menu_prefs"
+
+        // ── Radar ─────────────────────────────────────────────────────────────
+        const val PREF_RADAR_ON          = "radar_on"
+        const val PREF_RADAR_VISIBILITY  = "radar_visibility"
+        const val PREF_RADAR_FREQ        = "radar_freq_min"
+        const val DEFAULT_RADAR_FREQ_MIN = 5
+
+        // ── GPS Alerts ────────────────────────────────────────────────────────
+        const val PREF_WEATHER_ALERTS     = "weather_alerts_on"
+        const val PREF_WEATHER_BANNER     = "weather_banner_on"
+        const val PREF_HWY_ALERTS         = "highway_alerts_on"
+        const val PREF_HWY_ALERT_FREQ     = "highway_alert_freq_min"
+        const val PREF_TRAFFIC_SPEED      = "traffic_speed_on"
+        const val PREF_TRAFFIC_SPEED_FREQ = "traffic_speed_freq_min"
+        const val PREF_METAR_DISPLAY      = "metar_display_on"
+        const val PREF_METAR_FREQ         = "metar_freq_min"
+
+        // ── Transit ───────────────────────────────────────────────────────────
+        const val PREF_MBTA_TRAINS      = "mbta_trains_on"
+        const val PREF_MBTA_TRAINS_FREQ = "mbta_trains_freq_sec"
+        const val PREF_MBTA_SUBWAY      = "mbta_subway_on"
+        const val PREF_MBTA_SUBWAY_FREQ = "mbta_subway_freq_sec"
+        const val PREF_MBTA_BUSES       = "mbta_buses_on"
+        const val PREF_MBTA_BUSES_FREQ  = "mbta_buses_freq_sec"
+        const val PREF_NAT_ALERTS       = "national_alerts_on"
+        const val PREF_NAT_ALERTS_FREQ  = "national_alerts_freq_min"
+
+        // ── Cameras ───────────────────────────────────────────────────────────
+        const val PREF_TRAFFIC_CAMS = "traffic_cams_on"
+
+        // ── POI ───────────────────────────────────────────────────────────────
+        const val PREF_POI_TRANSIT     = "poi_transit_on"
+        const val PREF_POI_RESTAURANTS = "poi_restaurants_on"
+        const val PREF_POI_GAS         = "poi_gas_on"
+        const val PREF_POI_CIVIC       = "poi_civic_on"
+        const val PREF_POI_PARKS       = "poi_parks_on"
+        const val PREF_POI_EARTHQUAKES = "poi_earthquakes_on"
+
+        // ── Utility ───────────────────────────────────────────────────────────
+        const val PREF_RECORD_GPS = "record_gps_on"
+        const val PREF_GPS_MODE   = "gps_mode_auto"
+    }
+}

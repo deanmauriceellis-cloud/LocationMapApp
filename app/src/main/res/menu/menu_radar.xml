@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/menu_radar.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_radar_toggle"
+        android:title="Radar View"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider 0-100: radar tile alpha -->
+    <item
+        android:id="@+id/menu_radar_visibility"
+        android:title="Radar Visibility…"
+        app:showAsAction="never" />
+
+    <!-- Slider 5-15 min: auto-refresh interval -->
+    <item
+        android:id="@+id/menu_radar_frequency"
+        android:title="Radar Update Frequency…"
+        app:showAsAction="never" />
+
+</menu>

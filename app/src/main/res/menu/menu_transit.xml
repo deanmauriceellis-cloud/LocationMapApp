@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/menu_transit.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- MBTA Commuter Rail -->
+    <item
+        android:id="@+id/menu_mbta_trains"
+        android:title="MBTA Commuter Rail Locations"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_mbta_trains_frequency"
+        android:title="Commuter Rail Update Frequency…"
+        app:showAsAction="never" />
+
+    <!-- MBTA Subway -->
+    <item
+        android:id="@+id/menu_mbta_subway"
+        android:title="MBTA Subway Locations"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_mbta_subway_frequency"
+        android:title="Subway Update Frequency…"
+        app:showAsAction="never" />
+
+    <!-- MBTA Buses -->
+    <item
+        android:id="@+id/menu_mbta_buses"
+        android:title="MBTA Bus Locations"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_mbta_buses_frequency"
+        android:title="Bus Update Frequency…"
+        app:showAsAction="never" />
+
+    <!-- National Emergency / Weather CAP Alerts -->
+    <item
+        android:id="@+id/menu_national_alerts"
+        android:title="National Emergency Alerts (CAP)"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_national_alerts_frequency"
+        android:title="Emergency Alert Frequency…"
+        app:showAsAction="never" />
+
+</menu>

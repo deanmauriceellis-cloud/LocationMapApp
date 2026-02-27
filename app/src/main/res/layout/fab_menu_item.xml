@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- layout/fab_menu_item.xml
+     Single speed-dial row: small icon + text label, semi-transparent pill background.
+     No filled circles — icon sits clean against whatever is behind it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="48dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/fab_item_bg"
+    android:paddingStart="10dp"
+    android:paddingEnd="14dp"
+    android:elevation="6dp">
+
+    <ImageView
+        android:id="@+id/fabItemIcon"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/fabItemLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="@android:color/white"
+        android:textSize="13sp"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1" />
+
+</LinearLayout>

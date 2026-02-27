@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- drawable/fab_item_bg.xml — pill-shaped semi-opaque background for FAB rows -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="24dp" />
+    <solid android:color="#CC1C1C1C" />   <!-- 80% opacity dark charcoal -->
+</shape>

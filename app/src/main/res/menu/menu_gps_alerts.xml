@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/menu_gps_alerts.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Binary: Weather Alerts overlay -->
+    <item
+        android:id="@+id/menu_weather_alerts"
+        android:title="Weather Alerts"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Binary: Scrolling weather/forecast banner ribbon -->
+    <item
+        android:id="@+id/menu_weather_banner"
+        android:title="Scrolling Weather Banner"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Binary: Highway alerts/hazards -->
+    <item
+        android:id="@+id/menu_highway_alerts"
+        android:title="Highway Alerts / Hazards"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider stub: Highway alert update frequency 1-5 min -->
+    <item
+        android:id="@+id/menu_highway_alerts_frequency"
+        android:title="Highway Alert Frequency…"
+        app:showAsAction="never" />
+
+    <!-- Binary: Traffic speed coloring on road lines -->
+    <item
+        android:id="@+id/menu_traffic_speed"
+        android:title="Highway &amp; Local Speed Info"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider stub: Traffic speed update frequency 1-5 min -->
+    <item
+        android:id="@+id/menu_traffic_speed_frequency"
+        android:title="Speed Info Frequency…"
+        app:showAsAction="never" />
+
+    <!-- Binary: METAR human-readable display -->
+    <item
+        android:id="@+id/menu_metar_display"
+        android:title="METAR Information Display"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider stub: METAR update frequency 1-10 min -->
+    <item
+        android:id="@+id/menu_metar_frequency"
+        android:title="METAR Update Frequency…"
+        app:showAsAction="never" />
+
+</menu>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/menu_poi.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_poi_transit_access"
+        android:title="Commuter Access Points"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_poi_restaurants"
+        android:title="Restaurants"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_poi_gas_stations"
+        android:title="Gas Stations"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_poi_civic"
+        android:title="Civic &amp; Federal Buildings"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_poi_parks"
+        android:title="Parks"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Earthquake markers (existing feature) -->
+    <item
+        android:id="@+id/menu_poi_earthquakes"
+        android:title="Earthquake Events"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+</menu>
