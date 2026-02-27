@@ -1,5 +1,41 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-27 (Adaptive POI Radius)
+
+### Context
+POI search used a hardcoded 3000m radius. Dense metros (Boston downtown) triggered 429/504 errors from Overpass; rural areas returned zero results.
+
+### Changes Made
+
+#### Adaptive Radius — Proxy (`cache-proxy/server.js`)
+- Added `radiusHints` Map with separate disk persistence (`radius-hints.json`)
+- Grid key: 3dp lat/lon (~111m cells), same grid as POI cache
+- `GET /radius-hint?lat=X&lon=Y` → returns `{ radius }` (default 3000)
+- `POST /radius-hint` with `{ lat, lon, resultCount, error }` → applies adaptation rules:
+  - Error → shrink 30% (× 0.7)
+  - 0–4 results → grow 30% (× 1.3)
+  - 5+ results → confirm (no change, refresh timestamp)
+- Bounds: min 500m, max 15000m
+- `GET /radius-hints` → admin dump of all hints
+- `/cache/stats` now includes `radiusHints` count
+- `/cache/clear` now also clears hints + deletes `radius-hints.json`
+
+#### Adaptive Radius — App (`PlacesRepository.kt`)
+- Replaced `RADIUS_M = 3000` with companion constants: `DEFAULT_RADIUS_M`, `MIN_RADIUS_M`, `MAX_RADIUS_M`, `MIN_USEFUL_POI_COUNT`
+- Added `radiusHintCache` (ConcurrentHashMap, session-level)
+- `fetchRadiusHint()`: GET from proxy, cache locally in `radiusHintCache`
+- `postRadiusFeedback()`: POST result count / error to proxy, update local cache with response
+- `buildOverpassQuery()` now takes `radiusM` parameter
+- `searchPois()`: fetch hint → build query → execute → post feedback
+- `searchPoisCacheOnly()`: uses local hint cache (no network call for hint)
+- No changes to MainViewModel or MainActivity — adaptation is transparent
+
+### Files Changed
+- `cache-proxy/server.js`
+- `app/src/main/java/.../data/repository/PlacesRepository.kt`
+
+---
+
 ## Session: 2026-02-27 (Initial Commit Session)
 
 ### Context

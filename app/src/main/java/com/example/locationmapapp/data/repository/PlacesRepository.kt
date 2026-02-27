@@ -7,9 +7,12 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.osmdroid.util.GeoPoint
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,15 +27,75 @@ class PlacesRepository @Inject constructor() {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val OVERPASS_URL = "http://10.0.0.4:3000/overpass"
-    private val RADIUS_M     = 3000
+    private val PROXY_BASE    = "http://10.0.0.4:3000"
+    private val OVERPASS_URL  = "$PROXY_BASE/overpass"
+
+    companion object {
+        const val DEFAULT_RADIUS_M = 3000
+        const val MIN_RADIUS_M     = 500
+        const val MAX_RADIUS_M     = 15000
+        const val MIN_USEFUL_POI_COUNT = 5
+    }
+
+    /** Session-level in-memory cache of radius hints keyed by "lat3:lon3" */
+    private val radiusHintCache = ConcurrentHashMap<String, Int>()
+
+    // ── Radius hint helpers ──────────────────────────────────────────────────
+
+    private fun gridKey(lat: Double, lon: Double): String =
+        "%.3f:%.3f".format(lat, lon)
+
+    /** Fetch the recommended search radius from the proxy, with session cache. */
+    private fun fetchRadiusHint(center: GeoPoint): Int {
+        val key = gridKey(center.latitude, center.longitude)
+        radiusHintCache[key]?.let { return it }
+
+        return try {
+            val url = "$PROXY_BASE/radius-hint?lat=${center.latitude}&lon=${center.longitude}"
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val json = JsonParser.parseString(response.body!!.string()).asJsonObject
+                val radius = json["radius"].asInt
+                radiusHintCache[key] = radius
+                DebugLogger.d(TAG, "Radius hint for $key = ${radius}m")
+                radius
+            } else {
+                DebugLogger.w(TAG, "Radius hint request failed (${response.code}), using default")
+                DEFAULT_RADIUS_M
+            }
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Radius hint fetch error: ${e.message}, using default")
+            DEFAULT_RADIUS_M
+        }
+    }
+
+    /** Post search feedback to the proxy so it can adapt the radius for this grid cell. */
+    private fun postRadiusFeedback(center: GeoPoint, resultCount: Int, error: Boolean) {
+        try {
+            val key = gridKey(center.latitude, center.longitude)
+            val json = """{"lat":${center.latitude},"lon":${center.longitude},"resultCount":$resultCount,"error":$error}"""
+            val body = json.toRequestBody("application/json".toMediaType())
+            val request = Request.Builder().url("$PROXY_BASE/radius-hint").post(body).build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val respJson = JsonParser.parseString(response.body!!.string()).asJsonObject
+                val newRadius = respJson["radius"].asInt
+                radiusHintCache[key] = newRadius
+                DebugLogger.d(TAG, "Radius feedback posted for $key → ${newRadius}m")
+            }
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Radius feedback post error: ${e.message}")
+        }
+    }
 
     // ── POI search ────────────────────────────────────────────────────────────
 
     suspend fun searchPois(center: GeoPoint, categories: List<String>): List<PlaceResult> =
         withContext(Dispatchers.IO) {
-            val query = buildOverpassQuery(center, categories)
-            DebugLogger.d(TAG, "Overpass POST query (${query.length} chars)")
+            val radiusM = fetchRadiusHint(center)
+            val query = buildOverpassQuery(center, categories, radiusM)
+            DebugLogger.d(TAG, "Overpass POST query (${query.length} chars, radius=${radiusM}m)")
             val body = FormBody.Builder().add("data", query).build()
             val request = Request.Builder().url(OVERPASS_URL).post(body).build()
             val t0 = System.currentTimeMillis()
@@ -40,22 +103,28 @@ class PlacesRepository @Inject constructor() {
             val elapsed = System.currentTimeMillis() - t0
             DebugLogger.i(TAG, "Overpass response code=${response.code} in ${elapsed}ms contentType=${response.header("Content-Type")}")
             if (!response.isSuccessful) {
-                val body = response.body?.string()?.take(300) ?: "(empty)"
-                DebugLogger.e(TAG, "Overpass HTTP ${response.code} body: $body")
-                throw RuntimeException("HTTP ${response.code}: $body")
+                val errBody = response.body?.string()?.take(300) ?: "(empty)"
+                DebugLogger.e(TAG, "Overpass HTTP ${response.code} body: $errBody")
+                postRadiusFeedback(center, 0, error = true)
+                throw RuntimeException("HTTP ${response.code}: $errBody")
             }
             val bodyStr = response.body!!.string()
             DebugLogger.d(TAG, "Overpass response body length=${bodyStr.length} chars")
-            parseOverpassJson(bodyStr)
+            val results = parseOverpassJson(bodyStr)
+            postRadiusFeedback(center, results.size, error = false)
+            results
         }
 
     suspend fun searchGasStations(center: GeoPoint): List<PlaceResult> =
         searchPois(center, listOf("amenity=fuel"))
 
-    /** Cache-only variant: returns cached POIs if available, empty list if not cached. */
+    /** Cache-only variant: returns cached POIs if available, empty list if not cached.
+     *  Uses local hint cache for radius (no network round-trip for hint). */
     suspend fun searchPoisCacheOnly(center: GeoPoint, categories: List<String> = emptyList()): List<PlaceResult> =
         withContext(Dispatchers.IO) {
-            val query = buildOverpassQuery(center, categories)
+            val key = gridKey(center.latitude, center.longitude)
+            val radiusM = radiusHintCache[key] ?: DEFAULT_RADIUS_M
+            val query = buildOverpassQuery(center, categories, radiusM)
             val body = FormBody.Builder().add("data", query).build()
             val request = Request.Builder()
                 .url(OVERPASS_URL)
@@ -73,7 +142,7 @@ class PlacesRepository @Inject constructor() {
             parseOverpassJson(bodyStr)
         }
 
-    private fun buildOverpassQuery(center: GeoPoint, categories: List<String>): String {
+    private fun buildOverpassQuery(center: GeoPoint, categories: List<String>, radiusM: Int): String {
         val lat = center.latitude
         val lon = center.longitude
         val tags = if (categories.isEmpty()) {
@@ -88,8 +157,8 @@ class PlacesRepository @Inject constructor() {
             } else {
                 "[\"$tag\"]"
             }
-            sb.append("  node${filter}(around:$RADIUS_M,$lat,$lon);\n")
-            sb.append("  way${filter}(around:$RADIUS_M,$lat,$lon);\n")
+            sb.append("  node${filter}(around:$radiusM,$lat,$lon);\n")
+            sb.append("  way${filter}(around:$radiusM,$lat,$lon);\n")
         }
         sb.append(");\nout center 200;")
         return sb.toString()

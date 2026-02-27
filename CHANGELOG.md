@@ -1,5 +1,16 @@
 # LocationMapApp — Changelog
 
+## [1.5.1] — 2026-02-27
+
+### Added
+- **Adaptive POI search radius** — search radius self-tunes per location
+  - Proxy stores per-grid-cell radius hints (`radius-hints.json`, persistent)
+  - App fetches hint before each search, posts feedback after
+  - Error (429/504) → shrink 30%; too few results → grow 30%; healthy → confirm
+  - Bounds: 500m min, 15000m max, 3000m default
+  - New proxy routes: GET/POST `/radius-hint`, GET `/radius-hints`
+  - `/cache/stats` and `/cache/clear` updated to include hints
+
 ## [1.5.0] — 2026-02-27
 
 ### Added

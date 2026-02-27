@@ -15,6 +15,81 @@ const cache = new Map();   // key → { data, headers, timestamp }
 let stats = { hits: 0, misses: 0 };
 let savePending = false;
 
+// ── Radius hints ────────────────────────────────────────────────────────────
+
+const RADIUS_HINTS_FILE = path.join(__dirname, 'radius-hints.json');
+const radiusHints = new Map();   // "LAT3:LON3" → { radius, updatedAt }
+const DEFAULT_RADIUS = 3000;
+const MIN_RADIUS = 500;
+const MAX_RADIUS = 15000;
+const RADIUS_SHRINK = 0.70;
+const RADIUS_GROW   = 1.30;
+const MIN_USEFUL_POI = 5;
+let hintSavePending = false;
+
+function loadRadiusHints() {
+  try {
+    if (!fs.existsSync(RADIUS_HINTS_FILE)) return;
+    const raw = fs.readFileSync(RADIUS_HINTS_FILE, 'utf8');
+    const entries = JSON.parse(raw);
+    for (const [key, value] of entries) {
+      radiusHints.set(key, value);
+    }
+    console.log(`Loaded ${radiusHints.size} radius hints from disk`);
+  } catch (err) {
+    console.error('Failed to load radius hints from disk:', err.message);
+  }
+}
+
+function saveRadiusHints() {
+  if (hintSavePending) return;
+  hintSavePending = true;
+  setTimeout(() => {
+    hintSavePending = false;
+    try {
+      const entries = [...radiusHints.entries()];
+      fs.writeFileSync(RADIUS_HINTS_FILE, JSON.stringify(entries));
+      console.log(`Saved ${entries.length} radius hints to disk`);
+    } catch (err) {
+      console.error('Failed to save radius hints to disk:', err.message);
+    }
+  }, 2000);
+}
+
+function gridKey(lat, lon) {
+  return `${parseFloat(lat).toFixed(3)}:${parseFloat(lon).toFixed(3)}`;
+}
+
+function getRadiusHint(lat, lon) {
+  const key = gridKey(lat, lon);
+  const hint = radiusHints.get(key);
+  return hint ? hint.radius : DEFAULT_RADIUS;
+}
+
+function adjustRadiusHint(lat, lon, resultCount, error) {
+  const key = gridKey(lat, lon);
+  const current = radiusHints.get(key);
+  let radius = current ? current.radius : DEFAULT_RADIUS;
+
+  if (error) {
+    // Error (429/504/502) → shrink 30%
+    radius = Math.round(radius * RADIUS_SHRINK);
+    console.log(`[Radius] ${key} error → shrink to ${radius}m`);
+  } else if (resultCount < MIN_USEFUL_POI) {
+    // Too few results → grow 30%
+    radius = Math.round(radius * RADIUS_GROW);
+    console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
+  } else {
+    // Healthy result count → confirm (refresh timestamp, no radius change)
+    console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
+  }
+
+  radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius));
+  radiusHints.set(key, { radius, updatedAt: Date.now() });
+  saveRadiusHints();
+  return radius;
+}
+
 function loadCache() {
   try {
     if (!fs.existsSync(CACHE_FILE)) return;
@@ -46,6 +121,7 @@ function saveCache() {
 }
 
 loadCache();
+loadRadiusHints();
 
 function cacheGet(key, ttlMs) {
   const entry = cache.get(key);
@@ -199,12 +275,39 @@ proxyGet(
   60 * 60 * 1000
 );
 
+// ── Radius hint endpoints ───────────────────────────────────────────────
+
+app.get('/radius-hint', (req, res) => {
+  const { lat, lon } = req.query;
+  if (!lat || !lon) return res.status(400).json({ error: 'lat and lon required' });
+  const radius = getRadiusHint(lat, lon);
+  res.json({ radius });
+});
+
+app.post('/radius-hint', (req, res) => {
+  const { lat, lon, resultCount, error } = req.body;
+  if (!lat || !lon) return res.status(400).json({ error: 'lat and lon required' });
+  const isError = !!error;
+  const count = typeof resultCount === 'number' ? resultCount : 0;
+  const radius = adjustRadiusHint(lat, lon, count, isError);
+  res.json({ radius });
+});
+
+app.get('/radius-hints', (req, res) => {
+  const hints = {};
+  for (const [key, value] of radiusHints) {
+    hints[key] = value;
+  }
+  res.json({ count: radiusHints.size, hints });
+});
+
 // ── Admin endpoints ─────────────────────────────────────────────────────────
 
 app.get('/cache/stats', (req, res) => {
   const memUsage = process.memoryUsage();
   res.json({
     entries: cache.size,
+    radiusHints: radiusHints.size,
     hits: stats.hits,
     misses: stats.misses,
     hitRate: stats.hits + stats.misses > 0
@@ -217,11 +320,14 @@ app.get('/cache/stats', (req, res) => {
 
 app.post('/cache/clear', (req, res) => {
   const count = cache.size;
+  const hintCount = radiusHints.size;
   cache.clear();
+  radiusHints.clear();
   stats = { hits: 0, misses: 0 };
   try { fs.unlinkSync(CACHE_FILE); } catch (_) {}
-  console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries, disk file removed)`);
-  res.json({ cleared: count });
+  try { fs.unlinkSync(RADIUS_HINTS_FILE); } catch (_) {}
+  console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints, disk files removed)`);
+  res.json({ cleared: count, hintsCleared: hintCount });
 });
 
 // ── Start ───────────────────────────────────────────────────────────────────
@@ -229,5 +335,6 @@ app.post('/cache/clear', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
   console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar');
+  console.log('Radius: GET /radius-hint, POST /radius-hint, GET /radius-hints');
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });

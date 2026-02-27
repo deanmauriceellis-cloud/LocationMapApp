@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-27 16:30 UTC
+## Last Updated: 2026-02-27 22:15 UTC
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -21,7 +21,8 @@
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
 - POI prefetch along followed vehicle routes
 - Cache-only POI display on map scroll (no upstream API calls)
-- Cache proxy with disk persistence (cache-data.json, 365-day Overpass TTL)
+- Adaptive POI search radius — proxy stores per-grid-cell hints, app fetches/reports
+- Cache proxy with disk persistence (cache-data.json, radius-hints.json, 365-day Overpass TTL)
 - Debug logging + TCP log streamer
 
 ## External API Routing
@@ -31,6 +32,7 @@
 | USGS Earthquakes | `http://10.0.0.4:3000/earthquakes` | GET /earthquakes | 2 hours |
 | NWS Alerts | `http://10.0.0.4:3000/nws-alerts` | GET /nws-alerts | 1 hour |
 | METAR | `http://10.0.0.4:3000/metar` | GET /metar | 1 hour |
+| Radius Hints | `http://10.0.0.4:3000/radius-hint` | GET+POST /radius-hint | persistent |
 | MBTA | direct (api-v3.mbta.com) | not proxied | — |
 | Radar tiles | direct (mesonet.agron.iastate.edu) | not proxied | — |
 
@@ -50,11 +52,11 @@
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
+- `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
 
 ## Known Issues
 - MBTA API key hardcoded in MbtaRepository.kt (should be in BuildConfig/secrets)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
-- No error retry/backoff on Overpass 504s (relies on cache to reduce load)
 
 ## Next Steps
 - Test vehicle follow mode across full bus routes
