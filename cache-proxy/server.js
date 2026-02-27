@@ -63,7 +63,35 @@ function gridKey(lat, lon) {
 function getRadiusHint(lat, lon) {
   const key = gridKey(lat, lon);
   const hint = radiusHints.get(key);
-  return hint ? hint.radius : DEFAULT_RADIUS;
+  if (hint) return hint.radius;
+
+  // Fuzzy: find nearest hint within 1 mile (~0.01449°)
+  const latF = parseFloat(lat);
+  const lonF = parseFloat(lon);
+  const ONE_MILE_DEG = 0.01449;
+  let nearest = null;
+  let nearestDist = Infinity;
+
+  for (const [k, v] of radiusHints) {
+    const parts = k.split(':');
+    const hLat = parseFloat(parts[0]);
+    const hLon = parseFloat(parts[1]);
+    const dLat = hLat - latF;
+    const dLon = (hLon - lonF) * Math.cos(latF * Math.PI / 180);
+    const dist = Math.sqrt(dLat * dLat + dLon * dLon);
+    if (dist <= ONE_MILE_DEG && dist < nearestDist) {
+      nearest = v;
+      nearestDist = dist;
+    }
+  }
+
+  if (nearest) {
+    const miles = (nearestDist / ONE_MILE_DEG).toFixed(2);
+    console.log(`[Radius] Fuzzy hit for ${key} — nearest hint ${miles}mi away → ${nearest.radius}m`);
+    return nearest.radius;
+  }
+
+  return DEFAULT_RADIUS;
 }
 
 function adjustRadiusHint(lat, lon, resultCount, error) {

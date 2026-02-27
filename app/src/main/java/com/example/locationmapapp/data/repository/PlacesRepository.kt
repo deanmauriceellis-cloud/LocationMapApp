@@ -45,10 +45,39 @@ class PlacesRepository @Inject constructor() {
     private fun gridKey(lat: Double, lon: Double): String =
         "%.3f:%.3f".format(lat, lon)
 
+    /** Find the nearest cached radius hint within 1 mile, or null. */
+    private fun fuzzyRadiusHint(lat: Double, lon: Double): Int? {
+        val oneMileDeg = 0.01449  // ~1 mile in degrees latitude
+        val cosLat = Math.cos(Math.toRadians(lat))
+        var nearest: Int? = null
+        var nearestDist = Double.MAX_VALUE
+
+        for ((key, radius) in radiusHintCache) {
+            val parts = key.split(":")
+            if (parts.size != 2) continue
+            val hLat = parts[0].toDoubleOrNull() ?: continue
+            val hLon = parts[1].toDoubleOrNull() ?: continue
+            val dLat = hLat - lat
+            val dLon = (hLon - lon) * cosLat
+            val dist = Math.sqrt(dLat * dLat + dLon * dLon)
+            if (dist <= oneMileDeg && dist < nearestDist) {
+                nearest = radius
+                nearestDist = dist
+            }
+        }
+        return nearest
+    }
+
     /** Fetch the recommended search radius from the proxy, with session cache. */
     private fun fetchRadiusHint(center: GeoPoint): Int {
         val key = gridKey(center.latitude, center.longitude)
         radiusHintCache[key]?.let { return it }
+
+        // Fuzzy: check nearby cached hints before network call
+        fuzzyRadiusHint(center.latitude, center.longitude)?.let {
+            DebugLogger.d(TAG, "Radius fuzzy hit for $key → ${it}m")
+            return it
+        }
 
         return try {
             val url = "$PROXY_BASE/radius-hint?lat=${center.latitude}&lon=${center.longitude}"
@@ -123,7 +152,9 @@ class PlacesRepository @Inject constructor() {
     suspend fun searchPoisCacheOnly(center: GeoPoint, categories: List<String> = emptyList()): List<PlaceResult> =
         withContext(Dispatchers.IO) {
             val key = gridKey(center.latitude, center.longitude)
-            val radiusM = radiusHintCache[key] ?: DEFAULT_RADIUS_M
+            val radiusM = radiusHintCache[key]
+                ?: fuzzyRadiusHint(center.latitude, center.longitude)
+                ?: DEFAULT_RADIUS_M
             val query = buildOverpassQuery(center, categories, radiusM)
             val body = FormBody.Builder().add("data", query).build()
             val request = Request.Builder()
