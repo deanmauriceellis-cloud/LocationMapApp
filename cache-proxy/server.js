@@ -100,19 +100,20 @@ function adjustRadiusHint(lat, lon, resultCount, error) {
   let radius = current ? current.radius : DEFAULT_RADIUS;
 
   if (error) {
-    // Error (429/504/502) → shrink 30%
     radius = Math.round(radius * RADIUS_SHRINK);
-    console.log(`[Radius] ${key} error → shrink to ${radius}m`);
   } else if (resultCount < MIN_USEFUL_POI) {
-    // Too few results → grow 30%
     radius = Math.round(radius * RADIUS_GROW);
-    console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
-  } else {
-    // Healthy result count → confirm (refresh timestamp, no radius change)
-    console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
   }
 
   radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius));
+
+  if (error) {
+    console.log(`[Radius] ${key} error → shrink to ${radius}m`);
+  } else if (resultCount < MIN_USEFUL_POI) {
+    console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
+  } else {
+    console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
+  }
   radiusHints.set(key, { radius, updatedAt: Date.now() });
   saveRadiusHints();
   return radius;
@@ -148,9 +149,6 @@ function saveCache() {
   }, 2000);
 }
 
-loadCache();
-loadRadiusHints();
-
 function cacheGet(key, ttlMs) {
   const entry = cache.get(key);
   if (!entry) return null;
@@ -166,6 +164,78 @@ function cacheSet(key, data, headers) {
   cache.set(key, { data, headers, timestamp: Date.now() });
   saveCache();
 }
+
+// ── Individual POI cache ─────────────────────────────────────────────────────
+
+const POI_CACHE_FILE = path.join(__dirname, 'poi-cache.json');
+const poiCache = new Map();   // "poi:TYPE:ID" → { element, firstSeen, lastSeen }
+let poiSavePending = false;
+
+function loadPoiCache() {
+  try {
+    if (!fs.existsSync(POI_CACHE_FILE)) return;
+    const raw = fs.readFileSync(POI_CACHE_FILE, 'utf8');
+    const entries = JSON.parse(raw);
+    for (const [key, value] of entries) {
+      poiCache.set(key, value);
+    }
+    console.log(`Loaded ${poiCache.size} individual POIs from disk`);
+  } catch (err) {
+    console.error('Failed to load POI cache from disk:', err.message);
+  }
+}
+
+function savePoiCache() {
+  if (poiSavePending) return;
+  poiSavePending = true;
+  setTimeout(() => {
+    poiSavePending = false;
+    try {
+      const entries = [...poiCache.entries()];
+      fs.writeFileSync(POI_CACHE_FILE, JSON.stringify(entries));
+      console.log(`Saved ${entries.length} POIs to disk (${(fs.statSync(POI_CACHE_FILE).size / 1024 / 1024).toFixed(1)}MB)`);
+    } catch (err) {
+      console.error('Failed to save POI cache to disk:', err.message);
+    }
+  }, 2000);
+}
+
+function cacheIndividualPois(jsonBody) {
+  try {
+    const parsed = JSON.parse(jsonBody);
+    if (!parsed.elements || !Array.isArray(parsed.elements)) return;
+
+    const now = Date.now();
+    let added = 0;
+    let updated = 0;
+
+    for (const element of parsed.elements) {
+      if (!element.type || !element.id) continue;
+      const key = `poi:${element.type}:${element.id}`;
+      const existing = poiCache.get(key);
+
+      if (existing) {
+        existing.element = element;
+        existing.lastSeen = now;
+        updated++;
+      } else {
+        poiCache.set(key, { element, firstSeen: now, lastSeen: now });
+        added++;
+      }
+    }
+
+    console.log(`[POI Cache] +${added} new, ${updated} updated (${poiCache.size} total)`);
+    if (added > 0 || updated > 0) savePoiCache();
+  } catch (err) {
+    console.error('[POI Cache] Failed to parse response:', err.message);
+  }
+}
+
+// ── Load all caches from disk ────────────────────────────────────────────────
+
+loadCache();
+loadRadiusHints();
+loadPoiCache();
 
 // ── Logging ─────────────────────────────────────────────────────────────────
 
@@ -232,6 +302,7 @@ app.post('/overpass', async (req, res) => {
 
     if (upstream.ok && cacheKey) {
       cacheSet(cacheKey, body, { 'content-type': contentType });
+      cacheIndividualPois(body);
     }
 
     res.status(upstream.status).set('Content-Type', contentType).send(body);
@@ -329,6 +400,36 @@ app.get('/radius-hints', (req, res) => {
   res.json({ count: radiusHints.size, hints });
 });
 
+// ── POI cache endpoints ──────────────────────────────────────────────────────
+
+app.get('/pois/stats', (req, res) => {
+  let diskSize = 0;
+  try {
+    if (fs.existsSync(POI_CACHE_FILE)) {
+      diskSize = fs.statSync(POI_CACHE_FILE).size;
+    }
+  } catch (_) {}
+  res.json({
+    count: poiCache.size,
+    diskSizeMB: (diskSize / 1024 / 1024).toFixed(2),
+  });
+});
+
+app.get('/pois/export', (req, res) => {
+  const pois = [];
+  for (const [key, value] of poiCache) {
+    pois.push({ key, ...value });
+  }
+  res.json({ count: pois.length, pois });
+});
+
+app.get('/poi/:type/:id', (req, res) => {
+  const key = `poi:${req.params.type}:${req.params.id}`;
+  const entry = poiCache.get(key);
+  if (!entry) return res.status(404).json({ error: 'POI not found', key });
+  res.json(entry);
+});
+
 // ── Admin endpoints ─────────────────────────────────────────────────────────
 
 app.get('/cache/stats', (req, res) => {
@@ -336,6 +437,7 @@ app.get('/cache/stats', (req, res) => {
   res.json({
     entries: cache.size,
     radiusHints: radiusHints.size,
+    pois: poiCache.size,
     hits: stats.hits,
     misses: stats.misses,
     hitRate: stats.hits + stats.misses > 0
@@ -349,13 +451,16 @@ app.get('/cache/stats', (req, res) => {
 app.post('/cache/clear', (req, res) => {
   const count = cache.size;
   const hintCount = radiusHints.size;
+  const poiCount = poiCache.size;
   cache.clear();
   radiusHints.clear();
+  poiCache.clear();
   stats = { hits: 0, misses: 0 };
   try { fs.unlinkSync(CACHE_FILE); } catch (_) {}
   try { fs.unlinkSync(RADIUS_HINTS_FILE); } catch (_) {}
-  console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints, disk files removed)`);
-  res.json({ cleared: count, hintsCleared: hintCount });
+  try { fs.unlinkSync(POI_CACHE_FILE); } catch (_) {}
+  console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints + ${poiCount} POIs, disk files removed)`);
+  res.json({ cleared: count, hintsCleared: hintCount, poisCleared: poiCount });
 });
 
 // ── Start ───────────────────────────────────────────────────────────────────
@@ -364,5 +469,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
   console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar');
   console.log('Radius: GET /radius-hint, POST /radius-hint, GET /radius-hints');
+  console.log('POIs:   GET /pois/stats, GET /pois/export, GET /poi/:type/:id');
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });
