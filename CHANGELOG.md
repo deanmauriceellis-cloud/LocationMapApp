@@ -1,5 +1,26 @@
 # LocationMapApp — Changelog
 
+## [1.5.13] — 2026-02-28
+
+### Added
+- **Populate POIs** — systematic grid scanner in Utility menu
+  - Spirals outward from map center through rings 0→15 ((2R+1)² cells per ring)
+  - Step size: 80% of diameter (4800m at default 3000m radius) for ~20% overlap
+  - Adaptive delay based on proxy `X-Cache` header: 200ms cache hit, 4s cache miss, 10s on error
+  - Orange crosshair scanning marker shows current search position
+  - Progress banner: ring, cells searched, POIs found, cache hit rate, error count
+  - Tap banner to stop; auto-stops after 5 consecutive errors
+  - Guards: refuses to start while vehicle/aircraft follow is active
+  - Re-run efficiency: cached cells fly through at 200ms each
+  - Coverage: Ring 5 = ~46km², Ring 10 = ~96km², Ring 15 = ~144km²
+- **Proxy `X-Cache` header** — `/overpass` responses now include `X-Cache: HIT` or `X-Cache: MISS`
+  - Exact cache hit, neighbor cache hit, and upstream response paths all tagged
+- `PopulateSearchResult` data class — wraps search results with cache status and grid key
+- `searchPoisForPopulate()` in PlacesRepository — reads X-Cache header for populate scanner
+- `populateSearchAt()` suspend function in MainViewModel — direct call, not LiveData
+- `ic_crosshair.xml` — 24dp orange crosshair VectorDrawable
+- "crosshair" entry in MarkerIconHelper CATEGORY_MAP
+
 ## [1.5.12] — 2026-02-28
 
 ### Added

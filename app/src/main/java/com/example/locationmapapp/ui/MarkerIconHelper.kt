@@ -44,6 +44,7 @@ object MarkerIconHelper {
         "weather_alert"  to Pair(R.drawable.ic_weather_alert, Color.parseColor("#006064")),
         "record_gps"     to Pair(R.drawable.ic_record_gps,    Color.parseColor("#C62828")),
         "aircraft"       to Pair(R.drawable.ic_aircraft,      Color.parseColor("#1565C0")),
+        "crosshair"      to Pair(R.drawable.ic_crosshair,     Color.parseColor("#FF6D00")),
 
         // ── Food & Drink (#BF360C) ──────────────────────────────────────────
         "restaurant"     to Pair(R.drawable.ic_restaurant,    Color.parseColor("#BF360C")),

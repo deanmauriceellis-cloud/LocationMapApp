@@ -98,6 +98,10 @@ class MainActivity : AppCompatActivity() {
     private var webcamReloadJob: Job? = null
     private var pendingWebcamRestore = false
 
+    // Populate POIs scanner
+    private var populateJob: Job? = null
+    private var scanningMarker: Marker? = null
+
     // POI label zoom threshold tracking
     private var poiLabelsShowing = false
 
@@ -1899,6 +1903,180 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================================
+    // POPULATE POIs — SYSTEMATIC GRID SCANNER
+    // =========================================================================
+
+    private fun startPopulatePois() {
+        // Guard: don't allow while following something
+        if (followedVehicleId != null || followedAircraftIcao != null) {
+            toast("Stop following first")
+            // Reset pref back to OFF
+            val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+            prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
+            return
+        }
+
+        val center = binding.mapView.mapCenter
+        val centerLat = center.latitude
+        val centerLon = center.longitude
+        DebugLogger.i("MainActivity", "startPopulatePois() center=$centerLat,$centerLon")
+
+        // Step size: 80% of diameter at default 3000m radius → ~0.043° lat
+        val stepLat = 0.8 * 2 * 3000.0 / 111320.0  // meters to degrees latitude
+        val stepLon = stepLat / Math.cos(Math.toRadians(centerLat))
+
+        var cellsSearched = 0
+        var totalPois = 0
+        var cacheHits = 0
+        var consecutiveErrors = 0
+
+        populateJob = lifecycleScope.launch {
+            toast("Populate started — tap banner to stop")
+
+            for (ring in 0..15) {
+                val points = generateRingPoints(ring, centerLat, centerLon, stepLat, stepLon)
+                for ((gridLat, gridLon) in points) {
+                    // Check cancellation
+                    kotlinx.coroutines.yield()
+
+                    val point = GeoPoint(gridLat, gridLon)
+
+                    // Place scanning marker
+                    placeScanningMarker(point)
+
+                    // Show progress banner
+                    val hitRate = if (cellsSearched > 0) (cacheHits * 100 / cellsSearched) else 0
+                    showPopulateBanner(ring, cellsSearched, totalPois, hitRate, consecutiveErrors)
+
+                    // Search
+                    val result = viewModel.populateSearchAt(point)
+
+                    if (result != null) {
+                        consecutiveErrors = 0
+                        cellsSearched++
+                        totalPois += result.results.size
+                        if (result.cacheHit) cacheHits++
+
+                        // Adaptive delay
+                        val delayMs = if (result.cacheHit) 200L else 4000L
+                        delay(delayMs)
+                    } else {
+                        consecutiveErrors++
+                        cellsSearched++
+                        if (consecutiveErrors >= 5) {
+                            toast("Populate stopped — 5 consecutive errors")
+                            DebugLogger.w("MainActivity", "Populate auto-stopped after 5 consecutive errors")
+                            break
+                        }
+                        delay(10000L)  // error backoff
+                    }
+                }
+                if (consecutiveErrors >= 5) break
+            }
+
+            // Completion
+            DebugLogger.i("MainActivity", "Populate complete: $cellsSearched cells, $totalPois POIs, $cacheHits cache hits")
+            stopPopulatePois()
+            toast("Populate done — $cellsSearched cells, $totalPois POIs")
+        }
+    }
+
+    private fun stopPopulatePois() {
+        populateJob?.cancel()
+        populateJob = null
+        removeScanningMarker()
+        hideFollowBanner()
+        loadCachedPoisForVisibleArea()
+        // Reset menu pref
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
+        DebugLogger.i("MainActivity", "stopPopulatePois()")
+    }
+
+    /**
+     * Generate the ordered perimeter points for a square spiral ring.
+     * Ring 0 = center (1 point), Ring N = perimeter of (2N+1)² grid (8N points).
+     */
+    private fun generateRingPoints(
+        ring: Int, centerLat: Double, centerLon: Double,
+        stepLat: Double, stepLon: Double
+    ): List<Pair<Double, Double>> {
+        if (ring == 0) return listOf(Pair(centerLat, centerLon))
+
+        val points = mutableListOf<Pair<Double, Double>>()
+        val n = ring
+
+        // Top edge: left to right
+        for (dx in -n..n) {
+            points.add(Pair(centerLat + n * stepLat, centerLon + dx * stepLon))
+        }
+        // Right edge: top-1 to bottom
+        for (dy in (n - 1) downTo -n) {
+            points.add(Pair(centerLat + dy * stepLat, centerLon + n * stepLon))
+        }
+        // Bottom edge: right-1 to left
+        for (dx in (n - 1) downTo -n) {
+            points.add(Pair(centerLat - n * stepLat, centerLon + dx * stepLon))
+        }
+        // Left edge: bottom+1 to top-1
+        for (dy in (-n + 1)..(n - 1)) {
+            points.add(Pair(centerLat + dy * stepLat, centerLon - n * stepLon))
+        }
+
+        return points
+    }
+
+    private fun placeScanningMarker(point: GeoPoint) {
+        runOnUiThread {
+            if (scanningMarker == null) {
+                scanningMarker = Marker(binding.mapView).apply {
+                    icon = MarkerIconHelper.forCategory(this@MainActivity, "crosshair", 32)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    title = "Scanning…"
+                }
+                binding.mapView.overlays.add(scanningMarker)
+            }
+            scanningMarker?.position = point
+            binding.mapView.invalidate()
+        }
+    }
+
+    private fun removeScanningMarker() {
+        scanningMarker?.let { binding.mapView.overlays.remove(it) }
+        scanningMarker = null
+        binding.mapView.invalidate()
+    }
+
+    private fun showPopulateBanner(ring: Int, cells: Int, pois: Int, hitRate: Int, errors: Int) {
+        val errorStr = if (errors > 0) "  •  \u26A0 $errors err" else ""
+        val text = "\u2316 Populate  Ring $ring  •  $cells cells  •  $pois POIs  •  $hitRate% cached$errorStr\nTap to stop"
+
+        runOnUiThread {
+            if (followBanner == null) {
+                followBanner = TextView(this).apply {
+                    setBackgroundColor(Color.parseColor("#DD212121"))
+                    setTextColor(Color.WHITE)
+                    textSize = 13f
+                    setPadding(32, 20, 32, 20)
+                    val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
+                    }
+                    layoutParams = params
+                    elevation = 12f
+                    setOnClickListener { stopPopulatePois() }
+                }
+                (binding.root as ViewGroup).addView(followBanner)
+            }
+            followBanner?.setOnClickListener { stopPopulatePois() }
+            followBanner?.text = text
+            followBanner?.visibility = View.VISIBLE
+        }
+    }
+
+    // =========================================================================
     // MENU EVENT LISTENER
     // =========================================================================
 
@@ -2175,6 +2353,11 @@ class MainActivity : AppCompatActivity() {
         override fun onAutoFollowAircraftToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onAutoFollowAircraftToggled: $enabled")
             if (enabled) startAutoFollowAircraft() else stopAutoFollowAircraft()
+        }
+
+        override fun onPopulatePoisToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onPopulatePoisToggled: $enabled")
+            if (enabled) startPopulatePois() else stopPopulatePois()
         }
 
         override fun onGpsModeToggled(autoGps: Boolean) {

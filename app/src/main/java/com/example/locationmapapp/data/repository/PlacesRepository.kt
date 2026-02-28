@@ -1,6 +1,7 @@
 package com.example.locationmapapp.data.repository
 
 import com.example.locationmapapp.data.model.PlaceResult
+import com.example.locationmapapp.data.model.PopulateSearchResult
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
@@ -235,6 +236,28 @@ class PlacesRepository @Inject constructor() {
         DebugLogger.i(TAG, "Parsed ${results.size} POIs")
         return results
     }
+
+    /** Populate-mode variant: searches POIs and reads X-Cache header to report cache status. */
+    suspend fun searchPoisForPopulate(center: GeoPoint, categories: List<String> = emptyList()): PopulateSearchResult =
+        withContext(Dispatchers.IO) {
+            val key = gridKey(center.latitude, center.longitude)
+            val radiusM = fetchRadiusHint(center)
+            val query = buildOverpassQuery(center, categories, radiusM)
+            DebugLogger.d(TAG, "Populate search at $key (radius=${radiusM}m)")
+            val body = FormBody.Builder().add("data", query).build()
+            val request = Request.Builder().url(OVERPASS_URL).post(body).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                postRadiusFeedback(center, 0, error = true)
+                throw RuntimeException("HTTP ${response.code}")
+            }
+            val cacheHeader = response.header("X-Cache") ?: "MISS"
+            val cacheHit = cacheHeader.equals("HIT", ignoreCase = true)
+            val bodyStr = response.body!!.string()
+            val results = parseOverpassJson(bodyStr)
+            postRadiusFeedback(center, results.size, error = false)
+            PopulateSearchResult(results, cacheHit, key)
+        }
 
     /** Fetch cached POIs within a bounding box from the proxy's poi-cache. */
     suspend fun fetchCachedPoisInBbox(south: Double, west: Double, north: Double, east: Double): List<PlaceResult> = withContext(Dispatchers.IO) {

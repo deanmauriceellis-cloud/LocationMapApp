@@ -398,6 +398,7 @@ app.post('/overpass', async (req, res) => {
       stats.hits++;
       log('/overpass', true);
       res.set('Content-Type', cached.headers['content-type'] || 'application/json');
+      res.set('X-Cache', 'HIT');
       return res.send(cached.data);
     }
   }
@@ -434,6 +435,7 @@ app.post('/overpass', async (req, res) => {
       if (merged.size > 0) {
         stats.hits++;
         log('/overpass (cache-nearby)', true, 0, `${merged.size} POIs from neighbors`);
+        res.set('X-Cache', 'HIT');
         return res.json({ elements: [...merged.values()] });
       }
     }
@@ -460,7 +462,7 @@ app.post('/overpass', async (req, res) => {
       cacheIndividualPois(body);
     }
 
-    res.status(upstream.status).set('Content-Type', contentType).send(body);
+    res.status(upstream.status).set('Content-Type', contentType).set('X-Cache', 'MISS').send(body);
   } catch (err) {
     console.error('[Overpass upstream error]', err.message);
     res.status(502).json({ error: 'Upstream request failed', detail: err.message });

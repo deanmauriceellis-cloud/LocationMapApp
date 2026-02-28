@@ -1,5 +1,65 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28l (Populate POIs — Grid Scanner)
+
+### Context
+POI coverage was built passively (manual long-press, auto-follow aircraft). No way to systematically fill a geographic area. Implemented a "Populate" utility that takes the current map center and spirals outward through a square grid, searching every cell for POIs.
+
+### Changes Made
+
+#### Proxy: X-Cache header (`cache-proxy/server.js`)
+- Added `X-Cache: HIT` on cache hit path, neighbor cache hit path
+- Added `X-Cache: MISS` on upstream response
+- Enables app-side adaptive delay (fast on cache hits, slow on upstream calls)
+
+#### Data model (`Models.kt`)
+- New `PopulateSearchResult(results, cacheHit, gridKey)` data class
+
+#### Repository (`PlacesRepository.kt`)
+- New `searchPoisForPopulate()` — reuses existing Overpass query building/parsing, reads X-Cache header
+- Returns `PopulateSearchResult` with cache status for adaptive timing
+
+#### ViewModel (`MainViewModel.kt`)
+- New `populateSearchAt()` — direct suspend function, not LiveData-based
+
+#### Scanning marker (`ic_crosshair.xml`)
+- New 24dp VectorDrawable: orange crosshair with center dot and cross lines
+
+#### Menu + wiring
+- `menu_utility.xml` — checkable "Populate POIs" item after divider, before Debug Log
+- `MenuEventListener.kt` — `onPopulatePoisToggled(enabled: Boolean)` callback
+- `AppBarMenuManager.kt` — `PREF_POPULATE_POIS` constant (defaults OFF), toggle wiring, sync
+- `MarkerIconHelper.kt` — "crosshair" category entry with orange tint
+
+#### MainActivity — Core populate logic
+- State: `populateJob`, `scanningMarker`
+- `startPopulatePois()` — guards against active follow, computes step from latitude, launches spiral coroutine
+- `stopPopulatePois()` — cancels job, removes marker, hides banner, resets pref, triggers bbox refresh
+- `generateRingPoints()` — square spiral perimeter for ring N (8N points, ring 0 = center)
+- Adaptive delay: 200ms on cache HIT, 4000ms on MISS, 10000ms on error
+- Auto-stop after 5 consecutive errors
+- Progress banner reuses `followBanner` — ring, cells, POIs, hit rate, errors; tap to stop
+
+### Status
+- **BUILD SUCCESSFUL** — compiles clean
+- Version: v1.5.13
+
+### Files Created
+- `app/src/main/res/drawable/ic_crosshair.xml`
+
+### Files Changed
+- `cache-proxy/server.js` — X-Cache header on /overpass
+- `app/.../data/model/Models.kt` — PopulateSearchResult
+- `app/.../data/repository/PlacesRepository.kt` — searchPoisForPopulate()
+- `app/.../ui/MainViewModel.kt` — populateSearchAt()
+- `app/.../ui/MarkerIconHelper.kt` — crosshair category
+- `app/.../ui/menu/MenuEventListener.kt` — onPopulatePoisToggled()
+- `app/.../ui/menu/AppBarMenuManager.kt` — PREF_POPULATE_POIS, wiring
+- `app/src/main/res/menu/menu_utility.xml` — Populate POIs menu item
+- `app/.../ui/MainActivity.kt` — populate logic (183 lines added)
+
+---
+
 ## Session: 2026-02-28k (Aircraft "Air" Menu, Vehicle Staleness Detection)
 
 ### Context

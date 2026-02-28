@@ -123,6 +123,14 @@ data class Webcam(
     fun toGeoPoint() = GeoPoint(lat, lon)
 }
 
+// ── Populate POIs scanner ────────────────────────────────────────────────────
+
+data class PopulateSearchResult(
+    val results: List<PlaceResult>,
+    val cacheHit: Boolean,
+    val gridKey: String
+)
+
 enum class MbtaVehicleStatus(val display: String) {
     INCOMING_AT("Arriving"),
     STOPPED_AT("Stopped at"),

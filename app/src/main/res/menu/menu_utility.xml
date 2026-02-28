@@ -36,6 +36,13 @@
 
     <item android:id="@+id/menu_util_divider" style="@style/Widget.AppCompat.ActionBar.TabBar"/>
 
+    <!-- Populate POIs: systematic grid scanner -->
+    <item
+        android:id="@+id/menu_util_populate_pois"
+        android:title="Populate POIs"
+        android:checkable="true"
+        app:showAsAction="never" />
+
     <!-- Debug log viewer (existing feature surfaced here) -->
     <item
         android:id="@+id/menu_util_debug_log"

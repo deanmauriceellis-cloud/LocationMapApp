@@ -139,6 +139,9 @@ interface MenuEventListener {
     /** Auto-follow random high-altitude aircraft every 20 min for POI cache building. */
     fun onAutoFollowAircraftToggled(enabled: Boolean)
 
+    /** Systematic grid scanner: spiral outward from map center, searching every cell for POIs. */
+    fun onPopulatePoisToggled(enabled: Boolean)
+
     /** Switch between automatic GPS centering and manual tap-to-set-location mode. */
     fun onGpsModeToggled(autoGps: Boolean)
 

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 11 (Aircraft "Air" menu, vehicle staleness detection)
+## Last Updated: 2026-02-28 Session 12 (Populate POIs grid scanner)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -65,6 +65,12 @@
   - Minimum 0.5° bbox span enforced (Windy API returns 0 for small viewports)
   - Proxy `/webcams` endpoint with 10-min cache TTL, includes `playerUrl` and `detailUrl` fields
   - Deferred restore on app restart, defaults ON with "traffic" pre-selected
+- **Populate POIs** (grid scanner): Utility menu toggle for systematic cache building
+  - Spirals outward from map center, searching every grid cell for POIs
+  - Adaptive delay: 200ms on cache HIT, 4s on MISS, 10s on error; auto-stops after 5 consecutive errors
+  - Orange crosshair marker shows current scan position; banner shows ring/cells/POIs/hit-rate
+  - Guards: refuses while vehicle/aircraft follow is active; tap banner to stop
+  - Proxy `X-Cache` header (HIT/MISS) on `/overpass` responses drives adaptive timing
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
   - **Staleness detection**: banner and tap snippet show "STALE (Xm ago)" when vehicle GPS update is >2 min old
 - POI prefetch along followed vehicle/aircraft routes
@@ -97,7 +103,8 @@
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: follow mode (map tracks vehicle, banner shows status/speed)
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
-- **Tap follow banner**: stop following
+- **Tap follow/populate banner**: stop following or stop populate scan
+- **Utility → Populate POIs**: systematic grid scanner spirals from map center
 
 ## Key Files
 - `app/src/main/java/.../ui/MainActivity.kt` — main map activity, all overlays
@@ -182,10 +189,10 @@
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
 ## Next Steps
+- **Test Populate POIs** — Utility → Populate POIs → verify crosshair marker, banner, adaptive delay, clean stop
+- **Test X-Cache header** — `curl -v -X POST http://10.0.0.4:3000/overpass -d 'data=...'` verify HIT/MISS
 - **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads
-- **Test webcam category dialog** — new categories (coast, port, river, village, square, observatory, sportArea)
-- **Test webcam toggle on/off** — markers clear on off, reload on re-enable
 - Test viewport-only POI eviction on emulator — verify no OOM after extended run
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing

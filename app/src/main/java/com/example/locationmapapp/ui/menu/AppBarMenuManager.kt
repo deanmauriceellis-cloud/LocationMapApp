@@ -452,6 +452,9 @@ class AppBarMenuManager(
                 R.id.menu_util_analyze_today -> menuEventListener.onAnalyzeTodayRequested()
                 R.id.menu_util_anomalies     -> menuEventListener.onTravelAnomaliesRequested()
                 R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
+                R.id.menu_util_populate_pois ->
+                    toggleBinary(item, PREF_POPULATE_POIS) { menuEventListener.onPopulatePoisToggled(it) }
+
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
 
                 R.id.menu_util_gps_mode ->
@@ -465,8 +468,9 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_util_record_gps to PREF_RECORD_GPS,
-            R.id.menu_util_gps_mode   to PREF_GPS_MODE
+            R.id.menu_util_record_gps     to PREF_RECORD_GPS,
+            R.id.menu_util_populate_pois  to PREF_POPULATE_POIS,
+            R.id.menu_util_gps_mode       to PREF_GPS_MODE
         )
         popup.show()
     }
@@ -499,7 +503,7 @@ class AppBarMenuManager(
 
     /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
     private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
-        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT -> false
+        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS -> false
         else -> true
     }
 
@@ -622,5 +626,6 @@ class AppBarMenuManager(
         const val PREF_RECORD_GPS            = "record_gps_on"
         const val PREF_GPS_MODE              = "gps_mode_auto"
         const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
+        const val PREF_POPULATE_POIS         = "populate_pois_on"
     }
 }

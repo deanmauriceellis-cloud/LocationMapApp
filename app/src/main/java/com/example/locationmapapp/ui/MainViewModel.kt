@@ -168,6 +168,16 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /** Direct suspend call for populate scanner — returns result without LiveData. */
+    suspend fun populateSearchAt(point: GeoPoint, categories: List<String> = emptyList()): com.example.locationmapapp.data.model.PopulateSearchResult? {
+        return try {
+            placesRepository.searchPoisForPopulate(point, categories)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "populateSearchAt FAILED: ${e.message}", e)
+            null
+        }
+    }
+
     fun fetchWeatherAlerts() {
         DebugLogger.i(TAG, "fetchWeatherAlerts()")
         viewModelScope.launch {
