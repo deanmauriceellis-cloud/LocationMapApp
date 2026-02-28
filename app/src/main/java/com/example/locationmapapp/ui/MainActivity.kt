@@ -89,6 +89,9 @@ class MainActivity : AppCompatActivity() {
     private var autoFollowAircraftJob: Job? = null
     private var followedAircraftFailCount: Int = 0
     private var autoFollowEmptyPoiCount: Int = 0
+    // Bounce direction — auto-flip when aircraft nears CONUS boundary
+    private var autoFollowPreferWest: Boolean = true
+    private var autoFollowPreferSouth: Boolean = false
 
     // POI label zoom threshold tracking
     private var poiLabelsShowing = false
@@ -683,16 +686,43 @@ class MainActivity : AppCompatActivity() {
             // Refresh full cache display after prefetch; check for empty POI zone (auto-follow)
             binding.mapView.postDelayed({
                 loadCachedPoisForVisibleArea()
-                // If auto-follow is active, check altitude and POI desert
+                // If auto-follow is active, check altitude and boundary bounce
                 if (autoFollowAircraftJob?.isActive == true) {
                     val lat = state.lat
                     val lon = state.lon
-                    // Check if aircraft left the continental US (north into Canada or south past border)
-                    if (lat > 49.0 || lat < 25.0 || lon < -125.0 || lon > -66.0) {
-                        DebugLogger.i("MainActivity", "Auto-follow: aircraft outside US bounds (${lat},${lon}) — switching to interior")
-                        toast("Outside US — switching to interior flight")
+                    // Bounce margins — flip direction before aircraft leaves CONUS
+                    val WEST_MARGIN = -120.0
+                    val EAST_MARGIN = -70.0
+                    val NORTH_MARGIN = 47.0
+                    val SOUTH_MARGIN = 27.0
+                    var bounced = false
+                    // East/West bounce
+                    if (lon < WEST_MARGIN && autoFollowPreferWest) {
+                        autoFollowPreferWest = false
+                        bounced = true
+                        DebugLogger.i("MainActivity", "Auto-follow: hit west margin (lon=$lon) — flipping to eastbound")
+                        toast("West coast — switching to eastbound")
+                    } else if (lon > EAST_MARGIN && !autoFollowPreferWest) {
+                        autoFollowPreferWest = true
+                        bounced = true
+                        DebugLogger.i("MainActivity", "Auto-follow: hit east margin (lon=$lon) — flipping to westbound")
+                        toast("East coast — switching to westbound")
+                    }
+                    // North/South bounce
+                    if (lat > NORTH_MARGIN && !autoFollowPreferSouth) {
+                        autoFollowPreferSouth = true
+                        bounced = true
+                        DebugLogger.i("MainActivity", "Auto-follow: hit north margin (lat=$lat) — flipping to southbound")
+                        toast("North border — switching to southbound")
+                    } else if (lat < SOUTH_MARGIN && autoFollowPreferSouth) {
+                        autoFollowPreferSouth = false
+                        bounced = true
+                        DebugLogger.i("MainActivity", "Auto-follow: hit south margin (lat=$lat) — flipping to northbound")
+                        toast("South border — switching to northbound")
+                    }
+                    if (bounced) {
                         autoFollowEmptyPoiCount = 0
-                        pickInteriorAircraft()
+                        pickAndFollowRandomAircraft()
                         return@postDelayed
                     }
                     val altFt = (state.baroAltitude ?: 0.0) * 3.28084
@@ -705,10 +735,13 @@ class MainActivity : AppCompatActivity() {
                     }
                     val poiCount = viewModel.places.value?.second?.size ?: 0
                     if (poiCount == 0) {
-                        DebugLogger.i("MainActivity", "Auto-follow: no POIs — switching to furthest-west aircraft")
-                        toast("No POIs — switching to furthest west")
-                        autoFollowEmptyPoiCount = 0
-                        pickFurthestWestAircraft()
+                        autoFollowEmptyPoiCount++
+                        if (autoFollowEmptyPoiCount >= 2) {
+                            DebugLogger.i("MainActivity", "Auto-follow: no POIs $autoFollowEmptyPoiCount times — switching")
+                            toast("No POIs — switching aircraft")
+                            autoFollowEmptyPoiCount = 0
+                            pickAndFollowRandomAircraft()
+                        }
                     } else {
                         autoFollowEmptyPoiCount = 0
                     }
@@ -1505,18 +1538,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Compute a wide bbox (~zoom 11) centered on the map center, query aircraft in that area,
-     * and follow a random high-altitude one. Does NOT change the user's zoom or position.
+     * Compute a wide bbox (~zoom 8) centered on the map center, query aircraft in that area,
+     * and follow a random high-altitude one matching current direction preference.
+     * Does NOT change the user's zoom or position.
      */
-    private fun pickAndFollowRandomAircraft(westboundOnly: Boolean = false) {
+    private fun pickAndFollowRandomAircraft() {
+        val dirLabel = "${if (autoFollowPreferWest) "W" else "E"}${if (autoFollowPreferSouth) "S" else "N"}"
         // First check already-loaded aircraft
         val currentList = viewModel.aircraft.value ?: emptyList()
         val candidates = filterHighAltitude(currentList)
         if (candidates.isNotEmpty()) {
-            selectAndFollow(candidates, westboundOnly)
+            selectAndFollow(candidates)
             return
         }
-        // Build a wide bbox (~zoom 8, covers most of the northeast) to maximize candidates
+        // Build a wide bbox (~zoom 8, covers most of CONUS) to maximize candidates
         val center = binding.mapView.mapCenter
         val halfLat = 3.0   // ~330 km north/south
         val halfLon = 4.0   // ~340 km east/west
@@ -1524,7 +1559,7 @@ class MainActivity : AppCompatActivity() {
         val north = center.latitude + halfLat
         val west  = center.longitude - halfLon
         val east  = center.longitude + halfLon
-        DebugLogger.i("MainActivity", "Auto-follow: wide bbox query ${south},${west},${north},${east}")
+        DebugLogger.i("MainActivity", "Auto-follow: wide bbox query ${south},${west},${north},${east} pref=$dirLabel")
         viewModel.loadAircraft(south, west, north, east)
         // Wait for the network response then pick
         lifecycleScope.launch {
@@ -1532,7 +1567,7 @@ class MainActivity : AppCompatActivity() {
             val freshList = viewModel.aircraft.value ?: emptyList()
             val freshCandidates = filterHighAltitude(freshList)
             if (freshCandidates.isNotEmpty()) {
-                selectAndFollow(freshCandidates, westboundOnly)
+                selectAndFollow(freshCandidates)
             } else {
                 DebugLogger.i("MainActivity", "Auto-follow: no aircraft ≥ 10,000 ft in wide bbox — will retry in 20 min")
                 toast("No aircraft above 10,000 ft — will retry")
@@ -1546,93 +1581,36 @@ class MainActivity : AppCompatActivity() {
         return aircraft.filter { it.baroAltitude != null && it.baroAltitude * 3.28084 >= 10000 }
     }
 
-    private fun selectAndFollow(candidates: List<com.example.locationmapapp.data.model.AircraftState>, westboundOnly: Boolean = false) {
+    private fun selectAndFollow(candidates: List<com.example.locationmapapp.data.model.AircraftState>) {
         // Exclude currently followed aircraft for variety
         val currentIcao = followedAircraftIcao
         val others = candidates.filter { it.icao24 != currentIcao }
         val pool = if (others.isNotEmpty()) others else candidates
 
-        // Prioritize westbound aircraft (heading 180–360°) — they stay over land in New England
-        val westbound = pool.filter { it.track != null && it.track >= 180.0 && it.track <= 360.0 }
-        val pick = if (westbound.isNotEmpty()) {
-            DebugLogger.i("MainActivity", "Auto-follow: ${westbound.size} westbound of ${pool.size} candidates${if (westboundOnly) " (forced)" else ""}")
-            westbound.random()
-        } else if (westboundOnly) {
-            DebugLogger.i("MainActivity", "Auto-follow: no westbound available — will retry in 20 min")
-            toast("No westbound aircraft — will retry")
-            return
+        // Filter by preferred E/W direction
+        val ewFiltered = pool.filter { it.track != null && if (autoFollowPreferWest) it.track >= 180.0 && it.track <= 360.0 else it.track >= 0.0 && it.track < 180.0 }
+        // Further filter by preferred N/S direction (secondary preference — relaxed if too few)
+        val nsFiltered = ewFiltered.filter { it.track != null && if (autoFollowPreferSouth) it.track >= 90.0 && it.track <= 270.0 else it.track < 90.0 || it.track > 270.0 }
+
+        val dirLabel = "${if (autoFollowPreferWest) "W" else "E"}${if (autoFollowPreferSouth) "S" else "N"}"
+        val pick = if (nsFiltered.isNotEmpty()) {
+            DebugLogger.i("MainActivity", "Auto-follow: ${nsFiltered.size} $dirLabel of ${pool.size} candidates")
+            nsFiltered.random()
+        } else if (ewFiltered.isNotEmpty()) {
+            DebugLogger.i("MainActivity", "Auto-follow: ${ewFiltered.size} ${if (autoFollowPreferWest) "W" else "E"}-bound of ${pool.size} (relaxed N/S)")
+            ewFiltered.random()
         } else {
-            DebugLogger.i("MainActivity", "Auto-follow: no westbound — picking from all ${pool.size}")
+            DebugLogger.i("MainActivity", "Auto-follow: no $dirLabel — picking from all ${pool.size}")
             pool.random()
         }
         val hdg = pick.track?.let { "%.0f°".format(it) } ?: "?"
         DebugLogger.i("MainActivity", "Auto-follow: selected ${pick.icao24} (${pick.callsign}) " +
-                "alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg from ${candidates.size} candidates")
+                "alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg pref=$dirLabel")
         autoFollowEmptyPoiCount = 0
         followedAircraftFailCount = 0
         startFollowingAircraft(pick)
     }
 
-    private fun pickFurthestWestAircraft() {
-        val center = binding.mapView.mapCenter
-        val halfLat = 3.0
-        val halfLon = 4.0
-        val south = center.latitude - halfLat
-        val north = center.latitude + halfLat
-        val west  = center.longitude - halfLon
-        val east  = center.longitude + halfLon
-        DebugLogger.i("MainActivity", "Auto-follow: wide bbox for furthest-west query")
-        viewModel.loadAircraft(south, west, north, east)
-        lifecycleScope.launch {
-            delay(3000)
-            val freshList = viewModel.aircraft.value ?: emptyList()
-            val candidates = filterHighAltitude(freshList)
-                .filter { it.icao24 != followedAircraftIcao && it.lon != null }
-            if (candidates.isNotEmpty()) {
-                val pick = candidates.minByOrNull { it.lon }!!
-                val hdg = pick.track?.let { "%.0f°".format(it) } ?: "?"
-                DebugLogger.i("MainActivity", "Auto-follow: furthest west ${pick.icao24} (${pick.callsign}) " +
-                        "lon=${pick.lon} alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg")
-                autoFollowEmptyPoiCount = 0
-                followedAircraftFailCount = 0
-                startFollowingAircraft(pick)
-            } else {
-                DebugLogger.i("MainActivity", "Auto-follow: no candidates for furthest-west — will retry in 20 min")
-                toast("No aircraft available — will retry")
-            }
-        }
-    }
-
-    private fun pickInteriorAircraft() {
-        // Query a wide US-centered bbox
-        val south = 25.0; val north = 49.0; val west = -125.0; val east = -66.0
-        DebugLogger.i("MainActivity", "Auto-follow: querying full CONUS for interior aircraft")
-        viewModel.loadAircraft(south, west, north, east)
-        lifecycleScope.launch {
-            delay(3000)
-            val freshList = viewModel.aircraft.value ?: emptyList()
-            // Filter: high altitude, inside US bounds, exclude current
-            val candidates = filterHighAltitude(freshList)
-                .filter { it.icao24 != followedAircraftIcao && it.lat in 26.0..48.0 && it.lon in -124.0..-67.0 }
-            if (candidates.isNotEmpty()) {
-                // Pick the one closest to US center (~39°N, -98°W)
-                val pick = candidates.minByOrNull { a ->
-                    val dLat = a.lat - 39.0
-                    val dLon = a.lon - (-98.0)
-                    dLat * dLat + dLon * dLon
-                }!!
-                val hdg = pick.track?.let { "%.0f°".format(it) } ?: "?"
-                DebugLogger.i("MainActivity", "Auto-follow: interior pick ${pick.icao24} (${pick.callsign}) " +
-                        "at ${pick.lat},${pick.lon} alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg")
-                autoFollowEmptyPoiCount = 0
-                followedAircraftFailCount = 0
-                startFollowingAircraft(pick)
-            } else {
-                DebugLogger.i("MainActivity", "Auto-follow: no interior candidates — falling back to random")
-                pickAndFollowRandomAircraft()
-            }
-        }
-    }
 
     private fun updateFollowedAircraft(aircraft: List<com.example.locationmapapp.data.model.AircraftState>) {
         val icao = followedAircraftIcao ?: return
@@ -1660,7 +1638,12 @@ class MainActivity : AppCompatActivity() {
         val headingStr = state.track?.let { "%.0f\u00B0".format(it) } ?: ""
         val spiFlag = if (state.spi) "  \u26A0 SPI" else ""
 
-        val prefix = if (autoFollowAircraftJob?.isActive == true) "Auto-following" else "Following"
+        val dirLabel = if (autoFollowAircraftJob?.isActive == true) {
+            val ew = if (autoFollowPreferWest) "W" else "E"
+            val ns = if (autoFollowPreferSouth) "S" else "N"
+            " [$ew$ns]"
+        } else ""
+        val prefix = if (autoFollowAircraftJob?.isActive == true) "Auto-following$dirLabel" else "Following"
         val text = "$prefix \u2708 $label$spiFlag\n" +
                    "Alt $altFt  •  $speedKt  •  $headingStr  •  $vertDesc"
 
