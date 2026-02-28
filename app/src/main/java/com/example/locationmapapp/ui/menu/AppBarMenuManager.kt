@@ -224,11 +224,11 @@ class AppBarMenuManager(
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "CAMs: '${item.title}'")
             when (item.itemId) {
-                R.id.menu_traffic_cams ->
-                    toggleBinary(item, PREF_TRAFFIC_CAMS) { menuEventListener.onTrafficCamsToggled(it) }
+                R.id.menu_webcams ->
+                    toggleBinary(item, PREF_WEBCAMS_ON) { menuEventListener.onWebcamToggled(it) }
 
-                R.id.menu_cams_more ->
-                    menuEventListener.onCamsMoreRequested()
+                R.id.menu_webcam_categories ->
+                    showWebcamCategoryDialog()
 
                 else -> {
                     DebugLogger.w(TAG, "CAMs: unhandled id=0x${item.itemId.toString(16)}")
@@ -237,8 +237,49 @@ class AppBarMenuManager(
             }
             true
         }
-        syncCheckStates(popup.menu, R.id.menu_traffic_cams to PREF_TRAFFIC_CAMS)
+        syncCheckStates(popup.menu, R.id.menu_webcams to PREF_WEBCAMS_ON)
         popup.show()
+    }
+
+    /** All 18 Windy webcam categories. */
+    private val WEBCAM_CATEGORIES = arrayOf(
+        "traffic", "city", "beach", "indoor", "outdoor", "landscape",
+        "mountain", "lake", "harbor", "airport", "building", "meteo",
+        "forest", "animals", "island", "golf", "resort", "sportsite"
+    )
+
+    private fun showWebcamCategoryDialog() {
+        val saved = prefs.getStringSet(PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
+        val checked = BooleanArray(WEBCAM_CATEGORIES.size) { i -> saved.contains(WEBCAM_CATEGORIES[i]) }
+        val labels = WEBCAM_CATEGORIES.map { it.replaceFirstChar { c -> c.uppercase() } }.toTypedArray()
+
+        // Track whether all are selected for the toggle button
+        var allSelected = checked.all { it }
+
+        AlertDialog.Builder(context)
+            .setTitle("Camera Types")
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setNeutralButton(if (allSelected) "Deselect All" else "Select All") { dialog, _ ->
+                // Toggle all
+                val newState = !allSelected
+                for (i in checked.indices) checked[i] = newState
+                // Save and notify
+                val selected = if (newState) WEBCAM_CATEGORIES.toSet() else emptySet()
+                prefs.edit().putStringSet(PREF_WEBCAM_CATEGORIES, selected).apply()
+                DebugLogger.i(TAG, "Webcam categories ${if (newState) "select all" else "deselect all"}")
+                menuEventListener.onWebcamCategoriesChanged(selected)
+                dialog.dismiss()
+            }
+            .setPositiveButton("OK") { _, _ ->
+                val selected = WEBCAM_CATEGORIES.filterIndexed { i, _ -> checked[i] }.toSet()
+                prefs.edit().putStringSet(PREF_WEBCAM_CATEGORIES, selected).apply()
+                DebugLogger.i(TAG, "Webcam categories OK: $selected")
+                menuEventListener.onWebcamCategoriesChanged(selected)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // =========================================================================
@@ -540,7 +581,8 @@ class AppBarMenuManager(
         const val PREF_NAT_ALERTS_FREQ  = "national_alerts_freq_min"
 
         // ── Cameras ───────────────────────────────────────────────────────────
-        const val PREF_TRAFFIC_CAMS = "traffic_cams_on"
+        const val PREF_WEBCAMS_ON          = "webcams_on"
+        const val PREF_WEBCAM_CATEGORIES   = "webcam_categories"
 
         // ── POI ───────────────────────────────────────────────────────────────
         // POI pref keys now live in PoiCategories.ALL (PoiCategory.prefKey)

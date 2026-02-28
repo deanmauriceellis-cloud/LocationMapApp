@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
+import com.example.locationmapapp.data.repository.WebcamRepository
 import com.example.locationmapapp.data.repository.WeatherRepository
 import dagger.Module
 import dagger.Provides
@@ -28,4 +29,7 @@ object AppModule {
 
     @Provides @Singleton
     fun provideMbtaRepository(): MbtaRepository = MbtaRepository()
+
+    @Provides @Singleton
+    fun provideWebcamRepository(): WebcamRepository = WebcamRepository()
 }

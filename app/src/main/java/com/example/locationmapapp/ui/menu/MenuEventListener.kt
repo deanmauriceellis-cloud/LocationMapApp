@@ -85,11 +85,11 @@ interface MenuEventListener {
     // CAMERAS
     // =========================================================================
 
-    /** Highway traffic camera markers on map. */
-    fun onTrafficCamsToggled(enabled: Boolean)
+    /** Windy webcam markers on map. */
+    fun onWebcamToggled(enabled: Boolean)
 
-    /** Launch camera-source discovery / selection UI. */
-    fun onCamsMoreRequested()
+    /** User changed selected webcam categories — reload markers. */
+    fun onWebcamCategoriesChanged(categories: Set<String>)
 
     // =========================================================================
     // RADAR

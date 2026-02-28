@@ -1,5 +1,74 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28i (Webcam Layer — Windy Webcams API Integration)
+
+### Context
+Adding a webcam layer to the map using the Windy Webcams API (free tier). The CAMs menu button was already stubbed — wired it to real functionality with multi-select webcam categories and camera preview on tap.
+
+### Changes Made
+
+#### Proxy Route (`cache-proxy/server.js`)
+- `GET /webcams?s=&w=&n=&e=&categories=` — proxies Windy Webcams API v3
+- API key: `x-windy-api-key` header (free tier)
+- Upstream URL: `api.windy.com/webcams/api/v3/webcams?bbox=...&category=...&limit=50&include=images,location,categories`
+- 10-minute TTL cache (matches image URL expiry on free tier)
+- Response transformed to simplified JSON array: `[{ id, title, lat, lon, categories, previewUrl, thumbnailUrl, status, lastUpdated }]`
+- Startup log updated to include `/webcams` route
+
+#### Data Model (`Models.kt`)
+- New `Webcam` data class: id (Long), title, lat, lon, categories (List<String>), previewUrl, thumbnailUrl, status, lastUpdated, `toGeoPoint()`
+
+#### Repository (`WebcamRepository.kt` — new file)
+- `@Singleton` with `@Inject constructor()`, OkHttp client (15s/30s timeouts)
+- `fetchWebcams(south, west, north, east, categories)` — hits proxy `/webcams`, parses JSON array
+
+#### DI + ViewModel (`AppModule.kt`, `MainViewModel.kt`)
+- `provideWebcamRepository()` added to AppModule
+- `WebcamRepository` injected into MainViewModel
+- `_webcams` / `webcams` LiveData, `loadWebcams()`, `clearWebcams()`
+
+#### Menu System (`menu_cams.xml`, `MenuEventListener.kt`, `AppBarMenuManager.kt`)
+- `menu_cams.xml` replaced: "Webcams" checkable toggle + "Camera Types..." action
+- `MenuEventListener`: replaced `onTrafficCamsToggled` + `onCamsMoreRequested` with `onWebcamToggled(enabled)` + `onWebcamCategoriesChanged(categories: Set<String>)`
+- `AppBarMenuManager.showCamsMenu()` rewired for new menu items
+- `showWebcamCategoryDialog()` — AlertDialog with all 18 Windy categories as multi-select checkboxes
+  - "traffic" pre-selected by default
+  - "Select All / Deselect All" neutral button
+  - Stored as `StringSet` pref `"webcam_categories"`
+- Pref keys: `PREF_WEBCAMS_ON`, `PREF_WEBCAM_CATEGORIES` (replaces old `PREF_TRAFFIC_CAMS`)
+
+#### MainActivity — Markers & Tap Dialog
+- `webcamMarkers` list, `webcamReloadJob`, `pendingWebcamRestore` state variables
+- Observer: clears + adds markers on LiveData update
+- `addWebcamMarker()`: camera icon (20dp, existing "camera" category mapping), tap opens preview dialog
+- `showWebcamPreviewDialog()`: AlertDialog with ImageView + info text, async OkHttp image download in coroutine
+- `loadWebcamsForVisibleArea()`: gets bbox from map, reads active categories from prefs
+- `scheduleWebcamReload()`: 500ms debounce on scroll (same pattern as POI bbox)
+- Deferred restore in `onStart()` via `pendingWebcamRestore` — fires after GPS fix + 2s
+- Toggle off: cancels pending loads, clears LiveData + markers
+- Category change: reloads if webcams enabled, clears if empty category set
+
+### Status
+- **BUILD SUCCESSFUL** — compiles clean (only pre-existing deprecation warning)
+- **APK installed on emulator** — ready for testing
+- **Proxy restarted** with webcams route — verified: returns real webcam data for Massachusetts bbox
+- **Not yet tested on device** — needs manual testing of markers, scroll reload, tap dialog, category dialog
+
+### Files Created
+- `app/.../data/repository/WebcamRepository.kt`
+
+### Files Changed
+- `cache-proxy/server.js` — `/webcams` route, startup log
+- `app/.../data/model/Models.kt` — `Webcam` data class
+- `app/.../di/AppModule.kt` — `provideWebcamRepository()`
+- `app/.../ui/MainViewModel.kt` — webcam LiveData + methods
+- `app/src/main/res/menu/menu_cams.xml` — replaced with Webcams toggle + Camera Types
+- `app/.../ui/menu/MenuEventListener.kt` — new webcam callbacks
+- `app/.../ui/menu/AppBarMenuManager.kt` — showCamsMenu(), showWebcamCategoryDialog(), new pref keys
+- `app/.../ui/MainActivity.kt` — webcam markers, observer, scroll reload, tap dialog, deferred restore
+
+---
+
 ## Session: 2026-02-28h (Viewport-Only POI Markers with Eviction, LRU Icon Cache)
 
 ### Context

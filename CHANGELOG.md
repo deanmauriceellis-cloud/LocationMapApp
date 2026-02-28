@@ -1,5 +1,25 @@
 # LocationMapApp — Changelog
 
+## [1.5.10] — 2026-02-28
+
+### Added
+- **Webcam layer** — live camera markers using Windy Webcams API (free tier)
+  - Camera icon markers on map at webcam positions
+  - Tap marker to view 400×224 preview image in dialog with title, categories, status
+  - **18 webcam categories** selectable via multi-select dialog: traffic, city, beach, indoor, outdoor, landscape, mountain, lake, harbor, airport, building, meteo, forest, animals, island, golf, resort, sportsite
+  - "Traffic" pre-selected by default; Select All / Deselect All button
+  - Viewport reload on scroll/zoom (500ms debounce)
+  - Deferred restore on app restart (waits for GPS fix like other layers)
+  - Defaults ON with "traffic" category
+- **Proxy route** `GET /webcams?s=&w=&n=&e=&categories=` — 10-minute cache TTL
+  - Upstream: Windy Webcams API v3 (`api.windy.com/webcams/api/v3/webcams`)
+  - Response simplified to `[{ id, title, lat, lon, categories, previewUrl, thumbnailUrl, status, lastUpdated }]`
+- **WebcamRepository** — new `@Singleton` repository for webcam data fetching
+
+### Changed
+- CAMs menu rewritten: "Highway Traffic Cams" stub → functional "Webcams" toggle + "Camera Types..." dialog
+- `MenuEventListener`: `onTrafficCamsToggled`/`onCamsMoreRequested` → `onWebcamToggled`/`onWebcamCategoriesChanged`
+
 ## [1.5.9] — 2026-02-28
 
 ### Changed

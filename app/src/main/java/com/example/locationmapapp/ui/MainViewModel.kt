@@ -11,6 +11,7 @@ import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.model.*
 import com.example.locationmapapp.data.repository.AircraftRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
+import com.example.locationmapapp.data.repository.WebcamRepository
 import com.example.locationmapapp.data.repository.WeatherRepository
 import com.example.locationmapapp.util.DebugLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,7 +33,8 @@ class MainViewModel @Inject constructor(
     private val placesRepository: PlacesRepository,
     private val weatherRepository: WeatherRepository,
     private val mbtaRepository: MbtaRepository,
-    private val aircraftRepository: AircraftRepository
+    private val aircraftRepository: AircraftRepository,
+    private val webcamRepository: WebcamRepository
 ) : ViewModel() {
 
     private val TAG = "ViewModel"
@@ -272,6 +274,25 @@ class MainViewModel @Inject constructor(
     fun clearAircraft() {
         _aircraft.value = emptyList()
         DebugLogger.i(TAG, "Aircraft cleared")
+    }
+
+    // ── Webcams ────────────────────────────────────────────────────────────────
+
+    private val _webcams = MutableLiveData<List<Webcam>>()
+    val webcams: LiveData<List<Webcam>> = _webcams
+
+    fun loadWebcams(south: Double, west: Double, north: Double, east: Double, categories: String) {
+        DebugLogger.i(TAG, "loadWebcams() bbox=$south,$west,$north,$east categories=$categories")
+        viewModelScope.launch {
+            runCatching { webcamRepository.fetchWebcams(south, west, north, east, categories) }
+                .onSuccess { DebugLogger.i(TAG, "Webcams success — ${it.size}"); _webcams.value = it }
+                .onFailure { e -> DebugLogger.e(TAG, "Webcams FAILED: ${e.message}", e as? Exception); _error.value = "Webcams failed: ${e.message}" }
+        }
+    }
+
+    fun clearWebcams() {
+        _webcams.value = emptyList()
+        DebugLogger.i(TAG, "Webcams cleared")
     }
 
     fun refreshRadar() {

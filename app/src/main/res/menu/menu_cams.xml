@@ -4,15 +4,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/menu_traffic_cams"
-        android:title="Highway Traffic Cams"
+        android:id="@+id/menu_webcams"
+        android:title="Webcams"
         android:checkable="true"
         app:showAsAction="never" />
 
-    <!-- Placeholder for additional camera sources discovered at runtime -->
     <item
-        android:id="@+id/menu_cams_more"
-        android:title="Other Camera Sources…"
+        android:id="@+id/menu_webcam_categories"
+        android:title="Camera Types…"
         app:showAsAction="never" />
 
 </menu>

@@ -1,12 +1,12 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 8 (Viewport-only POI markers with eviction, LRU icon cache)
+## Last Updated: 2026-02-28 Session 9 (Webcam layer — Windy Webcams API integration)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
 - **Cache proxy** (Node.js/Express on port 3000) — transparent caching layer between app and external APIs
 - **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs and aircraft sightings
-- **Split**: App → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky)
+- **Split**: App → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
 
 ## What's Working
 - Map display with osmdroid (OpenStreetMap tiles)
@@ -57,6 +57,12 @@
     - **0 POIs returned** (over water) → picks furthest-west aircraft
     - **Outside US bounds** (>49°N, <25°N, >-66°W, <-125°W) → picks aircraft closest to US interior center
   - Banner shows "Auto-following ✈" prefix; restores on app restart
+- **Webcam layer** (Windy Webcams API) — live camera markers on map
+  - 18 webcam categories (traffic, city, beach, etc.) via multi-select dialog
+  - Camera icon markers, tap to view 400×224 preview image in dialog
+  - Viewport reload on scroll/zoom (500ms debounce, same pattern as POIs)
+  - Proxy `/webcams` endpoint with 10-min cache TTL (matches image URL expiry)
+  - Deferred restore on app restart, defaults ON with "traffic" pre-selected
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
 - POI prefetch along followed vehicle/aircraft routes
 - Cached POI coverage display: proxy `/pois/bbox` endpoint returns POIs within visible map area
@@ -76,6 +82,7 @@
 | Radius Hints | `http://10.0.0.4:3000/radius-hint` | GET+POST /radius-hint | persistent |
 | POI Cache | `http://10.0.0.4:3000/pois/...` | GET /pois/stats, /pois/export, /pois/bbox, /poi/:type/:id | persistent |
 | Aircraft | `http://10.0.0.4:3000/aircraft?...` | GET /aircraft?bbox=s,w,n,e or ?icao24=hex | 15 seconds |
+| Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
 | MBTA | direct (api-v3.mbta.com) | not proxied | — |
@@ -98,6 +105,7 @@
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
 - `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
+- `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
@@ -159,8 +167,10 @@
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
 ## Next Steps
+- **Test webcam layer on emulator** — markers appear, scroll/zoom reloads, tap preview dialog with image
+- **Test webcam category dialog** — multi-select, Select All/Deselect All, categories trigger reload
+- **Test webcam toggle on/off** — markers clear on off, reload on re-enable
 - Test viewport-only POI eviction on emulator — verify no OOM after extended run
-- Test vehicle follow mode across full bus routes
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)

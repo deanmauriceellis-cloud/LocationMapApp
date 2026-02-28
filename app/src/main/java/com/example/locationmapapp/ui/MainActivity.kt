@@ -93,6 +93,11 @@ class MainActivity : AppCompatActivity() {
     private var autoFollowPreferWest: Boolean = true
     private var autoFollowPreferSouth: Boolean = false
 
+    // Webcam tracking
+    private val webcamMarkers = mutableListOf<Marker>()
+    private var webcamReloadJob: Job? = null
+    private var pendingWebcamRestore = false
+
     // POI label zoom threshold tracking
     private var poiLabelsShowing = false
 
@@ -265,6 +270,12 @@ class MainActivity : AppCompatActivity() {
             pendingPoiRestore = true
             DebugLogger.i("MainActivity", "onStart() POI restore deferred — waiting for GPS fix")
         }
+        // Defer webcam restore until GPS fix
+        if (prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) {
+            pendingWebcamRestore = true
+            DebugLogger.i("MainActivity", "onStart() Webcam restore deferred — waiting for GPS fix")
+        }
+
         // Always load full cached POI coverage after GPS fix
         pendingCachedPoiLoad = true
     }
@@ -369,6 +380,7 @@ class MainActivity : AppCompatActivity() {
                     delay(500)
                     loadCachedPoisForVisibleArea()
                 }
+                scheduleWebcamReload()
                 return false
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
@@ -608,6 +620,14 @@ class MainActivity : AppCompatActivity() {
                     loadCachedPoisForVisibleArea()
                 }, 2000)
             }
+            // Webcam restore
+            if (pendingWebcamRestore) {
+                pendingWebcamRestore = false
+                binding.mapView.postDelayed({
+                    DebugLogger.i("MainActivity", "Webcam restore triggered — loading for visible area")
+                    loadWebcamsForVisibleArea()
+                }, 2000)
+            }
         }
         viewModel.places.observe(this) { (layerId, places) ->
             DebugLogger.i("MainActivity", "places → ${places.size} results layerId=$layerId")
@@ -635,6 +655,11 @@ class MainActivity : AppCompatActivity() {
         viewModel.radarRefreshTick.observe(this) {
             DebugLogger.i("MainActivity", "radarRefreshTick → refreshing overlay")
             refreshRadarOverlay()
+        }
+        viewModel.webcams.observe(this) { webcams ->
+            DebugLogger.i("MainActivity", "webcams → ${webcams.size} on map")
+            clearWebcamMarkers()
+            webcams.forEach { addWebcamMarker(it) }
         }
         viewModel.error.observe(this) { msg ->
             DebugLogger.e("MainActivity", "VM error: $msg")
@@ -1210,6 +1235,113 @@ class MainActivity : AppCompatActivity() {
         clearAllPoiMarkers()
         places.forEach { addPoiMarker("bbox", it) }
         binding.mapView.invalidate()
+    }
+
+    // =========================================================================
+    // WEBCAMS
+    // =========================================================================
+
+    private fun addWebcamMarker(webcam: com.example.locationmapapp.data.model.Webcam) {
+        val m = Marker(binding.mapView).apply {
+            position = webcam.toGeoPoint()
+            icon     = MarkerIconHelper.forCategory(this@MainActivity, "camera", 20)
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            title    = webcam.title
+            snippet  = webcam.categories.joinToString(", ") { it.replaceFirstChar { c -> c.uppercase() } }
+            setOnMarkerClickListener { _, _ ->
+                showWebcamPreviewDialog(webcam)
+                true
+            }
+        }
+        webcamMarkers.add(m)
+        binding.mapView.overlays.add(m)
+    }
+
+    private fun clearWebcamMarkers() {
+        webcamMarkers.forEach { binding.mapView.overlays.remove(it) }
+        webcamMarkers.clear()
+        binding.mapView.invalidate()
+    }
+
+    private fun loadWebcamsForVisibleArea() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) return
+        val bb = binding.mapView.boundingBox
+        val cats = prefs.getStringSet(AppBarMenuManager.PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
+        if (cats.isEmpty()) return
+        viewModel.loadWebcams(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast, cats.joinToString(","))
+    }
+
+    /** Debounced: reload webcams 500ms after user stops scrolling/zooming. */
+    private fun scheduleWebcamReload() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) return
+        webcamReloadJob?.cancel()
+        webcamReloadJob = lifecycleScope.launch {
+            delay(500)
+            loadWebcamsForVisibleArea()
+        }
+    }
+
+    private fun showWebcamPreviewDialog(webcam: com.example.locationmapapp.data.model.Webcam) {
+        val density = resources.displayMetrics.density
+        val imgWidth = (360 * density).toInt()
+        val imgHeight = (202 * density).toInt()  // ~16:9 from 400x224
+
+        val imageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(imgWidth, imgHeight)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setBackgroundColor(Color.parseColor("#E0E0E0"))
+        }
+
+        val catText = webcam.categories.joinToString(", ") {
+            it.replaceFirstChar { c -> c.uppercase() }
+        }
+        val infoText = TextView(this).apply {
+            text = buildString {
+                append(catText)
+                webcam.lastUpdated?.let { append("\nLast updated: $it") }
+                append("\nStatus: ${webcam.status}")
+            }
+            setPadding((16 * density).toInt(), (8 * density).toInt(), (16 * density).toInt(), (8 * density).toInt())
+            textSize = 13f
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(imageView)
+            addView(infoText)
+        }
+
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(webcam.title)
+            .setView(container)
+            .setPositiveButton("Close", null)
+            .show()
+
+        // Load preview image async via OkHttp
+        if (webcam.previewUrl.isNotBlank()) {
+            lifecycleScope.launch {
+                try {
+                    val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val client = okhttp3.OkHttpClient.Builder()
+                            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                            .build()
+                        val request = okhttp3.Request.Builder().url(webcam.previewUrl).build()
+                        val response = client.newCall(request).execute()
+                        if (response.isSuccessful) {
+                            response.body?.byteStream()?.let { android.graphics.BitmapFactory.decodeStream(it) }
+                        } else null
+                    }
+                    if (bitmap != null && dialog.isShowing) {
+                        imageView.setImageBitmap(bitmap)
+                    }
+                } catch (e: Exception) {
+                    DebugLogger.e("MainActivity", "Webcam image load failed: ${e.message}")
+                }
+            }
+        }
     }
 
     // =========================================================================
@@ -1862,16 +1994,29 @@ class MainActivity : AppCompatActivity() {
 
         // ── Cameras ───────────────────────────────────────────────────────────
 
-        override fun onTrafficCamsToggled(enabled: Boolean) {
-            DebugLogger.i("MainActivity", "onTrafficCamsToggled: $enabled")
-            // STUB: overlay highway camera markers (MassDOT / 511 feed)
-            stub("traffic_cams", enabled)
+        override fun onWebcamToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onWebcamToggled: $enabled")
+            if (enabled) {
+                loadWebcamsForVisibleArea()
+                toast("Loading webcams…")
+            } else {
+                webcamReloadJob?.cancel()
+                viewModel.clearWebcams()
+                clearWebcamMarkers()
+            }
         }
 
-        override fun onCamsMoreRequested() {
-            DebugLogger.i("MainActivity", "onCamsMoreRequested")
-            // STUB: open camera-source selection dialog / activity
-            stub("cams_more")
+        override fun onWebcamCategoriesChanged(categories: Set<String>) {
+            DebugLogger.i("MainActivity", "onWebcamCategoriesChanged: $categories")
+            val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+            if (prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) {
+                if (categories.isEmpty()) {
+                    viewModel.clearWebcams()
+                    clearWebcamMarkers()
+                } else {
+                    loadWebcamsForVisibleArea()
+                }
+            }
         }
 
         // ── POI (partially live) ──────────────────────────────────────────────

@@ -105,6 +105,22 @@ data class AircraftState(
     fun toGeoPoint() = GeoPoint(lat, lon)
 }
 
+// ── Webcam (Windy Webcams API) ──────────────────────────────────────────────
+
+data class Webcam(
+    val id: Long,
+    val title: String,
+    val lat: Double,
+    val lon: Double,
+    val categories: List<String>,
+    val previewUrl: String,
+    val thumbnailUrl: String,
+    val status: String,
+    val lastUpdated: String?
+) {
+    fun toGeoPoint() = GeoPoint(lat, lon)
+}
+
 enum class MbtaVehicleStatus(val display: String) {
     INCOMING_AT("Arriving"),
     STOPPED_AT("Stopped at"),
