@@ -33,6 +33,11 @@
         app:showAsAction="always|withText" />
 
     <item
+        android:id="@+id/menu_top_aircraft"
+        android:title="Air"
+        app:showAsAction="always|withText" />
+
+    <item
         android:id="@+id/menu_top_radar"
         android:title="Radar"
         app:showAsAction="always|withText" />

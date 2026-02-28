@@ -1,5 +1,49 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28k (Aircraft "Air" Menu, Vehicle Staleness Detection)
+
+### Context
+Aircraft controls were buried in the Alerts menu alongside weather/METAR items. Auto-follow was in Utility. Needed a dedicated top-level menu. Also discovered MBTA trains can report stale GPS positions (hours old) while still appearing in the API — needed staleness detection in the follow banner and tap info.
+
+### Changes Made
+
+#### Dedicated "Air" Top-Level Menu (`menu_aircraft.xml`, `menu_main_toolbar.xml`, `AppBarMenuManager.kt`)
+- New `menu_aircraft.xml` with: Aircraft Tracking toggle, Update Frequency slider, Auto-Follow (POI Builder)
+- New 7th toolbar button "Air" between CAMs and Radar
+- `showAircraftMenu()` method in AppBarMenuManager with full toggle/slider/sync logic
+- Removed aircraft items from `menu_gps_alerts.xml` (was alongside weather/METAR)
+- Removed Auto-Follow Aircraft from `menu_utility.xml` (moved to Air menu)
+- Toolbar now: `Alerts | Transit | CAMs | Air | Radar | POI | Utility`
+
+#### Vehicle Staleness Detection (`MainActivity.kt`)
+- New `vehicleStalenessTag(isoTimestamp)` — parses ISO-8601 timestamp, returns "" if fresh (≤2 min) or " — STALE (Xm ago)" / " — STALE (Xh Ym ago)"
+- Follow banner shows staleness on first line: "Following Train 1704 — Newburyport Line — STALE (5h 12m ago)"
+- Tap snippet (`buildTrainSnippet`) also shows staleness after the update timestamp
+- Discovered: MBTA API returns ghost vehicles with hours-old GPS data (e.g., train 1704 on shuttle-replaced weekend service)
+
+### MBTA Investigation
+- User reported missing trains near Beverly, MA
+- Root cause: Newburyport/Rockport line under weekend shuttle bus replacement (MBTA alert active Feb 28–Mar 1)
+- MBTA `/vehicles` API only reports vehicles actively broadcasting GPS — schedule shows service but no real-time vehicles
+- Train 1704 was a stale ghost entry (GPS frozen at 11:12 AM, API still reporting at 4 PM with 45 mph speed)
+
+### Status
+- **BUILD SUCCESSFUL** — compiles clean
+- **Installed on emulator** — Air menu verified working, 7 toolbar buttons visible
+- **Not yet committed**
+
+### Files Created
+- `app/src/main/res/menu/menu_aircraft.xml`
+
+### Files Changed
+- `app/src/main/res/menu/menu_main_toolbar.xml` — added Air button
+- `app/src/main/res/menu/menu_gps_alerts.xml` — removed aircraft items
+- `app/src/main/res/menu/menu_utility.xml` — removed auto-follow aircraft item
+- `app/.../ui/menu/AppBarMenuManager.kt` — showAircraftMenu(), removed aircraft from GPS Alerts and Utility handlers
+- `app/.../ui/MainActivity.kt` — vehicleStalenessTag(), staleness in follow banner and tap snippet
+
+---
+
 ## Session: 2026-02-28j (OpenSky Rate Limiter, Webcam Enhancements, Testing Fixes)
 
 ### Context

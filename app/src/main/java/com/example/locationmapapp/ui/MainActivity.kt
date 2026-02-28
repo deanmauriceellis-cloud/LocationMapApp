@@ -1458,7 +1458,26 @@ class MainActivity : AppCompatActivity() {
         }
         val speedLine  = "Speed: ${v.speedDisplay}"
         val updated    = v.updatedAt.take(19).replace("T", " ")
-        return "$statusLine\n$speedLine\nUpdated: $updated"
+        val staleTag   = vehicleStalenessTag(v.updatedAt)
+        return "$statusLine\n$speedLine\nUpdated: $updated$staleTag"
+    }
+
+    /**
+     * Parse an ISO-8601 timestamp and return a staleness tag if the update is old.
+     * Returns "" if fresh (≤2 min), or " — STALE (Xm ago)" / "(Xh ago)" etc.
+     */
+    private fun vehicleStalenessTag(isoTimestamp: String): String {
+        return try {
+            val updatedMs = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+                .parse(isoTimestamp)?.time ?: return ""
+            val ageMs = System.currentTimeMillis() - updatedMs
+            val ageSec = ageMs / 1000
+            when {
+                ageSec < 120  -> ""  // fresh
+                ageSec < 3600 -> " — STALE (${ageSec / 60}m ago)"
+                else          -> " — STALE (${ageSec / 3600}h ${(ageSec % 3600) / 60}m ago)"
+            }
+        } catch (_: Exception) { "" }
     }
 
     private fun clearTrainMarkers() {
@@ -1645,7 +1664,8 @@ class MainActivity : AppCompatActivity() {
             vehicle.stopName != null -> "${vehicle.currentStatus.display} ${vehicle.stopName}"
             else -> vehicle.currentStatus.display
         }
-        val text = "Following $typeLabel ${vehicle.label} — ${vehicle.routeName}\n" +
+        val staleTag = vehicleStalenessTag(vehicle.updatedAt)
+        val text = "Following $typeLabel ${vehicle.label} — ${vehicle.routeName}$staleTag\n" +
                    "$statusText  •  ${vehicle.speedDisplay}"
 
         if (followBanner == null) {

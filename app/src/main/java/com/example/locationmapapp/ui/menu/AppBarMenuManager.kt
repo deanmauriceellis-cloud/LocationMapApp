@@ -19,7 +19,7 @@ import com.google.android.material.slider.Slider
  * AppBarMenuManager  — v1.5
  *
  * Owns all toolbar / drop-down menu logic:
- *   • Inflates six top-level menu-bar items (GPS Alerts, Transit, CAMs, Radar, POI, Utility).
+ *   • Inflates seven top-level menu-bar items (GPS Alerts, Transit, CAMs, Air, Radar, POI, Utility).
  *   • Each item opens a PopupMenu with checkable binary items and slider-launched dialogs.
  *   • Binary state is persisted to SharedPreferences; checkmarks are synced each time a
  *     popup opens so they always reflect the stored value.
@@ -65,6 +65,7 @@ class AppBarMenuManager(
                 R.id.menu_top_gps_alerts -> { showGpsAlertsMenu(toolbar); true }
                 R.id.menu_top_transit    -> { showTransitMenu(toolbar);    true }
                 R.id.menu_top_cams       -> { showCamsMenu(toolbar);       true }
+                R.id.menu_top_aircraft   -> { showAircraftMenu(toolbar);   true }
                 R.id.menu_top_radar      -> { showRadarMenu(toolbar);      true }
                 R.id.menu_top_poi        -> { showPoiMenu(toolbar);        true }
                 R.id.menu_top_utility    -> { showUtilityMenu(toolbar);    true }
@@ -122,16 +123,6 @@ class AppBarMenuManager(
                         menuEventListener.onMetarFrequencyChanged(v)
                     }
 
-                R.id.menu_aircraft_display ->
-                    toggleBinary(item, PREF_AIRCRAFT_DISPLAY) { menuEventListener.onAircraftDisplayToggled(it) }
-
-                R.id.menu_aircraft_frequency ->
-                    showSliderDialog("Aircraft Update Frequency (sec)", 30, 300,
-                        prefs.getInt(PREF_AIRCRAFT_FREQ, 60)) { v ->
-                        prefs.edit().putInt(PREF_AIRCRAFT_FREQ, v).apply()
-                        menuEventListener.onAircraftFrequencyChanged(v)
-                    }
-
                 else -> {
                     DebugLogger.w(TAG, "GPS Alerts: unhandled id=0x${item.itemId.toString(16)}")
                     menuEventListener.onStubAction("gps_alerts_unknown:0x${item.itemId.toString(16)}")
@@ -144,8 +135,7 @@ class AppBarMenuManager(
             R.id.menu_weather_banner   to PREF_WEATHER_BANNER,
             R.id.menu_highway_alerts   to PREF_HWY_ALERTS,
             R.id.menu_traffic_speed    to PREF_TRAFFIC_SPEED,
-            R.id.menu_metar_display    to PREF_METAR_DISPLAY,
-            R.id.menu_aircraft_display to PREF_AIRCRAFT_DISPLAY
+            R.id.menu_metar_display    to PREF_METAR_DISPLAY
         )
         popup.show()
     }
@@ -285,6 +275,49 @@ class AppBarMenuManager(
     }
 
     // =========================================================================
+    // AIRCRAFT
+    // =========================================================================
+
+    private fun showAircraftMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_aircraft)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "Aircraft: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_aircraft_display ->
+                    toggleBinary(item, PREF_AIRCRAFT_DISPLAY) { menuEventListener.onAircraftDisplayToggled(it) }
+
+                R.id.menu_aircraft_frequency ->
+                    showSliderDialog("Aircraft Update Frequency (sec)", 30, 300,
+                        prefs.getInt(PREF_AIRCRAFT_FREQ, 60)) { v ->
+                        prefs.edit().putInt(PREF_AIRCRAFT_FREQ, v).apply()
+                        menuEventListener.onAircraftFrequencyChanged(v)
+                    }
+
+                R.id.menu_auto_follow_aircraft -> {
+                    val newState = !prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
+                    prefs.edit().putBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, newState).apply()
+                    item.isChecked = newState
+                    DebugLogger.i(TAG, "toggleBinary '$PREF_AUTO_FOLLOW_AIRCRAFT' → $newState")
+                    menuEventListener.onAutoFollowAircraftToggled(newState)
+                }
+
+                else -> {
+                    DebugLogger.w(TAG, "Aircraft: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("aircraft_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu,
+            R.id.menu_aircraft_display to PREF_AIRCRAFT_DISPLAY
+        )
+        // Auto-follow defaults to OFF, sync manually
+        popup.menu.findItem(R.id.menu_auto_follow_aircraft)?.isChecked =
+            prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
+        popup.show()
+    }
+
+    // =========================================================================
     // RADAR
     // =========================================================================
 
@@ -421,14 +454,6 @@ class AppBarMenuManager(
                 R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
 
-                R.id.menu_util_auto_follow_aircraft -> {
-                    val newState = !prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
-                    prefs.edit().putBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, newState).apply()
-                    item.isChecked = newState
-                    DebugLogger.i(TAG, "toggleBinary '$PREF_AUTO_FOLLOW_AIRCRAFT' → $newState")
-                    menuEventListener.onAutoFollowAircraftToggled(newState)
-                }
-
                 R.id.menu_util_gps_mode ->
                     toggleBinary(item, PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
 
@@ -443,9 +468,6 @@ class AppBarMenuManager(
             R.id.menu_util_record_gps to PREF_RECORD_GPS,
             R.id.menu_util_gps_mode   to PREF_GPS_MODE
         )
-        // Auto-follow defaults to OFF (false), so sync manually
-        popup.menu.findItem(R.id.menu_util_auto_follow_aircraft)?.isChecked =
-            prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
         popup.show()
     }
 

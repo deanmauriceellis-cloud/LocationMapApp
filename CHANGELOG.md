@@ -1,5 +1,20 @@
 # LocationMapApp — Changelog
 
+## [1.5.12] — 2026-02-28
+
+### Added
+- **"Air" top-level menu** — dedicated toolbar button for all aircraft controls
+  - Aircraft Tracking toggle, Update Frequency slider (30–300s), Auto-Follow (POI Builder)
+  - Toolbar now: Alerts | Transit | CAMs | **Air** | Radar | POI | Utility
+- **Vehicle staleness detection** — MBTA follow banner and tap snippet show age of GPS data
+  - Fresh (≤2 min): no indicator
+  - Stale (>2 min): " — STALE (Xm ago)" or " — STALE (Xh Ym ago)"
+  - Catches ghost vehicles with frozen GPS positions still reported by MBTA API
+
+### Changed
+- Aircraft controls moved out of Alerts menu into dedicated Air menu
+- Auto-Follow Aircraft (POI Builder) moved from Utility menu to Air menu
+
 ## [1.5.11] — 2026-02-28
 
 ### Added

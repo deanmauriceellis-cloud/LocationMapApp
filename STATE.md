@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 10 (OpenSky rate limiter, webcam enhancements, testing fixes)
+## Last Updated: 2026-02-28 Session 11 (Aircraft "Air" menu, vehicle staleness detection)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -42,7 +42,7 @@
   - Zoom guard: only fetches at zoom ≥ 10 to avoid massive queries
   - Reloads on scroll/zoom with 1s debounce
   - Deferred restore like METAR — waits for GPS fix
-  - FAB speed dial toggle + GPS Alerts menu toggle and frequency slider
+  - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
 - Aircraft follow mode: tap airplane → map tracks it globally via icao24 query
   - Dedicated icao24 refresh loop (not limited to bbox — tracks anywhere in the world)
   - Banner shows callsign, altitude, speed, heading, vertical rate, SPI flag
@@ -66,6 +66,7 @@
   - Proxy `/webcams` endpoint with 10-min cache TTL, includes `playerUrl` and `detailUrl` fields
   - Deferred restore on app restart, defaults ON with "traffic" pre-selected
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
+  - **Staleness detection**: banner and tap snippet show "STALE (Xm ago)" when vehicle GPS update is >2 min old
 - POI prefetch along followed vehicle/aircraft routes
 - Cached POI coverage display: proxy `/pois/bbox` endpoint returns POIs within visible map area
   - Loads on startup, refreshes on scroll/zoom (500ms debounce), refreshes after follow prefetch
