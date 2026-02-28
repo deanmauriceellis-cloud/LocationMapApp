@@ -29,6 +29,7 @@ data class WeatherAlert(
 
 data class MetarStation(
     val stationId: String,
+    val name: String?,
     val lat: Double,
     val lon: Double,
     val rawMetar: String,
@@ -36,9 +37,13 @@ data class MetarStation(
     val dewpointC: Double?,
     val windDirDeg: Int?,
     val windSpeedKt: Int?,
+    val windGustKt: Int?,
     val visibilityMiles: Double?,
     val altimeterInHg: Double?,
+    val slpMb: Double?,
     val flightCategory: String?,   // VFR / MVFR / IFR / LIFR
+    val skyCover: String?,         // CLR / FEW / SCT / BKN / OVC
+    val wxString: String?,         // weather phenomena: RA, SN, FG, etc.
     val observationTime: String?
 )
 
@@ -74,6 +79,30 @@ data class MbtaVehicle(
     val speedMph: Double? get() = speedMps?.let { it * 2.237 }
     val speedDisplay: String get() = speedMph?.let { "%.0f mph".format(it) } ?: "—"
     fun toGeoPoint() = org.osmdroid.util.GeoPoint(lat, lon)
+}
+
+// ── Aircraft (OpenSky Network) ───────────────────────────────────────────────
+
+data class AircraftState(
+    val icao24: String,
+    val callsign: String?,
+    val originCountry: String,
+    val timePosition: Long?,     // unix epoch of last position update
+    val lastContact: Long?,      // unix epoch of last message received
+    val lat: Double,
+    val lon: Double,
+    val baroAltitude: Double?,   // meters
+    val onGround: Boolean,
+    val velocity: Double?,       // m/s
+    val track: Double?,          // true track in degrees (0=north)
+    val verticalRate: Double?,   // m/s
+    val geoAltitude: Double?,    // meters
+    val squawk: String?,
+    val spi: Boolean,            // special purpose indicator (emergency/ident)
+    val positionSource: Int,     // 0=ADS-B, 1=ASTERIX, 2=MLAT, 3=FLARM
+    val category: Int            // aircraft category code
+) {
+    fun toGeoPoint() = GeoPoint(lat, lon)
 }
 
 enum class MbtaVehicleStatus(val display: String) {

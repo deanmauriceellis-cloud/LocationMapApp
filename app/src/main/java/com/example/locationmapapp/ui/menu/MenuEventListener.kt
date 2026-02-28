@@ -44,6 +44,12 @@ interface MenuEventListener {
     /** How often to refresh METAR data from aviationweather.gov. [minutes] in 1..10 */
     fun onMetarFrequencyChanged(minutes: Int)
 
+    /** Live aircraft positions from OpenSky Network. */
+    fun onAircraftDisplayToggled(enabled: Boolean)
+
+    /** How often to refresh aircraft positions. [seconds] in 5..60 */
+    fun onAircraftFrequencyChanged(seconds: Int)
+
     // =========================================================================
     // PUBLIC TRANSIT
     // =========================================================================
@@ -130,6 +136,9 @@ interface MenuEventListener {
     /** Open in-app DebugLogActivity. */
     fun onDebugLogRequested()
 
+    /** Auto-follow random high-altitude aircraft every 20 min for POI cache building. */
+    fun onAutoFollowAircraftToggled(enabled: Boolean)
+
     /** Switch between automatic GPS centering and manual tap-to-set-location mode. */
     fun onGpsModeToggled(autoGps: Boolean)
 
@@ -149,10 +158,20 @@ interface MenuEventListener {
 // POI layer ID constants — shared between AppBarMenuManager and MainActivity
 // ─────────────────────────────────────────────────────────────────────────────
 object PoiLayerId {
-    const val TRANSIT_ACCESS = "transit_access"
-    const val RESTAURANTS    = "restaurants"
-    const val GAS_STATIONS   = "gas_stations"
-    const val CIVIC          = "civic"
-    const val PARKS          = "parks"
-    const val EARTHQUAKES    = "earthquakes"
+    const val FOOD_DRINK      = "food_drink"
+    const val FUEL_CHARGING   = "fuel_charging"
+    const val TRANSIT         = "transit"
+    const val CIVIC           = "civic"
+    const val PARKS_REC       = "parks_rec"
+    const val SHOPPING        = "shopping"
+    const val HEALTHCARE      = "healthcare"
+    const val EDUCATION       = "education"
+    const val LODGING         = "lodging"
+    const val PARKING         = "parking"
+    const val FINANCE         = "finance"
+    const val WORSHIP         = "worship"
+    const val TOURISM_HISTORY = "tourism_history"
+    const val EMERGENCY       = "emergency"
+    const val AUTO_SERVICES   = "auto_services"
+    const val ENTERTAINMENT   = "entertainment"
 }

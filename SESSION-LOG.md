@@ -1,5 +1,449 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28h (Viewport-Only POI Markers with Eviction, LRU Icon Cache)
+
+### Context
+Emulator OOM after ~3 hours with all layers active + 22K POIs. POI Marker objects accumulated across all 16 category layers + the `all_cached` layer and were never evicted. The proxy already has a `GET /pois/bbox` endpoint that returns POIs within the visible bounding box, and `loadCachedPoisForVisibleArea()` fires on every scroll/zoom with 500ms debounce. Used this as the recovery mechanism — evict everything off-screen and let the bbox fetch re-materialize markers when the user scrolls back.
+
+### Changes Made
+
+#### Viewport-Only POI Display (`MainActivity.kt`, `MainViewModel.kt`)
+- **Places observer refactored**: two-path handler based on layerId
+  - `layerId == "bbox"` (from viewport bbox fetch): calls `replaceAllPoiMarkers()` — clears ALL POI markers from every layer, adds only visible results under single `"bbox"` key
+  - Any other layerId (from `searchPoisAt`): skips marker creation, schedules bbox refresh after 1s delay so newly cached data appears
+- **New `replaceAllPoiMarkers(places)`**: clears `poiMarkers` map entirely, removes all POI markers from overlays, adds only viewport results
+- **New `clearAllPoiMarkers()`**: helper to remove all POI markers from all layers at once
+- **`onPoiLayerToggled()` simplified**: toggle-off no longer calls `clearPoiMarkers(layerId)` — markers are viewport-driven, category toggles only control searching
+- **Renamed layerId**: `"all_cached"` → `"bbox"` in `loadCachedPoisForBbox()` for clarity
+
+#### LRU Icon Cache (`MarkerIconHelper.kt`)
+- Converted `cache` from `HashMap<String, BitmapDrawable>` to access-order `LinkedHashMap` with `removeEldestEntry()` override
+- Capped at 500 entries — evicts least-recently-used when exceeded
+- Prevents `labeledDot()` cache from growing unbounded with unique POI names (was 22K+ entries)
+
+### Memory Impact
+| Metric | Before | After |
+|--------|--------|-------|
+| POI Marker objects | ~22,000 (all categories accumulated) | ~100-400 (viewport only) |
+| Icon cache entries | unbounded (22K+ labeled dots) | capped at 500 (LRU) |
+| Estimated POI RAM | ~50-100 MB | ~1-2 MB |
+
+### Build Environment Note
+- Gradle requires Java 21 (`gradle/gradle-daemon-jvm.properties`)
+- System Java 17 is NOT sufficient
+- Must use JBR (JetBrains Runtime) 21.0.9 bundled with Android Studio:
+  `JAVA_HOME=/home/witchdoctor/AndroidStudio/android-studio/jbr ./gradlew assembleDebug`
+
+### Status
+- **BUILD SUCCESSFUL** — compiles clean with 2 warnings (deprecated `setBuiltInZoomControls`, always-true condition)
+- **Not yet tested on emulator** — needs extended run to verify OOM fix
+
+### Files Changed
+- `app/.../ui/MainActivity.kt` — observer refactored, `replaceAllPoiMarkers()`, `clearAllPoiMarkers()`, simplified `onPoiLayerToggled()`
+- `app/.../ui/MainViewModel.kt` — renamed `"all_cached"` → `"bbox"`
+- `app/.../ui/MarkerIconHelper.kt` — LRU cache cap at 500 entries
+
+---
+
+## Session: 2026-02-28g (PostgreSQL Query API, Aircraft Sightings DB, OpenSky OAuth2, Smart Auto-Follow)
+
+### Context
+POI cache had grown to 8,198 POIs (7,797 in PostgreSQL). The `pg` dependency was installed but unused — all endpoints used in-memory JSON. Added DB-backed query endpoints, real-time aircraft sighting tracking, OpenSky OAuth2 authentication, and smarter auto-follow logic.
+
+### Changes Made
+
+#### PostgreSQL POI Query API (`cache-proxy/server.js`, `cache-proxy/schema.sql`)
+- Added `pg` Pool init with `DATABASE_URL` env var (max 5 connections, 5s timeout)
+- `requirePg` middleware: `/db/*` routes return 503 if no DATABASE_URL
+- Added compound index `idx_pois_lat_lon ON pois (lat, lon)` for bbox queries
+- **6 new `/db/*` endpoints** (all parameterized SQL, Haversine distance):
+  - `GET /db/pois/search` — combined filtered search (q, category, category_like, bbox, lat/lon, radius, tag, tag_value, limit, offset)
+  - `GET /db/pois/nearby` — nearby POIs sorted by distance with bbox pre-filter
+  - `GET /db/poi/:type/:id` — single POI lookup with first_seen/last_seen
+  - `GET /db/pois/stats` — 5 parallel queries: total, named, top categories, bounds, time range
+  - `GET /db/pois/categories` — GROUP BY with key/value split
+  - `GET /db/pois/coverage` — rounded lat/lon grid with configurable resolution
+- Response format matches Overpass JSON (`{ count, elements: [{ type, id, lat, lon, tags }] }`)
+
+#### Aircraft Sightings Database (`cache-proxy/server.js`, `cache-proxy/schema.sql`)
+- New `aircraft_sightings` table: serial PK, icao24, callsign, origin_country, first/last seen+lat+lon+altitude+heading, velocity, vertical_rate, squawk, on_ground
+- Each continuous observation = separate row; 5-min gap = new sighting (enables flight history)
+- In-memory `activeSightings` map tracks which DB row to update
+- `trackAircraftSightings()` called on every aircraft response (cache hits AND misses)
+- Stale sighting purge every 10 minutes
+- Indexes: icao24, callsign, first_seen, last_seen, last_lat+lon
+- Results after ~8 hours: 28,690 sightings, 8,337 unique aircraft, 9,342 unique callsigns
+
+#### OpenSky OAuth2 Authentication (`cache-proxy/server.js`)
+- Replaced basic auth with OAuth2 client credentials flow
+- Token endpoint: `auth.opensky-network.org/.../openid-connect/token`
+- `getOpenskyToken()`: caches token, auto-refreshes 5 min before expiry (30-min tokens)
+- `OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` env vars
+- Graceful degradation: no credentials = anonymous (100 req/day)
+- Authenticated: 4,000 req/day
+
+#### Smart Auto-Follow Improvements (`MainActivity.kt`)
+- **Wider search bbox**: 1.5°×2° → 6°×8° (covers most of the northeast/CONUS)
+- **Lower altitude floor**: 20,000 ft → 10,000 ft (more candidates at night)
+- **Altitude switch**: below 10,000 ft → picks any new aircraft
+- **Over water switch**: 0 POIs → `pickFurthestWestAircraft()` (most inland candidate)
+- **US boundary check**: lat >49°, <25°, lon >-66°, <-125° → `pickInteriorAircraft()` (closest to geographic center of US ~39°N, -98°W)
+- `pickAndFollowRandomAircraft(westboundOnly)` parameter for forced westbound selection
+- `selectAndFollow(candidates, westboundOnly)` enforces westbound-only when flag set
+
+### Test Results
+- All 6 `/db/*` endpoints tested with curl — search, nearby, stats, categories, coverage, single lookup all working
+- Existing endpoints (`/pois/bbox`, `/pois/stats`, `/cache/stats`) unchanged
+- OpenSky OAuth2: token refresh working, HTTP 200 on authenticated requests
+- Aircraft DB: INSERT + UPDATE paths verified, positions updating in real-time
+- Auto-follow ran for ~8 hours: POI cache grew from 8,198 → 22,494; aircraft sightings collected 28,690 rows
+- Emulator OOM after ~3 hours with all layers active (memory pressure kill, not crash)
+
+### Files Changed
+- `cache-proxy/server.js` — PG pool, 6 `/db/*` endpoints, aircraft sighting tracker, OpenSky OAuth2, startup log
+- `cache-proxy/schema.sql` — lat/lon compound index, aircraft_sightings table + indexes
+- `app/.../ui/MainActivity.kt` — smart auto-follow (altitude check, furthest-west, interior US, wider bbox, lower altitude floor)
+
+---
+
+## Session: 2026-02-28f (Auto-Follow Aircraft POI Builder, Labeled POI Markers)
+
+### Context
+User wants to passively build the POI cache by automatically following random high-altitude aircraft. Also wants POI markers to show category type and business name at high zoom levels.
+
+### Changes Made
+
+#### Auto-Follow Aircraft — POI Builder (`menu_utility.xml`, `AppBarMenuManager.kt`, `MenuEventListener.kt`, `MainActivity.kt`)
+- New checkable Utility menu item "Auto-Follow Aircraft (POI Builder)"
+- `PREF_AUTO_FOLLOW_AIRCRAFT` constant (defaults false/off)
+- `onAutoFollowAircraftToggled()` callback wired through MenuEventListener
+- `startAutoFollowAircraft()` — ensures aircraft layer on, picks immediately, starts 20-min rotation job
+- `stopAutoFollowAircraft()` — cancels job, stops follow, toasts
+- `pickAndFollowRandomAircraft()` — computes zoom-11-equivalent bbox centered on map (1.5° × 2°) without changing user's zoom, queries aircraft, filters ≥ 20,000 ft altitude
+- `selectAndFollow()` — prioritizes westbound aircraft (track 180–360°) since this is New England east coast, excludes currently followed icao24 for variety
+- `filterHighAltitude()` — filters by `baroAltitude * 3.28084 >= 20000`
+- Banner prefix: "Auto-following ✈" when auto-follow active, "Following ✈" for manual
+- Edge cases:
+  - Aircraft lost from feed → if auto-follow active, immediately picks replacement
+  - No-POI zone: after 2 consecutive empty POI prefetches, switches to new aircraft
+  - Aircraft layer toggled off (menu or FAB) → cancels auto-follow, clears pref
+  - `onStart()` restore: deferred 5s after GPS fix so aircraft data has loaded
+- **3-strike failure tolerance**: `followedAircraftFailCount` tracks consecutive null responses from icao24 query; only declares "lost" after 3 failures (handles HTTP 429 rate limits)
+
+#### Labeled POI Markers at Zoom 18+ (`MarkerIconHelper.kt`, `MainActivity.kt`)
+- New `MarkerIconHelper.labeledDot()` — composite icon: category label → dot → name label
+  - Category humanized ("fast_food" → "Fast Food"), bold, colored to match category
+  - Name in dark gray below dot
+  - White pill backgrounds for readability, cached by color|type|name
+- `addPoiMarker()` checks `zoomLevelDouble >= 18.0` — uses `labeledDot` or `dot`
+- `PlaceResult` stored on `marker.relatedObject` for icon refresh without re-query
+- `refreshPoiMarkerIcons()` swaps all POI marker icons when crossing zoom threshold
+- `poiLabelsShowing` flag tracked in `onZoom` handler — triggers refresh on threshold crossing
+
+### Test Results
+- Auto-follow: toggled on, queried wide bbox (20 aircraft), filtered to 1 at 35,000 ft (FIN16), followed correctly
+- Pref persists across restart, auto-restores with deferred timing
+- POI labels: verified at zoom 18 — "Nature Reserve" / "Sarah Doublet Forest", "Park" / "Bumblebee Park", "Place Of Worship" / "Abundant Life Assembly Church"
+- Labels disappear when zooming below 18 (back to dots)
+- OpenSky 429 rate limit observed — 3-strike tolerance prevents premature aircraft loss
+
+## Session: 2026-02-28e (Enhanced Aircraft Markers, Aircraft Follow, POI Coverage Display)
+
+### Context
+Aircraft markers were basic (small icon with arrow). Needed: rotated airplane pointing to heading, callsign labels, vertical rate indicators, SPI emergency rings, aircraft follow mode, and cached POI coverage display for database building.
+
+### Changes Made
+
+#### Enhanced Aircraft Markers (`MarkerIconHelper.kt`)
+- New `aircraftMarker()` method replaces `withArrow()` for aircraft
+- Airplane icon **rotated to heading** — the plane itself points where it's flying
+- **Callsign text label** above icon with white pill background
+- **Vertical rate indicator**: ↑ climbing, ↓ descending, — level (next to callsign)
+- **SPI emergency ring**: thick red circle around marker when Special Purpose Indicator active
+
+#### New OpenSky Fields (`Models.kt`, `AircraftRepository.kt`)
+- Added `timePosition`, `lastContact`, `spi`, `positionSource` to `AircraftState`
+- Parses all 18 state vector fields (indices 3, 4, 15, 16 added)
+- Tap info shows: position source (ADS-B/MLAT/ASTERIX/FLARM), data age, SPI warning
+
+#### Aircraft Follow Mode (`MainActivity.kt`, `MainViewModel.kt`)
+- Tap aircraft marker to follow — map centers, dark banner shows flight info
+- **Global tracking via icao24 query** — not limited to visible bbox
+  - Proxy: `/aircraft?icao24=hex` route (no bbox needed, queries OpenSky globally)
+  - Dedicated `followedAircraftRefreshJob` polls at aircraft refresh interval
+  - `followedAircraft` LiveData in ViewModel for icao24 query results
+- Banner: callsign, altitude, speed, heading, vertical rate, SPI flag
+- Tap banner to stop; auto-stops when aircraft disappears from feed
+- Starting vehicle follow cancels aircraft follow and vice versa
+- Toggling aircraft layer off cancels follow
+
+#### POI Prefetch on Aircraft Follow
+- Each aircraft follow refresh fires `searchPoisAt()` at the aircraft's position
+- Same pattern as existing MBTA vehicle follow POI prefetch
+- Fills proxy cache + poi-cache.json as the plane flies over new territory
+
+#### Cached POI Coverage Display
+- **Proxy**: new `GET /pois/bbox?s=...&w=...&n=...&e=...` endpoint
+  - Returns all cached POIs within bounding box from poi-cache.json
+  - Server-side filtering — app only receives visible subset
+- **App**: `loadCachedPoisForVisibleArea()` calls bbox endpoint
+  - Fires on startup (deferred after GPS fix)
+  - Fires on scroll/zoom (500ms debounce)
+  - Fires 3s after each follow prefetch (aircraft or vehicle)
+- Replaces old per-grid-cell cache-only Overpass queries
+- No in-memory cache of all POIs — proxy handles filtering
+
+#### PostgreSQL Import
+- 7797 POIs imported (up from 1334)
+- DB user `witchdoctor` created with password auth
+
+### Status
+- **Builds clean** — BUILD SUCCESSFUL
+- **Tested on emulator** — aircraft follow working, POI prefetch populating cache along flight paths
+- **7797 POIs in PostgreSQL** after import
+
+### Files Created
+- None (all changes to existing files)
+
+### Files Changed
+- `app/.../data/model/Models.kt` — 4 new AircraftState fields
+- `app/.../data/repository/AircraftRepository.kt` — parse new fields + fetchAircraftByIcao()
+- `app/.../data/repository/PlacesRepository.kt` — fetchCachedPoisInBbox()
+- `app/.../ui/MarkerIconHelper.kt` — aircraftMarker() method
+- `app/.../ui/MainActivity.kt` — aircraft follow mode, cached POI bbox display, scroll handler
+- `app/.../ui/MainViewModel.kt` — followedAircraft LiveData, loadCachedPoisForBbox()
+- `cache-proxy/server.js` — /aircraft?icao24= support, /pois/bbox endpoint
+
+---
+
+## Session: 2026-02-28d (OpenSky Aircraft Tracking, GPS Center Fix)
+
+### Context
+Adding live aircraft positions to the map using the OpenSky Network API. Aircraft displayed as airplane markers with directional arrows showing heading, color-coded by altitude. Also fixed a long-standing issue where GPS updates constantly re-centered the map.
+
+### Changes Made
+
+#### Aircraft Tracking — Full Stack
+- **Proxy** (`cache-proxy/server.js`): Added `GET /aircraft?bbox=s,w,n,e` route
+  - Upstream: `opensky-network.org/api/states/all?lamin=...`
+  - 15-second TTL cache per bbox
+- **Model** (`Models.kt`): `AircraftState` data class — icao24, callsign, origin, lat/lon, altitude (baro+geo), velocity, track, vertical rate, squawk, category
+- **Repository** (`AircraftRepository.kt`): new `@Singleton`, parses OpenSky state vectors (mixed-type JSON arrays)
+  - Guards index 17 (category) with `s.size() > 17` — not always present
+  - Filters null lat/lon entries
+- **ViewModel** (`MainViewModel.kt`): `_aircraft`/`aircraft` LiveData, `loadAircraft()`, `clearAircraft()`
+  - Injected `AircraftRepository` via Hilt
+- **Menu** (`menu_gps_alerts.xml`): Aircraft Tracking toggle + frequency slider
+  - `MenuEventListener.kt`: `onAircraftDisplayToggled()`, `onAircraftFrequencyChanged()`
+  - `AppBarMenuManager.kt`: `PREF_AIRCRAFT_DISPLAY`, `PREF_AIRCRAFT_FREQ`, slider range 30–300s
+- **Drawable** (`ic_aircraft.xml`): 24dp airplane silhouette vector icon
+- **MarkerIconHelper.kt**: Added `aircraft` category entry
+- **MainActivity.kt**: Full integration
+  - `aircraftMarkers` list, `aircraftRefreshJob`, `aircraftRefreshIntervalSec` (default 60s)
+  - `addAircraftMarker()`: altitude-colored (green/blue/purple/gray), `withArrow()` for heading
+  - `buildAircraftSnippet()`: altitude ft, speed kt+mph, heading, vertical rate fpm, squawk, origin, category name
+  - `startAircraftRefresh()`/`stopAircraftRefresh()`: coroutine loop at configurable interval
+  - `loadAircraftForVisibleArea()`: zoom ≥ 10 guard
+  - `scheduleAircraftReload()`: 1s debounced reload on scroll/zoom (via MapListener)
+  - `pendingAircraftRestore`: deferred load after GPS fix + 1.5s settle
+  - `toggleAircraftFromFab()`: FAB quick-toggle mirrors menu logic
+  - Menu callbacks: `onAircraftDisplayToggled`, `onAircraftFrequencyChanged`
+
+#### GPS Center Fix
+- Map was re-centering on every GPS update (~60s), preventing the user from panning away
+- Added `initialCenterDone` flag — map only auto-centers on the **first** GPS fix
+- Subsequent GPS updates still move the GPS marker but don't pan the map
+
+#### Defaults
+- Aircraft tracking defaults **ON** (all layers default ON)
+- Frequency slider: 30s–5min range, default 60s
+
+### Bug Fixes During Testing
+- **IndexOutOfBoundsException**: OpenSky state vectors sometimes have 17 elements (indices 0–16), category at index 17 missing. Guarded with `s.size() > 17`.
+- **Stuck bbox**: Aircraft refresh loop wasn't picking up user's zoom/scroll changes. Fixed by adding `scheduleAircraftReload()` in MapListener's `onScroll`/`onZoom`.
+
+### Status
+- **Builds clean** — BUILD SUCCESSFUL
+- **Tested on emulator** — 26 aircraft visible near Boston at zoom 10-11
+- **Next**: enhance markers to show rotated airplane icon with callsign + altitude text labels
+
+### Files Created
+- `app/.../data/repository/AircraftRepository.kt`
+- `app/src/main/res/drawable/ic_aircraft.xml`
+
+### Files Changed
+- `cache-proxy/server.js` — /aircraft route
+- `app/.../data/model/Models.kt` — AircraftState
+- `app/.../ui/MainViewModel.kt` — aircraft LiveData + loadAircraft
+- `app/src/main/res/menu/menu_gps_alerts.xml` — aircraft menu items
+- `app/.../ui/menu/MenuEventListener.kt` — aircraft callbacks
+- `app/.../ui/menu/AppBarMenuManager.kt` — aircraft prefs + handling
+- `app/.../ui/MarkerIconHelper.kt` — aircraft category
+- `app/.../ui/MainActivity.kt` — aircraft markers, refresh, restore, FAB, GPS center fix
+
+---
+
+## Session: 2026-02-28c (METAR deferred load, human-readable snippets, vehicle direction arrows)
+
+### Context
+METAR stations were not appearing on startup because `loadMetarsForVisibleArea()` fired during `onStart()` before the map had a valid bounding box (returned `0,0,0,0`). METAR tap info was compact/abbreviated. MBTA vehicle markers had no indication of travel direction.
+
+### Changes Made
+
+#### METAR Deferred Load
+- Added `pendingMetarRestore` flag alongside existing `pendingPoiRestore`
+- `onStart()` now defers METAR load instead of calling `loadMetarsForVisibleArea()` immediately
+- METAR fires after GPS fix + `postDelayed(1500ms)` to let `animateTo()` animation settle
+- Verified: bbox now correctly reflects Beverly area (42.55,-71.01) instead of 0,0,0,0
+
+#### METAR HTTP 204 Handling
+- `WeatherRepository.fetchMetars()`: changed `response.body!!.string()` to `response.body?.string().orEmpty()`
+- Returns empty list when body is blank instead of crashing on `JsonParser.parseString("")`
+
+#### Human-Readable METAR Tap Info
+- Rewrote `buildMetarSnippet()` in MainActivity
+- Wind: compass direction ("Southwest") instead of degrees (200°)
+- Sky: decoded ("Scattered clouds") instead of abbreviation ("SCT")
+- Weather phenomena: expanded via `decodeWx()` helper ("Light Rain" not "-RA")
+- Flight category: explained ("VFR (Visual Flight Rules)")
+- Observation time: formatted to local time ("9:53 PM")
+- Added `degreesToCompass()` and `decodeWx()` helper methods
+- Raw METAR kept at bottom for reference
+
+#### Vehicle Direction Arrows
+- Added `MarkerIconHelper.withArrow()` method
+- Composites a small triangular arrow above the base vehicle icon, rotated to bearing
+- Arrow is 8dp, same color as the vehicle icon
+- Applied to all three vehicle types: trains (30dp), subway (26dp), buses (22dp)
+- Arrow not cached by bearing to avoid excessive cache entries — cached per (resId, size, color, bearing)
+
+### Status
+- **Builds clean** — BUILD SUCCESSFUL
+- **Tested** — METAR loads correctly after GPS fix, KBVY shows for Beverly area
+
+### Files Changed
+- `app/.../data/repository/WeatherRepository.kt` — HTTP 204 handling
+- `app/.../ui/MainActivity.kt` — deferred METAR, human-readable snippet, arrow calls
+- `app/.../ui/MarkerIconHelper.kt` — `withArrow()` method
+
+---
+
+## Session: 2026-02-28b (Defaults ON, Layer-aware LiveData, METAR Overhaul)
+
+### Context
+After expanding to 16 POI categories, all layers defaulted to OFF on fresh install. POI markers overwrote each other because all 16 categories shared a single LiveData. METAR was failing with HTTP 400 (API now requires bbox). METAR markers showed only a small icon with no weather data visible on the map.
+
+### Changes Made
+
+#### All Layers Default ON
+- POI categories: `getBoolean(prefKey, false)` → `true` in MainActivity restore + AppBarMenuManager toggle/sync
+- MBTA trains, subway, buses: restore defaults changed to `true`
+- Radar and METAR: restore defaults changed to `true`
+- Fresh install now shows everything immediately
+
+#### Layer-Aware POI LiveData
+- `_places` changed from `MutableLiveData<List<PlaceResult>>` to `MutableLiveData<Pair<String, List<PlaceResult>>>`
+- `searchPoisAt()` now takes `layerId` parameter, emits `layerId to results`
+- `searchPoisFromCache()` emits with `"cache"` layerId
+- Observer destructures pair: `{ (layerId, places) -> }` — only clears/replaces that specific layer
+- Removed `activePoiLayerId` variable (no longer needed)
+- Fixes: all 16 categories now coexist on map simultaneously
+
+#### METAR Bbox Passthrough
+- Proxy: replaced static `proxyGet('/metar', ...)` with custom route accepting `?bbox=lat0,lon0,lat1,lon1`
+- Proxy caches per-bbox key with 1h TTL
+- App: `fetchMetars()` now takes `(south, west, north, east)` bounds
+- ViewModel: `loadAllUsMetars()` → `loadMetars(south, west, north, east)`
+- MainActivity: `loadMetarsForVisibleArea()` helper gets map bounding box
+
+#### Rich METAR Station Markers
+- `MetarStation` model: added `name`, `windGustKt`, `slpMb`, `skyCover`, `wxString`
+- Parser: fixed `fltCat` field name (was `fltcat`), handles `visib` as string (`"10+"`), parses all new fields
+- Map marker: text-based bitmap with temp (°F), wind arrow+speed, sky/wx — color-coded border by flight category
+- Tap snippet: full METAR details (temp °F/°C, dewpoint, wind/gusts, vis, sky, wx, altimeter, SLP, raw METAR)
+- `windDirToArrow()` helper converts degrees to unicode arrows
+
+### Status
+- **Builds clean** — BUILD SUCCESSFUL
+- **Tested** — all layers load on fresh install, METAR stations display with weather data
+
+### Files Changed
+- `app/.../data/model/Models.kt` — MetarStation expanded
+- `app/.../data/repository/WeatherRepository.kt` — bbox param, new field parsing
+- `app/.../ui/MainActivity.kt` — defaults ON, layer-aware observer, METAR station icons, loadMetarsForVisibleArea()
+- `app/.../ui/MainViewModel.kt` — Pair LiveData, loadMetars(bbox)
+- `app/.../ui/menu/AppBarMenuManager.kt` — toggle/sync defaults to true
+- `cache-proxy/server.js` — METAR bbox route
+
+---
+
+## Session: 2026-02-27b (16 POI Categories with Submenu Refinement)
+
+### Context
+App had 6 POI toggles (Restaurants, Gas, Transit, Civic, Parks, Earthquakes). Expanded to 16 useful categories, dropped Earthquakes entirely. Categories with natural subtypes get an AlertDialog submenu for refinement.
+
+### Changes Made
+
+#### New: `PoiCategories.kt` — Central Category Config
+- `PoiCategory` data class: id, label, prefKey, tags, subtypes, color
+- `PoiSubtype` data class: label, tags (for submenu checkboxes)
+- `PoiCategories.ALL` — single source of truth for all 16 categories
+- Menu, toggles, restore, queries, and marker colors all driven from this list
+
+#### `MenuEventListener.kt` — PoiLayerId Expanded
+- 6 constants → 16: `FOOD_DRINK`, `FUEL_CHARGING`, `TRANSIT`, `CIVIC`, `PARKS_REC`, `SHOPPING`, `HEALTHCARE`, `EDUCATION`, `LODGING`, `PARKING`, `FINANCE`, `WORSHIP`, `TOURISM_HISTORY`, `EMERGENCY`, `AUTO_SERVICES`, `ENTERTAINMENT`
+- Old IDs removed: `RESTAURANTS`, `GAS_STATIONS`, `EARTHQUAKES`, `TRANSIT_ACCESS`, `PARKS`
+
+#### `menu_poi.xml` — 16 Menu Items
+- Categories with subtypes show `▸` suffix (e.g., "Food & Drink ▸")
+
+#### `AppBarMenuManager.kt` — Data-Driven POI Menu
+- Old 6 `PREF_POI_*` constants removed (now driven by `PoiCategory.prefKey`)
+- `showPoiMenu()` rewritten: `menuIdToCategory` lookup map, iterates `PoiCategories.ALL`
+- Simple categories toggle directly; subtype categories open `showPoiSubtypeDialog()`
+- `showPoiSubtypeDialog()`: AlertDialog with multi-choice checkboxes, stores selections as `StringSet` pref
+- `getActiveTags(categoryId)`: returns Overpass tags filtered by selected subtypes
+
+#### `MarkerIconHelper.kt` — ~80 Category Mappings
+- Expanded from 20 to ~80 entries covering all subtypes across all 16 categories
+- Each subtype maps to its parent category's color
+- Earthquake entry removed
+
+#### `PlacesRepository.kt` — Expanded Category Extraction, Earthquake Code Removed
+- `parseOverpassJson()` category chain: `amenity → shop → tourism → leisure → historic → office → "place"`
+- `searchGasStations()` removed (use `searchPois()` with `amenity=fuel`)
+- `fetchEarthquakes()` and `parseEarthquakeJson()` removed entirely
+
+#### `MainViewModel.kt` — Removed Gas/Earthquake LiveData
+- `gasStations` LiveData and `loadGasStations()` removed
+- `earthquakes` LiveData and `loadEarthquakesForMap()` removed
+- `searchPoisAt()` is the unified entry point for all POI searches
+
+#### `MainActivity.kt` — Unified Marker Tracking
+- 3 separate marker lists → `poiMarkers: MutableMap<String, MutableList<Marker>>`
+- `activePoiLayerId` tracks which layer owns current places observer result
+- `clearPoiMarkers(layerId)` and `addPoiMarker(layerId, place)` — per-layer ops
+- `onPoiLayerToggled()` rewritten: lookup category, get active tags, unified search
+- FAB speed dial: removed Earthquakes and Gas Stations buttons
+- `onStart()` restore: iterates all 16 categories from `PoiCategories.ALL`
+- Deferred restore: fires searches for all enabled categories with subtype filtering
+
+### Status
+- **Builds clean** (`./gradlew assembleDebug` — BUILD SUCCESSFUL)
+- **Not yet committed** — changes are unstaged
+
+### Files Changed
+- `app/src/main/java/.../ui/menu/PoiCategories.kt` (new)
+- `app/src/main/java/.../ui/menu/MenuEventListener.kt`
+- `app/src/main/java/.../ui/menu/AppBarMenuManager.kt`
+- `app/src/main/res/menu/menu_poi.xml`
+- `app/src/main/java/.../ui/MarkerIconHelper.kt`
+- `app/src/main/java/.../data/repository/PlacesRepository.kt`
+- `app/src/main/java/.../ui/MainViewModel.kt`
+- `app/src/main/java/.../ui/MainActivity.kt`
+
+---
+
 ## Session: 2026-02-28 (POI Database — PostgreSQL)
 
 ### Context

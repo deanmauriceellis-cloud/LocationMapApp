@@ -34,6 +34,13 @@
         android:title="Email GPS Coordinates (GPX)…"
         app:showAsAction="never" />
 
+    <!-- Auto-follow random high-altitude aircraft for passive POI cache building -->
+    <item
+        android:id="@+id/menu_util_auto_follow_aircraft"
+        android:title="Auto-Follow Aircraft (POI Builder)"
+        android:checkable="true"
+        app:showAsAction="never" />
+
     <item android:id="@+id/menu_util_divider" style="@style/Widget.AppCompat.ActionBar.TabBar"/>
 
     <!-- Debug log viewer (existing feature surfaced here) -->

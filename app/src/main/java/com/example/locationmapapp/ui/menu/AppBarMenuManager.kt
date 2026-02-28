@@ -122,6 +122,16 @@ class AppBarMenuManager(
                         menuEventListener.onMetarFrequencyChanged(v)
                     }
 
+                R.id.menu_aircraft_display ->
+                    toggleBinary(item, PREF_AIRCRAFT_DISPLAY) { menuEventListener.onAircraftDisplayToggled(it) }
+
+                R.id.menu_aircraft_frequency ->
+                    showSliderDialog("Aircraft Update Frequency (sec)", 30, 300,
+                        prefs.getInt(PREF_AIRCRAFT_FREQ, 60)) { v ->
+                        prefs.edit().putInt(PREF_AIRCRAFT_FREQ, v).apply()
+                        menuEventListener.onAircraftFrequencyChanged(v)
+                    }
+
                 else -> {
                     DebugLogger.w(TAG, "GPS Alerts: unhandled id=0x${item.itemId.toString(16)}")
                     menuEventListener.onStubAction("gps_alerts_unknown:0x${item.itemId.toString(16)}")
@@ -130,11 +140,12 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_weather_alerts to PREF_WEATHER_ALERTS,
-            R.id.menu_weather_banner to PREF_WEATHER_BANNER,
-            R.id.menu_highway_alerts to PREF_HWY_ALERTS,
-            R.id.menu_traffic_speed  to PREF_TRAFFIC_SPEED,
-            R.id.menu_metar_display  to PREF_METAR_DISPLAY
+            R.id.menu_weather_alerts   to PREF_WEATHER_ALERTS,
+            R.id.menu_weather_banner   to PREF_WEATHER_BANNER,
+            R.id.menu_highway_alerts   to PREF_HWY_ALERTS,
+            R.id.menu_traffic_speed    to PREF_TRAFFIC_SPEED,
+            R.id.menu_metar_display    to PREF_METAR_DISPLAY,
+            R.id.menu_aircraft_display to PREF_AIRCRAFT_DISPLAY
         )
         popup.show()
     }
@@ -271,45 +282,82 @@ class AppBarMenuManager(
     // POINTS OF INTEREST
     // =========================================================================
 
+    /** Map from menu item XML id to PoiCategory.id — built once via reflection. */
+    private val menuIdToCategory: Map<Int, PoiCategory> by lazy {
+        PoiCategories.ALL.mapNotNull { cat ->
+            val resName = "menu_poi_${cat.id}"
+            val resId = context.resources.getIdentifier(resName, "id", context.packageName)
+            if (resId != 0) resId to cat else null
+        }.toMap()
+    }
+
     private fun showPoiMenu(anchor: View) {
         val popup = buildPopup(anchor, R.menu.menu_poi)
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "POI: '${item.title}'")
-            when (item.itemId) {
-                R.id.menu_poi_transit_access ->
-                    toggleBinary(item, PREF_POI_TRANSIT)     { menuEventListener.onPoiLayerToggled(PoiLayerId.TRANSIT_ACCESS, it) }
-
-                R.id.menu_poi_restaurants ->
-                    toggleBinary(item, PREF_POI_RESTAURANTS) { menuEventListener.onPoiLayerToggled(PoiLayerId.RESTAURANTS, it) }
-
-                R.id.menu_poi_gas_stations ->
-                    toggleBinary(item, PREF_POI_GAS)         { menuEventListener.onPoiLayerToggled(PoiLayerId.GAS_STATIONS, it) }
-
-                R.id.menu_poi_civic ->
-                    toggleBinary(item, PREF_POI_CIVIC)       { menuEventListener.onPoiLayerToggled(PoiLayerId.CIVIC, it) }
-
-                R.id.menu_poi_parks ->
-                    toggleBinary(item, PREF_POI_PARKS)       { menuEventListener.onPoiLayerToggled(PoiLayerId.PARKS, it) }
-
-                R.id.menu_poi_earthquakes ->
-                    toggleBinary(item, PREF_POI_EARTHQUAKES) { menuEventListener.onPoiLayerToggled(PoiLayerId.EARTHQUAKES, it) }
-
-                else -> {
-                    DebugLogger.w(TAG, "POI: unhandled id=0x${item.itemId.toString(16)}")
-                    menuEventListener.onStubAction("poi_unknown:0x${item.itemId.toString(16)}")
+            val cat = menuIdToCategory[item.itemId]
+            if (cat != null) {
+                if (cat.subtypes != null) {
+                    // Has subtypes → show subtype dialog (always, whether toggling on or off)
+                    showPoiSubtypeDialog(cat, item)
+                } else {
+                    // Simple toggle — no subtypes
+                    toggleBinary(item, cat.prefKey) { menuEventListener.onPoiLayerToggled(cat.id, it) }
                 }
+            } else {
+                DebugLogger.w(TAG, "POI: unhandled id=0x${item.itemId.toString(16)}")
+                menuEventListener.onStubAction("poi_unknown:0x${item.itemId.toString(16)}")
             }
             true
         }
-        syncCheckStates(popup.menu,
-            R.id.menu_poi_transit_access to PREF_POI_TRANSIT,
-            R.id.menu_poi_restaurants    to PREF_POI_RESTAURANTS,
-            R.id.menu_poi_gas_stations   to PREF_POI_GAS,
-            R.id.menu_poi_civic          to PREF_POI_CIVIC,
-            R.id.menu_poi_parks          to PREF_POI_PARKS,
-            R.id.menu_poi_earthquakes    to PREF_POI_EARTHQUAKES
-        )
+        // Sync check states for all 16 categories
+        val pairs = menuIdToCategory.map { (resId, cat) -> resId to cat.prefKey }.toTypedArray()
+        syncCheckStates(popup.menu, *pairs)
         popup.show()
+    }
+
+    /**
+     * Show an AlertDialog with multi-choice checkboxes for a category's subtypes.
+     * Checking any subtype enables the layer; unchecking all disables it.
+     * Selected subtypes are stored as a StringSet pref keyed "poi_{id}_subtypes".
+     */
+    private fun showPoiSubtypeDialog(cat: PoiCategory, menuItem: android.view.MenuItem) {
+        val subtypes = cat.subtypes ?: return
+        val subtypePrefKey = "poi_${cat.id}_subtypes"
+        val savedSet = prefs.getStringSet(subtypePrefKey, null) ?: emptySet()
+
+        val labels = subtypes.map { it.label }.toTypedArray()
+        val checked = BooleanArray(subtypes.size) { i -> savedSet.contains(subtypes[i].label) }
+
+        AlertDialog.Builder(context)
+            .setTitle(cat.label)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton("OK") { _, _ ->
+                val selected = subtypes.filterIndexed { i, _ -> checked[i] }.map { it.label }.toSet()
+                prefs.edit().putStringSet(subtypePrefKey, selected).apply()
+                val anySelected = selected.isNotEmpty()
+                prefs.edit().putBoolean(cat.prefKey, anySelected).apply()
+                menuItem.isChecked = anySelected
+                DebugLogger.i(TAG, "POI subtype dialog OK: ${cat.id} selected=$selected enabled=$anySelected")
+                menuEventListener.onPoiLayerToggled(cat.id, anySelected)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Get the active Overpass tags for a category, filtered by selected subtypes.
+     * If no subtypes exist or none saved, returns the full default tag list.
+     */
+    fun getActiveTags(categoryId: String): List<String> {
+        val cat = PoiCategories.find(categoryId) ?: return emptyList()
+        val subtypes = cat.subtypes ?: return cat.tags
+        val subtypePrefKey = "poi_${cat.id}_subtypes"
+        val savedSet = prefs.getStringSet(subtypePrefKey, null)
+        if (savedSet.isNullOrEmpty()) return cat.tags
+        return subtypes.filter { savedSet.contains(it.label) }.flatMap { it.tags }
     }
 
     // =========================================================================
@@ -330,6 +378,14 @@ class AppBarMenuManager(
                 R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
 
+                R.id.menu_util_auto_follow_aircraft -> {
+                    val newState = !prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
+                    prefs.edit().putBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, newState).apply()
+                    item.isChecked = newState
+                    DebugLogger.i(TAG, "toggleBinary '$PREF_AUTO_FOLLOW_AIRCRAFT' → $newState")
+                    menuEventListener.onAutoFollowAircraftToggled(newState)
+                }
+
                 R.id.menu_util_gps_mode ->
                     toggleBinary(item, PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
 
@@ -344,6 +400,9 @@ class AppBarMenuManager(
             R.id.menu_util_record_gps to PREF_RECORD_GPS,
             R.id.menu_util_gps_mode   to PREF_GPS_MODE
         )
+        // Auto-follow defaults to OFF (false), so sync manually
+        popup.menu.findItem(R.id.menu_util_auto_follow_aircraft)?.isChecked =
+            prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
         popup.show()
     }
 
@@ -382,7 +441,7 @@ class AppBarMenuManager(
         prefKey:  String,
         onChanged: (Boolean) -> Unit
     ) {
-        val newState = !prefs.getBoolean(prefKey, false)
+        val newState = !prefs.getBoolean(prefKey, true)
         prefs.edit().putBoolean(prefKey, newState).apply()
         item.isChecked = newState
         DebugLogger.i(TAG, "toggleBinary '$prefKey' → $newState  ('${item.title}')")
@@ -397,7 +456,7 @@ class AppBarMenuManager(
         pairs.forEach { (id, prefKey) ->
             val item = menu.findItem(id)
             if (item != null) {
-                item.isChecked = prefs.getBoolean(prefKey, false)
+                item.isChecked = prefs.getBoolean(prefKey, true)
             } else {
                 DebugLogger.w(TAG, "syncCheckStates: findItem(0x${id.toString(16)}) null — check R.id vs menu XML")
             }
@@ -467,6 +526,8 @@ class AppBarMenuManager(
         const val PREF_TRAFFIC_SPEED_FREQ = "traffic_speed_freq_min"
         const val PREF_METAR_DISPLAY      = "metar_display_on"
         const val PREF_METAR_FREQ         = "metar_freq_min"
+        const val PREF_AIRCRAFT_DISPLAY   = "aircraft_display_on"
+        const val PREF_AIRCRAFT_FREQ      = "aircraft_freq_sec"
 
         // ── Transit ───────────────────────────────────────────────────────────
         const val PREF_MBTA_TRAINS      = "mbta_trains_on"
@@ -482,15 +543,12 @@ class AppBarMenuManager(
         const val PREF_TRAFFIC_CAMS = "traffic_cams_on"
 
         // ── POI ───────────────────────────────────────────────────────────────
-        const val PREF_POI_TRANSIT     = "poi_transit_on"
-        const val PREF_POI_RESTAURANTS = "poi_restaurants_on"
-        const val PREF_POI_GAS         = "poi_gas_on"
-        const val PREF_POI_CIVIC       = "poi_civic_on"
-        const val PREF_POI_PARKS       = "poi_parks_on"
-        const val PREF_POI_EARTHQUAKES = "poi_earthquakes_on"
+        // POI pref keys now live in PoiCategories.ALL (PoiCategory.prefKey)
+        // Old constants removed — use PoiCategories.find(id)?.prefKey
 
         // ── Utility ───────────────────────────────────────────────────────────
-        const val PREF_RECORD_GPS = "record_gps_on"
-        const val PREF_GPS_MODE   = "gps_mode_auto"
+        const val PREF_RECORD_GPS            = "record_gps_on"
+        const val PREF_GPS_MODE              = "gps_mode_auto"
+        const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
     }
 }

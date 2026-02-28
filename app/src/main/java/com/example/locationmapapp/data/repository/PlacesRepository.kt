@@ -1,6 +1,5 @@
 package com.example.locationmapapp.data.repository
 
-import com.example.locationmapapp.data.model.EarthquakeEvent
 import com.example.locationmapapp.data.model.PlaceResult
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
@@ -144,9 +143,6 @@ class PlacesRepository @Inject constructor() {
             results
         }
 
-    suspend fun searchGasStations(center: GeoPoint): List<PlaceResult> =
-        searchPois(center, listOf("amenity=fuel"))
-
     /** Cache-only variant: returns cached POIs if available, empty list if not cached.
      *  Uses local hint cache for radius (no network round-trip for hint). */
     suspend fun searchPoisCacheOnly(center: GeoPoint, categories: List<String> = emptyList()): List<PlaceResult> =
@@ -217,6 +213,9 @@ class PlacesRepository @Inject constructor() {
                 val category = tags["amenity"]?.asString
                     ?: tags["shop"]?.asString
                     ?: tags["tourism"]?.asString
+                    ?: tags["leisure"]?.asString
+                    ?: tags["historic"]?.asString
+                    ?: tags["office"]?.asString
                     ?: "place"
                 results.add(PlaceResult(
                     id           = obj["id"].asString,
@@ -237,6 +236,67 @@ class PlacesRepository @Inject constructor() {
         return results
     }
 
+    /** Fetch cached POIs within a bounding box from the proxy's poi-cache. */
+    suspend fun fetchCachedPoisInBbox(south: Double, west: Double, north: Double, east: Double): List<PlaceResult> = withContext(Dispatchers.IO) {
+        val url = "$PROXY_BASE/pois/bbox?s=$south&w=$west&n=$north&e=$east"
+        DebugLogger.d(TAG, "Fetching cached POIs for bbox=$south,$west,$north,$east")
+        val t0 = System.currentTimeMillis()
+        val response = client.newCall(Request.Builder().url(url).build()).execute()
+        val elapsed = System.currentTimeMillis() - t0
+        DebugLogger.i(TAG, "POI bbox response code=${response.code} in ${elapsed}ms")
+        if (!response.isSuccessful) return@withContext emptyList()
+        val bodyStr = response.body?.string().orEmpty()
+        if (bodyStr.isBlank()) return@withContext emptyList()
+        // Response format: { count, elements: [...] } — same element format as Overpass
+        parseOverpassJson(bodyStr)
+    }
+
+    private fun parsePoiExportJson(json: String): List<PlaceResult> {
+        val results = mutableListOf<PlaceResult>()
+        try {
+            val root = JsonParser.parseString(json).asJsonObject
+            val pois = root["pois"]?.asJsonArray ?: return emptyList()
+            for (entry in pois) {
+                val obj = entry.asJsonObject
+                val el = obj["element"]?.asJsonObject ?: continue
+                val tags = el["tags"]?.asJsonObject ?: continue
+                val lat = when {
+                    el.has("lat")    -> el["lat"].asDouble
+                    el.has("center") -> el["center"].asJsonObject["lat"].asDouble
+                    else -> continue
+                }
+                val lon = when {
+                    el.has("lon")    -> el["lon"].asDouble
+                    el.has("center") -> el["center"].asJsonObject["lon"].asDouble
+                    else -> continue
+                }
+                val category = tags["amenity"]?.asString
+                    ?: tags["shop"]?.asString
+                    ?: tags["tourism"]?.asString
+                    ?: tags["leisure"]?.asString
+                    ?: tags["historic"]?.asString
+                    ?: tags["office"]?.asString
+                    ?: "place"
+                val name = tags["name"]?.asString ?: category
+                results.add(PlaceResult(
+                    id       = el["id"]?.asString ?: continue,
+                    name     = name,
+                    lat      = lat,
+                    lon      = lon,
+                    category = category,
+                    address  = buildAddress(tags),
+                    phone    = tags["phone"]?.asString,
+                    website  = tags["website"]?.asString,
+                    openingHours = tags["opening_hours"]?.asString
+                ))
+            }
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "POI export parse error", e)
+        }
+        DebugLogger.i(TAG, "Parsed ${results.size} POIs from export")
+        return results
+    }
+
     private fun buildAddress(tags: com.google.gson.JsonObject): String? {
         val parts = listOfNotNull(
             tags["addr:housenumber"]?.asString,
@@ -245,50 +305,5 @@ class PlacesRepository @Inject constructor() {
             tags["addr:state"]?.asString
         )
         return if (parts.isEmpty()) null else parts.joinToString(", ")
-    }
-
-    // ── Earthquakes ───────────────────────────────────────────────────────────
-
-    suspend fun fetchEarthquakes(): List<EarthquakeEvent> = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:3000/earthquakes"
-        DebugLogger.d(TAG, "Fetching earthquakes")
-        val t0 = System.currentTimeMillis()
-        val response = client.newCall(Request.Builder().url(url).build()).execute()
-        val elapsed = System.currentTimeMillis() - t0
-        DebugLogger.i(TAG, "Earthquake response code=${response.code} in ${elapsed}ms")
-        if (!response.isSuccessful) {
-            val errBody = response.body?.string()?.take(300) ?: "(empty)"
-            DebugLogger.e(TAG, "Earthquake HTTP ${response.code} body: $errBody")
-            throw RuntimeException("HTTP ${response.code}: $errBody")
-        }
-        val bodyStr = response.body!!.string()
-        DebugLogger.d(TAG, "Earthquake body length=${bodyStr.length}")
-        parseEarthquakeJson(bodyStr)
-    }
-
-    private fun parseEarthquakeJson(json: String): List<EarthquakeEvent> {
-        val results = mutableListOf<EarthquakeEvent>()
-        try {
-            val features = JsonParser.parseString(json)
-                .asJsonObject["features"].asJsonArray
-            for (f in features) {
-                val props = f.asJsonObject["properties"].asJsonObject
-                val coords = f.asJsonObject["geometry"].asJsonObject["coordinates"].asJsonArray
-                results.add(EarthquakeEvent(
-                    id        = f.asJsonObject["id"].asString,
-                    magnitude = props["mag"]?.asDouble ?: 0.0,
-                    place     = props["place"]?.asString ?: "Unknown",
-                    lat       = coords[1].asDouble,
-                    lon       = coords[0].asDouble,
-                    depth     = coords[2].asDouble,
-                    time      = props["time"]?.asLong ?: 0L,
-                    url       = props["url"]?.asString ?: ""
-                ))
-            }
-        } catch (e: Exception) {
-            DebugLogger.e(TAG, "Earthquake JSON parse error", e)
-        }
-        DebugLogger.i(TAG, "Parsed ${results.size} earthquakes")
-        return results
     }
 }

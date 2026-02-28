@@ -1,42 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- menu/menu_poi.xml -->
+<!-- menu/menu_poi.xml — 16 POI categories -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <item
-        android:id="@+id/menu_poi_transit_access"
-        android:title="Commuter Access Points"
+    <item android:id="@+id/menu_poi_food_drink"
+        android:title="Food &amp; Drink \u25B8"
         android:checkable="true"
         app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menu_poi_restaurants"
-        android:title="Restaurants"
+    <item android:id="@+id/menu_poi_fuel_charging"
+        android:title="Fuel &amp; Charging \u25B8"
         android:checkable="true"
         app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menu_poi_gas_stations"
-        android:title="Gas Stations"
+    <item android:id="@+id/menu_poi_transit"
+        android:title="Transit"
         android:checkable="true"
         app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menu_poi_civic"
-        android:title="Civic &amp; Federal Buildings"
+    <item android:id="@+id/menu_poi_civic"
+        android:title="Civic &amp; Gov \u25B8"
         android:checkable="true"
         app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menu_poi_parks"
-        android:title="Parks"
+    <item android:id="@+id/menu_poi_parks_rec"
+        android:title="Parks &amp; Rec \u25B8"
         android:checkable="true"
         app:showAsAction="never" />
 
-    <!-- Earthquake markers (existing feature) -->
-    <item
-        android:id="@+id/menu_poi_earthquakes"
-        android:title="Earthquake Events"
+    <item android:id="@+id/menu_poi_shopping"
+        android:title="Shopping \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_healthcare"
+        android:title="Healthcare \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_education"
+        android:title="Education \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_lodging"
+        android:title="Lodging"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_parking"
+        android:title="Parking"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_finance"
+        android:title="Finance \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_worship"
+        android:title="Places of Worship"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_tourism_history"
+        android:title="Tourism &amp; History \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_emergency"
+        android:title="Emergency Svc \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_auto_services"
+        android:title="Auto Services"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_entertainment"
+        android:title="Entertainment \u25B8"
         android:checkable="true"
         app:showAsAction="never" />
 

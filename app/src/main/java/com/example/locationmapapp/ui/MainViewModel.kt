@@ -9,6 +9,7 @@ import com.example.locationmapapp.data.model.MbtaVehicle
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.model.*
+import com.example.locationmapapp.data.repository.AircraftRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.WeatherRepository
 import com.example.locationmapapp.util.DebugLogger
@@ -30,7 +31,8 @@ class MainViewModel @Inject constructor(
     private val locationManager: LocationManager,
     private val placesRepository: PlacesRepository,
     private val weatherRepository: WeatherRepository,
-    private val mbtaRepository: MbtaRepository
+    private val mbtaRepository: MbtaRepository,
+    private val aircraftRepository: AircraftRepository
 ) : ViewModel() {
 
     private val TAG = "ViewModel"
@@ -43,20 +45,14 @@ class MainViewModel @Inject constructor(
 
     private var locationJob: Job? = null
 
-    private val _places = MutableLiveData<List<PlaceResult>>()
-    val places: LiveData<List<PlaceResult>> = _places
-
-    private val _gasStations = MutableLiveData<List<PlaceResult>>()
-    val gasStations: LiveData<List<PlaceResult>> = _gasStations
+    private val _places = MutableLiveData<Pair<String, List<PlaceResult>>>()
+    val places: LiveData<Pair<String, List<PlaceResult>>> = _places
 
     private val _weatherAlerts = MutableLiveData<List<WeatherAlert>>()
     val weatherAlerts: LiveData<List<WeatherAlert>> = _weatherAlerts
 
     private val _metars = MutableLiveData<List<MetarStation>>()
     val metars: LiveData<List<MetarStation>> = _metars
-
-    private val _earthquakes = MutableLiveData<List<EarthquakeEvent>>()
-    val earthquakes: LiveData<List<EarthquakeEvent>> = _earthquakes
 
     private val _mbtaTrains = MutableLiveData<List<MbtaVehicle>>()
     val mbtaTrains: LiveData<List<MbtaVehicle>> = _mbtaTrains
@@ -66,6 +62,12 @@ class MainViewModel @Inject constructor(
 
     private val _mbtaBuses = MutableLiveData<List<MbtaVehicle>>()
     val mbtaBuses: LiveData<List<MbtaVehicle>> = _mbtaBuses
+
+    private val _aircraft = MutableLiveData<List<AircraftState>>()
+    val aircraft: LiveData<List<AircraftState>> = _aircraft
+
+    private val _followedAircraft = MutableLiveData<AircraftState?>()
+    val followedAircraft: LiveData<AircraftState?> = _followedAircraft
 
     private val _radarRefreshTick = MutableLiveData<Long>()
     val radarRefreshTick: LiveData<Long> = _radarRefreshTick
@@ -137,11 +139,11 @@ class MainViewModel @Inject constructor(
 
     // ── Data loads — user-initiated only, never called from init ──────────────
 
-    fun searchPoisAt(point: GeoPoint, categories: List<String> = emptyList()) {
-        DebugLogger.i(TAG, "searchPoisAt() lat=${point.latitude} lon=${point.longitude} categories=$categories")
+    fun searchPoisAt(point: GeoPoint, categories: List<String> = emptyList(), layerId: String = "default") {
+        DebugLogger.i(TAG, "searchPoisAt() lat=${point.latitude} lon=${point.longitude} layerId=$layerId categories=$categories")
         viewModelScope.launch {
             runCatching { placesRepository.searchPois(point, categories) }
-                .onSuccess { DebugLogger.i(TAG, "POI success — ${it.size}"); _places.value = it }
+                .onSuccess { DebugLogger.i(TAG, "POI success — ${it.size} layerId=$layerId"); _places.value = layerId to it }
                 .onFailure { e -> DebugLogger.e(TAG, "POI FAILED: ${e.message}", e as? Exception); _error.value = "POI failed: ${e.message}" }
         }
     }
@@ -149,17 +151,18 @@ class MainViewModel @Inject constructor(
     fun searchPoisFromCache(point: GeoPoint) {
         viewModelScope.launch {
             runCatching { placesRepository.searchPoisCacheOnly(point) }
-                .onSuccess { if (it.isNotEmpty()) { DebugLogger.i(TAG, "Cache POI hit — ${it.size}"); _places.value = it } }
+                .onSuccess { if (it.isNotEmpty()) { DebugLogger.i(TAG, "Cache POI hit — ${it.size}"); _places.value = "cache" to it } }
                 .onFailure { /* silent — cache miss is expected */ }
         }
     }
 
-    fun loadGasStations(point: GeoPoint) {
-        DebugLogger.i(TAG, "loadGasStations() lat=${point.latitude} lon=${point.longitude}")
+    /** Load cached POIs within a bounding box from the proxy's poi-cache. */
+    fun loadCachedPoisForBbox(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadCachedPoisForBbox() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
-            runCatching { placesRepository.searchGasStations(point) }
-                .onSuccess { DebugLogger.i(TAG, "Gas stations success — ${it.size}"); _gasStations.value = it }
-                .onFailure { e -> DebugLogger.e(TAG, "Gas FAILED: ${e.message}", e as? Exception); _error.value = "Gas failed: ${e.message}" }
+            runCatching { placesRepository.fetchCachedPoisInBbox(south, west, north, east) }
+                .onSuccess { DebugLogger.i(TAG, "Cached POIs in bbox — ${it.size}"); _places.value = "bbox" to it }
+                .onFailure { e -> DebugLogger.e(TAG, "Cached POIs bbox FAILED: ${e.message}", e as? Exception) }
         }
     }
 
@@ -172,21 +175,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun loadAllUsMetars() {
-        DebugLogger.i(TAG, "loadAllUsMetars()")
+    fun loadMetars(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadMetars() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
-            runCatching { weatherRepository.fetchMetars() }
+            runCatching { weatherRepository.fetchMetars(south, west, north, east) }
                 .onSuccess { DebugLogger.i(TAG, "METAR success — ${it.size}"); _metars.value = it }
                 .onFailure { e -> DebugLogger.e(TAG, "METAR FAILED: ${e.message}", e as? Exception); _error.value = "METAR failed: ${e.message}" }
-        }
-    }
-
-    fun loadEarthquakesForMap() {
-        DebugLogger.i(TAG, "loadEarthquakesForMap()")
-        viewModelScope.launch {
-            runCatching { placesRepository.fetchEarthquakes() }
-                .onSuccess { DebugLogger.i(TAG, "Earthquakes success — ${it.size}"); _earthquakes.value = it }
-                .onFailure { e -> DebugLogger.e(TAG, "Earthquakes FAILED: ${e.message}", e as? Exception); _error.value = "Earthquakes failed: ${e.message}" }
         }
     }
 
@@ -248,6 +242,36 @@ class MainViewModel @Inject constructor(
     fun clearMbtaBuses() {
         _mbtaBuses.value = emptyList()
         DebugLogger.i(TAG, "MBTA buses cleared")
+    }
+
+    fun loadAircraft(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadAircraft() bbox=$south,$west,$north,$east")
+        viewModelScope.launch {
+            runCatching { aircraftRepository.fetchAircraft(south, west, north, east) }
+                .onSuccess { DebugLogger.i(TAG, "Aircraft success — ${it.size}"); _aircraft.value = it }
+                .onFailure { e -> DebugLogger.e(TAG, "Aircraft FAILED: ${e.message}", e as? Exception); _error.value = "Aircraft failed: ${e.message}" }
+        }
+    }
+
+    fun loadFollowedAircraft(icao24: String) {
+        DebugLogger.i(TAG, "loadFollowedAircraft() icao24=$icao24")
+        viewModelScope.launch {
+            runCatching { aircraftRepository.fetchAircraftByIcao(icao24) }
+                .onSuccess { state ->
+                    DebugLogger.i(TAG, "Followed aircraft ${if (state != null) "found at ${state.lat},${state.lon}" else "NOT found"}")
+                    _followedAircraft.value = state
+                }
+                .onFailure { e -> DebugLogger.e(TAG, "Followed aircraft FAILED: ${e.message}", e as? Exception) }
+        }
+    }
+
+    fun clearFollowedAircraft() {
+        _followedAircraft.value = null
+    }
+
+    fun clearAircraft() {
+        _aircraft.value = emptyList()
+        DebugLogger.i(TAG, "Aircraft cleared")
     }
 
     fun refreshRadar() {

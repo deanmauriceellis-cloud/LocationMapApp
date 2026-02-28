@@ -22,6 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.locationmapapp.R
+import com.example.locationmapapp.ui.menu.PoiCategories
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.locationmapapp.databinding.ActivityMainBinding
 import com.example.locationmapapp.ui.menu.AppBarMenuManager
@@ -50,9 +51,7 @@ class MainActivity : AppCompatActivity() {
     private val radarScheduler = RadarRefreshScheduler()
 
     private val metarMarkers      = mutableListOf<Marker>()
-    private val earthquakeMarkers = mutableListOf<Marker>()
-    private val placeMarkers      = mutableListOf<Marker>()
-    private val gasStationMarkers = mutableListOf<Marker>()
+    private val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
     private val trainMarkers      = mutableListOf<Marker>()
     private val subwayMarkers     = mutableListOf<Marker>()
     private val busMarkers        = mutableListOf<Marker>()
@@ -70,15 +69,66 @@ class MainActivity : AppCompatActivity() {
     private var busRefreshJob: Job? = null
     private var busRefreshIntervalSec: Int = 60
 
-    // Vehicle follow mode
+    // Vehicle / aircraft follow mode
     private var followedVehicleId: String? = null
+    private var followedAircraftIcao: String? = null
     private var followBanner: TextView? = null
 
     // Debounced cache-only POI loader on map scroll
     private var cachePoiJob: Job? = null
+    // Debounced aircraft reload on scroll/zoom
+    private var aircraftReloadJob: Job? = null
 
-    // Deferred POI restore — wait for first real GPS fix before querying
+    // Aircraft tracking
+    private val aircraftMarkers = mutableListOf<Marker>()
+    private var aircraftRefreshJob: Job? = null
+    private var aircraftRefreshIntervalSec: Int = 60
+    private var followedAircraftRefreshJob: Job? = null
+    private var lastFollowedAircraftState: com.example.locationmapapp.data.model.AircraftState? = null
+    // Auto-follow random high-altitude aircraft for POI cache building
+    private var autoFollowAircraftJob: Job? = null
+    private var followedAircraftFailCount: Int = 0
+    private var autoFollowEmptyPoiCount: Int = 0
+
+    // POI label zoom threshold tracking
+    private var poiLabelsShowing = false
+
+    // Deferred restore — wait for first real GPS fix so the map has a valid bounding box
     private var pendingPoiRestore = false
+    private var pendingMetarRestore = false
+    private var pendingCachedPoiLoad = false
+
+    private var pendingAircraftRestore = false
+    private var pendingAutoFollowRestore = false
+    private var initialCenterDone = false   // only auto-center map on FIRST GPS fix
+
+    /** Load METARs for the current visible map bounding box. */
+    private fun loadMetarsForVisibleArea() {
+        val bb = binding.mapView.boundingBox
+        viewModel.loadMetars(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+    }
+
+    /** Debounced: reload aircraft 1s after user stops scrolling/zooming. */
+    private fun scheduleAircraftReload() {
+        if (aircraftRefreshJob?.isActive != true) return  // aircraft tracking not enabled
+        aircraftReloadJob?.cancel()
+        aircraftReloadJob = lifecycleScope.launch {
+            delay(1000)
+            loadAircraftForVisibleArea()
+        }
+    }
+
+    /** Load aircraft for the current visible map bounding box. Requires zoom >= 10 to avoid massive queries. */
+    private fun loadAircraftForVisibleArea() {
+        val zoom = binding.mapView.zoomLevelDouble
+        if (zoom < 10.0) {
+            DebugLogger.d("MainActivity", "Aircraft skipped — zoom ${zoom.toInt()} < 10")
+            return
+        }
+        val bb = binding.mapView.boundingBox
+        DebugLogger.i("MainActivity", "loadAircraftForVisibleArea zoom=${zoom.toInt()} bbox=${bb.latSouth},${bb.lonWest},${bb.latNorth},${bb.lonEast}")
+        viewModel.loadAircraft(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+    }
 
     // v1.4: guard to prevent startGpsUpdatesAndCenter() running twice
     // (fast-path pre-check + launcher callback can both fire on first run).
@@ -163,7 +213,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
 
         // Restore radar — add the tile overlay AND restart the refresh scheduler
-        val radarOn = prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, false)
+        val radarOn = prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, true)
         DebugLogger.i("MainActivity", "onStart() radarOn=$radarOn interval=${appBarMenuManager.radarUpdateMinutes}min")
         if (radarOn) {
             if (radarTileOverlay == null) {
@@ -175,34 +225,45 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Restore MBTA layers from persisted toggle state
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_TRAINS, false) && trainRefreshJob?.isActive != true) {
+        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_TRAINS, true) && trainRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA trains")
             startTrainRefresh()
         }
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_SUBWAY, false) && subwayRefreshJob?.isActive != true) {
+        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_SUBWAY, true) && subwayRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA subway")
             startSubwayRefresh()
         }
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUSES, false) && busRefreshJob?.isActive != true) {
+        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUSES, true) && busRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA buses")
             startBusRefresh()
         }
 
-        // Restore METAR
-        if (prefs.getBoolean(AppBarMenuManager.PREF_METAR_DISPLAY, false)) {
-            DebugLogger.i("MainActivity", "onStart() restoring METAR display")
-            viewModel.loadAllUsMetars()
+        // Defer METAR restore until GPS fix so the map has a real bounding box
+        if (prefs.getBoolean(AppBarMenuManager.PREF_METAR_DISPLAY, true)) {
+            pendingMetarRestore = true
+            DebugLogger.i("MainActivity", "onStart() METAR restore deferred — waiting for GPS fix")
+        }
+
+        // Defer Aircraft restore
+        if (prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true)) {
+            pendingAircraftRestore = true
+            DebugLogger.i("MainActivity", "onStart() Aircraft restore deferred — waiting for GPS fix")
+        }
+
+        // Restore auto-follow aircraft if it was active
+        if (prefs.getBoolean(AppBarMenuManager.PREF_AUTO_FOLLOW_AIRCRAFT, false)) {
+            pendingAutoFollowRestore = true
+            DebugLogger.i("MainActivity", "onStart() Auto-follow restore deferred — waiting for GPS fix + aircraft data")
         }
 
         // Defer POI restore until first GPS fix so we query at the real location
-        val needsRestaurants = prefs.getBoolean(AppBarMenuManager.PREF_POI_RESTAURANTS, false)
-        val needsGas = prefs.getBoolean(AppBarMenuManager.PREF_POI_GAS, false)
-        val needsEarthquakes = prefs.getBoolean(AppBarMenuManager.PREF_POI_EARTHQUAKES, false)
-        if (needsRestaurants || needsGas || needsEarthquakes) {
+        val anyPoiEnabled = PoiCategories.ALL.any { prefs.getBoolean(it.prefKey, true) }
+        if (anyPoiEnabled) {
             pendingPoiRestore = true
-            DebugLogger.i("MainActivity", "onStart() POI restore deferred — waiting for GPS fix " +
-                    "(restaurants=$needsRestaurants gas=$needsGas earthquakes=$needsEarthquakes)")
+            DebugLogger.i("MainActivity", "onStart() POI restore deferred — waiting for GPS fix")
         }
+        // Always load full cached POI coverage after GPS fix
+        pendingCachedPoiLoad = true
     }
 
     override fun onStop()   { super.onStop();   radarScheduler.stop(); DebugLogger.i("MainActivity","onStop()") }
@@ -295,20 +356,27 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Listen for zoom changes from pinch-to-zoom or programmatic changes
+        // Listen for zoom/scroll changes from pinch-to-zoom, programmatic changes, or panning
         map.addMapListener(object : org.osmdroid.events.MapListener {
             override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
-                // Debounce: load cached POIs 500ms after user stops scrolling
+                scheduleAircraftReload()
+                // Debounce: load cached POIs for visible bbox 500ms after scrolling stops
                 cachePoiJob?.cancel()
                 cachePoiJob = lifecycleScope.launch {
                     delay(500)
-                    val center = binding.mapView.mapCenter as GeoPoint
-                    viewModel.searchPoisFromCache(center)
+                    loadCachedPoisForVisibleArea()
                 }
                 return false
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 updateZoomBubble()
+                scheduleAircraftReload()
+                // Refresh POI marker icons when crossing the zoom-18 label threshold
+                val nowLabeled = binding.mapView.zoomLevelDouble >= 18.0
+                if (nowLabeled != poiLabelsShowing) {
+                    poiLabelsShowing = nowLabeled
+                    refreshPoiMarkerIcons()
+                }
                 return false
             }
         })
@@ -394,6 +462,31 @@ class MainActivity : AppCompatActivity() {
         toast("Location mode: ${viewModel.locationMode.value}")
     }
 
+    /** FAB quick-toggle for aircraft layer — mirrors the menu toggle logic. */
+    private fun toggleAircraftFromFab() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        val wasOn = prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true)
+        val nowOn = !wasOn
+        prefs.edit().putBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, nowOn).apply()
+        if (nowOn) {
+            startAircraftRefresh()
+            toast("Aircraft tracking ON")
+        } else {
+            stopAircraftRefresh()
+            viewModel.clearAircraft()
+            clearAircraftMarkers()
+            // Cancel auto-follow if aircraft layer toggled off via FAB
+            if (autoFollowAircraftJob?.isActive == true) {
+                autoFollowAircraftJob?.cancel()
+                autoFollowAircraftJob = null
+                prefs.edit().putBoolean(AppBarMenuManager.PREF_AUTO_FOLLOW_AIRCRAFT, false).apply()
+                stopFollowing()
+                DebugLogger.i("MainActivity", "Auto-follow cancelled — aircraft layer FAB off")
+            }
+            toast("Aircraft tracking OFF")
+        }
+    }
+
     // =========================================================================
     // FAB SPEED DIAL
     // =========================================================================
@@ -404,10 +497,9 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "buildFabSpeedDial() start")
         val defs = listOf(
             FabDef("Radar",        R.drawable.ic_radar,         "#0277BD") { toggleRadar() },
-            FabDef("METAR",        R.drawable.ic_metar,         "#1B5E20") { viewModel.loadAllUsMetars(); toast("Loading METARs…") },
-            FabDef("Earthquakes",  R.drawable.ic_earthquake,    "#B71C1C") { viewModel.loadEarthquakesForMap(); toast("Loading earthquakes…") },
+            FabDef("METAR",        R.drawable.ic_metar,         "#1B5E20") { loadMetarsForVisibleArea(); toast("Loading METARs…") },
+            FabDef("Aircraft",     R.drawable.ic_aircraft,      "#1565C0") { toggleAircraftFromFab() },
             FabDef("Search Here",  R.drawable.ic_search,        "#4A148C") { searchFromCurrentLocation() },
-            FabDef("Gas Stations", R.drawable.ic_gas_station,   "#E65100") { loadGasStations() },
             FabDef("Weather",      R.drawable.ic_weather_alert, "#006064") { viewModel.fetchWeatherAlerts() },
             FabDef("GPS / Manual", R.drawable.ic_gps,           "#37474F") { toggleLocationMode() },
             FabDef("Debug Log",    R.drawable.ic_debug,         "#424242") { startActivity(Intent(this, DebugLogActivity::class.java)) }
@@ -459,45 +551,79 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "observeViewModel() — attaching all observers")
 
         viewModel.currentLocation.observe(this) { point ->
-            DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude}" +
-                if (followedVehicleId != null) " (follow mode — skipping map center)" else " — centering map zoom=14")
             updateGpsMarker(point)
-            // Don't move the map when following a vehicle
-            if (followedVehicleId == null) {
+            // Only auto-center on the first GPS fix
+            if (followedVehicleId == null && !initialCenterDone) {
+                initialCenterDone = true
+                DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=14")
                 binding.mapView.controller.animateTo(point)
                 binding.mapView.controller.setZoom(14.0)
+            } else {
+                DebugLogger.d("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (marker only)")
             }
             // Fire deferred POI queries now that we have a real GPS position
             if (pendingPoiRestore) {
                 pendingPoiRestore = false
                 val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
                 DebugLogger.i("MainActivity", "POI restore triggered at lat=${point.latitude} lon=${point.longitude}")
-                if (prefs.getBoolean(AppBarMenuManager.PREF_POI_RESTAURANTS, false)) {
-                    viewModel.searchPoisAt(point, listOf("amenity=restaurant"))
-                }
-                if (prefs.getBoolean(AppBarMenuManager.PREF_POI_GAS, false)) {
-                    viewModel.loadGasStations(point)
-                }
-                if (prefs.getBoolean(AppBarMenuManager.PREF_POI_EARTHQUAKES, false)) {
-                    viewModel.loadEarthquakesForMap()
+                for (cat in PoiCategories.ALL) {
+                    if (prefs.getBoolean(cat.prefKey, true)) {
+                        val tags = appBarMenuManager.getActiveTags(cat.id)
+                        viewModel.searchPoisAt(point, tags, cat.id)
+                    }
                 }
             }
+            // Fire deferred METAR load after the map animation settles
+            if (pendingMetarRestore) {
+                pendingMetarRestore = false
+                binding.mapView.postDelayed({
+                    DebugLogger.i("MainActivity", "METAR restore triggered — loading for visible area")
+                    loadMetarsForVisibleArea()
+                }, 1500)
+            }
+            // Fire deferred Aircraft load after the map animation settles
+            if (pendingAircraftRestore) {
+                pendingAircraftRestore = false
+                binding.mapView.postDelayed({
+                    DebugLogger.i("MainActivity", "Aircraft restore triggered — starting refresh")
+                    startAircraftRefresh()
+                }, 1500)
+            }
+            // Restore auto-follow after aircraft data has had time to load
+            if (pendingAutoFollowRestore) {
+                pendingAutoFollowRestore = false
+                binding.mapView.postDelayed({
+                    DebugLogger.i("MainActivity", "Auto-follow restore triggered")
+                    startAutoFollowAircraft()
+                }, 5000)  // extra delay so aircraft list is populated
+            }
+            // Load cached POIs for visible area
+            if (pendingCachedPoiLoad) {
+                pendingCachedPoiLoad = false
+                binding.mapView.postDelayed({
+                    DebugLogger.i("MainActivity", "Loading cached POIs for visible area")
+                    loadCachedPoisForVisibleArea()
+                }, 2000)
+            }
         }
-        viewModel.places.observe(this) { places ->
-            DebugLogger.i("MainActivity", "places → ${places.size} results")
-            clearPlaceMarkers(); places.forEach { addPlaceMarker(it) }
-        }
-        viewModel.gasStations.observe(this) { stations ->
-            DebugLogger.i("MainActivity", "gasStations → ${stations.size} results")
-            clearGasStationMarkers(); stations.forEach { addGasStationMarker(it) }
+        viewModel.places.observe(this) { (layerId, places) ->
+            DebugLogger.i("MainActivity", "places → ${places.size} results layerId=$layerId")
+            if (layerId == "bbox") {
+                // Viewport bbox fetch — replace ALL POI markers with only visible results
+                replaceAllPoiMarkers(places)
+            } else {
+                // User-initiated search or category restore — data goes to proxy cache.
+                // Trigger a bbox refresh so the newly cached POIs appear on screen.
+                cachePoiJob?.cancel()
+                cachePoiJob = lifecycleScope.launch {
+                    delay(1000)
+                    loadCachedPoisForVisibleArea()
+                }
+            }
         }
         viewModel.metars.observe(this) { metars ->
             DebugLogger.i("MainActivity", "metars → ${metars.size} stations")
             clearMetarMarkers(); metars.forEach { addMetarMarker(it) }
-        }
-        viewModel.earthquakes.observe(this) { quakes ->
-            DebugLogger.i("MainActivity", "earthquakes → ${quakes.size} events")
-            clearEarthquakeMarkers(); quakes.forEach { addEarthquakeMarker(it) }
         }
         viewModel.weatherAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "weatherAlerts → ${alerts.size} alerts")
@@ -510,6 +636,84 @@ class MainActivity : AppCompatActivity() {
         viewModel.error.observe(this) { msg ->
             DebugLogger.e("MainActivity", "VM error: $msg")
             toast(msg)
+        }
+        viewModel.aircraft.observe(this) { aircraft ->
+            DebugLogger.i("MainActivity", "aircraft → ${aircraft.size} on map")
+            clearAircraftMarkers()
+            // Merge followed aircraft into list if it's outside the bbox results
+            val icao = followedAircraftIcao
+            val merged = if (icao != null && aircraft.none { it.icao24 == icao }) {
+                val followed = lastFollowedAircraftState
+                if (followed != null) aircraft + followed else aircraft
+            } else aircraft
+            merged.forEach { addAircraftMarker(it) }
+            updateFollowedAircraft(merged)
+        }
+        viewModel.followedAircraft.observe(this) { state ->
+            if (state == null) {
+                if (followedAircraftIcao != null) {
+                    followedAircraftFailCount++
+                    DebugLogger.i("MainActivity", "Followed aircraft ${followedAircraftIcao} null response — failCount=$followedAircraftFailCount")
+                    if (followedAircraftFailCount < 3) {
+                        // Tolerate transient failures (429 rate limits, network blips)
+                        DebugLogger.i("MainActivity", "Tolerating failure $followedAircraftFailCount/3 — keeping lock")
+                        return@observe
+                    }
+                    DebugLogger.i("MainActivity", "Followed aircraft ${followedAircraftIcao} lost after $followedAircraftFailCount failures")
+                    stopFollowing()
+                    if (autoFollowAircraftJob?.isActive == true) {
+                        DebugLogger.i("MainActivity", "Auto-follow active — picking replacement aircraft")
+                        toast("Aircraft lost — picking another…")
+                        pickAndFollowRandomAircraft()
+                    } else {
+                        toast("Aircraft lost from feed")
+                    }
+                }
+                return@observe
+            }
+            followedAircraftFailCount = 0  // reset on successful update
+            lastFollowedAircraftState = state
+            DebugLogger.i("MainActivity", "Followed aircraft update: ${state.callsign ?: state.icao24} at ${state.lat},${state.lon}")
+            binding.mapView.controller.animateTo(state.toGeoPoint())
+            showAircraftFollowBanner(state)
+            // Pre-fill POI cache at aircraft's current position
+            val point = state.toGeoPoint()
+            DebugLogger.i("MainActivity", "Aircraft follow POI prefetch at ${point.latitude},${point.longitude}")
+            viewModel.searchPoisAt(point)
+            // Refresh full cache display after prefetch; check for empty POI zone (auto-follow)
+            binding.mapView.postDelayed({
+                loadCachedPoisForVisibleArea()
+                // If auto-follow is active, check altitude and POI desert
+                if (autoFollowAircraftJob?.isActive == true) {
+                    val lat = state.lat
+                    val lon = state.lon
+                    // Check if aircraft left the continental US (north into Canada or south past border)
+                    if (lat > 49.0 || lat < 25.0 || lon < -125.0 || lon > -66.0) {
+                        DebugLogger.i("MainActivity", "Auto-follow: aircraft outside US bounds (${lat},${lon}) — switching to interior")
+                        toast("Outside US — switching to interior flight")
+                        autoFollowEmptyPoiCount = 0
+                        pickInteriorAircraft()
+                        return@postDelayed
+                    }
+                    val altFt = (state.baroAltitude ?: 0.0) * 3.28084
+                    if (altFt < 10000 && altFt > 0) {
+                        DebugLogger.i("MainActivity", "Auto-follow: aircraft below 10,000 ft (${altFt.toInt()} ft) — switching")
+                        toast("Aircraft descending (${altFt.toInt()} ft) — switching")
+                        autoFollowEmptyPoiCount = 0
+                        pickAndFollowRandomAircraft()
+                        return@postDelayed
+                    }
+                    val poiCount = viewModel.places.value?.second?.size ?: 0
+                    if (poiCount == 0) {
+                        DebugLogger.i("MainActivity", "Auto-follow: no POIs — switching to furthest-west aircraft")
+                        toast("No POIs — switching to furthest west")
+                        autoFollowEmptyPoiCount = 0
+                        pickFurthestWestAircraft()
+                    } else {
+                        autoFollowEmptyPoiCount = 0
+                    }
+                }
+            }, 3000)
         }
         viewModel.mbtaTrains.observe(this) { vehicles ->
             DebugLogger.i("MainActivity", "MBTA trains update — ${vehicles.size} vehicles on map")
@@ -597,13 +801,6 @@ class MainActivity : AppCompatActivity() {
         toast("Searching around tapped location…")
     }
 
-    fun loadGasStations() {
-        val loc = viewModel.currentLocation.value ?: GeoPoint(42.3601, -71.0589)
-        DebugLogger.i("MainActivity", "loadGasStations() lat=${loc.latitude} lon=${loc.longitude}")
-        viewModel.loadGasStations(loc)
-        toast("Loading gas stations…")
-    }
-
     // =========================================================================
     // MARKERS
     // =========================================================================
@@ -620,30 +817,48 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.invalidate()
     }
 
-    private fun addPlaceMarker(place: com.example.locationmapapp.data.model.PlaceResult) {
+    private fun addPoiMarker(layerId: String, place: com.example.locationmapapp.data.model.PlaceResult) {
+        val labeled = binding.mapView.zoomLevelDouble >= 18.0
         val m = Marker(binding.mapView).apply {
             position = GeoPoint(place.lat, place.lon)
-            icon     = MarkerIconHelper.dot(this@MainActivity, place.category)
+            icon = if (labeled) {
+                MarkerIconHelper.labeledDot(this@MainActivity, place.category, place.name)
+            } else {
+                MarkerIconHelper.dot(this@MainActivity, place.category)
+            }
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title    = place.name
             snippet  = buildPlaceSnippet(place)
+            relatedObject = place  // retained for icon refresh on zoom threshold
         }
-        placeMarkers.add(m); binding.mapView.overlays.add(m); binding.mapView.invalidate()
+        poiMarkers.getOrPut(layerId) { mutableListOf() }.add(m)
+        binding.mapView.overlays.add(m)
+        binding.mapView.invalidate()
     }
 
-    private fun addGasStationMarker(place: com.example.locationmapapp.data.model.PlaceResult) {
-        val m = Marker(binding.mapView).apply {
-            position = GeoPoint(place.lat, place.lon)
-            icon     = MarkerIconHelper.dot(this@MainActivity, "gas_station")
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            title    = place.name
-            snippet  = place.address ?: "Gas Station"
+    /** Swap all POI marker icons between dot and labeled-dot when crossing zoom 18. */
+    private fun refreshPoiMarkerIcons() {
+        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        DebugLogger.i("MainActivity", "refreshPoiMarkerIcons labeled=$labeled")
+        poiMarkers.values.flatten().forEach { marker ->
+            val place = marker.relatedObject as? com.example.locationmapapp.data.model.PlaceResult ?: return@forEach
+            marker.icon = if (labeled) {
+                MarkerIconHelper.labeledDot(this, place.category, place.name)
+            } else {
+                MarkerIconHelper.dot(this, place.category)
+            }
         }
-        gasStationMarkers.add(m); binding.mapView.overlays.add(m); binding.mapView.invalidate()
+        binding.mapView.invalidate()
+    }
+
+    /** Ask the proxy for cached POIs within the visible map bounding box. */
+    private fun loadCachedPoisForVisibleArea() {
+        val bb = binding.mapView.boundingBox
+        viewModel.loadCachedPoisForBbox(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
 
     private fun addMetarMarker(station: com.example.locationmapapp.data.model.MetarStation) {
-        val tint = when (station.flightCategory?.uppercase()) {
+        val fltCatColor = when (station.flightCategory?.uppercase()) {
             "VFR"  -> Color.parseColor("#2E7D32")
             "MVFR" -> Color.parseColor("#1565C0")
             "IFR"  -> Color.parseColor("#C62828")
@@ -652,55 +867,316 @@ class MainActivity : AppCompatActivity() {
         }
         val m = Marker(binding.mapView).apply {
             position = GeoPoint(station.lat, station.lon)
-            icon     = MarkerIconHelper.get(this@MainActivity, R.drawable.ic_metar, 24, tint)
+            icon     = buildMetarStationIcon(station, fltCatColor)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            title    = "${station.stationId}  ${station.flightCategory ?: "?"}"
+            title    = "${station.stationId} — ${station.name ?: station.flightCategory ?: "?"}"
             snippet  = buildMetarSnippet(station)
         }
         metarMarkers.add(m); binding.mapView.overlays.add(m); binding.mapView.invalidate()
     }
 
-    private fun addEarthquakeMarker(eq: com.example.locationmapapp.data.model.EarthquakeEvent) {
-        val sizeDp = (20 + (eq.magnitude - 2.0).coerceIn(0.0, 6.0) * 2.7).toInt()
-        val tint = when {
-            eq.magnitude < 3.5 -> Color.parseColor("#558B2F")
-            eq.magnitude < 5.0 -> Color.parseColor("#F57F17")
-            eq.magnitude < 6.5 -> Color.parseColor("#BF360C")
-            else               -> Color.parseColor("#880E4F")
+    private fun buildMetarStationIcon(s: com.example.locationmapapp.data.model.MetarStation, color: Int): android.graphics.drawable.Drawable {
+        val density = resources.displayMetrics.density
+        val tempF = s.tempC?.let { "%.0f°".format(it * 9.0 / 5.0 + 32) } ?: "?"
+        val wind = if (s.windSpeedKt != null && s.windSpeedKt > 0) {
+            val dir = s.windDirDeg?.let { windDirToArrow(it) } ?: ""
+            val gust = if (s.windGustKt != null) "G${s.windGustKt}" else ""
+            "$dir${s.windSpeedKt}$gust"
+        } else "Calm"
+        val wx = s.wxString ?: s.skyCover ?: ""
+
+        val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 11 * density
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            this.color = color
         }
-        val m = Marker(binding.mapView).apply {
-            position = GeoPoint(eq.lat, eq.lon)
-            icon     = MarkerIconHelper.get(this@MainActivity, R.drawable.ic_earthquake, sizeDp, tint)
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            title    = "M${eq.magnitude}  ${eq.place}"
-            snippet  = "Depth: ${eq.depth}km"
+        val smallPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 9 * density
+            typeface = android.graphics.Typeface.DEFAULT
+            this.color = Color.parseColor("#333333")
         }
-        earthquakeMarkers.add(m); binding.mapView.overlays.add(m); binding.mapView.invalidate()
+
+        val lines = listOf(tempF, wind, wx).filter { it.isNotBlank() }
+        val lineHeight = textPaint.textSize + 2 * density
+        val widths = lines.mapIndexed { i, line -> if (i == 0) textPaint.measureText(line) else smallPaint.measureText(line) }
+        val maxW = (widths.maxOrNull() ?: 30f) + 8 * density
+        val totalH = lineHeight * lines.size + 4 * density
+
+        val bmp = android.graphics.Bitmap.createBitmap(maxW.toInt(), totalH.toInt(), android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        // Background
+        val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = Color.argb(200, 255, 255, 255)
+            style = android.graphics.Paint.Style.FILL
+        }
+        canvas.drawRoundRect(0f, 0f, maxW, totalH, 4 * density, 4 * density, bgPaint)
+        // Border
+        val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 1 * density
+        }
+        canvas.drawRoundRect(0f, 0f, maxW, totalH, 4 * density, 4 * density, borderPaint)
+        // Text
+        lines.forEachIndexed { i, line ->
+            val p = if (i == 0) textPaint else smallPaint
+            val x = (maxW - p.measureText(line)) / 2
+            val y = lineHeight * (i + 1)
+            canvas.drawText(line, x, y, p)
+        }
+
+        return android.graphics.drawable.BitmapDrawable(resources, bmp)
+    }
+
+    private fun windDirToArrow(deg: Int): String = when ((deg + 22) / 45 % 8) {
+        0 -> "↓"; 1 -> "↙"; 2 -> "←"; 3 -> "↖"
+        4 -> "↑"; 5 -> "↗"; 6 -> "→"; 7 -> "↘"
+        else -> ""
     }
 
     private fun buildPlaceSnippet(p: com.example.locationmapapp.data.model.PlaceResult) =
         listOfNotNull(p.address, p.phone, p.openingHours).joinToString("\n").ifBlank { p.category }
 
     private fun buildMetarSnippet(s: com.example.locationmapapp.data.model.MetarStation): String {
-        val temp = s.tempC?.let { "${it}°C" } ?: "?"
-        val wind = if (s.windDirDeg != null && s.windSpeedKt != null)
-            "${s.windDirDeg}° @ ${s.windSpeedKt}kt" else "calm"
-        val vis  = s.visibilityMiles?.let { "${it}sm" } ?: "?"
-        val alt  = s.altimeterInHg?.let { "%.2f inHg".format(it) } ?: "?"
-        return "Temp:$temp  Wind:$wind  Vis:$vis  Alt:$alt\n${s.rawMetar.take(60)}"
+        val lines = mutableListOf<String>()
+
+        // Temperature & dewpoint
+        val tempF = s.tempC?.let { "%.0f°F".format(it * 9.0 / 5.0 + 32) }
+        val dewF  = s.dewpointC?.let { "%.0f°F".format(it * 9.0 / 5.0 + 32) }
+        if (tempF != null) {
+            val dewPart = if (dewF != null) ", Dewpoint $dewF" else ""
+            lines += "Temperature: $tempF$dewPart"
+        }
+
+        // Wind
+        val wind = if (s.windSpeedKt != null && s.windSpeedKt > 0) {
+            val dirName = s.windDirDeg?.let { degreesToCompass(it) } ?: "Variable"
+            val gust = if (s.windGustKt != null) ", gusting to ${s.windGustKt} kt" else ""
+            "Wind: $dirName at ${s.windSpeedKt} kt$gust"
+        } else "Wind: Calm"
+        lines += wind
+
+        // Visibility
+        s.visibilityMiles?.let {
+            val visStr = if (it >= 10.0) "10+ miles" else "${"%.0f".format(it)} miles"
+            lines += "Visibility: $visStr"
+        }
+
+        // Sky condition
+        s.skyCover?.let { cover ->
+            val decoded = when (cover.uppercase()) {
+                "CLR", "SKC" -> "Clear"
+                "FEW"        -> "Few clouds"
+                "SCT"        -> "Scattered clouds"
+                "BKN"        -> "Broken clouds"
+                "OVC"        -> "Overcast"
+                else         -> cover
+            }
+            lines += "Sky: $decoded"
+        }
+
+        // Weather phenomena
+        s.wxString?.let { lines += "Weather: ${decodeWx(it)}" }
+
+        // Altimeter
+        s.altimeterInHg?.let { lines += "Altimeter: ${"%.2f".format(it)} inHg" }
+
+        // Sea level pressure
+        s.slpMb?.let { lines += "Sea Level Pressure: ${"%.1f".format(it)} mb" }
+
+        // Flight category
+        s.flightCategory?.let { cat ->
+            val decoded = when (cat.uppercase()) {
+                "VFR"  -> "VFR (Visual Flight Rules)"
+                "MVFR" -> "MVFR (Marginal VFR)"
+                "IFR"  -> "IFR (Instrument Flight Rules)"
+                "LIFR" -> "LIFR (Low IFR)"
+                else   -> cat
+            }
+            lines += "Flight Category: $decoded"
+        }
+
+        // Observation time
+        s.observationTime?.let {
+            try {
+                val instant = java.time.Instant.parse(it)
+                val local = java.time.LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
+                lines += "Observed: ${local.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))}"
+            } catch (_: Exception) {}
+        }
+
+        // Raw METAR at the bottom
+        lines += "\n${s.rawMetar}"
+
+        return lines.joinToString("\n")
+    }
+
+    private fun degreesToCompass(deg: Int): String = when ((deg + 22) / 45 % 8) {
+        0 -> "North"; 1 -> "Northeast"; 2 -> "East"; 3 -> "Southeast"
+        4 -> "South"; 5 -> "Southwest"; 6 -> "West"; 7 -> "Northwest"
+        else -> "${deg}°"
+    }
+
+    private fun decodeWx(wx: String): String {
+        val map = mapOf(
+            "RA" to "Rain", "SN" to "Snow", "DZ" to "Drizzle",
+            "FG" to "Fog", "BR" to "Mist", "HZ" to "Haze",
+            "TS" to "Thunderstorm", "SH" to "Showers", "FZ" to "Freezing",
+            "GR" to "Hail", "GS" to "Small hail", "PL" to "Ice pellets",
+            "SG" to "Snow grains", "IC" to "Ice crystals",
+            "UP" to "Unknown precip", "FU" to "Smoke",
+            "VA" to "Volcanic ash", "DU" to "Dust", "SA" to "Sand",
+            "SQ" to "Squall", "FC" to "Funnel cloud",
+            "SS" to "Sandstorm", "DS" to "Duststorm"
+        )
+        val intensityMap = mapOf("-" to "Light ", "+" to "Heavy ", "VC" to "Vicinity ")
+        var result = wx
+        for ((code, name) in map) result = result.replace(code, name + " ")
+        for ((code, prefix) in intensityMap) result = result.replace(code, prefix)
+        return result.trim().replace("\\s+".toRegex(), " ")
     }
 
     fun clearMetarMarkers() {
         metarMarkers.forEach { binding.mapView.overlays.remove(it) }
         metarMarkers.clear(); binding.mapView.invalidate()
     }
-    private fun clearEarthquakeMarkers() {
-        earthquakeMarkers.forEach { binding.mapView.overlays.remove(it) }
-        earthquakeMarkers.clear(); binding.mapView.invalidate()
+
+    // =========================================================================
+    // AIRCRAFT
+    // =========================================================================
+
+    private fun addAircraftMarker(state: com.example.locationmapapp.data.model.AircraftState) {
+        val altFt = state.baroAltitude?.let { it * 3.28084 }
+        val tint = when {
+            state.onGround           -> Color.parseColor("#78909C")  // gray
+            altFt == null            -> Color.parseColor("#1565C0")  // blue default
+            altFt < 5000             -> Color.parseColor("#2E7D32")  // green — low
+            altFt < 20000            -> Color.parseColor("#1565C0")  // blue — mid
+            else                     -> Color.parseColor("#6A1B9A")  // purple — high
+        }
+        val heading = state.track?.toInt() ?: 0
+        val m = Marker(binding.mapView).apply {
+            position = state.toGeoPoint()
+            icon     = MarkerIconHelper.aircraftMarker(
+                this@MainActivity, heading, tint,
+                state.callsign, state.verticalRate, state.spi
+            )
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            title    = state.callsign?.ifBlank { null } ?: state.icao24
+            snippet  = buildAircraftSnippet(state)
+            setOnMarkerClickListener { _, _ ->
+                onAircraftMarkerTapped(state)
+                true
+            }
+        }
+        aircraftMarkers.add(m)
+        binding.mapView.overlays.add(m)
+        binding.mapView.invalidate()
     }
-    private fun clearPlaceMarkers() {
-        placeMarkers.forEach { binding.mapView.overlays.remove(it) }
-        placeMarkers.clear(); binding.mapView.invalidate()
+
+    private fun buildAircraftSnippet(s: com.example.locationmapapp.data.model.AircraftState): String {
+        val lines = mutableListOf<String>()
+        // SPI emergency flag
+        if (s.spi) lines += "⚠ SPECIAL PURPOSE INDICATOR ACTIVE"
+        // Altitude
+        val altFt = s.baroAltitude?.let { "%.0f ft".format(it * 3.28084) }
+        val geoFt = s.geoAltitude?.let { "%.0f ft".format(it * 3.28084) }
+        if (altFt != null) lines += "Altitude: $altFt (baro)" + if (geoFt != null) " / $geoFt (geo)" else ""
+        // Speed
+        s.velocity?.let { lines += "Speed: ${"%.0f".format(it * 1.94384)} kt (${"%.0f".format(it * 2.237)} mph)" }
+        // Heading
+        s.track?.let { lines += "Heading: ${"%.0f".format(it)}°" }
+        // Vertical rate
+        s.verticalRate?.let {
+            val fpm = it * 196.85
+            val dir = when { fpm > 100 -> "↑ climbing"; fpm < -100 -> "↓ descending"; else -> "level" }
+            lines += "Vertical: ${"%.0f".format(fpm)} ft/min ($dir)"
+        }
+        // Squawk
+        s.squawk?.let { lines += "Squawk: $it" }
+        // On ground
+        if (s.onGround) lines += "Status: On ground"
+        // Origin
+        if (s.originCountry.isNotBlank()) lines += "Origin: ${s.originCountry}"
+        // Category
+        val catName = aircraftCategoryName(s.category)
+        if (catName.isNotBlank()) lines += "Category: $catName"
+        // Position source
+        val srcName = when (s.positionSource) {
+            0 -> "ADS-B"; 1 -> "ASTERIX"; 2 -> "MLAT"; 3 -> "FLARM"; else -> null
+        }
+        srcName?.let { lines += "Source: $it" }
+        // Data age
+        s.timePosition?.let {
+            val ageSec = (System.currentTimeMillis() / 1000) - it
+            lines += "Position age: ${ageSec}s"
+        }
+        // ICAO24
+        lines += "ICAO24: ${s.icao24}"
+        return lines.joinToString("\n")
+    }
+
+    private fun aircraftCategoryName(cat: Int): String = when (cat) {
+        0  -> ""
+        1  -> "No ADS-B category"
+        2  -> "Light (<15,500 lbs)"
+        3  -> "Small (15,500–75,000 lbs)"
+        4  -> "Large (75,000–300,000 lbs)"
+        5  -> "High Vortex Large"
+        6  -> "Heavy (>300,000 lbs)"
+        7  -> "High Performance"
+        8  -> "Rotorcraft"
+        9  -> "Glider/Sailplane"
+        10 -> "Lighter-than-air"
+        11 -> "Skydiver"
+        12 -> "Ultralight"
+        13 -> "UAV"
+        14 -> "Space vehicle"
+        else -> "Cat $cat"
+    }
+
+    private fun clearAircraftMarkers() {
+        aircraftMarkers.forEach { binding.mapView.overlays.remove(it) }
+        aircraftMarkers.clear()
+        binding.mapView.invalidate()
+    }
+
+    private fun startAircraftRefresh() {
+        aircraftRefreshJob?.cancel()
+        DebugLogger.i("MainActivity", "Starting aircraft refresh every ${aircraftRefreshIntervalSec}s")
+        aircraftRefreshJob = lifecycleScope.launch {
+            while (true) {
+                loadAircraftForVisibleArea()
+                delay(aircraftRefreshIntervalSec * 1000L)
+            }
+        }
+    }
+
+    private fun stopAircraftRefresh() {
+        aircraftRefreshJob?.cancel()
+        aircraftRefreshJob = null
+        DebugLogger.i("MainActivity", "Aircraft refresh stopped")
+    }
+
+    private fun clearPoiMarkers(layerId: String) {
+        poiMarkers[layerId]?.forEach { binding.mapView.overlays.remove(it) }
+        poiMarkers[layerId]?.clear()
+        binding.mapView.invalidate()
+    }
+
+    /** Clear ALL POI markers from every layer at once. */
+    private fun clearAllPoiMarkers() {
+        poiMarkers.values.forEach { list ->
+            list.forEach { binding.mapView.overlays.remove(it) }
+        }
+        poiMarkers.clear()
+    }
+
+    /** Replace all POI markers with only the given viewport results. */
+    private fun replaceAllPoiMarkers(places: List<com.example.locationmapapp.data.model.PlaceResult>) {
+        clearAllPoiMarkers()
+        places.forEach { addPoiMarker("bbox", it) }
+        binding.mapView.invalidate()
     }
 
     // =========================================================================
@@ -719,7 +1195,7 @@ class MainActivity : AppCompatActivity() {
         }
         val m = Marker(binding.mapView).apply {
             position = vehicle.toGeoPoint()
-            icon     = MarkerIconHelper.get(this@MainActivity, R.drawable.ic_transit_rail, 30, tint)
+            icon     = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_transit_rail, 30, tint, vehicle.bearing)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title   = "Train ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
@@ -785,7 +1261,7 @@ class MainActivity : AppCompatActivity() {
         }
         val m = Marker(binding.mapView).apply {
             position = vehicle.toGeoPoint()
-            icon     = MarkerIconHelper.get(this@MainActivity, R.drawable.ic_transit_rail, 26, tint)
+            icon     = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_transit_rail, 26, tint, vehicle.bearing)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title   = "Subway ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
@@ -830,7 +1306,7 @@ class MainActivity : AppCompatActivity() {
         val tint = Color.parseColor("#00695C")  // Teal for buses
         val m = Marker(binding.mapView).apply {
             position = vehicle.toGeoPoint()
-            icon     = MarkerIconHelper.get(this@MainActivity, R.drawable.ic_bus, 22, tint)
+            icon     = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_bus, 22, tint, vehicle.bearing)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title   = "Bus ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
@@ -880,6 +1356,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startFollowing(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
+        followedAircraftIcao = null   // stop any aircraft follow
         followedVehicleId = vehicle.id
         DebugLogger.i("MainActivity", "Following vehicle ${vehicle.id} (${vehicle.label} — ${vehicle.routeName})")
 
@@ -890,8 +1367,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopFollowing() {
-        DebugLogger.i("MainActivity", "Stopped following vehicle $followedVehicleId")
+        DebugLogger.i("MainActivity", "Stopped following vehicle=$followedVehicleId aircraft=$followedAircraftIcao")
         followedVehicleId = null
+        followedAircraftIcao = null
+        followedAircraftFailCount = 0
+        autoFollowEmptyPoiCount = 0
+        stopFollowedAircraftRefresh()
         hideFollowBanner()
     }
 
@@ -906,6 +1387,8 @@ class MainActivity : AppCompatActivity() {
             val point = vehicle.toGeoPoint()
             DebugLogger.i("MainActivity", "Follow POI prefetch at ${point.latitude},${point.longitude}")
             viewModel.searchPoisAt(point)
+            // Refresh full cache display after prefetch
+            binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 3000)
         }
         // If not found in this list, it may be in another vehicle type's list — don't stop yet
     }
@@ -949,9 +1432,258 @@ class MainActivity : AppCompatActivity() {
         followBanner?.visibility = View.GONE
     }
 
-    private fun clearGasStationMarkers() {
-        gasStationMarkers.forEach { binding.mapView.overlays.remove(it) }
-        gasStationMarkers.clear(); binding.mapView.invalidate()
+    // ── Aircraft follow ─────────────────────────────────────────────────────
+
+    private fun onAircraftMarkerTapped(state: com.example.locationmapapp.data.model.AircraftState) {
+        if (followedAircraftIcao == state.icao24) {
+            stopFollowing()
+        } else {
+            startFollowingAircraft(state)
+        }
+    }
+
+    private fun startFollowingAircraft(state: com.example.locationmapapp.data.model.AircraftState) {
+        // Stop any existing vehicle follow
+        followedVehicleId = null
+        followedAircraftIcao = state.icao24
+        lastFollowedAircraftState = state
+        DebugLogger.i("MainActivity", "Following aircraft ${state.icao24} (${state.callsign})")
+
+        binding.mapView.controller.animateTo(state.toGeoPoint())
+        showAircraftFollowBanner(state)
+
+        // Start dedicated icao24 refresh — tracks globally, not limited to bbox
+        startFollowedAircraftRefresh(state.icao24)
+    }
+
+    private fun startFollowedAircraftRefresh(icao24: String) {
+        followedAircraftRefreshJob?.cancel()
+        DebugLogger.i("MainActivity", "Starting followed aircraft refresh for $icao24 every ${aircraftRefreshIntervalSec}s")
+        followedAircraftRefreshJob = lifecycleScope.launch {
+            while (true) {
+                delay(aircraftRefreshIntervalSec * 1000L)
+                viewModel.loadFollowedAircraft(icao24)
+            }
+        }
+    }
+
+    private fun stopFollowedAircraftRefresh() {
+        followedAircraftRefreshJob?.cancel()
+        followedAircraftRefreshJob = null
+        viewModel.clearFollowedAircraft()
+        lastFollowedAircraftState = null
+    }
+
+    // ── Auto-follow random high-altitude aircraft ────────────────────────
+
+    private fun startAutoFollowAircraft() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        // Ensure aircraft layer is on
+        if (!prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true)) {
+            prefs.edit().putBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true).apply()
+            startAircraftRefresh()
+            DebugLogger.i("MainActivity", "Auto-follow: enabled aircraft layer")
+        }
+        pickAndFollowRandomAircraft()
+        autoFollowAircraftJob?.cancel()
+        autoFollowAircraftJob = lifecycleScope.launch {
+            while (true) {
+                delay(20 * 60 * 1000L)  // 20 minutes
+                DebugLogger.i("MainActivity", "Auto-follow: 20-min rotation — picking new aircraft")
+                pickAndFollowRandomAircraft()
+            }
+        }
+        toast("Auto-follow ON — picking high-altitude aircraft")
+    }
+
+    private fun stopAutoFollowAircraft() {
+        autoFollowAircraftJob?.cancel()
+        autoFollowAircraftJob = null
+        stopFollowing()
+        toast("Auto-follow stopped")
+        DebugLogger.i("MainActivity", "Auto-follow stopped")
+    }
+
+    /**
+     * Compute a wide bbox (~zoom 11) centered on the map center, query aircraft in that area,
+     * and follow a random high-altitude one. Does NOT change the user's zoom or position.
+     */
+    private fun pickAndFollowRandomAircraft(westboundOnly: Boolean = false) {
+        // First check already-loaded aircraft
+        val currentList = viewModel.aircraft.value ?: emptyList()
+        val candidates = filterHighAltitude(currentList)
+        if (candidates.isNotEmpty()) {
+            selectAndFollow(candidates, westboundOnly)
+            return
+        }
+        // Build a wide bbox (~zoom 8, covers most of the northeast) to maximize candidates
+        val center = binding.mapView.mapCenter
+        val halfLat = 3.0   // ~330 km north/south
+        val halfLon = 4.0   // ~340 km east/west
+        val south = center.latitude - halfLat
+        val north = center.latitude + halfLat
+        val west  = center.longitude - halfLon
+        val east  = center.longitude + halfLon
+        DebugLogger.i("MainActivity", "Auto-follow: wide bbox query ${south},${west},${north},${east}")
+        viewModel.loadAircraft(south, west, north, east)
+        // Wait for the network response then pick
+        lifecycleScope.launch {
+            delay(3000)
+            val freshList = viewModel.aircraft.value ?: emptyList()
+            val freshCandidates = filterHighAltitude(freshList)
+            if (freshCandidates.isNotEmpty()) {
+                selectAndFollow(freshCandidates, westboundOnly)
+            } else {
+                DebugLogger.i("MainActivity", "Auto-follow: no aircraft ≥ 10,000 ft in wide bbox — will retry in 20 min")
+                toast("No aircraft above 10,000 ft — will retry")
+            }
+        }
+    }
+
+    private fun filterHighAltitude(
+        aircraft: List<com.example.locationmapapp.data.model.AircraftState>
+    ): List<com.example.locationmapapp.data.model.AircraftState> {
+        return aircraft.filter { it.baroAltitude != null && it.baroAltitude * 3.28084 >= 10000 }
+    }
+
+    private fun selectAndFollow(candidates: List<com.example.locationmapapp.data.model.AircraftState>, westboundOnly: Boolean = false) {
+        // Exclude currently followed aircraft for variety
+        val currentIcao = followedAircraftIcao
+        val others = candidates.filter { it.icao24 != currentIcao }
+        val pool = if (others.isNotEmpty()) others else candidates
+
+        // Prioritize westbound aircraft (heading 180–360°) — they stay over land in New England
+        val westbound = pool.filter { it.track != null && it.track >= 180.0 && it.track <= 360.0 }
+        val pick = if (westbound.isNotEmpty()) {
+            DebugLogger.i("MainActivity", "Auto-follow: ${westbound.size} westbound of ${pool.size} candidates${if (westboundOnly) " (forced)" else ""}")
+            westbound.random()
+        } else if (westboundOnly) {
+            DebugLogger.i("MainActivity", "Auto-follow: no westbound available — will retry in 20 min")
+            toast("No westbound aircraft — will retry")
+            return
+        } else {
+            DebugLogger.i("MainActivity", "Auto-follow: no westbound — picking from all ${pool.size}")
+            pool.random()
+        }
+        val hdg = pick.track?.let { "%.0f°".format(it) } ?: "?"
+        DebugLogger.i("MainActivity", "Auto-follow: selected ${pick.icao24} (${pick.callsign}) " +
+                "alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg from ${candidates.size} candidates")
+        autoFollowEmptyPoiCount = 0
+        followedAircraftFailCount = 0
+        startFollowingAircraft(pick)
+    }
+
+    private fun pickFurthestWestAircraft() {
+        val center = binding.mapView.mapCenter
+        val halfLat = 3.0
+        val halfLon = 4.0
+        val south = center.latitude - halfLat
+        val north = center.latitude + halfLat
+        val west  = center.longitude - halfLon
+        val east  = center.longitude + halfLon
+        DebugLogger.i("MainActivity", "Auto-follow: wide bbox for furthest-west query")
+        viewModel.loadAircraft(south, west, north, east)
+        lifecycleScope.launch {
+            delay(3000)
+            val freshList = viewModel.aircraft.value ?: emptyList()
+            val candidates = filterHighAltitude(freshList)
+                .filter { it.icao24 != followedAircraftIcao && it.lon != null }
+            if (candidates.isNotEmpty()) {
+                val pick = candidates.minByOrNull { it.lon }!!
+                val hdg = pick.track?.let { "%.0f°".format(it) } ?: "?"
+                DebugLogger.i("MainActivity", "Auto-follow: furthest west ${pick.icao24} (${pick.callsign}) " +
+                        "lon=${pick.lon} alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg")
+                autoFollowEmptyPoiCount = 0
+                followedAircraftFailCount = 0
+                startFollowingAircraft(pick)
+            } else {
+                DebugLogger.i("MainActivity", "Auto-follow: no candidates for furthest-west — will retry in 20 min")
+                toast("No aircraft available — will retry")
+            }
+        }
+    }
+
+    private fun pickInteriorAircraft() {
+        // Query a wide US-centered bbox
+        val south = 25.0; val north = 49.0; val west = -125.0; val east = -66.0
+        DebugLogger.i("MainActivity", "Auto-follow: querying full CONUS for interior aircraft")
+        viewModel.loadAircraft(south, west, north, east)
+        lifecycleScope.launch {
+            delay(3000)
+            val freshList = viewModel.aircraft.value ?: emptyList()
+            // Filter: high altitude, inside US bounds, exclude current
+            val candidates = filterHighAltitude(freshList)
+                .filter { it.icao24 != followedAircraftIcao && it.lat in 26.0..48.0 && it.lon in -124.0..-67.0 }
+            if (candidates.isNotEmpty()) {
+                // Pick the one closest to US center (~39°N, -98°W)
+                val pick = candidates.minByOrNull { a ->
+                    val dLat = a.lat - 39.0
+                    val dLon = a.lon - (-98.0)
+                    dLat * dLat + dLon * dLon
+                }!!
+                val hdg = pick.track?.let { "%.0f°".format(it) } ?: "?"
+                DebugLogger.i("MainActivity", "Auto-follow: interior pick ${pick.icao24} (${pick.callsign}) " +
+                        "at ${pick.lat},${pick.lon} alt=${"%.0f".format((pick.baroAltitude ?: 0.0) * 3.28084)} ft hdg=$hdg")
+                autoFollowEmptyPoiCount = 0
+                followedAircraftFailCount = 0
+                startFollowingAircraft(pick)
+            } else {
+                DebugLogger.i("MainActivity", "Auto-follow: no interior candidates — falling back to random")
+                pickAndFollowRandomAircraft()
+            }
+        }
+    }
+
+    private fun updateFollowedAircraft(aircraft: List<com.example.locationmapapp.data.model.AircraftState>) {
+        val icao = followedAircraftIcao ?: return
+        // If the followed aircraft is in the bbox results, update its last known state
+        val state = aircraft.find { it.icao24 == icao }
+        if (state != null) {
+            lastFollowedAircraftState = state
+            showAircraftFollowBanner(state)
+        }
+        // Don't stop following if missing from bbox — the dedicated icao24 query handles that
+    }
+
+    private fun showAircraftFollowBanner(state: com.example.locationmapapp.data.model.AircraftState) {
+        val label = state.callsign?.ifBlank { null } ?: state.icao24
+        val altFt = state.baroAltitude?.let { "%.0f ft".format(it * 3.28084) } ?: "—"
+        val speedKt = state.velocity?.let { "%.0f kt".format(it * 1.94384) } ?: "—"
+        val vertDesc = state.verticalRate?.let {
+            val fpm = it * 196.85
+            when {
+                fpm > 100  -> "\u2191 %.0f ft/min".format(fpm)
+                fpm < -100 -> "\u2193 %.0f ft/min".format(fpm)
+                else       -> "level"
+            }
+        } ?: ""
+        val headingStr = state.track?.let { "%.0f\u00B0".format(it) } ?: ""
+        val spiFlag = if (state.spi) "  \u26A0 SPI" else ""
+
+        val prefix = if (autoFollowAircraftJob?.isActive == true) "Auto-following" else "Following"
+        val text = "$prefix \u2708 $label$spiFlag\n" +
+                   "Alt $altFt  •  $speedKt  •  $headingStr  •  $vertDesc"
+
+        if (followBanner == null) {
+            followBanner = TextView(this).apply {
+                setBackgroundColor(Color.parseColor("#DD212121"))
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                setPadding(32, 20, 32, 20)
+                val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
+                }
+                layoutParams = params
+                elevation = 12f
+                setOnClickListener { stopFollowing() }
+            }
+            (binding.root as ViewGroup).addView(followBanner)
+        }
+        followBanner?.text = text
+        followBanner?.visibility = View.VISIBLE
     }
 
     // =========================================================================
@@ -1032,7 +1764,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onMetarDisplayToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onMetarDisplayToggled: $enabled")
-            if (enabled) { viewModel.loadAllUsMetars(); toast("Loading METARs…") }
+            if (enabled) { loadMetarsForVisibleArea(); toast("Loading METARs…") }
             else          clearMetarMarkers()
         }
 
@@ -1040,6 +1772,38 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onMetarFrequencyChanged: ${minutes}min")
             // STUB: wire to a periodic METAR refresh scheduler
             stub("metar_freq", minutes)
+        }
+
+        // ── Aircraft ─────────────────────────────────────────────────────────
+
+        override fun onAircraftDisplayToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onAircraftDisplayToggled: $enabled")
+            if (enabled) {
+                startAircraftRefresh()
+                toast("Loading aircraft…")
+            } else {
+                stopAircraftRefresh()
+                viewModel.clearAircraft()
+                clearAircraftMarkers()
+                if (followedAircraftIcao != null) stopFollowing()
+                // Cancel auto-follow if aircraft layer turned off
+                if (autoFollowAircraftJob?.isActive == true) {
+                    autoFollowAircraftJob?.cancel()
+                    autoFollowAircraftJob = null
+                    val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+                    prefs.edit().putBoolean(AppBarMenuManager.PREF_AUTO_FOLLOW_AIRCRAFT, false).apply()
+                    DebugLogger.i("MainActivity", "Auto-follow cancelled — aircraft layer turned off")
+                }
+            }
+        }
+
+        override fun onAircraftFrequencyChanged(seconds: Int) {
+            DebugLogger.i("MainActivity", "onAircraftFrequencyChanged: ${seconds}s")
+            aircraftRefreshIntervalSec = seconds
+            if (aircraftRefreshJob?.isActive == true) {
+                startAircraftRefresh()
+            }
+            toast("Aircraft refresh: every $seconds sec")
         }
 
         // ── Transit ───────────────────────────────────────────────────────────
@@ -1131,34 +1895,19 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPoiLayerToggled(layerId: String, enabled: Boolean) {
             DebugLogger.i("MainActivity", "onPoiLayerToggled: layerId=$layerId enabled=$enabled")
-            val loc = viewModel.currentLocation.value ?: GeoPoint(42.3601, -71.0589)
-            when (layerId) {
-                PoiLayerId.RESTAURANTS   ->
-                    if (enabled) { viewModel.searchPoisAt(loc, listOf("amenity=restaurant")); toast("Loading restaurants…") }
-                    else          clearPlaceMarkers()
-
-                PoiLayerId.GAS_STATIONS  ->
-                    if (enabled) { viewModel.loadGasStations(loc); toast("Loading gas stations…") }
-                    else          clearGasStationMarkers()
-
-                PoiLayerId.EARTHQUAKES   ->
-                    if (enabled) { viewModel.loadEarthquakesForMap(); toast("Loading earthquakes…") }
-                    else          clearEarthquakeMarkers()
-
-                PoiLayerId.TRANSIT_ACCESS ->
-                    if (enabled) { viewModel.searchPoisAt(loc, listOf("public_transport=station", "railway=station", "amenity=bus_station")); toast("Loading transit access…") }
-                    else          clearPlaceMarkers()
-
-                PoiLayerId.CIVIC ->
-                    if (enabled) { viewModel.searchPoisAt(loc, listOf("amenity=townhall", "amenity=courthouse", "amenity=post_office", "office=government")); toast("Loading civic buildings…") }
-                    else          clearPlaceMarkers()
-
-                PoiLayerId.PARKS ->
-                    if (enabled) { viewModel.searchPoisAt(loc, listOf("leisure=park", "leisure=nature_reserve")); toast("Loading parks…") }
-                    else          clearPlaceMarkers()
-
-                else -> stub("poi_unknown:$layerId", enabled)
+            if (!enabled) {
+                // Markers are now viewport-driven via bbox — toggle off just stops searching
+                return
             }
+            val cat = PoiCategories.find(layerId)
+            if (cat == null) {
+                stub("poi_unknown:$layerId", enabled)
+                return
+            }
+            val tags = appBarMenuManager.getActiveTags(layerId)
+            val loc = viewModel.currentLocation.value ?: GeoPoint(42.3601, -71.0589)
+            viewModel.searchPoisAt(loc, tags, layerId)
+            toast("Loading ${cat.label}…")
         }
 
         // ── Utility ───────────────────────────────────────────────────────────
@@ -1196,6 +1945,11 @@ class MainActivity : AppCompatActivity() {
         override fun onDebugLogRequested() {
             DebugLogger.i("MainActivity", "onDebugLogRequested")
             startActivity(Intent(this@MainActivity, DebugLogActivity::class.java))
+        }
+
+        override fun onAutoFollowAircraftToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onAutoFollowAircraftToggled: $enabled")
+            if (enabled) startAutoFollowAircraft() else stopAutoFollowAircraft()
         }
 
         override fun onGpsModeToggled(autoGps: Boolean) {

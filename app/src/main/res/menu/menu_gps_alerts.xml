@@ -56,4 +56,17 @@
         android:title="METAR Update Frequency…"
         app:showAsAction="never" />
 
+    <!-- Binary: Aircraft tracking (OpenSky) -->
+    <item
+        android:id="@+id/menu_aircraft_display"
+        android:title="Aircraft Tracking"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider stub: Aircraft update frequency 5-60 sec -->
+    <item
+        android:id="@+id/menu_aircraft_frequency"
+        android:title="Aircraft Update Frequency…"
+        app:showAsAction="never" />
+
 </menu>

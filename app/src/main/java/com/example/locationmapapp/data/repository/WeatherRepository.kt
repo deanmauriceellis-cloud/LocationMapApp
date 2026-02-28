@@ -76,9 +76,9 @@ class WeatherRepository @Inject constructor() {
 
     // ── METAR (aviationweather.gov AWOS/ASOS) ─────────────────────────────────
 
-    suspend fun fetchMetars(): List<MetarStation> = withContext(Dispatchers.IO) {
-        // Fetch all US METARs reported in last hour as JSON
-        val url = "http://10.0.0.4:3000/metar"
+    suspend fun fetchMetars(south: Double, west: Double, north: Double, east: Double): List<MetarStation> = withContext(Dispatchers.IO) {
+        val bbox = "$south,$west,$north,$east"
+        val url = "http://10.0.0.4:3000/metar?bbox=$bbox"
         DebugLogger.d(TAG, "Fetching METARs")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -89,9 +89,9 @@ class WeatherRepository @Inject constructor() {
             DebugLogger.e(TAG, "METAR HTTP ${response.code} body: $errBody")
             throw RuntimeException("HTTP ${response.code}: $errBody")
         }
-        val bodyStr = response.body!!.string()
+        val bodyStr = response.body?.string().orEmpty()
         DebugLogger.d(TAG, "METAR body length=${bodyStr.length}")
-        parseMetarJson(bodyStr)
+        if (bodyStr.isBlank()) emptyList() else parseMetarJson(bodyStr)
     }
 
     private fun parseMetarJson(json: String): List<MetarStation> {
@@ -102,18 +102,29 @@ class WeatherRepository @Inject constructor() {
                 val obj = el.asJsonObject
                 val lat = obj["lat"]?.asDouble ?: continue
                 val lon = obj["lon"]?.asDouble ?: continue
+                val visibRaw = obj["visib"]?.let {
+                    if (it.isJsonNull) null
+                    else if (it.isJsonPrimitive && it.asJsonPrimitive.isString) {
+                        it.asString.replace("+", "").toDoubleOrNull()
+                    } else it.asDouble
+                }
                 results.add(MetarStation(
                     stationId       = obj["icaoId"]?.asString ?: "",
+                    name            = obj["name"]?.let { if (it.isJsonNull) null else it.asString },
                     lat             = lat,
                     lon             = lon,
                     rawMetar        = obj["rawOb"]?.asString ?: "",
-                    tempC           = obj["temp"]?.asDouble,
-                    dewpointC       = obj["dewp"]?.asDouble,
+                    tempC           = obj["temp"]?.let { if (it.isJsonNull) null else it.asDouble },
+                    dewpointC       = obj["dewp"]?.let { if (it.isJsonNull) null else it.asDouble },
                     windDirDeg      = obj["wdir"]?.let { if (it.isJsonNull) null else it.asInt },
                     windSpeedKt     = obj["wspd"]?.let { if (it.isJsonNull) null else it.asInt },
-                    visibilityMiles = obj["visib"]?.let { if (it.isJsonNull) null else it.asDouble },
+                    windGustKt      = obj["wgst"]?.let { if (it.isJsonNull) null else it.asInt },
+                    visibilityMiles = visibRaw,
                     altimeterInHg   = obj["altim"]?.let { if (it.isJsonNull) null else it.asDouble / 33.8639 },
-                    flightCategory  = obj["fltcat"]?.asString,
+                    slpMb           = obj["slp"]?.let { if (it.isJsonNull) null else it.asDouble },
+                    flightCategory  = obj["fltCat"]?.let { if (it.isJsonNull) null else it.asString },
+                    skyCover        = obj["cover"]?.let { if (it.isJsonNull) null else it.asString },
+                    wxString        = obj["wxString"]?.let { if (it.isJsonNull) null else it.asString },
                     observationTime = obj["reportTime"]?.asString
                 ))
             }

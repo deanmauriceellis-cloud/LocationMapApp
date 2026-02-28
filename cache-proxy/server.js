@@ -1,8 +1,66 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { Pool } = require('pg');
 const app = express();
 const PORT = 3000;
+
+// ── PostgreSQL pool (optional — /db/* endpoints require DATABASE_URL) ────────
+
+let pgPool = null;
+if (process.env.DATABASE_URL) {
+  pgPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 5,
+    connectionTimeoutMillis: 5000,
+  });
+  pgPool.on('error', (err) => console.error('[PG Pool] Unexpected error:', err.message));
+}
+
+function requirePg(req, res, next) {
+  if (!pgPool) return res.status(503).json({ error: 'Database not configured (set DATABASE_URL)' });
+  next();
+}
+
+// ── OpenSky OAuth2 (optional — set OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET) ──
+
+const OPENSKY_TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+let openskyToken = null;    // { access_token, expiresAt }
+
+async function getOpenskyToken() {
+  const clientId = process.env.OPENSKY_CLIENT_ID;
+  const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  // Reuse token if still valid (5 min buffer)
+  if (openskyToken && Date.now() < openskyToken.expiresAt - 300000) {
+    return openskyToken.access_token;
+  }
+
+  try {
+    const resp = await fetch(OPENSKY_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`,
+    });
+    if (!resp.ok) {
+      console.error(`[OpenSky] Token request failed: ${resp.status}`);
+      return null;
+    }
+    const data = await resp.json();
+    openskyToken = {
+      access_token: data.access_token,
+      expiresAt: Date.now() + data.expires_in * 1000,
+    };
+    console.log(`[OpenSky] Token refreshed, expires in ${data.expires_in}s`);
+    return openskyToken.access_token;
+  } catch (err) {
+    console.error('[OpenSky] Token error:', err.message);
+    return null;
+  }
+}
+
+const openskyConfigured = !!(process.env.OPENSKY_CLIENT_ID && process.env.OPENSKY_CLIENT_SECRET);
 
 // Parse URL-encoded bodies (Overpass POST sends form data)
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -280,8 +338,41 @@ app.post('/overpass', async (req, res) => {
     }
   }
 
-  // Cache-only mode: don't hit upstream, just return 204 if not cached
+  // Cache-only mode: search neighboring grid cells (3x3) and merge results
   if (cacheOnly) {
+    const aroundMatch = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
+    if (aroundMatch) {
+      const tagMatches = [...dataField.matchAll(/\["([^"]+)"(?:="([^"]+)")?\]/g)];
+      const tags = [...new Set(tagMatches.map(m => m[2] ? `${m[1]}=${m[2]}` : m[1]))].sort();
+      const tagStr = tags.join(',');
+      const lat = parseFloat(aroundMatch[2]);
+      const lon = parseFloat(aroundMatch[3]);
+      const step = 0.001; // 3dp grid step
+      const merged = new Map(); // dedup by element id
+      for (let dlat = -1; dlat <= 1; dlat++) {
+        for (let dlon = -1; dlon <= 1; dlon++) {
+          const nlat = (lat + dlat * step).toFixed(3);
+          const nlon = (lon + dlon * step).toFixed(3);
+          const nkey = `overpass:${nlat}:${nlon}:${tagStr}`;
+          const cached = cacheGet(nkey, OVERPASS_TTL);
+          if (cached) {
+            try {
+              const data = JSON.parse(cached.data);
+              if (data.elements) {
+                for (const el of data.elements) {
+                  merged.set(`${el.type}/${el.id}`, el);
+                }
+              }
+            } catch (e) { /* skip unparseable */ }
+          }
+        }
+      }
+      if (merged.size > 0) {
+        stats.hits++;
+        log('/overpass (cache-nearby)', true, 0, `${merged.size} POIs from neighbors`);
+        return res.json({ elements: [...merged.values()] });
+      }
+    }
     log('/overpass (cache-only)', false, 0);
     return res.status(204).end();
   }
@@ -365,14 +456,171 @@ proxyGet(
   { 'User-Agent': 'LocationMapApp/1.1 contact@example.com' }
 );
 
-// ── METAR (1h TTL) ──────────────────────────────────────────────────────────
+// ── METAR (1h TTL, bbox passthrough) ────────────────────────────────────────
 
-proxyGet(
-  '/metar',
-  'https://aviationweather.gov/api/data/metar?format=json&hours=1&taf=false',
-  'metar',
-  60 * 60 * 1000
-);
+app.get('/metar', async (req, res) => {
+  const { bbox } = req.query;
+  if (!bbox) return res.status(400).json({ error: 'Must specify bbox (lat0,lon0,lat1,lon1)' });
+
+  const cacheKey = `metar:${bbox}`;
+  const ttlMs = 60 * 60 * 1000;
+  const cached = cacheGet(cacheKey, ttlMs);
+  if (cached) {
+    stats.hits++;
+    log('/metar', true);
+    res.set('Content-Type', cached.headers['content-type'] || 'application/json');
+    return res.send(cached.data);
+  }
+
+  stats.misses++;
+  try {
+    const upstreamUrl = `https://aviationweather.gov/api/data/metar?format=json&hours=1&taf=false&bbox=${encodeURIComponent(bbox)}`;
+    const t0 = Date.now();
+    const upstream = await fetch(upstreamUrl);
+    const elapsed = Date.now() - t0;
+    const body = await upstream.text();
+    const contentType = upstream.headers.get('content-type') || 'application/json';
+
+    log('/metar', false, elapsed);
+
+    if (upstream.ok) {
+      cacheSet(cacheKey, body, { 'content-type': contentType });
+    }
+
+    res.status(upstream.status).set('Content-Type', contentType).send(body);
+  } catch (err) {
+    console.error('[METAR upstream error]', err.message);
+    res.status(502).json({ error: 'Upstream request failed', detail: err.message });
+  }
+});
+
+// ── Aircraft sighting tracker (real-time DB writes) ──────────────────────
+
+const activeSightings = new Map();  // icao24 → { id, lastSeen }
+const SIGHTING_GAP_MS = 5 * 60 * 1000;  // 5 min gap = new sighting
+
+async function trackAircraftSightings(body) {
+  if (!pgPool) return;
+  try {
+    const data = JSON.parse(body);
+    const states = data.states || [];
+    if (states.length === 0) return;
+
+    const now = new Date();
+    let inserted = 0, updated = 0;
+
+    for (const s of states) {
+      const icao24 = s[0];
+      const callsign = s[1]?.trim() || null;
+      const origin = s[2] || null;
+      const lon = s[5], lat = s[6];
+      const baro = s[7], onGround = s[8];
+      const velocity = s[9], heading = s[10];
+      const vertRate = s[11], squawk = s[14];
+
+      if (!icao24 || lat == null || lon == null) continue;
+
+      const active = activeSightings.get(icao24);
+      if (active && (now - active.lastSeen) < SIGHTING_GAP_MS) {
+        // Update existing sighting
+        await pgPool.query(
+          `UPDATE aircraft_sightings SET
+            last_seen=$1, last_lat=$2, last_lon=$3, last_altitude=$4,
+            last_heading=$5, last_velocity=$6, last_vertical_rate=$7,
+            squawk=$8, on_ground=$9, callsign=COALESCE($10, callsign)
+          WHERE id=$11`,
+          [now, lat, lon, baro, heading, velocity, vertRate, squawk, !!onGround, callsign, active.id]
+        );
+        active.lastSeen = now;
+        updated++;
+      } else {
+        // New sighting
+        const res = await pgPool.query(
+          `INSERT INTO aircraft_sightings
+            (icao24, callsign, origin_country, first_seen, last_seen,
+             first_lat, first_lon, first_altitude, first_heading,
+             last_lat, last_lon, last_altitude, last_heading,
+             last_velocity, last_vertical_rate, squawk, on_ground)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          RETURNING id`,
+          [icao24, callsign, origin, now, now,
+           lat, lon, baro, heading,
+           lat, lon, baro, heading,
+           velocity, vertRate, squawk, !!onGround]
+        );
+        activeSightings.set(icao24, { id: res.rows[0].id, lastSeen: now });
+        inserted++;
+      }
+    }
+
+    if (inserted > 0 || updated > 0) {
+      console.log(`[Aircraft DB] +${inserted} new sightings, ${updated} updated (${activeSightings.size} active)`);
+    }
+  } catch (err) {
+    console.error('[Aircraft DB]', err.message);
+  }
+}
+
+// Purge stale entries from active map every 10 min
+setInterval(() => {
+  const cutoff = Date.now() - SIGHTING_GAP_MS;
+  let purged = 0;
+  for (const [icao, entry] of activeSightings) {
+    if (entry.lastSeen < cutoff) {
+      activeSightings.delete(icao);
+      purged++;
+    }
+  }
+  if (purged > 0) console.log(`[Aircraft DB] Purged ${purged} stale sightings (${activeSightings.size} active)`);
+}, 10 * 60 * 1000);
+
+// ── OpenSky Aircraft (15s TTL, bbox passthrough) ─────────────────────────
+
+app.get('/aircraft', async (req, res) => {
+  const { bbox, icao24 } = req.query;
+  if (!bbox && !icao24) return res.status(400).json({ error: 'Must specify bbox (south,west,north,east) or icao24' });
+
+  const cacheKey = icao24 ? `aircraft:icao:${icao24}` : `aircraft:${bbox}`;
+  const ttlMs = 15 * 1000;
+  const cached = cacheGet(cacheKey, ttlMs);
+  if (cached) {
+    stats.hits++;
+    log('/aircraft', true);
+    trackAircraftSightings(cached.data);  // track on cache hits too
+    res.set('Content-Type', cached.headers['content-type'] || 'application/json');
+    return res.send(cached.data);
+  }
+
+  stats.misses++;
+  try {
+    let upstreamUrl;
+    if (icao24) {
+      upstreamUrl = `https://opensky-network.org/api/states/all?icao24=${icao24.toLowerCase()}`;
+    } else {
+      const parts = bbox.split(',');
+      upstreamUrl = `https://opensky-network.org/api/states/all?lamin=${parts[0]}&lomin=${parts[1]}&lamax=${parts[2]}&lomax=${parts[3]}`;
+    }
+    const token = await getOpenskyToken();
+    const fetchOpts = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    const t0 = Date.now();
+    const upstream = await fetch(upstreamUrl, fetchOpts);
+    const elapsed = Date.now() - t0;
+    const body = await upstream.text();
+    const contentType = upstream.headers.get('content-type') || 'application/json';
+
+    log('/aircraft', false, elapsed);
+
+    if (upstream.ok) {
+      cacheSet(cacheKey, body, { 'content-type': contentType });
+      trackAircraftSightings(body);  // fire-and-forget DB write
+    }
+
+    res.status(upstream.status).set('Content-Type', contentType).send(body);
+  } catch (err) {
+    console.error('[Aircraft upstream error]', err.message);
+    res.status(502).json({ error: 'Upstream request failed', detail: err.message });
+  }
+});
 
 // ── Radius hint endpoints ───────────────────────────────────────────────
 
@@ -423,11 +671,246 @@ app.get('/pois/export', (req, res) => {
   res.json({ count: pois.length, pois });
 });
 
+app.get('/pois/bbox', (req, res) => {
+  const { s, w, n, e } = req.query;
+  if (!s || !w || !n || !e) return res.status(400).json({ error: 'Must specify s, w, n, e bounds' });
+  const south = parseFloat(s), west = parseFloat(w), north = parseFloat(n), east = parseFloat(e);
+  const elements = [];
+  for (const [, value] of poiCache) {
+    const el = value.element;
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+    if (lat == null || lon == null) continue;
+    if (lat >= south && lat <= north && lon >= west && lon <= east) {
+      elements.push(el);
+    }
+  }
+  res.json({ count: elements.length, elements });
+});
+
 app.get('/poi/:type/:id', (req, res) => {
   const key = `poi:${req.params.type}:${req.params.id}`;
   const entry = poiCache.get(key);
   if (!entry) return res.status(404).json({ error: 'POI not found', key });
   res.json(entry);
+});
+
+// ── PostgreSQL-backed /db/* endpoints ────────────────────────────────────────
+
+const HAVERSINE_SQL = `
+  6371000 * 2 * ASIN(SQRT(
+    POWER(SIN(RADIANS(lat - $LAT) / 2), 2) +
+    COS(RADIANS($LAT)) * COS(RADIANS(lat)) *
+    POWER(SIN(RADIANS(lon - $LON) / 2), 2)
+  ))`;
+
+function haversine(latParam, lonParam) {
+  return HAVERSINE_SQL.replace(/\$LAT/g, latParam).replace(/\$LON/g, lonParam);
+}
+
+function toOverpassElement(row) {
+  const el = { type: row.osm_type, id: row.osm_id, lat: row.lat, lon: row.lon, tags: row.tags || {} };
+  if (row.distance_m != null) el.distance_m = Math.round(row.distance_m);
+  return el;
+}
+
+// GET /db/pois/search — combined filtered search
+app.get('/db/pois/search', requirePg, async (req, res) => {
+  try {
+    const { q, category, category_like, s, w, n, e, lat, lon, radius, tag, tag_value, limit, offset } = req.query;
+    const conditions = [];
+    const params = [];
+    let pi = 1;
+
+    if (q) {
+      conditions.push(`name ILIKE $${pi}`);
+      params.push(`%${q}%`);
+      pi++;
+    }
+    if (category) {
+      conditions.push(`category = $${pi}`);
+      params.push(category);
+      pi++;
+    }
+    if (category_like) {
+      conditions.push(`category ILIKE $${pi}`);
+      params.push(`%${category_like}%`);
+      pi++;
+    }
+    if (s && w && n && e) {
+      conditions.push(`lat BETWEEN $${pi} AND $${pi + 1}`);
+      params.push(parseFloat(s), parseFloat(n));
+      pi += 2;
+      conditions.push(`lon BETWEEN $${pi} AND $${pi + 1}`);
+      params.push(parseFloat(w), parseFloat(e));
+      pi += 2;
+    }
+    if (tag) {
+      if (tag_value) {
+        conditions.push(`tags->>$${pi} = $${pi + 1}`);
+        params.push(tag, tag_value);
+        pi += 2;
+      } else {
+        conditions.push(`tags ? $${pi}`);
+        params.push(tag);
+        pi++;
+      }
+    }
+
+    const hasLatLon = lat && lon;
+    let distExpr = '';
+    let orderClause = 'ORDER BY name NULLS LAST';
+
+    if (hasLatLon) {
+      const latP = `$${pi}`, lonP = `$${pi + 1}`;
+      params.push(parseFloat(lat), parseFloat(lon));
+      distExpr = `, ${haversine(latP, lonP)} AS distance_m`;
+      orderClause = 'ORDER BY distance_m';
+      pi += 2;
+
+      if (radius) {
+        conditions.push(`${haversine(latP, lonP)} <= $${pi}`);
+        params.push(parseFloat(radius));
+        pi++;
+      }
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const lim = Math.min(parseInt(limit) || 100, 500);
+    const off = parseInt(offset) || 0;
+
+    const sql = `SELECT osm_type, osm_id, lat, lon, tags${distExpr} FROM pois ${where} ${orderClause} LIMIT ${lim} OFFSET ${off}`;
+    const result = await pgPool.query(sql, params);
+
+    res.json({ count: result.rows.length, elements: result.rows.map(toOverpassElement) });
+  } catch (err) {
+    console.error('[/db/pois/search]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /db/pois/nearby — nearby POIs sorted by distance
+app.get('/db/pois/nearby', requirePg, async (req, res) => {
+  try {
+    const { lat, lon, radius, category, limit } = req.query;
+    if (!lat || !lon) return res.status(400).json({ error: 'lat and lon required' });
+
+    const fLat = parseFloat(lat), fLon = parseFloat(lon);
+    const fRadius = parseFloat(radius) || 1000;
+    const lim = Math.min(parseInt(limit) || 50, 200);
+
+    // Pre-filter with bbox approximation (~0.009° per km at mid-latitudes)
+    const degPerKm = 0.009;
+    const kmRadius = fRadius / 1000;
+    const latDelta = kmRadius * degPerKm;
+    const lonDelta = kmRadius * degPerKm / Math.cos(fLat * Math.PI / 180);
+
+    const conditions = [
+      `lat BETWEEN $1 AND $2`,
+      `lon BETWEEN $3 AND $4`,
+    ];
+    const params = [fLat - latDelta, fLat + latDelta, fLon - lonDelta, fLon + lonDelta];
+    let pi = 5;
+
+    if (category) {
+      conditions.push(`category = $${pi}`);
+      params.push(category);
+      pi++;
+    }
+
+    params.push(fLat, fLon, fRadius);
+    const distCol = haversine(`$${pi}`, `$${pi + 1}`);
+    const radiusP = `$${pi + 2}`;
+
+    const sql = `SELECT osm_type, osm_id, lat, lon, tags, ${distCol} AS distance_m
+      FROM pois WHERE ${conditions.join(' AND ')} AND ${distCol} <= ${radiusP}
+      ORDER BY distance_m LIMIT ${lim}`;
+
+    const result = await pgPool.query(sql, params);
+    res.json({ count: result.rows.length, elements: result.rows.map(toOverpassElement) });
+  } catch (err) {
+    console.error('[/db/pois/nearby]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /db/poi/:type/:id — single POI lookup
+app.get('/db/poi/:type/:id', requirePg, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      'SELECT osm_type, osm_id, lat, lon, name, category, tags, first_seen, last_seen FROM pois WHERE osm_type = $1 AND osm_id = $2',
+      [req.params.type, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'POI not found' });
+    const row = result.rows[0];
+    res.json({
+      type: row.osm_type, id: row.osm_id, lat: row.lat, lon: row.lon,
+      name: row.name, category: row.category, tags: row.tags,
+      first_seen: row.first_seen, last_seen: row.last_seen,
+    });
+  } catch (err) {
+    console.error('[/db/poi/:type/:id]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /db/pois/stats — analytics overview
+app.get('/db/pois/stats', requirePg, async (req, res) => {
+  try {
+    const [total, named, topCategories, bounds, timeRange] = await Promise.all([
+      pgPool.query('SELECT COUNT(*) AS n FROM pois'),
+      pgPool.query('SELECT COUNT(*) AS n FROM pois WHERE name IS NOT NULL'),
+      pgPool.query('SELECT category, COUNT(*) AS n FROM pois WHERE category IS NOT NULL GROUP BY category ORDER BY n DESC LIMIT 20'),
+      pgPool.query('SELECT MIN(lat) AS min_lat, MAX(lat) AS max_lat, MIN(lon) AS min_lon, MAX(lon) AS max_lon FROM pois'),
+      pgPool.query('SELECT MIN(first_seen) AS earliest, MAX(last_seen) AS latest FROM pois'),
+    ]);
+    res.json({
+      total: parseInt(total.rows[0].n),
+      named: parseInt(named.rows[0].n),
+      topCategories: topCategories.rows.map(r => ({ category: r.category, count: parseInt(r.n) })),
+      bounds: bounds.rows[0],
+      timeRange: timeRange.rows[0],
+    });
+  } catch (err) {
+    console.error('[/db/pois/stats]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /db/pois/categories — category breakdown
+app.get('/db/pois/categories', requirePg, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      'SELECT category, COUNT(*) AS n FROM pois WHERE category IS NOT NULL GROUP BY category ORDER BY n DESC'
+    );
+    const categories = result.rows.map(r => {
+      const parts = r.category.split('=');
+      return { category: r.category, key: parts[0], value: parts[1] || null, count: parseInt(r.n) };
+    });
+    res.json({ count: categories.length, categories });
+  } catch (err) {
+    console.error('[/db/pois/categories]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /db/pois/coverage — geographic grid coverage
+app.get('/db/pois/coverage', requirePg, async (req, res) => {
+  try {
+    const resolution = Math.min(Math.max(parseInt(req.query.resolution) || 2, 1), 4);
+    const result = await pgPool.query(
+      `SELECT ROUND(lat::numeric, $1) AS grid_lat, ROUND(lon::numeric, $1) AS grid_lon, COUNT(*) AS n
+       FROM pois GROUP BY grid_lat, grid_lon ORDER BY n DESC`,
+      [resolution]
+    );
+    const cells = result.rows.map(r => ({
+      lat: parseFloat(r.grid_lat), lon: parseFloat(r.grid_lon), count: parseInt(r.n),
+    }));
+    res.json({ resolution, cells: cells.length, grid: cells });
+  } catch (err) {
+    console.error('[/db/pois/coverage]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Admin endpoints ─────────────────────────────────────────────────────────
@@ -467,8 +950,11 @@ app.post('/cache/clear', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
-  console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar');
+  console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft');
   console.log('Radius: GET /radius-hint, POST /radius-hint, GET /radius-hints');
-  console.log('POIs:   GET /pois/stats, GET /pois/export, GET /poi/:type/:id');
+  console.log('POIs:   GET /pois/stats, GET /pois/export, GET /pois/bbox, GET /poi/:type/:id');
+  console.log('DB:     GET /db/pois/search, /db/pois/nearby, /db/poi/:type/:id, /db/pois/stats, /db/pois/categories, /db/pois/coverage');
+  console.log(`        PostgreSQL: ${pgPool ? 'connected' : 'not configured (set DATABASE_URL)'}`);
+  console.log(`        OpenSky:    ${openskyConfigured ? 'OAuth2 configured (4000 req/day)' : 'anonymous (100 req/day — set OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET)'}`);
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });
