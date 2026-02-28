@@ -1,5 +1,80 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28j (OpenSky Rate Limiter, Webcam Enhancements, Testing Fixes)
+
+### Context
+OpenSky API was being hammered with requests — 5 independent app-side request paths (periodic refresh, scroll debounce, followed aircraft, auto-follow wide bbox, POI prefetch) with zero backoff at either proxy or app level. 429 responses cascaded into more requests. Also tested webcam layer for the first time, found and fixed several issues.
+
+### Changes Made
+
+#### OpenSky Rate Limiter (`cache-proxy/server.js`)
+- **Proxy-level rate limiter** — single throttle point for all aircraft requests
+- Rolling 24h request counter, 90% safety margin (3,600 of 4,000 authenticated limit)
+- Minimum interval between upstream requests (~24s authenticated, ~960s anonymous)
+- **Exponential backoff** on 429 responses: 10s → 20s → 40s → 80s → 160s → 300s cap
+- **Stale cache fallback**: when throttled, returns expired cached data (app doesn't see errors)
+- `Retry-After` header when no cache available
+- Backoff resets on successful response
+- `openskyCanRequest()`, `openskyRecordRequest()`, `openskyRecord429()`, `openskyRecordSuccess()`
+- Rate state exposed in `/cache/stats` → `opensky` object
+
+#### Webcam Live Player (`MainActivity.kt`, `Models.kt`, `WebcamRepository.kt`, `server.js`)
+- Proxy now fetches `include=images,location,categories,player,urls` from Windy API
+- Response includes `playerUrl` (Windy embed player) and `detailUrl` (Windy webcam page)
+- `Webcam` data class: added `playerUrl`, `detailUrl` fields
+- `WebcamRepository`: parses new fields with null safety
+- **Preview dialog redesigned**: 90% fullscreen dark panel with title + X close button
+- **"View Live" button**: tapping swaps preview image for in-app WebView loading Windy player
+- WebView: JavaScript enabled, DOM storage, no user gesture required for media
+- WebView destroyed on dialog dismiss to free resources
+
+#### Webcam Bbox Minimum (`MainActivity.kt`)
+- Windy API returns 0 results for small bboxes (discovered during testing)
+- `loadWebcamsForVisibleArea()` enforces minimum 0.5° span in both lat and lon
+- Ensures webcams appear even at high zoom levels
+
+#### Webcam Zoom Reload (`MainActivity.kt`)
+- `scheduleWebcamReload()` was only called from `onScroll`, not `onZoom`
+- Added call in `onZoom` handler — webcams now reload on zoom changes too
+
+#### Webcam Categories (`AppBarMenuManager.kt`)
+- Updated to match actual Windy API v3 categories (was 18 with 5 dead ones)
+- **Added**: coast, port, river, village, square, observatory, sportArea
+- **Removed** (don't exist in Windy API): outdoor, harbor, animals, island, golf, resort, sportsite
+- `sportArea` label formatted as "Sport Area" via camelCase splitting regex
+
+#### Aircraft + Auto-Follow Default OFF (`MainActivity.kt`, `AppBarMenuManager.kt`)
+- Aircraft display defaults **OFF** on fresh install (was ON)
+- Auto-follow aircraft already defaulted OFF
+- New `prefDefault(prefKey)` helper in AppBarMenuManager — returns correct default per pref key
+- `syncCheckStates()` and `toggleBinary()` use `prefDefault()` instead of hardcoded `true`
+
+#### Logging Enhancement (`cache-proxy/server.js`)
+- `log()` function accepts optional `extra` parameter for contextual suffixes
+- Rate limiter events logged with context: `[stale (backoff 19s)]`, `[throttled (min interval)]`, `[upstream 429]`
+
+### Test Results
+- **Rate limiter**: verified — only 2 upstream requests in 60s when app was hammering (was 10-20+)
+- **Exponential backoff**: confirmed escalation 10s → 20s → 40s → 80s on consecutive 429s
+- **Webcam markers**: appear on map after bbox fix (4-9 visible in Massachusetts)
+- **Webcam preview dialog**: 90% fullscreen, image loads, "View Live" button present
+- **Webcam live player**: WebView loads Windy player in-app (no Chrome fork)
+- **Vehicle follow POI prefetch**: confirmed working via logcat (57K chars of POI data returned)
+
+### Status
+- **BUILD SUCCESSFUL** — compiles clean
+- **Committed & pushed**: `43e7ff6` on `master`
+- **Proxy running** with rate limiter + OAuth2
+
+### Files Changed
+- `cache-proxy/server.js` — rate limiter, log enhancement, webcam player+urls fields, rate stats in /cache/stats
+- `app/.../data/model/Models.kt` — Webcam: added playerUrl, detailUrl
+- `app/.../data/repository/WebcamRepository.kt` — parse playerUrl, detailUrl
+- `app/.../ui/MainActivity.kt` — 90% webcam dialog, WebView live player, bbox minimum, zoom reload, aircraft default OFF
+- `app/.../ui/menu/AppBarMenuManager.kt` — updated webcam categories, prefDefault(), aircraft default OFF
+
+---
+
 ## Session: 2026-02-28i (Webcam Layer — Windy Webcams API Integration)
 
 ### Context

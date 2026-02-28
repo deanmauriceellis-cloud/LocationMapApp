@@ -1,5 +1,35 @@
 # LocationMapApp — Changelog
 
+## [1.5.11] — 2026-02-28
+
+### Added
+- **OpenSky rate limiter** — proxy-level throttling to stay within API daily quota
+  - Rolling 24h request counter with 90% safety margin (3,600 of 4,000 authenticated)
+  - Minimum interval between upstream requests (~24s authenticated)
+  - Exponential backoff on 429 responses: 10s → 20s → 40s → ... → 300s cap
+  - Stale cache fallback: returns expired cached data when throttled (transparent to app)
+  - Rate stats exposed in `/cache/stats` → `opensky` object
+- **Webcam live player** — "View Live" button in webcam preview dialog
+  - Loads Windy embed player in in-app WebView (no browser fork)
+  - JavaScript, DOM storage, and auto-play enabled; WebView destroyed on dismiss
+- **Webcam player/detail URLs** — proxy now fetches `player,urls` from Windy API
+  - Response includes `playerUrl` (embed player) and `detailUrl` (Windy page)
+
+### Changed
+- **Webcam preview dialog** redesigned as 90% fullscreen dark panel with X close button
+- **Webcam bbox minimum** — enforces 0.5° span to work around Windy API returning 0 for small viewports
+- **Webcam reload on zoom** — `scheduleWebcamReload()` now fires on zoom events (was only scroll)
+- **Webcam categories** updated to match actual Windy API v3
+  - Added: coast, port, river, village, square, observatory, sportArea
+  - Removed (dead): outdoor, harbor, animals, island, golf, resort, sportsite
+- **Aircraft display defaults OFF** on fresh install (was ON); auto-follow already defaulted OFF
+- **`prefDefault()` helper** in AppBarMenuManager for per-pref-key defaults
+
+### Fixed
+- **Webcam markers not appearing** at high zoom — Windy API returns 0 for small bboxes, now enforces minimum span
+- **Webcam not reloading on zoom** — only `onScroll` called `scheduleWebcamReload()`, now `onZoom` does too
+- **OpenSky 429 storm** — app had 5 independent request paths with no backoff; rate limiter blocks all at proxy
+
 ## [1.5.10] — 2026-02-28
 
 ### Added

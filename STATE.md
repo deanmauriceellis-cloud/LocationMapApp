@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 9 (Webcam layer — Windy Webcams API integration)
+## Last Updated: 2026-02-28 Session 10 (OpenSky rate limiter, webcam enhancements, testing fixes)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -22,7 +22,7 @@
   - **Zoom ≥ 18**: dots switch to labeled icons showing category type above and business name below
 - Layer-aware POI LiveData — `Pair<String, List>` ensures categories don't overwrite each other
 - Unified POI pipeline — all categories use searchPoisAt() via Overpass
-- All layers default ON on fresh install (POIs, MBTA, radar, METAR)
+- All layers default ON on fresh install (POIs, MBTA, radar, METAR, webcams) — except aircraft (OFF)
 - Weather alerts (NWS active alerts)
 - METAR stations with rich text markers — temp (°F), wind arrow+speed, sky/wx, flight-category color
   - Bbox passthrough to Aviation Weather API, cached per-bbox
@@ -58,10 +58,12 @@
     - **Outside US bounds** (>49°N, <25°N, >-66°W, <-125°W) → picks aircraft closest to US interior center
   - Banner shows "Auto-following ✈" prefix; restores on app restart
 - **Webcam layer** (Windy Webcams API) — live camera markers on map
-  - 18 webcam categories (traffic, city, beach, etc.) via multi-select dialog
-  - Camera icon markers, tap to view 400×224 preview image in dialog
-  - Viewport reload on scroll/zoom (500ms debounce, same pattern as POIs)
-  - Proxy `/webcams` endpoint with 10-min cache TTL (matches image URL expiry)
+  - 18 webcam categories (matches Windy API v3): traffic, city, village, beach, coast, port, lake, river, mountain, forest, landscape, indoor, airport, building, square, observatory, meteo, sportArea
+  - Camera icon markers, tap opens 90% fullscreen dark dialog with preview image, info, and "View Live" button
+  - "View Live" loads Windy player in in-app WebView (no browser fork)
+  - Viewport reload on scroll AND zoom (500ms debounce, same pattern as POIs)
+  - Minimum 0.5° bbox span enforced (Windy API returns 0 for small viewports)
+  - Proxy `/webcams` endpoint with 10-min cache TTL, includes `playerUrl` and `detailUrl` fields
   - Deferred restore on app restart, defaults ON with "traffic" pre-selected
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
 - POI prefetch along followed vehicle/aircraft routes
@@ -143,9 +145,20 @@
 
 ## OpenSky OAuth2
 - Registered account: `DeanMauriceEllis`
+- Client ID: `deanmauriceellis-api-client`
 - Client credentials flow: `OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` env vars
 - Token endpoint: `auth.opensky-network.org/.../token` (30-min expiry, auto-refresh with 5-min buffer)
 - Authenticated: 4,000 req/day (vs 100 anonymous)
+
+## OpenSky Rate Limiter (v1.5.11)
+- **Proxy-level** — all aircraft requests throttled at the single proxy choke point
+- Daily quota: 90% of limit (3,600 of 4,000 authenticated, 90 of 100 anonymous)
+- Minimum interval: `86400000 / effective_limit` ms between upstream requests (~24s authenticated)
+- **Exponential backoff** on 429: 10s → 20s → 40s → 80s → 160s → 300s cap
+- **Stale cache fallback**: returns expired cached data when throttled (app doesn't see errors)
+- `Retry-After` header sent when no cache available
+- Rate stats exposed in `/cache/stats` → `opensky` object (requestsLast24h, remaining, backoff state)
+- Resets on successful response after 429 series
 
 ## Build Environment
 - **Java**: JBR (JetBrains Runtime) 21.0.9 bundled with Android Studio
@@ -168,8 +181,9 @@
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
 ## Next Steps
-- **Test webcam layer on emulator** — markers appear, scroll/zoom reloads, tap preview dialog with image
-- **Test webcam category dialog** — multi-select, Select All/Deselect All, categories trigger reload
+- **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
+- **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads
+- **Test webcam category dialog** — new categories (coast, port, river, village, square, observatory, sportArea)
 - **Test webcam toggle on/off** — markers clear on off, reload on re-enable
 - Test viewport-only POI eviction on emulator — verify no OOM after extended run
 - Monitor cache growth and hit rates over time
