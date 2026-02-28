@@ -1,5 +1,45 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28 (POI Database — PostgreSQL)
+
+### Context
+The proxy's individual POI cache (`poi-cache.json`) had grown to 1334 unique POIs with rich Overpass data (280 unique tag keys, avg 7.3 tags/POI). Needed permanent storage for querying, analytics, and eventual API endpoints.
+
+### Changes Made
+
+#### PostgreSQL Schema (`cache-proxy/schema.sql`)
+- `pois` table with composite PK `(osm_type, osm_id)` — globally unique OSM identifiers
+- Promoted columns: `name` (from `tags.name`), `category` (derived: first match of amenity/shop/tourism/leisure/historic/office → `"key=value"`)
+- `tags` JSONB column preserves all OSM tag keys; GIN index for flexible queries
+- `first_seen`/`last_seen` TIMESTAMPTZ for discovery tracking
+- Indexes: `category`, `name` (partial WHERE NOT NULL), `tags` (GIN)
+
+#### Import Script (`cache-proxy/import-pois.js`)
+- Standalone Node.js script, no dependency on proxy server code
+- Fetches `http://localhost:3000/pois/export`, parses all POIs
+- Extracts lat/lon (top-level for nodes, `center` for ways)
+- Derives category from first matching tag key (amenity > shop > tourism > leisure > historic > office)
+- Batch UPSERT in single transaction: `INSERT ... ON CONFLICT DO UPDATE` (preserves original `first_seen`)
+- Connection via `DATABASE_URL` environment variable
+- Prints summary: upserted count, total in database
+
+#### Dependencies (`cache-proxy/package.json`)
+- Added `pg` ^8.13.0 (node-postgres)
+
+### Results
+- Schema applied, all indexes created
+- 1334 POIs imported successfully
+- Top categories: parking (167), restaurant (94), bench (89), pitch (65), school (58)
+- Re-import verified idempotent: count stays at 1334, no duplicates
+
+### Files Changed
+- `cache-proxy/schema.sql` (new)
+- `cache-proxy/import-pois.js` (new)
+- `cache-proxy/package.json`
+- `cache-proxy/package-lock.json`
+
+---
+
 ## Session: 2026-02-27 (Adaptive POI Radius)
 
 ### Context

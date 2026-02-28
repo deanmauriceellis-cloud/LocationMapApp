@@ -1,5 +1,20 @@
 # LocationMapApp — Changelog
 
+## [1.5.2] — 2026-02-28
+
+### Added
+- **POI database** (PostgreSQL) — permanent storage for all cached POIs
+  - Table `pois` with composite PK `(osm_type, osm_id)`, JSONB tags with GIN index
+  - Promoted `name` and `category` columns for fast filtering
+  - `first_seen`/`last_seen` timestamps for discovery tracking
+- **Import script** (`cache-proxy/import-pois.js`) — fetches from proxy, batch upserts into PostgreSQL
+  - Derives category from first matching tag (amenity/shop/tourism/leisure/historic/office)
+  - Idempotent: re-running updates `last_seen` without duplicates
+- **Schema file** (`cache-proxy/schema.sql`) — table + indexes, apply with `psql -f`
+
+### Dependencies
+- Added `pg` ^8.13.0 to cache-proxy
+
 ## [1.5.1] — 2026-02-27
 
 ### Added

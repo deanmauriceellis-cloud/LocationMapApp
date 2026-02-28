@@ -209,6 +209,23 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() { super.onResume(); binding.mapView.onResume(); DebugLogger.i("MainActivity","onResume()") }
     override fun onPause()  { super.onPause();  binding.mapView.onPause();  DebugLogger.i("MainActivity","onPause()") }
 
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        val map = binding.mapView
+        return when (keyCode) {
+            android.view.KeyEvent.KEYCODE_PLUS, android.view.KeyEvent.KEYCODE_NUMPAD_ADD -> {
+                map.controller.setZoom((map.zoomLevelDouble + 1.0).coerceAtMost(map.maxZoomLevel))
+                updateZoomBubble()
+                true
+            }
+            android.view.KeyEvent.KEYCODE_MINUS, android.view.KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> {
+                map.controller.setZoom((map.zoomLevelDouble - 1.0).coerceAtLeast(map.minZoomLevel))
+                updateZoomBubble()
+                true
+            }
+            else -> super.onKeyDown(keyCode, event)
+        }
+    }
+
     // =========================================================================
     // MAP SETUP
     // =========================================================================
@@ -442,11 +459,14 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "observeViewModel() — attaching all observers")
 
         viewModel.currentLocation.observe(this) { point ->
-            DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — centering map zoom=14")
+            DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude}" +
+                if (followedVehicleId != null) " (follow mode — skipping map center)" else " — centering map zoom=14")
             updateGpsMarker(point)
-            // BUG FIX: zoom to 14 on first real GPS fix so user sees their neighborhood
-            binding.mapView.controller.animateTo(point)
-            binding.mapView.controller.setZoom(14.0)
+            // Don't move the map when following a vehicle
+            if (followedVehicleId == null) {
+                binding.mapView.controller.animateTo(point)
+                binding.mapView.controller.setZoom(14.0)
+            }
             // Fire deferred POI queries now that we have a real GPS position
             if (pendingPoiRestore) {
                 pendingPoiRestore = false

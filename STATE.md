@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-27 22:15 UTC
+## Last Updated: 2026-02-28 UTC
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -22,7 +22,9 @@
 - POI prefetch along followed vehicle routes
 - Cache-only POI display on map scroll (no upstream API calls)
 - Adaptive POI search radius — proxy stores per-grid-cell hints, app fetches/reports
-- Cache proxy with disk persistence (cache-data.json, radius-hints.json, 365-day Overpass TTL)
+- Individual POI cache (poi-cache.json) — deduped by OSM type+id, with first/last seen timestamps
+- POI database (PostgreSQL) — permanent storage with JSONB tags, category indexing, upsert import
+- Cache proxy with disk persistence (cache-data.json, radius-hints.json, poi-cache.json, 365-day Overpass TTL)
 - Debug logging + TCP log streamer
 
 ## External API Routing
@@ -33,6 +35,7 @@
 | NWS Alerts | `http://10.0.0.4:3000/nws-alerts` | GET /nws-alerts | 1 hour |
 | METAR | `http://10.0.0.4:3000/metar` | GET /metar | 1 hour |
 | Radius Hints | `http://10.0.0.4:3000/radius-hint` | GET+POST /radius-hint | persistent |
+| POI Cache | `http://10.0.0.4:3000/pois/...` | GET /pois/stats, /pois/export, /poi/:type/:id | persistent |
 | MBTA | direct (api-v3.mbta.com) | not proxied | — |
 | Radar tiles | direct (mesonet.agron.iastate.edu) | not proxied | — |
 
@@ -53,6 +56,18 @@
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
+- `cache-proxy/poi-cache.json` — individual POI cache, deduped by type+id (gitignored)
+- `cache-proxy/schema.sql` — PostgreSQL schema for permanent POI storage
+- `cache-proxy/import-pois.js` — standalone script to import POIs from proxy into PostgreSQL
+
+## PostgreSQL POI Database
+- Database: `locationmapapp`, table: `pois`
+- Composite PK: `(osm_type, osm_id)` — globally unique OSM identifiers
+- Promoted columns: `name`, `category` (e.g. `amenity=restaurant`) for fast filtering
+- `tags` JSONB with GIN index — preserves all OSM tag keys for flexible queries
+- `first_seen`/`last_seen` timestamps track cache discovery history
+- Import: `DATABASE_URL=postgres://... node import-pois.js` (fetches from proxy `/pois/export`, upserts)
+- 1334 POIs imported as of 2026-02-28
 
 ## Known Issues
 - MBTA API key hardcoded in MbtaRepository.kt (should be in BuildConfig/secrets)
@@ -63,3 +78,5 @@
 - Monitor cache growth and hit rates over time
 - Consider adding more POI categories to prefetch
 - Evaluate proxy → remote deployment for non-local testing
+- Build query API on top of PostgreSQL POI database
+- Automate periodic POI imports (cron or proxy hook)
