@@ -253,7 +253,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Defer Aircraft restore
-        if (prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true)) {
+        if (prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, false)) {
             pendingAircraftRestore = true
             DebugLogger.i("MainActivity", "onStart() Aircraft restore deferred — waiting for GPS fix")
         }
@@ -386,6 +386,7 @@ class MainActivity : AppCompatActivity() {
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 updateZoomBubble()
                 scheduleAircraftReload()
+                scheduleWebcamReload()
                 // Refresh POI marker icons when crossing the zoom-18 label threshold
                 val nowLabeled = binding.mapView.zoomLevelDouble >= 18.0
                 if (nowLabeled != poiLabelsShowing) {
@@ -480,7 +481,7 @@ class MainActivity : AppCompatActivity() {
     /** FAB quick-toggle for aircraft layer — mirrors the menu toggle logic. */
     private fun toggleAircraftFromFab() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-        val wasOn = prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true)
+        val wasOn = prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, false)
         val nowOn = !wasOn
         prefs.edit().putBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, nowOn).apply()
         if (nowOn) {
@@ -1269,7 +1270,12 @@ class MainActivity : AppCompatActivity() {
         val bb = binding.mapView.boundingBox
         val cats = prefs.getStringSet(AppBarMenuManager.PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
         if (cats.isEmpty()) return
-        viewModel.loadWebcams(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast, cats.joinToString(","))
+        // Windy API returns 0 results for very small bboxes — enforce minimum ~0.5° span
+        val centerLat = (bb.latNorth + bb.latSouth) / 2.0
+        val centerLon = (bb.lonEast + bb.lonWest) / 2.0
+        val halfLat = maxOf((bb.latNorth - bb.latSouth) / 2.0, 0.25)
+        val halfLon = maxOf((bb.lonEast - bb.lonWest) / 2.0, 0.25)
+        viewModel.loadWebcams(centerLat - halfLat, centerLon - halfLon, centerLat + halfLat, centerLon + halfLon, cats.joinToString(","))
     }
 
     /** Debounced: reload webcams 500ms after user stops scrolling/zooming. */
@@ -1283,43 +1289,114 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
     private fun showWebcamPreviewDialog(webcam: com.example.locationmapapp.data.model.Webcam) {
         val density = resources.displayMetrics.density
-        val imgWidth = (360 * density).toInt()
-        val imgHeight = (202 * density).toInt()  // ~16:9 from 400x224
+        val dp = { v: Int -> (v * density).toInt() }
 
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        // ── Header: title + X button ──
+        val titleText = TextView(this).apply {
+            text = webcam.title
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "X"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(4), dp(4), dp(4))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(12), dp(8))
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Preview image ──
         val imageView = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(imgWidth, imgHeight)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(220)
+            )
             scaleType = ImageView.ScaleType.CENTER_CROP
-            setBackgroundColor(Color.parseColor("#E0E0E0"))
+            setBackgroundColor(Color.parseColor("#222222"))
         }
 
-        val catText = webcam.categories.joinToString(", ") {
-            it.replaceFirstChar { c -> c.uppercase() }
-        }
+        // ── Info text ──
+        val catText = webcam.categories.joinToString(", ") { it.replaceFirstChar { c -> c.uppercase() } }
         val infoText = TextView(this).apply {
             text = buildString {
                 append(catText)
                 webcam.lastUpdated?.let { append("\nLast updated: $it") }
                 append("\nStatus: ${webcam.status}")
             }
-            setPadding((16 * density).toInt(), (8 * density).toInt(), (16 * density).toInt(), (8 * density).toInt())
+            setPadding(dp(16), dp(8), dp(16), dp(8))
             textSize = 13f
+            setTextColor(Color.parseColor("#CCCCCC"))
         }
 
+        // ── View Live button ──
+        val liveBtn = if (webcam.playerUrl.isNotBlank()) {
+            android.widget.Button(this, null, android.R.attr.buttonBarButtonStyle).apply {
+                text = "View Live"
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#1976D2"))
+                setPadding(dp(16), dp(10), dp(16), dp(10))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(dp(16), dp(8), dp(16), dp(8)) }
+                setOnClickListener {
+                    // Replace image + info + button with WebView
+                    val parent = this.parent as LinearLayout
+                    val idx = parent.indexOfChild(imageView)
+                    parent.removeView(imageView)
+                    parent.removeView(infoText)
+                    parent.removeView(this)
+                    val webView = android.webkit.WebView(this@MainActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+                        )
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        setBackgroundColor(Color.BLACK)
+                        loadUrl(webcam.playerUrl)
+                    }
+                    parent.addView(webView, idx)
+                    dialog.setOnDismissListener { webView.destroy() }
+                }
+            }
+        } else null
+
+        // ── Container ──
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            addView(header)
             addView(imageView)
             addView(infoText)
+            liveBtn?.let { addView(it) }
         }
 
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(webcam.title)
-            .setView(container)
-            .setPositiveButton("Close", null)
-            .show()
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.9).toInt(), (dm.heightPixels * 0.9).toInt())
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+        dialog.show()
 
-        // Load preview image async via OkHttp
+        // Load preview image async
         if (webcam.previewUrl.isNotBlank()) {
             lifecycleScope.launch {
                 try {

@@ -115,6 +115,8 @@ data class Webcam(
     val categories: List<String>,
     val previewUrl: String,
     val thumbnailUrl: String,
+    val playerUrl: String,
+    val detailUrl: String,
     val status: String,
     val lastUpdated: String?
 ) {

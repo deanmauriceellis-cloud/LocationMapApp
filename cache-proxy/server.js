@@ -62,6 +62,69 @@ async function getOpenskyToken() {
 
 const openskyConfigured = !!(process.env.OPENSKY_CLIENT_ID && process.env.OPENSKY_CLIENT_SECRET);
 
+// ── OpenSky rate limiter — stay within API daily quota ────────────────────────
+
+const OPENSKY_DAILY_LIMIT = openskyConfigured ? 4000 : 100;
+const OPENSKY_SAFETY_MARGIN = 0.9;  // use 90% of quota to leave headroom
+const OPENSKY_EFFECTIVE_LIMIT = Math.floor(OPENSKY_DAILY_LIMIT * OPENSKY_SAFETY_MARGIN);
+const OPENSKY_MIN_INTERVAL_MS = Math.ceil((24 * 60 * 60 * 1000) / OPENSKY_EFFECTIVE_LIMIT);  // ms between requests
+
+const openskyRateState = {
+  requests: [],         // timestamps of upstream requests (rolling 24h window)
+  backoffUntil: 0,      // timestamp: don't hit upstream before this time
+  backoffSeconds: 10,   // current backoff delay (exponential)
+  consecutive429s: 0,   // track consecutive 429s for backoff scaling
+};
+
+function openskyCanRequest() {
+  const now = Date.now();
+  // Prune requests older than 24h
+  const cutoff = now - 24 * 60 * 60 * 1000;
+  openskyRateState.requests = openskyRateState.requests.filter(t => t > cutoff);
+
+  // Check backoff
+  if (now < openskyRateState.backoffUntil) {
+    const waitSec = Math.ceil((openskyRateState.backoffUntil - now) / 1000);
+    return { allowed: false, reason: `backoff (${waitSec}s remaining)`, retryAfter: waitSec };
+  }
+
+  // Check daily quota
+  if (openskyRateState.requests.length >= OPENSKY_EFFECTIVE_LIMIT) {
+    const oldestExpires = openskyRateState.requests[0] + 24 * 60 * 60 * 1000;
+    const waitSec = Math.ceil((oldestExpires - now) / 1000);
+    return { allowed: false, reason: `daily quota (${openskyRateState.requests.length}/${OPENSKY_EFFECTIVE_LIMIT})`, retryAfter: waitSec };
+  }
+
+  // Check minimum interval between requests
+  const lastReq = openskyRateState.requests[openskyRateState.requests.length - 1] || 0;
+  if (now - lastReq < OPENSKY_MIN_INTERVAL_MS) {
+    const waitMs = OPENSKY_MIN_INTERVAL_MS - (now - lastReq);
+    return { allowed: false, reason: `min interval (${Math.ceil(waitMs / 1000)}s)`, retryAfter: Math.ceil(waitMs / 1000) };
+  }
+
+  return { allowed: true };
+}
+
+function openskyRecordRequest() {
+  openskyRateState.requests.push(Date.now());
+}
+
+function openskyRecord429() {
+  openskyRateState.consecutive429s++;
+  // Exponential backoff: 10s, 20s, 40s, 80s, 160s, capped at 300s (5 min)
+  openskyRateState.backoffSeconds = Math.min(300, 10 * Math.pow(2, openskyRateState.consecutive429s - 1));
+  openskyRateState.backoffUntil = Date.now() + openskyRateState.backoffSeconds * 1000;
+  console.log(`[OpenSky] 429 rate limited — backoff ${openskyRateState.backoffSeconds}s (consecutive: ${openskyRateState.consecutive429s})`);
+}
+
+function openskyRecordSuccess() {
+  if (openskyRateState.consecutive429s > 0) {
+    console.log(`[OpenSky] Recovered from rate limit (was ${openskyRateState.consecutive429s} consecutive 429s)`);
+  }
+  openskyRateState.consecutive429s = 0;
+  openskyRateState.backoffSeconds = 10;
+}
+
 // Parse URL-encoded bodies (Overpass POST sends form data)
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.json());
@@ -297,11 +360,12 @@ loadPoiCache();
 
 // ── Logging ─────────────────────────────────────────────────────────────────
 
-function log(endpoint, hit, upstreamMs) {
+function log(endpoint, hit, upstreamMs, extra) {
   const ts = new Date().toISOString();
   const status = hit ? 'HIT' : 'MISS';
   const timing = hit ? '' : ` upstream=${upstreamMs}ms`;
-  console.log(`[${ts}] ${endpoint} ${status}${timing} (${cache.size} cached)`);
+  const suffix = extra ? ` [${extra}]` : '';
+  console.log(`[${ts}] ${endpoint} ${status}${timing} (${cache.size} cached)${suffix}`);
 }
 
 // ── Overpass POI proxy ──────────────────────────────────────────────────────
@@ -591,6 +655,26 @@ app.get('/aircraft', async (req, res) => {
     return res.send(cached.data);
   }
 
+  // Rate limit check — serve stale cache or 429 if we can't hit upstream
+  const rateCheck = openskyCanRequest();
+  if (!rateCheck.allowed) {
+    // Try to serve stale cache (ignore TTL)
+    const stale = cache.get(cacheKey);
+    if (stale) {
+      stats.hits++;
+      log('/aircraft', true, 0, `stale (${rateCheck.reason})`);
+      trackAircraftSightings(stale.data);
+      res.set('Content-Type', stale.headers['content-type'] || 'application/json');
+      res.set('X-Cache', 'STALE');
+      res.set('X-Rate-Limit-Reason', rateCheck.reason);
+      return res.send(stale.data);
+    }
+    log('/aircraft', false, 0, `throttled (${rateCheck.reason})`);
+    return res.status(429)
+      .set('Retry-After', String(rateCheck.retryAfter || 30))
+      .json({ error: 'Rate limited', reason: rateCheck.reason, retryAfter: rateCheck.retryAfter });
+  }
+
   stats.misses++;
   try {
     let upstreamUrl;
@@ -603,11 +687,30 @@ app.get('/aircraft', async (req, res) => {
     const token = await getOpenskyToken();
     const fetchOpts = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
     const t0 = Date.now();
+    openskyRecordRequest();  // record BEFORE the request
     const upstream = await fetch(upstreamUrl, fetchOpts);
     const elapsed = Date.now() - t0;
     const body = await upstream.text();
     const contentType = upstream.headers.get('content-type') || 'application/json';
 
+    if (upstream.status === 429) {
+      openskyRecord429();
+      // Try stale cache before returning 429
+      const stale = cache.get(cacheKey);
+      if (stale) {
+        log('/aircraft', true, elapsed, 'stale (upstream 429)');
+        trackAircraftSightings(stale.data);
+        res.set('Content-Type', stale.headers['content-type'] || 'application/json');
+        res.set('X-Cache', 'STALE');
+        return res.send(stale.data);
+      }
+      log('/aircraft', false, elapsed, 'upstream 429');
+      return res.status(429)
+        .set('Retry-After', String(openskyRateState.backoffSeconds))
+        .json({ error: 'Rate limited by OpenSky', retryAfter: openskyRateState.backoffSeconds });
+    }
+
+    openskyRecordSuccess();
     log('/aircraft', false, elapsed);
 
     if (upstream.ok) {
@@ -935,7 +1038,7 @@ app.get('/webcams', async (req, res) => {
 
   stats.misses++;
   try {
-    const upstreamUrl = `https://api.windy.com/webcams/api/v3/webcams?bbox=${n},${e},${s},${w}&category=${encodeURIComponent(catParam)}&limit=50&include=images,location,categories`;
+    const upstreamUrl = `https://api.windy.com/webcams/api/v3/webcams?bbox=${n},${e},${s},${w}&category=${encodeURIComponent(catParam)}&limit=50&include=images,location,categories,player,urls`;
     const t0 = Date.now();
     const upstream = await fetch(upstreamUrl, {
       headers: { 'x-windy-api-key': WINDY_API_KEY },
@@ -957,6 +1060,8 @@ app.get('/webcams', async (req, res) => {
       categories: (wc.categories || []).map(c => c.id || c),
       previewUrl: wc.images?.current?.preview || wc.images?.daylight?.preview || '',
       thumbnailUrl: wc.images?.current?.thumbnail || wc.images?.daylight?.thumbnail || '',
+      playerUrl: wc.player?.lifetime || wc.player?.day || '',
+      detailUrl: wc.urls?.detail || '',
       status: wc.status || 'active',
       lastUpdated: wc.lastUpdatedOn || null,
     }));
@@ -975,6 +1080,9 @@ app.get('/webcams', async (req, res) => {
 
 app.get('/cache/stats', (req, res) => {
   const memUsage = process.memoryUsage();
+  const now = Date.now();
+  const cutoff24h = now - 24 * 60 * 60 * 1000;
+  const recentRequests = openskyRateState.requests.filter(t => t > cutoff24h);
   res.json({
     entries: cache.size,
     radiusHints: radiusHints.size,
@@ -985,6 +1093,16 @@ app.get('/cache/stats', (req, res) => {
       ? ((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(1) + '%'
       : 'N/A',
     memoryMB: (memUsage.heapUsed / 1024 / 1024).toFixed(1),
+    opensky: {
+      requestsLast24h: recentRequests.length,
+      dailyLimit: OPENSKY_EFFECTIVE_LIMIT,
+      remaining: OPENSKY_EFFECTIVE_LIMIT - recentRequests.length,
+      minIntervalMs: OPENSKY_MIN_INTERVAL_MS,
+      backoffUntil: openskyRateState.backoffUntil > now ? new Date(openskyRateState.backoffUntil).toISOString() : null,
+      backoffSeconds: openskyRateState.consecutive429s > 0 ? openskyRateState.backoffSeconds : 0,
+      consecutive429s: openskyRateState.consecutive429s,
+      authenticated: openskyConfigured,
+    },
     keys: [...cache.keys()],
   });
 });
@@ -1013,6 +1131,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('POIs:   GET /pois/stats, GET /pois/export, GET /pois/bbox, GET /poi/:type/:id');
   console.log('DB:     GET /db/pois/search, /db/pois/nearby, /db/poi/:type/:id, /db/pois/stats, /db/pois/categories, /db/pois/coverage');
   console.log(`        PostgreSQL: ${pgPool ? 'connected' : 'not configured (set DATABASE_URL)'}`);
-  console.log(`        OpenSky:    ${openskyConfigured ? 'OAuth2 configured (4000 req/day)' : 'anonymous (100 req/day — set OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET)'}`);
+  console.log(`        OpenSky:    ${openskyConfigured ? 'OAuth2 configured' : 'anonymous — set OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET'}`);
+  console.log(`        OpenSky:    rate limiter active — ${OPENSKY_EFFECTIVE_LIMIT} req/day (${OPENSKY_DAILY_LIMIT} limit × ${OPENSKY_SAFETY_MARGIN} safety), min interval ${OPENSKY_MIN_INTERVAL_MS}ms`);
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });

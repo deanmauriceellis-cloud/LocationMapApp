@@ -52,6 +52,8 @@ Adding a webcam layer to the map using the Windy Webcams API (free tier). The CA
 - **BUILD SUCCESSFUL** — compiles clean (only pre-existing deprecation warning)
 - **APK installed on emulator** — ready for testing
 - **Proxy restarted** with webcams route — verified: returns real webcam data for Massachusetts bbox
+- **Committed & pushed**: `4cce176` on `master` → `github.com/deanmauriceellis-cloud/LocationMapApp`
+- **GitHub auth configured**: `gh auth login` + `gh auth setup-git` (credential helper persists)
 - **Not yet tested on device** — needs manual testing of markers, scroll reload, tap dialog, category dialog
 
 ### Files Created

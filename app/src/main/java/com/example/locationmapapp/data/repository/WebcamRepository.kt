@@ -57,6 +57,8 @@ class WebcamRepository @Inject constructor() {
                     categories   = cats,
                     previewUrl   = obj["previewUrl"]?.asString ?: "",
                     thumbnailUrl = obj["thumbnailUrl"]?.asString ?: "",
+                    playerUrl    = obj["playerUrl"]?.let { if (it.isJsonNull) "" else it.asString } ?: "",
+                    detailUrl    = obj["detailUrl"]?.let { if (it.isJsonNull) "" else it.asString } ?: "",
                     status       = obj["status"]?.asString ?: "active",
                     lastUpdated  = obj["lastUpdated"]?.let { if (it.isJsonNull) null else it.asString }
                 ))

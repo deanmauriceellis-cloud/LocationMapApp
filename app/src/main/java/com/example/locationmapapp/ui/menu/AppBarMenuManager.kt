@@ -241,17 +241,19 @@ class AppBarMenuManager(
         popup.show()
     }
 
-    /** All 18 Windy webcam categories. */
+    /** Windy webcam categories (matches Windy API v3). */
     private val WEBCAM_CATEGORIES = arrayOf(
-        "traffic", "city", "beach", "indoor", "outdoor", "landscape",
-        "mountain", "lake", "harbor", "airport", "building", "meteo",
-        "forest", "animals", "island", "golf", "resort", "sportsite"
+        "traffic", "city", "village", "beach", "coast", "port",
+        "lake", "river", "mountain", "forest", "landscape", "indoor",
+        "airport", "building", "square", "observatory", "meteo", "sportArea"
     )
 
     private fun showWebcamCategoryDialog() {
         val saved = prefs.getStringSet(PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
         val checked = BooleanArray(WEBCAM_CATEGORIES.size) { i -> saved.contains(WEBCAM_CATEGORIES[i]) }
-        val labels = WEBCAM_CATEGORIES.map { it.replaceFirstChar { c -> c.uppercase() } }.toTypedArray()
+        val labels = WEBCAM_CATEGORIES.map { cat ->
+            cat.replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() }
+        }.toTypedArray()
 
         // Track whether all are selected for the toggle button
         var allSelected = checked.all { it }
@@ -473,6 +475,12 @@ class AppBarMenuManager(
         return popup
     }
 
+    /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
+    private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
+        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT -> false
+        else -> true
+    }
+
     /**
      * Flip a boolean pref, update the menu item's checked state, notify caller.
      * Returns the NEW state.
@@ -482,7 +490,7 @@ class AppBarMenuManager(
         prefKey:  String,
         onChanged: (Boolean) -> Unit
     ) {
-        val newState = !prefs.getBoolean(prefKey, true)
+        val newState = !prefs.getBoolean(prefKey, prefDefault(prefKey))
         prefs.edit().putBoolean(prefKey, newState).apply()
         item.isChecked = newState
         DebugLogger.i(TAG, "toggleBinary '$prefKey' → $newState  ('${item.title}')")
@@ -497,7 +505,7 @@ class AppBarMenuManager(
         pairs.forEach { (id, prefKey) ->
             val item = menu.findItem(id)
             if (item != null) {
-                item.isChecked = prefs.getBoolean(prefKey, true)
+                item.isChecked = prefs.getBoolean(prefKey, prefDefault(prefKey))
             } else {
                 DebugLogger.w(TAG, "syncCheckStates: findItem(0x${id.toString(16)}) null — check R.id vs menu XML")
             }

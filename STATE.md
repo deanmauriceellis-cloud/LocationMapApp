@@ -163,6 +163,7 @@
 
 ## Known Issues
 - MBTA API key hardcoded in MbtaRepository.kt (should be in BuildConfig/secrets)
+- Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
