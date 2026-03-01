@@ -362,6 +362,24 @@ loadCache();
 loadRadiusHints();
 loadPoiCache();
 
+// ── Bbox snapping (improve cache hit rate for scroll-heavy layers) ───────────
+
+/**
+ * Round bbox coordinates to a grid so small scrolls reuse the same cache key.
+ * precision=2 → snap to 0.01° (~1.1 km), precision=1 → snap to 0.1° (~11 km).
+ * South/west snap down, north/east snap up to ensure the snapped bbox fully
+ * contains the original viewport.
+ */
+function snapBbox(s, w, n, e, precision = 2) {
+  const f = Math.pow(10, precision);
+  return {
+    s: Math.floor(s * f) / f,
+    w: Math.floor(w * f) / f,
+    n: Math.ceil(n * f) / f,
+    e: Math.ceil(e * f) / f,
+  };
+}
+
 // ── Logging ─────────────────────────────────────────────────────────────────
 
 function log(endpoint, hit, upstreamMs, extra) {
@@ -592,7 +610,12 @@ app.get('/metar', async (req, res) => {
   const { bbox } = req.query;
   if (!bbox) return res.status(400).json({ error: 'Must specify bbox (lat0,lon0,lat1,lon1)' });
 
-  const cacheKey = `metar:${bbox}`;
+  // Snap bbox to 0.01° grid for cache reuse across small scrolls
+  const parts = bbox.split(',').map(Number);
+  const snapped = snapBbox(parts[0], parts[1], parts[2], parts[3], 2);
+  const snappedBbox = `${snapped.s},${snapped.w},${snapped.n},${snapped.e}`;
+
+  const cacheKey = `metar:${snappedBbox}`;
   const ttlMs = 60 * 60 * 1000;
   const cached = cacheGet(cacheKey, ttlMs);
   if (cached) {
@@ -604,7 +627,7 @@ app.get('/metar', async (req, res) => {
 
   stats.misses++;
   try {
-    const upstreamUrl = `https://aviationweather.gov/api/data/metar?format=json&hours=1&taf=false&bbox=${encodeURIComponent(bbox)}`;
+    const upstreamUrl = `https://aviationweather.gov/api/data/metar?format=json&hours=1&taf=false&bbox=${encodeURIComponent(snappedBbox)}`;
     const t0 = Date.now();
     const upstream = await fetch(upstreamUrl);
     const elapsed = Date.now() - t0;
@@ -710,7 +733,15 @@ app.get('/aircraft', async (req, res) => {
   const { bbox, icao24 } = req.query;
   if (!bbox && !icao24) return res.status(400).json({ error: 'Must specify bbox (south,west,north,east) or icao24' });
 
-  const cacheKey = icao24 ? `aircraft:icao:${icao24}` : `aircraft:${bbox}`;
+  // Snap bbox to 0.1° grid for cache reuse (aircraft have 15s TTL, coarse snap is fine)
+  let snappedBbox = bbox;
+  if (bbox && !icao24) {
+    const parts = bbox.split(',').map(Number);
+    const snapped = snapBbox(parts[0], parts[1], parts[2], parts[3], 1);
+    snappedBbox = `${snapped.s},${snapped.w},${snapped.n},${snapped.e}`;
+  }
+
+  const cacheKey = icao24 ? `aircraft:icao:${icao24}` : `aircraft:${snappedBbox}`;
   const ttlMs = 15 * 1000;
   const cached = cacheGet(cacheKey, ttlMs);
   if (cached) {
@@ -747,7 +778,7 @@ app.get('/aircraft', async (req, res) => {
     if (icao24) {
       upstreamUrl = `https://opensky-network.org/api/states/all?icao24=${icao24.toLowerCase()}`;
     } else {
-      const parts = bbox.split(',');
+      const parts = snappedBbox.split(',');
       upstreamUrl = `https://opensky-network.org/api/states/all?lamin=${parts[0]}&lomin=${parts[1]}&lamax=${parts[2]}&lomax=${parts[3]}`;
     }
     const token = await getOpenskyToken();
@@ -1092,7 +1123,10 @@ app.get('/webcams', async (req, res) => {
   if (!s || !w || !n || !e) return res.status(400).json({ error: 'Must specify s, w, n, e bounds' });
 
   const catParam = categories || 'traffic';
-  const cacheKey = `webcams:${s},${w},${n},${e}:${catParam}`;
+
+  // Snap bbox to 0.01° grid for cache reuse across small scrolls
+  const snapped = snapBbox(Number(s), Number(w), Number(n), Number(e), 2);
+  const cacheKey = `webcams:${snapped.s},${snapped.w},${snapped.n},${snapped.e}:${catParam}`;
   const ttlMs = 10 * 60 * 1000;  // 10 minutes — matches image URL expiry
 
   const cached = cacheGet(cacheKey, ttlMs);
@@ -1105,7 +1139,7 @@ app.get('/webcams', async (req, res) => {
 
   stats.misses++;
   try {
-    const upstreamUrl = `https://api.windy.com/webcams/api/v3/webcams?bbox=${n},${e},${s},${w}&category=${encodeURIComponent(catParam)}&limit=50&include=images,location,categories,player,urls`;
+    const upstreamUrl = `https://api.windy.com/webcams/api/v3/webcams?bbox=${snapped.n},${snapped.e},${snapped.s},${snapped.w}&category=${encodeURIComponent(catParam)}&limit=50&include=images,location,categories,player,urls`;
     const t0 = Date.now();
     const upstream = await fetch(upstreamUrl, {
       headers: { 'x-windy-api-key': WINDY_API_KEY },
