@@ -1,5 +1,6 @@
 package com.example.locationmapapp.util
 
+import android.util.Log
 import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -12,7 +13,8 @@ import java.net.Socket
  *   adb forward tcp:8085 tcp:8085 && curl localhost:8085/state
  *
  * Minimal HTTP/1.0 parser. All responses are Connection: close.
- * Runs accept loop on Dispatchers.IO. Call start() once from MainActivity.onCreate().
+ * Runs accept loop on Dispatchers.IO. Call start() from MainActivity.onCreate(),
+ * stop() from onDestroy(). Safe to call start() multiple times.
  */
 object DebugHttpServer {
 
@@ -23,9 +25,18 @@ object DebugHttpServer {
     @Volatile var endpoints: DebugEndpoints? = null
 
     private var serverSocket: ServerSocket? = null
+    private var job: Job? = null
 
     fun start() {
-        scope.launch {
+        if (job?.isActive == true) {
+            DebugLogger.i(TAG, "Already running on port $PORT, skipping start()")
+            return
+        }
+        // Clean up any leftover socket from a previous run
+        serverSocket?.runCatching { close() }
+        serverSocket = null
+
+        job = scope.launch {
             try {
                 serverSocket = ServerSocket(PORT)
                 DebugLogger.i(TAG, "Listening on port $PORT")
@@ -34,9 +45,18 @@ object DebugHttpServer {
                     launch { handleConnection(socket) }
                 }
             } catch (e: Exception) {
-                if (isActive) DebugLogger.e(TAG, "Server error: ${e.message}", e)
+                Log.e(TAG, "Server error: ${e.message}", e)
+                DebugLogger.e(TAG, "Server error: ${e.message}", e)
             }
         }
+    }
+
+    fun stop() {
+        job?.cancel()
+        job = null
+        serverSocket?.runCatching { close() }
+        serverSocket = null
+        DebugLogger.i(TAG, "Stopped")
     }
 
     private suspend fun handleConnection(socket: Socket) {

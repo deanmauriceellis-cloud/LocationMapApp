@@ -1,5 +1,35 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01a (Debug Server Fix + DB Re-import)
+
+### Context
+Debug HTTP server (port 8085) wouldn't start — `Connection refused` in logcat. Root cause: `DebugHttpServer` is a singleton `object` whose `start()` had no guard against double-start on Activity recreation. When the Activity was destroyed and recreated, `ServerSocket(PORT)` threw `BindException` which was silently swallowed. Also, PostgreSQL tables were empty and needed re-import.
+
+### Changes Made
+
+#### `DebugHttpServer.kt` — double-start fix
+- Added `private var job: Job?` to track the server coroutine
+- `start()` now returns early if `job?.isActive == true` (already running)
+- Closes any leftover `serverSocket` before starting new one
+- Added `fun stop()` — cancels job, closes socket, logs shutdown
+- Catch block now always logs via `Log.e` (was only logging when `isActive`)
+
+#### `MainActivity.kt` — onDestroy cleanup
+- Added `onDestroy()` override calling `DebugHttpServer.stop()` to release port 8085 on Activity recreation
+
+#### PostgreSQL re-import
+- Ran `import-pois.js` — imported 6,631 POIs from proxy cache into `pois` table
+- Aircraft sightings start empty, accumulate in real-time
+
+### Verification
+- `curl localhost:8085/state` — returns JSON with map state, marker counts
+- `curl localhost:8085/perf` — returns memory/thread stats
+- `curl localhost:8085/livedata` — returns LiveData values (538 POIs, 257 stations)
+- `curl localhost:8085/screenshot -o test.png` — valid PNG (2400x1080)
+- `SELECT COUNT(*) FROM pois` — 6,631 rows
+
+---
+
 ## Session: 2026-02-28q (Debug HTTP Server — Embedded in App)
 
 ### Context

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 17 (Debug HTTP Server — Embedded in App)
+## Last Updated: 2026-03-01 Session 18 (Debug Server Fix + DB Re-import)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -122,6 +122,9 @@
   - `runOnMain` helper for UI-thread access via `suspendCancellableCoroutine`
   - Marker tap via synthetic MotionEvent at projected screen position
   - Lifecycle-aware: endpoints registered in `onResume`, nulled in `onPause`
+  - **Double-start guard**: `start()` returns early if job already active; `stop()` cancels job + closes socket
+  - **`onDestroy()` cleanup**: MainActivity calls `DebugHttpServer.stop()` to release port on Activity recreation
+  - Bind exceptions always logged (no more silent swallowing behind `isActive` check)
   - Usage: `adb forward tcp:8085 tcp:8085 && curl localhost:8085/state | jq .`
 
 ## External API Routing
@@ -175,12 +178,12 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
-  - 70,808 POIs as of 2026-02-28 (synced via `import-pois.js`)
+  - 6,631 POIs as of 2026-03-01 (re-imported via `import-pois.js` after DB reset)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)
   - Indexes: icao24, callsign, first_seen, last_seen, last_lat+lon
-  - 28,690 sightings / 8,337 unique aircraft as of 2026-02-28
+  - 0 sightings as of 2026-03-01 (accumulates in real-time when aircraft tracking enabled)
   - Real-time: proxy writes to DB on every aircraft API response (cache hits and misses)
 - **DB query API** (`/db/*` prefix): 6 endpoints for searching, filtering, analytics
   - `GET /db/pois/search` — name search (ILIKE), category filter, bbox, tag queries, distance sort
@@ -262,7 +265,7 @@
 Marker types: `poi`, `stations`, `trains`, `subway`, `buses`, `aircraft`, `webcams`, `metar`, `gps`
 
 ## Next Steps
-- **Test debug HTTP server** — `adb forward tcp:8085 tcp:8085`, verify all endpoints
+- **Systematic testing** via debug HTTP server — all layers, endpoints, follow modes
 - **Test station markers** — toggle on, verify ~270 stations appear, tap one, verify arrival board, tap train row, verify schedule
 - **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads

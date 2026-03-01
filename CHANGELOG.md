@@ -1,5 +1,17 @@
 # LocationMapApp — Changelog
 
+## [1.5.18] — 2026-03-01
+
+### Fixed
+- **Debug HTTP server won't start on Activity recreation** — `ServerSocket` bind failed silently on double-start
+  - Added `Job` tracking with early-return guard in `start()` when already running
+  - Added `stop()` method to cancel coroutine and close socket
+  - `onDestroy()` now calls `DebugHttpServer.stop()` to release port 8085
+  - Bind exceptions always logged via `Log.e` (was only logged when coroutine `isActive`)
+
+### Database
+- Re-imported 6,631 POIs from proxy cache into PostgreSQL (tables were empty after reset)
+
 ## [1.5.18] — 2026-02-28
 
 ### Added

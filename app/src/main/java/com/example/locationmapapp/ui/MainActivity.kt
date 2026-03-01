@@ -313,6 +313,11 @@ class MainActivity : AppCompatActivity() {
         DebugHttpServer.endpoints = null
         DebugLogger.i("MainActivity","onPause()")
     }
+    override fun onDestroy() {
+        super.onDestroy()
+        DebugHttpServer.stop()
+        DebugLogger.i("MainActivity","onDestroy()")
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
