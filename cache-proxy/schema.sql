@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_pois_category ON pois (category);
 CREATE INDEX IF NOT EXISTS idx_pois_name ON pois (name) WHERE name IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_pois_tags ON pois USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_pois_lat_lon ON pois (lat, lon);
+CREATE INDEX IF NOT EXISTS idx_pois_category_lat_lon ON pois (category, lat, lon);
 
 -- Aircraft sightings — each continuous observation is a separate row
 CREATE TABLE IF NOT EXISTS aircraft_sightings (

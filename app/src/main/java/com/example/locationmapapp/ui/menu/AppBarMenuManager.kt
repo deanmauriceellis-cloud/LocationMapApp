@@ -69,7 +69,7 @@ class AppBarMenuManager(
                 R.id.menu_top_radar      -> { showRadarMenu(toolbar);      true }
                 R.id.menu_top_poi        -> { showPoiMenu(toolbar);        true }
                 R.id.menu_top_utility    -> { showUtilityMenu(toolbar);    true }
-                R.id.menu_top_legend     -> { menuEventListener.onLegendRequested(); true }
+                R.id.menu_top_find       -> { menuEventListener.onFindRequested();   true }
                 else -> {
                     DebugLogger.w(TAG, "No sub-menu for id=0x${item.itemId.toString(16)}")
                     false
@@ -380,6 +380,10 @@ class AppBarMenuManager(
         val popup = buildPopup(anchor, R.menu.menu_poi)
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "POI: '${item.title}'")
+            if (item.itemId == R.id.menu_poi_all_on) {
+                enableAllPois(popup.menu)
+                return@setOnMenuItemClickListener true
+            }
             val cat = menuIdToCategory[item.itemId]
             if (cat != null) {
                 if (cat.subtypes != null) {
@@ -399,6 +403,16 @@ class AppBarMenuManager(
         val pairs = menuIdToCategory.map { (resId, cat) -> resId to cat.prefKey }.toTypedArray()
         syncCheckStates(popup.menu, *pairs)
         popup.show()
+    }
+
+    /** Enable all 16 POI categories at once and notify the listener for each. */
+    private fun enableAllPois(menu: Menu) {
+        DebugLogger.i(TAG, "enableAllPois — turning on all 16 categories")
+        for ((resId, cat) in menuIdToCategory) {
+            prefs.edit().putBoolean(cat.prefKey, true).apply()
+            menu.findItem(resId)?.isChecked = true
+            menuEventListener.onPoiLayerToggled(cat.id, true)
+        }
     }
 
     /**
@@ -473,6 +487,8 @@ class AppBarMenuManager(
 
                 R.id.menu_util_gps_mode ->
                     toggleBinary(item, PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
+
+                R.id.menu_util_legend -> menuEventListener.onLegendRequested()
 
                 else -> {
                     DebugLogger.w(TAG, "Utility: unhandled id=0x${item.itemId.toString(16)}")

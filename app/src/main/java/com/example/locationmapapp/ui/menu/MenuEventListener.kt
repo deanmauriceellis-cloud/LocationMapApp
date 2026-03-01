@@ -152,8 +152,11 @@ interface MenuEventListener {
     fun onGpsModeToggled(autoGps: Boolean)
 
     // =========================================================================
-    // LEGEND
+    // FIND / LEGEND
     // =========================================================================
+
+    /** Open the Find POI discovery dialog. */
+    fun onFindRequested()
 
     /** Open the map legend dialog showing all marker types and their meanings. */
     fun onLegendRequested()

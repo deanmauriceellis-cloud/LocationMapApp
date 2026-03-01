@@ -55,4 +55,10 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <!-- Map legend dialog -->
+    <item
+        android:id="@+id/menu_util_legend"
+        android:title="Map Legend"
+        app:showAsAction="never" />
+
 </menu>

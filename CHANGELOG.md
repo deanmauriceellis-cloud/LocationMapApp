@@ -1,5 +1,30 @@
 # LocationMapApp — Changelog
 
+## [1.5.26] — 2026-03-01
+
+### Added
+- **Find dialog** — POI discovery feature replacing Legend on toolbar
+  - **Category grid** (4x4): 16 categories with color backgrounds and DB count badges
+  - **Subtype grid**: dynamic 2-3 column layout with back navigation
+  - **Results list**: distance-sorted with cardinal direction ("0.3 mi NW"), name, detail (cuisine/type), address
+  - Tap result → map animates to POI at zoom 17 with bbox POI reload
+  - Long-press category/subtype → **map filter mode**: replaces POI markers with filtered set
+  - Filter mode shows "Showing: X ✕" banner over map, tap to dismiss
+  - Filter auto-clears on scroll/zoom (reloads filtered set) and on reopening Find
+- **Find proxy endpoints** — two new PostgreSQL-backed endpoints
+  - `GET /db/pois/counts` — category counts with 10-min server-side cache
+  - `GET /db/pois/find` — distance-sorted POIs by category with bbox pre-filter + Haversine sort, auto-expands 50km→200km
+  - New composite index `idx_pois_category_lat_lon` for efficient queries
+- **FindRepository.kt** — new singleton with 10-min client cache for counts, `findNearby()` for results
+- **FindResult/FindCounts/FindResponse** data classes in Models.kt with `typeValue`, `detail`, `toPlaceResult()` helpers
+- **"All POIs On"** button at top of POI menu — enables all 16 categories in one tap
+- **Legend moved to Utility menu** — accessible via Utility → Map Legend
+
+### Changed
+- **Toolbar**: `Alerts | Transit | CAMs | Air | Radar | POI | Utility | Find` (Find replaces Legend)
+- Debug `/state` endpoint includes `findFilter` object (active, label, tags)
+- Scroll/zoom debounce respects find filter mode (loads filtered POIs instead of normal bbox)
+
 ## [1.5.25] — 2026-03-01
 
 ### Added

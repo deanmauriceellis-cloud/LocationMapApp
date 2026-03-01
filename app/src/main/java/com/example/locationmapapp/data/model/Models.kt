@@ -179,6 +179,59 @@ data class PopulateSearchResult(
     val poiKnown: Int = 0
 )
 
+// ── Find Feature Models ─────────────────────────────────────────────────────
+
+data class FindResult(
+    val id: Long,
+    val type: String,
+    val name: String?,
+    val lat: Double,
+    val lon: Double,
+    val category: String,
+    val distanceM: Int,
+    val tags: Map<String, String>,
+    val address: String? = null,
+    val cuisine: String? = null,
+    val phone: String? = null,
+    val openingHours: String? = null
+) {
+    /** Extracts value after "=" (e.g. "amenity=cafe" → "cafe") */
+    val typeValue: String get() = category.substringAfter("=", category)
+
+    /** First non-null detail from cuisine/denomination/sport (semicolons → commas) */
+    val detail: String? get() {
+        val raw = cuisine
+            ?: tags["denomination"]
+            ?: tags["sport"]
+            ?: tags["brand"]
+        return raw?.replace(";", ", ")
+    }
+
+    fun toGeoPoint() = GeoPoint(lat, lon)
+
+    fun toPlaceResult() = PlaceResult(
+        id = "$type:$id",
+        name = name ?: typeValue.replaceFirstChar { it.uppercase() },
+        lat = lat,
+        lon = lon,
+        category = category,
+        address = address,
+        phone = phone,
+        openingHours = openingHours
+    )
+}
+
+data class FindCounts(
+    val counts: Map<String, Int>,
+    val total: Int
+)
+
+data class FindResponse(
+    val results: List<FindResult>,
+    val totalInRange: Int,
+    val scopeM: Int
+)
+
 enum class MbtaVehicleStatus(val display: String) {
     INCOMING_AT("Arriving"),
     STOPPED_AT("Stopped at"),

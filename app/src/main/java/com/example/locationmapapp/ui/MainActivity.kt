@@ -532,7 +532,7 @@ class MainActivity : AppCompatActivity() {
                 cachePoiJob?.cancel()
                 cachePoiJob = lifecycleScope.launch {
                     delay(500)
-                    loadCachedPoisForVisibleArea()
+                    if (findFilterActive) loadFilteredPois() else loadCachedPoisForVisibleArea()
                 }
                 // Suppress webcam reloads while populate scanner is running
                 if (populateJob == null) scheduleWebcamReload()
@@ -2668,6 +2668,574 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ── Find Dialog (POI Discovery) ──────────────────────────────────────────
+
+    // Filter mode state
+    private var findFilterActive = false
+    private var findFilterTags = listOf<String>()
+    private var findFilterLabel = ""
+    private var findFilterBanner: View? = null
+
+    @SuppressLint("SetTextI18n")
+    private fun showFindDialog() {
+        // Auto-exit filter mode when reopening Find
+        if (findFilterActive) exitFindFilterMode()
+        viewModel.loadFindCounts()
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        showFindCategoryGrid(dialog)
+        dialog.show()
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showFindCategoryGrid(dialog: android.app.Dialog) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        val counts = viewModel.findCounts.value
+
+        // ── Header ──
+        val titleText = TextView(this).apply {
+            text = "Find"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), 0, dp(4), 0)
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(12), dp(12), dp(8))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── 4×4 Category Grid ──
+        val grid = android.widget.GridLayout(this).apply {
+            columnCount = 4
+            setPadding(dp(8), 0, dp(8), dp(12))
+        }
+
+        for (cat in PoiCategories.ALL) {
+            val catCount = counts?.let { c ->
+                cat.tags.sumOf { tag -> c.counts[tag] ?: 0 }
+            }
+
+            val cell = android.widget.FrameLayout(this).apply {
+                val lp = android.widget.GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = dp(64)
+                    columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                }
+                layoutParams = lp
+                val bg = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.argb(77, Color.red(cat.color), Color.green(cat.color), Color.blue(cat.color)))
+                    cornerRadius = dp(6).toFloat()
+                }
+                background = bg
+                setPadding(dp(6), dp(6), dp(6), dp(6))
+            }
+
+            // Label
+            val label = TextView(this).apply {
+                text = cat.label
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                maxLines = 2
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.BOTTOM
+                )
+            }
+
+            // Count badge
+            if (catCount != null && catCount > 0) {
+                val badge = TextView(this).apply {
+                    text = if (catCount >= 1000) "%.1fk".format(catCount / 1000.0) else catCount.toString()
+                    textSize = 10f
+                    setTextColor(Color.parseColor("#9E9E9E"))
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.TOP or android.view.Gravity.END
+                    )
+                }
+                cell.addView(badge)
+            }
+
+            cell.addView(label)
+
+            // Short tap
+            cell.setOnClickListener {
+                if (cat.subtypes != null) {
+                    showFindSubtypeGrid(dialog, cat)
+                } else {
+                    showFindResults(dialog, cat.label, cat.tags, null)
+                }
+            }
+
+            // Long press → filter mode
+            cell.setOnLongClickListener {
+                dialog.dismiss()
+                enterFindFilterMode(cat.tags, cat.label)
+                true
+            }
+
+            grid.addView(cell)
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            addView(header)
+            addView(grid)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.90).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showFindSubtypeGrid(dialog: android.app.Dialog, cat: com.example.locationmapapp.ui.menu.PoiCategory) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        val counts = viewModel.findCounts.value
+        val subtypes = cat.subtypes ?: return
+
+        // ── Header with back ──
+        val backBtn = TextView(this).apply {
+            text = "\u2190"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, dp(12), 0)
+            setOnClickListener { showFindCategoryGrid(dialog) }
+        }
+        val titleText = TextView(this).apply {
+            text = cat.label
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), 0, dp(4), 0)
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(12), dp(12), dp(8))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(backBtn)
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Dynamic column count ──
+        val colCount = when {
+            subtypes.size <= 4 -> 2
+            else -> 3
+        }
+
+        val grid = android.widget.GridLayout(this).apply {
+            columnCount = colCount
+            setPadding(dp(8), 0, dp(8), dp(12))
+        }
+
+        for (sub in subtypes) {
+            val subCount = counts?.let { c ->
+                sub.tags.sumOf { tag -> c.counts[tag] ?: 0 }
+            }
+
+            val cell = android.widget.FrameLayout(this).apply {
+                val lp = android.widget.GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = dp(56)
+                    columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                }
+                layoutParams = lp
+                val bg = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.argb(77, Color.red(cat.color), Color.green(cat.color), Color.blue(cat.color)))
+                    cornerRadius = dp(6).toFloat()
+                }
+                background = bg
+                setPadding(dp(6), dp(6), dp(6), dp(6))
+            }
+
+            val label = TextView(this).apply {
+                text = sub.label
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                maxLines = 2
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.BOTTOM
+                )
+            }
+
+            if (subCount != null && subCount > 0) {
+                val badge = TextView(this).apply {
+                    text = if (subCount >= 1000) "%.1fk".format(subCount / 1000.0) else subCount.toString()
+                    textSize = 10f
+                    setTextColor(Color.parseColor("#9E9E9E"))
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.TOP or android.view.Gravity.END
+                    )
+                }
+                cell.addView(badge)
+            }
+
+            cell.addView(label)
+
+            cell.setOnClickListener {
+                showFindResults(dialog, sub.label, sub.tags, cat)
+            }
+
+            cell.setOnLongClickListener {
+                dialog.dismiss()
+                enterFindFilterMode(sub.tags, sub.label)
+                true
+            }
+
+            grid.addView(cell)
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            addView(header)
+            addView(grid)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.90).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showFindResults(
+        dialog: android.app.Dialog,
+        title: String,
+        tags: List<String>,
+        parentCategory: com.example.locationmapapp.ui.menu.PoiCategory?
+    ) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        // ── Header with back ──
+        val backBtn = TextView(this).apply {
+            text = "\u2190"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, dp(12), 0)
+            setOnClickListener {
+                if (parentCategory != null) {
+                    showFindSubtypeGrid(dialog, parentCategory)
+                } else {
+                    showFindCategoryGrid(dialog)
+                }
+            }
+        }
+        val titleText = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), 0, dp(4), 0)
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(12), dp(12), dp(8))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(backBtn)
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Loading spinner ──
+        val spinner = android.widget.ProgressBar(this).apply {
+            setPadding(0, dp(24), 0, dp(24))
+        }
+
+        val resultsList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), 0, dp(8), dp(8))
+        }
+
+        val footer = TextView(this).apply {
+            textSize = 11f
+            setTextColor(Color.parseColor("#757575"))
+            setPadding(dp(16), dp(8), dp(16), dp(12))
+        }
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            addView(resultsList)
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            addView(header)
+            addView(spinner)
+            addView(scrollView)
+            addView(footer)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.90).toInt(), (dm.heightPixels * 0.75).toInt())
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+
+        // Fetch results
+        val center = binding.mapView.mapCenter
+        lifecycleScope.launch {
+            val response = viewModel.findNearbyDirectly(center.latitude, center.longitude, tags, 50)
+            spinner.visibility = View.GONE
+
+            if (response == null || response.results.isEmpty()) {
+                resultsList.addView(TextView(this@MainActivity).apply {
+                    text = "No results found nearby"
+                    textSize = 14f
+                    setTextColor(Color.parseColor("#9E9E9E"))
+                    setPadding(dp(16), dp(24), dp(16), dp(24))
+                })
+                return@launch
+            }
+
+            for (result in response.results) {
+                val row = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(dp(4), dp(8), dp(4), dp(8))
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+
+                // Left column: distance + direction
+                val distText = TextView(this@MainActivity).apply {
+                    text = formatDistanceDirection(
+                        center.latitude, center.longitude,
+                        result.lat, result.lon
+                    )
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#4FC3F7"))
+                    layoutParams = LinearLayout.LayoutParams(dp(65), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        marginEnd = dp(8)
+                    }
+                }
+
+                // Right column: name + details
+                val infoCol = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val nameText = TextView(this@MainActivity).apply {
+                    text = result.name ?: result.typeValue.replaceFirstChar { it.uppercase() }
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                infoCol.addView(nameText)
+
+                // Detail line (cuisine/type)
+                val detailStr = result.detail ?: result.typeValue.replaceFirstChar { it.uppercase() }
+                val detailText = TextView(this@MainActivity).apply {
+                    text = detailStr
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#9E9E9E"))
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                infoCol.addView(detailText)
+
+                // Address line
+                if (result.address != null) {
+                    val addrText = TextView(this@MainActivity).apply {
+                        text = result.address
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#616161"))
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+                    infoCol.addView(addrText)
+                }
+
+                row.addView(distText)
+                row.addView(infoCol)
+
+                // Tap → animate to POI
+                row.setOnClickListener {
+                    dialog.dismiss()
+                    val point = result.toGeoPoint()
+                    binding.mapView.controller.animateTo(point, 17.0, 800L)
+                    // Schedule POI bbox reload after animation completes
+                    lifecycleScope.launch {
+                        delay(1000)
+                        loadCachedPoisForVisibleArea()
+                    }
+                }
+
+                resultsList.addView(row)
+
+                // Separator line
+                resultsList.addView(View(this@MainActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 1
+                    ).apply { setMargins(dp(65), 0, 0, 0) }
+                    setBackgroundColor(Color.parseColor("#2A2A2A"))
+                })
+            }
+
+            // Footer
+            val maxDistMi = if (response.results.isNotEmpty()) {
+                response.results.last().distanceM / 1609.34
+            } else 0.0
+            footer.text = "Showing ${response.results.size} nearest (within %.1f mi)".format(maxDistMi)
+        }
+    }
+
+    /** Format distance + cardinal direction between two points. */
+    private fun formatDistanceDirection(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): String {
+        val results = FloatArray(2)
+        android.location.Location.distanceBetween(fromLat, fromLon, toLat, toLon, results)
+        val distM = results[0]
+        val bearing = results[1]
+        val cardinal = bearingToCardinal(bearing)
+        val distMi = distM / 1609.34
+
+        return when {
+            distMi < 0.1 -> "%.0f ft %s".format(distM * 3.28084, cardinal)
+            distMi < 10.0 -> "%.1f mi %s".format(distMi, cardinal)
+            else -> "%.0f mi %s".format(distMi, cardinal)
+        }
+    }
+
+    private fun bearingToCardinal(bearing: Float): String {
+        val normalized = ((bearing % 360) + 360) % 360
+        return when {
+            normalized < 22.5 || normalized >= 337.5 -> "N"
+            normalized < 67.5 -> "NE"
+            normalized < 112.5 -> "E"
+            normalized < 157.5 -> "SE"
+            normalized < 202.5 -> "S"
+            normalized < 247.5 -> "SW"
+            normalized < 292.5 -> "W"
+            else -> "NW"
+        }
+    }
+
+    // ── Map Filter Mode ──────────────────────────────────────────────────────
+
+    private fun enterFindFilterMode(tags: List<String>, label: String) {
+        findFilterActive = true
+        findFilterTags = tags
+        findFilterLabel = label
+        DebugLogger.i("MainActivity", "enterFindFilterMode: $label tags=$tags")
+
+        // Show dismissible banner
+        showFindFilterBanner(label)
+
+        // Load filtered POIs
+        loadFilteredPois()
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showFindFilterBanner(label: String) {
+        removeFindFilterBanner()
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val banner = TextView(this).apply {
+            text = "Showing: $label  \u2715"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#CC333333"))
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            gravity = android.view.Gravity.CENTER
+            setOnClickListener { exitFindFilterMode() }
+        }
+
+        val parent = binding.mapView.parent as? ViewGroup ?: return
+        val lp = android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.TOP
+        )
+        parent.addView(banner, lp)
+        findFilterBanner = banner
+    }
+
+    private fun removeFindFilterBanner() {
+        findFilterBanner?.let {
+            (it.parent as? ViewGroup)?.removeView(it)
+        }
+        findFilterBanner = null
+    }
+
+    private fun loadFilteredPois() {
+        val center = binding.mapView.mapCenter
+        lifecycleScope.launch {
+            val response = viewModel.findNearbyDirectly(center.latitude, center.longitude, findFilterTags, 200)
+            if (response != null) {
+                val places = response.results.map { it.toPlaceResult() }
+                replaceAllPoiMarkers(places)
+            }
+        }
+    }
+
+    private fun exitFindFilterMode() {
+        DebugLogger.i("MainActivity", "exitFindFilterMode")
+        findFilterActive = false
+        findFilterTags = emptyList()
+        findFilterLabel = ""
+        removeFindFilterBanner()
+        // Restore normal POI display
+        loadCachedPoisForVisibleArea()
+    }
+
     // ── Legend Dialog ─────────────────────────────────────────────────────────
 
     @SuppressLint("SetTextI18n")
@@ -3834,7 +4402,12 @@ class MainActivity : AppCompatActivity() {
             toggleLocationMode()
         }
 
-        // ── Legend ────────────────────────────────────────────────────────────
+        // ── Find / Legend ─────────────────────────────────────────────────────
+
+        override fun onFindRequested() {
+            DebugLogger.i("MainActivity", "onFindRequested")
+            showFindDialog()
+        }
 
         override fun onLegendRequested() {
             DebugLogger.i("MainActivity", "onLegendRequested")
@@ -3894,6 +4467,11 @@ class MainActivity : AppCompatActivity() {
             ),
             "followedVehicle" to followedVehicleId,
             "followedAircraft" to followedAircraftIcao,
+            "findFilter" to mapOf(
+                "active" to findFilterActive,
+                "label" to findFilterLabel,
+                "tags" to findFilterTags
+            ),
             "overlays" to map.overlays.size
         )
     }

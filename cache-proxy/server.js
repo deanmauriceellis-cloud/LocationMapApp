@@ -1114,6 +1114,131 @@ app.get('/db/pois/coverage', requirePg, async (req, res) => {
   }
 });
 
+// ── /db/pois/counts — category counts with 10-min server cache ───────────────
+
+let poiCountsCache = null;
+let poiCountsCachedAt = 0;
+const POI_COUNTS_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+app.get('/db/pois/counts', requirePg, async (req, res) => {
+  try {
+    const now = Date.now();
+    if (poiCountsCache && (now - poiCountsCachedAt) < POI_COUNTS_TTL_MS) {
+      return res.json(poiCountsCache);
+    }
+    const result = await pgPool.query(
+      `SELECT category, COUNT(*)::int AS count FROM pois WHERE category IS NOT NULL GROUP BY category ORDER BY count DESC`
+    );
+    const counts = {};
+    let total = 0;
+    for (const row of result.rows) {
+      counts[row.category] = row.count;
+      total += row.count;
+    }
+    poiCountsCache = { counts, total, cachedAt: new Date().toISOString() };
+    poiCountsCachedAt = now;
+    res.json(poiCountsCache);
+  } catch (err) {
+    console.error('[/db/pois/counts]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── /db/pois/find — distance-sorted POIs by category ─────────────────────────
+
+app.get('/db/pois/find', requirePg, async (req, res) => {
+  try {
+    const { lat, lon, categories, limit: rawLimit, offset: rawOffset } = req.query;
+    if (!lat || !lon) return res.status(400).json({ error: 'lat and lon required' });
+
+    const userLat = parseFloat(lat);
+    const userLon = parseFloat(lon);
+    const maxResults = Math.min(parseInt(rawLimit) || 50, 200);
+    const skip = parseInt(rawOffset) || 0;
+    const catList = categories ? categories.split(',').map(c => c.trim()).filter(Boolean) : [];
+    if (catList.length === 0) return res.status(400).json({ error: 'categories required (comma-separated)' });
+
+    // Try 50km first, expand to 200km if too few results
+    let scopeKm = 50;
+    let rows, totalInRange;
+
+    // Inline lat/lon in Haversine to avoid pg type inference issues
+    const distExpr = haversine(String(userLat), String(userLon));
+
+    for (const tryKm of [50, 200]) {
+      scopeKm = tryKm;
+      const degLat = tryKm / 111.0;
+      const degLon = degLat / Math.cos(userLat * Math.PI / 180);
+
+      const params = [
+        userLat - degLat, userLat + degLat,   // $1, $2 — lat bbox
+        ...catList                             // $3.. — categories
+      ];
+      const catPlaceholders = catList.map((_, i) => `$${i + 3}`).join(', ');
+
+      // lon bounds after categories
+      const lonIdx1 = params.length + 1;
+      const lonIdx2 = params.length + 2;
+      params.push(userLon - degLon, userLon + degLon);
+
+      const limitIdx = lonIdx2 + 1;
+      const offsetIdx = lonIdx2 + 2;
+      params.push(maxResults, skip);
+
+      const sql = `
+        SELECT osm_type, osm_id, lat, lon, name, category, tags,
+               ${distExpr} AS distance_m
+        FROM pois
+        WHERE category IN (${catPlaceholders})
+          AND lat BETWEEN $1 AND $2
+          AND lon BETWEEN $${lonIdx1} AND $${lonIdx2}
+        ORDER BY distance_m
+        LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `;
+
+      // Count query (same filters, no limit)
+      const countSql = `
+        SELECT COUNT(*)::int AS total
+        FROM pois
+        WHERE category IN (${catPlaceholders})
+          AND lat BETWEEN $1 AND $2
+          AND lon BETWEEN $${lonIdx1} AND $${lonIdx2}
+      `;
+      const countParams = params.slice(0, params.length - 2); // exclude limit/offset
+
+      const [dataResult, countResult] = await Promise.all([
+        pgPool.query(sql, params),
+        pgPool.query(countSql, countParams)
+      ]);
+      rows = dataResult.rows;
+      totalInRange = countResult.rows[0]?.total || 0;
+
+      if (rows.length >= maxResults || tryKm >= 200) break;
+    }
+
+    const elements = rows.map(row => ({
+      type: row.osm_type,
+      id: row.osm_id,
+      lat: row.lat,
+      lon: row.lon,
+      name: row.name,
+      category: row.category,
+      distance_m: Math.round(row.distance_m),
+      tags: row.tags || {}
+    }));
+
+    res.json({
+      count: elements.length,
+      total_in_range: totalInRange,
+      scope_m: scopeKm * 1000,
+      elements
+    });
+  } catch (err) {
+    console.error('[/db/pois/find]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── PostgreSQL-backed /db/aircraft/* endpoints ───────────────────────────────
 
 function toSighting(row) {

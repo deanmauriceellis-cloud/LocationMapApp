@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 25 (Legend Dialog + Zoom/Transit UX Fixes)
+## Last Updated: 2026-03-01 Session 26 (Find Dialog — POI Discovery)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -115,7 +115,13 @@
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
   - **Staleness detection**: banner and tap snippet show "STALE (Xm ago)" when vehicle GPS update is >2 min old
 - POI prefetch along followed vehicle/aircraft routes
-- **Legend dialog** (v1.5.25) — 8th toolbar button, scrollable dark dialog explaining all marker types
+- **Find dialog** (v1.5.26) — POI discovery feature on toolbar
+  - Category grid (4×4) → subtype grid → distance-sorted results list → tap to navigate
+  - Long-press category/subtype → map filter mode with "Showing: X ✕" banner
+  - DB-backed: `/db/pois/counts` (10-min cache) + `/db/pois/find` (Haversine-sorted, 50→200km auto-expand)
+  - `FindRepository.kt` with client-side counts cache; `FindResult`/`FindCounts`/`FindResponse` models
+  - "All POIs On" button in POI menu for quick recovery after filtering
+- **Legend dialog** (v1.5.25) — accessible via Utility → Map Legend
   - 7 sections: GPS, 16 POI categories, METAR/radar, transit vehicles, transit stops, aircraft, webcams
   - POI section driven from `PoiCategories.ALL` — stays in sync automatically
 - **Transit zoom guard** (v1.5.25) — all transit markers hidden at zoom ≤ 10, restored on zoom in
@@ -163,6 +169,7 @@
 | Aircraft | `http://10.0.0.4:3000/aircraft?...` | GET /aircraft?bbox=s,w,n,e or ?icao24=hex | 15 seconds |
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
+| DB POI Find | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/counts (10-min cache), /db/pois/find | 10 min / live |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
 | DB Aircraft | `http://10.0.0.4:3000/db/aircraft/...` | GET /db/aircraft/search, /recent, /stats, /:icao24 | live |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
@@ -181,6 +188,9 @@
 - **Tap bus stop marker**: arrival board dialog (real-time bus predictions)
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
+- **Tap find filter banner**: exit filter mode, restore normal POI display
+- **Find toolbar button**: category grid → subtype grid → distance-sorted results → tap to navigate
+- **Find long-press**: filter map to show only that category's POIs
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center
 
 ## Key Files
@@ -192,6 +202,7 @@
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
 - `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
+- `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
@@ -213,13 +224,15 @@
   - Indexes: icao24, callsign, first_seen, last_seen, last_lat+lon
   - 501+ sightings as of 2026-03-01, 195 unique aircraft (accumulates in real-time)
   - Real-time: proxy writes to DB on every aircraft API response (cache hits and misses)
-- **DB query API** (`/db/*` prefix): 10 endpoints — 6 POI + 4 aircraft
+- **DB query API** (`/db/*` prefix): 12 endpoints — 8 POI + 4 aircraft
   - `GET /db/pois/search` — name search (ILIKE), category filter, bbox, tag queries, distance sort
   - `GET /db/pois/nearby` — Haversine distance sort with bbox pre-filter
   - `GET /db/poi/:type/:id` — single POI with timestamps
   - `GET /db/pois/stats` — totals, named count, top categories, bounds, time range
   - `GET /db/pois/categories` — category breakdown with key/value split
   - `GET /db/pois/coverage` — geographic grid with configurable resolution
+  - `GET /db/pois/counts` — category counts with 10-min server cache (Find dialog)
+  - `GET /db/pois/find` — distance-sorted POIs by category, Haversine sort, auto-expand (Find dialog)
   - `GET /db/aircraft/search` — filter by callsign, icao24, country, bbox, time range
   - `GET /db/aircraft/stats` — totals, unique aircraft, top countries/callsigns, altitude distribution
   - `GET /db/aircraft/recent` — most recently seen aircraft, deduplicated by icao24
@@ -358,8 +371,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - 0 test failures across entire run
 
 ## Next Steps
-- **Verify cache hit rate improvement** — bbox snapping deployed, monitor actual hit rate over next session
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)
-- Consider adding aircraft DB endpoints to debug server (in-app access to flight history)
+- Find dialog enhancements: pagination (load more), search within results, recent/favorites

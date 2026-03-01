@@ -3,6 +3,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <item android:id="@+id/menu_poi_all_on"
+        android:title="All POIs On"
+        app:showAsAction="never" />
+
     <item android:id="@+id/menu_poi_food_drink"
         android:title="Food &amp; Drink \u25B8"
         android:checkable="true"

@@ -1,5 +1,61 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01i (Find Dialog — POI Discovery — v1.5.26)
+
+### Changes Made
+
+#### Proxy Endpoints (2 new, cache-proxy/server.js + schema.sql)
+- **`GET /db/pois/counts`** — category counts with 10-min in-memory server cache
+  - SQL: `SELECT category, COUNT(*) FROM pois WHERE category IS NOT NULL GROUP BY category`
+  - Response: `{ counts: { "amenity=bar": 65, ... }, total: 23343, cachedAt: "..." }`
+- **`GET /db/pois/find`** — distance-sorted POIs by category
+  - Params: lat, lon (required), categories (comma-separated), limit (default 50, max 200), offset
+  - Strategy: bbox pre-filter (50km), Haversine sort, auto-expand to 200km if < limit results
+  - Inlines lat/lon in Haversine SQL to avoid pg type inference issues (learned from initial `$1`/`$2` failure)
+  - Returns full JSONB tags for cuisine, denomination, address extraction
+- **`idx_pois_category_lat_lon`** composite index added to schema.sql
+
+#### App Data Layer (4 files)
+- **Models.kt** — `FindResult` (with `typeValue`, `detail`, `toPlaceResult()`), `FindCounts`, `FindResponse`
+- **FindRepository.kt** (NEW) — `@Singleton`, OkHttpClient, 10-min client counts cache, `fetchCounts()`, `findNearby()`
+- **AppModule.kt** — `provideFindRepository()` DI binding
+- **MainViewModel.kt** — `findCounts` LiveData, `loadFindCounts()`, `findNearbyDirectly()` suspend call
+
+#### Menu Wiring (5 files)
+- **menu_main_toolbar.xml** — `menu_top_legend` → `menu_top_find` ("Find")
+- **menu_utility.xml** — Added `menu_util_legend` ("Map Legend") at bottom
+- **menu_poi.xml** — Added `menu_poi_all_on` ("All POIs On") at top
+- **MenuEventListener.kt** — `onFindRequested()` in new FIND / LEGEND section
+- **AppBarMenuManager.kt** — `menu_top_find` → `onFindRequested()`, `menu_util_legend` → `onLegendRequested()`, `menu_poi_all_on` → `enableAllPois()` helper
+
+#### Find Dialog (MainActivity.kt, ~350 lines)
+- **`showFindDialog()`** — entry point, auto-exits filter mode, loads counts
+- **`showFindCategoryGrid(dialog)`** — 4×4 GridLayout: color cells (30% alpha), label (12sp bold), count badge (10sp gray)
+  - Short tap: subtypes → `showFindSubtypeGrid()`, else → `showFindResults()`
+  - Long press: `dialog.dismiss()` + `enterFindFilterMode()`
+- **`showFindSubtypeGrid(dialog, cat)`** — dynamic 2-3 col grid, back navigation, same tap/long-press behavior
+- **`showFindResults(dialog, title, tags, parentCat)`** — async-loaded ScrollView results list
+  - Each row: distance+direction (light blue #4FC3F7, 65dp col) + name (14sp bold) + detail (12sp gray) + address (11sp)
+  - Footer: "Showing N nearest (within X.X mi)"
+  - Tap row → dismiss, animateTo(zoom 17, 800ms), schedule loadCachedPoisForVisibleArea after 1s
+- **`formatDistanceDirection()`** — `Location.distanceBetween()` + 8-point compass; "150 ft N" / "0.3 mi NW" / "12 mi SE"
+
+#### Map Filter Mode (MainActivity.kt, ~60 lines)
+- State: `findFilterActive`, `findFilterTags`, `findFilterLabel`, `findFilterBanner`
+- **`enterFindFilterMode(tags, label)`** — sets state, shows banner, calls `loadFilteredPois()`
+- **`loadFilteredPois()`** — `findNearbyDirectly()` with 200 limit → `toPlaceResult()` → `replaceAllPoiMarkers()`
+- **`exitFindFilterMode()`** — clears state, removes banner, restores `loadCachedPoisForVisibleArea()`
+- Scroll debounce: `if (findFilterActive) loadFilteredPois() else loadCachedPoisForVisibleArea()`
+- Auto-exit: `showFindDialog()` calls `exitFindFilterMode()` if active
+
+#### Debug Integration (DebugEndpoints.kt via MainActivity)
+- `debugState()` returns `findFilter: { active, label, tags }` in `/state` response
+
+### Bug Fixes During Implementation
+- **Haversine pg type error** — initial `haversine('$1', '$2')` failed with "could not determine data type of parameter $1"; fixed by inlining lat/lon values directly into SQL string (matches existing `/db/pois/nearby` pattern)
+
+---
+
 ## Session: 2026-03-01h (Legend Dialog + Zoom/Transit UX Fixes — v1.5.25)
 
 ### Changes Made

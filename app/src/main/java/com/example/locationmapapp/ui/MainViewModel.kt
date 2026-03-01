@@ -13,6 +13,7 @@ import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.model.*
 import com.example.locationmapapp.data.repository.AircraftRepository
+import com.example.locationmapapp.data.repository.FindRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.WebcamRepository
 import com.example.locationmapapp.data.repository.WeatherRepository
@@ -37,7 +38,8 @@ class MainViewModel @Inject constructor(
     private val weatherRepository: WeatherRepository,
     private val mbtaRepository: MbtaRepository,
     private val aircraftRepository: AircraftRepository,
-    private val webcamRepository: WebcamRepository
+    private val webcamRepository: WebcamRepository,
+    private val findRepository: FindRepository
 ) : ViewModel() {
 
     private val TAG = "ViewModel"
@@ -388,6 +390,30 @@ class MainViewModel @Inject constructor(
     fun refreshRadar() {
         _radarRefreshTick.value = System.currentTimeMillis()
         DebugLogger.i(TAG, "Radar refresh tick")
+    }
+
+    // ── Find (POI Discovery) ──────────────────────────────────────────────────
+
+    private val _findCounts = MutableLiveData<FindCounts?>()
+    val findCounts: LiveData<FindCounts?> = _findCounts
+
+    fun loadFindCounts() {
+        DebugLogger.i(TAG, "loadFindCounts()")
+        viewModelScope.launch {
+            runCatching { findRepository.fetchCounts() }
+                .onSuccess { _findCounts.value = it }
+                .onFailure { e -> DebugLogger.e(TAG, "FindCounts FAILED: ${e.message}", e as? Exception) }
+        }
+    }
+
+    /** Direct suspend call for Find dialog — returns results without LiveData. */
+    suspend fun findNearbyDirectly(lat: Double, lon: Double, categories: List<String>, limit: Int = 50, offset: Int = 0): FindResponse? {
+        return try {
+            findRepository.findNearby(lat, lon, categories, limit, offset)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "findNearbyDirectly FAILED: ${e.message}", e)
+            null
+        }
     }
 }
 

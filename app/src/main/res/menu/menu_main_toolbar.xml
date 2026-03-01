@@ -53,8 +53,8 @@
         app:showAsAction="always|withText" />
 
     <item
-        android:id="@+id/menu_top_legend"
-        android:title="Legend"
+        android:id="@+id/menu_top_find"
+        android:title="Find"
         app:showAsAction="always|withText" />
 
 </menu>
