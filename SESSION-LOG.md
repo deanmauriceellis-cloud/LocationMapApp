@@ -1,5 +1,71 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28q (Debug HTTP Server — Embedded in App)
+
+### Context
+Testing the app required guessing pixel coordinates for `adb shell input tap`. We needed a way to programmatically interrogate and control the running app from the terminal. Solution: an embedded HTTP server accessed via `adb forward tcp:8085 tcp:8085` + `curl`.
+
+### Changes Made
+
+#### New file: `DebugHttpServer.kt`
+- Singleton `object` with `ServerSocket` accept loop on `Dispatchers.IO`
+- Port 8085, minimal HTTP/1.0 parser (method, path, query params)
+- Routes to `DebugEndpoints`, always `Connection: close`
+- URL-decoded query parameter parsing
+- `@Volatile var endpoints` — set/cleared by Activity lifecycle
+
+#### New file: `DebugEndpoints.kt`
+- Holds `MainActivity` + `MainViewModel` references
+- `EndpointResult` data class for responses (status, contentType, body, bodyBytes for PNG)
+- `runOnMain` helper: `suspendCancellableCoroutine` + `Handler(Looper.getMainLooper())`
+- 19 endpoint handlers:
+  - `/` — endpoint listing
+  - `/state` — map center, zoom, bounds, marker counts, follow state
+  - `/logs` — DebugLogger entries with tail/filter/level params
+  - `/logs/clear` — clear buffer
+  - `/map` — read or set map position (animates via controller)
+  - `/markers` — list markers by type with lat/lon/title/snippet
+  - `/markers/tap` — trigger click via `debugTapMarker()` (synthetic MotionEvent)
+  - `/markers/nearest` — Haversine distance sort from a point
+  - `/markers/search` — text search on title/snippet
+  - `/screenshot` — `@Suppress("DEPRECATION")` drawing cache → PNG bytes
+  - `/livedata` — all ViewModel LiveData current values
+  - `/prefs` — dump SharedPreferences
+  - `/toggle` — toggle pref + fire layer handler (reuses handleDebugIntent pattern)
+  - `/search` — trigger POI search at lat/lon
+  - `/refresh` — force refresh any layer
+  - `/follow` — follow aircraft by icao or vehicle by type+index
+  - `/stop-follow` — stop following
+  - `/perf` — Runtime memory, thread count, uptime
+  - `/overlays` — map overlay list with types and counts
+
+#### Modified: `MainActivity.kt`
+- Added imports: `DebugEndpoints`, `DebugHttpServer`
+- `onCreate()`: `DebugHttpServer.start()` after `TcpLogStreamer.start()`
+- `onResume()`: `DebugHttpServer.endpoints = DebugEndpoints(this, viewModel)`
+- `onPause()`: `DebugHttpServer.endpoints = null`
+- New `internal` accessor methods:
+  - `debugMapView()` — returns binding.mapView
+  - `debugState()` — snapshot map of center, zoom, bounds, all marker counts, follow IDs, overlay count
+  - `debugMarkers(type)` — serializable list of marker info (type/index/lat/lon/title/snippet)
+  - `debugRawMarkers(type)` — raw Marker objects for tap
+  - `debugTapMarker(marker)` — synthetic MotionEvent at projected screen position → `onSingleTapConfirmed`
+  - `debugTogglePref(pref, value)` — sets pref + invokes menuEventListenerImpl handler
+  - `debugRefreshLayer(layer)` — dispatches to ViewModel fetch or local load method
+  - `debugFollowAircraft(icao)` — finds marker or starts icao24 tracking
+  - `debugFollowVehicleByIndex(type, index)` — taps marker at index
+  - `debugStopFollow()` — delegates to `stopFollowing()`
+
+### Build Issues & Fixes
+1. `onMarkerClickDefault` is `protected` in osmdroid `Marker` — switched to synthetic `MotionEvent` + `onSingleTapConfirmed`
+2. Drawing cache deprecation warnings — suppressed with `@Suppress("DEPRECATION")`
+3. `runOnMain` catch block was re-calling `block()` — fixed to `resumeWithException(e)`
+
+### Version
+- v1.5.18
+
+---
+
 ## Session: 2026-02-28p (MBTA Train Station Markers with Arrivals & Schedules)
 
 ### Context

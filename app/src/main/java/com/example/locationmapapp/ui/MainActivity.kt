@@ -28,6 +28,8 @@ import com.example.locationmapapp.databinding.ActivityMainBinding
 import com.example.locationmapapp.ui.menu.AppBarMenuManager
 import com.example.locationmapapp.ui.menu.MenuEventListener
 import com.example.locationmapapp.ui.radar.RadarRefreshScheduler
+import com.example.locationmapapp.util.DebugEndpoints
+import com.example.locationmapapp.util.DebugHttpServer
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.TcpLogStreamer
 import dagger.hilt.android.AndroidEntryPoint
@@ -172,6 +174,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         DebugLogger.i("MainActivity", "onCreate() start — device=${android.os.Build.MODEL} SDK=${android.os.Build.VERSION.SDK_INT}")
         TcpLogStreamer.start()
+        DebugHttpServer.start()
 
         Configuration.getInstance().apply {
             load(applicationContext, PreferenceManager.getDefaultSharedPreferences(applicationContext))
@@ -203,6 +206,11 @@ class MainActivity : AppCompatActivity() {
         buildFabSpeedDial()
         observeViewModel()
         requestLocationPermission()
+        // Post debug intent to next frame so it runs after onStart() restore
+        if (intent?.extras?.let { it.containsKey("lat") || it.containsKey("zoom") ||
+                    it.containsKey("enable") || it.containsKey("disable") } == true) {
+            binding.mapView.post { handleDebugIntent(intent) }
+        }
         DebugLogger.i("MainActivity", "onCreate() complete")
     }
 
@@ -295,8 +303,106 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop()   { super.onStop();   radarScheduler.stop(); DebugLogger.i("MainActivity","onStop()") }
-    override fun onResume() { super.onResume(); binding.mapView.onResume(); DebugLogger.i("MainActivity","onResume()") }
-    override fun onPause()  { super.onPause();  binding.mapView.onPause();  DebugLogger.i("MainActivity","onPause()") }
+    override fun onResume() {
+        super.onResume(); binding.mapView.onResume()
+        DebugHttpServer.endpoints = DebugEndpoints(this, viewModel)
+        DebugLogger.i("MainActivity","onResume()")
+    }
+    override fun onPause() {
+        super.onPause(); binding.mapView.onPause()
+        DebugHttpServer.endpoints = null
+        DebugLogger.i("MainActivity","onPause()")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDebugIntent(intent)
+    }
+
+    /**
+     * Debug intent handler — drive the app from adb for testing.
+     *
+     * Usage:
+     *   adb shell am start -n com.example.locationmapapp/.ui.MainActivity \
+     *     --ef lat 42.3601 --ef lon -71.0589 --ei zoom 15 \
+     *     --es enable "mbta_stations_on,radar_on" \
+     *     --es disable "webcams_on,aircraft_display_on"
+     *
+     * Extras:
+     *   lat/lon  (float)  — center map at these coordinates
+     *   zoom     (int)    — set zoom level (1–20)
+     *   enable   (string) — comma-separated pref keys to turn ON
+     *   disable  (string) — comma-separated pref keys to turn OFF
+     *
+     * Pref keys: mbta_stations_on, mbta_trains_on, mbta_subway_on, mbta_buses_on,
+     *   radar_on, metar_display_on, aircraft_display_on, webcams_on,
+     *   weather_alerts_on, national_alerts_on
+     */
+    private fun handleDebugIntent(intent: Intent?) {
+        if (intent == null) return
+        val extras = intent.extras ?: return
+        val hasDebug = extras.containsKey("lat") || extras.containsKey("zoom") ||
+                extras.containsKey("enable") || extras.containsKey("disable")
+        if (!hasDebug) return
+
+        DebugLogger.i("MainActivity", "handleDebugIntent — processing debug extras")
+
+        // ── Map position ──
+        if (extras.containsKey("lat") && extras.containsKey("lon")) {
+            val lat = extras.getFloat("lat").toDouble()
+            val lon = extras.getFloat("lon").toDouble()
+            val point = GeoPoint(lat, lon)
+            binding.mapView.controller.animateTo(point)
+            initialCenterDone = true  // suppress GPS auto-center
+            DebugLogger.i("MainActivity", "Debug: center map at $lat, $lon")
+        }
+        if (extras.containsKey("zoom")) {
+            val zoom = extras.getInt("zoom").toDouble().coerceIn(1.0, 20.0)
+            binding.mapView.controller.setZoom(zoom)
+            updateZoomBubble()
+            DebugLogger.i("MainActivity", "Debug: zoom=$zoom")
+        }
+
+        // ── Layer toggles ──
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        val toggleMap = mapOf<String, (Boolean) -> Unit>(
+            AppBarMenuManager.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
+            AppBarMenuManager.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
+            AppBarMenuManager.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
+            AppBarMenuManager.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
+            AppBarMenuManager.PREF_RADAR_ON         to { menuEventListenerImpl.onRadarToggled(it) },
+            AppBarMenuManager.PREF_METAR_DISPLAY    to { menuEventListenerImpl.onMetarDisplayToggled(it) },
+            AppBarMenuManager.PREF_AIRCRAFT_DISPLAY to { menuEventListenerImpl.onAircraftDisplayToggled(it) },
+            AppBarMenuManager.PREF_WEBCAMS_ON       to { menuEventListenerImpl.onWebcamToggled(it) },
+            AppBarMenuManager.PREF_WEATHER_ALERTS   to { menuEventListenerImpl.onWeatherAlertsToggled(it) },
+            AppBarMenuManager.PREF_NAT_ALERTS       to { menuEventListenerImpl.onNationalAlertsToggled(it) },
+        )
+
+        extras.getString("enable")?.split(",")?.map { it.trim() }?.forEach { key ->
+            val handler = toggleMap[key]
+            if (handler != null) {
+                prefs.edit().putBoolean(key, true).apply()
+                handler(true)
+                DebugLogger.i("MainActivity", "Debug: enabled $key")
+            } else {
+                DebugLogger.w("MainActivity", "Debug: unknown pref key '$key'")
+            }
+        }
+        extras.getString("disable")?.split(",")?.map { it.trim() }?.forEach { key ->
+            val handler = toggleMap[key]
+            if (handler != null) {
+                prefs.edit().putBoolean(key, false).apply()
+                handler(false)
+                DebugLogger.i("MainActivity", "Debug: disabled $key")
+            } else {
+                DebugLogger.w("MainActivity", "Debug: unknown pref key '$key'")
+            }
+        }
+
+        // Clear the extras so they don't re-fire on configuration change
+        intent.replaceExtras(Bundle())
+    }
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
         val map = binding.mapView
@@ -660,6 +766,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.metars.observe(this) { metars ->
             DebugLogger.i("MainActivity", "metars → ${metars.size} stations")
             clearMetarMarkers(); metars.forEach { addMetarMarker(it) }
+            bringStationMarkersToFront()
         }
         viewModel.weatherAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "weatherAlerts → ${alerts.size} alerts")
@@ -673,6 +780,7 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "webcams → ${webcams.size} on map")
             clearWebcamMarkers()
             webcams.forEach { addWebcamMarker(it) }
+            bringStationMarkersToFront()
         }
         viewModel.error.observe(this) { msg ->
             DebugLogger.e("MainActivity", "VM error: $msg")
@@ -1258,7 +1366,17 @@ class MainActivity : AppCompatActivity() {
     private fun replaceAllPoiMarkers(places: List<com.example.locationmapapp.data.model.PlaceResult>) {
         clearAllPoiMarkers()
         places.forEach { addPoiMarker("bbox", it) }
+        // Re-add station markers so they stay on top and receive taps first
+        bringStationMarkersToFront()
         binding.mapView.invalidate()
+    }
+
+    /** Move station markers to the end of the overlay list so they draw on top and get taps first. */
+    private fun bringStationMarkersToFront() {
+        if (stationMarkers.isEmpty()) return
+        val overlays = binding.mapView.overlays
+        stationMarkers.forEach { overlays.remove(it) }
+        overlays.addAll(stationMarkers)
     }
 
     // =========================================================================
@@ -1637,7 +1755,7 @@ class MainActivity : AppCompatActivity() {
         routeId == "Orange"                       -> Color.parseColor("#E65100")
         routeId == "Blue"                         -> Color.parseColor("#1565C0")
         routeId.startsWith("Green")               -> Color.parseColor("#2E7D32")
-        routeId.startsWith("CR-")                 -> Color.parseColor("#6A1B9A")
+        routeId == "CR" || routeId.startsWith("CR-") -> Color.parseColor("#6A1B9A")
         routeId == "Silver"                       -> Color.parseColor("#546E7A")
         else                                      -> Color.parseColor("#37474F")
     }
@@ -1649,7 +1767,7 @@ class MainActivity : AppCompatActivity() {
         routeId == "Blue"                         -> "BL"
         routeId == "Mattapan"                     -> "M"
         routeId.startsWith("Green-")              -> "GL-${routeId.removePrefix("Green-")}"
-        routeId.startsWith("CR-")                 -> "CR"
+        routeId == "CR" || routeId.startsWith("CR-") -> "CR"
         routeId == "Silver"                       -> "SL"
         else                                      -> routeId.take(4)
     }
@@ -1716,9 +1834,10 @@ class MainActivity : AppCompatActivity() {
             addView(closeBtn)
         }
 
-        // ── Subtitle: lines served ──
+        // ── Subtitle: lines served (updated once predictions arrive) ──
         val linesText = TextView(this).apply {
-            text = "Lines: " + stop.routeIds.joinToString(", ") { routeAbbrev(it) }
+            val staticLines = stop.routeIds.joinToString(", ") { routeAbbrev(it) }
+            text = if (staticLines.isNotEmpty()) "Lines: $staticLines" else "Lines: loading…"
             textSize = 13f
             setTextColor(Color.parseColor("#AAAAAA"))
             setPadding(dp(16), 0, dp(16), dp(8))
@@ -1789,6 +1908,11 @@ class MainActivity : AppCompatActivity() {
                 val predictions = viewModel.fetchPredictionsDirectly(stop.id)
                 if (!dialog.isShowing) return@launch
                 listContainer.removeAllViews()
+                // Update lines subtitle from actual prediction data
+                val linesList = predictions.map { it.routeId }.distinct()
+                    .joinToString(", ") { routeAbbrev(it) }
+                if (linesList.isNotEmpty()) linesText.text = "Lines: $linesList"
+
                 if (predictions.isEmpty()) {
                     listContainer.addView(TextView(this@MainActivity).apply {
                         text = "No upcoming arrivals"
@@ -3020,4 +3144,186 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    // =========================================================================
+    // DEBUG HTTP SERVER — accessor methods
+    // =========================================================================
+
+    /** Returns the map view for direct control from DebugEndpoints. */
+    internal fun debugMapView() = binding.mapView
+
+    /** Returns a snapshot of current app state for /state and /map endpoints. */
+    internal fun debugState(): Map<String, Any?> {
+        val map = binding.mapView
+        val bb = map.boundingBox
+        return mapOf(
+            "center" to mapOf("lat" to map.mapCenter.latitude, "lon" to map.mapCenter.longitude),
+            "zoom" to map.zoomLevelDouble,
+            "bounds" to mapOf(
+                "north" to bb.latNorth, "south" to bb.latSouth,
+                "east" to bb.lonEast, "west" to bb.lonWest
+            ),
+            "markers" to mapOf(
+                "poi" to poiMarkers.values.sumOf { it.size },
+                "stations" to stationMarkers.size,
+                "trains" to trainMarkers.size,
+                "subway" to subwayMarkers.size,
+                "buses" to busMarkers.size,
+                "aircraft" to aircraftMarkers.size,
+                "webcams" to webcamMarkers.size,
+                "metar" to metarMarkers.size,
+                "gps" to if (gpsMarker != null) 1 else 0
+            ),
+            "followedVehicle" to followedVehicleId,
+            "followedAircraft" to followedAircraftIcao,
+            "overlays" to map.overlays.size
+        )
+    }
+
+    /** Returns serializable marker info for /markers endpoint. */
+    internal fun debugMarkers(type: String?): List<Map<String, Any?>> {
+        val result = mutableListOf<Map<String, Any?>>()
+        fun add(markers: List<Marker>, markerType: String) {
+            markers.forEachIndexed { i, m ->
+                result.add(mapOf(
+                    "type" to markerType,
+                    "index" to i,
+                    "lat" to m.position.latitude,
+                    "lon" to m.position.longitude,
+                    "title" to (m.title ?: ""),
+                    "snippet" to (m.snippet ?: "")
+                ))
+            }
+        }
+        when (type) {
+            "poi"      -> poiMarkers.values.flatten().let { add(it, "poi") }
+            "stations" -> add(stationMarkers, "stations")
+            "trains"   -> add(trainMarkers, "trains")
+            "subway"   -> add(subwayMarkers, "subway")
+            "buses"    -> add(busMarkers, "buses")
+            "aircraft" -> add(aircraftMarkers, "aircraft")
+            "webcams"  -> add(webcamMarkers, "webcams")
+            "metar"    -> add(metarMarkers, "metar")
+            "gps"      -> gpsMarker?.let { add(listOf(it), "gps") }
+            null -> {
+                poiMarkers.values.flatten().let { add(it, "poi") }
+                add(stationMarkers, "stations")
+                add(trainMarkers, "trains")
+                add(subwayMarkers, "subway")
+                add(busMarkers, "buses")
+                add(aircraftMarkers, "aircraft")
+                add(webcamMarkers, "webcams")
+                add(metarMarkers, "metar")
+                gpsMarker?.let { add(listOf(it), "gps") }
+            }
+            else -> {} // unknown type — empty list
+        }
+        return result
+    }
+
+    /** Triggers the click handler on a marker, as if the user tapped it. */
+    internal fun debugTapMarker(marker: Marker) {
+        // Create a synthetic MotionEvent at the marker's screen position
+        val proj = binding.mapView.projection
+        val pt = proj.toPixels(marker.position, null)
+        val event = android.view.MotionEvent.obtain(
+            android.os.SystemClock.uptimeMillis(),
+            android.os.SystemClock.uptimeMillis(),
+            android.view.MotionEvent.ACTION_DOWN,
+            pt.x.toFloat(), pt.y.toFloat(), 0
+        )
+        marker.onSingleTapConfirmed(event, binding.mapView)
+        event.recycle()
+    }
+
+    /** Returns raw Marker objects for /markers/tap endpoint. */
+    internal fun debugRawMarkers(type: String): List<Marker> {
+        return when (type) {
+            "poi"      -> poiMarkers.values.flatten()
+            "stations" -> stationMarkers
+            "trains"   -> trainMarkers
+            "subway"   -> subwayMarkers
+            "buses"    -> busMarkers
+            "aircraft" -> aircraftMarkers
+            "webcams"  -> webcamMarkers
+            "metar"    -> metarMarkers
+            "gps"      -> listOfNotNull(gpsMarker)
+            else       -> emptyList()
+        }
+    }
+
+    /** Toggle a preference and fire the corresponding layer handler. */
+    internal fun debugTogglePref(pref: String, value: Boolean) {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        prefs.edit().putBoolean(pref, value).apply()
+        val toggleMap = mapOf<String, (Boolean) -> Unit>(
+            AppBarMenuManager.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
+            AppBarMenuManager.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
+            AppBarMenuManager.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
+            AppBarMenuManager.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
+            AppBarMenuManager.PREF_RADAR_ON         to { menuEventListenerImpl.onRadarToggled(it) },
+            AppBarMenuManager.PREF_METAR_DISPLAY    to { menuEventListenerImpl.onMetarDisplayToggled(it) },
+            AppBarMenuManager.PREF_AIRCRAFT_DISPLAY to { menuEventListenerImpl.onAircraftDisplayToggled(it) },
+            AppBarMenuManager.PREF_WEBCAMS_ON       to { menuEventListenerImpl.onWebcamToggled(it) },
+            AppBarMenuManager.PREF_WEATHER_ALERTS   to { menuEventListenerImpl.onWeatherAlertsToggled(it) },
+            AppBarMenuManager.PREF_NAT_ALERTS       to { menuEventListenerImpl.onNationalAlertsToggled(it) },
+        )
+        toggleMap[pref]?.invoke(value)
+            ?: DebugLogger.w("DebugHttp", "debugTogglePref: unknown pref '$pref'")
+    }
+
+    /** Force refresh a specific data layer. */
+    internal fun debugRefreshLayer(layer: String) {
+        when (layer) {
+            "trains"   -> viewModel.fetchMbtaTrains()
+            "subway"   -> viewModel.fetchMbtaSubway()
+            "buses"    -> viewModel.fetchMbtaBuses()
+            "stations" -> viewModel.fetchMbtaStations()
+            "aircraft" -> loadAircraftForVisibleArea()
+            "metar"    -> loadMetarsForVisibleArea()
+            "webcams"  -> loadWebcamsForVisibleArea()
+            "pois"     -> loadCachedPoisForVisibleArea()
+            "radar"    -> viewModel.refreshRadar()
+            else -> DebugLogger.w("DebugHttp", "debugRefreshLayer: unknown layer '$layer'")
+        }
+    }
+
+    /** Follow an aircraft by icao24. */
+    internal fun debugFollowAircraft(icao24: String) {
+        // Find in current aircraft list, or create a minimal state to start tracking
+        val state = aircraftMarkers.firstOrNull { (it.snippet ?: "").contains(icao24, ignoreCase = true) }
+        if (state != null) {
+            // Tap the marker to use normal flow
+            debugTapMarker(state)
+        } else {
+            // Start following even without a marker — the refresh loop will pick it up
+            followedVehicleId = null
+            followedAircraftIcao = icao24
+            followedAircraftFailCount = 0
+            viewModel.loadFollowedAircraft(icao24)
+            startFollowedAircraftRefresh(icao24)
+        }
+    }
+
+    /** Follow a vehicle by type and marker index. */
+    internal fun debugFollowVehicleByIndex(type: String, index: Int): Map<String, Any?> {
+        val markers = debugRawMarkers(type)
+        if (index < 0 || index >= markers.size) {
+            return mapOf("error" to "Index $index out of range (0..${markers.size - 1})")
+        }
+        val marker = markers[index]
+        debugTapMarker(marker)
+        return mapOf(
+            "status" to "ok",
+            "following" to type,
+            "index" to index,
+            "title" to (marker.title ?: ""),
+            "position" to mapOf("lat" to marker.position.latitude, "lon" to marker.position.longitude)
+        )
+    }
+
+    /** Stop following any vehicle or aircraft. */
+    internal fun debugStopFollow() {
+        stopFollowing()
+    }
 }

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 16 (MBTA Train Station Markers with Arrivals & Schedules)
+## Last Updated: 2026-02-28 Session 17 (Debug HTTP Server — Embedded in App)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -115,6 +115,14 @@
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging + TCP log streamer
+- **Embedded debug HTTP server** (v1.5.18) — programmatic app control via `adb forward` + `curl`
+  - Port 8085, raw `ServerSocket` on `Dispatchers.IO`, minimal HTTP/1.0 parser, JSON via Gson
+  - 19 endpoints: state, logs, map control, marker listing/search/tap/nearest, screenshot, livedata, prefs, toggle, search, refresh, follow, stop-follow, perf, overlays
+  - `DebugHttpServer.kt` (singleton accept loop) + `DebugEndpoints.kt` (all handlers)
+  - `runOnMain` helper for UI-thread access via `suspendCancellableCoroutine`
+  - Marker tap via synthetic MotionEvent at projected screen position
+  - Lifecycle-aware: endpoints registered in `onResume`, nulled in `onPause`
+  - Usage: `adb forward tcp:8085 tcp:8085 && curl localhost:8085/state | jq .`
 
 ## External API Routing
 | API | App Endpoint | Proxy Route | TTL |
@@ -159,6 +167,8 @@
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
 - `cache-proxy/poi-cache.json` — individual POI cache, deduped by type+id (gitignored)
 - `cache-proxy/schema.sql` — PostgreSQL schema for permanent POI storage
+- `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
+- `app/src/main/java/.../util/DebugEndpoints.kt` — all debug endpoint handlers
 - `cache-proxy/import-pois.js` — standalone script to import POIs from proxy into PostgreSQL
 
 ## PostgreSQL Database
@@ -226,7 +236,33 @@
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
+## Debug HTTP Server (v1.5.18)
+| Endpoint | Description |
+|---|---|
+| `GET /` | List all endpoints |
+| `GET /state` | Map center, zoom, bounds, marker counts, follow state |
+| `GET /logs?tail=N&filter=X&level=E` | Debug log entries (filtered, tailed) |
+| `GET /logs/clear` | Clear log buffer |
+| `GET /map?lat=X&lon=Y&zoom=Z` | Set/read map position (animates) |
+| `GET /markers?type=X&limit=N` | List markers by type |
+| `GET /markers/tap?type=X&index=N` | Trigger marker click handler |
+| `GET /markers/nearest?lat=X&lon=Y&type=X` | Find nearest marker(s) |
+| `GET /markers/search?q=X&type=X` | Search markers by title/snippet |
+| `GET /screenshot` | PNG of root view |
+| `GET /livedata` | All ViewModel LiveData values |
+| `GET /prefs` | Dump SharedPreferences |
+| `GET /toggle?pref=X&value=true` | Toggle layer pref + fire handler |
+| `GET /search?lat=X&lon=Y` | Trigger POI search at point |
+| `GET /refresh?layer=X` | Force refresh a layer |
+| `GET /follow?type=aircraft&icao=X` | Follow aircraft/vehicle |
+| `GET /stop-follow` | Stop following |
+| `GET /perf` | Memory, threads, uptime |
+| `GET /overlays` | List all map overlays |
+
+Marker types: `poi`, `stations`, `trains`, `subway`, `buses`, `aircraft`, `webcams`, `metar`, `gps`
+
 ## Next Steps
+- **Test debug HTTP server** — `adb forward tcp:8085 tcp:8085`, verify all endpoints
 - **Test station markers** — toggle on, verify ~270 stations appear, tap one, verify arrival board, tap train row, verify schedule
 - **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads

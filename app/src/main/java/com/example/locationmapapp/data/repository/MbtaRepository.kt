@@ -66,38 +66,44 @@ class MbtaRepository @Inject constructor() {
 
     // ── Stations ──────────────────────────────────────────────────────────────
 
-    /** Subway routes to query (location_type=1 = parent station) */
-    private val SUBWAY_ROUTES = "Red,Orange,Blue,Green-B,Green-C,Green-D,Green-E,Mattapan"
+    /** Subway routes to query individually for route→stop mapping */
+    private val SUBWAY_ROUTES_LIST = listOf(
+        "Red", "Orange", "Blue", "Green-B", "Green-C", "Green-D", "Green-E", "Mattapan"
+    )
 
     /**
      * Fetch all subway + commuter rail stations.
-     * Two API calls: one for subway lines, one for CR (route_type=2).
-     * Merges by stop ID so multi-line stations combine their routeIds.
+     * Subway: query each route separately so we know which routes serve each stop
+     *   (the MBTA API returns null route relationships on parent station objects).
+     * CR: filter by route_type=2 (returns platforms grouped by parent_station).
+     * Merges by ID so shared stations (South Station, etc.) combine routeIds.
      */
     suspend fun fetchStations(): List<MbtaStop> = withContext(Dispatchers.IO) {
         val mergedStops = mutableMapOf<String, MbtaStop>()
 
-        // 1) Subway stops (filter by explicit route names)
-        val subwayUrl = "$BASE_URL/stops" +
-                "?filter%5Broute%5D=$SUBWAY_ROUTES" +
-                "&filter%5Blocation_type%5D=1" +
-                "&include=route" +
-                "&api_key=$API_KEY"
-        val subwayJson = executeGet(subwayUrl, "subway stops")
-        parseStops(subwayJson).forEach { stop ->
-            mergedStops.merge(stop.id, stop) { existing, new ->
-                existing.copy(routeIds = (existing.routeIds + new.routeIds).distinct())
+        // 1) Subway stops — query per route to tag each stop with its route ID
+        for (route in SUBWAY_ROUTES_LIST) {
+            val url = "$BASE_URL/stops" +
+                    "?filter%5Broute%5D=$route" +
+                    "&filter%5Blocation_type%5D=1" +
+                    "&api_key=$API_KEY"
+            val json = executeGet(url, "stops route=$route")
+            parseStopsWithRoute(json, route).forEach { stop ->
+                mergedStops.merge(stop.id, stop) { existing, new ->
+                    existing.copy(routeIds = (existing.routeIds + new.routeIds).distinct())
+                }
             }
         }
+        DebugLogger.i(TAG, "Subway: ${mergedStops.size} parent stations")
 
-        // 2) Commuter Rail stops (route_type=2)
+        // 2) Commuter Rail stops (type=0 platforms — no route relationships)
+        //    Group by parent_station ID so we get 143 unique stations instead of 227 platforms.
+        //    Parent IDs are "place-xxx" format, same as subway — shared stations merge by ID.
         val crUrl = "$BASE_URL/stops" +
                 "?filter%5Broute_type%5D=2" +
-                "&filter%5Blocation_type%5D=1" +
-                "&include=route" +
                 "&api_key=$API_KEY"
         val crJson = executeGet(crUrl, "CR stops")
-        parseStops(crJson).forEach { stop ->
+        parseCrStops(crJson).forEach { stop ->
             mergedStops.merge(stop.id, stop) { existing, new ->
                 existing.copy(routeIds = (existing.routeIds + new.routeIds).distinct())
             }
@@ -271,19 +277,10 @@ class MbtaRepository @Inject constructor() {
 
     // ── Station parsers ─────────────────────────────────────────────────────
 
-    private fun parseStops(json: String): List<MbtaStop> {
+    /** Parse stops JSON and tag each with the known route ID (since the API doesn't provide it). */
+    private fun parseStopsWithRoute(json: String, routeId: String): List<MbtaStop> {
         val root = JsonParser.parseString(json).asJsonObject
         val dataArray = root.getAsJsonArray("data") ?: return emptyList()
-
-        // Build route name lookup from included
-        val routeNames = mutableMapOf<String, String>()
-        root.getAsJsonArray("included")?.forEach { element ->
-            val obj = element.asJsonObject
-            if (obj.get("type")?.asString == "route") {
-                val id = obj.get("id")?.asString ?: return@forEach
-                routeNames[id] = id  // use route ID as-is (Red, Orange, CR-Worcester...)
-            }
-        }
 
         val stops = mutableListOf<MbtaStop>()
         dataArray.forEach { element ->
@@ -295,27 +292,52 @@ class MbtaRepository @Inject constructor() {
                 val lon = attrs.get("longitude")?.takeIf { !it.isJsonNull }?.asDouble ?: return@forEach
                 val name = attrs.get("name")?.asString ?: id
 
-                // Extract route IDs from relationships
-                val routeIds = mutableListOf<String>()
-                obj.getAsJsonObject("relationships")
-                    ?.getAsJsonObject("route")
-                    ?.get("data")?.let { data ->
-                        if (data.isJsonArray) {
-                            data.asJsonArray.forEach { r ->
-                                r.asJsonObject.get("id")?.asString?.let { routeIds.add(it) }
-                            }
-                        } else if (data.isJsonObject) {
-                            data.asJsonObject.get("id")?.asString?.let { routeIds.add(it) }
-                        }
-                    }
-
-                stops.add(MbtaStop(id = id, name = name, lat = lat, lon = lon, routeIds = routeIds))
+                stops.add(MbtaStop(id = id, name = name, lat = lat, lon = lon, routeIds = listOf(routeId)))
             } catch (e: Exception) {
                 DebugLogger.w(TAG, "Failed to parse stop: ${e.message}")
             }
         }
-        DebugLogger.i(TAG, "Parsed ${stops.size} stops")
         return stops
+    }
+
+    /**
+     * Parse CR stops (location_type=0 platforms) and group by parent_station ID.
+     * CR stops don't have route relationships, so we tag them all with "CR".
+     * Uses parent_station "place-xxx" ID as the stop ID so shared stations
+     * (South Station, Back Bay, etc.) automatically merge with subway entries.
+     */
+    private fun parseCrStops(json: String): List<MbtaStop> {
+        val root = JsonParser.parseString(json).asJsonObject
+        val dataArray = root.getAsJsonArray("data") ?: return emptyList()
+
+        // Group platforms by parent station — use first platform's coords per parent
+        val parentStops = mutableMapOf<String, MbtaStop>()
+        dataArray.forEach { element ->
+            try {
+                val obj = element.asJsonObject
+                val attrs = obj.getAsJsonObject("attributes") ?: return@forEach
+                val lat = attrs.get("latitude")?.takeIf { !it.isJsonNull }?.asDouble ?: return@forEach
+                val lon = attrs.get("longitude")?.takeIf { !it.isJsonNull }?.asDouble ?: return@forEach
+                val name = attrs.get("name")?.asString ?: return@forEach
+
+                // Use parent_station ID as our stop ID (matches subway "place-xxx" format)
+                val parentId = obj.getAsJsonObject("relationships")
+                    ?.getAsJsonObject("parent_station")
+                    ?.get("data")?.takeIf { !it.isJsonNull }?.asJsonObject
+                    ?.get("id")?.asString ?: return@forEach
+
+                if (parentId !in parentStops) {
+                    parentStops[parentId] = MbtaStop(
+                        id = parentId, name = name, lat = lat, lon = lon,
+                        routeIds = listOf("CR")
+                    )
+                }
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "Failed to parse CR stop: ${e.message}")
+            }
+        }
+        DebugLogger.i(TAG, "Parsed ${parentStops.size} CR parent stations from ${dataArray.size()} platforms")
+        return parentStops.values.toList()
     }
 
     private fun parsePredictions(json: String): List<MbtaPrediction> {

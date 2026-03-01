@@ -1,5 +1,43 @@
 # LocationMapApp — Changelog
 
+## [1.5.18] — 2026-02-28
+
+### Added
+- **Embedded debug HTTP server** — programmatic app control via `adb forward` + `curl`
+  - `DebugHttpServer.kt` — singleton `ServerSocket` accept loop on `Dispatchers.IO`, port 8085
+  - `DebugEndpoints.kt` — all endpoint handlers with `runOnMain` helper for UI-thread access
+  - Minimal HTTP/1.0 parser, JSON responses via Gson, `Connection: close`
+  - Lifecycle-aware: endpoints registered in `onResume`, nulled in `onPause`
+- **19 debug endpoints**:
+  - `GET /` — list all endpoints
+  - `GET /state` — map center, zoom, viewport bounds, marker counts, follow state
+  - `GET /logs?tail=N&filter=X&level=E` — debug log entries with filtering
+  - `GET /logs/clear` — clear log buffer
+  - `GET /map?lat=X&lon=Y&zoom=Z` — set/read map position (animates)
+  - `GET /markers?type=X&limit=N` — list markers by type with position/title/snippet
+  - `GET /markers/tap?type=X&index=N` — trigger marker click handler via synthetic MotionEvent
+  - `GET /markers/nearest?lat=X&lon=Y&type=X` — find nearest marker(s) by distance
+  - `GET /markers/search?q=X&type=X` — search markers by title/snippet text
+  - `GET /screenshot` — returns PNG of root view
+  - `GET /livedata` — current values of all ViewModel LiveData
+  - `GET /prefs` — dump SharedPreferences
+  - `GET /toggle?pref=X&value=true|false` — toggle any layer preference + fire handler
+  - `GET /search?lat=X&lon=Y` — trigger POI search at a point
+  - `GET /refresh?layer=X` — force refresh a layer (trains, subway, buses, stations, aircraft, metar, webcams, pois, radar)
+  - `GET /follow?type=aircraft&icao=X` — follow an aircraft by ICAO24
+  - `GET /follow?type=trains&index=N` — follow a vehicle by marker index
+  - `GET /stop-follow` — stop following any vehicle or aircraft
+  - `GET /perf` — performance stats (memory, threads, uptime)
+  - `GET /overlays` — list all map overlays with types and counts
+- **`debugState()`** internal method on MainActivity — returns snapshot of marker counts, map state, follow state
+- **`debugMarkers(type)`** — returns serializable marker info for any marker type
+- **`debugRawMarkers(type)`** — returns raw Marker objects for tap simulation
+- **`debugTapMarker(marker)`** — triggers click via synthetic MotionEvent at projected screen position
+- **`debugTogglePref(pref, value)`** — toggles pref and fires the corresponding layer handler
+- **`debugRefreshLayer(layer)`** — force refreshes any data layer
+- **`debugFollowAircraft(icao)`** / **`debugFollowVehicleByIndex(type, index)`** — programmatic follow
+- **`debugStopFollow()`** — stop following
+
 ## [1.5.17] — 2026-02-28
 
 ### Added
