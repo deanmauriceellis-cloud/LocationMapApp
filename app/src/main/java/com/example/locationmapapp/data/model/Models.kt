@@ -123,6 +123,16 @@ data class Webcam(
     fun toGeoPoint() = GeoPoint(lat, lon)
 }
 
+// ── Cap detection (automatic subdivision) ────────────────────────────────────
+
+data class CapEvent(
+    val center: GeoPoint,
+    val radiusM: Int,
+    val rawCount: Int,
+    val parsedCount: Int,
+    val categories: List<String>
+)
+
 // ── Populate POIs scanner ────────────────────────────────────────────────────
 
 data class PopulateSearchResult(

@@ -141,7 +141,7 @@ let savePending = false;
 const RADIUS_HINTS_FILE = path.join(__dirname, 'radius-hints.json');
 const radiusHints = new Map();   // "LAT3:LON3" → { radius, updatedAt }
 const DEFAULT_RADIUS = 3000;
-const MIN_RADIUS = 500;
+const MIN_RADIUS = 250;
 const MAX_RADIUS = 15000;
 const RADIUS_SHRINK = 0.70;
 const RADIUS_GROW   = 1.30;
@@ -215,12 +215,15 @@ function getRadiusHint(lat, lon) {
   return DEFAULT_RADIUS;
 }
 
-function adjustRadiusHint(lat, lon, resultCount, error) {
+function adjustRadiusHint(lat, lon, resultCount, error, capped) {
   const key = gridKey(lat, lon);
   const current = radiusHints.get(key);
   let radius = current ? current.radius : DEFAULT_RADIUS;
 
-  if (error) {
+  if (capped) {
+    radius = Math.round(radius * 0.5);
+    console.log(`[Radius] ${key} CAPPED (${resultCount} POIs) → halve to ${radius}m`);
+  } else if (error) {
     radius = Math.round(radius * RADIUS_SHRINK);
   } else if (resultCount < MIN_USEFUL_POI) {
     radius = Math.round(radius * RADIUS_GROW);
@@ -228,12 +231,14 @@ function adjustRadiusHint(lat, lon, resultCount, error) {
 
   radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius));
 
-  if (error) {
-    console.log(`[Radius] ${key} error → shrink to ${radius}m`);
-  } else if (resultCount < MIN_USEFUL_POI) {
-    console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
-  } else {
-    console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
+  if (!capped) {
+    if (error) {
+      console.log(`[Radius] ${key} error → shrink to ${radius}m`);
+    } else if (resultCount < MIN_USEFUL_POI) {
+      console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
+    } else {
+      console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
+    }
   }
   radiusHints.set(key, { radius, updatedAt: Date.now() });
   saveRadiusHints();
@@ -739,11 +744,12 @@ app.get('/radius-hint', (req, res) => {
 });
 
 app.post('/radius-hint', (req, res) => {
-  const { lat, lon, resultCount, error } = req.body;
+  const { lat, lon, resultCount, error, capped } = req.body;
   if (!lat || !lon) return res.status(400).json({ error: 'lat and lon required' });
   const isError = !!error;
+  const isCapped = !!capped;
   const count = typeof resultCount === 'number' ? resultCount : 0;
-  const radius = adjustRadiusHint(lat, lon, count, isError);
+  const radius = adjustRadiusHint(lat, lon, count, isError, isCapped);
   res.json({ radius });
 });
 

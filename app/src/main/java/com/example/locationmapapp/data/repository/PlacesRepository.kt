@@ -1,10 +1,14 @@
 package com.example.locationmapapp.data.repository
 
+import com.example.locationmapapp.data.model.CapEvent
 import com.example.locationmapapp.data.model.PlaceResult
 import com.example.locationmapapp.data.model.PopulateSearchResult
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
@@ -29,6 +33,10 @@ class PlacesRepository @Inject constructor() {
 
     private val PROXY_BASE    = "http://10.0.0.4:3000"
     private val OVERPASS_URL  = "$PROXY_BASE/overpass"
+
+    /** Cap detection events — emitted when Overpass returns exactly the result limit */
+    private val _capEvents = MutableSharedFlow<CapEvent>(extraBufferCapacity = 8)
+    val capEvents: SharedFlow<CapEvent> = _capEvents.asSharedFlow()
 
     /** Session-level in-memory cache of radius hints keyed by "lat3:lon3" */
     private val radiusHintCache = ConcurrentHashMap<String, Int>()
@@ -93,10 +101,10 @@ class PlacesRepository @Inject constructor() {
     }
 
     /** Post search feedback to the proxy so it can adapt the radius for this grid cell. */
-    private fun postRadiusFeedback(center: GeoPoint, resultCount: Int, error: Boolean) {
+    private fun postRadiusFeedback(center: GeoPoint, resultCount: Int, error: Boolean, capped: Boolean = false) {
         try {
             val key = gridKey(center.latitude, center.longitude)
-            val json = """{"lat":${center.latitude},"lon":${center.longitude},"resultCount":$resultCount,"error":$error}"""
+            val json = """{"lat":${center.latitude},"lon":${center.longitude},"resultCount":$resultCount,"error":$error,"capped":$capped}"""
             val body = json.toRequestBody("application/json".toMediaType())
             val request = Request.Builder().url("$PROXY_BASE/radius-hint").post(body).build()
             val response = client.newCall(request).execute()
@@ -132,8 +140,15 @@ class PlacesRepository @Inject constructor() {
             }
             val bodyStr = response.body!!.string()
             DebugLogger.d(TAG, "Overpass response body length=${bodyStr.length} chars")
-            val (results, _) = parseOverpassJson(bodyStr)
-            postRadiusFeedback(center, results.size, error = false)
+            val (results, rawCount) = parseOverpassJson(bodyStr)
+            val capped = rawCount >= OVERPASS_RESULT_LIMIT
+            if (capped) {
+                DebugLogger.w(TAG, "CAPPED — raw=$rawCount, parsed=${results.size} at radius=${radiusM}m")
+                postRadiusFeedback(center, results.size, error = false, capped = true)
+                _capEvents.tryEmit(CapEvent(center, radiusM, rawCount, results.size, categories))
+            } else {
+                postRadiusFeedback(center, results.size, error = false)
+            }
             results
         }
 
@@ -260,9 +275,35 @@ class PlacesRepository @Inject constructor() {
             PopulateSearchResult(results, cacheHit, key, radiusM, capped)
         }
 
+    /** Subdivision search result — includes cap status for recursive subdivision decisions. */
+    data class SubdivisionResult(val poiCount: Int, val capped: Boolean)
+
+    /** Lightweight subdivision search — queries a sub-cell at given radius.
+     *  Results flow into the proxy cache automatically; returns count + cap status. */
+    suspend fun searchSubdivision(center: GeoPoint, categories: List<String>, radiusM: Int): SubdivisionResult =
+        withContext(Dispatchers.IO) {
+            val query = buildOverpassQuery(center, categories, radiusM)
+            DebugLogger.d(TAG, "Subdivision search at ${center.latitude},${center.longitude} radius=${radiusM}m")
+            val body = FormBody.Builder().add("data", query).build()
+            val request = Request.Builder().url(OVERPASS_URL).post(body).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                DebugLogger.w(TAG, "Subdivision search failed: HTTP ${response.code}")
+                return@withContext SubdivisionResult(0, false)
+            }
+            val bodyStr = response.body!!.string()
+            val (results, rawCount) = parseOverpassJson(bodyStr)
+            val capped = rawCount >= OVERPASS_RESULT_LIMIT
+            if (capped) {
+                DebugLogger.w(TAG, "Subdivision sub-cell capped (raw=$rawCount, parsed=${results.size}) at radius=${radiusM}m")
+            }
+            postRadiusFeedback(center, results.size, error = false, capped = capped)
+            SubdivisionResult(results.size, capped)
+        }
+
     companion object {
         const val DEFAULT_RADIUS_M = 3000
-        const val MIN_RADIUS_M     = 500
+        const val MIN_RADIUS_M     = 250
         const val MAX_RADIUS_M     = 15000
         const val MIN_USEFUL_POI_COUNT = 5
         const val OVERPASS_RESULT_LIMIT = 200

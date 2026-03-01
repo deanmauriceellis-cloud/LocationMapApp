@@ -334,6 +334,7 @@ class MainActivity : AppCompatActivity() {
                 DebugLogger.i("MainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
                 // Stop populate scanner if running — user is interacting with a new location
                 if (populateJob != null) stopPopulatePois()
+                viewModel.cancelSubdivision()
                 viewModel.setManualLocation(p)
                 binding.mapView.controller.animateTo(p)
                 triggerFullSearch(p)
@@ -654,6 +655,14 @@ class MainActivity : AppCompatActivity() {
                     loadCachedPoisForVisibleArea()
                 }
             }
+        }
+        viewModel.capDetected.observe(this) { event ->
+            DebugLogger.i("MainActivity", "Cap detected — raw=${event.rawCount} at radius=${event.radiusM}m — filling in POIs")
+            toast("Dense area — filling in POIs…")
+        }
+        viewModel.subdivisionComplete.observe(this) { _ ->
+            DebugLogger.i("MainActivity", "Subdivision complete — refreshing viewport")
+            loadCachedPoisForVisibleArea()
         }
         viewModel.metars.observe(this) { metars ->
             DebugLogger.i("MainActivity", "metars → ${metars.size} stations")
@@ -1923,6 +1932,7 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun startPopulatePois() {
+        viewModel.cancelSubdivision()
         // Guard: don't allow while following something
         if (followedVehicleId != null || followedAircraftIcao != null) {
             toast("Stop following first")
