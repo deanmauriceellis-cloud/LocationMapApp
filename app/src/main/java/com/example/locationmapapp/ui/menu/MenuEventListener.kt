@@ -152,6 +152,13 @@ interface MenuEventListener {
     fun onGpsModeToggled(autoGps: Boolean)
 
     // =========================================================================
+    // LEGEND
+    // =========================================================================
+
+    /** Open the map legend dialog showing all marker types and their meanings. */
+    fun onLegendRequested()
+
+    // =========================================================================
     // SAFETY NET
     // =========================================================================
 

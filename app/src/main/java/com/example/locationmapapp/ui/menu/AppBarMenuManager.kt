@@ -69,6 +69,7 @@ class AppBarMenuManager(
                 R.id.menu_top_radar      -> { showRadarMenu(toolbar);      true }
                 R.id.menu_top_poi        -> { showPoiMenu(toolbar);        true }
                 R.id.menu_top_utility    -> { showUtilityMenu(toolbar);    true }
+                R.id.menu_top_legend     -> { menuEventListener.onLegendRequested(); true }
                 else -> {
                     DebugLogger.w(TAG, "No sub-menu for id=0x${item.itemId.toString(16)}")
                     false

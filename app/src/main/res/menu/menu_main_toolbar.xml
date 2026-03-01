@@ -52,4 +52,9 @@
         android:title="Utility"
         app:showAsAction="always|withText" />
 
+    <item
+        android:id="@+id/menu_top_legend"
+        android:title="Legend"
+        app:showAsAction="always|withText" />
+
 </menu>
