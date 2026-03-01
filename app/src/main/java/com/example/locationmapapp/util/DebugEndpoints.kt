@@ -88,6 +88,30 @@ class DebugEndpoints(
         return EndpointResult(body = gson.toJson(mapOf("endpoints" to endpoints)))
     }
 
+    // ── Fuzzy search helper ─────────────────────────────────────────────────
+
+    /** Common abbreviation → expansion map for transit stop names. */
+    private val ABBREVIATIONS = mapOf(
+        "mass" to "massachusetts", "ave" to "avenue", "st" to "street",
+        "sq" to "square", "ctr" to "center", "ctr." to "center",
+        "dr" to "drive", "rd" to "road", "blvd" to "boulevard",
+        "hwy" to "highway", "pkwy" to "parkway", "pl" to "place",
+        "ln" to "lane", "ct" to "court", "mt" to "mount",
+        "jfk" to "kennedy", "govt" to "government"
+    )
+
+    /**
+     * Fuzzy name match: splits query into words, expands abbreviations,
+     * and checks that every word appears somewhere in the target (case-insensitive).
+     */
+    private fun fuzzyMatch(target: String, query: String): Boolean {
+        val tLower = target.lowercase()
+        return query.lowercase().split("\\s+".toRegex()).all { word ->
+            val expanded = ABBREVIATIONS[word]
+            tLower.contains(word) || (expanded != null && tLower.contains(expanded))
+        }
+    }
+
     // ── /state ──────────────────────────────────────────────────────────────
 
     private suspend fun handleState(): EndpointResult {
@@ -291,7 +315,7 @@ class DebugEndpoints(
         val matched = markers.filter { m ->
             val title = (m["title"] as? String) ?: ""
             val snippet = (m["snippet"] as? String) ?: ""
-            title.contains(query, ignoreCase = true) || snippet.contains(query, ignoreCase = true)
+            fuzzyMatch(title, query) || fuzzyMatch(snippet, query)
         }
         return EndpointResult(body = gson.toJson(mapOf(
             "query" to query,
@@ -357,7 +381,7 @@ class DebugEndpoints(
 
         var stations = runOnMain { activity.debugStations() }
         if (query != null) {
-            stations = stations.filter { it.name.contains(query, ignoreCase = true) }
+            stations = stations.filter { fuzzyMatch(it.name, query) }
         }
 
         val truncated = stations.take(limit)
@@ -384,7 +408,7 @@ class DebugEndpoints(
 
         var stops = runOnMain { activity.debugBusStops() }
         if (query != null) {
-            stops = stops.filter { it.name.contains(query, ignoreCase = true) }
+            stops = stops.filter { fuzzyMatch(it.name, query) }
         }
 
         val truncated = stops.take(limit)
