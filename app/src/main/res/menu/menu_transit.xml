@@ -46,6 +46,13 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <!-- MBTA Bus Stops -->
+    <item
+        android:id="@+id/menu_mbta_bus_stops"
+        android:title="Bus Stops"
+        android:checkable="true"
+        app:showAsAction="never" />
+
     <!-- National Emergency / Weather CAP Alerts -->
     <item
         android:id="@+id/menu_national_alerts"

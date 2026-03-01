@@ -452,5 +452,12 @@ object MarkerIconHelper {
         return get(context, R.drawable.ic_train_station, 26, tintColor)
     }
 
+    /**
+     * Bus stop icon: 20dp bus stop sign, smaller than 26dp station icons.
+     */
+    fun busStopIcon(context: Context, tintColor: Int): BitmapDrawable {
+        return get(context, R.drawable.ic_bus_stop, 20, tintColor)
+    }
+
     fun clearCache() = cache.clear()
 }

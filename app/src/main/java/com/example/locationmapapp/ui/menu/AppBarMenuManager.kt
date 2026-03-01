@@ -152,6 +152,9 @@ class AppBarMenuManager(
                 R.id.menu_mbta_stations ->
                     toggleBinary(item, PREF_MBTA_STATIONS) { menuEventListener.onMbtaStationsToggled(it) }
 
+                R.id.menu_mbta_bus_stops ->
+                    toggleBinary(item, PREF_MBTA_BUS_STOPS) { menuEventListener.onMbtaBusStopsToggled(it) }
+
                 R.id.menu_mbta_trains ->
                     toggleBinary(item, PREF_MBTA_TRAINS) { menuEventListener.onMbtaTrainsToggled(it) }
 
@@ -201,6 +204,7 @@ class AppBarMenuManager(
         }
         syncCheckStates(popup.menu,
             R.id.menu_mbta_stations   to PREF_MBTA_STATIONS,
+            R.id.menu_mbta_bus_stops  to PREF_MBTA_BUS_STOPS,
             R.id.menu_mbta_trains     to PREF_MBTA_TRAINS,
             R.id.menu_mbta_subway     to PREF_MBTA_SUBWAY,
             R.id.menu_mbta_buses      to PREF_MBTA_BUSES,
@@ -515,7 +519,7 @@ class AppBarMenuManager(
 
     /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
     private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
-        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS -> false
+        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS, PREF_MBTA_BUS_STOPS -> false
         else -> true
     }
 
@@ -624,6 +628,7 @@ class AppBarMenuManager(
         const val PREF_MBTA_SUBWAY_FREQ = "mbta_subway_freq_sec"
         const val PREF_MBTA_BUSES       = "mbta_buses_on"
         const val PREF_MBTA_BUSES_FREQ  = "mbta_buses_freq_sec"
+        const val PREF_MBTA_BUS_STOPS   = "mbta_bus_stops_on"
         const val PREF_NAT_ALERTS       = "national_alerts_on"
         const val PREF_NAT_ALERTS_FREQ  = "national_alerts_freq_min"
 

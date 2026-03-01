@@ -98,6 +98,11 @@ class MainActivity : AppCompatActivity() {
     // Station markers
     private val stationMarkers = mutableListOf<Marker>()
 
+    // Bus stop markers (viewport-filtered from allBusStops)
+    private val busStopMarkers = mutableListOf<Marker>()
+    private var allBusStops: List<com.example.locationmapapp.data.model.MbtaStop> = emptyList()
+    private var busStopReloadJob: Job? = null
+
     // Webcam tracking
     private val webcamMarkers = mutableListOf<Marker>()
     private var webcamReloadJob: Job? = null
@@ -267,6 +272,10 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA stations")
             viewModel.fetchMbtaStations()
         }
+        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUS_STOPS, false) && allBusStops.isEmpty()) {
+            DebugLogger.i("MainActivity", "onStart() restoring MBTA bus stops")
+            viewModel.fetchMbtaBusStops()
+        }
 
         // Defer METAR restore until GPS fix so the map has a real bounding box
         if (prefs.getBoolean(AppBarMenuManager.PREF_METAR_DISPLAY, true)) {
@@ -373,6 +382,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
         val toggleMap = mapOf<String, (Boolean) -> Unit>(
             AppBarMenuManager.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
+            AppBarMenuManager.PREF_MBTA_BUS_STOPS  to { menuEventListenerImpl.onMbtaBusStopsToggled(it) },
             AppBarMenuManager.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
             AppBarMenuManager.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
             AppBarMenuManager.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
@@ -501,6 +511,7 @@ class MainActivity : AppCompatActivity() {
         map.addMapListener(object : org.osmdroid.events.MapListener {
             override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
                 scheduleAircraftReload()
+                scheduleBusStopReload()
                 // Debounce: load cached POIs for visible bbox 500ms after scrolling stops
                 cachePoiJob?.cancel()
                 cachePoiJob = lifecycleScope.launch {
@@ -514,6 +525,7 @@ class MainActivity : AppCompatActivity() {
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 updateZoomBubble()
                 scheduleAircraftReload()
+                scheduleBusStopReload()
                 if (populateJob == null) scheduleWebcamReload()
                 // Refresh POI marker icons when crossing the zoom-18 label threshold
                 val nowLabeled = binding.mapView.zoomLevelDouble >= 18.0
@@ -921,6 +933,11 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "MBTA stations update — ${stations.size} stations on map")
             clearStationMarkers()
             stations.forEach { addStationMarker(it) }
+        }
+        viewModel.mbtaBusStops.observe(this) { stops ->
+            DebugLogger.i("MainActivity", "MBTA bus stops update — ${stops.size} total stops loaded")
+            allBusStops = stops
+            refreshBusStopMarkersForViewport()
         }
         DebugLogger.i("MainActivity", "observeViewModel() complete — all observers attached")
     }
@@ -1804,6 +1821,57 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.invalidate()
     }
 
+    // =========================================================================
+    // MBTA BUS STOPS (viewport-filtered)
+    // =========================================================================
+
+    /** Debounced: refresh bus stop markers 300ms after scroll/zoom. */
+    private fun scheduleBusStopReload() {
+        if (allBusStops.isEmpty()) return
+        busStopReloadJob?.cancel()
+        busStopReloadJob = lifecycleScope.launch {
+            delay(300)
+            refreshBusStopMarkersForViewport()
+        }
+    }
+
+    /** Show bus stop markers only at zoom >= 15, filtered by visible bounding box. */
+    private fun refreshBusStopMarkersForViewport() {
+        clearBusStopMarkers()
+        val zoom = binding.mapView.zoomLevelDouble
+        if (zoom < 15.0 || allBusStops.isEmpty()) return
+
+        val bb = binding.mapView.boundingBox
+        val visible = allBusStops.filter { stop ->
+            stop.lat in bb.latSouth..bb.latNorth && stop.lon in bb.lonWest..bb.lonEast
+        }
+        DebugLogger.d("MainActivity", "Bus stops viewport: ${visible.size} of ${allBusStops.size} visible at zoom ${zoom.toInt()}")
+        visible.forEach { addBusStopMarker(it) }
+        binding.mapView.invalidate()
+    }
+
+    private fun addBusStopMarker(stop: com.example.locationmapapp.data.model.MbtaStop) {
+        val tint = Color.parseColor("#00695C")  // Teal
+        val m = Marker(binding.mapView).apply {
+            position = stop.toGeoPoint()
+            icon     = MarkerIconHelper.busStopIcon(this@MainActivity, tint)
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            title    = stop.name
+            snippet  = "Bus Stop"
+            setOnMarkerClickListener { _, _ ->
+                showArrivalBoardDialog(stop)
+                true
+            }
+        }
+        busStopMarkers.add(m)
+        binding.mapView.overlays.add(m)
+    }
+
+    private fun clearBusStopMarkers() {
+        busStopMarkers.forEach { binding.mapView.overlays.remove(it) }
+        busStopMarkers.clear()
+    }
+
     // ── Arrival Board Dialog ─────────────────────────────────────────────────
 
     private var arrivalRefreshJob: Job? = null
@@ -2218,11 +2286,221 @@ class MainActivity : AppCompatActivity() {
     private fun onVehicleMarkerTapped(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
         // Stop populate scanner if running — user is interacting with an object
         if (populateJob != null) stopPopulatePois()
-        if (followedVehicleId == vehicle.id) {
-            stopFollowing()
-        } else {
-            startFollowing(vehicle)
+        showVehicleDetailDialog(vehicle)
+    }
+
+    // ── Vehicle Detail Dialog ────────────────────────────────────────────────
+
+    @SuppressLint("SetTextI18n")
+    private fun showVehicleDetailDialog(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val typeLabel = when (vehicle.routeType) {
+            3    -> "Bus"
+            2    -> "Commuter Rail"
+            0    -> "Light Rail"
+            1    -> "Subway"
+            else -> "Vehicle"
         }
+        val lineColor = vehicleRouteColor(vehicle)
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        // ── Header ──
+        val titleText = TextView(this).apply {
+            text = "$typeLabel ${vehicle.label}"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "X"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(4), dp(4), dp(4))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(12), dp(4))
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Color bar ──
+        val colorBar = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(4)
+            )
+            setBackgroundColor(lineColor)
+        }
+
+        // ── Info rows ──
+        val infoContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+
+        fun addInfoRow(label: String, value: String) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            row.addView(TextView(this).apply {
+                text = label
+                textSize = 13f
+                setTextColor(Color.parseColor("#999999"))
+                layoutParams = LinearLayout.LayoutParams(dp(100), LinearLayout.LayoutParams.WRAP_CONTENT)
+            })
+            row.addView(TextView(this).apply {
+                text = value
+                textSize = 14f
+                setTextColor(Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            infoContainer.addView(row)
+        }
+
+        addInfoRow("Route", vehicle.routeName)
+        addInfoRow("Vehicle", vehicle.label)
+        val statusText = when {
+            vehicle.stopName != null -> "${vehicle.currentStatus.display} ${vehicle.stopName}"
+            else -> vehicle.currentStatus.display
+        }
+        addInfoRow("Status", statusText)
+        addInfoRow("Speed", vehicle.speedDisplay)
+        val updated = vehicle.updatedAt.take(19).replace("T", " ")
+        val staleTag = vehicleStalenessTag(vehicle.updatedAt)
+        addInfoRow("Updated", "$updated$staleTag")
+
+        // ── Action buttons ──
+        val buttonContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(16))
+        }
+        val buttonLp = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            setMargins(dp(4), 0, dp(4), 0)
+        }
+
+        // Follow button
+        val followBtn = TextView(this).apply {
+            text = if (followedVehicleId == vehicle.id) "Unfollow" else "Follow"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#00695C"))
+            layoutParams = buttonLp
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setOnClickListener {
+                dialog.dismiss()
+                if (followedVehicleId == vehicle.id) {
+                    stopFollowing()
+                } else {
+                    startFollowing(vehicle)
+                }
+            }
+        }
+
+        // View Route button
+        val routeBtn = TextView(this).apply {
+            text = "View Route"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#546E7A"))
+            layoutParams = buttonLp
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            val tripId = vehicle.tripId
+            if (tripId != null) {
+                setOnClickListener {
+                    dialog.dismiss()
+                    val syntheticPred = com.example.locationmapapp.data.model.MbtaPrediction(
+                        id = "vehicle-${vehicle.id}",
+                        routeId = vehicle.routeId,
+                        routeName = vehicle.routeName,
+                        tripId = tripId,
+                        headsign = vehicle.stopName,
+                        arrivalTime = null,
+                        departureTime = null,
+                        directionId = 0,
+                        status = null,
+                        vehicleId = vehicle.id
+                    )
+                    showTripScheduleDialog(syntheticPred)
+                }
+            } else {
+                alpha = 0.4f
+                setOnClickListener { toast("No trip info available") }
+            }
+        }
+
+        // Arrivals at Stop button
+        val arrivalsBtn = TextView(this).apply {
+            text = "Arrivals"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#1565C0"))
+            layoutParams = buttonLp
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            val stopId = vehicle.stopId
+            val stopName = vehicle.stopName
+            if (stopId != null && stopName != null) {
+                setOnClickListener {
+                    dialog.dismiss()
+                    val syntheticStop = com.example.locationmapapp.data.model.MbtaStop(
+                        id = stopId,
+                        name = stopName,
+                        lat = vehicle.lat,
+                        lon = vehicle.lon,
+                        routeIds = listOf(vehicle.routeId)
+                    )
+                    showArrivalBoardDialog(syntheticStop)
+                }
+            } else {
+                alpha = 0.4f
+                setOnClickListener { toast("No stop info available") }
+            }
+        }
+
+        buttonContainer.addView(followBtn)
+        buttonContainer.addView(routeBtn)
+        buttonContainer.addView(arrivalsBtn)
+
+        // ── Container ──
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            addView(header)
+            addView(colorBar)
+            addView(infoContainer)
+            addView(buttonContainer)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.85).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+        dialog.show()
+    }
+
+    /** Get the route color for a vehicle (handles buses with numeric route IDs). */
+    private fun vehicleRouteColor(vehicle: com.example.locationmapapp.data.model.MbtaVehicle): Int {
+        // Buses — use teal for all bus routes
+        if (vehicle.routeType == 3) return Color.parseColor("#00695C")
+        // Rail/subway — use standard routeColor
+        return routeColor(vehicle.routeId)
     }
 
     private fun startFollowing(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
@@ -2965,6 +3243,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        override fun onMbtaBusStopsToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onMbtaBusStopsToggled: $enabled")
+            if (enabled) {
+                viewModel.fetchMbtaBusStops()
+                toast("Loading bus stops…")
+            } else {
+                viewModel.clearMbtaBusStops()
+                allBusStops = emptyList()
+                clearBusStopMarkers()
+            }
+        }
+
         override fun onMbtaTrainsToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onMbtaTrainsToggled: $enabled")
             if (enabled) {
@@ -3171,6 +3461,8 @@ class MainActivity : AppCompatActivity() {
             "markers" to mapOf(
                 "poi" to poiMarkers.values.sumOf { it.size },
                 "stations" to stationMarkers.size,
+                "busStops" to busStopMarkers.size,
+                "busStopsTotal" to allBusStops.size,
                 "trains" to trainMarkers.size,
                 "subway" to subwayMarkers.size,
                 "buses" to busMarkers.size,
@@ -3201,18 +3493,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         when (type) {
-            "poi"      -> poiMarkers.values.flatten().let { add(it, "poi") }
-            "stations" -> add(stationMarkers, "stations")
-            "trains"   -> add(trainMarkers, "trains")
-            "subway"   -> add(subwayMarkers, "subway")
-            "buses"    -> add(busMarkers, "buses")
-            "aircraft" -> add(aircraftMarkers, "aircraft")
-            "webcams"  -> add(webcamMarkers, "webcams")
-            "metar"    -> add(metarMarkers, "metar")
-            "gps"      -> gpsMarker?.let { add(listOf(it), "gps") }
+            "poi"       -> poiMarkers.values.flatten().let { add(it, "poi") }
+            "stations"  -> add(stationMarkers, "stations")
+            "bus_stops" -> add(busStopMarkers, "bus_stops")
+            "trains"    -> add(trainMarkers, "trains")
+            "subway"    -> add(subwayMarkers, "subway")
+            "buses"     -> add(busMarkers, "buses")
+            "aircraft"  -> add(aircraftMarkers, "aircraft")
+            "webcams"   -> add(webcamMarkers, "webcams")
+            "metar"     -> add(metarMarkers, "metar")
+            "gps"       -> gpsMarker?.let { add(listOf(it), "gps") }
             null -> {
                 poiMarkers.values.flatten().let { add(it, "poi") }
                 add(stationMarkers, "stations")
+                add(busStopMarkers, "bus_stops")
                 add(trainMarkers, "trains")
                 add(subwayMarkers, "subway")
                 add(busMarkers, "buses")
@@ -3244,16 +3538,17 @@ class MainActivity : AppCompatActivity() {
     /** Returns raw Marker objects for /markers/tap endpoint. */
     internal fun debugRawMarkers(type: String): List<Marker> {
         return when (type) {
-            "poi"      -> poiMarkers.values.flatten()
-            "stations" -> stationMarkers
-            "trains"   -> trainMarkers
-            "subway"   -> subwayMarkers
-            "buses"    -> busMarkers
-            "aircraft" -> aircraftMarkers
-            "webcams"  -> webcamMarkers
-            "metar"    -> metarMarkers
-            "gps"      -> listOfNotNull(gpsMarker)
-            else       -> emptyList()
+            "poi"       -> poiMarkers.values.flatten()
+            "stations"  -> stationMarkers
+            "bus_stops" -> busStopMarkers
+            "trains"    -> trainMarkers
+            "subway"    -> subwayMarkers
+            "buses"     -> busMarkers
+            "aircraft"  -> aircraftMarkers
+            "webcams"   -> webcamMarkers
+            "metar"     -> metarMarkers
+            "gps"       -> listOfNotNull(gpsMarker)
+            else        -> emptyList()
         }
     }
 
@@ -3263,6 +3558,7 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putBoolean(pref, value).apply()
         val toggleMap = mapOf<String, (Boolean) -> Unit>(
             AppBarMenuManager.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
+            AppBarMenuManager.PREF_MBTA_BUS_STOPS  to { menuEventListenerImpl.onMbtaBusStopsToggled(it) },
             AppBarMenuManager.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
             AppBarMenuManager.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
             AppBarMenuManager.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
@@ -3283,8 +3579,9 @@ class MainActivity : AppCompatActivity() {
             "trains"   -> viewModel.fetchMbtaTrains()
             "subway"   -> viewModel.fetchMbtaSubway()
             "buses"    -> viewModel.fetchMbtaBuses()
-            "stations" -> viewModel.fetchMbtaStations()
-            "aircraft" -> loadAircraftForVisibleArea()
+            "stations"  -> viewModel.fetchMbtaStations()
+            "bus_stops" -> viewModel.fetchMbtaBusStops()
+            "aircraft"  -> loadAircraftForVisibleArea()
             "metar"    -> loadMetarsForVisibleArea()
             "webcams"  -> loadWebcamsForVisibleArea()
             "pois"     -> loadCachedPoisForVisibleArea()

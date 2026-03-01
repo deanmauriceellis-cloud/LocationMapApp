@@ -71,6 +71,9 @@ class MainViewModel @Inject constructor(
     private val _mbtaStations = MutableLiveData<List<MbtaStop>>()
     val mbtaStations: LiveData<List<MbtaStop>> = _mbtaStations
 
+    private val _mbtaBusStops = MutableLiveData<List<MbtaStop>>()
+    val mbtaBusStops: LiveData<List<MbtaStop>> = _mbtaBusStops
+
     private val _aircraft = MutableLiveData<List<AircraftState>>()
     val aircraft: LiveData<List<AircraftState>> = _aircraft
 
@@ -281,6 +284,26 @@ class MainViewModel @Inject constructor(
     fun clearMbtaStations() {
         _mbtaStations.value = emptyList()
         DebugLogger.i(TAG, "MBTA stations cleared")
+    }
+
+    fun fetchMbtaBusStops() {
+        DebugLogger.i(TAG, "fetchMbtaBusStops() — fetching all bus stops")
+        viewModelScope.launch {
+            runCatching { mbtaRepository.fetchBusStops() }
+                .onSuccess {
+                    DebugLogger.i(TAG, "MBTA bus stops success — ${it.size} stops")
+                    _mbtaBusStops.value = it
+                }
+                .onFailure { e ->
+                    DebugLogger.e(TAG, "MBTA bus stops FAILED: ${e.message}", e as? Exception)
+                    _error.value = "MBTA bus stops failed: ${e.message}"
+                }
+        }
+    }
+
+    fun clearMbtaBusStops() {
+        _mbtaBusStops.value = emptyList()
+        DebugLogger.i(TAG, "MBTA bus stops cleared")
     }
 
     /** Suspend call — returns predictions directly for dialogs. */

@@ -57,6 +57,9 @@ interface MenuEventListener {
     /** MBTA train station markers on map (subway + commuter rail). */
     fun onMbtaStationsToggled(enabled: Boolean)
 
+    /** MBTA bus stop markers on map (route_type=3). */
+    fun onMbtaBusStopsToggled(enabled: Boolean)
+
     /** Live MBTA Commuter Rail vehicle positions. */
     fun onMbtaTrainsToggled(enabled: Boolean)
 

@@ -396,6 +396,45 @@ class MbtaRepository @Inject constructor() {
         return predictions
     }
 
+    // ── Bus Stops ─────────────────────────────────────────────────────────
+
+    /**
+     * Fetch all bus stops (route_type=3) from MBTA API.
+     * Returns ~7,900 stops as flat MbtaStop objects (no parent grouping).
+     * Uses page[limit]=10000 to get all in one request (~500KB).
+     */
+    suspend fun fetchBusStops(): List<MbtaStop> = withContext(Dispatchers.IO) {
+        val url = "$BASE_URL/stops" +
+                "?filter%5Broute_type%5D=3" +
+                "&page%5Blimit%5D=10000" +
+                "&api_key=$API_KEY"
+        val json = executeGet(url, "bus stops")
+        parseBusStops(json)
+    }
+
+    private fun parseBusStops(json: String): List<MbtaStop> {
+        val root = JsonParser.parseString(json).asJsonObject
+        val dataArray = root.getAsJsonArray("data") ?: return emptyList()
+
+        val stops = mutableListOf<MbtaStop>()
+        dataArray.forEach { element ->
+            try {
+                val obj = element.asJsonObject
+                val id = obj.get("id")?.asString ?: return@forEach
+                val attrs = obj.getAsJsonObject("attributes") ?: return@forEach
+                val lat = attrs.get("latitude")?.takeIf { !it.isJsonNull }?.asDouble ?: return@forEach
+                val lon = attrs.get("longitude")?.takeIf { !it.isJsonNull }?.asDouble ?: return@forEach
+                val name = attrs.get("name")?.asString ?: id
+
+                stops.add(MbtaStop(id = id, name = name, lat = lat, lon = lon, routeIds = listOf("Bus")))
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "Failed to parse bus stop: ${e.message}")
+            }
+        }
+        DebugLogger.i(TAG, "Parsed ${stops.size} bus stops")
+        return stops
+    }
+
     private fun parseTripSchedule(json: String): List<MbtaTripScheduleEntry> {
         val root = JsonParser.parseString(json).asJsonObject
         val dataArray = root.getAsJsonArray("data") ?: return emptyList()

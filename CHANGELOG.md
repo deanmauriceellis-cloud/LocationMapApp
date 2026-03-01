@@ -1,5 +1,31 @@
 # LocationMapApp — Changelog
 
+## [1.5.19] — 2026-03-01
+
+### Added
+- **MBTA bus stop markers** — ~7,900 bus stops fetched once, viewport-filtered client-side
+  - `fetchBusStops()` + `parseBusStops()` in MbtaRepository (route_type=3, page limit 10,000)
+  - Zoom guard: only shown at zoom >= 15 to prevent marker flood
+  - 300ms debounced reload on scroll/zoom, instant viewport filtering from in-memory list
+  - Bus stop sign icon (`ic_bus_stop.xml`, 20dp) with teal tint
+  - `busStopIcon()` method in MarkerIconHelper
+  - Tap any bus stop → reuses existing arrival board dialog with real-time bus predictions
+  - Transit menu: "Bus Stops" checkable toggle, defaults OFF (opt-in)
+  - `PREF_MBTA_BUS_STOPS` preference, `onMbtaBusStopsToggled()` callback
+  - `mbtaBusStops` LiveData in MainViewModel with fetch/clear
+  - Restored from persisted pref in `onStart()`
+- **Vehicle detail dialog** — replaces tap-to-follow for all MBTA vehicle types
+  - Tapping any bus, train, or subway marker now shows an info dialog first
+  - Shows: vehicle type/number, route name, status/current stop, speed, last updated + staleness
+  - Color bar under header matches route line color (teal for buses, standard colors for rail/subway)
+  - Three action buttons:
+    - **Follow** (teal) — starts existing follow mode
+    - **View Route** (gray) — opens trip schedule dialog via synthetic MbtaPrediction
+    - **Arrivals** (blue) — opens arrival board dialog via synthetic MbtaStop
+  - Buttons dimmed when trip/stop info unavailable
+  - 85% width, centered, dark theme, wrap-content height
+- **Debug endpoint updates** — `busStops` + `busStopsTotal` marker counts in `/state`, `bus_stops` type in `/markers` and `/refresh`
+
 ## [1.5.18] — 2026-03-01
 
 ### Fixed

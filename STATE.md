@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 18 (Debug Server Fix + DB Re-import)
+## Last Updated: 2026-03-01 Session 19 (Bus Stops + Vehicle Detail Dialog)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -41,6 +41,15 @@
   - Toggle in Transit menu ("Train Stations"), defaults ON, persisted with `PREF_MBTA_STATIONS`
   - Fetches via 2 MBTA API calls (subway routes + CR route_type=2), merges by stop ID
   - No interference with vehicle/aircraft follow mode
+- **MBTA bus stop markers** (v1.5.19) — ~7,900 bus stops, viewport-filtered client-side
+  - Fetched once via MBTA API (route_type=3, page limit 10,000), held in memory (~500KB)
+  - Only shown at zoom >= 15; 300ms debounced viewport filter on scroll/zoom
+  - Bus stop sign icon (20dp, teal tint), tap → reuses arrival board dialog
+  - Toggle in Transit menu ("Bus Stops"), defaults OFF (opt-in), persisted with `PREF_MBTA_BUS_STOPS`
+- **Vehicle detail dialog** (v1.5.19) — replaces direct tap-to-follow for all vehicles
+  - Tapping bus/train/subway shows info dialog: route, vehicle ID, status, speed, staleness
+  - Three buttons: Follow (teal), View Route (trip schedule), Arrivals (arrival board)
+  - Route color bar under header; buttons dimmed when trip/stop info unavailable
 - Aircraft tracking (OpenSky Network) — live airplane positions
   - Rotated airplane icon pointing to heading, callsign label, vertical rate indicator (↑↓—)
   - SPI emergency flag: thick red circle around marker, warning in tap info
@@ -149,8 +158,9 @@
 - **Single tap**: no action
 - **Long press (~2s)**: enter manual mode, center map, search POIs at location
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
-- **Tap vehicle marker**: follow mode (map tracks vehicle, banner shows status/speed)
+- **Tap vehicle marker**: vehicle detail dialog (route, status, speed) with Follow / View Route / Arrivals buttons
 - **Tap station marker**: arrival board dialog (real-time predictions), tap train → trip schedule dialog
+- **Tap bus stop marker**: arrival board dialog (real-time bus predictions)
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center

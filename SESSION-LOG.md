@@ -1,5 +1,46 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01b (Bus Stops + Vehicle Detail Dialog — v1.5.19)
+
+### Changes Made
+
+#### Feature 1: MBTA Bus Stop Markers
+- **`MbtaRepository.kt`** — added `fetchBusStops()` + `parseBusStops()` (route_type=3, page limit 10,000)
+- **`MainViewModel.kt`** — added `_mbtaBusStops` LiveData, `fetchMbtaBusStops()`, `clearMbtaBusStops()`
+- **`ic_bus_stop.xml`** — new 24dp vector drawable (bus stop sign with "B" letter)
+- **`MarkerIconHelper.kt`** — added `busStopIcon()` method (20dp, teal tint)
+- **`menu_transit.xml`** — added "Bus Stops" checkable menu item
+- **`AppBarMenuManager.kt`** — added `PREF_MBTA_BUS_STOPS` constant (defaults OFF), wired toggle + syncCheckStates
+- **`MenuEventListener.kt`** — added `onMbtaBusStopsToggled(enabled: Boolean)` callback
+- **`MainActivity.kt`**:
+  - `busStopMarkers` list + `allBusStops` in-memory list + `busStopReloadJob` debounce
+  - Observer stores full list, calls `refreshBusStopMarkersForViewport()`
+  - Zoom >= 15 guard, bounding box filter, 300ms debounced reload on scroll/zoom
+  - `addBusStopMarker()`: teal tint, tap → `showArrivalBoardDialog(stop)`
+  - `onMbtaBusStopsToggled()` handler, `onStart()` restore from persisted pref
+
+#### Feature 2: Vehicle Detail Dialog
+- **`MainActivity.kt`**:
+  - `onVehicleMarkerTapped()` now calls `showVehicleDetailDialog()` instead of `startFollowing()`
+  - New `showVehicleDetailDialog()`: 85% width dark dialog, color bar, info rows (route, vehicle, status, speed, updated)
+  - Three action buttons: Follow (teal), View Route (gray), Arrivals (blue)
+  - Follow calls existing `startFollowing(vehicle)` / `stopFollowing()`
+  - View Route creates synthetic `MbtaPrediction` from vehicle's `tripId`, opens `showTripScheduleDialog()`
+  - Arrivals creates synthetic `MbtaStop` from vehicle's `stopId`, opens `showArrivalBoardDialog()`
+  - Buttons dimmed (alpha 0.4) when tripId/stopId unavailable
+  - `vehicleRouteColor()` helper: teal for buses (routeType 3), `routeColor()` for rail/subway
+
+#### Debug Endpoints
+- `/state` now includes `busStops` and `busStopsTotal` marker counts
+- `/markers`, `/markers/tap`, `/refresh` support `bus_stops` type
+
+### Files Modified
+- `MbtaRepository.kt`, `MainViewModel.kt`, `MarkerIconHelper.kt`
+- `menu_transit.xml`, `AppBarMenuManager.kt`, `MenuEventListener.kt`
+- `MainActivity.kt` (bus stops + vehicle detail dialog + debug endpoints)
+- `ic_bus_stop.xml` (new)
+- `CHANGELOG.md`, `STATE.md`, `SESSION-LOG.md`
+
 ## Session: 2026-03-01a (Debug Server Fix + DB Re-import)
 
 ### Context
