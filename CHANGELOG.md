@@ -1,5 +1,68 @@
 # LocationMapApp — Changelog
 
+## [1.5.22] — 2026-03-01
+
+### Added
+- **Overnight test harness** (`overnight-test.sh`, ~1,850 lines) — unattended 6-8 hour automated test suite
+  - **Phase 1: Setup & Baseline** — verify debug server + proxy, capture baseline state/perf/cache, run `test-app.sh`
+  - **Phase 1.5: Layer Initialization Timing** — times each layer's enable→refresh→count cycle, saves `init-timing.json`
+  - **Phase 2: Feature Exercise** — systematic deep test of every feature (MBTA x3 modes, stations, bus stops, aircraft, webcams, METAR, POI search, map nav, 11 layer toggles, marker interactions, radar, follow modes)
+  - **Phase 3: Endurance Monitoring** — 30s loop: 5-min snapshots, 15-min screenshots, 30-min full refresh, 60-min map moves, aircraft follow cycles, memory leak detection, service transition detection
+  - **Phase 4: Late-Night Validation** — vehicle staleness, station persistence, memory/error assessment
+  - **Phase 5: Report Generation** — `report.md` with summary table, memory trend, cache performance, OpenSky usage, event timeline, feature coverage matrix, recommendations
+  - **Time-aware testing**: `transit_service_window()` classifies hours as active/winding_down/overnight/starting_up; 0 vehicles during overnight = PASS not FAIL
+  - **Service transition detection**: triggers full vehicle refresh + screenshot when MBTA service window changes
+  - Output: `overnight-runs/YYYY-MM-DD_HHMM/` with `events.log`, `time-series.csv` (30 columns), `report.md`, screenshots, snapshots
+- **Morning transit test** (`morning-transit-test.sh`, ~500 lines) — deep transit validation for active service hours
+  - `--wait-for-service` flag: polls every 30s until vehicles appear (up to 60 min)
+  - Deep vehicle analysis: completeness % (headsign, tripId, stopName, routeName, bearing, speed), staleness check, marker cross-check
+  - Deep station test: LiveData vs endpoint vs marker count comparison, 10-station search, per-line route coverage
+  - Deep bus stop test: 3-location viewport test, 4-term name search
+  - Follow endurance test: 60s follow with 10s check intervals
+  - Multi-location density: 6 locations, counts all transit types per location
+  - API reliability: 5 rapid requests to 9 endpoints, measures failure rate
+- **Master test runner** (`run-full-test-suite.sh`, ~100 lines) — chains overnight → morning test
+  - Flags: `--overnight N`, `--morning N`, `--morning-only`, `--quick` (30+30 min)
+  - Auto-detects transit availability, adds `--wait-for-service` during overnight hours
+
+### Fixed
+- **`/follow` endpoint bypasses vehicle detail dialog** — `debugFollowVehicleByIndex()` now calls `startFollowing(vehicle)` directly via `relatedObject`, enabling automated follow-mode testing
+- **`debugFollowAircraft()` bypasses tap** — starts follow directly without opening dialog
+
+### Discovered (via test harness)
+- **Station/bus-stop LiveData mismatch** (fixed by app rebuild): `/stations` and `/bus-stops` endpoints returned 0 because app was running pre-v1.5.21 code without those endpoints
+- **Aircraft altitude null for ground aircraft**: `baroAltitude` correctly null when `onGround=true` — not a bug
+- **test-app.sh ANSI grep**: `grep -c '^\[PASS\]'` fails on color-coded output (ANSI codes precede `[PASS]`)
+
+## [1.5.21] — 2026-03-01
+
+### Added
+- **Debug API: `/vehicles` endpoint** — raw `MbtaVehicle` data from LiveData, params: `type=trains|subway|buses`, `limit=N`, `index=N`
+  - Full fields: id, label, routeId, routeName, tripId, headsign, stopId, stopName, lat, lon, bearing, speedMps/Mph, currentStatus, updatedAt, routeType
+- **Debug API: `/stations` endpoint** — raw `MbtaStop` data, params: `limit=N`, `q=X` (name search)
+- **Debug API: `/bus-stops` endpoint** — all cached bus stops, params: `limit=N`, `q=X` (name search)
+- **Enhanced `/markers` response** — includes `relatedObject` data (vehicleId, headsign, tripId, stopName, etc.) when present
+- **`relatedObject` stored on all markers** — vehicles, stations, bus stops, aircraft, webcams
+- **`test-app.sh`** — automated test suite (30+ tests) via curl to debug HTTP server
+  - Covers: core state, MBTA buses/trains/subway, stations, bus stops, layer toggles, aircraft, webcams, METAR, enhanced marker data
+  - Output: color-coded PASS/FAIL/WARN/SKIP with summary
+
+### Fixed
+- **`/markers/tap` invokes custom click listeners** — was calling `onMarkerClickDefault()` (shows default info window); now uses reflection to invoke `setOnMarkerClickListener` lambdas (vehicle detail dialog, arrival board, etc.)
+
+## [1.5.20] — 2026-03-01
+
+### Changed
+- **Bus stops routed through proxy cache** — `fetchBusStops()` now uses `GET /mbta/bus-stops` on the cache proxy instead of hitting the MBTA API directly
+  - 24-hour cache TTL (bus stop locations rarely change)
+  - ~6,904 stops served instantly from cache on app restart or toggle
+  - Proxy `MBTA_API_KEY` constant for upstream auth
+
+### Removed
+- **TcpLogStreamer disabled** — removed `TcpLogStreamer.start()` from `onCreate()`
+  - Was retrying TCP to port 3333 every 10s, spamming logs with ECONNREFUSED errors
+  - Superseded by debug HTTP server `/logs` endpoint (port 8085)
+
 ## [1.5.19] — 2026-03-01
 
 ### Added

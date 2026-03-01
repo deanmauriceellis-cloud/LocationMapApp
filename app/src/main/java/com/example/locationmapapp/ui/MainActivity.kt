@@ -31,7 +31,6 @@ import com.example.locationmapapp.ui.radar.RadarRefreshScheduler
 import com.example.locationmapapp.util.DebugEndpoints
 import com.example.locationmapapp.util.DebugHttpServer
 import com.example.locationmapapp.util.DebugLogger
-import com.example.locationmapapp.util.TcpLogStreamer
 import dagger.hilt.android.AndroidEntryPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -178,7 +177,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DebugLogger.i("MainActivity", "onCreate() start — device=${android.os.Build.MODEL} SDK=${android.os.Build.VERSION.SDK_INT}")
-        TcpLogStreamer.start()
         DebugHttpServer.start()
 
         Configuration.getInstance().apply {
@@ -1276,6 +1274,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title    = state.callsign?.ifBlank { null } ?: state.icao24
             snippet  = buildAircraftSnippet(state)
+            relatedObject = state
             setOnMarkerClickListener { _, _ ->
                 onAircraftMarkerTapped(state)
                 true
@@ -1412,6 +1411,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title    = webcam.title
             snippet  = webcam.categories.joinToString(", ") { it.replaceFirstChar { c -> c.uppercase() } }
+            relatedObject = webcam
             setOnMarkerClickListener { _, _ ->
                 showWebcamPreviewDialog(webcam)
                 true
@@ -1604,6 +1604,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title   = "Train ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
+            relatedObject = vehicle
             setOnMarkerClickListener { _, _ ->
                 onVehicleMarkerTapped(vehicle)
                 true
@@ -1689,6 +1690,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title   = "Subway ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
+            relatedObject = vehicle
             setOnMarkerClickListener { _, _ ->
                 onVehicleMarkerTapped(vehicle)
                 true
@@ -1734,6 +1736,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title   = "Bus ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
+            relatedObject = vehicle
             setOnMarkerClickListener { _, _ ->
                 onVehicleMarkerTapped(vehicle)
                 true
@@ -1806,6 +1809,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title    = stop.name
             snippet  = stop.routeIds.joinToString(", ") { routeAbbrev(it) }
+            relatedObject = stop
             setOnMarkerClickListener { _, _ ->
                 showArrivalBoardDialog(stop)
                 true
@@ -1858,6 +1862,7 @@ class MainActivity : AppCompatActivity() {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             title    = stop.name
             snippet  = "Bus Stop"
+            relatedObject = stop
             setOnMarkerClickListener { _, _ ->
                 showArrivalBoardDialog(stop)
                 true
@@ -2366,6 +2371,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         addInfoRow("Route", vehicle.routeName)
+        if (vehicle.headsign != null) {
+            addInfoRow("Destination", vehicle.headsign)
+        }
         addInfoRow("Vehicle", vehicle.label)
         val statusText = when {
             vehicle.stopName != null -> "${vehicle.currentStatus.display} ${vehicle.stopName}"
@@ -2426,7 +2434,7 @@ class MainActivity : AppCompatActivity() {
                         routeId = vehicle.routeId,
                         routeName = vehicle.routeName,
                         tripId = tripId,
-                        headsign = vehicle.stopName,
+                        headsign = vehicle.headsign ?: vehicle.stopName,
                         arrivalTime = null,
                         departureTime = null,
                         directionId = 0,
@@ -3482,14 +3490,51 @@ class MainActivity : AppCompatActivity() {
         val result = mutableListOf<Map<String, Any?>>()
         fun add(markers: List<Marker>, markerType: String) {
             markers.forEachIndexed { i, m ->
-                result.add(mapOf(
+                val info = mutableMapOf<String, Any?>(
                     "type" to markerType,
                     "index" to i,
                     "lat" to m.position.latitude,
                     "lon" to m.position.longitude,
                     "title" to (m.title ?: ""),
                     "snippet" to (m.snippet ?: "")
-                ))
+                )
+                // Include key fields from relatedObject when present
+                when (val obj = m.relatedObject) {
+                    is com.example.locationmapapp.data.model.MbtaVehicle -> {
+                        info["vehicleId"] = obj.id
+                        info["label"] = obj.label
+                        info["routeId"] = obj.routeId
+                        info["routeName"] = obj.routeName
+                        info["tripId"] = obj.tripId
+                        info["headsign"] = obj.headsign
+                        info["stopId"] = obj.stopId
+                        info["stopName"] = obj.stopName
+                        info["bearing"] = obj.bearing
+                        info["speedMph"] = obj.speedMph
+                        info["currentStatus"] = obj.currentStatus.display
+                        info["updatedAt"] = obj.updatedAt
+                        info["routeType"] = obj.routeType
+                    }
+                    is com.example.locationmapapp.data.model.MbtaStop -> {
+                        info["stopId"] = obj.id
+                        info["stopName"] = obj.name
+                        info["routeIds"] = obj.routeIds
+                    }
+                    is com.example.locationmapapp.data.model.AircraftState -> {
+                        info["icao24"] = obj.icao24
+                        info["callsign"] = obj.callsign
+                        info["altitude_ft"] = obj.baroAltitude?.let { it * 3.28084 }
+                        info["velocity_kt"] = obj.velocity?.let { it * 1.94384 }
+                        info["track"] = obj.track
+                        info["onGround"] = obj.onGround
+                    }
+                    is com.example.locationmapapp.data.model.Webcam -> {
+                        info["webcamId"] = obj.id
+                        info["categories"] = obj.categories
+                        info["status"] = obj.status
+                    }
+                }
+                result.add(info)
             }
         }
         when (type) {
@@ -3522,17 +3567,18 @@ class MainActivity : AppCompatActivity() {
 
     /** Triggers the click handler on a marker, as if the user tapped it. */
     internal fun debugTapMarker(marker: Marker) {
-        // Create a synthetic MotionEvent at the marker's screen position
-        val proj = binding.mapView.projection
-        val pt = proj.toPixels(marker.position, null)
-        val event = android.view.MotionEvent.obtain(
-            android.os.SystemClock.uptimeMillis(),
-            android.os.SystemClock.uptimeMillis(),
-            android.view.MotionEvent.ACTION_DOWN,
-            pt.x.toFloat(), pt.y.toFloat(), 0
-        )
-        marker.onSingleTapConfirmed(event, binding.mapView)
-        event.recycle()
+        // Invoke the marker's custom OnMarkerClickListener if set, otherwise default
+        val listener = try {
+            val field = Marker::class.java.getDeclaredField("mOnMarkerClickListener")
+            field.isAccessible = true
+            field.get(marker) as? Marker.OnMarkerClickListener
+        } catch (_: Exception) { null }
+        if (listener != null) {
+            listener.onMarkerClick(marker, binding.mapView)
+        } else {
+            // No custom listener — show info window (default behavior)
+            marker.showInfoWindow()
+        }
     }
 
     /** Returns raw Marker objects for /markers/tap endpoint. */
@@ -3592,34 +3638,35 @@ class MainActivity : AppCompatActivity() {
 
     /** Follow an aircraft by icao24. */
     internal fun debugFollowAircraft(icao24: String) {
-        // Find in current aircraft list, or create a minimal state to start tracking
-        val state = aircraftMarkers.firstOrNull { (it.snippet ?: "").contains(icao24, ignoreCase = true) }
-        if (state != null) {
-            // Tap the marker to use normal flow
-            debugTapMarker(state)
-        } else {
-            // Start following even without a marker — the refresh loop will pick it up
-            followedVehicleId = null
-            followedAircraftIcao = icao24
-            followedAircraftFailCount = 0
-            viewModel.loadFollowedAircraft(icao24)
-            startFollowedAircraftRefresh(icao24)
-        }
+        // Start following directly — no dialog
+        followedVehicleId = null
+        followedAircraftIcao = icao24
+        followedAircraftFailCount = 0
+        viewModel.loadFollowedAircraft(icao24)
+        startFollowedAircraftRefresh(icao24)
     }
 
-    /** Follow a vehicle by type and marker index. */
+    /** Follow a vehicle by type and marker index — starts follow directly (bypasses detail dialog). */
     internal fun debugFollowVehicleByIndex(type: String, index: Int): Map<String, Any?> {
         val markers = debugRawMarkers(type)
         if (index < 0 || index >= markers.size) {
             return mapOf("error" to "Index $index out of range (0..${markers.size - 1})")
         }
         val marker = markers[index]
-        debugTapMarker(marker)
+        // Get the vehicle from relatedObject and start following directly
+        val vehicle = marker.relatedObject as? com.example.locationmapapp.data.model.MbtaVehicle
+        if (vehicle != null) {
+            startFollowing(vehicle)
+        } else {
+            // Fallback: tap the marker (opens detail dialog)
+            debugTapMarker(marker)
+        }
         return mapOf(
             "status" to "ok",
             "following" to type,
             "index" to index,
             "title" to (marker.title ?: ""),
+            "vehicleId" to (vehicle?.id ?: ""),
             "position" to mapOf("lat" to marker.position.latitude, "lon" to marker.position.longitude)
         )
     }
@@ -3627,5 +3674,25 @@ class MainActivity : AppCompatActivity() {
     /** Stop following any vehicle or aircraft. */
     internal fun debugStopFollow() {
         stopFollowing()
+    }
+
+    /** Returns raw MbtaVehicle list from LiveData for /vehicles endpoint. */
+    internal fun debugVehicles(type: String): List<com.example.locationmapapp.data.model.MbtaVehicle> {
+        return when (type) {
+            "trains" -> viewModel.mbtaTrains.value ?: emptyList()
+            "subway" -> viewModel.mbtaSubway.value ?: emptyList()
+            "buses"  -> viewModel.mbtaBuses.value ?: emptyList()
+            else     -> emptyList()
+        }
+    }
+
+    /** Returns raw MbtaStop list from LiveData for /stations endpoint. */
+    internal fun debugStations(): List<com.example.locationmapapp.data.model.MbtaStop> {
+        return viewModel.mbtaStations.value ?: emptyList()
+    }
+
+    /** Returns all cached bus stops for /bus-stops endpoint. */
+    internal fun debugBusStops(): List<com.example.locationmapapp.data.model.MbtaStop> {
+        return allBusStops
     }
 }

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 19 (Bus Stops + Vehicle Detail Dialog)
+## Last Updated: 2026-03-01 Session 22 (Automated Test Harness)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -42,7 +42,7 @@
   - Fetches via 2 MBTA API calls (subway routes + CR route_type=2), merges by stop ID
   - No interference with vehicle/aircraft follow mode
 - **MBTA bus stop markers** (v1.5.19) — ~7,900 bus stops, viewport-filtered client-side
-  - Fetched once via MBTA API (route_type=3, page limit 10,000), held in memory (~500KB)
+  - Fetched via proxy `/mbta/bus-stops` (24h cache TTL), held in memory (~500KB)
   - Only shown at zoom >= 15; 300ms debounced viewport filter on scroll/zoom
   - Bus stop sign icon (20dp, teal tint), tap → reuses arrival board dialog
   - Toggle in Transit menu ("Bus Stops"), defaults OFF (opt-in), persisted with `PREF_MBTA_BUS_STOPS`
@@ -123,13 +123,16 @@
   - `X-POI-New` / `X-POI-Known` response headers report new vs existing POIs per request
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
-- Debug logging + TCP log streamer
+- Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
 - **Embedded debug HTTP server** (v1.5.18) — programmatic app control via `adb forward` + `curl`
   - Port 8085, raw `ServerSocket` on `Dispatchers.IO`, minimal HTTP/1.0 parser, JSON via Gson
-  - 19 endpoints: state, logs, map control, marker listing/search/tap/nearest, screenshot, livedata, prefs, toggle, search, refresh, follow, stop-follow, perf, overlays
+  - 22 endpoints: state, logs, map control, marker listing/search/tap/nearest, vehicles, stations, bus-stops, screenshot, livedata, prefs, toggle, search, refresh, follow, stop-follow, perf, overlays
   - `DebugHttpServer.kt` (singleton accept loop) + `DebugEndpoints.kt` (all handlers)
   - `runOnMain` helper for UI-thread access via `suspendCancellableCoroutine`
-  - Marker tap via synthetic MotionEvent at projected screen position
+  - Marker tap invokes custom `OnMarkerClickListener` via reflection (v1.5.21)
+  - `relatedObject` stored on all markers for rich data access (v1.5.21)
+  - Automated test suite: `./test-app.sh` (30+ tests, curl + jq)
+  - **Overnight test harness**: `./overnight-test.sh` (~1,850 lines), `./morning-transit-test.sh`, `./run-full-test-suite.sh`
   - Lifecycle-aware: endpoints registered in `onResume`, nulled in `onPause`
   - **Double-start guard**: `start()` returns early if job already active; `stop()` cancels job + closes socket
   - **`onDestroy()` cleanup**: MainActivity calls `DebugHttpServer.stop()` to release port on Activity recreation
@@ -148,6 +151,7 @@
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
+| MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
 | MBTA Stations | direct (api-v3.mbta.com/stops) | not proxied | — |
 | MBTA Predictions | direct (api-v3.mbta.com/predictions) | not proxied | — |
@@ -248,6 +252,7 @@
 - Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
+- **test-app.sh ANSI grep**: `grep -c '^\[PASS\]'` on color-coded output returns 0 — ANSI escape codes precede `[PASS]` text
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |
@@ -261,6 +266,9 @@
 | `GET /markers/tap?type=X&index=N` | Trigger marker click handler |
 | `GET /markers/nearest?lat=X&lon=Y&type=X` | Find nearest marker(s) |
 | `GET /markers/search?q=X&type=X` | Search markers by title/snippet |
+| `GET /vehicles?type=X&limit=N&index=N` | Raw vehicle data (headsign, tripId, stopName, etc.) |
+| `GET /stations?limit=N&q=X` | Raw station data with name search |
+| `GET /bus-stops?limit=N&q=X` | All cached bus stops with name search |
 | `GET /screenshot` | PNG of root view |
 | `GET /livedata` | All ViewModel LiveData values |
 | `GET /prefs` | Dump SharedPreferences |
@@ -274,11 +282,54 @@
 
 Marker types: `poi`, `stations`, `trains`, `subway`, `buses`, `aircraft`, `webcams`, `metar`, `gps`
 
+## Automated Testing
+
+### Test Scripts (project root)
+| Script | Lines | Purpose |
+|--------|-------|---------|
+| `test-app.sh` | ~650 | Quick endpoint tests (30+ checks, ~1 min) |
+| `overnight-test.sh` | ~1,850 | Full overnight harness (6-8 hrs unattended) |
+| `morning-transit-test.sh` | ~500 | Deep transit validation (active service hours) |
+| `run-full-test-suite.sh` | ~100 | Master chain: overnight → morning |
+
+### Running Tests
+```bash
+adb forward tcp:8085 tcp:8085        # Required first
+./test-app.sh                        # Quick smoke test
+./overnight-test.sh --duration 30    # 30-min trial run
+./overnight-test.sh                  # Full 8-hour overnight run
+./run-full-test-suite.sh --quick     # 30-min overnight + 30-min morning
+./run-full-test-suite.sh             # Full suite (8hr + 1hr)
+```
+
+### Test Output
+```
+overnight-runs/YYYY-MM-DD_HHMM/
+  events.log          — timestamped PASS/FAIL/WARN/INFO stream
+  time-series.csv     — 30-column CSV (memory, markers, cache, OpenSky, errors)
+  report.md           — final summary with recommendations
+  baseline/           — initial state snapshots + init-timing.json
+  snapshots/          — periodic JSON state every 5 min
+  screenshots/        — PNG captures every 15 min
+  logs/               — error snapshots + final log dump
+```
+
+### First Test Run Results (2026-03-01 01:41, overnight window)
+- **28 PASS, 2 FAIL, 8 WARN** across all features
+- Memory: 13MB baseline → 7-9MB during endurance (stable)
+- OpenSky: 3 requests used of 3,600 budget
+- Webcams: 50 loaded, METAR: 1 station, POI: 227 markers / 7,131 cached / 6,631 in DB
+- All 11 layer toggles: working
+- 988 map overlays (radar): present
+- Stations: 0 from LiveData endpoint BUT 257 markers on map + tap works (bug found)
+- Bus stops: 0 from LiveData endpoint BUT 46 markers visible at zoom 16 (bug found)
+- Init timing: stations=5.6s, bus_stops=5.3s, metar=5.3s, webcams=5.3s, pois=3.2s
+
 ## Next Steps
-- **Systematic testing** via debug HTTP server — all layers, endpoints, follow modes
-- **Test station markers** — toggle on, verify ~270 stations appear, tap one, verify arrival board, tap train row, verify schedule
-- **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
-- **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads
+- **Fix station/bus-stop LiveData mismatch** — endpoints return 0 while markers exist on map
+- **Add altitude to aircraft debugMarkers()** — missing from relatedObject serialization
+- **Fix test-app.sh ANSI grep** — strip color codes before counting PASS/FAIL
+- **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads (manual)
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)

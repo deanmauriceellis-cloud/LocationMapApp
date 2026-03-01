@@ -163,7 +163,7 @@ class MbtaRepository @Inject constructor() {
         withContext(Dispatchers.IO) {
             val url = "$BASE_URL/vehicles" +
                     "?filter%5Broute_type%5D=$routeType" +
-                    "&include=stop%2Croute" +
+                    "&include=stop%2Croute%2Ctrip" +
                     "&api_key=$API_KEY"
 
             val bodyStr = executeGet(url, "vehicles routeType=$routeType")
@@ -185,9 +185,10 @@ class MbtaRepository @Inject constructor() {
         val root = JsonParser.parseString(json).asJsonObject
         val dataArray = root.getAsJsonArray("data") ?: return emptyList()
 
-        // Build stop name lookup from included objects
+        // Build lookup maps from included objects (stops, routes, trips)
         val stopNames = mutableMapOf<String, String>()
         val routeNames = mutableMapOf<String, String>()
+        val tripHeadsigns = mutableMapOf<String, String>()
 
         root.getAsJsonArray("included")?.forEach { element ->
             val obj = element.asJsonObject
@@ -200,6 +201,9 @@ class MbtaRepository @Inject constructor() {
                 "route" -> routeNames[id] = attrs.get("long_name")?.asString
                     ?: attrs.get("short_name")?.asString
                     ?: id
+                "trip"  -> attrs.get("headsign")?.takeIf { !it.isJsonNull }?.asString?.let {
+                    tripHeadsigns[id] = it
+                }
             }
         }
 
@@ -239,6 +243,7 @@ class MbtaRepository @Inject constructor() {
 
                 val stopName  = stopId?.let { stopNames[it] }
                 val routeName = routeNames[routeId] ?: formatRouteId(routeId)
+                val headsign  = tripId?.let { tripHeadsigns[it] }
 
                 vehicles.add(
                     MbtaVehicle(
@@ -247,6 +252,7 @@ class MbtaRepository @Inject constructor() {
                         routeId       = routeId,
                         routeName     = routeName,
                         tripId        = tripId,
+                        headsign      = headsign,
                         stopId        = stopId,
                         stopName      = stopName,
                         lat           = lat,
@@ -404,10 +410,7 @@ class MbtaRepository @Inject constructor() {
      * Uses page[limit]=10000 to get all in one request (~500KB).
      */
     suspend fun fetchBusStops(): List<MbtaStop> = withContext(Dispatchers.IO) {
-        val url = "$BASE_URL/stops" +
-                "?filter%5Broute_type%5D=3" +
-                "&page%5Blimit%5D=10000" +
-                "&api_key=$API_KEY"
+        val url = "http://10.0.0.4:3000/mbta/bus-stops"
         val json = executeGet(url, "bus stops")
         parseBusStops(json)
     }

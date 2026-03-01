@@ -66,6 +66,7 @@ data class MbtaVehicle(
     val routeId: String,         // e.g. "CR-Fitchburg"
     val routeName: String,       // e.g. "Fitchburg Line"
     val tripId: String?,
+    val headsign: String?,       // Trip destination e.g. "Harvard" — from included trip object
     val stopId: String?,         // Current/next stop ID
     val stopName: String?,       // Resolved stop name
     val lat: Double,

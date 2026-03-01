@@ -41,6 +41,9 @@ class DebugEndpoints(
             "/markers/tap"      -> handleMarkerTap(params)
             "/markers/nearest"  -> handleMarkersNearest(params)
             "/markers/search"   -> handleMarkersSearch(params)
+            "/vehicles"         -> handleVehicles(params)
+            "/stations"         -> handleStations(params)
+            "/bus-stops"        -> handleBusStops(params)
             "/screenshot"       -> handleScreenshot()
             "/livedata"         -> handleLiveData()
             "/prefs"            -> handlePrefs()
@@ -68,6 +71,9 @@ class DebugEndpoints(
             mapOf("path" to "/markers/tap",     "method" to "GET", "description" to "Trigger marker click. Params: type=X, index=N"),
             mapOf("path" to "/markers/nearest", "method" to "GET", "description" to "Find nearest marker(s). Params: lat=X, lon=Y, type=X, limit=N"),
             mapOf("path" to "/markers/search",  "method" to "GET", "description" to "Search markers by title/snippet. Params: q=X, type=X, limit=N"),
+            mapOf("path" to "/vehicles",        "method" to "GET", "description" to "Raw vehicle data from LiveData. Params: type=trains|subway|buses, limit=N, index=N"),
+            mapOf("path" to "/stations",        "method" to "GET", "description" to "Raw station data from LiveData. Params: limit=N, q=X (search by name)"),
+            mapOf("path" to "/bus-stops",       "method" to "GET", "description" to "All cached bus stops. Params: limit=N, q=X (search by name)"),
             mapOf("path" to "/screenshot",      "method" to "GET", "description" to "Returns PNG of root view"),
             mapOf("path" to "/livedata",        "method" to "GET", "description" to "Current values of all ViewModel LiveData"),
             mapOf("path" to "/prefs",           "method" to "GET", "description" to "Dump SharedPreferences"),
@@ -293,6 +299,107 @@ class DebugEndpoints(
             "total" to matched.size,
             "returned" to minOf(matched.size, limit),
             "markers" to matched.take(limit)
+        )))
+    }
+
+    // ── /vehicles ─────────────────────────────────────────────────────────────
+
+    private suspend fun handleVehicles(params: Map<String, String>): EndpointResult {
+        val type = params["type"] ?: return EndpointResult(400, body = gson.toJson(mapOf("error" to "Missing 'type' param (trains|subway|buses)")))
+        val limit = params["limit"]?.toIntOrNull() ?: 500
+        val index = params["index"]?.toIntOrNull()
+
+        val vehicles = runOnMain { activity.debugVehicles(type) }
+
+        if (index != null) {
+            if (index < 0 || index >= vehicles.size) {
+                return EndpointResult(400, body = gson.toJson(mapOf("error" to "Index $index out of range (0..${vehicles.size - 1})")))
+            }
+            return EndpointResult(body = gson.toJson(serializeVehicle(vehicles[index], index)))
+        }
+
+        val truncated = vehicles.take(limit)
+        return EndpointResult(body = gson.toJson(mapOf(
+            "type" to type,
+            "total" to vehicles.size,
+            "returned" to truncated.size,
+            "vehicles" to truncated.mapIndexed { i, v -> serializeVehicle(v, i) }
+        )))
+    }
+
+    private fun serializeVehicle(v: com.example.locationmapapp.data.model.MbtaVehicle, index: Int): Map<String, Any?> {
+        return mapOf(
+            "index" to index,
+            "id" to v.id,
+            "label" to v.label,
+            "routeId" to v.routeId,
+            "routeName" to v.routeName,
+            "tripId" to v.tripId,
+            "headsign" to v.headsign,
+            "stopId" to v.stopId,
+            "stopName" to v.stopName,
+            "lat" to v.lat,
+            "lon" to v.lon,
+            "bearing" to v.bearing,
+            "speedMps" to v.speedMps,
+            "speedMph" to v.speedMph,
+            "currentStatus" to v.currentStatus.display,
+            "updatedAt" to v.updatedAt,
+            "routeType" to v.routeType
+        )
+    }
+
+    // ── /stations ────────────────────────────────────────────────────────────
+
+    private suspend fun handleStations(params: Map<String, String>): EndpointResult {
+        val limit = params["limit"]?.toIntOrNull() ?: 500
+        val query = params["q"]
+
+        var stations = runOnMain { activity.debugStations() }
+        if (query != null) {
+            stations = stations.filter { it.name.contains(query, ignoreCase = true) }
+        }
+
+        val truncated = stations.take(limit)
+        return EndpointResult(body = gson.toJson(mapOf(
+            "total" to stations.size,
+            "returned" to truncated.size,
+            "stations" to truncated.map { s ->
+                mapOf(
+                    "id" to s.id,
+                    "name" to s.name,
+                    "lat" to s.lat,
+                    "lon" to s.lon,
+                    "routeIds" to s.routeIds
+                )
+            }
+        )))
+    }
+
+    // ── /bus-stops ───────────────────────────────────────────────────────────
+
+    private suspend fun handleBusStops(params: Map<String, String>): EndpointResult {
+        val limit = params["limit"]?.toIntOrNull() ?: 500
+        val query = params["q"]
+
+        var stops = runOnMain { activity.debugBusStops() }
+        if (query != null) {
+            stops = stops.filter { it.name.contains(query, ignoreCase = true) }
+        }
+
+        val truncated = stops.take(limit)
+        return EndpointResult(body = gson.toJson(mapOf(
+            "total" to stops.size,
+            "returned" to truncated.size,
+            "busStops" to truncated.map { s ->
+                mapOf(
+                    "id" to s.id,
+                    "name" to s.name,
+                    "lat" to s.lat,
+                    "lon" to s.lon,
+                    "routeIds" to s.routeIds
+                )
+            }
         )))
     }
 
