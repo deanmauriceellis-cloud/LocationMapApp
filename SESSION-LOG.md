@@ -1,5 +1,33 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01g (Aircraft Flight Path Visualization — v1.5.24)
+
+### Changes Made
+
+#### Flight Path Trail (4 files modified)
+- **`FlightPathPoint` data class** (Models.kt) — lat, lon, altitudeMeters (nullable), timestamp (epoch ms), `toGeoPoint()`
+- **`fetchFlightHistory(icao24)`** (AircraftRepository.kt) — calls `GET /db/aircraft/:icao24`, parses `path` array into `List<FlightPathPoint>`. Each sighting yields 2 points (first + last position). Uses `java.time.Instant.parse()` for ISO timestamps.
+- **`fetchFlightHistoryDirectly(icao24)`** (MainViewModel.kt) — suspend bridge, same pattern as `fetchPredictionsDirectly`
+- **MainActivity.kt trail implementation**:
+  - `flightTrailPoints: MutableList<FlightPathPoint>` + `flightTrailOverlays: MutableList<Polyline>`
+  - Extracted `altitudeColor(altitudeMeters, onGround)` helper — replaces inline logic in `addAircraftMarker`, shared with trail
+  - `redrawFlightTrail()` — full rebuild from points, one Polyline per continuous segment, skips >30min gaps, caps 1000 points, inserts before aircraft markers (z-order)
+  - `appendToFlightTrail(state)` — incremental single-segment add on live updates, deduplicates by position
+  - `clearFlightTrail()` — removes all overlays + clears points
+  - `loadFlightTrailHistory(icao24, currentState?)` — coroutine: fetches DB history, appends current position, redraws
+  - `startFollowingAircraft()` → calls `clearFlightTrail()` + `loadFlightTrailHistory()`
+  - `followedAircraft` observer → calls `appendToFlightTrail(state)` on each live update
+  - `stopFollowing()` → calls `clearFlightTrail()` at top
+  - `debugFollowAircraft()` → also loads trail history
+  - `debugState()` → includes `flightTrailPoints` and `flightTrailSegments` in markers map
+  - Removed unused `routeOverlay: Polyline?` field
+- Polyline styling: 6f width, alpha 200, round caps, anti-alias, non-interactive (`isEnabled = false`)
+
+### No Proxy Changes
+- Uses existing `/db/aircraft/:icao24` endpoint (v1.5.23) — no server modifications needed
+
+---
+
 ## Session: 2026-03-01f (Bug Fixes + Cache Optimization + Aircraft DB — v1.5.23)
 
 ### Changes Made

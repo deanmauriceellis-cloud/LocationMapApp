@@ -1,6 +1,7 @@
 package com.example.locationmapapp.data.repository
 
 import com.example.locationmapapp.data.model.AircraftState
+import com.example.locationmapapp.data.model.FlightPathPoint
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,55 @@ class AircraftRepository @Inject constructor() {
         }
         val bodyStr = response.body?.string().orEmpty()
         if (bodyStr.isBlank()) null else parseAircraftJson(bodyStr).firstOrNull()
+    }
+
+    /** Fetch DB flight history for an aircraft. Returns chronological path points (2 per sighting). */
+    suspend fun fetchFlightHistory(icao24: String): List<FlightPathPoint> = withContext(Dispatchers.IO) {
+        val url = "http://10.0.0.4:3000/db/aircraft/${icao24.lowercase()}"
+        DebugLogger.d(TAG, "Fetching flight history for $icao24")
+        try {
+            val response = client.newCall(Request.Builder().url(url).build()).execute()
+            if (!response.isSuccessful) {
+                DebugLogger.e(TAG, "Flight history HTTP ${response.code}")
+                return@withContext emptyList()
+            }
+            val bodyStr = response.body?.string().orEmpty()
+            if (bodyStr.isBlank()) return@withContext emptyList()
+            val root = JsonParser.parseString(bodyStr).asJsonObject
+            val pathArr = root.getAsJsonArray("path") ?: return@withContext emptyList()
+            val points = mutableListOf<FlightPathPoint>()
+            for (el in pathArr) {
+                val obj = el.asJsonObject
+                val firstLat = obj["firstLat"]?.let { if (it.isJsonNull) null else it.asDouble }
+                val firstLon = obj["firstLon"]?.let { if (it.isJsonNull) null else it.asDouble }
+                val lastLat = obj["lastLat"]?.let { if (it.isJsonNull) null else it.asDouble }
+                val lastLon = obj["lastLon"]?.let { if (it.isJsonNull) null else it.asDouble }
+                val altitude = obj["altitude"]?.let { if (it.isJsonNull) null else it.asDouble }
+                val firstSeen = obj["firstSeen"]?.let { if (it.isJsonNull) null else it.asString }
+                val lastSeen = obj["lastSeen"]?.let { if (it.isJsonNull) null else it.asString }
+                val firstTs = parseIsoTimestamp(firstSeen)
+                val lastTs = parseIsoTimestamp(lastSeen)
+                if (firstLat != null && firstLon != null && firstTs > 0) {
+                    points.add(FlightPathPoint(firstLat, firstLon, altitude, firstTs))
+                }
+                if (lastLat != null && lastLon != null && lastTs > 0 &&
+                    (lastLat != firstLat || lastLon != firstLon)) {
+                    points.add(FlightPathPoint(lastLat, lastLon, altitude, lastTs))
+                }
+            }
+            DebugLogger.i(TAG, "Flight history: ${points.size} path points from ${pathArr.size()} sightings")
+            points
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "Flight history error", e)
+            emptyList()
+        }
+    }
+
+    private fun parseIsoTimestamp(iso: String?): Long {
+        if (iso == null) return 0
+        return try {
+            java.time.Instant.parse(iso).toEpochMilli()
+        } catch (_: Exception) { 0 }
     }
 
     private fun parseAircraftJson(json: String): List<AircraftState> {

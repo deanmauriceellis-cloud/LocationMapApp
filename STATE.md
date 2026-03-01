@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 23 (Bug Fixes + Cache + Aircraft DB)
+## Last Updated: 2026-03-01 Session 24 (Aircraft Flight Path Visualization)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -67,6 +67,11 @@
   - POI prefetch at aircraft position each refresh cycle
   - 3-strike failure tolerance on position queries (handles 429 rate limits)
   - Auto-stops with toast when aircraft disappears after 3 consecutive failures
+  - **Flight path trail** (v1.5.24): altitude-colored polyline drawn on map during follow
+    - Loads DB sighting history on follow start (2 points per sighting), grows live each 60s refresh
+    - Colors: gray (ground), green (<5k ft), blue (5–20k ft), purple (>20k ft)
+    - Skips >30min gaps (separate flights); caps at 1000 points; z-ordered under markers
+    - Clears on stop-follow; debug state reports trail point/segment counts
 - **Auto-follow aircraft (POI Builder)**: Utility menu toggle for passive POI cache building
   - Picks random aircraft ≥ 10,000 ft from wide bbox (~zoom 8, 6°×8° span), follows via aircraft follow mode
   - Rotates every 20 minutes; prioritizes westbound aircraft (stays over land)
@@ -348,10 +353,10 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - 0 test failures across entire run
 
 ## Next Steps
+- **Test flight path trail** — follow aircraft with DB history → verify trail renders with colored segments
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads (manual)
 - **Verify cache hit rate improvement** — bbox snapping deployed, monitor actual hit rate over next session
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)
-- Consider aircraft flight path visualization on map (DB has path data now)
 - Consider adding aircraft DB endpoints to debug server (in-app access to flight history)

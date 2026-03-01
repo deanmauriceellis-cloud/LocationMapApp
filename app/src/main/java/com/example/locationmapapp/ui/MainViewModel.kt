@@ -351,6 +351,16 @@ class MainViewModel @Inject constructor(
         _followedAircraft.value = null
     }
 
+    /** Suspend call — returns flight history path points directly for trail drawing. */
+    suspend fun fetchFlightHistoryDirectly(icao24: String): List<FlightPathPoint> {
+        return try {
+            aircraftRepository.fetchFlightHistory(icao24)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchFlightHistoryDirectly FAILED: ${e.message}", e)
+            emptyList()
+        }
+    }
+
     fun clearAircraft() {
         _aircraft.value = emptyList()
         DebugLogger.i(TAG, "Aircraft cleared")

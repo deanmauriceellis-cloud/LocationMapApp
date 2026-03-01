@@ -56,7 +56,6 @@ class MainActivity : AppCompatActivity() {
     private val trainMarkers      = mutableListOf<Marker>()
     private val subwayMarkers     = mutableListOf<Marker>()
     private val busMarkers        = mutableListOf<Marker>()
-    private var routeOverlay: Polyline? = null
     private var gpsMarker: Marker? = null
     private var radarTileOverlay: TilesOverlay? = null
     private var radarAlphaPercent: Int = 70  // 0–100, default 70%
@@ -101,6 +100,10 @@ class MainActivity : AppCompatActivity() {
     private val busStopMarkers = mutableListOf<Marker>()
     private var allBusStops: List<com.example.locationmapapp.data.model.MbtaStop> = emptyList()
     private var busStopReloadJob: Job? = null
+
+    // Flight trail overlays (aircraft follow mode)
+    private val flightTrailPoints = mutableListOf<com.example.locationmapapp.data.model.FlightPathPoint>()
+    private val flightTrailOverlays = mutableListOf<Polyline>()
 
     // Webcam tracking
     private val webcamMarkers = mutableListOf<Marker>()
@@ -840,6 +843,8 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "Followed aircraft update: ${state.callsign ?: state.icao24} at ${state.lat},${state.lon}")
             binding.mapView.controller.animateTo(state.toGeoPoint())
             showAircraftFollowBanner(state)
+            // Grow the flight trail with the new position
+            appendToFlightTrail(state)
             // Pre-fill POI cache at aircraft's current position
             val point = state.toGeoPoint()
             DebugLogger.i("MainActivity", "Aircraft follow POI prefetch at ${point.latitude},${point.longitude}")
@@ -1255,15 +1260,20 @@ class MainActivity : AppCompatActivity() {
     // AIRCRAFT
     // =========================================================================
 
-    private fun addAircraftMarker(state: com.example.locationmapapp.data.model.AircraftState) {
-        val altFt = state.baroAltitude?.let { it * 3.28084 }
-        val tint = when {
-            state.onGround           -> Color.parseColor("#78909C")  // gray
-            altFt == null            -> Color.parseColor("#1565C0")  // blue default
-            altFt < 5000             -> Color.parseColor("#2E7D32")  // green — low
-            altFt < 20000            -> Color.parseColor("#1565C0")  // blue — mid
-            else                     -> Color.parseColor("#6A1B9A")  // purple — high
+    /** Altitude → color for aircraft markers and flight trail segments. */
+    private fun altitudeColor(altitudeMeters: Double?, onGround: Boolean = false): Int {
+        val altFt = altitudeMeters?.let { it * 3.28084 }
+        return when {
+            onGround              -> Color.parseColor("#78909C")  // gray
+            altFt == null         -> Color.parseColor("#1565C0")  // blue default
+            altFt < 5000          -> Color.parseColor("#2E7D32")  // green — low
+            altFt < 20000         -> Color.parseColor("#1565C0")  // blue — mid
+            else                  -> Color.parseColor("#6A1B9A")  // purple — high
         }
+    }
+
+    private fun addAircraftMarker(state: com.example.locationmapapp.data.model.AircraftState) {
+        val tint = altitudeColor(state.baroAltitude, state.onGround)
         val heading = state.track?.toInt() ?: 0
         val m = Marker(binding.mapView).apply {
             position = state.toGeoPoint()
@@ -1350,6 +1360,127 @@ class MainActivity : AppCompatActivity() {
         aircraftMarkers.forEach { binding.mapView.overlays.remove(it) }
         aircraftMarkers.clear()
         binding.mapView.invalidate()
+    }
+
+    // ── Flight trail ─────────────────────────────────────────────────────────
+
+    /** Rebuild all trail polylines from flightTrailPoints. Skips gaps >30min. Cap: 1000 points. */
+    private fun redrawFlightTrail() {
+        // Remove existing trail overlays
+        flightTrailOverlays.forEach { binding.mapView.overlays.remove(it) }
+        flightTrailOverlays.clear()
+        if (flightTrailPoints.size < 2) { binding.mapView.invalidate(); return }
+
+        // Cap at 1000 points (keep most recent)
+        while (flightTrailPoints.size > 1000) flightTrailPoints.removeAt(0)
+
+        val GAP_THRESHOLD_MS = 30 * 60 * 1000L  // 30 minutes
+        // Find insert position: before aircraft markers (trail renders underneath)
+        val insertIdx = binding.mapView.overlays.indexOfFirst { it is Marker && aircraftMarkers.contains(it) }
+            .let { if (it < 0) binding.mapView.overlays.size else it }
+
+        var segStart = 0
+        for (i in 1 until flightTrailPoints.size) {
+            val prev = flightTrailPoints[i - 1]
+            val cur = flightTrailPoints[i]
+            val isGap = (cur.timestamp - prev.timestamp) > GAP_THRESHOLD_MS
+            val isLast = i == flightTrailPoints.size - 1
+
+            if (isGap || isLast) {
+                val endIdx = if (isGap) i else i + 1
+                if (endIdx - segStart >= 2) {
+                    val segment = flightTrailPoints.subList(segStart, endIdx)
+                    val line = Polyline(binding.mapView).apply {
+                        outlinePaint.apply {
+                            color = altitudeColor(segment.last().altitudeMeters)
+                            alpha = 200
+                            strokeWidth = 6f
+                            strokeCap = android.graphics.Paint.Cap.ROUND
+                            isAntiAlias = true
+                        }
+                        setPoints(segment.map { it.toGeoPoint() })
+                        isEnabled = false  // non-interactive
+                    }
+                    flightTrailOverlays.add(line)
+                    binding.mapView.overlays.add(insertIdx, line)
+                }
+                segStart = i
+            }
+        }
+        binding.mapView.invalidate()
+    }
+
+    /** Append a live aircraft position to the trail incrementally. */
+    private fun appendToFlightTrail(state: com.example.locationmapapp.data.model.AircraftState) {
+        val point = com.example.locationmapapp.data.model.FlightPathPoint(
+            lat = state.lat, lon = state.lon,
+            altitudeMeters = state.baroAltitude,
+            timestamp = (state.timePosition ?: (System.currentTimeMillis() / 1000)) * 1000
+        )
+        // Deduplicate — skip if same position as last point
+        val last = flightTrailPoints.lastOrNull()
+        if (last != null && last.lat == point.lat && last.lon == point.lon) return
+
+        flightTrailPoints.add(point)
+
+        // Cap at 1000 points
+        while (flightTrailPoints.size > 1000) flightTrailPoints.removeAt(0)
+
+        // Incremental: add a single segment from previous to new point (if we have ≥2 points)
+        if (flightTrailPoints.size >= 2) {
+            val prev = flightTrailPoints[flightTrailPoints.size - 2]
+            val GAP_THRESHOLD_MS = 30 * 60 * 1000L
+            if ((point.timestamp - prev.timestamp) <= GAP_THRESHOLD_MS) {
+                val insertIdx = binding.mapView.overlays.indexOfFirst { it is Marker && aircraftMarkers.contains(it) }
+                    .let { if (it < 0) binding.mapView.overlays.size else it }
+                val line = Polyline(binding.mapView).apply {
+                    outlinePaint.apply {
+                        color = altitudeColor(point.altitudeMeters)
+                        alpha = 200
+                        strokeWidth = 6f
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        isAntiAlias = true
+                    }
+                    setPoints(listOf(prev.toGeoPoint(), point.toGeoPoint()))
+                    isEnabled = false
+                }
+                flightTrailOverlays.add(line)
+                binding.mapView.overlays.add(insertIdx, line)
+                binding.mapView.invalidate()
+            }
+        }
+    }
+
+    /** Remove all trail overlays and clear the point list. */
+    private fun clearFlightTrail() {
+        flightTrailOverlays.forEach { binding.mapView.overlays.remove(it) }
+        flightTrailOverlays.clear()
+        flightTrailPoints.clear()
+        binding.mapView.invalidate()
+    }
+
+    /** Load DB history for an aircraft and draw initial trail. */
+    private fun loadFlightTrailHistory(icao24: String, currentState: com.example.locationmapapp.data.model.AircraftState? = null) {
+        lifecycleScope.launch {
+            val history = viewModel.fetchFlightHistoryDirectly(icao24)
+            if (history.isNotEmpty()) {
+                flightTrailPoints.addAll(history)
+            }
+            // Append current position if available
+            if (currentState != null) {
+                val point = com.example.locationmapapp.data.model.FlightPathPoint(
+                    lat = currentState.lat, lon = currentState.lon,
+                    altitudeMeters = currentState.baroAltitude,
+                    timestamp = (currentState.timePosition ?: (System.currentTimeMillis() / 1000)) * 1000
+                )
+                val last = flightTrailPoints.lastOrNull()
+                if (last == null || last.lat != point.lat || last.lon != point.lon) {
+                    flightTrailPoints.add(point)
+                }
+            }
+            redrawFlightTrail()
+            DebugLogger.i("MainActivity", "Flight trail loaded: ${flightTrailPoints.size} points, ${flightTrailOverlays.size} segments")
+        }
     }
 
     private fun startAircraftRefresh() {
@@ -2524,6 +2655,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopFollowing() {
         DebugLogger.i("MainActivity", "Stopped following vehicle=$followedVehicleId aircraft=$followedAircraftIcao")
+        clearFlightTrail()
         followedVehicleId = null
         followedAircraftIcao = null
         followedAircraftFailCount = 0
@@ -2610,6 +2742,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.mapView.controller.animateTo(state.toGeoPoint())
         showAircraftFollowBanner(state)
+
+        // Load DB flight history and draw trail
+        clearFlightTrail()
+        loadFlightTrailHistory(state.icao24, state)
 
         // Start dedicated icao24 refresh — tracks globally, not limited to bbox
         startFollowedAircraftRefresh(state.icao24)
@@ -3477,7 +3613,9 @@ class MainActivity : AppCompatActivity() {
                 "aircraft" to aircraftMarkers.size,
                 "webcams" to webcamMarkers.size,
                 "metar" to metarMarkers.size,
-                "gps" to if (gpsMarker != null) 1 else 0
+                "gps" to if (gpsMarker != null) 1 else 0,
+                "flightTrailPoints" to flightTrailPoints.size,
+                "flightTrailSegments" to flightTrailOverlays.size
             ),
             "followedVehicle" to followedVehicleId,
             "followedAircraft" to followedAircraftIcao,
@@ -3642,6 +3780,8 @@ class MainActivity : AppCompatActivity() {
         followedVehicleId = null
         followedAircraftIcao = icao24
         followedAircraftFailCount = 0
+        clearFlightTrail()
+        loadFlightTrailHistory(icao24)
         viewModel.loadFollowedAircraft(icao24)
         startFollowedAircraftRefresh(icao24)
     }

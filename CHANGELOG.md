@@ -1,5 +1,26 @@
 # LocationMapApp — Changelog
 
+## [1.5.24] — 2026-03-01
+
+### Added
+- **Aircraft flight path visualization** — altitude-colored polyline trail during aircraft follow mode
+  - `FlightPathPoint` data class (lat, lon, altitudeMeters, timestamp)
+  - `fetchFlightHistory(icao24)` in AircraftRepository — fetches DB sighting history from `/db/aircraft/:icao24`
+  - Trail auto-loads DB history on follow start (2 points per sighting: first + last position)
+  - Trail grows incrementally on each live position update (~60s interval)
+  - Altitude-colored segments: gray (ground), green (<5k ft), blue (5–20k ft), purple (>20k ft)
+  - Segments skip gaps >30 minutes (separate flights)
+  - 1000-point cap (~16hrs live tracking or ~500 DB sightings)
+  - Z-ordered under aircraft markers (trail renders behind planes)
+  - Polyline styling: 6px wide, semi-transparent (alpha 200), round caps, anti-alias
+  - Trail clears automatically on stop-follow
+  - Debug state includes `flightTrailPoints` and `flightTrailSegments` counts
+  - Works with both manual follow (tap aircraft) and debug follow (`/follow?type=aircraft&icao=X`)
+
+### Changed
+- Extracted `altitudeColor()` helper — shared by aircraft markers and flight trail (was inline in `addAircraftMarker`)
+- Removed unused `routeOverlay: Polyline?` field from MainActivity
+
 ## [1.5.23] — 2026-03-01
 
 ### Added

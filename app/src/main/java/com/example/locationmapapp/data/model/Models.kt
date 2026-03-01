@@ -106,6 +106,15 @@ data class AircraftState(
     fun toGeoPoint() = GeoPoint(lat, lon)
 }
 
+data class FlightPathPoint(
+    val lat: Double,
+    val lon: Double,
+    val altitudeMeters: Double?,
+    val timestamp: Long  // epoch millis
+) {
+    fun toGeoPoint() = GeoPoint(lat, lon)
+}
+
 // ── Webcam (Windy Webcams API) ──────────────────────────────────────────────
 
 data class Webcam(
