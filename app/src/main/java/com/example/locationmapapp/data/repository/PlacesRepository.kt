@@ -196,7 +196,7 @@ class PlacesRepository @Inject constructor() {
             sb.append("  node${filter}(around:$radiusM,$lat,$lon);\n")
             sb.append("  way${filter}(around:$radiusM,$lat,$lon);\n")
         }
-        sb.append(");\nout center 200;")
+        sb.append(");\nout center 500;")
         return sb.toString()
     }
 
@@ -303,10 +303,10 @@ class PlacesRepository @Inject constructor() {
 
     companion object {
         const val DEFAULT_RADIUS_M = 3000
-        const val MIN_RADIUS_M     = 250
+        const val MIN_RADIUS_M     = 100
         const val MAX_RADIUS_M     = 15000
         const val MIN_USEFUL_POI_COUNT = 5
-        const val OVERPASS_RESULT_LIMIT = 200
+        const val OVERPASS_RESULT_LIMIT = 500
     }
 
     /** Fetch cached POIs within a bounding box from the proxy's poi-cache. */

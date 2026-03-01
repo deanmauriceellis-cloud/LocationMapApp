@@ -165,7 +165,7 @@ class MainViewModel @Inject constructor(
     }
 
     companion object {
-        const val MIN_SUBDIVISION_RADIUS = 250
+        const val MIN_SUBDIVISION_RADIUS = 100
     }
 
     // ── Location ──────────────────────────────────────────────────────────────
