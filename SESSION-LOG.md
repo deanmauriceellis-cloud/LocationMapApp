@@ -1,5 +1,60 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28n (Auto Cap Detection & Retry-to-Fit)
+
+### Context
+The Overpass API `out center 200` silently truncates results in dense areas. Only the populate scanner detected this. Regular `searchPois()` discarded the raw count, so GPS startup, long-press, category toggles, and follow-mode prefetches all silently lost POIs in dense areas. The 1-mile fuzzy radius hint range was too small — a search 2km from a known dense area would start at the default 3000m and retry through the full chain.
+
+### Changes Made
+
+#### Phase 1: Subdivision queue (later replaced)
+- Added `CapEvent` model, `SharedFlow<CapEvent>` in PlacesRepository, recursive `subdivideCell()` in MainViewModel
+- This was over-engineered — replaced in Phase 2
+
+#### Phase 2: Retry-to-fit (`PlacesRepository.kt`)
+- `searchPois()` now retries in-place when capped: halves radius, re-queries same center
+- Loop continues until results fit under 500-element cap or 100m floor reached
+- `postRadiusFeedback()` sends `capped: Boolean` to proxy for aggressive hint shrinking
+- Removed: CapEvent model, SharedFlow, subdivision queue, ViewModel cap collection, Activity observers
+
+#### Overpass cap raised to 500 (`PlacesRepository.kt`)
+- `out center 200` → `out center 500` — reduces cap frequency significantly
+- `OVERPASS_RESULT_LIMIT` constant updated to 500
+
+#### MIN_RADIUS lowered to 100m (`PlacesRepository.kt`, `MainViewModel.kt`, `server.js`)
+- Was 500m → now 100m in app and proxy
+- Subdivision floor also 100m
+
+#### 20km fuzzy radius hints (`PlacesRepository.kt`, `server.js`)
+- Fuzzy hint search range expanded from 1 mile (~0.01449°) to 20km (~0.1798°)
+- Proxy logs distance in km instead of miles
+- Effect: one capped search in downtown Boston seeds hints for entire metro area
+
+#### Proxy capped radius halving (`server.js`)
+- `adjustRadiusHint(lat, lon, resultCount, error, capped)` — new 5th parameter
+- When `capped=true`: halves radius (×0.5) instead of confirming
+- POST `/radius-hint` reads `capped` from request body
+
+#### Database sync
+- Imported 70,808 POIs from proxy cache into PostgreSQL (was 22,494)
+
+### Testing
+- Downtown Boston (42.358, -71.058): 500 cap at all radii down to 375m, clears at 250m (290 elements)
+- Beverly, MA (42.558, -70.880): 6/9 grid cells clear at 3000m, 3 cap (Salem/Danvers density)
+- 20km fuzzy: Back Bay (2km) → 188m, Cambridge (5km) → 188m, Quincy (13km) → 188m, Plymouth (60km) → 3000m default
+
+### Files Modified
+- `app/.../data/model/Models.kt` — CapEvent added then removed (clean)
+- `app/.../data/repository/PlacesRepository.kt` — retry loop, postRadiusFeedback capped flag, 20km fuzzy, MIN_RADIUS=100, OVERPASS_RESULT_LIMIT=500
+- `app/.../ui/MainViewModel.kt` — subdivision queue added then removed (clean)
+- `app/.../ui/MainActivity.kt` — cap observers added then removed (clean)
+- `cache-proxy/server.js` — adjustRadiusHint capped param, 20km fuzzy, MIN_RADIUS=100
+
+### Version
+v1.5.15 — committed as two commits (cap detection + retry, then raised cap/min radius)
+
+---
+
 ## Session: 2026-02-28m (Populate POIs — Hardening)
 
 ### Context

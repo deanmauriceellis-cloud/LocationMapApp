@@ -1,6 +1,6 @@
 {
   "name": "locationmapapp-cache-proxy",
-  "version": "1.0.0",
+  "version": "1.5.15",
   "description": "Caching proxy for LocationMapApp external APIs",
   "main": "server.js",
   "scripts": {

@@ -186,10 +186,10 @@ function getRadiusHint(lat, lon) {
   const hint = radiusHints.get(key);
   if (hint) return hint.radius;
 
-  // Fuzzy: find nearest hint within 1 mile (~0.01449°)
+  // Fuzzy: find nearest hint within 20km (~0.1798°)
   const latF = parseFloat(lat);
   const lonF = parseFloat(lon);
-  const ONE_MILE_DEG = 0.01449;
+  const TWENTY_KM_DEG = 0.1798;
   let nearest = null;
   let nearestDist = Infinity;
 
@@ -200,15 +200,15 @@ function getRadiusHint(lat, lon) {
     const dLat = hLat - latF;
     const dLon = (hLon - lonF) * Math.cos(latF * Math.PI / 180);
     const dist = Math.sqrt(dLat * dLat + dLon * dLon);
-    if (dist <= ONE_MILE_DEG && dist < nearestDist) {
+    if (dist <= TWENTY_KM_DEG && dist < nearestDist) {
       nearest = v;
       nearestDist = dist;
     }
   }
 
   if (nearest) {
-    const miles = (nearestDist / ONE_MILE_DEG).toFixed(2);
-    console.log(`[Radius] Fuzzy hit for ${key} — nearest hint ${miles}mi away → ${nearest.radius}m`);
+    const km = (nearestDist / 0.008993).toFixed(1);
+    console.log(`[Radius] Fuzzy hit for ${key} — nearest hint ${km}km away → ${nearest.radius}m`);
     return nearest.radius;
   }
 

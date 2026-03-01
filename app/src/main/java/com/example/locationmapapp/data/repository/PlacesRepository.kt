@@ -1,14 +1,10 @@
 package com.example.locationmapapp.data.repository
 
-import com.example.locationmapapp.data.model.CapEvent
 import com.example.locationmapapp.data.model.PlaceResult
 import com.example.locationmapapp.data.model.PopulateSearchResult
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,10 +30,6 @@ class PlacesRepository @Inject constructor() {
     private val PROXY_BASE    = "http://10.0.0.4:3000"
     private val OVERPASS_URL  = "$PROXY_BASE/overpass"
 
-    /** Cap detection events — emitted when Overpass returns exactly the result limit */
-    private val _capEvents = MutableSharedFlow<CapEvent>(extraBufferCapacity = 8)
-    val capEvents: SharedFlow<CapEvent> = _capEvents.asSharedFlow()
-
     /** Session-level in-memory cache of radius hints keyed by "lat3:lon3" */
     private val radiusHintCache = ConcurrentHashMap<String, Int>()
 
@@ -46,9 +38,9 @@ class PlacesRepository @Inject constructor() {
     private fun gridKey(lat: Double, lon: Double): String =
         "%.3f:%.3f".format(lat, lon)
 
-    /** Find the nearest cached radius hint within 1 mile, or null. */
+    /** Find the nearest cached radius hint within 20km, or null. */
     private fun fuzzyRadiusHint(lat: Double, lon: Double): Int? {
-        val oneMileDeg = 0.01449  // ~1 mile in degrees latitude
+        val twentyKmDeg = 0.1798  // ~20km in degrees latitude
         val cosLat = Math.cos(Math.toRadians(lat))
         var nearest: Int? = null
         var nearestDist = Double.MAX_VALUE
@@ -61,7 +53,7 @@ class PlacesRepository @Inject constructor() {
             val dLat = hLat - lat
             val dLon = (hLon - lon) * cosLat
             val dist = Math.sqrt(dLat * dLat + dLon * dLon)
-            if (dist <= oneMileDeg && dist < nearestDist) {
+            if (dist <= twentyKmDeg && dist < nearestDist) {
                 nearest = radius
                 nearestDist = dist
             }
@@ -123,33 +115,51 @@ class PlacesRepository @Inject constructor() {
 
     suspend fun searchPois(center: GeoPoint, categories: List<String>): List<PlaceResult> =
         withContext(Dispatchers.IO) {
-            val radiusM = fetchRadiusHint(center)
-            val query = buildOverpassQuery(center, categories, radiusM)
-            DebugLogger.d(TAG, "Overpass POST query (${query.length} chars, radius=${radiusM}m)")
-            val body = FormBody.Builder().add("data", query).build()
-            val request = Request.Builder().url(OVERPASS_URL).post(body).build()
-            val t0 = System.currentTimeMillis()
-            val response = client.newCall(request).execute()
-            val elapsed = System.currentTimeMillis() - t0
-            DebugLogger.i(TAG, "Overpass response code=${response.code} in ${elapsed}ms contentType=${response.header("Content-Type")}")
-            if (!response.isSuccessful) {
-                val errBody = response.body?.string()?.take(300) ?: "(empty)"
-                DebugLogger.e(TAG, "Overpass HTTP ${response.code} body: $errBody")
-                postRadiusFeedback(center, 0, error = true)
-                throw RuntimeException("HTTP ${response.code}: $errBody")
+            var radiusM = fetchRadiusHint(center)
+            var attempts = 0
+
+            while (true) {
+                attempts++
+                val query = buildOverpassQuery(center, categories, radiusM)
+                DebugLogger.d(TAG, "Overpass POST query (${query.length} chars, radius=${radiusM}m, attempt=$attempts)")
+                val body = FormBody.Builder().add("data", query).build()
+                val request = Request.Builder().url(OVERPASS_URL).post(body).build()
+                val t0 = System.currentTimeMillis()
+                val response = client.newCall(request).execute()
+                val elapsed = System.currentTimeMillis() - t0
+                DebugLogger.i(TAG, "Overpass response code=${response.code} in ${elapsed}ms contentType=${response.header("Content-Type")}")
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(300) ?: "(empty)"
+                    DebugLogger.e(TAG, "Overpass HTTP ${response.code} body: $errBody")
+                    postRadiusFeedback(center, 0, error = true)
+                    throw RuntimeException("HTTP ${response.code}: $errBody")
+                }
+                val bodyStr = response.body!!.string()
+                DebugLogger.d(TAG, "Overpass response body length=${bodyStr.length} chars")
+                val (results, rawCount) = parseOverpassJson(bodyStr)
+                val capped = rawCount >= OVERPASS_RESULT_LIMIT
+
+                if (capped && radiusM / 2 >= MIN_RADIUS_M) {
+                    // Capped — halve radius and retry
+                    DebugLogger.w(TAG, "CAPPED — raw=$rawCount, parsed=${results.size} at radius=${radiusM}m → retrying at ${radiusM / 2}m")
+                    postRadiusFeedback(center, results.size, error = false, capped = true)
+                    radiusM /= 2
+                } else {
+                    // Either not capped, or at floor — accept results
+                    if (capped) {
+                        DebugLogger.w(TAG, "CAPPED at floor — raw=$rawCount, parsed=${results.size} at radius=${radiusM}m — accepting")
+                        postRadiusFeedback(center, results.size, error = false, capped = true)
+                    } else {
+                        postRadiusFeedback(center, results.size, error = false)
+                    }
+                    if (attempts > 1) {
+                        DebugLogger.i(TAG, "Settled at radius=${radiusM}m after $attempts attempts")
+                    }
+                    return@withContext results
+                }
             }
-            val bodyStr = response.body!!.string()
-            DebugLogger.d(TAG, "Overpass response body length=${bodyStr.length} chars")
-            val (results, rawCount) = parseOverpassJson(bodyStr)
-            val capped = rawCount >= OVERPASS_RESULT_LIMIT
-            if (capped) {
-                DebugLogger.w(TAG, "CAPPED — raw=$rawCount, parsed=${results.size} at radius=${radiusM}m")
-                postRadiusFeedback(center, results.size, error = false, capped = true)
-                _capEvents.tryEmit(CapEvent(center, radiusM, rawCount, results.size, categories))
-            } else {
-                postRadiusFeedback(center, results.size, error = false)
-            }
-            results
+            @Suppress("UNREACHABLE_CODE")
+            emptyList()
         }
 
     /** Cache-only variant: returns cached POIs if available, empty list if not cached.
@@ -273,32 +283,6 @@ class PlacesRepository @Inject constructor() {
             }
             postRadiusFeedback(center, results.size, error = false)
             PopulateSearchResult(results, cacheHit, key, radiusM, capped)
-        }
-
-    /** Subdivision search result — includes cap status for recursive subdivision decisions. */
-    data class SubdivisionResult(val poiCount: Int, val capped: Boolean)
-
-    /** Lightweight subdivision search — queries a sub-cell at given radius.
-     *  Results flow into the proxy cache automatically; returns count + cap status. */
-    suspend fun searchSubdivision(center: GeoPoint, categories: List<String>, radiusM: Int): SubdivisionResult =
-        withContext(Dispatchers.IO) {
-            val query = buildOverpassQuery(center, categories, radiusM)
-            DebugLogger.d(TAG, "Subdivision search at ${center.latitude},${center.longitude} radius=${radiusM}m")
-            val body = FormBody.Builder().add("data", query).build()
-            val request = Request.Builder().url(OVERPASS_URL).post(body).build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                DebugLogger.w(TAG, "Subdivision search failed: HTTP ${response.code}")
-                return@withContext SubdivisionResult(0, false)
-            }
-            val bodyStr = response.body!!.string()
-            val (results, rawCount) = parseOverpassJson(bodyStr)
-            val capped = rawCount >= OVERPASS_RESULT_LIMIT
-            if (capped) {
-                DebugLogger.w(TAG, "Subdivision sub-cell capped (raw=$rawCount, parsed=${results.size}) at radius=${radiusM}m")
-            }
-            postRadiusFeedback(center, results.size, error = false, capped = capped)
-            SubdivisionResult(results.size, capped)
         }
 
     companion object {

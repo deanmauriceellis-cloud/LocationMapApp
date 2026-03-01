@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 13 (Populate POIs hardening)
+## Last Updated: 2026-02-28 Session 14 (Auto cap detection, retry-to-fit, 20km fuzzy hints)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -65,10 +65,17 @@
   - Minimum 0.5° bbox span enforced (Windy API returns 0 for small viewports)
   - Proxy `/webcams` endpoint with 10-min cache TTL, includes `playerUrl` and `detailUrl` fields
   - Deferred restore on app restart, defaults ON with "traffic" pre-selected
+- **Automatic cap detection & retry-to-fit** (v1.5.15): all POI searches self-correct in dense areas
+  - Overpass `out center 500` cap — when hit, `searchPois()` halves radius and retries in-place
+  - Keeps halving until results fit or 100m floor reached — no subdivision queue needed
+  - Radius hint halved on cap feedback so future searches at that location start small
+  - **20km fuzzy radius hints**: nearest known hint within 20km used as starting radius
+    - Eliminates retry chains in known dense metro areas (e.g., Boston downtown → all of metro area)
+  - Tested: downtown Boston settles at 250m (5 attempts first time, 1 attempt after hint saved)
 - **Populate POIs** (grid scanner, v1.5.14): Utility menu for systematic cache building
   - Spirals outward from map center, searching every grid cell for POIs
   - **30s fixed pacing** between all searches (was adaptive); failed cells retry in-place
-  - **Cap detection**: raw Overpass elements >= 200 triggers cell subdivision (2x2 mini-grid at half radius)
+  - **Cap detection**: raw Overpass elements >= 500 triggers cell subdivision (2x2 mini-grid at half radius)
   - **Zoom-14 view**: map centers on crosshair during scan, keeping viewport small to limit bbox POI count
   - Orange crosshair marker shows current scan position
   - Banner shows: ring, cells, POIs, success/fail/capped counts, countdown timer, retry radius
@@ -83,7 +90,7 @@
 - POI prefetch along followed vehicle/aircraft routes
 - Cached POI coverage display: proxy `/pois/bbox` endpoint returns POIs within visible map area
   - Loads on startup, refreshes on scroll/zoom (500ms debounce), refreshes after follow prefetch
-- Adaptive POI search radius — proxy stores per-grid-cell hints, app fetches/reports
+- Adaptive POI search radius — proxy stores per-grid-cell hints, app fetches/reports, 20km fuzzy matching
 - Individual POI cache (poi-cache.json) — deduped by OSM type+id, with first/last seen timestamps
 - POI database (PostgreSQL) — permanent storage with JSONB tags, category indexing, upsert import
 - Cache proxy with disk persistence (cache-data.json, radius-hints.json, poi-cache.json, 365-day Overpass TTL)
@@ -134,7 +141,7 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
-  - 22,494 POIs as of 2026-02-28 (synced via `import-pois.js`)
+  - 70,808 POIs as of 2026-02-28 (synced via `import-pois.js`)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)
@@ -196,10 +203,8 @@
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
 ## Next Steps
-- **Test cap subdivision** in dense cities (Manhattan, downtown Boston) — verify sub-cells resolve cap
 - **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads
-- Consider recursive subdivision for extremely dense areas (sub-cell still capped at 1500m)
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)

@@ -1,5 +1,29 @@
 # LocationMapApp — Changelog
 
+## [1.5.15] — 2026-02-28
+
+### Changed
+- **Overpass result cap raised to 500** — `out center 200` → `out center 500`, reduces cap frequency by ~60%
+- **Auto-retry on cap** — `searchPois()` halves radius and retries in-place when Overpass returns 500 elements
+  - Keeps halving until results fit or 100m floor reached; no external subdivision queue
+  - Radius hint saved at settled value so future searches start small
+  - Downtown Boston: settles at 250m (5 attempts first time, instant on subsequent)
+- **20km fuzzy radius hints** — nearest known hint within 20km used as starting radius (was 1 mile)
+  - A single capped search in downtown Boston seeds the entire metro area
+  - Eliminates retry chains for nearby searches in known dense areas
+- **Proxy `adjustRadiusHint()` capped flag** — when `capped=true`, halves radius (×0.5) instead of confirming
+- **MIN_RADIUS lowered to 100m** (was 500m) — app, proxy, and subdivision floor all aligned
+- **`postRadiusFeedback()` sends `capped` flag** — proxy can distinguish cap from normal feedback
+
+### Removed
+- **Subdivision queue** — CapEvent model, SharedFlow, ViewModel subdivision queue, recursive subdivideCell()
+  - Replaced by simpler in-place retry loop inside `searchPois()` itself
+  - No UI observers needed (capDetected, subdivisionComplete removed from ViewModel)
+  - No cancellation calls needed in longPressHelper/startPopulatePois
+
+### Database
+- POI database synced: 70,808 POIs (was 22,494)
+
 ## [1.5.14] — 2026-02-28
 
 ### Changed

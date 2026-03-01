@@ -16,10 +16,8 @@ import com.example.locationmapapp.data.repository.WeatherRepository
 import com.example.locationmapapp.util.DebugLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
-import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 
 /**
@@ -79,93 +77,10 @@ class MainViewModel @Inject constructor(
     private val _error = MutableLiveData<String>()
     val error: LiveData<String> = _error
 
-    // ── Cap detection & subdivision ───────────────────────────────────────────
-
-    private val _capDetected = MutableLiveData<CapEvent>()
-    val capDetected: LiveData<CapEvent> = _capDetected
-
-    private val _subdivisionComplete = MutableLiveData<Boolean>()
-    val subdivisionComplete: LiveData<Boolean> = _subdivisionComplete
-
-    private val subdivisionQueue = ConcurrentLinkedQueue<CapEvent>()
-    private var subdivisionJob: Job? = null
-
     init {
         // Pure state init only — NO GPS, NO network calls.
         // GPS starts only after Activity grants permission via onPermissionGranted().
         DebugLogger.i(TAG, "ViewModel created — waiting for permission before starting GPS")
-
-        // Collect cap events from PlacesRepository
-        viewModelScope.launch {
-            placesRepository.capEvents.collect { event ->
-                DebugLogger.i(TAG, "Cap event received — raw=${event.rawCount} parsed=${event.parsedCount} radius=${event.radiusM}m")
-                _capDetected.value = event
-                enqueueSubdivision(event)
-            }
-        }
-    }
-
-    private fun enqueueSubdivision(event: CapEvent) {
-        subdivisionQueue.add(event)
-        if (subdivisionJob?.isActive != true) {
-            subdivisionJob = viewModelScope.launch { processSubdivisionQueue() }
-        }
-    }
-
-    private suspend fun processSubdivisionQueue() {
-        while (subdivisionQueue.isNotEmpty()) {
-            val event = subdivisionQueue.poll() ?: break
-            subdivideCell(event.center, event.radiusM, event.categories, depth = 0)
-        }
-        _subdivisionComplete.postValue(true)
-    }
-
-    /** Recursively subdivide a capped cell into 2x2 sub-grid at half radius.
-     *  Keeps halving until sub-cells stop capping or we hit MIN_SUBDIVISION_RADIUS. */
-    private suspend fun subdivideCell(center: GeoPoint, radiusM: Int, categories: List<String>, depth: Int) {
-        val halfRadius = radiusM / 2
-        if (halfRadius < MIN_SUBDIVISION_RADIUS) {
-            DebugLogger.w(TAG, "Subdivision hit floor (${halfRadius}m < ${MIN_SUBDIVISION_RADIUS}m) at depth=$depth — area too dense, accepting loss")
-            return
-        }
-        val offsetDeg = halfRadius.toDouble() / 111320.0
-        val cosLat = Math.cos(Math.toRadians(center.latitude))
-        val offsetLon = offsetDeg / cosLat
-
-        val subCenters = listOf(
-            GeoPoint(center.latitude - offsetDeg, center.longitude - offsetLon),
-            GeoPoint(center.latitude - offsetDeg, center.longitude + offsetLon),
-            GeoPoint(center.latitude + offsetDeg, center.longitude - offsetLon),
-            GeoPoint(center.latitude + offsetDeg, center.longitude + offsetLon)
-        )
-
-        DebugLogger.i(TAG, "Subdivision depth=$depth: 4 sub-cells at ${halfRadius}m radius")
-        for ((i, subCenter) in subCenters.withIndex()) {
-            try {
-                val result = placesRepository.searchSubdivision(subCenter, categories, halfRadius)
-                DebugLogger.d(TAG, "Subdivision d=$depth cell ${i+1}/4 → ${result.poiCount} POIs, capped=${result.capped}")
-                if (result.capped) {
-                    // Still capped — recurse deeper
-                    subdivideCell(subCenter, halfRadius, categories, depth + 1)
-                }
-            } catch (e: Exception) {
-                DebugLogger.w(TAG, "Subdivision d=$depth cell ${i+1}/4 failed: ${e.message}")
-            }
-            if (i < subCenters.lastIndex) {
-                delay(5000) // 5s pacing between subdivision queries
-            }
-        }
-    }
-
-    fun cancelSubdivision() {
-        subdivisionJob?.cancel()
-        subdivisionJob = null
-        subdivisionQueue.clear()
-        DebugLogger.i(TAG, "Subdivision cancelled")
-    }
-
-    companion object {
-        const val MIN_SUBDIVISION_RADIUS = 100
     }
 
     // ── Location ──────────────────────────────────────────────────────────────
