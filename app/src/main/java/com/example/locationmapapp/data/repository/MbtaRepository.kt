@@ -198,8 +198,9 @@ class MbtaRepository @Inject constructor() {
 
             when (type) {
                 "stop"  -> stopNames[id]  = attrs.get("name")?.asString ?: id
-                "route" -> routeNames[id] = attrs.get("long_name")?.asString
-                    ?: attrs.get("short_name")?.asString
+                "route" -> routeNames[id] = attrs.get("long_name")?.asString?.takeIf { it.isNotBlank() }
+                    ?: attrs.get("short_name")?.asString?.takeIf { it.isNotBlank() }
+                    ?: attrs.get("description")?.asString?.takeIf { it.isNotBlank() }
                     ?: id
                 "trip"  -> attrs.get("headsign")?.takeIf { !it.isJsonNull }?.asString?.let {
                     tripHeadsigns[id] = it
@@ -360,8 +361,10 @@ class MbtaRepository @Inject constructor() {
             val attrs = obj.getAsJsonObject("attributes") ?: return@forEach
             when (type) {
                 "trip" -> tripHeadsigns[id] = attrs.get("headsign")?.asString ?: ""
-                "route" -> routeNames[id] = attrs.get("long_name")?.asString
-                    ?: attrs.get("short_name")?.asString ?: id
+                "route" -> routeNames[id] = attrs.get("long_name")?.asString?.takeIf { it.isNotBlank() }
+                    ?: attrs.get("short_name")?.asString?.takeIf { it.isNotBlank() }
+                    ?: attrs.get("description")?.asString?.takeIf { it.isNotBlank() }
+                    ?: id
             }
         }
 
