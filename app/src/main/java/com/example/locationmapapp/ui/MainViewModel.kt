@@ -168,10 +168,11 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /** Direct suspend call for populate scanner — returns result without LiveData. */
-    suspend fun populateSearchAt(point: GeoPoint, categories: List<String> = emptyList()): com.example.locationmapapp.data.model.PopulateSearchResult? {
+    /** Direct suspend call for populate scanner — returns result without LiveData.
+     *  @param radiusOverride if non-null, overrides the radius hint (used for cap-retry) */
+    suspend fun populateSearchAt(point: GeoPoint, categories: List<String> = emptyList(), radiusOverride: Int? = null): com.example.locationmapapp.data.model.PopulateSearchResult? {
         return try {
-            placesRepository.searchPoisForPopulate(point, categories)
+            placesRepository.searchPoisForPopulate(point, categories, radiusOverride)
         } catch (e: Exception) {
             DebugLogger.e(TAG, "populateSearchAt FAILED: ${e.message}", e)
             null

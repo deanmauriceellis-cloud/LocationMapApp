@@ -452,8 +452,13 @@ class AppBarMenuManager(
                 R.id.menu_util_analyze_today -> menuEventListener.onAnalyzeTodayRequested()
                 R.id.menu_util_anomalies     -> menuEventListener.onTravelAnomaliesRequested()
                 R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
-                R.id.menu_util_populate_pois ->
-                    toggleBinary(item, PREF_POPULATE_POIS) { menuEventListener.onPopulatePoisToggled(it) }
+                R.id.menu_util_populate_pois -> {
+                    val running = prefs.getBoolean(PREF_POPULATE_POIS, false)
+                    val newState = !running
+                    prefs.edit().putBoolean(PREF_POPULATE_POIS, newState).apply()
+                    DebugLogger.i(TAG, "Populate POIs → $newState")
+                    menuEventListener.onPopulatePoisToggled(newState)
+                }
 
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
 
@@ -469,9 +474,12 @@ class AppBarMenuManager(
         }
         syncCheckStates(popup.menu,
             R.id.menu_util_record_gps     to PREF_RECORD_GPS,
-            R.id.menu_util_populate_pois  to PREF_POPULATE_POIS,
             R.id.menu_util_gps_mode       to PREF_GPS_MODE
         )
+        // Update populate title to reflect running state
+        val popRunning = prefs.getBoolean(PREF_POPULATE_POIS, false)
+        popup.menu.findItem(R.id.menu_util_populate_pois)?.title =
+            if (popRunning) "\u2316 Populate POIs (active)" else "Populate POIs"
         popup.show()
     }
 

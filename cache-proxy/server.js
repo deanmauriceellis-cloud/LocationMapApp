@@ -377,6 +377,7 @@ function parseOverpassCacheKey(dataField) {
   const aroundMatch = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
   if (!aroundMatch) return null;
 
+  const radius = parseInt(aroundMatch[1]);
   const lat = parseFloat(aroundMatch[2]).toFixed(3);
   const lon = parseFloat(aroundMatch[3]).toFixed(3);
 
@@ -384,7 +385,8 @@ function parseOverpassCacheKey(dataField) {
   const tagMatches = [...dataField.matchAll(/\["([^"]+)"(?:="([^"]+)")?\]/g)];
   const tags = [...new Set(tagMatches.map(m => m[2] ? `${m[1]}=${m[2]}` : m[1]))].sort();
 
-  return `overpass:${lat}:${lon}:${tags.join(',')}`;
+  // Include radius in key so different-radius queries for the same point don't collide
+  return `overpass:${lat}:${lon}:r${radius}:${tags.join(',')}`;
 }
 
 app.post('/overpass', async (req, res) => {

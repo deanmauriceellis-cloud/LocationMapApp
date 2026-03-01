@@ -1,5 +1,54 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28m (Populate POIs — Hardening)
+
+### Context
+Populate scanner from v1.5.13 had several issues discovered during testing:
+- Overpass 429s from aggressive adaptive delay (200ms/4s)
+- Webcam reload spam triggered by crosshair animation moving the map
+- POIs not appearing on map during scan (no bbox refresh after search)
+- Overpass `out center 200` silently truncating dense areas (cap detection checked post-filter count)
+- Cap retries hitting same cached response (proxy cache key didn't include radius)
+- GC pressure from rendering thousands of POI markers at wide zoom
+
+### Changes Made
+
+#### Populate scanner pacing (`MainActivity.kt`)
+- Replaced adaptive delay (200ms hit / 4s miss / 10s error) with **30s fixed pacing**
+- Failed cells **retry in-place** instead of advancing to next cell
+- Added `loadCachedPoisForVisibleArea()` after each successful search so POIs appear immediately
+
+#### Populate scanner cap detection (`PlacesRepository.kt`, `Models.kt`, `MainActivity.kt`)
+- `parseOverpassJson` now returns `Pair<List<PlaceResult>, Int>` — results + raw element count
+- Cap detection checks **raw element count >= 200** (not post-filter named count)
+- `PopulateSearchResult` gains `radiusM` and `capped` fields
+- `searchPoisForPopulate()` accepts optional `radiusOverride` parameter
+- When capped: subdivides cell into **mini-grid** (2x2 at half radius) instead of retrying center point
+- Sub-grid step recomputed from halved radius: `0.8 * 2 * subRadius / 111320`
+
+#### Populate banner improvements (`MainActivity.kt`)
+- Shows success/fail/capped counts: `✓ok ⚠fail ✂capped`
+- Per-second countdown timer: `Next: 25s`
+- Shows `(retry 1500m)` during sub-cell searches
+
+#### Populate UX changes (`MainActivity.kt`, `AppBarMenuManager.kt`, `menu_utility.xml`)
+- Menu item no longer checkable — title changes to "⌖ Populate POIs (active)" when running
+- Pref cleared in `onStart()` — never auto-restarts on app launch
+- Stops on user interaction: long-press on map, vehicle marker tap, aircraft marker tap
+- Map zooms to **zoom 14** at each scan point — smaller viewport = fewer bbox POIs = less GC pressure
+
+#### Scroll event suppression (`MainActivity.kt`)
+- Webcam reloads suppressed during populate (crosshair animation was triggering every 2-3s)
+- Bbox POI reloads kept active so user sees new POIs appear
+
+#### POI zoom guard (`MainActivity.kt`)
+- `loadCachedPoisForVisibleArea()` skips loading at zoom ≤ 8 and clears existing markers
+- Prevents overwhelming map with thousands of POI dots at wide zoom
+
+#### Proxy cache key fix (`cache-proxy/server.js`)
+- Overpass cache key now includes radius: `overpass:lat:lon:rRADIUS:tags`
+- Prevents cap-retry with smaller radius from returning same cached 200-element response
+
 ## Session: 2026-02-28l (Populate POIs — Grid Scanner)
 
 ### Context

@@ -30,13 +30,6 @@ class PlacesRepository @Inject constructor() {
     private val PROXY_BASE    = "http://10.0.0.4:3000"
     private val OVERPASS_URL  = "$PROXY_BASE/overpass"
 
-    companion object {
-        const val DEFAULT_RADIUS_M = 3000
-        const val MIN_RADIUS_M     = 500
-        const val MAX_RADIUS_M     = 15000
-        const val MIN_USEFUL_POI_COUNT = 5
-    }
-
     /** Session-level in-memory cache of radius hints keyed by "lat3:lon3" */
     private val radiusHintCache = ConcurrentHashMap<String, Int>()
 
@@ -139,7 +132,7 @@ class PlacesRepository @Inject constructor() {
             }
             val bodyStr = response.body!!.string()
             DebugLogger.d(TAG, "Overpass response body length=${bodyStr.length} chars")
-            val results = parseOverpassJson(bodyStr)
+            val (results, _) = parseOverpassJson(bodyStr)
             postRadiusFeedback(center, results.size, error = false)
             results
         }
@@ -167,7 +160,7 @@ class PlacesRepository @Inject constructor() {
                 return@withContext emptyList<PlaceResult>()
             }
             val bodyStr = response.body!!.string()
-            parseOverpassJson(bodyStr)
+            parseOverpassJson(bodyStr).first
         }
 
     private fun buildOverpassQuery(center: GeoPoint, categories: List<String>, radiusM: Int): String {
@@ -192,11 +185,14 @@ class PlacesRepository @Inject constructor() {
         return sb.toString()
     }
 
-    private fun parseOverpassJson(json: String): List<PlaceResult> {
+    /** Pair<parsed results, raw element count from Overpass before filtering> */
+    private fun parseOverpassJson(json: String): Pair<List<PlaceResult>, Int> {
         val results = mutableListOf<PlaceResult>()
+        var rawCount = 0
         try {
             val elements = JsonParser.parseString(json)
                 .asJsonObject["elements"].asJsonArray
+            rawCount = elements.size()
             for (el in elements) {
                 val obj  = el.asJsonObject
                 val tags = obj["tags"]?.asJsonObject ?: continue
@@ -233,15 +229,16 @@ class PlacesRepository @Inject constructor() {
         } catch (e: Exception) {
             DebugLogger.e(TAG, "JSON parse error", e)
         }
-        DebugLogger.i(TAG, "Parsed ${results.size} POIs")
-        return results
+        DebugLogger.i(TAG, "Parsed ${results.size} POIs (raw elements: $rawCount)")
+        return Pair(results, rawCount)
     }
 
-    /** Populate-mode variant: searches POIs and reads X-Cache header to report cache status. */
-    suspend fun searchPoisForPopulate(center: GeoPoint, categories: List<String> = emptyList()): PopulateSearchResult =
+    /** Populate-mode variant: searches POIs and reads X-Cache header to report cache status.
+     *  @param radiusOverride if non-null, overrides the radius hint (used for cap-retry with smaller radius) */
+    suspend fun searchPoisForPopulate(center: GeoPoint, categories: List<String> = emptyList(), radiusOverride: Int? = null): PopulateSearchResult =
         withContext(Dispatchers.IO) {
             val key = gridKey(center.latitude, center.longitude)
-            val radiusM = fetchRadiusHint(center)
+            val radiusM = radiusOverride ?: fetchRadiusHint(center)
             val query = buildOverpassQuery(center, categories, radiusM)
             DebugLogger.d(TAG, "Populate search at $key (radius=${radiusM}m)")
             val body = FormBody.Builder().add("data", query).build()
@@ -254,10 +251,22 @@ class PlacesRepository @Inject constructor() {
             val cacheHeader = response.header("X-Cache") ?: "MISS"
             val cacheHit = cacheHeader.equals("HIT", ignoreCase = true)
             val bodyStr = response.body!!.string()
-            val results = parseOverpassJson(bodyStr)
+            val (results, rawCount) = parseOverpassJson(bodyStr)
+            val capped = rawCount >= OVERPASS_RESULT_LIMIT
+            if (capped) {
+                DebugLogger.w(TAG, "Populate CAPPED — raw=$rawCount elements (limit=$OVERPASS_RESULT_LIMIT), parsed=${results.size} named POIs at $key (radius=${radiusM}m) — POIs likely lost")
+            }
             postRadiusFeedback(center, results.size, error = false)
-            PopulateSearchResult(results, cacheHit, key)
+            PopulateSearchResult(results, cacheHit, key, radiusM, capped)
         }
+
+    companion object {
+        const val DEFAULT_RADIUS_M = 3000
+        const val MIN_RADIUS_M     = 500
+        const val MAX_RADIUS_M     = 15000
+        const val MIN_USEFUL_POI_COUNT = 5
+        const val OVERPASS_RESULT_LIMIT = 200
+    }
 
     /** Fetch cached POIs within a bounding box from the proxy's poi-cache. */
     suspend fun fetchCachedPoisInBbox(south: Double, west: Double, north: Double, east: Double): List<PlaceResult> = withContext(Dispatchers.IO) {
@@ -271,7 +280,7 @@ class PlacesRepository @Inject constructor() {
         val bodyStr = response.body?.string().orEmpty()
         if (bodyStr.isBlank()) return@withContext emptyList()
         // Response format: { count, elements: [...] } — same element format as Overpass
-        parseOverpassJson(bodyStr)
+        parseOverpassJson(bodyStr).first
     }
 
     private fun parsePoiExportJson(json: String): List<PlaceResult> {

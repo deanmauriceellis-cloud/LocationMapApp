@@ -224,6 +224,9 @@ class MainActivity : AppCompatActivity() {
                 "toolbarMenu.size=${binding.toolbar.menu?.size()}")
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
 
+        // Populate is never auto-restored — user must pick a location and start manually
+        prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
+
         // Restore radar — add the tile overlay AND restart the refresh scheduler
         val radarOn = prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, true)
         DebugLogger.i("MainActivity", "onStart() radarOn=$radarOn interval=${appBarMenuManager.radarUpdateMinutes}min")
@@ -329,6 +332,8 @@ class MainActivity : AppCompatActivity() {
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
                 DebugLogger.i("MainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
+                // Stop populate scanner if running — user is interacting with a new location
+                if (populateJob != null) stopPopulatePois()
                 viewModel.setManualLocation(p)
                 binding.mapView.controller.animateTo(p)
                 triggerFullSearch(p)
@@ -384,13 +389,14 @@ class MainActivity : AppCompatActivity() {
                     delay(500)
                     loadCachedPoisForVisibleArea()
                 }
-                scheduleWebcamReload()
+                // Suppress webcam reloads while populate scanner is running
+                if (populateJob == null) scheduleWebcamReload()
                 return false
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 updateZoomBubble()
                 scheduleAircraftReload()
-                scheduleWebcamReload()
+                if (populateJob == null) scheduleWebcamReload()
                 // Refresh POI marker icons when crossing the zoom-18 label threshold
                 val nowLabeled = binding.mapView.zoomLevelDouble >= 18.0
                 if (nowLabeled != poiLabelsShowing) {
@@ -914,8 +920,14 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.invalidate()
     }
 
-    /** Ask the proxy for cached POIs within the visible map bounding box. */
+    /** Ask the proxy for cached POIs within the visible map bounding box.
+     *  Skips loading at zoom ≤ 8 — viewport too large, too many markers. */
     private fun loadCachedPoisForVisibleArea() {
+        if (binding.mapView.zoomLevelDouble <= 8.0) {
+            // Clear POI markers when zoomed out too far
+            replaceAllPoiMarkers(emptyList())
+            return
+        }
         val bb = binding.mapView.boundingBox
         viewModel.loadCachedPoisForBbox(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
@@ -1613,6 +1625,8 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun onVehicleMarkerTapped(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
+        // Stop populate scanner if running — user is interacting with an object
+        if (populateJob != null) stopPopulatePois()
         if (followedVehicleId == vehicle.id) {
             stopFollowing()
         } else {
@@ -1701,6 +1715,8 @@ class MainActivity : AppCompatActivity() {
     // ── Aircraft follow ─────────────────────────────────────────────────────
 
     private fun onAircraftMarkerTapped(state: com.example.locationmapapp.data.model.AircraftState) {
+        // Stop populate scanner if running — user is interacting with an object
+        if (populateJob != null) stopPopulatePois()
         if (followedAircraftIcao == state.icao24) {
             stopFollowing()
         } else {
@@ -1927,55 +1943,119 @@ class MainActivity : AppCompatActivity() {
 
         var cellsSearched = 0
         var totalPois = 0
-        var cacheHits = 0
+        var successCount = 0
+        var failCount = 0
+        var cappedCount = 0
         var consecutiveErrors = 0
+        val minRadius = com.example.locationmapapp.data.repository.PlacesRepository.MIN_RADIUS_M
 
         populateJob = lifecycleScope.launch {
             toast("Populate started — tap banner to stop")
 
             for (ring in 0..15) {
                 val points = generateRingPoints(ring, centerLat, centerLon, stepLat, stepLon)
-                for ((gridLat, gridLon) in points) {
+                var pointIdx = 0
+                while (pointIdx < points.size) {
                     // Check cancellation
                     kotlinx.coroutines.yield()
 
+                    val (gridLat, gridLon) = points[pointIdx]
                     val point = GeoPoint(gridLat, gridLon)
 
                     // Place scanning marker
                     placeScanningMarker(point)
 
-                    // Show progress banner
-                    val hitRate = if (cellsSearched > 0) (cacheHits * 100 / cellsSearched) else 0
-                    showPopulateBanner(ring, cellsSearched, totalPois, hitRate, consecutiveErrors)
+                    // Show banner before search
+                    showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, 0)
 
-                    // Search
+                    // Search — with cap-subdivide: if we hit 200 limit, subdivide cell with smaller radius
                     val result = viewModel.populateSearchAt(point)
 
                     if (result != null) {
                         consecutiveErrors = 0
-                        cellsSearched++
                         totalPois += result.results.size
-                        if (result.cacheHit) cacheHits++
 
-                        // Adaptive delay
-                        val delayMs = if (result.cacheHit) 200L else 4000L
-                        delay(delayMs)
-                    } else {
-                        consecutiveErrors++
+                        if (result.capped) {
+                            // Hit the 200-result cap — area too dense, subdivide into mini-grid
+                            cappedCount++
+                            val subRadius = result.radiusM / 2
+                            DebugLogger.w("MainActivity",
+                                "Populate CAPPED at ${result.results.size} POIs (radius=${result.radiusM}m) — subdividing cell into mini-grid at ${subRadius}m")
+                            toast("Dense area — subdividing to ${subRadius}m radius")
+
+                            // Generate sub-grid points covering the original cell area
+                            val subStepLat = 0.8 * 2 * subRadius / 111320.0
+                            val subStepLon = subStepLat / Math.cos(Math.toRadians(gridLat))
+                            // How many sub-cells fit in original cell: original step / sub step
+                            val subdivisions = Math.ceil(stepLat / subStepLat).toInt().coerceAtLeast(2)
+                            val halfSpan = (subdivisions - 1) / 2.0
+
+                            val subPoints = mutableListOf<Pair<Double, Double>>()
+                            for (sy in 0 until subdivisions) {
+                                for (sx in 0 until subdivisions) {
+                                    val subLat = gridLat + (sy - halfSpan) * subStepLat
+                                    val subLon = gridLon + (sx - halfSpan) * subStepLon
+                                    subPoints.add(Pair(subLat, subLon))
+                                }
+                            }
+
+                            DebugLogger.i("MainActivity",
+                                "Subdivided into ${subPoints.size} sub-cells (${subdivisions}x${subdivisions}) at radius=${subRadius}m")
+
+                            for ((subLat, subLon) in subPoints) {
+                                kotlinx.coroutines.yield()
+                                val subPoint = GeoPoint(subLat, subLon)
+                                placeScanningMarker(subPoint)
+                                showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, 0, subRadius)
+
+                                // Wait 30s before sub-search
+                                for (sec in 30 downTo 1) {
+                                    showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, sec, subRadius)
+                                    delay(1_000L)
+                                }
+
+                                val subResult = viewModel.populateSearchAt(subPoint, radiusOverride = subRadius)
+                                if (subResult != null) {
+                                    totalPois += subResult.results.size
+                                    if (subResult.capped) {
+                                        cappedCount++
+                                        DebugLogger.w("MainActivity",
+                                            "Sub-cell still capped at ${subRadius}m (${subResult.results.size} POIs) — accepting loss at minimum granularity")
+                                    }
+                                    loadCachedPoisForVisibleArea()
+                                } else {
+                                    failCount++
+                                }
+                            }
+                        }
+
+                        successCount++
                         cellsSearched++
+                        pointIdx++  // advance to next cell
+                        // Refresh map so new POIs appear immediately
+                        loadCachedPoisForVisibleArea()
+                    } else {
+                        // Failed — do NOT advance; retry same cell after delay
+                        failCount++
+                        consecutiveErrors++
                         if (consecutiveErrors >= 5) {
                             toast("Populate stopped — 5 consecutive errors")
                             DebugLogger.w("MainActivity", "Populate auto-stopped after 5 consecutive errors")
                             break
                         }
-                        delay(10000L)  // error backoff
+                    }
+
+                    // Countdown 30s with banner update every second
+                    for (sec in 30 downTo 1) {
+                        showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, sec)
+                        delay(1_000L)
                     }
                 }
                 if (consecutiveErrors >= 5) break
             }
 
             // Completion
-            DebugLogger.i("MainActivity", "Populate complete: $cellsSearched cells, $totalPois POIs, $cacheHits cache hits")
+            DebugLogger.i("MainActivity", "Populate complete: $cellsSearched cells, $totalPois POIs, $successCount ok, $failCount fail, $cappedCount capped")
             stopPopulatePois()
             toast("Populate done — $cellsSearched cells, $totalPois POIs")
         }
@@ -2037,7 +2117,10 @@ class MainActivity : AppCompatActivity() {
                 binding.mapView.overlays.add(scanningMarker)
             }
             scanningMarker?.position = point
-            binding.mapView.invalidate()
+            // Zoom to scan point at zoom 14 — keeps viewport small so bbox
+            // returns fewer POIs and out-of-view markers fall off naturally
+            binding.mapView.controller.setZoom(14.0)
+            binding.mapView.controller.animateTo(point)
         }
     }
 
@@ -2047,9 +2130,12 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.invalidate()
     }
 
-    private fun showPopulateBanner(ring: Int, cells: Int, pois: Int, hitRate: Int, errors: Int) {
-        val errorStr = if (errors > 0) "  •  \u26A0 $errors err" else ""
-        val text = "\u2316 Populate  Ring $ring  •  $cells cells  •  $pois POIs  •  $hitRate% cached$errorStr\nTap to stop"
+    private fun showPopulateBanner(ring: Int, cells: Int, pois: Int, ok: Int, fail: Int, capped: Int, countdown: Int, retryRadius: Int? = null) {
+        val countdownStr = if (countdown > 0) "  Next: ${countdown}s" else "  Searching\u2026"
+        val failStr = if (fail > 0) "  \u26A0$fail" else ""
+        val cappedStr = if (capped > 0) "  \u2702$capped" else ""
+        val retryStr = if (retryRadius != null) "  (retry ${retryRadius}m)" else ""
+        val text = "\u2316 Populate  R$ring  •  $cells cells  •  $pois POIs  •  \u2713$ok$failStr$cappedStr$retryStr$countdownStr\nTap to stop"
 
         runOnUiThread {
             if (followBanner == null) {

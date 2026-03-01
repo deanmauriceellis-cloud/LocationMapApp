@@ -128,7 +128,9 @@ data class Webcam(
 data class PopulateSearchResult(
     val results: List<PlaceResult>,
     val cacheHit: Boolean,
-    val gridKey: String
+    val gridKey: String,
+    val radiusM: Int = 3000,
+    val capped: Boolean = false   // true when Overpass returned exactly the limit (200)
 )
 
 enum class MbtaVehicleStatus(val display: String) {

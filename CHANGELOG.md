@@ -1,5 +1,38 @@
 # LocationMapApp — Changelog
 
+## [1.5.14] — 2026-02-28
+
+### Changed
+- **Populate scanner: 30s fixed pacing** — replaces adaptive delay (200ms/4s/10s) to avoid Overpass 429s
+  - Failed cells are retried in-place instead of advancing
+  - Auto-stops after 5 consecutive errors (unchanged)
+- **Populate scanner: cap detection and cell subdivision** — prevents silent POI loss in dense areas
+  - Overpass `out center 200` silently truncates dense results; now detected via raw element count
+  - When raw elements >= 200: halves radius, subdivides cell into mini-grid (2x2 at 1500m), searches each sub-cell
+  - Logs warning with raw vs parsed counts; toasts "Dense area — subdividing to Xm radius"
+  - Sub-cells that are still capped are logged but accepted (one level of subdivision)
+- **Populate scanner: zoom-14 view** — map zooms to scan point at zoom 14 during populate
+  - Keeps viewport small so bbox POI query returns fewer markers
+  - Old POIs fall off naturally via viewport-only eviction, reducing GC pressure
+- **Populate banner: countdown timer + success/fail counts**
+  - Shows `✓ok ⚠fail ✂capped Next: 25s` with per-second countdown during 30s wait
+  - Shows `(retry 1500m)` during sub-cell searches
+- **Populate menu: activation state instead of checkbox**
+  - Title changes to "⌖ Populate POIs (active)" when running; no checkable attribute
+- **Populate: never auto-restarts** — pref cleared in `onStart()`, user must manually activate
+- **Populate stops on user interaction** — long-press, vehicle tap, aircraft tap all cancel scanner
+- **Webcam reloads suppressed during populate** — prevents scroll-triggered webcam spam from crosshair animation
+- **POI markers hidden at zoom ≤ 8** — bbox query skipped and markers cleared to avoid overwhelming the map
+- **Proxy Overpass cache key includes radius** — `overpass:lat:lon:rRADIUS:tags` prevents cache collisions between different-radius queries for the same point
+- **`parseOverpassJson` returns raw element count** — `Pair<List<PlaceResult>, Int>` enables cap detection against pre-filter count
+
+### Fixed
+- **Populate POIs not appearing on map** — `loadCachedPoisForVisibleArea()` now called after each successful search
+- **Webcam reload spam during populate** — crosshair animation triggered scroll listener every 2-3s
+- **Overpass 429s during populate** — adaptive delay too aggressive; now 30s fixed pacing
+- **Cap detection false negatives** — was checking post-filter named count (195) vs limit (200); now checks raw element count (200)
+- **Cap retry returning cached data** — proxy cache key didn't include radius, so smaller-radius retries returned same cached 200-element response
+
 ## [1.5.13] — 2026-02-28
 
 ### Added
