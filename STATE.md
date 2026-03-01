@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 22 (Automated Test Harness)
+## Last Updated: 2026-03-01 Session 23 (Bug Fixes + Cache + Aircraft DB)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -121,6 +121,9 @@
   - Prevents Overpass 429/504 storms from parallel requests
   - Queue depth visible in `/cache/stats` → `overpassQueue`
   - `X-POI-New` / `X-POI-Known` response headers report new vs existing POIs per request
+- **Bbox snapping for cache hit rate** (v1.5.23): coordinates rounded to grid for reuse across small scrolls
+  - METAR: 0.01° (~1km), webcams: 0.01° (~1km), aircraft: 0.1° (~11km)
+  - South/west snap down, north/east snap up to fully contain original viewport
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
@@ -151,6 +154,7 @@
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
+| DB Aircraft | `http://10.0.0.4:3000/db/aircraft/...` | GET /db/aircraft/search, /recent, /stats, /:icao24 | live |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
 | MBTA Stations | direct (api-v3.mbta.com/stops) | not proxied | — |
@@ -192,20 +196,24 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
-  - 6,631 POIs as of 2026-03-01 (re-imported via `import-pois.js` after DB reset)
+  - 23,343 POIs as of 2026-03-01 (re-imported via `import-pois.js`)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)
   - Indexes: icao24, callsign, first_seen, last_seen, last_lat+lon
-  - 0 sightings as of 2026-03-01 (accumulates in real-time when aircraft tracking enabled)
+  - 501+ sightings as of 2026-03-01, 195 unique aircraft (accumulates in real-time)
   - Real-time: proxy writes to DB on every aircraft API response (cache hits and misses)
-- **DB query API** (`/db/*` prefix): 6 endpoints for searching, filtering, analytics
+- **DB query API** (`/db/*` prefix): 10 endpoints — 6 POI + 4 aircraft
   - `GET /db/pois/search` — name search (ILIKE), category filter, bbox, tag queries, distance sort
   - `GET /db/pois/nearby` — Haversine distance sort with bbox pre-filter
   - `GET /db/poi/:type/:id` — single POI with timestamps
   - `GET /db/pois/stats` — totals, named count, top categories, bounds, time range
   - `GET /db/pois/categories` — category breakdown with key/value split
   - `GET /db/pois/coverage` — geographic grid with configurable resolution
+  - `GET /db/aircraft/search` — filter by callsign, icao24, country, bbox, time range
+  - `GET /db/aircraft/stats` — totals, unique aircraft, top countries/callsigns, altitude distribution
+  - `GET /db/aircraft/recent` — most recently seen aircraft, deduplicated by icao24
+  - `GET /db/aircraft/:icao24` — full sighting history + flight path for one aircraft
 - Import: `DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp node import-pois.js`
 - Proxy startup: `DATABASE_URL=... OPENSKY_CLIENT_ID=... OPENSKY_CLIENT_SECRET=... node server.js`
   - Without DATABASE_URL: proxy starts normally, `/db/*` returns 503
@@ -252,7 +260,7 @@
 - Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
-- **test-app.sh ANSI grep**: `grep -c '^\[PASS\]'` on color-coded output returns 0 — ANSI escape codes precede `[PASS]` text
+- ~~**test-app.sh ANSI grep**~~ — fixed in v1.5.23, strips ANSI before counting
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |
@@ -330,7 +338,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - Follow endurance: 6/6 checks active over 60s
 - API reliability: 45/45 requests succeeded (100%)
 - Bus stops: Downtown=46, Cambridge=139, Seaport=78
-- Warnings: bus routeName 80%, bus stop search 'Mass Ave' = 0 (uses full "Massachusetts Ave")
+- Warnings: bus routeName 80% **(fixed v1.5.23)**, bus stop search 'Mass Ave' = 0 **(fixed v1.5.23 — fuzzy search)**
 
 **Monitor (14 snapshots, 30-min intervals, 2:22AM → 8:53AM)**
 - Transit ramp: 52 buses (2AM) → 100 (5:23) → 198 (6:23) → 273 (8:53)
@@ -340,12 +348,10 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - 0 test failures across entire run
 
 ## Next Steps
-- **Fix test-app.sh ANSI grep** — strip color codes before counting PASS/FAIL
-- **Investigate bus routeName 80%** — 20% of buses have empty route name from MBTA API
-- **Bus stop search improvements** — 'Mass Ave' returns 0 (stored as "Massachusetts Ave"), consider substring/fuzzy matching
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads (manual)
-- **Improve cache hit rate** — 28% session rate during testing; consider TTL tuning or pre-warming
+- **Verify cache hit rate improvement** — bbox snapping deployed, monitor actual hit rate over next session
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)
-- Add aircraft query endpoints to /db/* API (search by callsign, flight path analysis)
+- Consider aircraft flight path visualization on map (DB has path data now)
+- Consider adding aircraft DB endpoints to debug server (in-app access to flight history)

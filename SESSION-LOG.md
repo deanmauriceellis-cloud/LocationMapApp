@@ -1,5 +1,51 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01f (Bug Fixes + Cache Optimization + Aircraft DB — v1.5.23)
+
+### Changes Made
+
+#### Bug Fixes
+- **overnight-test.sh ANSI grep fix** — `grep -c '^\[PASS\]'` on test-app.sh output returned 0 because ANSI color codes preceded `[PASS]`. Fixed by piping through `sed 's/\x1b\[[0-9;]*m//g'` to strip escape codes before counting. Only affected lines 471-472 in overnight-test.sh (events.log was already plain text).
+
+- **Bus routeName 100%** (was 80%) — Root cause: MBTA shuttle routes (`Shuttle-Generic`, `Shuttle-Generic-Red`) have `long_name: ""` (empty string, not null). Kotlin's `?:` Elvis operator doesn't trigger on `""`, so the fallback to `short_name` never fired. Fixed by adding `.takeIf { it.isNotBlank() }` to the chain, plus `description` as a third fallback. Both parser locations in MbtaRepository.kt updated. Result: 0 empty route names (was 59/317).
+
+#### Fuzzy Search
+- **Fuzzy match helper** in `DebugEndpoints.kt` — `fuzzyMatch(target, query)` splits query into words, matches each against target independently, with abbreviation expansion (17 common abbreviations: Mass→Massachusetts, Ave→Avenue, Sq→Square, St→Street, Ctr→Center, etc.)
+- Applied to `/bus-stops?q=`, `/stations?q=`, and `/markers/search?q=` endpoints
+- "Mass Ave" → 163 bus stops, "Harvard Sq" → 2 bus stops (was 0 for both)
+
+#### Cache Hit Rate Optimization
+- **`snapBbox()` helper** in server.js — rounds bbox coordinates to a grid so small scrolls reuse the same cache key
+  - `Math.floor` for south/west, `Math.ceil` for north/east → snapped bbox always contains original
+  - METAR: 0.01° precision (~1.1km), 1h TTL
+  - Webcams: 0.01° precision (~1.1km), 10min TTL
+  - Aircraft: 0.1° precision (~11km), 15s TTL
+- Before: every scroll generated unique 15-decimal-place bbox keys → near-zero cache hits for metar/webcams/aircraft (95 webcam entries, 24 metar entries, 20 aircraft entries in cache)
+- After: small pans produce identical snapped keys → much higher cache reuse
+
+#### Aircraft DB Query Endpoints
+- **4 new `/db/aircraft/*` endpoints** in server.js:
+  - `GET /db/aircraft/search` — filter by q (callsign/icao24), icao24, callsign, country, bbox (s/w/n/e), since/until time range, on_ground; sorted by last_seen DESC
+  - `GET /db/aircraft/stats` — totalSightings, uniqueAircraft, topCountries, topCallsigns, timeRange, altitudeDistribution (ground/<5k/5-20k/>20k ft)
+  - `GET /db/aircraft/recent` — most recently seen aircraft deduplicated by icao24
+  - `GET /db/aircraft/:icao24` — full sighting history + flight path with first/last positions
+- Route ordering: /stats and /recent defined before /:icao24 to avoid Express param matching
+- `toSighting()` helper formats DB rows to camelCase JSON with computed durationSec
+
+#### Database
+- POIs re-imported: 6,631 → 23,343 (proxy cache growth from POI building sessions)
+- Aircraft sightings: 501 across 195 unique aircraft, 204 unique callsigns
+- Top traffic: JetBlue (JBU), Delta (DAL); 10 countries represented
+
+### Commits
+- `80adf86` — Fix ANSI grep in overnight-test.sh
+- `fb7c2a2` — Fix bus routeName empty for shuttle routes
+- `715a657` — Add fuzzy search to bus stops, stations, and marker search
+- `2df1aa1` — Add bbox snapping to metar/aircraft/webcam cache keys
+- `d6fd93f` — Add /db/aircraft/* query endpoints
+
+---
+
 ## Session: 2026-03-01e (Automated Test Harness — v1.5.22)
 
 ### Changes Made

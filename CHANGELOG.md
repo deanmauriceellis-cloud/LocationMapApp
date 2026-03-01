@@ -1,5 +1,34 @@
 # LocationMapApp — Changelog
 
+## [1.5.23] — 2026-03-01
+
+### Added
+- **Aircraft DB query endpoints** — 4 new `/db/aircraft/*` PostgreSQL-backed endpoints
+  - `/db/aircraft/search` — filter by callsign, icao24, country, bbox, time range, on_ground
+  - `/db/aircraft/stats` — totals, unique aircraft, top countries/callsigns, altitude distribution
+  - `/db/aircraft/recent` — most recently seen aircraft, deduplicated by icao24
+  - `/db/aircraft/:icao24` — full sighting history + flight path for one aircraft
+- **Fuzzy search** for `/bus-stops`, `/stations`, and `/markers/search` endpoints
+  - Splits query into words, matches each independently (AND logic)
+  - Abbreviation expansion: Mass→Massachusetts, Ave→Avenue, Sq→Square, St→Street, etc.
+  - "Mass Ave" now returns 163 bus stops (was 0)
+- **Bbox snapping for cache hit rate** — `snapBbox()` rounds coordinates to grid
+  - METAR: 0.01° (~1km), webcams: 0.01° (~1km), aircraft: 0.1° (~11km)
+  - South/west snap down, north/east snap up to fully contain original viewport
+  - Eliminates unique cache keys from 15-decimal-place bbox coordinates on every scroll
+
+### Fixed
+- **Bus routeName 100%** (was 80%) — MBTA shuttle routes have `long_name: ""` (empty string, not null)
+  - Elvis chain `?:` didn't trigger on empty strings; added `.takeIf { it.isNotBlank() }`
+  - Falls through to `short_name` then `description` — "Shuttle-Generic" → "Shuttle", "Shuttle-Generic-Red" → "Red Line Shuttle"
+  - Applied to both vehicle parser locations in MbtaRepository.kt
+- **overnight-test.sh ANSI grep** — `grep -c '^\[PASS\]'` returned 0 on color-coded test-app.sh output
+  - ANSI escape codes preceded `[PASS]` text; now stripped with `sed` before counting
+
+### Database
+- POIs re-imported: 6,631 → **23,343 POIs** (from proxy cache growth)
+- Aircraft sightings: 501+ across 195 unique aircraft
+
 ## [1.5.22] — 2026-03-01
 
 ### Added
