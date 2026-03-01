@@ -1,5 +1,38 @@
 # LocationMapApp — Changelog
 
+## [1.5.16] — 2026-02-28
+
+### Changed
+- **Populate POIs v2 — probe-calibrate-subdivide**
+  - Phase 1: probes map center to discover correct radius (up to 3 retry attempts on transient errors)
+  - Phase 2: calculates grid step from probe's settled radius (was hardcoded 3000m)
+  - Phase 3: spirals outward using calibrated grid; each cell has retry-to-fit
+  - Beverly downtown: probe settles at 1500m, grid auto-calibrates to ~2.4km spacing
+- **Recursive 3×3 subdivision** — when a cell settles at smaller radius than grid, fills 8 surrounding points
+  - Recurses if fill points settle even smaller (e.g., 1500m→750m→375m, depth 0→1→2)
+  - Stops at MIN_RADIUS (100m); sparse areas unaffected (1 search per cell)
+- **Narrative populate banner** — two-line status with real-time diagnostics
+  - Line 1: ring, cells, total POIs (new count), grid radius
+  - Line 2: narrative action ("Searching cell 3/8 at 1500m", "Fill 5/8: 45 POIs (8 new) at 750m", "Dense area! 1500m→750m — filling 8 gaps")
+- **Overpass request queue** — proxy serializes upstream requests with 10s minimum gap
+  - Cache hits return instantly; misses queued one-at-a-time
+  - Re-checks cache before processing (earlier queued request may have populated it)
+  - Eliminates 429/504 storms from parallel requests at startup or populate
+- **Startup POI optimization** — removed 16 parallel per-category Overpass queries on launch
+  - Now loads cached POIs via single `/pois/bbox` call (display-driven, not search-driven)
+- **Error radius immunity** — proxy no longer shrinks radius hints on 504/429 errors
+  - Transient API errors (timeouts, rate limits) are not density signals
+  - Prevents hint poisoning that caused cascading failures
+- **searchPoisForPopulate retry-to-fit** — populate searches now retry in-place on cap, same as regular searches
+  - Returns settled radius in `PopulateSearchResult` for grid calibration
+- **Proxy `X-POI-New` / `X-POI-Known` headers** — Overpass responses report new vs existing POI counts
+  - App accumulates and displays in populate banner
+
+### Removed
+- **Old populate subdivision logic** — caller-side 2×2 mini-grid, sub-cell loops, capped counter
+  - Replaced by recursive 3×3 subdivision driven by settled radius comparison
+- **Per-category startup Overpass queries** — 16 parallel searches replaced by single bbox load
+
 ## [1.5.15] — 2026-02-28
 
 ### Changed

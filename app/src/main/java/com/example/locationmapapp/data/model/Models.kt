@@ -130,7 +130,9 @@ data class PopulateSearchResult(
     val cacheHit: Boolean,
     val gridKey: String,
     val radiusM: Int = 3000,
-    val capped: Boolean = false   // true when Overpass returned exactly the limit (200)
+    val capped: Boolean = false,
+    val poiNew: Int = 0,
+    val poiKnown: Int = 0
 )
 
 enum class MbtaVehicleStatus(val display: String) {

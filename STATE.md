@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 14 (Auto cap detection, retry-to-fit, 20km fuzzy hints)
+## Last Updated: 2026-02-28 Session 15 (Populate v2: probe-calibrate-subdivide, Overpass throttle)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -72,13 +72,17 @@
   - **20km fuzzy radius hints**: nearest known hint within 20km used as starting radius
     - Eliminates retry chains in known dense metro areas (e.g., Boston downtown → all of metro area)
   - Tested: downtown Boston settles at 250m (5 attempts first time, 1 attempt after hint saved)
-- **Populate POIs** (grid scanner, v1.5.14): Utility menu for systematic cache building
-  - Spirals outward from map center, searching every grid cell for POIs
-  - **30s fixed pacing** between all searches (was adaptive); failed cells retry in-place
-  - **Cap detection**: raw Overpass elements >= 500 triggers cell subdivision (2x2 mini-grid at half radius)
-  - **Zoom-14 view**: map centers on crosshair during scan, keeping viewport small to limit bbox POI count
+- **Populate POIs v2** (grid scanner, v1.5.16): Utility menu for systematic cache building
+  - **Three-phase approach**: probe center → calibrate grid → spiral with recursive subdivision
+  - Phase 1: probes map center to discover settled radius (retries up to 3× on transient errors)
+  - Phase 2: calculates grid step from settled radius (not hardcoded 3000m)
+  - Phase 3: spirals outward; each cell has retry-to-fit; dense cells trigger recursive 3×3 subdivision
+  - **Recursive 3×3 subdivision**: when a cell settles at smaller radius than grid, fills 8 surrounding points
+    - Recurses further if fill points also settle smaller; stops at MIN_RADIUS (100m)
+    - Dense pockets get fine coverage; sparse areas stay at 1 search per cell
+  - **Narrative banner**: two-line status showing grid radius, current action, POI counts (new vs known)
+    - "Searching cell 3/8 at 1500m…", "Dense area! 1500m→750m — filling 8 gaps", "Fill 3/8: 45 POIs (8 new)"
   - Orange crosshair marker shows current scan position
-  - Banner shows: ring, cells, POIs, success/fail/capped counts, countdown timer, retry radius
   - Guards: refuses while vehicle/aircraft follow is active; tap banner to stop
   - Stops on user interaction: long-press, vehicle tap, aircraft tap
   - Never auto-restarts on app launch — pref cleared in `onStart()`
@@ -94,6 +98,13 @@
 - Individual POI cache (poi-cache.json) — deduped by OSM type+id, with first/last seen timestamps
 - POI database (PostgreSQL) — permanent storage with JSONB tags, category indexing, upsert import
 - Cache proxy with disk persistence (cache-data.json, radius-hints.json, poi-cache.json, 365-day Overpass TTL)
+- **Overpass request queue** (v1.5.16): proxy serializes upstream Overpass requests, 10s minimum gap
+  - Cache hits return instantly; cache misses queued and processed one at a time
+  - Prevents Overpass 429/504 storms from parallel requests
+  - Queue depth visible in `/cache/stats` → `overpassQueue`
+  - `X-POI-New` / `X-POI-Known` response headers report new vs existing POIs per request
+- **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
+- **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging + TCP log streamer
 
 ## External API Routing

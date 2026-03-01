@@ -587,17 +587,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 DebugLogger.d("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (marker only)")
             }
-            // Fire deferred POI queries now that we have a real GPS position
+            // Fire deferred POI display now that we have a real GPS position
+            // Display is driven by /pois/bbox — no need to fire per-category Overpass queries on startup
             if (pendingPoiRestore) {
                 pendingPoiRestore = false
-                val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-                DebugLogger.i("MainActivity", "POI restore triggered at lat=${point.latitude} lon=${point.longitude}")
-                for (cat in PoiCategories.ALL) {
-                    if (prefs.getBoolean(cat.prefKey, true)) {
-                        val tags = appBarMenuManager.getActiveTags(cat.id)
-                        viewModel.searchPoisAt(point, tags, cat.id)
-                    }
-                }
+                DebugLogger.i("MainActivity", "POI restore — loading cached POIs for visible area")
+                binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 1500)
             }
             // Fire deferred METAR load after the map animation settles
             if (pendingMetarRestore) {
@@ -1922,6 +1917,21 @@ class MainActivity : AppCompatActivity() {
     // POPULATE POIs — SYSTEMATIC GRID SCANNER
     // =========================================================================
 
+    /** Mutable counters shared across the populate coroutine and recursive subdivision. */
+    private class PopulateStats {
+        var cells = 0       // main grid cells completed
+        var pois = 0        // total POIs found
+        var newPois = 0     // POIs new to cache
+        var knownPois = 0   // POIs already in cache
+        var searches = 0    // total successful searches (main + sub)
+        var fails = 0       // total failed searches
+        var subdivs = 0     // number of cells that triggered subdivision
+        var gridRadius = 0  // calibrated grid radius from probe
+        var currentRadius = 0  // radius of current/last search
+        var depth = 0       // current subdivision depth (0 = main grid)
+        var status = ""     // narrative status line
+    }
+
     private fun startPopulatePois() {
         // Guard: don't allow while following something
         if (followedVehicleId != null || followedAircraftIcao != null) {
@@ -1937,106 +1947,103 @@ class MainActivity : AppCompatActivity() {
         val centerLon = center.longitude
         DebugLogger.i("MainActivity", "startPopulatePois() center=$centerLat,$centerLon")
 
-        // Step size: 80% of diameter at default 3000m radius → ~0.043° lat
-        val stepLat = 0.8 * 2 * 3000.0 / 111320.0  // meters to degrees latitude
-        val stepLon = stepLat / Math.cos(Math.toRadians(centerLat))
-
-        var cellsSearched = 0
-        var totalPois = 0
-        var successCount = 0
-        var failCount = 0
-        var cappedCount = 0
+        val stats = PopulateStats()
         var consecutiveErrors = 0
-        val minRadius = com.example.locationmapapp.data.repository.PlacesRepository.MIN_RADIUS_M
 
         populateJob = lifecycleScope.launch {
-            toast("Populate started — tap banner to stop")
+            // ── Phase 1: Probe center to discover settled radius ──
+            val probePoint = GeoPoint(centerLat, centerLon)
+            placeScanningMarker(probePoint)
+            stats.status = "Probing center to calibrate grid\u2026"
+            showPopulateBanner(0, stats, 0)
 
-            for (ring in 0..15) {
+            var probeResult: com.example.locationmapapp.data.model.PopulateSearchResult? = null
+            for (probeAttempt in 1..3) {
+                probeResult = viewModel.populateSearchAt(probePoint)
+                if (probeResult != null) break
+                DebugLogger.w("MainActivity", "Probe attempt $probeAttempt failed — retrying in 30s")
+                stats.status = "Probe attempt $probeAttempt failed — retrying\u2026"
+                for (sec in 30 downTo 1) {
+                    showPopulateBanner(0, stats, sec)
+                    delay(1_000L)
+                }
+            }
+            if (probeResult == null) {
+                toast("Probe failed after 3 attempts — cannot calibrate grid")
+                stopPopulatePois()
+                return@launch
+            }
+
+            val settledRadius = probeResult.radiusM
+            stats.pois += probeResult.results.size
+            stats.newPois += probeResult.poiNew
+            stats.knownPois += probeResult.poiKnown
+            stats.searches++
+            stats.cells++
+            loadCachedPoisForVisibleArea()
+
+            // ── Phase 2: Calculate grid from settled radius ──
+            val stepLat = 0.8 * 2 * settledRadius.toDouble() / 111320.0
+            val stepLon = stepLat / Math.cos(Math.toRadians(centerLat))
+            DebugLogger.i("MainActivity",
+                "Populate grid calibrated: settledRadius=${settledRadius}m, stepLat=${"%.5f".format(stepLat)}°, stepLon=${"%.5f".format(stepLon)}°")
+            stats.gridRadius = settledRadius
+            stats.currentRadius = settledRadius
+            stats.status = "Grid calibrated at ${settledRadius}m — ${probeResult.results.size} POIs (${probeResult.poiNew} new)"
+
+            // No subdivision needed for probe — grid is calibrated from its settled radius,
+            // so ring 1 cells inherently cover the area around center at the right spacing.
+
+            // Countdown after probe
+            for (sec in 30 downTo 1) {
+                showPopulateBanner(0, stats, sec)
+                delay(1_000L)
+            }
+
+            // ── Phase 3: Spiral outward using calibrated grid ──
+            for (ring in 1..15) {
                 val points = generateRingPoints(ring, centerLat, centerLon, stepLat, stepLon)
                 var pointIdx = 0
                 while (pointIdx < points.size) {
-                    // Check cancellation
                     kotlinx.coroutines.yield()
 
                     val (gridLat, gridLon) = points[pointIdx]
                     val point = GeoPoint(gridLat, gridLon)
 
-                    // Place scanning marker
+                    stats.depth = 0
+                    stats.currentRadius = settledRadius
+                    stats.status = "Searching cell ${pointIdx + 1}/${points.size} at ${settledRadius}m\u2026"
                     placeScanningMarker(point)
+                    showPopulateBanner(ring, stats, 0)
 
-                    // Show banner before search
-                    showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, 0)
-
-                    // Search — with cap-subdivide: if we hit 200 limit, subdivide cell with smaller radius
                     val result = viewModel.populateSearchAt(point)
 
                     if (result != null) {
                         consecutiveErrors = 0
-                        totalPois += result.results.size
-
-                        if (result.capped) {
-                            // Hit the 200-result cap — area too dense, subdivide into mini-grid
-                            cappedCount++
-                            val subRadius = result.radiusM / 2
-                            DebugLogger.w("MainActivity",
-                                "Populate CAPPED at ${result.results.size} POIs (radius=${result.radiusM}m) — subdividing cell into mini-grid at ${subRadius}m")
-                            toast("Dense area — subdividing to ${subRadius}m radius")
-
-                            // Generate sub-grid points covering the original cell area
-                            val subStepLat = 0.8 * 2 * subRadius / 111320.0
-                            val subStepLon = subStepLat / Math.cos(Math.toRadians(gridLat))
-                            // How many sub-cells fit in original cell: original step / sub step
-                            val subdivisions = Math.ceil(stepLat / subStepLat).toInt().coerceAtLeast(2)
-                            val halfSpan = (subdivisions - 1) / 2.0
-
-                            val subPoints = mutableListOf<Pair<Double, Double>>()
-                            for (sy in 0 until subdivisions) {
-                                for (sx in 0 until subdivisions) {
-                                    val subLat = gridLat + (sy - halfSpan) * subStepLat
-                                    val subLon = gridLon + (sx - halfSpan) * subStepLon
-                                    subPoints.add(Pair(subLat, subLon))
-                                }
-                            }
-
-                            DebugLogger.i("MainActivity",
-                                "Subdivided into ${subPoints.size} sub-cells (${subdivisions}x${subdivisions}) at radius=${subRadius}m")
-
-                            for ((subLat, subLon) in subPoints) {
-                                kotlinx.coroutines.yield()
-                                val subPoint = GeoPoint(subLat, subLon)
-                                placeScanningMarker(subPoint)
-                                showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, 0, subRadius)
-
-                                // Wait 30s before sub-search
-                                for (sec in 30 downTo 1) {
-                                    showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, sec, subRadius)
-                                    delay(1_000L)
-                                }
-
-                                val subResult = viewModel.populateSearchAt(subPoint, radiusOverride = subRadius)
-                                if (subResult != null) {
-                                    totalPois += subResult.results.size
-                                    if (subResult.capped) {
-                                        cappedCount++
-                                        DebugLogger.w("MainActivity",
-                                            "Sub-cell still capped at ${subRadius}m (${subResult.results.size} POIs) — accepting loss at minimum granularity")
-                                    }
-                                    loadCachedPoisForVisibleArea()
-                                } else {
-                                    failCount++
-                                }
-                            }
-                        }
-
-                        successCount++
-                        cellsSearched++
-                        pointIdx++  // advance to next cell
-                        // Refresh map so new POIs appear immediately
+                        stats.pois += result.results.size
+                        stats.newPois += result.poiNew
+                        stats.knownPois += result.poiKnown
+                        stats.searches++
+                        stats.cells++
+                        stats.currentRadius = result.radiusM
+                        pointIdx++
                         loadCachedPoisForVisibleArea()
+
+                        val newStr = if (result.poiNew > 0) "${result.poiNew} new" else "all known"
+                        stats.status = "Found ${result.results.size} POIs ($newStr) at ${result.radiusM}m"
+
+                        // Recursive subdivision if settled smaller than grid radius
+                        if (result.radiusM < settledRadius) {
+                            stats.status = "Dense area! ${settledRadius}m\u2192${result.radiusM}m — filling 8 gaps"
+                            showPopulateBanner(ring, stats, 0)
+                            searchCellSubdivisions(point, settledRadius, result.radiusM, 0, ring, stats)
+                            stats.depth = 0
+                            stats.currentRadius = settledRadius
+                            stats.status = "Subdivision done — back to main grid"
+                        }
                     } else {
-                        // Failed — do NOT advance; retry same cell after delay
-                        failCount++
+                        stats.fails++
+                        stats.status = "Search failed — retrying\u2026"
                         consecutiveErrors++
                         if (consecutiveErrors >= 5) {
                             toast("Populate stopped — 5 consecutive errors")
@@ -2045,19 +2052,85 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    // Countdown 30s with banner update every second
+                    // Countdown 30s between main grid cells
                     for (sec in 30 downTo 1) {
-                        showPopulateBanner(ring, cellsSearched, totalPois, successCount, failCount, cappedCount, sec)
+                        showPopulateBanner(ring, stats, sec)
                         delay(1_000L)
                     }
                 }
                 if (consecutiveErrors >= 5) break
             }
 
-            // Completion
-            DebugLogger.i("MainActivity", "Populate complete: $cellsSearched cells, $totalPois POIs, $successCount ok, $failCount fail, $cappedCount capped")
+            DebugLogger.i("MainActivity",
+                "Populate complete: ${stats.cells} cells, ${stats.pois} POIs, ${stats.searches} searches, ${stats.fails} fail, ${stats.subdivs} subdivisions")
             stopPopulatePois()
-            toast("Populate done — $cellsSearched cells, $totalPois POIs")
+            toast("Populate done — ${stats.cells} cells, ${stats.pois} POIs")
+        }
+    }
+
+    /**
+     * Recursive 3x3 subdivision: when a cell settles at a smaller radius than the grid expects,
+     * search 8 surrounding fill-in points at the settled radius spacing.
+     * If any of those also settle smaller, recurse again. Stops at MIN_RADIUS.
+     */
+    private suspend fun searchCellSubdivisions(
+        center: GeoPoint,
+        gridRadius: Int,      // radius this grid level was designed for
+        settledRadius: Int,   // radius the center actually settled at
+        depth: Int,
+        ring: Int,
+        stats: PopulateStats
+    ) {
+        val minRadius = com.example.locationmapapp.data.repository.PlacesRepository.MIN_RADIUS_M
+        if (settledRadius < minRadius * 2) return  // can't subdivide further
+
+        stats.subdivs++
+        val subStepLat = 0.8 * 2 * settledRadius.toDouble() / 111320.0
+        val subStepLon = subStepLat / Math.cos(Math.toRadians(center.latitude))
+
+        DebugLogger.i("MainActivity",
+            "Subdivide depth=$depth: grid=${gridRadius}m → settled=${settledRadius}m, 8 fill points around ${center.latitude},${center.longitude}")
+
+        var fillIdx = 0
+        for (dy in -1..1) {
+            for (dx in -1..1) {
+                if (dy == 0 && dx == 0) continue  // center already searched
+                fillIdx++
+                kotlinx.coroutines.yield()
+
+                val subPoint = GeoPoint(
+                    center.latitude + dy * subStepLat,
+                    center.longitude + dx * subStepLon
+                )
+                stats.depth = depth + 1
+                stats.currentRadius = settledRadius
+                stats.status = "Fill $fillIdx/8 at ${settledRadius}m (depth ${depth + 1})\u2026"
+                placeScanningMarker(subPoint)
+                showPopulateBanner(ring, stats, 0)
+
+                val result = viewModel.populateSearchAt(subPoint)
+                if (result != null) {
+                    stats.pois += result.results.size
+                    stats.newPois += result.poiNew
+                    stats.knownPois += result.poiKnown
+                    stats.searches++
+                    stats.currentRadius = result.radiusM
+                    val newStr = if (result.poiNew > 0) "${result.poiNew} new" else "all known"
+                    stats.status = "Fill $fillIdx/8: ${result.results.size} POIs ($newStr) at ${result.radiusM}m"
+                    showPopulateBanner(ring, stats, 0)
+                    loadCachedPoisForVisibleArea()
+
+                    // Recurse if this sub-cell settled even smaller
+                    if (result.radiusM < settledRadius) {
+                        stats.status = "Deeper! ${settledRadius}m\u2192${result.radiusM}m — subdividing again"
+                        showPopulateBanner(ring, stats, 0)
+                        searchCellSubdivisions(subPoint, settledRadius, result.radiusM, depth + 1, ring, stats)
+                    }
+                } else {
+                    stats.fails++
+                    stats.status = "Fill $fillIdx/8 failed"
+                }
+            }
         }
     }
 
@@ -2130,12 +2203,13 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.invalidate()
     }
 
-    private fun showPopulateBanner(ring: Int, cells: Int, pois: Int, ok: Int, fail: Int, capped: Int, countdown: Int, retryRadius: Int? = null) {
-        val countdownStr = if (countdown > 0) "  Next: ${countdown}s" else "  Searching\u2026"
-        val failStr = if (fail > 0) "  \u26A0$fail" else ""
-        val cappedStr = if (capped > 0) "  \u2702$capped" else ""
-        val retryStr = if (retryRadius != null) "  (retry ${retryRadius}m)" else ""
-        val text = "\u2316 Populate  R$ring  •  $cells cells  •  $pois POIs  •  \u2713$ok$failStr$cappedStr$retryStr$countdownStr\nTap to stop"
+    private fun showPopulateBanner(ring: Int, stats: PopulateStats, countdown: Int) {
+        val countdownStr = if (countdown > 0) "  Next in ${countdown}s" else ""
+        val failStr = if (stats.fails > 0) " \u26A0${stats.fails}err" else ""
+        val gridStr = if (stats.gridRadius > 0) "grid ${stats.gridRadius}m" else "probing"
+        val line1 = "\u2316 R$ring | ${stats.cells} cells | ${stats.pois} POIs (${stats.newPois} new)$failStr | $gridStr"
+        val line2 = stats.status + countdownStr
+        val text = "$line1\n$line2 — tap to stop"
 
         runOnUiThread {
             if (followBanner == null) {

@@ -220,26 +220,23 @@ function adjustRadiusHint(lat, lon, resultCount, error, capped) {
   const current = radiusHints.get(key);
   let radius = current ? current.radius : DEFAULT_RADIUS;
 
+  if (error) {
+    // Errors (504, 429) are transient — don't change the radius hint
+    console.log(`[Radius] ${key} error — keeping at ${radius}m (transient)`);
+    return radius;
+  }
+
   if (capped) {
     radius = Math.round(radius * 0.5);
     console.log(`[Radius] ${key} CAPPED (${resultCount} POIs) → halve to ${radius}m`);
-  } else if (error) {
-    radius = Math.round(radius * RADIUS_SHRINK);
   } else if (resultCount < MIN_USEFUL_POI) {
     radius = Math.round(radius * RADIUS_GROW);
+    console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
+  } else {
+    console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
   }
 
   radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius));
-
-  if (!capped) {
-    if (error) {
-      console.log(`[Radius] ${key} error → shrink to ${radius}m`);
-    } else if (resultCount < MIN_USEFUL_POI) {
-      console.log(`[Radius] ${key} only ${resultCount} POIs → grow to ${radius}m`);
-    } else {
-      console.log(`[Radius] ${key} ${resultCount} POIs — confirmed at ${radius}m`);
-    }
-  }
   radiusHints.set(key, { radius, updatedAt: Date.now() });
   saveRadiusHints();
   return radius;
@@ -329,7 +326,7 @@ function savePoiCache() {
 function cacheIndividualPois(jsonBody) {
   try {
     const parsed = JSON.parse(jsonBody);
-    if (!parsed.elements || !Array.isArray(parsed.elements)) return;
+    if (!parsed.elements || !Array.isArray(parsed.elements)) return { added: 0, updated: 0 };
 
     const now = Date.now();
     let added = 0;
@@ -352,8 +349,10 @@ function cacheIndividualPois(jsonBody) {
 
     console.log(`[POI Cache] +${added} new, ${updated} updated (${poiCache.size} total)`);
     if (added > 0 || updated > 0) savePoiCache();
+    return { added, updated };
   } catch (err) {
     console.error('[POI Cache] Failed to parse response:', err.message);
+    return { added: 0, updated: 0 };
   }
 }
 
@@ -376,6 +375,68 @@ function log(endpoint, hit, upstreamMs, extra) {
 // ── Overpass POI proxy ──────────────────────────────────────────────────────
 
 const OVERPASS_TTL = 365 * 24 * 60 * 60 * 1000;  // 365 days
+const OVERPASS_MIN_INTERVAL_MS = 10_000;  // 10s between upstream requests
+
+// Upstream request queue — serializes cache misses, 10s apart
+const overpassQueue = [];
+let overpassWorkerRunning = false;
+let overpassLastUpstream = 0;
+
+async function overpassWorker() {
+  if (overpassWorkerRunning) return;
+  overpassWorkerRunning = true;
+
+  while (overpassQueue.length > 0) {
+    const { dataField, cacheKey, resolve } = overpassQueue.shift();
+    console.log(`[Overpass queue] processing (${overpassQueue.length} remaining)`);
+
+    // Wait for minimum interval since last upstream request
+    const elapsed = Date.now() - overpassLastUpstream;
+    if (elapsed < OVERPASS_MIN_INTERVAL_MS) {
+      const wait = OVERPASS_MIN_INTERVAL_MS - elapsed;
+      console.log(`[Overpass queue] throttle — waiting ${(wait / 1000).toFixed(1)}s`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+
+    // Check cache again — a previous queued request for the same key may have populated it
+    if (cacheKey) {
+      const cached = cacheGet(cacheKey, OVERPASS_TTL);
+      if (cached) {
+        console.log(`[Overpass queue] cache hit while queued — ${cacheKey}`);
+        resolve({ hit: true, data: cached.data, contentType: cached.headers['content-type'] || 'application/json' });
+        continue;
+      }
+    }
+
+    try {
+      const t0 = Date.now();
+      overpassLastUpstream = t0;
+      const upstream = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(dataField)}`,
+      });
+      const elapsedMs = Date.now() - t0;
+      const body = await upstream.text();
+      const contentType = upstream.headers.get('content-type') || 'application/json';
+
+      log('/overpass', false, elapsedMs);
+
+      let poiStats = { added: 0, updated: 0 };
+      if (upstream.ok && cacheKey) {
+        cacheSet(cacheKey, body, { 'content-type': contentType });
+        poiStats = cacheIndividualPois(body);
+      }
+
+      resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.added, poiKnown: poiStats.updated });
+    } catch (err) {
+      console.error('[Overpass upstream error]', err.message);
+      resolve({ hit: false, error: true, message: err.message });
+    }
+  }
+
+  overpassWorkerRunning = false;
+}
 
 function parseOverpassCacheKey(dataField) {
   // Extract around:RADIUS,LAT,LON from the Overpass QL query
@@ -451,29 +512,25 @@ app.post('/overpass', async (req, res) => {
   }
 
   stats.misses++;
-  try {
-    const t0 = Date.now();
-    const upstream = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(dataField)}`,
-    });
-    const elapsed = Date.now() - t0;
-    const body = await upstream.text();
-    const contentType = upstream.headers.get('content-type') || 'application/json';
-
-    log('/overpass', false, elapsed);
-
-    if (upstream.ok && cacheKey) {
-      cacheSet(cacheKey, body, { 'content-type': contentType });
-      cacheIndividualPois(body);
-    }
-
-    res.status(upstream.status).set('Content-Type', contentType).set('X-Cache', 'MISS').send(body);
-  } catch (err) {
-    console.error('[Overpass upstream error]', err.message);
-    res.status(502).json({ error: 'Upstream request failed', detail: err.message });
+  // Queue the upstream request — worker processes one at a time, 10s apart
+  const queuePos = overpassQueue.length + 1;
+  if (queuePos > 0) {
+    console.log(`[Overpass queue] enqueued (position ${queuePos}, ~${queuePos * 10}s wait)`);
   }
+  const result = await new Promise(resolve => {
+    overpassQueue.push({ dataField, cacheKey, resolve });
+    overpassWorker();
+  });
+
+  if (result.error) {
+    return res.status(502).json({ error: 'Upstream request failed', detail: result.message });
+  }
+  res.status(result.status || 200)
+    .set('Content-Type', result.contentType)
+    .set('X-Cache', result.hit ? 'HIT' : 'MISS')
+    .set('X-POI-New', String(result.poiNew || 0))
+    .set('X-POI-Known', String(result.poiKnown || 0))
+    .send(result.data);
 });
 
 // ── Generic GET proxy helper ────────────────────────────────────────────────
@@ -1097,6 +1154,7 @@ app.get('/cache/stats', (req, res) => {
     entries: cache.size,
     radiusHints: radiusHints.size,
     pois: poiCache.size,
+    overpassQueue: overpassQueue.length,
     hits: stats.hits,
     misses: stats.misses,
     hitRate: stats.hits + stats.misses > 0

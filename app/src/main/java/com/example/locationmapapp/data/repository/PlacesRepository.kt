@@ -258,31 +258,57 @@ class PlacesRepository @Inject constructor() {
         return Pair(results, rawCount)
     }
 
-    /** Populate-mode variant: searches POIs and reads X-Cache header to report cache status.
+    /** Populate-mode variant: searches POIs with retry-to-fit on cap, reads X-Cache header.
      *  @param radiusOverride if non-null, overrides the radius hint (used for cap-retry with smaller radius) */
     suspend fun searchPoisForPopulate(center: GeoPoint, categories: List<String> = emptyList(), radiusOverride: Int? = null): PopulateSearchResult =
         withContext(Dispatchers.IO) {
             val key = gridKey(center.latitude, center.longitude)
-            val radiusM = radiusOverride ?: fetchRadiusHint(center)
-            val query = buildOverpassQuery(center, categories, radiusM)
-            DebugLogger.d(TAG, "Populate search at $key (radius=${radiusM}m)")
-            val body = FormBody.Builder().add("data", query).build()
-            val request = Request.Builder().url(OVERPASS_URL).post(body).build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                postRadiusFeedback(center, 0, error = true)
-                throw RuntimeException("HTTP ${response.code}")
+            var radiusM = radiusOverride ?: fetchRadiusHint(center)
+            var attempts = 0
+            var lastCacheHit = false
+            var totalNew = 0
+            var totalKnown = 0
+
+            while (true) {
+                attempts++
+                val query = buildOverpassQuery(center, categories, radiusM)
+                DebugLogger.d(TAG, "Populate search at $key (radius=${radiusM}m, attempt=$attempts)")
+                val body = FormBody.Builder().add("data", query).build()
+                val request = Request.Builder().url(OVERPASS_URL).post(body).build()
+                val response = client.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    postRadiusFeedback(center, 0, error = true)
+                    throw RuntimeException("HTTP ${response.code}")
+                }
+                val cacheHeader = response.header("X-Cache") ?: "MISS"
+                lastCacheHit = cacheHeader.equals("HIT", ignoreCase = true)
+                totalNew += response.header("X-POI-New")?.toIntOrNull() ?: 0
+                totalKnown += response.header("X-POI-Known")?.toIntOrNull() ?: 0
+                val bodyStr = response.body!!.string()
+                val (results, rawCount) = parseOverpassJson(bodyStr)
+                val capped = rawCount >= OVERPASS_RESULT_LIMIT
+
+                if (capped && radiusM / 2 >= MIN_RADIUS_M) {
+                    // Capped — halve radius and retry in-place
+                    DebugLogger.w(TAG, "Populate CAPPED — raw=$rawCount at radius=${radiusM}m → retrying at ${radiusM / 2}m")
+                    postRadiusFeedback(center, results.size, error = false, capped = true)
+                    radiusM /= 2
+                } else {
+                    // Settled — either fits or at floor
+                    if (capped) {
+                        DebugLogger.w(TAG, "Populate CAPPED at floor — raw=$rawCount at radius=${radiusM}m — accepting")
+                        postRadiusFeedback(center, results.size, error = false, capped = true)
+                    } else {
+                        postRadiusFeedback(center, results.size, error = false)
+                    }
+                    if (attempts > 1) {
+                        DebugLogger.i(TAG, "Populate settled at radius=${radiusM}m after $attempts attempts")
+                    }
+                    return@withContext PopulateSearchResult(results, lastCacheHit, key, radiusM, capped, totalNew, totalKnown)
+                }
             }
-            val cacheHeader = response.header("X-Cache") ?: "MISS"
-            val cacheHit = cacheHeader.equals("HIT", ignoreCase = true)
-            val bodyStr = response.body!!.string()
-            val (results, rawCount) = parseOverpassJson(bodyStr)
-            val capped = rawCount >= OVERPASS_RESULT_LIMIT
-            if (capped) {
-                DebugLogger.w(TAG, "Populate CAPPED — raw=$rawCount elements (limit=$OVERPASS_RESULT_LIMIT), parsed=${results.size} named POIs at $key (radius=${radiusM}m) — POIs likely lost")
-            }
-            postRadiusFeedback(center, results.size, error = false)
-            PopulateSearchResult(results, cacheHit, key, radiusM, capped)
+            @Suppress("UNREACHABLE_CODE")
+            PopulateSearchResult(emptyList(), false, key, radiusM, false)
         }
 
     companion object {

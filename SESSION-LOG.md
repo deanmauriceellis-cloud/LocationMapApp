@@ -1,5 +1,64 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28o (Populate v2: Probe-Calibrate-Subdivide)
+
+### Context
+Testing populate utility on Beverly, MA downtown revealed multiple issues: 16 parallel Overpass queries on startup caused 504 storms, 504 errors poisoned radius hints (shrinking to 100m), populate grid was hardcoded at 3000m spacing regardless of actual density, and dense pockets within the grid left gaps.
+
+### Changes Made
+
+#### Populate v2: Three-phase approach (`MainActivity.kt`)
+- Phase 1 (Probe): searches center first to discover settled radius, 3 retry attempts on errors
+- Phase 2 (Calibrate): grid step calculated from settled radius, not hardcoded 3000m
+- Phase 3 (Spiral): starts ring 1, each cell searches with retry-to-fit
+- Removed old caller-side subdivision logic (2x2 mini-grid, sub-cell loops)
+
+#### Recursive 3×3 subdivision (`MainActivity.kt`)
+- New `searchCellSubdivisions()` function: when a cell settles smaller than grid radius, searches 8 fill points
+- Recurses if fill points settle even smaller (tested: depth 0→1→2, 1500m→750m→375m)
+- Tracks fill progress: "Fill 3/8 at 750m (depth 1)"
+- Fixed bug: probe was unnecessarily subdividing (compared vs DEFAULT_RADIUS instead of grid radius)
+
+#### searchPoisForPopulate retry-to-fit (`PlacesRepository.kt`)
+- Added same cap-detection retry loop as `searchPois()` — halves radius on cap, retries in-place
+- Returns settled radius and accumulated new/known POI counts in `PopulateSearchResult`
+- `PopulateSearchResult` model extended with `poiNew` and `poiKnown` fields
+
+#### Overpass request queue (`server.js`)
+- All upstream Overpass cache misses serialized through a FIFO queue
+- 10-second minimum interval between upstream requests (OVERPASS_MIN_INTERVAL_MS)
+- Re-checks cache before processing (earlier queued request may have populated the same key)
+- Queue depth exposed in `/cache/stats` → `overpassQueue`
+
+#### Error radius immunity (`server.js`)
+- `adjustRadiusHint()` now returns early on errors without changing the radius
+- 504/429 timeouts are transient infrastructure problems, not density signals
+- Prevents hint poisoning cascade (was: error→shrink→100m→all future searches use 100m)
+
+#### Startup POI optimization (`MainActivity.kt`)
+- Removed: loop over 16 `PoiCategories.ALL` firing `searchPoisAt()` for each enabled category
+- Replaced with: single deferred `loadCachedPoisForVisibleArea()` (bbox display)
+- Startup went from ~16 parallel Overpass queries to 0
+
+#### Narrative populate banner (`MainActivity.kt`)
+- Two-line banner with real-time diagnostics
+- Shows: ring, cells, POIs (new count), grid radius, current action narrative
+- Actions: "Probing center…", "Searching cell 3/8 at 1500m…", "Dense area! 1500m→750m — filling 8 gaps", "Fill 3/8: 45 POIs (8 new) at 750m"
+
+#### Proxy POI count headers (`server.js`)
+- `cacheIndividualPois()` now returns `{ added, updated }` counts
+- Overpass responses include `X-POI-New` and `X-POI-Known` headers
+- App reads headers in `searchPoisForPopulate` and accumulates in PopulateStats
+
+### Testing
+- Beverly, MA downtown: probe settled at 1500m, grid calibrated correctly
+- Recursive subdivision fired at depths 0→1→2 (1500m→750m→375m) in dense pockets
+- 1,741 POIs found in ~20 searches, zero 504 errors with throttle active
+- Clean startup: only METAR + webcam cache hits, zero Overpass queries
+
+### Memory note
+- **NEVER attempt sudo or postgres-owned database commands** — must tell user to run manually
+
 ## Session: 2026-02-28n (Auto Cap Detection & Retry-to-Fit)
 
 ### Context
