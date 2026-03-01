@@ -314,22 +314,37 @@ overnight-runs/YYYY-MM-DD_HHMM/
   logs/               — error snapshots + final log dump
 ```
 
-### First Test Run Results (2026-03-01 01:41, overnight window)
-- **28 PASS, 2 FAIL, 8 WARN** across all features
-- Memory: 13MB baseline → 7-9MB during endurance (stable)
-- OpenSky: 3 requests used of 3,600 budget
-- Webcams: 50 loaded, METAR: 1 station, POI: 227 markers / 7,131 cached / 6,631 in DB
-- All 11 layer toggles: working
-- 988 map overlays (radar): present
-- Stations: 0 from LiveData endpoint BUT 257 markers on map + tap works (bug found)
-- Bus stops: 0 from LiveData endpoint BUT 46 markers visible at zoom 16 (bug found)
-- Init timing: stations=5.6s, bus_stops=5.3s, metar=5.3s, webcams=5.3s, pois=3.2s
+### Full Suite Results (2026-03-01, overnight 2:19AM + morning 7:50AM)
+
+**Overnight (5.5 hrs): 67 PASS, 0 FAIL, 4 WARN**
+- Memory: 38MB baseline → 12-20MB steady, peak 62MB (GC spike), **no leak**
+- Cache: 184→265 entries, 28% session hit rate
+- OpenSky: 183 requests, 3,400 remaining
+- 27 screenshots, 69 CSV rows, 64 snapshots
+- Transit came online at 5:25 AM — detected automatically (buses 0→171, trains 0→9, subway 0→32)
+- Init timing: stations=257/7.3s, bus_stops=6904/5.4s, metar=1/5.2s, webcams=50/6.4s, pois=844/3.1s
+- Warnings: bus headsign/stopName 25% (early AM), aircraft altitude null (on ground), METAR 0 overnight
+
+**Morning (1 hr): 36 PASS, 0 FAIL, 2 WARN**
+- Vehicle quality: buses 240-270 (80% headsign, 100% tripId), CR 11-16 (100% all), subway 69-77 (100% all)
+- Follow endurance: 6/6 checks active over 60s
+- API reliability: 45/45 requests succeeded (100%)
+- Bus stops: Downtown=46, Cambridge=139, Seaport=78
+- Warnings: bus routeName 80%, bus stop search 'Mass Ave' = 0 (uses full "Massachusetts Ave")
+
+**Monitor (14 snapshots, 30-min intervals, 2:22AM → 8:53AM)**
+- Transit ramp: 52 buses (2AM) → 100 (5:23) → 198 (6:23) → 273 (8:53)
+- Subway: 0 (3AM) → 9 (5:23) → 54 (6:23) → 75 (8:53)
+- POI markers: 3,136 → 4,828 (peak) — cache building during map moves
+- Memory: 9-27MB range, no trend upward
+- 0 test failures across entire run
 
 ## Next Steps
-- **Fix station/bus-stop LiveData mismatch** — endpoints return 0 while markers exist on map
-- **Add altitude to aircraft debugMarkers()** — missing from relatedObject serialization
 - **Fix test-app.sh ANSI grep** — strip color codes before counting PASS/FAIL
+- **Investigate bus routeName 80%** — 20% of buses have empty route name from MBTA API
+- **Bus stop search improvements** — 'Mass Ave' returns 0 (stored as "Massachusetts Ave"), consider substring/fuzzy matching
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads (manual)
+- **Improve cache hit rate** — 28% session rate during testing; consider TTL tuning or pre-warming
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)

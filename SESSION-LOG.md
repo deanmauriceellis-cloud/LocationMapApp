@@ -46,12 +46,25 @@
 - **Aircraft altitude null**: correctly null for ground aircraft (`onGround=true`) — not a bug
 - **test-app.sh ANSI grep**: color codes cause `grep -c '^\[PASS\]'` to miss all matches (open)
 
-### First Run Results (01:41 overnight window)
-- 28 PASS, 2 FAIL, 8 WARN
-- Memory: stable 7-13MB, OpenSky: 3/3600 used
-- Webcams: 50, METAR: 1, POI: 227/7131/6631
-- Init timing: all layers 3-6 seconds
-- All 11 layer toggles working, 988 radar overlays present
+### Full Suite Results (2026-03-01)
+
+**Overnight (5.5 hrs, 2:19 AM → 7:50 AM): 67 PASS, 0 FAIL, 4 WARN**
+- Memory stable 9-27MB, no leak (peak 62MB = GC spike)
+- OpenSky: 183/3600 used — well within budget
+- Transit detected coming online at 5:25 AM: buses 0→171, trains 0→9, subway 0→32
+- 27 screenshots, 69 CSV rows, 64 JSON snapshots captured
+- Warns: bus headsign/stopName 25% (early AM), aircraft altitude null (ground), METAR 0 overnight
+
+**Morning (1 hr, 7:50 AM → 8:50 AM): 36 PASS, 0 FAIL, 2 WARN**
+- Buses: 240→270, headsign 80%, tripId 100%, stopName 80%
+- Commuter Rail: 11→16, all fields 100%
+- Subway: 69→77, all fields 100%
+- Follow endurance: 6/6 checks active; API reliability: 45/45 = 100%
+- Warns: bus routeName 80%, bus stop search 'Mass Ave' = 0
+
+**Monitor (14 snapshots, 30-min, 2:22 AM → 8:53 AM)**
+- Transit ramp: 52→100→198→273 buses, 0→9→54→75 subway
+- 0 failures across entire 7-hour run
 
 ## Session: 2026-03-01d (Debug API Enhancements + Test Script — v1.5.21)
 
