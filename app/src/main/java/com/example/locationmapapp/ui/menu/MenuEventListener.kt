@@ -54,6 +54,9 @@ interface MenuEventListener {
     // PUBLIC TRANSIT
     // =========================================================================
 
+    /** MBTA train station markers on map (subway + commuter rail). */
+    fun onMbtaStationsToggled(enabled: Boolean)
+
     /** Live MBTA Commuter Rail vehicle positions. */
     fun onMbtaTrainsToggled(enabled: Boolean)
 

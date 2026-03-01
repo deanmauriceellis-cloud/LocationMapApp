@@ -123,6 +123,40 @@ data class Webcam(
     fun toGeoPoint() = GeoPoint(lat, lon)
 }
 
+// ── MBTA Station / Prediction / Schedule Models ─────────────────────────────
+
+data class MbtaStop(
+    val id: String,
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val routeIds: List<String>
+) {
+    fun toGeoPoint() = GeoPoint(lat, lon)
+}
+
+data class MbtaPrediction(
+    val id: String,
+    val routeId: String,
+    val routeName: String,
+    val tripId: String?,
+    val headsign: String?,
+    val arrivalTime: String?,
+    val departureTime: String?,
+    val directionId: Int,
+    val status: String?,
+    val vehicleId: String?
+)
+
+data class MbtaTripScheduleEntry(
+    val stopId: String,
+    val stopName: String,
+    val stopSequence: Int,
+    val arrivalTime: String?,
+    val departureTime: String?,
+    val platformCode: String?
+)
+
 // ── Populate POIs scanner ────────────────────────────────────────────────────
 
 data class PopulateSearchResult(

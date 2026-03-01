@@ -39,6 +39,13 @@
         android:title="Bus Update Frequency…"
         app:showAsAction="never" />
 
+    <!-- MBTA Train Stations (subway + commuter rail) -->
+    <item
+        android:id="@+id/menu_mbta_stations"
+        android:title="Train Stations"
+        android:checkable="true"
+        app:showAsAction="never" />
+
     <!-- National Emergency / Weather CAP Alerts -->
     <item
         android:id="@+id/menu_national_alerts"

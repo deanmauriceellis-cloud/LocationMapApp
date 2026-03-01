@@ -5,6 +5,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.locationmapapp.data.model.MbtaPrediction
+import com.example.locationmapapp.data.model.MbtaStop
+import com.example.locationmapapp.data.model.MbtaTripScheduleEntry
 import com.example.locationmapapp.data.model.MbtaVehicle
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.location.LocationManager
@@ -64,6 +67,9 @@ class MainViewModel @Inject constructor(
 
     private val _mbtaBuses = MutableLiveData<List<MbtaVehicle>>()
     val mbtaBuses: LiveData<List<MbtaVehicle>> = _mbtaBuses
+
+    private val _mbtaStations = MutableLiveData<List<MbtaStop>>()
+    val mbtaStations: LiveData<List<MbtaStop>> = _mbtaStations
 
     private val _aircraft = MutableLiveData<List<AircraftState>>()
     val aircraft: LiveData<List<AircraftState>> = _aircraft
@@ -255,6 +261,46 @@ class MainViewModel @Inject constructor(
     fun clearMbtaBuses() {
         _mbtaBuses.value = emptyList()
         DebugLogger.i(TAG, "MBTA buses cleared")
+    }
+
+    fun fetchMbtaStations() {
+        DebugLogger.i(TAG, "fetchMbtaStations() — fetching subway + CR stations")
+        viewModelScope.launch {
+            runCatching { mbtaRepository.fetchStations() }
+                .onSuccess {
+                    DebugLogger.i(TAG, "MBTA stations success — ${it.size} stations")
+                    _mbtaStations.value = it
+                }
+                .onFailure { e ->
+                    DebugLogger.e(TAG, "MBTA stations FAILED: ${e.message}", e as? Exception)
+                    _error.value = "MBTA stations failed: ${e.message}"
+                }
+        }
+    }
+
+    fun clearMbtaStations() {
+        _mbtaStations.value = emptyList()
+        DebugLogger.i(TAG, "MBTA stations cleared")
+    }
+
+    /** Suspend call — returns predictions directly for dialogs. */
+    suspend fun fetchPredictionsDirectly(stopId: String): List<MbtaPrediction> {
+        return try {
+            mbtaRepository.fetchPredictions(stopId)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchPredictionsDirectly FAILED: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    /** Suspend call — returns trip schedule directly for dialogs. */
+    suspend fun fetchTripScheduleDirectly(tripId: String): List<MbtaTripScheduleEntry> {
+        return try {
+            mbtaRepository.fetchTripSchedule(tripId)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchTripScheduleDirectly FAILED: ${e.message}", e)
+            emptyList()
+        }
     }
 
     fun loadAircraft(south: Double, west: Double, north: Double, east: Double) {

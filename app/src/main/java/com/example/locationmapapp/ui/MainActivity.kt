@@ -93,6 +93,9 @@ class MainActivity : AppCompatActivity() {
     private var autoFollowPreferWest: Boolean = true
     private var autoFollowPreferSouth: Boolean = false
 
+    // Station markers
+    private val stationMarkers = mutableListOf<Marker>()
+
     // Webcam tracking
     private val webcamMarkers = mutableListOf<Marker>()
     private var webcamReloadJob: Job? = null
@@ -251,6 +254,10 @@ class MainActivity : AppCompatActivity() {
         if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUSES, true) && busRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA buses")
             startBusRefresh()
+        }
+        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_STATIONS, true) && stationMarkers.isEmpty()) {
+            DebugLogger.i("MainActivity", "onStart() restoring MBTA stations")
+            viewModel.fetchMbtaStations()
         }
 
         // Defer METAR restore until GPS fix so the map has a real bounding box
@@ -796,6 +803,11 @@ class MainActivity : AppCompatActivity() {
             clearBusMarkers()
             vehicles.forEach { addBusMarker(it) }
             updateFollowedVehicle(vehicles)
+        }
+        viewModel.mbtaStations.observe(this) { stations ->
+            DebugLogger.i("MainActivity", "MBTA stations update — ${stations.size} stations on map")
+            clearStationMarkers()
+            stations.forEach { addStationMarker(it) }
         }
         DebugLogger.i("MainActivity", "observeViewModel() complete — all observers attached")
     }
@@ -1616,6 +1628,461 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================================
+    // MBTA TRAIN STATIONS
+    // =========================================================================
+
+    /** Get the MBTA line color for a route ID. */
+    private fun routeColor(routeId: String): Int = when {
+        routeId == "Red" || routeId == "Mattapan" -> Color.parseColor("#C62828")
+        routeId == "Orange"                       -> Color.parseColor("#E65100")
+        routeId == "Blue"                         -> Color.parseColor("#1565C0")
+        routeId.startsWith("Green")               -> Color.parseColor("#2E7D32")
+        routeId.startsWith("CR-")                 -> Color.parseColor("#6A1B9A")
+        routeId == "Silver"                       -> Color.parseColor("#546E7A")
+        else                                      -> Color.parseColor("#37474F")
+    }
+
+    /** Abbreviated route label for arrival board. */
+    private fun routeAbbrev(routeId: String): String = when {
+        routeId == "Red"                          -> "RL"
+        routeId == "Orange"                       -> "OL"
+        routeId == "Blue"                         -> "BL"
+        routeId == "Mattapan"                     -> "M"
+        routeId.startsWith("Green-")              -> "GL-${routeId.removePrefix("Green-")}"
+        routeId.startsWith("CR-")                 -> "CR"
+        routeId == "Silver"                       -> "SL"
+        else                                      -> routeId.take(4)
+    }
+
+    private fun addStationMarker(stop: com.example.locationmapapp.data.model.MbtaStop) {
+        val tint = if (stop.routeIds.size > 1) {
+            Color.parseColor("#37474F")  // neutral dark gray for multi-line stations
+        } else {
+            routeColor(stop.routeIds.firstOrNull() ?: "")
+        }
+        val m = Marker(binding.mapView).apply {
+            position = stop.toGeoPoint()
+            icon     = MarkerIconHelper.stationIcon(this@MainActivity, tint)
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            title    = stop.name
+            snippet  = stop.routeIds.joinToString(", ") { routeAbbrev(it) }
+            setOnMarkerClickListener { _, _ ->
+                showArrivalBoardDialog(stop)
+                true
+            }
+        }
+        stationMarkers.add(m)
+        binding.mapView.overlays.add(m)
+    }
+
+    private fun clearStationMarkers() {
+        stationMarkers.forEach { binding.mapView.overlays.remove(it) }
+        stationMarkers.clear()
+        binding.mapView.invalidate()
+    }
+
+    // ── Arrival Board Dialog ─────────────────────────────────────────────────
+
+    private var arrivalRefreshJob: Job? = null
+
+    @SuppressLint("SetTextI18n")
+    private fun showArrivalBoardDialog(stop: com.example.locationmapapp.data.model.MbtaStop) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        // ── Header ──
+        val titleText = TextView(this).apply {
+            text = stop.name
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "X"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(4), dp(4), dp(4))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(12), dp(4))
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Subtitle: lines served ──
+        val linesText = TextView(this).apply {
+            text = "Lines: " + stop.routeIds.joinToString(", ") { routeAbbrev(it) }
+            textSize = 13f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setPadding(dp(16), 0, dp(16), dp(8))
+        }
+
+        // ── Column headers ──
+        val colHeaders = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(4), dp(16), dp(4))
+            setBackgroundColor(Color.parseColor("#333333"))
+            addView(TextView(this@MainActivity).apply {
+                text = "Line"; textSize = 12f; setTextColor(Color.parseColor("#999999"))
+                layoutParams = LinearLayout.LayoutParams(dp(60), LinearLayout.LayoutParams.WRAP_CONTENT)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "Destination"; textSize = 12f; setTextColor(Color.parseColor("#999999"))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "Arrives"; textSize = 12f; setTextColor(Color.parseColor("#999999"))
+                layoutParams = LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT)
+                gravity = android.view.Gravity.END
+            })
+        }
+
+        // ── Scrollable list container ──
+        val listContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), 0)
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            addView(listContainer)
+        }
+
+        // ── Loading indicator ──
+        val loadingText = TextView(this).apply {
+            text = "Loading arrivals…"
+            textSize = 14f
+            setTextColor(Color.parseColor("#CCCCCC"))
+            setPadding(dp(16), dp(24), dp(16), dp(24))
+            gravity = android.view.Gravity.CENTER
+        }
+        listContainer.addView(loadingText)
+
+        // ── Container ──
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            addView(header)
+            addView(linesText)
+            addView(colHeaders)
+            addView(scrollView)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.9).toInt(), (dm.heightPixels * 0.9).toInt())
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+
+        // ── Load predictions and auto-refresh ──
+        fun loadPredictions() {
+            lifecycleScope.launch {
+                val predictions = viewModel.fetchPredictionsDirectly(stop.id)
+                if (!dialog.isShowing) return@launch
+                listContainer.removeAllViews()
+                if (predictions.isEmpty()) {
+                    listContainer.addView(TextView(this@MainActivity).apply {
+                        text = "No upcoming arrivals"
+                        textSize = 14f
+                        setTextColor(Color.parseColor("#999999"))
+                        setPadding(dp(0), dp(24), dp(0), dp(24))
+                        gravity = android.view.Gravity.CENTER
+                    })
+                } else {
+                    predictions.forEach { pred ->
+                        val row = LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = android.view.Gravity.CENTER_VERTICAL
+                            setPadding(0, dp(8), 0, dp(8))
+                        }
+
+                        // Route dot + abbreviation
+                        val routeLabel = LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = android.view.Gravity.CENTER_VERTICAL
+                            layoutParams = LinearLayout.LayoutParams(dp(60), LinearLayout.LayoutParams.WRAP_CONTENT)
+                        }
+                        val dotView = View(this@MainActivity).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(10), dp(10)).apply {
+                                setMargins(0, 0, dp(4), 0)
+                            }
+                            background = android.graphics.drawable.GradientDrawable().apply {
+                                shape = android.graphics.drawable.GradientDrawable.OVAL
+                                setColor(routeColor(pred.routeId))
+                            }
+                        }
+                        routeLabel.addView(dotView)
+                        routeLabel.addView(TextView(this@MainActivity).apply {
+                            text = routeAbbrev(pred.routeId)
+                            textSize = 13f
+                            setTextColor(Color.WHITE)
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                        })
+                        row.addView(routeLabel)
+
+                        // Headsign / destination
+                        row.addView(TextView(this@MainActivity).apply {
+                            text = pred.headsign ?: pred.routeName
+                            textSize = 14f
+                            setTextColor(Color.WHITE)
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                        })
+
+                        // Arrival time
+                        row.addView(TextView(this@MainActivity).apply {
+                            text = formatArrivalTime(pred.arrivalTime ?: pred.departureTime)
+                            textSize = 14f
+                            setTextColor(Color.parseColor("#4FC3F7"))
+                            layoutParams = LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT)
+                            gravity = android.view.Gravity.END
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                        })
+
+                        // Tap row → trip schedule
+                        if (pred.tripId != null) {
+                            row.isClickable = true
+                            row.isFocusable = true
+                            row.setBackgroundResource(android.R.drawable.list_selector_background)
+                            row.setOnClickListener {
+                                showTripScheduleDialog(pred)
+                            }
+                        }
+
+                        listContainer.addView(row)
+                        // Divider
+                        listContainer.addView(View(this@MainActivity).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, 1
+                            )
+                            setBackgroundColor(Color.parseColor("#333333"))
+                        })
+                    }
+                }
+            }
+        }
+
+        loadPredictions()
+
+        // Auto-refresh every 30s
+        arrivalRefreshJob?.cancel()
+        arrivalRefreshJob = lifecycleScope.launch {
+            while (dialog.isShowing) {
+                delay(30_000)
+                if (dialog.isShowing) loadPredictions()
+            }
+        }
+
+        dialog.setOnDismissListener {
+            arrivalRefreshJob?.cancel()
+            arrivalRefreshJob = null
+        }
+
+        dialog.show()
+    }
+
+    /** Format ISO-8601 arrival time to "Now", "X min", or "H:MM AM/PM". */
+    private fun formatArrivalTime(isoTime: String?): String {
+        if (isoTime == null) return "—"
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+            val arrivalMs = sdf.parse(isoTime)?.time ?: return isoTime
+            val diffMs = arrivalMs - System.currentTimeMillis()
+            val diffMin = diffMs / 60_000
+            when {
+                diffMin <= 0  -> "Now"
+                diffMin < 60  -> "${diffMin} min"
+                else -> {
+                    val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.US)
+                    timeFmt.format(java.util.Date(arrivalMs))
+                }
+            }
+        } catch (_: Exception) { isoTime.takeLast(8).take(5) }
+    }
+
+    // ── Trip Schedule Dialog ─────────────────────────────────────────────────
+
+    @SuppressLint("SetTextI18n")
+    private fun showTripScheduleDialog(pred: com.example.locationmapapp.data.model.MbtaPrediction) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        // ── Header with back button ──
+        val backBtn = TextView(this).apply {
+            text = "\u2190"  // ← arrow
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            setPadding(dp(4), dp(4), dp(12), dp(4))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val titleText = TextView(this).apply {
+            text = "${pred.routeName} to ${pred.headsign ?: "?"}"
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "X"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(4), dp(4), dp(4))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(12), dp(12), dp(4))
+            addView(backBtn)
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Route color bar ──
+        val colorBar = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(4)
+            )
+            setBackgroundColor(routeColor(pred.routeId))
+        }
+
+        // ── Scrollable stop list ──
+        val listContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(16))
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            addView(listContainer)
+        }
+
+        // ── Loading ──
+        listContainer.addView(TextView(this).apply {
+            text = "Loading schedule…"
+            textSize = 14f
+            setTextColor(Color.parseColor("#CCCCCC"))
+            setPadding(0, dp(24), 0, dp(24))
+            gravity = android.view.Gravity.CENTER
+        })
+
+        // ── Container ──
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            addView(header)
+            addView(colorBar)
+            addView(scrollView)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.9).toInt(), (dm.heightPixels * 0.9).toInt())
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+
+        // ── Load schedule ──
+        val tripId = pred.tripId ?: return
+        lifecycleScope.launch {
+            val entries = viewModel.fetchTripScheduleDirectly(tripId)
+            if (!dialog.isShowing) return@launch
+            listContainer.removeAllViews()
+            if (entries.isEmpty()) {
+                listContainer.addView(TextView(this@MainActivity).apply {
+                    text = "No schedule data available"
+                    textSize = 14f
+                    setTextColor(Color.parseColor("#999999"))
+                    setPadding(0, dp(24), 0, dp(24))
+                    gravity = android.view.Gravity.CENTER
+                })
+            } else {
+                val lineColor = routeColor(pred.routeId)
+                entries.forEach { entry ->
+                    val row = LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        setPadding(0, dp(6), 0, dp(6))
+                    }
+
+                    // Colored dot
+                    row.addView(View(this@MainActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(8), dp(8)).apply {
+                            setMargins(0, 0, dp(8), 0)
+                        }
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            shape = android.graphics.drawable.GradientDrawable.OVAL
+                            setColor(lineColor)
+                        }
+                    })
+
+                    // Stop name
+                    row.addView(TextView(this@MainActivity).apply {
+                        text = entry.stopName
+                        textSize = 14f
+                        setTextColor(Color.WHITE)
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    })
+
+                    // Time (12h format)
+                    val timeStr = formatScheduleTime(entry.arrivalTime ?: entry.departureTime)
+                    row.addView(TextView(this@MainActivity).apply {
+                        text = timeStr
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#B0BEC5"))
+                        layoutParams = LinearLayout.LayoutParams(dp(75), LinearLayout.LayoutParams.WRAP_CONTENT)
+                        gravity = android.view.Gravity.END
+                    })
+
+                    // Track number (commuter rail)
+                    if (entry.platformCode != null) {
+                        row.addView(TextView(this@MainActivity).apply {
+                            text = "Trk ${entry.platformCode}"
+                            textSize = 12f
+                            setTextColor(Color.parseColor("#78909C"))
+                            layoutParams = LinearLayout.LayoutParams(dp(45), LinearLayout.LayoutParams.WRAP_CONTENT)
+                            gravity = android.view.Gravity.END
+                        })
+                    }
+
+                    listContainer.addView(row)
+                    // Divider
+                    listContainer.addView(View(this@MainActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, 1
+                        )
+                        setBackgroundColor(Color.parseColor("#2A2A2A"))
+                    })
+                }
+            }
+        }
+
+        dialog.show()
+    }
+
+    /** Format ISO-8601 schedule time to "h:mm a" for display. */
+    private fun formatScheduleTime(isoTime: String?): String {
+        if (isoTime == null) return "—"
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+            val ms = sdf.parse(isoTime)?.time ?: return isoTime
+            java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(java.util.Date(ms))
+        } catch (_: Exception) { isoTime.takeLast(8).take(5) }
+    }
+
+    // =========================================================================
     // VEHICLE FOLLOW MODE
     // =========================================================================
 
@@ -2357,6 +2824,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ── Transit ───────────────────────────────────────────────────────────
+
+        override fun onMbtaStationsToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onMbtaStationsToggled: $enabled")
+            if (enabled) {
+                viewModel.fetchMbtaStations()
+                toast("Loading train stations…")
+            } else {
+                viewModel.clearMbtaStations()
+                clearStationMarkers()
+            }
+        }
 
         override fun onMbtaTrainsToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onMbtaTrainsToggled: $enabled")

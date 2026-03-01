@@ -39,6 +39,7 @@ object MarkerIconHelper {
         "transit_rail"   to Pair(R.drawable.ic_transit_rail,  Color.parseColor("#0277BD")),
         "bus_stop"       to Pair(R.drawable.ic_bus,           Color.parseColor("#1565C0")),
         "bus_station"    to Pair(R.drawable.ic_bus,           Color.parseColor("#1565C0")),
+        "train_station"  to Pair(R.drawable.ic_train_station,  Color.parseColor("#37474F")),
         "camera"         to Pair(R.drawable.ic_camera,        Color.parseColor("#455A64")),
         "search"         to Pair(R.drawable.ic_search,        Color.parseColor("#4A148C")),
         "weather_alert"  to Pair(R.drawable.ic_weather_alert, Color.parseColor("#006064")),
@@ -442,6 +443,13 @@ object MarkerIconHelper {
         val result = BitmapDrawable(context.resources, bitmap)
         cache[key] = result
         return result
+    }
+
+    /**
+     * Station icon: 26dp train station drawable tinted to [tintColor].
+     */
+    fun stationIcon(context: Context, tintColor: Int): BitmapDrawable {
+        return get(context, R.drawable.ic_train_station, 26, tintColor)
     }
 
     fun clearCache() = cache.clear()

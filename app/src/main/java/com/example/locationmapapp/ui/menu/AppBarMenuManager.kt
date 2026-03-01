@@ -149,6 +149,9 @@ class AppBarMenuManager(
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Transit: '${item.title}'")
             when (item.itemId) {
+                R.id.menu_mbta_stations ->
+                    toggleBinary(item, PREF_MBTA_STATIONS) { menuEventListener.onMbtaStationsToggled(it) }
+
                 R.id.menu_mbta_trains ->
                     toggleBinary(item, PREF_MBTA_TRAINS) { menuEventListener.onMbtaTrainsToggled(it) }
 
@@ -197,6 +200,7 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
+            R.id.menu_mbta_stations   to PREF_MBTA_STATIONS,
             R.id.menu_mbta_trains     to PREF_MBTA_TRAINS,
             R.id.menu_mbta_subway     to PREF_MBTA_SUBWAY,
             R.id.menu_mbta_buses      to PREF_MBTA_BUSES,
@@ -613,6 +617,7 @@ class AppBarMenuManager(
         const val PREF_AIRCRAFT_FREQ      = "aircraft_freq_sec"
 
         // ── Transit ───────────────────────────────────────────────────────────
+        const val PREF_MBTA_STATIONS    = "mbta_stations_on"
         const val PREF_MBTA_TRAINS      = "mbta_trains_on"
         const val PREF_MBTA_TRAINS_FREQ = "mbta_trains_freq_sec"
         const val PREF_MBTA_SUBWAY      = "mbta_subway_on"

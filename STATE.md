@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-02-28 Session 15 (Populate v2: probe-calibrate-subdivide, Overpass throttle)
+## Last Updated: 2026-02-28 Session 16 (MBTA Train Station Markers with Arrivals & Schedules)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -32,6 +32,15 @@
 - NWS NEXRAD radar tiles (Iowa State Mesonet — replaced RainViewer)
 - MBTA live vehicles: buses, commuter rail, subway (with auto-refresh)
   - Directional arrows on vehicle markers showing bearing/heading
+- **MBTA train station markers** (v1.5.17) — ~270 subway + commuter rail stations on map
+  - Station building icon (26dp, tinted per line); multi-line stations use neutral dark gray
+  - Tap station → **arrival board dialog**: real-time predictions with route dots, headsign, "Now/X min/H:MM" times
+  - Auto-refreshes every 30s while dialog is open
+  - Tap a train row → **trip schedule dialog**: full timetable with stop names, times, track numbers (CR)
+  - `routeColor()` / `routeAbbrev()` helpers extract duplicated color logic
+  - Toggle in Transit menu ("Train Stations"), defaults ON, persisted with `PREF_MBTA_STATIONS`
+  - Fetches via 2 MBTA API calls (subway routes + CR route_type=2), merges by stop ID
+  - No interference with vehicle/aircraft follow mode
 - Aircraft tracking (OpenSky Network) — live airplane positions
   - Rotated airplane icon pointing to heading, callsign label, vertical rate indicator (↑↓—)
   - SPI emergency flag: thick red circle around marker, warning in tap info
@@ -119,7 +128,10 @@
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
-| MBTA | direct (api-v3.mbta.com) | not proxied | — |
+| MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
+| MBTA Stations | direct (api-v3.mbta.com/stops) | not proxied | — |
+| MBTA Predictions | direct (api-v3.mbta.com/predictions) | not proxied | — |
+| MBTA Schedules | direct (api-v3.mbta.com/schedules) | not proxied | — |
 | Radar tiles | direct (mesonet.agron.iastate.edu) | not proxied | — |
 
 ## Map Interaction Model
@@ -127,6 +139,7 @@
 - **Long press (~2s)**: enter manual mode, center map, search POIs at location
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: follow mode (map tracks vehicle, banner shows status/speed)
+- **Tap station marker**: arrival board dialog (real-time predictions), tap train → trip schedule dialog
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center
@@ -214,6 +227,7 @@
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 
 ## Next Steps
+- **Test station markers** — toggle on, verify ~270 stations appear, tap one, verify arrival board, tap train row, verify schedule
 - **Test aircraft layer** with rate limiter — enable aircraft, verify throttling works, no 429 storms
 - **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads
 - Monitor cache growth and hit rates over time

@@ -1,0 +1,21 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+  <!-- Building body -->
+  <path android:fillColor="#37474F"
+        android:pathData="M4,4 L20,4 L20,20 L4,20 Z"/>
+  <!-- Roof / canopy -->
+  <path android:fillColor="#37474F"
+        android:pathData="M2,4 L22,4 L22,6 L2,6 Z"/>
+  <!-- Door -->
+  <path android:fillColor="#FFFFFF"
+        android:pathData="M10,14 L14,14 L14,20 L10,20 Z"/>
+  <!-- Windows row -->
+  <path android:fillColor="#FFFFFF"
+        android:pathData="M6,8 L9,8 L9,11 L6,11 Z"/>
+  <path android:fillColor="#FFFFFF"
+        android:pathData="M15,8 L18,8 L18,11 L15,11 Z"/>
+  <!-- Clock / circle accent at top center -->
+  <path android:fillColor="#FFFFFF"
+        android:pathData="M12,2 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0"/>
+</vector>

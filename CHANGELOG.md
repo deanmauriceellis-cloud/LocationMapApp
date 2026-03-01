@@ -1,5 +1,39 @@
 # LocationMapApp — Changelog
 
+## [1.5.17] — 2026-02-28
+
+### Added
+- **MBTA train station markers** — ~270 subway + commuter rail stations displayed on map
+  - Station building icon (`ic_train_station.xml`, 26dp), tinted per transit line color
+  - Multi-line stations (e.g., Park Street = Red+Green) get neutral dark gray tint
+  - Single-line stations get their line color (red, orange, blue, green, purple for CR)
+- **Arrival board dialog** — tap any station to see real-time arrivals
+  - 90% fullscreen dark dialog (same pattern as webcam preview)
+  - Header with station name, subtitle with lines served
+  - Column headers: Line | Destination | Arrives
+  - Each row: colored route dot, abbreviation (RL/OL/GL-B/CR), headsign, arrival time
+  - Arrival time format: "Now", "X min", or "H:MM AM/PM"
+  - Auto-refreshes every 30s while dialog is open
+  - Empty state: "No upcoming arrivals"
+- **Trip schedule dialog** — tap a train row in the arrival board
+  - Back button + close button header
+  - Route color bar under header
+  - Full timetable: colored dot, stop name, 12h time, track number (commuter rail only)
+- **MbtaStop, MbtaPrediction, MbtaTripScheduleEntry** data classes in Models.kt
+- **3 new API methods** in MbtaRepository.kt:
+  - `fetchStations()` — 2 API calls (subway routes + CR route_type=2), merges by stop ID
+  - `fetchPredictions(stopId)` — real-time arrivals from `/predictions` endpoint
+  - `fetchTripSchedule(tripId)` — full timetable from `/schedules` endpoint
+  - Shared `executeGet()` helper extracted from existing fetch logic
+- **`stationIcon()`** method in MarkerIconHelper + `"train_station"` in CATEGORY_MAP
+- **`routeColor()` / `routeAbbrev()`** helpers in MainActivity — centralized MBTA color logic
+- **Transit menu** — "Train Stations" checkable toggle (defaults ON)
+- **`PREF_MBTA_STATIONS`** preference constant, wired through AppBarMenuManager
+- **`onMbtaStationsToggled()`** in MenuEventListener interface
+- **`mbtaStations` LiveData** in MainViewModel with `fetchMbtaStations()`, `clearMbtaStations()`
+- **`fetchPredictionsDirectly()` / `fetchTripScheduleDirectly()`** suspend functions for dialog use
+- **`onStart()` restore** — stations restored from persisted toggle state like other MBTA layers
+
 ## [1.5.16] — 2026-02-28
 
 ### Changed

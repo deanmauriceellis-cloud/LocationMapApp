@@ -1,5 +1,76 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-02-28p (MBTA Train Station Markers with Arrivals & Schedules)
+
+### Context
+The app shows live MBTA vehicle positions but had no station markers. User wants to see all subway (~123) and commuter rail (~150) stations on the map, tap a station to see arriving trains with destinations, and tap a train to see its full schedule. MBTA v3 API supports all of this via `/stops`, `/predictions`, `/schedules`.
+
+### Changes Made
+
+#### Data classes (`Models.kt`)
+- Added `MbtaStop(id, name, lat, lon, routeIds)` with `toGeoPoint()`
+- Added `MbtaPrediction(id, routeId, routeName, tripId, headsign, arrivalTime, departureTime, directionId, status, vehicleId)`
+- Added `MbtaTripScheduleEntry(stopId, stopName, stopSequence, arrivalTime, departureTime, platformCode)`
+
+#### Station icon (`ic_train_station.xml`)
+- 24dp vector drawable — building shape with canopy, door, two windows, clock accent at top
+- Tinted at runtime per transit line color
+
+#### MBTA API methods (`MbtaRepository.kt`)
+- Extracted shared `executeGet(url, label)` helper from existing vehicle fetch logic
+- `fetchStations()` — 2 API calls: subway routes (Red,Orange,Blue,Green-B/C/D/E,Mattapan) filtered by location_type=1 + CR route_type=2; merges by stop ID to combine routeIds for multi-line stations
+- `fetchPredictions(stopId)` — real-time arrivals from `/predictions?filter[stop]=X&include=trip,route&sort=departure_time`; headsign from included trip, routeName from included route
+- `fetchTripSchedule(tripId)` — full timetable from `/schedules?filter[trip]=X&include=stop&sort=stop_sequence`; stopName and platformCode from included stops
+
+#### MarkerIconHelper changes
+- Added `"train_station"` to CATEGORY_MAP with dark gray default
+- Added `stationIcon(context, tintColor)` — 26dp tinted station icon
+
+#### ViewModel (`MainViewModel.kt`)
+- `_mbtaStations` / `mbtaStations` LiveData for station list
+- `fetchMbtaStations()` — launches coroutine to call repository
+- `clearMbtaStations()` — empties LiveData
+- `fetchPredictionsDirectly(stopId)` — suspend, returns directly for dialog use
+- `fetchTripScheduleDirectly(tripId)` — suspend, returns directly for dialog use
+
+#### Menu wiring
+- `MenuEventListener.kt` — added `onMbtaStationsToggled(enabled: Boolean)`
+- `menu_transit.xml` — added checkable "Train Stations" item before national alerts
+- `AppBarMenuManager.kt` — added `PREF_MBTA_STATIONS` constant (default ON), toggle handler, syncCheckStates
+
+#### MainActivity — markers, dialogs, glue
+- `stationMarkers` list with `addStationMarker()` / `clearStationMarkers()`
+- `routeColor(routeId)` — centralized MBTA line color mapping (Red→#C62828, Orange→#E65100, Blue→#1565C0, Green→#2E7D32, CR→#6A1B9A, Silver→#546E7A)
+- `routeAbbrev(routeId)` — short labels for arrival board (RL, OL, BL, GL-B, CR, M, SL)
+- Multi-line stations (>1 routeId) get neutral dark gray tint; single-line get line color
+- Observer on `mbtaStations` LiveData: clear + rebuild markers
+- `onStart()` restore block: fetches stations if pref ON and markers empty
+- Station tap does NOT interfere with vehicle/aircraft follow mode
+- **Arrival board dialog** (`showArrivalBoardDialog`): 90% fullscreen dark, header + subtitle, column headers, prediction rows with colored dot + abbreviation + headsign + arrival time, 30s auto-refresh, tap row → trip schedule
+- **Trip schedule dialog** (`showTripScheduleDialog`): back+close header, route color bar, stop list with dot + name + time + track number
+- `formatArrivalTime()` — "Now" (≤0 min), "X min" (<60), "H:MM AM/PM" (else)
+- `formatScheduleTime()` — 12h AM/PM format
+- `onMbtaStationsToggled()` in menuEventListenerImpl
+
+### Files Changed (9 files, 1 new)
+1. `app/src/main/res/drawable/ic_train_station.xml` — **NEW** station icon
+2. `app/.../data/model/Models.kt` — 3 new data classes
+3. `app/.../data/repository/MbtaRepository.kt` — 3 API methods + parsers + shared executeGet
+4. `app/.../ui/MarkerIconHelper.kt` — train_station category + stationIcon method
+5. `app/.../ui/MainViewModel.kt` — stations LiveData + 3 functions
+6. `app/.../ui/menu/MenuEventListener.kt` — onMbtaStationsToggled interface method
+7. `app/src/main/res/menu/menu_transit.xml` — Train Stations checkable item
+8. `app/.../ui/menu/AppBarMenuManager.kt` — PREF_MBTA_STATIONS + toggle + sync
+9. `app/.../ui/MainActivity.kt` — station markers, arrival/schedule dialogs, menu handler
+
+### Build
+- `assembleDebug` passes cleanly (only pre-existing deprecation warning)
+
+### Version
+- v1.5.17
+
+---
+
 ## Session: 2026-02-28o (Populate v2: Probe-Calibrate-Subdivide)
 
 ### Context
