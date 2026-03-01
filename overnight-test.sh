@@ -468,8 +468,8 @@ phase1_setup_baseline() {
         event INFO "Running existing test-app.sh..."
         bash ./test-app.sh --skip-setup > "$TEST_APP_OUTPUT" 2>&1 || true
         local ta_pass ta_fail
-        ta_pass=$(grep -c '^\[PASS\]' "$TEST_APP_OUTPUT" 2>/dev/null || echo 0)
-        ta_fail=$(grep -c '^\[FAIL\]' "$TEST_APP_OUTPUT" 2>/dev/null || echo 0)
+        ta_pass=$(sed 's/\x1b\[[0-9;]*m//g' "$TEST_APP_OUTPUT" | grep -c '^\[PASS\]' 2>/dev/null || echo 0)
+        ta_fail=$(sed 's/\x1b\[[0-9;]*m//g' "$TEST_APP_OUTPUT" | grep -c '^\[FAIL\]' 2>/dev/null || echo 0)
         event INFO "test-app.sh results: $ta_pass pass, $ta_fail fail"
     else
         event WARN "test-app.sh not found — skipping"
