@@ -122,6 +122,7 @@ class MainActivity : AppCompatActivity() {
 
     // POI label zoom threshold tracking
     private var poiLabelsShowing = false
+    private var transitMarkersVisible = true
 
     // Deferred restore — wait for first real GPS fix so the map has a valid bounding box
     private var pendingPoiRestore = false
@@ -470,8 +471,16 @@ class MainActivity : AppCompatActivity() {
                 // Stop populate scanner if running — user is interacting with a new location
                 if (populateJob != null) stopPopulatePois()
                 viewModel.setManualLocation(p)
-                binding.mapView.controller.animateTo(p)
+                // Zoom to 14 if currently zoomed out; leave alone if already 14+
+                val targetZoom = if (binding.mapView.zoomLevelDouble < 14.0) 14.0 else binding.mapView.zoomLevelDouble
+                binding.mapView.controller.animateTo(p, targetZoom, null)
                 triggerFullSearch(p)
+                // Programmatic animateTo doesn't fire onScroll — schedule bbox POI refresh
+                cachePoiJob?.cancel()
+                cachePoiJob = lifecycleScope.launch {
+                    delay(2000)
+                    loadCachedPoisForVisibleArea()
+                }
                 toast("Manual mode — searching POIs…")
                 return true
             }
@@ -534,8 +543,27 @@ class MainActivity : AppCompatActivity() {
                 scheduleAircraftReload()
                 scheduleBusStopReload()
                 if (populateJob == null) scheduleWebcamReload()
+                // Hide transit markers when zoomed out to 10 or less
+                val zoom = binding.mapView.zoomLevelDouble
+                if (zoom <= 10.0) {
+                    if (transitMarkersVisible) {
+                        transitMarkersVisible = false
+                        clearTrainMarkers(); clearSubwayMarkers(); clearBusMarkers()
+                        clearStationMarkers(); clearBusStopMarkers()
+                        binding.mapView.invalidate()
+                    }
+                } else if (!transitMarkersVisible) {
+                    transitMarkersVisible = true
+                    // Re-add from latest LiveData values
+                    viewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
+                    viewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
+                    viewModel.mbtaBuses.value?.let { it.forEach { v -> addBusMarker(v) } }
+                    viewModel.mbtaStations.value?.let { it.forEach { s -> addStationMarker(s) } }
+                    refreshBusStopMarkersForViewport()
+                    binding.mapView.invalidate()
+                }
                 // Refresh POI marker icons when crossing the zoom-18 label threshold
-                val nowLabeled = binding.mapView.zoomLevelDouble >= 18.0
+                val nowLabeled = zoom >= 18.0
                 if (nowLabeled != poiLabelsShowing) {
                     poiLabelsShowing = nowLabeled
                     refreshPoiMarkerIcons()
@@ -921,27 +949,27 @@ class MainActivity : AppCompatActivity() {
             }, 3000)
         }
         viewModel.mbtaTrains.observe(this) { vehicles ->
-            DebugLogger.i("MainActivity", "MBTA trains update — ${vehicles.size} vehicles on map")
+            DebugLogger.i("MainActivity", "MBTA trains update — ${vehicles.size} vehicles")
             clearTrainMarkers()
-            vehicles.forEach { addTrainMarker(it) }
+            if (transitMarkersVisible) vehicles.forEach { addTrainMarker(it) }
             updateFollowedVehicle(vehicles)
         }
         viewModel.mbtaSubway.observe(this) { vehicles ->
-            DebugLogger.i("MainActivity", "MBTA subway update — ${vehicles.size} vehicles on map")
+            DebugLogger.i("MainActivity", "MBTA subway update — ${vehicles.size} vehicles")
             clearSubwayMarkers()
-            vehicles.forEach { addSubwayMarker(it) }
+            if (transitMarkersVisible) vehicles.forEach { addSubwayMarker(it) }
             updateFollowedVehicle(vehicles)
         }
         viewModel.mbtaBuses.observe(this) { vehicles ->
-            DebugLogger.i("MainActivity", "MBTA buses update — ${vehicles.size} vehicles on map")
+            DebugLogger.i("MainActivity", "MBTA buses update — ${vehicles.size} vehicles")
             clearBusMarkers()
-            vehicles.forEach { addBusMarker(it) }
+            if (transitMarkersVisible) vehicles.forEach { addBusMarker(it) }
             updateFollowedVehicle(vehicles)
         }
         viewModel.mbtaStations.observe(this) { stations ->
-            DebugLogger.i("MainActivity", "MBTA stations update — ${stations.size} stations on map")
+            DebugLogger.i("MainActivity", "MBTA stations update — ${stations.size} stations")
             clearStationMarkers()
-            stations.forEach { addStationMarker(it) }
+            if (transitMarkersVisible) stations.forEach { addStationMarker(it) }
         }
         viewModel.mbtaBusStops.observe(this) { stops ->
             DebugLogger.i("MainActivity", "MBTA bus stops update — ${stops.size} total stops loaded")
@@ -3447,9 +3475,10 @@ class MainActivity : AppCompatActivity() {
                 binding.mapView.overlays.add(scanningMarker)
             }
             scanningMarker?.position = point
-            // Zoom to scan point at zoom 14 — keeps viewport small so bbox
-            // returns fewer POIs and out-of-view markers fall off naturally
-            binding.mapView.controller.setZoom(14.0)
+            // Zoom to 14 if zoomed out; leave alone if already 14+
+            if (binding.mapView.zoomLevelDouble < 14.0) {
+                binding.mapView.controller.setZoom(14.0)
+            }
             binding.mapView.controller.animateTo(point)
         }
     }

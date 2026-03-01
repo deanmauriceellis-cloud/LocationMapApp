@@ -1,5 +1,38 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01h (Legend Dialog + Zoom/Transit UX Fixes — v1.5.25)
+
+### Changes Made
+
+#### Legend Toolbar Button (4 files)
+- **`menu_main_toolbar.xml`** — 8th toolbar item `menu_top_legend` ("Legend") after Utility
+- **`MenuEventListener.kt`** — `onLegendRequested()` callback in new LEGEND section
+- **`AppBarMenuManager.kt`** — direct callback in `when` block (no sub-menu XML)
+- **`MainActivity.kt`** — `showLegendDialog()`: dark scrollable dialog (90% width, 85% height, #1A1A1A)
+  - 7 sections: Your Location, POIs (iterates PoiCategories.ALL), Weather (METAR swatches + radar gradient), Transit Vehicles (7 line colors), Transit Stops, Aircraft (4 altitude colors + SPI + trail), Cameras
+  - Programmatic icon rendering: colored dots, bordered rects, gradient bar, colored lines
+  - 6 new graphics imports (Bitmap, Canvas, Paint, LinearGradient, Shader, RectF)
+
+#### POI Bbox Refresh Fix (long-press)
+- **Bug**: programmatic `animateTo()` doesn't trigger osmdroid's `onScroll` listener, so `loadCachedPoisForVisibleArea()` never ran after long-press location change — POIs fetched into cache but never displayed
+- **Fix**: explicit `loadCachedPoisForVisibleArea()` scheduled 2s after long-press `animateTo()` via debounced `cachePoiJob`
+
+#### Long-Press Auto-Zoom
+- If zoom < 14 on long-press → zooms to 14; if already 14+ → leaves current zoom
+- Replaces previous behavior of no zoom change (user had to manually zoom in)
+
+#### Transit Zoom Guard (zoom ≤ 10)
+- `transitMarkersVisible` flag tracks state, toggled in `onZoom` listener
+- Zoom ≤ 10: clears all transit markers (trains, subway, buses, stations, bus stops)
+- Zoom > 10: re-adds markers from latest LiveData values
+- LiveData observers guarded: skip `addMarker` calls when `!transitMarkersVisible`
+
+#### Populate Scanner Zoom Fix
+- `placeScanningMarker()` no longer forces zoom to 14 — only sets zoom 14 if current zoom < 14
+- Allows populate to run at user's preferred zoom (e.g., zoom 18 for detailed view)
+
+---
+
 ## Session: 2026-03-01g (Aircraft Flight Path Visualization — v1.5.24)
 
 ### Changes Made

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 24 (Aircraft Flight Path Visualization)
+## Last Updated: 2026-03-01 Session 25 (Legend Dialog + Zoom/Transit UX Fixes)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -115,8 +115,13 @@
 - Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
   - **Staleness detection**: banner and tap snippet show "STALE (Xm ago)" when vehicle GPS update is >2 min old
 - POI prefetch along followed vehicle/aircraft routes
+- **Legend dialog** (v1.5.25) — 8th toolbar button, scrollable dark dialog explaining all marker types
+  - 7 sections: GPS, 16 POI categories, METAR/radar, transit vehicles, transit stops, aircraft, webcams
+  - POI section driven from `PoiCategories.ALL` — stays in sync automatically
+- **Transit zoom guard** (v1.5.25) — all transit markers hidden at zoom ≤ 10, restored on zoom in
 - Cached POI coverage display: proxy `/pois/bbox` endpoint returns POIs within visible map area
   - Loads on startup, refreshes on scroll/zoom (500ms debounce), refreshes after follow prefetch
+  - Also triggered explicitly after long-press location change (programmatic moves don't fire onScroll)
 - Adaptive POI search radius — proxy stores per-grid-cell hints, app fetches/reports, 20km fuzzy matching
 - Individual POI cache (poi-cache.json) — deduped by OSM type+id, with first/last seen timestamps
 - POI database (PostgreSQL) — permanent storage with JSONB tags, category indexing, upsert import
@@ -169,7 +174,7 @@
 
 ## Map Interaction Model
 - **Single tap**: no action
-- **Long press (~2s)**: enter manual mode, center map, search POIs at location
+- **Long press (~2s)**: enter manual mode, center map (auto-zoom to 14 if <14), search POIs at location
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: vehicle detail dialog (route, status, speed) with Follow / View Route / Arrivals buttons
 - **Tap station marker**: arrival board dialog (real-time predictions), tap train → trip schedule dialog
@@ -353,8 +358,6 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - 0 test failures across entire run
 
 ## Next Steps
-- **Test flight path trail** — follow aircraft with DB history → verify trail renders with colored segments
-- **Test webcam "View Live"** — tap webcam → preview → View Live → verify WebView player loads (manual)
 - **Verify cache hit rate improvement** — bbox snapping deployed, monitor actual hit rate over next session
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing

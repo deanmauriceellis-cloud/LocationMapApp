@@ -1,5 +1,18 @@
 # LocationMapApp — Changelog
 
+## [1.5.25] — 2026-03-01
+
+### Added
+- **Legend toolbar button** — 8th toolbar item opens scrollable dark dialog explaining all marker types
+  - 7 sections: GPS location, 16 POI categories (driven from PoiCategories.ALL), METAR flight categories + radar gradient, transit vehicles by line color, transit stops, aircraft altitude colors + SPI + flight trail, webcams
+  - Programmatic icon rendering: colored dots, bordered rects, gradient bar, colored lines
+- **Transit zoom guard** — all transit markers (trains, subway, buses, stations, bus stops) hidden at zoom ≤ 10, restored when zooming back in
+- **Long-press auto-zoom** — zooms to 14 if currently below 14; leaves zoom alone if already 14+
+
+### Fixed
+- **POIs not appearing after long-press location change** — programmatic `animateTo()` doesn't fire osmdroid `onScroll`, so bbox POI refresh never triggered; now explicitly scheduled 2s after long-press
+- **Populate scanner forcing zoom 14** — `placeScanningMarker()` no longer resets zoom if already ≥ 14 (was always `setZoom(14.0)`)
+
 ## [1.5.24] — 2026-03-01
 
 ### Added
