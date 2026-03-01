@@ -1,5 +1,53 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01j (POI Detail Dialog — v1.5.27)
+
+### Changes Made
+
+#### Proxy (cache-proxy/)
+- **package.json** — Added `duck-duck-scrape: ^2.2.5` dependency
+- **server.js** — Added `require('duck-duck-scrape')` + `GET /pois/website` endpoint
+  - 3-tier website resolution waterfall: OSM tags → Wikidata P856 → DuckDuckGo search
+  - `cacheResolvedWebsite()` helper writes `_resolved_website`/`_resolved_source` to pois JSONB tags
+  - Directory site filter (yelp, facebook, tripadvisor, yellowpages, foursquare, bbb, etc.)
+  - Always returns phone/hours/address from existing tags
+  - Graceful error handling — never throws, returns `{ url: null, source: "none" }` on failure
+
+#### App Data Layer
+- **Models.kt** — Added `PoiWebsite` data class (url, source, phone, hours, address)
+- **FindRepository.kt** — Added `fetchWebsite()` suspend function calling `/pois/website`
+- **MainViewModel.kt** — Added `fetchPoiWebsiteDirectly()` pass-through suspend call
+
+#### POI Detail Dialog (MainActivity.kt, ~250 lines)
+- **`poiCategoryColor()`** — maps category tag to PoiCategory color from central config
+- **`showPoiDetailDialog(result)`** — 90%w × 85%h dark dialog
+  - Header: category color dot + compact GPS distance (cyan "1.4mi(NE)") + name + close (✕)
+  - Category color bar (4dp)
+  - Info rows: Distance, Type (with detail), Address, Phone (tappable cyan → ACTION_DIAL), Hours
+  - Website area: spinner → "Load Website" button (async resolved) or "No website available"
+  - Action buttons: Directions (green), Call (blue, dimmed if no phone), Reviews (amber), Map (gray → zoom 18)
+- **`showFullScreenWebView(url, title)`** — full-screen dialog with WebView
+  - Top bar: back arrow (← = browser back or dismiss) + title + close (✕)
+  - `useWideViewPort + loadWithOverviewMode` — sites scale to fit screen
+  - Pinch-to-zoom enabled, `onRenderProcessGone` crash handler returns `true` (no ANR)
+  - WebView destroyed on dialog dismiss
+- **Rewired Find results tap**: `showPoiDetailDialog(result)` instead of direct map animate
+- **External intents**: `FLAG_ACTIVITY_NO_HISTORY` on Directions + Call — auto-killed on return
+
+#### Bug Fixes During Session
+- WebView renderer crash (emulator) caused ANR → added `onRenderProcessGone` handler
+- Auto-loading WebView blocked main thread during Chromium init → switched to deferred "Load Website" button
+- Website rendered at desktop scale → enabled `useWideViewPort + loadWithOverviewMode`
+- Directions opened Google Maps with raw coordinates → uses named destination URL
+- Google Maps lingered in back stack → `FLAG_ACTIVITY_NO_HISTORY` kills on return
+
+### Testing
+- Proxy `/pois/website` tested: Tier 1 (Starbucks → OSM tag), Tier 2 (Salem Five → Wikidata), cache hit (instant)
+- DDG Tier 3 rate-limited during rapid testing (expected) — graceful fallback to "none"
+- All resolved URLs persisted in DB as `_resolved_website` JSONB tags
+- Android build: BUILD SUCCESSFUL, no new warnings
+- Dialog tested on device: info rows, Load Website, Directions, back navigation all working
+
 ## Session: 2026-03-01i (Find Dialog — POI Discovery — v1.5.26)
 
 ### Changes Made

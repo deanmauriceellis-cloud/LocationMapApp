@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -3106,16 +3107,10 @@ class MainActivity : AppCompatActivity() {
                 row.addView(distText)
                 row.addView(infoCol)
 
-                // Tap → animate to POI
+                // Tap → POI detail dialog
                 row.setOnClickListener {
                     dialog.dismiss()
-                    val point = result.toGeoPoint()
-                    binding.mapView.controller.animateTo(point, 17.0, 800L)
-                    // Schedule POI bbox reload after animation completes
-                    lifecycleScope.launch {
-                        delay(1000)
-                        loadCachedPoisForVisibleArea()
-                    }
+                    showPoiDetailDialog(result)
                 }
 
                 resultsList.addView(row)
@@ -3135,6 +3130,417 @@ class MainActivity : AppCompatActivity() {
             } else 0.0
             footer.text = "Showing ${response.results.size} nearest (within %.1f mi)".format(maxDistMi)
         }
+    }
+
+    private fun poiCategoryColor(categoryTag: String): Int {
+        return PoiCategories.ALL.firstOrNull { it.tags.contains(categoryTag) }?.color
+            ?: Color.parseColor("#757575")
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun showPoiDetailDialog(result: com.example.locationmapapp.data.model.FindResult) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        val catColor = poiCategoryColor(result.category)
+        val center = binding.mapView.mapCenter
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        // ── Header: color dot + compact distance + name + close ──
+        val dot = View(this).apply {
+            val size = dp(12)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(6) }
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(catColor)
+            }
+        }
+        // Compact distance from current GPS: "1.4mi(NE)"
+        val gpsLoc = viewModel.currentLocation.value
+        val compactDist = if (gpsLoc != null) {
+            val results = FloatArray(2)
+            android.location.Location.distanceBetween(
+                gpsLoc.latitude, gpsLoc.longitude, result.lat, result.lon, results
+            )
+            val distMi = results[0] / 1609.34
+            val cardinal = bearingToCardinal(results[1])
+            val distStr = if (distMi < 0.1) "%.0fft".format(results[0] * 3.28084)
+                else if (distMi < 10) "%.1fmi".format(distMi)
+                else "%.0fmi".format(distMi)
+            "$distStr($cardinal)"
+        } else null
+        val distLabel = TextView(this).apply {
+            text = compactDist ?: ""
+            textSize = 12f
+            setTextColor(Color.parseColor("#4FC3F7"))
+            setPadding(0, 0, dp(8), 0)
+            if (compactDist == null) visibility = View.GONE
+        }
+        val titleText = TextView(this).apply {
+            text = result.name ?: result.typeValue.replaceFirstChar { it.uppercase() }
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(4), dp(4), dp(4))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(12), dp(4))
+            addView(dot)
+            addView(distLabel)
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Color bar ──
+        val colorBar = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(4)
+            )
+            setBackgroundColor(catColor)
+        }
+
+        // ── Info rows ──
+        val infoContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+
+        fun addInfoRow(label: String, value: String, tappable: Boolean = false, onClick: (() -> Unit)? = null) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            row.addView(TextView(this).apply {
+                text = label
+                textSize = 13f
+                setTextColor(Color.parseColor("#999999"))
+                layoutParams = LinearLayout.LayoutParams(dp(100), LinearLayout.LayoutParams.WRAP_CONTENT)
+            })
+            row.addView(TextView(this).apply {
+                text = value
+                textSize = 14f
+                setTextColor(if (tappable) Color.parseColor("#4FC3F7") else Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                if (onClick != null) setOnClickListener { onClick() }
+            })
+            infoContainer.addView(row)
+        }
+
+        // Distance
+        addInfoRow("Distance", formatDistanceDirection(
+            center.latitude, center.longitude, result.lat, result.lon
+        ))
+
+        // Type
+        val typeLine = buildString {
+            append(result.typeValue.replaceFirstChar { it.uppercase() })
+            result.detail?.let { append(" ($it)") }
+        }
+        addInfoRow("Type", typeLine)
+
+        // Address
+        if (result.address != null) addInfoRow("Address", result.address)
+
+        // Phone (tappable)
+        if (result.phone != null) {
+            addInfoRow("Phone", result.phone, tappable = true) {
+                try {
+                    startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${result.phone}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    })
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Hours
+        if (result.openingHours != null) addInfoRow("Hours", result.openingHours)
+
+        // ── Website button area ──
+        val websiteArea = android.widget.FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            setBackgroundColor(Color.parseColor("#111111"))
+        }
+
+        // Spinner while resolving
+        val loadingLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        loadingLayout.addView(android.widget.ProgressBar(this))
+        loadingLayout.addView(TextView(this).apply {
+            text = "Resolving website..."
+            textSize = 12f
+            setTextColor(Color.parseColor("#757575"))
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(8), 0, 0)
+        })
+        websiteArea.addView(loadingLayout)
+
+        // Resolved URL stored here for Reviews button fallback
+        var resolvedUrl: String? = null
+
+        // Async resolve → show big button or "no website"
+        lifecycleScope.launch {
+            val websiteInfo = viewModel.fetchPoiWebsiteDirectly(
+                result.type, result.id, result.name, result.lat, result.lon
+            )
+            websiteArea.removeAllViews()
+            if (websiteInfo?.url != null) {
+                resolvedUrl = websiteInfo.url
+                websiteArea.addView(TextView(this@MainActivity).apply {
+                    text = "\uD83C\uDF10  Load Website"
+                    textSize = 18f
+                    setTextColor(Color.WHITE)
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    gravity = android.view.Gravity.CENTER
+                    setBackgroundColor(Color.parseColor("#1565C0"))
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        dp(260), dp(56)
+                    ).apply { gravity = android.view.Gravity.CENTER }
+                    setOnClickListener { showFullScreenWebView(websiteInfo.url, result.name ?: "Website") }
+                })
+            } else {
+                websiteArea.addView(TextView(this@MainActivity).apply {
+                    text = "No website available"
+                    textSize = 14f
+                    setTextColor(Color.parseColor("#616161"))
+                    gravity = android.view.Gravity.CENTER
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                })
+            }
+        }
+
+        // ── Action buttons ──
+        val buttonContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(16), dp(8), dp(16), dp(12))
+        }
+        val buttonLp = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            setMargins(dp(3), 0, dp(3), 0)
+        }
+
+        // Directions button
+        buttonContainer.addView(TextView(this).apply {
+            text = "Directions"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#2E7D32"))
+            layoutParams = buttonLp
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            setOnClickListener {
+                val dest = if (result.name != null) {
+                    Uri.encode("${result.name}, ${result.lat},${result.lon}")
+                } else {
+                    "${result.lat},${result.lon}"
+                }
+                val mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=$dest"
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    })
+                } catch (_: Exception) {}
+            }
+        })
+
+        // Call button
+        buttonContainer.addView(TextView(this).apply {
+            text = "Call"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#1565C0"))
+            layoutParams = buttonLp
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            alpha = if (result.phone != null) 1.0f else 0.4f
+            setOnClickListener {
+                if (result.phone != null) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${result.phone}")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                        })
+                    } catch (_: Exception) {}
+                }
+            }
+        })
+
+        // Reviews button
+        buttonContainer.addView(TextView(this).apply {
+            text = "Reviews"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#F57F17"))
+            layoutParams = buttonLp
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            setOnClickListener {
+                val name = Uri.encode(result.name ?: "")
+                val loc = Uri.encode("${result.lat},${result.lon}")
+                val yelpUrl = "https://www.yelp.com/search?find_desc=$name&find_loc=$loc"
+                showFullScreenWebView(yelpUrl, "Reviews")
+            }
+        })
+
+        // Map button
+        buttonContainer.addView(TextView(this).apply {
+            text = "Map"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#546E7A"))
+            layoutParams = buttonLp
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            setOnClickListener {
+                dialog.dismiss()
+                val point = result.toGeoPoint()
+                binding.mapView.controller.animateTo(point, 18.0, 800L)
+                lifecycleScope.launch {
+                    delay(1000)
+                    loadCachedPoisForVisibleArea()
+                }
+            }
+        })
+
+        // ── Container ──
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            addView(header)
+            addView(colorBar)
+            addView(infoContainer)
+            addView(websiteArea)
+            addView(buttonContainer)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.90).toInt(), (dm.heightPixels * 0.85).toInt())
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+        dialog.show()
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun showFullScreenWebView(url: String, title: String) {
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        var webView: android.webkit.WebView? = null
+
+        // ── Top bar: back + title + close ──
+        val backBtn = TextView(this).apply {
+            text = "\u2190"
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+            setOnClickListener {
+                if (webView?.canGoBack() == true) webView?.goBack() else dialog.dismiss()
+            }
+        }
+        val titleText = TextView(this).apply {
+            text = title
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+            setOnClickListener { dialog.dismiss() }
+        }
+        val topBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            addView(backBtn)
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── WebView ──
+        val wv = android.webkit.WebView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+            settings.builtInZoomControls = true
+            settings.displayZoomControls = false
+            settings.setSupportZoom(true)
+            setInitialScale(0)
+            setBackgroundColor(Color.BLACK)
+            webViewClient = object : android.webkit.WebViewClient() {
+                override fun onRenderProcessGone(
+                    view: android.webkit.WebView?,
+                    detail: android.webkit.RenderProcessGoneDetail?
+                ): Boolean {
+                    dialog.dismiss()
+                    return true
+                }
+            }
+            loadUrl(url)
+        }
+        webView = wv
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.BLACK)
+            addView(topBar)
+            addView(wv)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            win.setLayout(
+                android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT
+            )
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+        dialog.setOnDismissListener { wv.destroy() }
+        dialog.show()
     }
 
     /** Format distance + cardinal direction between two points. */

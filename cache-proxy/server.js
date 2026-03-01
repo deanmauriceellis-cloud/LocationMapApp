@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+const DDG = require('duck-duck-scrape');
 const app = express();
 const PORT = 3000;
 
@@ -1236,6 +1237,114 @@ app.get('/db/pois/find', requirePg, async (req, res) => {
   } catch (err) {
     console.error('[/db/pois/find]', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /pois/website — resolve website URL for a POI (waterfall: OSM → Wikidata → DDG) ──
+
+const DIRECTORY_DOMAINS = ['yelp.com', 'facebook.com', 'tripadvisor.com', 'yellowpages.com',
+  'foursquare.com', 'bbb.org', 'mapquest.com', 'whitepages.com', 'manta.com'];
+
+async function cacheResolvedWebsite(osmType, osmId, url, source) {
+  if (!pgPool) return;
+  try {
+    const escaped = (url || '').replace(/'/g, "''");
+    const patch = JSON.stringify({ _resolved_website: url || '', _resolved_source: source });
+    await pgPool.query(
+      `UPDATE pois SET tags = tags || $1::jsonb WHERE osm_type = $2 AND osm_id = $3`,
+      [patch, osmType, parseInt(osmId)]
+    );
+  } catch (err) {
+    console.error('[cacheResolvedWebsite]', err.message);
+  }
+}
+
+app.get('/pois/website', requirePg, async (req, res) => {
+  try {
+    const { osm_type, osm_id, name, lat, lon } = req.query;
+    if (!osm_type || !osm_id) {
+      return res.status(400).json({ error: 'osm_type and osm_id required' });
+    }
+
+    // Fetch POI row
+    const result = await pgPool.query(
+      `SELECT tags FROM pois WHERE osm_type = $1 AND osm_id = $2`,
+      [osm_type, parseInt(osm_id)]
+    );
+    const tags = result.rows[0]?.tags || {};
+
+    // Extract contact info from tags regardless of website outcome
+    const phone = tags['phone'] || tags['contact:phone'] || null;
+    const hours = tags['opening_hours'] || null;
+    const addrParts = [];
+    if (tags['addr:housenumber']) addrParts.push(tags['addr:housenumber']);
+    if (tags['addr:street']) addrParts.push(tags['addr:street']);
+    if (tags['addr:city']) addrParts.push(tags['addr:city']);
+    if (tags['addr:state']) addrParts.push(tags['addr:state']);
+    const address = addrParts.length > 0 ? addrParts.join(' ') : null;
+
+    // Check cached result first
+    if (tags._resolved_website) {
+      return res.json({ url: tags._resolved_website || null, source: 'cached', phone, hours, address });
+    }
+    if (tags._resolved_source === 'none') {
+      return res.json({ url: null, source: 'cached', phone, hours, address });
+    }
+
+    // Tier 1 — OSM tags
+    const osmUrl = tags['website'] || tags['contact:website'] || tags['brand:website'] || tags['url'];
+    if (osmUrl) {
+      cacheResolvedWebsite(osm_type, osm_id, osmUrl, 'osm');
+      return res.json({ url: osmUrl, source: 'osm', phone, hours, address });
+    }
+
+    // Tier 2 — Wikidata
+    const wikidataId = tags['wikidata'] || tags['brand:wikidata'];
+    if (wikidataId) {
+      try {
+        const wdResp = await fetch(
+          `https://www.wikidata.org/wiki/Special:EntityData/${wikidataId}.json`
+        );
+        if (wdResp.ok) {
+          const wdData = await wdResp.json();
+          const entity = wdData.entities?.[wikidataId];
+          const p856 = entity?.claims?.P856?.[0]?.mainsnak?.datavalue?.value;
+          if (p856) {
+            cacheResolvedWebsite(osm_type, osm_id, p856, 'wikidata');
+            return res.json({ url: p856, source: 'wikidata', phone, hours, address });
+          }
+        }
+      } catch (wdErr) {
+        console.error('[/pois/website] Wikidata error:', wdErr.message);
+      }
+    }
+
+    // Tier 3 — DuckDuckGo search
+    if (name && lat && lon) {
+      try {
+        const searchQuery = `${name} ${lat} ${lon}`;
+        const ddgResults = await DDG.search(searchQuery, { safeSearch: DDG.SafeSearchType.OFF });
+        const hits = (ddgResults?.results || []).filter(r => {
+          if (!r.url) return false;
+          const hostname = new URL(r.url).hostname.toLowerCase();
+          return !DIRECTORY_DOMAINS.some(d => hostname.includes(d));
+        });
+        if (hits.length > 0) {
+          const foundUrl = hits[0].url;
+          cacheResolvedWebsite(osm_type, osm_id, foundUrl, 'search');
+          return res.json({ url: foundUrl, source: 'search', phone, hours, address });
+        }
+      } catch (ddgErr) {
+        console.error('[/pois/website] DDG search error:', ddgErr.message);
+      }
+    }
+
+    // No website found
+    cacheResolvedWebsite(osm_type, osm_id, '', 'none');
+    res.json({ url: null, source: 'none', phone, hours, address });
+  } catch (err) {
+    console.error('[/pois/website]', err.message);
+    res.json({ url: null, source: 'none', phone: null, hours: null, address: null });
   }
 });
 

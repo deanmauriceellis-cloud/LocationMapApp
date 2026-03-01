@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 26 (Find Dialog — POI Discovery)
+## Last Updated: 2026-03-01 Session 27 (POI Detail Dialog)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -121,6 +121,16 @@
   - DB-backed: `/db/pois/counts` (10-min cache) + `/db/pois/find` (Haversine-sorted, 50→200km auto-expand)
   - `FindRepository.kt` with client-side counts cache; `FindResult`/`FindCounts`/`FindResponse` models
   - "All POIs On" button in POI menu for quick recovery after filtering
+- **POI Detail Dialog** (v1.5.27) — rich info view when tapping Find results
+  - Header: category color dot + compact GPS distance + POI name + close
+  - Info rows: Distance, Type (with cuisine/brand detail), Address, Phone (tappable → dialer), Hours
+  - "Load Website" button → full-screen in-app WebView (deferred init avoids ANR)
+  - Proxy `/pois/website` endpoint: 3-tier waterfall (OSM tags → Wikidata P856 → DuckDuckGo)
+  - Resolved URLs cached permanently in DB as `_resolved_website` JSONB tag
+  - `duck-duck-scrape` npm dependency for Tier 3 search
+  - 4 action buttons: Directions (Google Maps), Call (dialer), Reviews (Yelp in WebView), Map (zoom 18)
+  - External intents use `FLAG_ACTIVITY_NO_HISTORY` — auto-killed on return to app
+  - Full-screen WebView: back/close bar, pinch-to-zoom, `onRenderProcessGone` crash handler
 - **Legend dialog** (v1.5.25) — accessible via Utility → Map Legend
   - 7 sections: GPS, 16 POI categories, METAR/radar, transit vehicles, transit stops, aircraft, webcams
   - POI section driven from `PoiCategories.ALL` — stays in sync automatically
@@ -170,6 +180,7 @@
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
 | DB POI Find | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/counts (10-min cache), /db/pois/find | 10 min / live |
+| POI Website | `http://10.0.0.4:3000/pois/website` | GET /pois/website?osm_type=&osm_id=&name=&lat=&lon= | permanent (DB) |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
 | DB Aircraft | `http://10.0.0.4:3000/db/aircraft/...` | GET /db/aircraft/search, /recent, /stats, /:icao24 | live |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
@@ -189,7 +200,8 @@
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
 - **Tap find filter banner**: exit filter mode, restore normal POI display
-- **Find toolbar button**: category grid → subtype grid → distance-sorted results → tap to navigate
+- **Find toolbar button**: category grid → subtype grid → distance-sorted results → tap to open POI detail dialog
+- **POI detail dialog**: info rows + Load Website button + action buttons (Directions, Call, Reviews, Map)
 - **Find long-press**: filter map to show only that category's POIs
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center
 

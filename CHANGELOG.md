@@ -1,5 +1,30 @@
 # LocationMapApp — Changelog
 
+## [1.5.27] — 2026-03-01
+
+### Added
+- **POI Detail Dialog** — rich info dialog when tapping Find results
+  - Header with category color dot, compact GPS distance ("1.4mi(NE)"), POI name
+  - Category color bar (4dp), info rows: Distance, Type, Address, Phone (tappable → dialer), Hours
+  - "Load Website" button — resolves URL via proxy waterfall, opens full-screen in-app WebView
+  - Full-screen WebView dialog with back/close bar, pinch-to-zoom, `onRenderProcessGone` crash handler
+  - 4 action buttons: Directions (green → Google Maps), Call (blue, dimmed if no phone), Reviews (amber → Yelp), Map (gray → zoom 18)
+  - External intents use `FLAG_ACTIVITY_NO_HISTORY` — Google Maps/dialer auto-killed on return
+- **`GET /pois/website` proxy endpoint** — website URL resolution with 3-tier waterfall
+  - **Tier 1**: OSM tags (`website`, `contact:website`, `brand:website`, `url`)
+  - **Tier 2**: Wikidata API (property P856 via `wikidata`/`brand:wikidata` tag)
+  - **Tier 3**: DuckDuckGo search (via `duck-duck-scrape`, filters directory sites)
+  - Resolved URLs cached permanently in DB as `_resolved_website`/`_resolved_source` JSONB tags
+  - Always returns phone/hours/address from existing tags regardless of website outcome
+- **`PoiWebsite` data class** in Models.kt (url, source, phone, hours, address)
+- **`fetchWebsite()`** in FindRepository.kt — calls `/pois/website` endpoint
+- **`fetchPoiWebsiteDirectly()`** in MainViewModel.kt — direct suspend call
+
+### Changed
+- Find results tap → opens POI Detail Dialog (was: animate to map)
+- Map button in POI detail zooms to 18 (was 17) so labeled POI names appear
+- Proxy: added `duck-duck-scrape` dependency to package.json
+
 ## [1.5.26] — 2026-03-01
 
 ### Added

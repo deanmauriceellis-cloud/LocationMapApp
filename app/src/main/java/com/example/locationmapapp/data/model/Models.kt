@@ -232,6 +232,14 @@ data class FindResponse(
     val scopeM: Int
 )
 
+data class PoiWebsite(
+    val url: String?,
+    val source: String,   // "osm", "wikidata", "search", "cached", "none"
+    val phone: String?,
+    val hours: String?,
+    val address: String?
+)
+
 enum class MbtaVehicleStatus(val display: String) {
     INCOMING_AT("Arriving"),
     STOPPED_AT("Stopped at"),

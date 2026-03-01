@@ -415,6 +415,15 @@ class MainViewModel @Inject constructor(
             null
         }
     }
+
+    suspend fun fetchPoiWebsiteDirectly(osmType: String, osmId: Long, name: String?, lat: Double, lon: Double): PoiWebsite? {
+        return try {
+            findRepository.fetchWebsite(osmType, osmId, name, lat, lon)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchPoiWebsiteDirectly FAILED: ${e.message}", e)
+            null
+        }
+    }
 }
 
 enum class LocationMode { GPS, MANUAL }

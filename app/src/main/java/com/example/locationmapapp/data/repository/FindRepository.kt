@@ -3,6 +3,7 @@ package com.example.locationmapapp.data.repository
 import com.example.locationmapapp.data.model.FindCounts
 import com.example.locationmapapp.data.model.FindResponse
 import com.example.locationmapapp.data.model.FindResult
+import com.example.locationmapapp.data.model.PoiWebsite
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
@@ -124,6 +125,39 @@ class FindRepository @Inject constructor() {
             FindResponse(results, totalInRange, scopeM)
         } catch (e: Exception) {
             DebugLogger.e(TAG, "findNearby error", e)
+            null
+        }
+    }
+
+    suspend fun fetchWebsite(
+        osmType: String,
+        osmId: Long,
+        name: String?,
+        lat: Double,
+        lon: Double
+    ): PoiWebsite? = withContext(Dispatchers.IO) {
+        val params = StringBuilder("osm_type=${URLEncoder.encode(osmType, "UTF-8")}&osm_id=$osmId")
+        if (name != null) params.append("&name=${URLEncoder.encode(name, "UTF-8")}")
+        params.append("&lat=$lat&lon=$lon")
+        val url = "http://10.0.0.4:3000/pois/website?$params"
+        DebugLogger.d(TAG, "fetchWebsite osm=$osmType/$osmId")
+        try {
+            val response = client.newCall(Request.Builder().url(url).build()).execute()
+            if (!response.isSuccessful) {
+                DebugLogger.e(TAG, "fetchWebsite HTTP ${response.code}")
+                return@withContext null
+            }
+            val body = response.body?.string() ?: return@withContext null
+            val obj = JsonParser.parseString(body).asJsonObject
+            PoiWebsite(
+                url = obj["url"]?.let { if (it.isJsonNull) null else it.asString },
+                source = obj["source"]?.asString ?: "none",
+                phone = obj["phone"]?.let { if (it.isJsonNull) null else it.asString },
+                hours = obj["hours"]?.let { if (it.isJsonNull) null else it.asString },
+                address = obj["address"]?.let { if (it.isJsonNull) null else it.asString }
+            )
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchWebsite error", e)
             null
         }
     }
