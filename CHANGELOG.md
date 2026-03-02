@@ -1,5 +1,33 @@
 # LocationMapApp — Changelog
 
+## [1.5.40] — 2026-03-02
+
+### Added
+- **Slim Toolbar + Status Line + Grid Dropdown** — complete toolbar redesign
+  - **Slim toolbar** (40dp): Weather icon (left), spacer, Alerts icon + Grid menu button (right)
+  - **Status line** (24dp): persistent priority-based info bar below toolbar
+    - Idle: GPS coordinates + speed + weather (e.g., "42.5557, -70.8730 • 61°F")
+    - Active: follow info, scan progress, or geofence alerts — highest priority wins
+    - 7 priority levels: GPS_IDLE (0) → SILENT_FILL (1) → IDLE_POPULATE (2) → POPULATE (3) → AIRCRAFT_FOLLOW (4) → VEHICLE_FOLLOW (5) → GEOFENCE_ALERT (6)
+    - Geofence alerts show zone-type-colored background
+    - Tap status line to stop follow/scan (context-sensitive click handler)
+  - **Grid dropdown**: PopupWindow with 8 labeled buttons (icon + text) in 2×4 grid
+    - Row 1: Transit, Webcams, Aircraft, Radar | Row 2: POI, Utility, Find, Go To
+    - Dark semi-transparent background, ripple feedback, auto-dismiss on outside tap
+  - **`StatusLineManager.kt`** (new): priority-based status manager with set/clear/updateIdle API
+  - **`ic_grid_menu.xml`** (new): Material Design 3×3 grid icon
+  - **`grid_dropdown_panel.xml`** (new): PopupWindow layout for grid dropdown
+
+### Changed
+- **`toolbar_two_row.xml`** — replaced 2×5 icon grid with slim icon row + status line
+- **`activity_main.xml`** — added `fitsSystemWindows="true"` to AppBarLayout
+- **`AppBarMenuManager.kt`** — `setupSlimToolbar()` + `showGridDropdown()` replace `setupTwoRowToolbar()`; removed 10 ICON_* constants
+- **`MainActivity.kt`** — rewired toolbar init; migrated 6 banner functions to StatusLineManager; eliminated `followBanner` field; GPS + weather observers update idle status; `statusLine` added to `debugState()`
+
+### Removed
+- `followBanner` field and all dynamic banner `TextView` creation (6 places)
+- 10 `ICON_*` constants from `AppBarMenuManager.companion`
+
 ## [1.5.39] — 2026-03-02
 
 ### Added

@@ -1,0 +1,87 @@
+LocationMapApp v1.5.40 — Session Summary
+==========================================
+Date: 2026-03-02
+Topic: Slim Toolbar + Status Line + Grid Dropdown
+
+WHAT WAS DONE
+=============
+
+Replaced the two-row icon toolbar (10 cryptic white icons in 2x5 grid)
+with a new three-component design:
+
+1. SLIM TOOLBAR (40dp)
+   - Weather icon on the left (dynamic — shows current conditions)
+   - Alerts icon + Grid menu button on the right
+   - Compact: 3 icons instead of 10
+
+2. STATUS LINE (24dp)
+   - Persistent bar directly below toolbar
+   - When idle: shows GPS coords + speed + weather temp
+     Example: "42.5557, -70.8730 • 61F"
+   - When active: shows highest-priority status
+   - Priority system (highest wins):
+     6 = Geofence Alert (zone-colored background)
+     5 = Vehicle Follow (bus/train/subway tracking)
+     4 = Aircraft Follow
+     3 = Manual Populate (grid scanner)
+     2 = Idle Populate (auto-scanner)
+     1 = Silent Fill (background single-cell)
+     0 = GPS Idle (default coords+weather)
+   - Tap the status line to stop follow/scan
+
+3. GRID DROPDOWN
+   - Triggered by the grid button (3x3 squares icon)
+   - PopupWindow overlay with 8 labeled buttons (icon + text)
+   - Row 1: Transit | Webcams | Aircraft | Radar
+   - Row 2: POI | Utility | Find | Go To
+   - Auto-dismisses on tap or outside touch
+
+WHAT WAS ELIMINATED
+====================
+
+- followBanner: TextView? field — no more dynamic View creation
+- All 6 banner functions that created/managed floating TextViews:
+  showFollowBanner, showAircraftFollowBanner, showSilentFillBanner,
+  showIdlePopulateBanner, showPopulateBanner, showGeofenceAlertBanner
+  (all migrated to StatusLineManager.set/clear calls)
+- 10 ICON_* constants from AppBarMenuManager companion
+- Old two-row layout (2x5 grid)
+
+NET RESULT: 8dp height saved (72dp -> 64dp), labeled buttons for
+discoverability, persistent status line for live tracking info.
+
+FILES CREATED
+=============
+- app/.../ui/StatusLineManager.kt (new)
+- app/.../res/drawable/ic_grid_menu.xml (new)
+- app/.../res/layout/grid_dropdown_panel.xml (new)
+
+FILES MODIFIED
+==============
+- app/.../res/layout/toolbar_two_row.xml (rewritten)
+- app/.../res/layout/activity_main.xml (fitsSystemWindows fix)
+- app/.../ui/menu/AppBarMenuManager.kt (major rewrite)
+- app/.../ui/MainActivity.kt (toolbar init + banner migration)
+
+TESTING RESULTS
+===============
+- Deployed to emulator, all features verified working
+- Status line shows GPS + weather when idle
+- Status line correctly shows scan progress during idle populate
+- Grid dropdown opens with 8 labeled buttons
+- Debug endpoint: curl localhost:8085/state | jq .statusLine
+  Returns: { "text": "42.5557, -70.8730 * 61F", "priority": "GPS_IDLE" }
+- fitsSystemWindows fix prevents icons bleeding into system status bar
+
+BUG FIX DURING TESTING
+=======================
+- Icons were bleeding into the Android system status bar (battery, signal area)
+- Root cause: AppBarLayout had no fitsSystemWindows attribute
+- Fix: Added android:fitsSystemWindows="true" to AppBarLayout in activity_main.xml
+
+DOCUMENTS UPDATED
+=================
+- CHANGELOG.md — v1.5.40 entry added
+- STATE.md — toolbar section rewritten, StatusLineManager added to key files
+- SESSION-LOG.md — full session entry appended
+- MEMORY.md — toolbar description updated, version bumped to v1.5.40

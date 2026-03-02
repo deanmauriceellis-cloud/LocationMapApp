@@ -4,11 +4,16 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
@@ -86,68 +91,118 @@ class AppBarMenuManager(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TWO-ROW TOOLBAR — 10 icon buttons in 2 rows of 5
+    // SLIM TOOLBAR — Weather + Alerts + Grid button
     // ─────────────────────────────────────────────────────────────────────────
 
+    data class SlimToolbarRefs(
+        val weatherIcon: ImageView,
+        val alertsIcon: ImageView,
+        val gridButton: ImageView,
+        val statusLine: TextView
+    )
+
     /**
-     * Build 10 icon buttons in two rows of 5, inside the toolbar's included layout.
-     * Each button: equal weight, ripple touch feedback, white tint, tooltip on long-press.
-     * Returns the Alerts icon ImageView (caller stores reference for dynamic color updates).
+     * Wire the three slim toolbar icons with click listeners.
+     * Weather → onWeatherRequested, Alerts → onAlertsRequested, Grid → showGridDropdown.
      */
-    fun setupTwoRowToolbar(row1: LinearLayout, row2: LinearLayout): ImageView {
-        data class Btn(val id: Int, val iconRes: Int, val tooltip: String, val onClick: (View) -> Unit)
+    fun setupSlimToolbar(
+        weatherIcon: ImageView,
+        alertsIcon: ImageView,
+        gridButton: ImageView,
+        statusLine: TextView
+    ): SlimToolbarRefs {
+        weatherIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+        alertsIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+
+        weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
+        alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
+        gridButton.setOnClickListener { showGridDropdown(it) }
+
+        DebugLogger.i(TAG, "setupSlimToolbar() — 3 icons wired (Weather, Alerts, Grid)")
+        return SlimToolbarRefs(weatherIcon, alertsIcon, gridButton, statusLine)
+    }
+
+    /**
+     * Show a PopupWindow dropdown with 8 labeled buttons in a 2×4 grid.
+     * Row 1: Transit, Webcams, Aircraft, Radar
+     * Row 2: POI, Utility, Find, Go To
+     */
+    fun showGridDropdown(anchor: View) {
+        val inflater = LayoutInflater.from(context)
+        val panel = inflater.inflate(R.layout.grid_dropdown_panel, null)
+        val row1 = panel.findViewById<LinearLayout>(R.id.gridRow1)
+        val row2 = panel.findViewById<LinearLayout>(R.id.gridRow2)
+
+        val popup = PopupWindow(panel, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        popup.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        popup.isOutsideTouchable = true
+
+        data class GridBtn(val iconRes: Int, val label: String, val onClick: (View) -> Unit)
 
         val row1Btns = listOf(
-            Btn(ICON_WEATHER, R.drawable.ic_wx_default, "Weather") { menuEventListener.onWeatherRequested() },
-            Btn(ICON_TRANSIT, R.drawable.ic_transit_rail, "Transit") { showTransitMenu(it) },
-            Btn(ICON_CAMS,    R.drawable.ic_camera,       "Webcams") { showCamsMenu(it) },
-            Btn(ICON_AIR,     R.drawable.ic_aircraft,     "Aircraft") { showAircraftMenu(it) },
-            Btn(ICON_RADAR,   R.drawable.ic_radar,        "Radar") { showRadarMenu(it) }
+            GridBtn(R.drawable.ic_transit_rail, "Transit") { v -> popup.dismiss(); showTransitMenu(v) },
+            GridBtn(R.drawable.ic_camera,       "Webcams") { v -> popup.dismiss(); showCamsMenu(v) },
+            GridBtn(R.drawable.ic_aircraft,     "Aircraft") { v -> popup.dismiss(); showAircraftMenu(v) },
+            GridBtn(R.drawable.ic_radar,        "Radar") { v -> popup.dismiss(); showRadarMenu(v) }
         )
         val row2Btns = listOf(
-            Btn(ICON_POI,     R.drawable.ic_poi,          "POI Categories") { showPoiMenu(it) },
-            Btn(ICON_UTILITY, R.drawable.ic_debug,        "Utility") { showUtilityMenu(it) },
-            Btn(ICON_FIND,    R.drawable.ic_search,       "Find POI") { menuEventListener.onFindRequested() },
-            Btn(ICON_GOTO,    R.drawable.ic_goto_location, "Go to Location") { menuEventListener.onGoToLocationRequested() },
-            Btn(ICON_ALERTS,  R.drawable.ic_alerts,        "Alerts") { menuEventListener.onAlertsRequested() }
+            GridBtn(R.drawable.ic_poi,           "POI") { popup.dismiss(); showPoiMenu(anchor) },
+            GridBtn(R.drawable.ic_debug,         "Utility") { popup.dismiss(); showUtilityMenu(anchor) },
+            GridBtn(R.drawable.ic_search,        "Find") { popup.dismiss(); menuEventListener.onFindRequested() },
+            GridBtn(R.drawable.ic_goto_location, "Go To") { popup.dismiss(); menuEventListener.onGoToLocationRequested() }
         )
 
-        var alertsIcon: ImageView? = null
-
-        fun addButtons(row: LinearLayout, btns: List<Btn>) {
+        fun addGridButtons(row: LinearLayout, btns: List<GridBtn>) {
             for (btn in btns) {
-                val iv = ImageView(context).apply {
-                    id = btn.id
-                    setImageResource(btn.iconRes)
-                    imageTintList = ColorStateList.valueOf(Color.WHITE)
-                    scaleType = ImageView.ScaleType.CENTER_INSIDE
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                val cell = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    val dp8 = dp(8)
+                    setPadding(dp8, dp8, dp8, dp8)
                     val ripple = android.util.TypedValue()
-                    context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, ripple, true)
+                    context.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
                     setBackgroundResource(ripple.resourceId)
                     isClickable = true
                     isFocusable = true
-                    tooltipText = btn.tooltip
-                    contentDescription = btn.tooltip
-                    val dp4 = (4 * resources.displayMetrics.density).toInt()
-                    setPadding(dp4, dp4, dp4, dp4)
                     setOnClickListener(btn.onClick)
                 }
-                row.addView(iv)
-                if (btn.id == ICON_ALERTS) alertsIcon = iv
+                val icon = ImageView(context).apply {
+                    setImageResource(btn.iconRes)
+                    imageTintList = ColorStateList.valueOf(Color.WHITE)
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    }
+                }
+                val label = TextView(context).apply {
+                    text = btn.label
+                    textSize = 10f
+                    setTextColor(Color.parseColor("#CCFFFFFF"))
+                    gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        topMargin = dp(2)
+                    }
+                }
+                cell.addView(icon)
+                cell.addView(label)
+                row.addView(cell)
             }
         }
 
-        addButtons(row1, row1Btns)
-        addButtons(row2, row2Btns)
-        DebugLogger.i(TAG, "setupTwoRowToolbar() — 10 icons wired (5+5)")
-        return alertsIcon!!
+        addGridButtons(row1, row1Btns)
+        addGridButtons(row2, row2Btns)
+
+        popup.showAsDropDown(anchor)
+        DebugLogger.i(TAG, "showGridDropdown() — 8 buttons shown")
     }
 
-    /** Find a specific toolbar icon by its ID across both rows. */
-    fun findToolbarIcon(row1: LinearLayout, row2: LinearLayout, iconId: Int): ImageView? {
-        return row1.findViewById(iconId) ?: row2.findViewById(iconId)
-    }
+    /** Density-independent pixel helper. */
+    private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
 
     // =========================================================================
     // PUBLIC TRANSIT
@@ -699,18 +754,6 @@ class AppBarMenuManager(
     companion object {
 
         const val PREFS_NAME = "app_bar_menu_prefs"
-
-        // ── Toolbar icon IDs ─────────────────────────────────────────────────
-        const val ICON_WEATHER = 1001
-        const val ICON_TRANSIT = 1002
-        const val ICON_CAMS    = 1003
-        const val ICON_AIR     = 1004
-        const val ICON_RADAR   = 1005
-        const val ICON_POI     = 1006
-        const val ICON_UTILITY = 1007
-        const val ICON_FIND    = 1008
-        const val ICON_GOTO    = 1009
-        const val ICON_ALERTS  = 1010
 
         // ── Radar ─────────────────────────────────────────────────────────────
         const val PREF_RADAR_ON          = "radar_on"

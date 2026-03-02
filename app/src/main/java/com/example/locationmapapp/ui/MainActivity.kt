@@ -81,7 +81,9 @@ class MainActivity : AppCompatActivity() {
     // Vehicle / aircraft follow mode
     private var followedVehicleId: String? = null
     private var followedAircraftIcao: String? = null
-    private var followBanner: TextView? = null
+
+    // Status line manager (priority-based, replaces followBanner)
+    private lateinit var statusLineManager: StatusLineManager
 
     // Debounced cache-only POI loader on map scroll
     private var cachePoiJob: Job? = null
@@ -253,23 +255,28 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // ── Toolbar (two-row layout) ────────────────────────────────────────
+        // ── Toolbar (slim layout) ─────────────────────────────────────────
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        DebugLogger.i("MainActivity", "setSupportActionBar complete — title hidden for two-row toolbar")
+        DebugLogger.i("MainActivity", "setSupportActionBar complete — title hidden for slim toolbar")
 
-        // ── Menu manager — two-row toolbar with 10 icons ─────────────────────
+        // ── Menu manager — slim toolbar with 3 icons + grid dropdown ──────
         appBarMenuManager = AppBarMenuManager(
             context           = this,
             toolbar           = binding.toolbar,
             viewModel         = viewModel,
             menuEventListener = menuEventListenerImpl
         )
-        val row1 = binding.root.findViewById<LinearLayout>(R.id.toolbarRow1)
-        val row2 = binding.root.findViewById<LinearLayout>(R.id.toolbarRow2)
-        alertsIconView = appBarMenuManager.setupTwoRowToolbar(row1, row2)
-        weatherIconView = appBarMenuManager.findToolbarIcon(row1, row2, AppBarMenuManager.ICON_WEATHER)
-        DebugLogger.i("MainActivity", "Two-row toolbar wired — 10 icons")
+        val toolbarRefs = appBarMenuManager.setupSlimToolbar(
+            weatherIcon = binding.root.findViewById(R.id.toolbarWeatherIcon),
+            alertsIcon  = binding.root.findViewById(R.id.toolbarAlertsIcon),
+            gridButton  = binding.root.findViewById(R.id.toolbarGridButton),
+            statusLine  = binding.root.findViewById(R.id.toolbarStatusLine)
+        )
+        weatherIconView = toolbarRefs.weatherIcon
+        alertsIconView  = toolbarRefs.alertsIcon
+        statusLineManager = StatusLineManager(toolbarRefs.statusLine)
+        DebugLogger.i("MainActivity", "Slim toolbar wired — Weather, Alerts, Grid + StatusLine")
 
         setupMap()
         buildFabSpeedDial()
@@ -283,16 +290,15 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "onCreate() complete")
     }
 
-    // Two-row toolbar is set up in onCreate() — no menu inflation needed.
+    // Slim toolbar is set up in onCreate() — no menu inflation needed.
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        DebugLogger.i("MainActivity", "onCreateOptionsMenu() — skipped (using two-row toolbar)")
+        DebugLogger.i("MainActivity", "onCreateOptionsMenu() — skipped (using slim toolbar)")
         return true
     }
 
     override fun onStart() {
         super.onStart()
-        DebugLogger.i("MainActivity", "onStart() toolbar.childCount=${binding.toolbar.childCount} " +
-                "toolbarMenu.size=${binding.toolbar.menu?.size()}")
+        DebugLogger.i("MainActivity", "onStart() toolbar.childCount=${binding.toolbar.childCount}")
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
 
         // Populate is never auto-restored — user must pick a location and start manually
@@ -831,6 +837,9 @@ class MainActivity : AppCompatActivity() {
                 // Still handle deferred restores even during jitter
                 handleDeferredRestores(point)
 
+                // ── Update status line with GPS position ──
+                updateIdleStatusLine(point.latitude, point.longitude, speedMph)
+
                 // ── Idle auto-populate: start full scanner after 60s stationary ──
                 val idleMs = System.currentTimeMillis() - lastSignificantMoveTime
                 if (idleMs > 60_000L
@@ -882,6 +891,9 @@ class MainActivity : AppCompatActivity() {
                 viewModel.checkGeofences(point.latitude, point.longitude, null, bearing)
             }
 
+            // ── 5c. Update status line with GPS position ──
+            updateIdleStatusLine(point.latitude, point.longitude, speedMph)
+
             // ── 6. Deferred restores — always fire regardless of speed ──
             handleDeferredRestores(point)
 
@@ -932,6 +944,8 @@ class MainActivity : AppCompatActivity() {
         viewModel.weatherData.observe(this) { data ->
             DebugLogger.i("MainActivity", "weatherData → ${data?.location?.city ?: "null"}")
             updateWeatherToolbarIcon(data)
+            // Refresh idle status line with latest weather info
+            lastGpsPoint?.let { pt -> updateIdleStatusLine(pt.latitude, pt.longitude, lastGpsSpeedMph) }
         }
         viewModel.radarRefreshTick.observe(this) {
             DebugLogger.i("MainActivity", "radarRefreshTick → refreshing overlay")
@@ -1205,6 +1219,14 @@ class MainActivity : AppCompatActivity() {
         }
         binding.mapView.overlays.add(gpsMarker!!)
         binding.mapView.invalidate()
+    }
+
+    /** Update the GPS idle status line with current position + weather info. */
+    private fun updateIdleStatusLine(lat: Double, lon: Double, speedMph: Double?) {
+        val weather = viewModel.weatherData.value
+        val tempF = weather?.current?.temperature
+        val desc = weather?.current?.description
+        statusLineManager.updateIdle(lat, lon, speedMph, tempF, desc)
     }
 
     private fun addPoiMarker(layerId: String, place: com.example.locationmapapp.data.model.PlaceResult) {
@@ -2637,65 +2659,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Show a banner at top of map for critical geofence alerts. Color varies by zone type. */
+    /** Show a status line entry for critical geofence alerts. Color varies by zone type. */
     @SuppressLint("SetTextI18n")
     private fun showGeofenceAlertBanner(alert: com.example.locationmapapp.data.model.GeofenceAlert) {
-        // Remove existing follow banner if present
-        followBanner?.let { (it.parent as? ViewGroup)?.removeView(it) }
-
-        val density = resources.displayMetrics.density
-        val dp = { v: Int -> (v * density).toInt() }
-
         val alertLabel = when (alert.zoneType) {
-            com.example.locationmapapp.data.model.ZoneType.TFR -> "TFR Alert:"
-            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "Camera Alert:"
-            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "School Zone:"
-            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "Flood Zone:"
+            com.example.locationmapapp.data.model.ZoneType.TFR -> "TFR:"
+            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "Camera:"
+            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "School:"
+            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "Flood:"
             com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "RR Crossing:"
-            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "Military Base:"
-            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "No-Fly Zone:"
-            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "Zone Alert:"
+            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "Military:"
+            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "No-Fly:"
+            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "Zone:"
         }
-        val bannerColor = when (alert.zoneType) {
-            com.example.locationmapapp.data.model.ZoneType.TFR -> "#DDD32F2F"
-            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "#DDE65100"
-            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#DDF57F17"
-            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#DD1565C0"
-            com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#DD424242"
-            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "#DD2E7D32"
-            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "#DD7B1FA2"
-            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "#DD616161"
+        val bgColor = when (alert.zoneType) {
+            com.example.locationmapapp.data.model.ZoneType.TFR -> Color.parseColor("#DDD32F2F")
+            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> Color.parseColor("#DDE65100")
+            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> Color.parseColor("#DDF57F17")
+            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> Color.parseColor("#DD1565C0")
+            com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> Color.parseColor("#DD424242")
+            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> Color.parseColor("#DD2E7D32")
+            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> Color.parseColor("#DD7B1FA2")
+            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> Color.parseColor("#DD616161")
         }
+        val distText = if (alert.distanceNm != null && alert.distanceNm > 0) " %.1fNM".format(alert.distanceNm) else ""
+        val text = "\u26A0 $alertLabel ${alert.zoneName}$distText — ${alert.description.take(60)}"
 
-        val banner = TextView(this).apply {
-            val altText = if (alert.distanceNm != null && alert.distanceNm > 0) " — %.1f NM".format(alert.distanceNm) else ""
-            text = "\u26A0 $alertLabel ${alert.zoneName}\n${alert.description.take(100)}$altText"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor(bannerColor))
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            maxLines = 3
-            setOnClickListener {
-                // Dismiss banner and find zone to show detail
-                (parent as? ViewGroup)?.removeView(this)
-                followBanner = null
-                val zone = findZoneById(alert.zoneId)
-                if (zone != null) showZoneDetailDialog(zone)
-            }
+        statusLineManager.set(StatusLineManager.Priority.GEOFENCE_ALERT, text, bgColor) {
+            statusLineManager.clear(StatusLineManager.Priority.GEOFENCE_ALERT)
+            val zone = findZoneById(alert.zoneId)
+            if (zone != null) showZoneDetailDialog(zone)
         }
-
-        val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply {
-            anchorId = R.id.appBarLayout
-            anchorGravity = android.view.Gravity.BOTTOM
-            gravity = android.view.Gravity.TOP
-        }
-
-        (binding.root as ViewGroup).addView(banner, params)
-        followBanner = banner
-        DebugLogger.i("MainActivity", "Geofence alert banner shown: ${alert.alertType} ${alert.zoneName}")
+        DebugLogger.i("MainActivity", "Geofence alert status: ${alert.alertType} ${alert.zoneName}")
     }
 
     /** Find a zone by ID across all zone type lists. */
@@ -5856,33 +5851,13 @@ class MainActivity : AppCompatActivity() {
             else -> vehicle.currentStatus.display
         }
         val staleTag = vehicleStalenessTag(vehicle.updatedAt)
-        val text = "Following $typeLabel ${vehicle.label} — ${vehicle.routeName}$staleTag\n" +
-                   "$statusText  •  ${vehicle.speedDisplay}"
-
-        if (followBanner == null) {
-            followBanner = TextView(this).apply {
-                setBackgroundColor(Color.parseColor("#DD212121"))
-                setTextColor(Color.WHITE)
-                textSize = 13f
-                setPadding(32, 20, 32, 20)
-                val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
-                }
-                layoutParams = params
-                elevation = 12f
-                setOnClickListener { stopFollowing() }
-            }
-            (binding.root as ViewGroup).addView(followBanner)
-        }
-        followBanner?.text = text
-        followBanner?.visibility = View.VISIBLE
+        val text = "Following $typeLabel ${vehicle.label} — ${vehicle.routeName}$staleTag | $statusText • ${vehicle.speedDisplay}"
+        statusLineManager.set(StatusLineManager.Priority.VEHICLE_FOLLOW, text) { stopFollowing() }
     }
 
     private fun hideFollowBanner() {
-        followBanner?.visibility = View.GONE
+        statusLineManager.clear(StatusLineManager.Priority.VEHICLE_FOLLOW)
+        statusLineManager.clear(StatusLineManager.Priority.AIRCRAFT_FOLLOW)
     }
 
     // ── Aircraft follow ─────────────────────────────────────────────────────
@@ -6058,43 +6033,22 @@ class MainActivity : AppCompatActivity() {
         val vertDesc = state.verticalRate?.let {
             val fpm = it * 196.85
             when {
-                fpm > 100  -> "\u2191 %.0f ft/min".format(fpm)
-                fpm < -100 -> "\u2193 %.0f ft/min".format(fpm)
+                fpm > 100  -> "\u2191%.0f fpm".format(fpm)
+                fpm < -100 -> "\u2193%.0f fpm".format(fpm)
                 else       -> "level"
             }
         } ?: ""
         val headingStr = state.track?.let { "%.0f\u00B0".format(it) } ?: ""
-        val spiFlag = if (state.spi) "  \u26A0 SPI" else ""
+        val spiFlag = if (state.spi) " \u26A0SPI" else ""
 
         val dirLabel = if (autoFollowAircraftJob?.isActive == true) {
             val ew = if (autoFollowPreferWest) "W" else "E"
             val ns = if (autoFollowPreferSouth) "S" else "N"
             " [$ew$ns]"
         } else ""
-        val prefix = if (autoFollowAircraftJob?.isActive == true) "Auto-following$dirLabel" else "Following"
-        val text = "$prefix \u2708 $label$spiFlag\n" +
-                   "Alt $altFt  •  $speedKt  •  $headingStr  •  $vertDesc"
-
-        if (followBanner == null) {
-            followBanner = TextView(this).apply {
-                setBackgroundColor(Color.parseColor("#DD212121"))
-                setTextColor(Color.WHITE)
-                textSize = 13f
-                setPadding(32, 20, 32, 20)
-                val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
-                }
-                layoutParams = params
-                elevation = 12f
-                setOnClickListener { stopFollowing() }
-            }
-            (binding.root as ViewGroup).addView(followBanner)
-        }
-        followBanner?.text = text
-        followBanner?.visibility = View.VISIBLE
+        val prefix = if (autoFollowAircraftJob?.isActive == true) "Auto$dirLabel" else "Following"
+        val text = "$prefix \u2708 $label$spiFlag | $altFt • $speedKt • $headingStr • $vertDesc"
+        statusLineManager.set(StatusLineManager.Priority.AIRCRAFT_FOLLOW, text) { stopFollowing() }
     }
 
     // =========================================================================
@@ -6169,32 +6123,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSilentFillBanner(text: String) {
         runOnUiThread {
-            if (followBanner == null) {
-                followBanner = TextView(this).apply {
-                    setBackgroundColor(Color.parseColor("#DD212121"))
-                    setTextColor(Color.WHITE)
-                    textSize = 13f
-                    setPadding(32, 20, 32, 20)
-                    val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
-                    }
-                    layoutParams = params
-                    elevation = 12f
-                    setOnClickListener { stopSilentFill() }
-                }
-                (binding.root as ViewGroup).addView(followBanner)
-            }
-            followBanner?.setOnClickListener { stopSilentFill() }
-            followBanner?.text = "\uD83D\uDD0D $text"
-            followBanner?.visibility = View.VISIBLE
+            statusLineManager.set(StatusLineManager.Priority.SILENT_FILL, "\uD83D\uDD0D $text") { stopSilentFill() }
         }
     }
 
     private fun hideSilentFillBanner() {
-        runOnUiThread { followBanner?.visibility = View.GONE }
+        runOnUiThread { statusLineManager.clear(StatusLineManager.Priority.SILENT_FILL) }
     }
 
     // =========================================================================
@@ -6330,40 +6264,17 @@ class MainActivity : AppCompatActivity() {
         idlePopulateJob?.cancel()
         idlePopulateJob = null
         removeScanningMarker()
-        hideFollowBanner()
+        statusLineManager.clear(StatusLineManager.Priority.IDLE_POPULATE)
         DebugLogger.i("MainActivity", "stopIdlePopulate()")
     }
 
     private fun showIdlePopulateBanner(ring: Int, stats: PopulateStats, countdown: Int) {
-        val countdownStr = if (countdown > 0) "  Next in ${countdown}s" else ""
+        val countdownStr = if (countdown > 0) " ${countdown}s" else ""
         val failStr = if (stats.fails > 0) " \u26A0${stats.fails}err" else ""
-        val gridStr = if (stats.gridRadius > 0) "grid ${stats.gridRadius}m" else "probing"
-        val line1 = "Idle scan: R$ring | ${stats.cells} cells | ${stats.pois} POIs (${stats.newPois} new)$failStr | $gridStr"
-        val line2 = stats.status + countdownStr
-        val text = "$line1\n$line2 — tap to stop"
-
+        val gridStr = if (stats.gridRadius > 0) "${stats.gridRadius}m" else "probe"
+        val text = "Idle: R$ring | ${stats.cells}cells | ${stats.pois}POIs(${stats.newPois}new)$failStr | $gridStr | ${stats.status}$countdownStr"
         runOnUiThread {
-            if (followBanner == null) {
-                followBanner = TextView(this).apply {
-                    setBackgroundColor(Color.parseColor("#DD212121"))
-                    setTextColor(Color.WHITE)
-                    textSize = 13f
-                    setPadding(32, 20, 32, 20)
-                    val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
-                    }
-                    layoutParams = params
-                    elevation = 12f
-                    setOnClickListener { stopIdlePopulate() }
-                }
-                (binding.root as ViewGroup).addView(followBanner)
-            }
-            followBanner?.setOnClickListener { stopIdlePopulate() }
-            followBanner?.text = text
-            followBanner?.visibility = View.VISIBLE
+            statusLineManager.set(StatusLineManager.Priority.IDLE_POPULATE, text) { stopIdlePopulate() }
         }
     }
 
@@ -6595,7 +6506,7 @@ class MainActivity : AppCompatActivity() {
         populateJob?.cancel()
         populateJob = null
         removeScanningMarker()
-        hideFollowBanner()
+        statusLineManager.clear(StatusLineManager.Priority.POPULATE)
         loadCachedPoisForVisibleArea()
         // Reset menu pref
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
@@ -6662,35 +6573,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPopulateBanner(ring: Int, stats: PopulateStats, countdown: Int) {
-        val countdownStr = if (countdown > 0) "  Next in ${countdown}s" else ""
+        val countdownStr = if (countdown > 0) " ${countdown}s" else ""
         val failStr = if (stats.fails > 0) " \u26A0${stats.fails}err" else ""
-        val gridStr = if (stats.gridRadius > 0) "grid ${stats.gridRadius}m" else "probing"
-        val line1 = "\u2316 R$ring | ${stats.cells} cells | ${stats.pois} POIs (${stats.newPois} new)$failStr | $gridStr"
-        val line2 = stats.status + countdownStr
-        val text = "$line1\n$line2 — tap to stop"
-
+        val gridStr = if (stats.gridRadius > 0) "${stats.gridRadius}m" else "probe"
+        val text = "\u2316 R$ring | ${stats.cells}cells | ${stats.pois}POIs(${stats.newPois}new)$failStr | $gridStr | ${stats.status}$countdownStr"
         runOnUiThread {
-            if (followBanner == null) {
-                followBanner = TextView(this).apply {
-                    setBackgroundColor(Color.parseColor("#DD212121"))
-                    setTextColor(Color.WHITE)
-                    textSize = 13f
-                    setPadding(32, 20, 32, 20)
-                    val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
-                    }
-                    layoutParams = params
-                    elevation = 12f
-                    setOnClickListener { stopPopulatePois() }
-                }
-                (binding.root as ViewGroup).addView(followBanner)
-            }
-            followBanner?.setOnClickListener { stopPopulatePois() }
-            followBanner?.text = text
-            followBanner?.visibility = View.VISIBLE
+            statusLineManager.set(StatusLineManager.Priority.POPULATE, text) { stopPopulatePois() }
         }
     }
 
@@ -7144,6 +7032,10 @@ class MainActivity : AppCompatActivity() {
             "idlePopulate" to (idlePopulateJob?.isActive == true),
             "idleTimeSec" to ((System.currentTimeMillis() - lastSignificantMoveTime) / 1000),
             "populate" to (populateJob?.isActive == true),
+            "statusLine" to mapOf(
+                "text" to statusLineManager.currentText(),
+                "priority" to statusLineManager.currentPriority()?.name
+            ),
             "gpsSpeedMph" to lastGpsSpeedMph,
             "gpsIntervalMs" to currentGpsIntervalMs,
             "lastPoiFetchDistanceM" to lastPoiFetchPoint?.let { from ->

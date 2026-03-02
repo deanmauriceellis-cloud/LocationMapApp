@@ -1976,3 +1976,76 @@ First documented session. App was already functional with map, GPS, POI search, 
 - PlacesRepository: Overpass + earthquakes → proxy at 10.0.0.4:3000
 - WeatherRepository: NWS alerts + METAR → proxy at 10.0.0.4:3000
 - AndroidManifest: usesCleartextTraffic was already true
+
+---
+
+## Session: 2026-03-02 (v1.5.40 — Slim Toolbar + Status Line + Grid Dropdown)
+
+### Context
+The two-row icon toolbar (10 white icons in 2×5 grid, v1.5.35) was functional but cryptic — icons had no labels and the redesign had eliminated the status line that showed live tracking info. Banners were dynamic TextViews added/removed from the CoordinatorLayout. User wanted the status area restored and icons converted to a labeled button grid for better discoverability.
+
+### Changes Made
+
+#### New Layout: Slim Toolbar → Status Line → Grid Dropdown → Map
+- **Slim toolbar** (40dp): Weather icon (left) | spacer | Alerts icon + Grid menu button (right)
+- **Status line** (24dp): persistent priority-based info bar below toolbar
+  - Idle: GPS coordinates + speed + weather (e.g., "42.5557, -70.8730 • 61°F")
+  - Active: highest-priority state wins — follow info, scan progress, or geofence alerts
+  - 7 priority levels: GPS_IDLE(0) → SILENT_FILL(1) → IDLE_POPULATE(2) → POPULATE(3) → AIRCRAFT_FOLLOW(4) → VEHICLE_FOLLOW(5) → GEOFENCE_ALERT(6)
+  - Geofence alerts show zone-type-colored background; tap to dismiss + show zone detail
+  - Tap on follow/scan entries to stop the active operation
+- **Grid dropdown**: PopupWindow triggered by grid button
+  - 8 labeled buttons (icon + text) in 2×4 grid
+  - Row 1: Transit, Webcams, Aircraft, Radar | Row 2: POI, Utility, Find, Go To
+  - Dark semi-transparent background (#E8212121), ripple feedback, auto-dismiss
+- Net height: 72dp → 64dp = 8dp saved
+
+#### New Files
+- `app/.../ui/StatusLineManager.kt` — priority-based status line manager
+  - `StatusEntry` data class: priority, text, bgColor, textColor, onClick
+  - `set(entry)` / `clear(priority)` / `updateIdle(lat, lon, speed, temp, desc)`
+  - `currentText()` / `currentPriority()` for debug endpoint
+- `app/.../res/drawable/ic_grid_menu.xml` — Material 3×3 grid icon
+- `app/.../res/layout/grid_dropdown_panel.xml` — PopupWindow content
+
+#### Modified Files
+- `toolbar_two_row.xml` — replaced 2×5 grid with slim icon row + status line TextView
+- `activity_main.xml` — added `fitsSystemWindows="true"` to AppBarLayout (icons were bleeding into system status bar)
+- `AppBarMenuManager.kt`:
+  - Removed: `setupTwoRowToolbar()`, `findToolbarIcon()`, 10 `ICON_*` constants
+  - Added: `SlimToolbarRefs` data class, `setupSlimToolbar()`, `showGridDropdown()`, `dp()` helper
+  - Added imports: PopupWindow, ColorDrawable, Gravity, LayoutInflater, ViewGroup
+- `MainActivity.kt`:
+  - Replaced `followBanner: TextView?` with `statusLineManager: StatusLineManager`
+  - Rewired toolbar init: `setupSlimToolbar()` returns `SlimToolbarRefs`
+  - Migrated 6 banner functions to StatusLineManager set/clear calls:
+    - `showFollowBanner()` → `set(VEHICLE_FOLLOW, ...)`
+    - `showAircraftFollowBanner()` → `set(AIRCRAFT_FOLLOW, ...)`
+    - `showSilentFillBanner()` → `set(SILENT_FILL, ...)`
+    - `showIdlePopulateBanner()` → `set(IDLE_POPULATE, ...)`
+    - `showPopulateBanner()` → `set(POPULATE, ...)`
+    - `showGeofenceAlertBanner()` → `set(GEOFENCE_ALERT, ..., bgColor)`
+    - `hideFollowBanner()` → `clear(VEHICLE_FOLLOW) + clear(AIRCRAFT_FOLLOW)`
+    - `hideSilentFillBanner()` → `clear(SILENT_FILL)`
+    - `stopIdlePopulate()` → `clear(IDLE_POPULATE)` (was `hideFollowBanner()`)
+    - `stopPopulatePois()` → `clear(POPULATE)` (was `hideFollowBanner()`)
+  - Added `updateIdleStatusLine()` helper — called from GPS observer (both jitter and significant-move paths) and weather data observer
+  - Added `statusLine` field to `debugState()` map
+  - All dynamic `TextView` creation + `addView()` patterns eliminated
+
+### Testing
+- Deployed to emulator, verified:
+  - Slim toolbar properly below system status bar (fitsSystemWindows fix)
+  - Status line shows GPS coords + weather when idle
+  - Grid dropdown opens with 8 labeled buttons
+  - Status line priority system: idle scan overrides GPS idle correctly
+  - Debug endpoint: `curl localhost:8085/state | jq .statusLine` returns text + priority
+
+### Files Changed
+- `app/src/main/res/drawable/ic_grid_menu.xml` (new)
+- `app/src/main/res/layout/grid_dropdown_panel.xml` (new)
+- `app/src/main/res/layout/toolbar_two_row.xml` (rewritten)
+- `app/src/main/res/layout/activity_main.xml` (fitsSystemWindows)
+- `app/src/main/java/.../ui/StatusLineManager.kt` (new)
+- `app/src/main/java/.../ui/menu/AppBarMenuManager.kt` (major rewrite)
+- `app/src/main/java/.../ui/MainActivity.kt` (toolbar init + banner migration)

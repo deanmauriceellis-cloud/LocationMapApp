@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 39 (Geofence Phase 4 — Database Import & Export)
+## Last Updated: 2026-03-02 Session 40 (Slim Toolbar + Status Line + Grid Dropdown)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -69,12 +69,18 @@
   - Reloads on scroll/zoom with 1s debounce
   - Deferred restore like METAR — waits for GPS fix
   - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
-- **Two-row icon toolbar** (v1.5.35): 10 icon-only buttons in 2 rows of 5, long-press shows tooltip
-  - Row 1: Weather, Transit, CAMs, Air, Radar
-  - Row 2: POI, Utility, Find, Go to Location, Alerts
-  - Programmatic ImageView creation (no more menu inflation); `setupTwoRowToolbar()` in AppBarMenuManager
+- **Slim toolbar + status line + grid dropdown** (v1.5.40): replaced 2×5 icon grid with compact 3-icon bar
+  - **Toolbar** (40dp): Weather icon (left) | spacer | Alerts icon + Grid menu button (right)
+  - **Status line** (24dp): priority-based info bar — GPS coords+weather when idle, follow/scan/alert info when active
+    - `StatusLineManager.kt`: 7 priority levels (GPS_IDLE → GEOFENCE_ALERT), set/clear/updateIdle API
+    - All banner functions migrated from dynamic TextView creation to StatusLineManager
+    - Geofence alerts show zone-type-colored background on status line
+  - **Grid dropdown**: PopupWindow with 8 labeled buttons (icon+text) in 2×4 grid
+    - Row 1: Transit, Webcams, Aircraft, Radar | Row 2: POI, Utility, Find, Go To
+  - `setupSlimToolbar()` + `showGridDropdown()` in AppBarMenuManager; `fitsSystemWindows` on AppBarLayout
   - Weather icon dynamically updates to show current conditions; red border when alerts active
   - Alerts icon dynamically colored by severity: gray (none), blue (INFO), yellow (WARNING), red (CRITICAL), pulsing red (EMERGENCY)
+  - Debug `/state` includes `statusLine` field with text + priority name
 - **Go to Location** (v1.5.32): geocode autocomplete dialog — type-ahead suggestions as you type
   - **Photon geocoder** (Komoot OSM) via proxy `/geocode` — prefix matching, US-only (bbox filter)
   - Auto-suggest: `TextWatcher` with 500ms debounce, fires at >= 3 characters
@@ -298,6 +304,7 @@
 - `app/src/main/java/.../ui/MainViewModel.kt` — LiveData, data fetching
 - `app/src/main/java/.../ui/MarkerIconHelper.kt` — icon/dot rendering with cache
 - `app/src/main/java/.../ui/WeatherIconHelper.kt` — NWS icon code → drawable mapping
+- `app/src/main/java/.../ui/StatusLineManager.kt` — priority-based toolbar status line manager
 - `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 16 POI categories
 - `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search (injects `@ApplicationContext` for X-Client-ID)
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR

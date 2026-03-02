@@ -1,25 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- toolbar_two_row.xml — 2×5 icon grid inside the Toolbar -->
+<!-- Slim toolbar: icon row (40dp) + status line (24dp) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/toolbarTwoRowRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- Row 1: Weather | Transit | CAMs | Air | Radar -->
+    <!-- Icon row: Weather (left) | spacer | Alerts | Grid button (right) -->
     <LinearLayout
-        android:id="@+id/toolbarRow1"
+        android:id="@+id/toolbarIconRow"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="40dp"
         android:orientation="horizontal"
-        android:gravity="center_vertical" />
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
 
-    <!-- Row 2: POI | Utility | Find | GoTo | Alerts -->
-    <LinearLayout
-        android:id="@+id/toolbarRow2"
+        <ImageView
+            android:id="@+id/toolbarWeatherIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_wx_default"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Weather"
+            android:tooltipText="Weather" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <ImageView
+            android:id="@+id/toolbarAlertsIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_alerts"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="Alerts"
+            android:tooltipText="Alerts" />
+
+        <ImageView
+            android:id="@+id/toolbarGridButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_grid_menu"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Menu"
+            android:tooltipText="Menu" />
+
+    </LinearLayout>
+
+    <!-- Status line: persistent single-line info bar -->
+    <TextView
+        android:id="@+id/toolbarStatusLine"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical" />
+        android:layout_height="24dp"
+        android:gravity="center_vertical"
+        android:textSize="11sp"
+        android:textColor="#B0FFFFFF"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:background="#20000000" />
 
 </LinearLayout>
