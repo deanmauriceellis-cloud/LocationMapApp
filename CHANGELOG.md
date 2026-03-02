@@ -1,5 +1,37 @@
 # LocationMapApp — Changelog
 
+## [1.5.34] — 2026-03-02
+
+### Added
+- **Weather dialog** — rich graphical weather display replacing old Alerts submenu
+  - Current conditions: temperature, wind chill/heat index, wind, humidity, visibility, dewpoint, barometer
+  - 48-hour hourly forecast: scrollable strip with weather icons, temps, precip probability
+  - 7-day daily outlook: day/night pairs with icons, hi/lo temps, forecast text, precip %
+  - Location-specific alerts: severity-colored banners (Extreme/Severe/Moderate/Minor), tap to expand
+  - Station info footer with formatted update time
+- **Dynamic weather toolbar icon** — shows current condition icon; red border when alerts active
+- **Weather auto-fetch** — fetches on first GPS fix and every 30 minutes automatically
+- **Proxy `/weather` composite endpoint** — merges 5 NWS API calls with per-section cache TTLs
+  - Points lookup (24h), current observations (5min), hourly forecast (30min), daily forecast (30min), alerts (5min)
+  - Unit conversion: °C→°F, km/h→mph, Pa→inHg, m→miles
+  - Icon code extraction from NWS icon URLs
+- **22 weather condition vector icons** — day/night variants for clear, clouds, rain, snow, thunderstorm, fog, wind, etc.
+- **`WeatherIconHelper.kt`** — NWS icon code → drawable resource mapping
+- **Weather data in debug `/state`** — location, temperature, icon code, hourly/daily/alert counts
+
+### Changed
+- Toolbar: **Alerts → Weather** — single icon opens dialog directly (was submenu with 8 items, 4 stubs)
+- METAR toggle + frequency moved from Alerts submenu to **Radar menu** (weather overlays grouped together)
+- FAB speed dial: Weather entry opens weather dialog (was fetching global alerts)
+- `WeatherAlert` model: added `urgency` and `instruction` fields
+
+### Removed
+- `menu_gps_alerts.xml` — entire GPS Alerts submenu deleted
+- `showGpsAlertsMenu()` — handler for deleted submenu
+- 6 dead `MenuEventListener` callbacks: `onWeatherAlertsToggled`, `onWeatherBannerToggled`, `onHighwayAlertsToggled`, `onHighwayAlertsFrequencyChanged`, `onTrafficSpeedToggled`, `onTrafficSpeedFrequencyChanged`
+- Dead preference constants: `PREF_WEATHER_ALERTS`, `PREF_WEATHER_BANNER`, `PREF_HWY_ALERTS`, `PREF_HWY_ALERT_FREQ`, `PREF_TRAFFIC_SPEED`, `PREF_TRAFFIC_SPEED_FREQ`
+- All stub implementations in MainActivity for deleted callbacks
+
 ## [1.5.33] — 2026-03-02
 
 ### Added

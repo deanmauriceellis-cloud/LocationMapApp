@@ -93,6 +93,9 @@ class MainViewModel @Inject constructor(
     private val _radarRefreshTick = MutableLiveData<Long>()
     val radarRefreshTick: LiveData<Long> = _radarRefreshTick
 
+    private val _weatherData = MutableLiveData<WeatherData?>()
+    val weatherData: LiveData<WeatherData?> = _weatherData
+
     private val _error = MutableLiveData<String>()
     val error: LiveData<String> = _error
 
@@ -245,6 +248,25 @@ class MainViewModel @Inject constructor(
             runCatching { weatherRepository.fetchAlerts() }
                 .onSuccess { DebugLogger.i(TAG, "Alerts success — ${it.size}"); _weatherAlerts.value = it }
                 .onFailure { e -> DebugLogger.e(TAG, "Alerts FAILED: ${e.message}", e as? Exception); _error.value = "Alerts failed: ${e.message}" }
+        }
+    }
+
+    fun fetchWeather(lat: Double, lon: Double) {
+        DebugLogger.i(TAG, "fetchWeather() lat=$lat lon=$lon")
+        viewModelScope.launch {
+            runCatching { weatherRepository.fetchWeather(lat, lon) }
+                .onSuccess { DebugLogger.i(TAG, "Weather success — ${it.location.city},${it.location.state}"); _weatherData.value = it }
+                .onFailure { e -> DebugLogger.e(TAG, "Weather FAILED: ${e.message}", e as? Exception); _error.value = "Weather failed: ${e.message}" }
+        }
+    }
+
+    /** Suspend call — returns weather data directly for dialog. */
+    suspend fun fetchWeatherDirectly(lat: Double, lon: Double): WeatherData? {
+        return try {
+            weatherRepository.fetchWeather(lat, lon)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchWeatherDirectly FAILED: ${e.message}", e)
+            null
         }
     }
 

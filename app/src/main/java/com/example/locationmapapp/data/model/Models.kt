@@ -22,9 +22,66 @@ data class WeatherAlert(
     val headline: String,
     val description: String,
     val severity: String,
+    val urgency: String = "",
+    val instruction: String = "",
     val effective: String,
     val expires: String,
     val areaDesc: String
+)
+
+// ── Weather Composite Models ────────────────────────────────────────────────
+
+data class WeatherLocation(
+    val city: String,
+    val state: String,
+    val station: String
+)
+
+data class CurrentConditions(
+    val temperature: Int?,
+    val temperatureUnit: String,
+    val humidity: Int?,
+    val windSpeed: Int?,
+    val windDirection: String?,
+    val windChill: Int?,
+    val heatIndex: Int?,
+    val dewpoint: Int?,
+    val description: String,
+    val iconCode: String,
+    val isDaytime: Boolean,
+    val visibility: Double?,
+    val barometer: Double?
+)
+
+data class HourlyForecast(
+    val time: String,
+    val temperature: Int,
+    val windSpeed: String,
+    val windDirection: String,
+    val precipProbability: Int,
+    val shortForecast: String,
+    val iconCode: String,
+    val isDaytime: Boolean
+)
+
+data class DailyForecast(
+    val name: String,
+    val isDaytime: Boolean,
+    val temperature: Int,
+    val windSpeed: String,
+    val shortForecast: String,
+    val detailedForecast: String,
+    val iconCode: String,
+    val precipProbability: Int
+)
+
+data class WeatherData(
+    val location: WeatherLocation,
+    val current: CurrentConditions?,
+    val hourly: List<HourlyForecast>,
+    val daily: List<DailyForecast>,
+    val alerts: List<WeatherAlert>,
+    val fetchedAt: String
 )
 
 data class MetarStation(

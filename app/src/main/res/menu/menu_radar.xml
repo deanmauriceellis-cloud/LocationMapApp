@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- menu/menu_radar.xml -->
+<!-- menu/menu_radar.xml — Radar + METAR weather overlays -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
@@ -19,6 +19,17 @@
     <item
         android:id="@+id/menu_radar_frequency"
         android:title="Radar Update Frequency…"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_metar_display"
+        android:title="METAR Information Display"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_metar_frequency"
+        android:title="METAR Update Frequency…"
         app:showAsAction="never" />
 
 </menu>

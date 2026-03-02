@@ -17,26 +17,11 @@ package com.example.locationmapapp.ui.menu
 interface MenuEventListener {
 
     // =========================================================================
-    // GPS ALERTS
+    // WEATHER
     // =========================================================================
 
-    /** Live NWS weather alert polygons toggled on/off map. */
-    fun onWeatherAlertsToggled(enabled: Boolean)
-
-    /** Scrolling ribbon at bottom of map showing current-location weather summary + alerts. */
-    fun onWeatherBannerToggled(enabled: Boolean)
-
-    /** Highway incident / hazard markers toggled on map. */
-    fun onHighwayAlertsToggled(enabled: Boolean)
-
-    /** How often to refresh highway alert data. [minutes] in 1..5 */
-    fun onHighwayAlertsFrequencyChanged(minutes: Int)
-
-    /** Color-coded traffic speed overlay on road lines. */
-    fun onTrafficSpeedToggled(enabled: Boolean)
-
-    /** How often to refresh traffic speed data. [minutes] in 1..5 */
-    fun onTrafficSpeedFrequencyChanged(minutes: Int)
+    /** Open the rich weather dialog (current, hourly, daily, alerts). */
+    fun onWeatherRequested()
 
     /** METAR station markers with human-readable pop-up. */
     fun onMetarDisplayToggled(enabled: Boolean)

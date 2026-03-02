@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+  <!-- Large cloud filling most of icon -->
+  <path
+      android:fillColor="#78909C"
+      android:pathData="M6.5,20h13c1.93,0 3.5,-1.57 3.5,-3.5s-1.57,-3.5 -3.5,-3.5h-0.12c0.08,-0.36 0.12,-0.74 0.12,-1.13 0,-3.22 -2.61,-5.83 -5.83,-5.83 -2.57,0 -4.75,1.68 -5.52,4.0C7.6,9.7 6.88,9.5 6.1,9.5c-2.27,0 -4.1,1.83 -4.1,4.1 0,0.1 0.0,0.19 0.01,0.28C0.83,14.3 0,15.58 0,17.06 0,18.68 1.32,20 2.94,20z"/>
+</vector>

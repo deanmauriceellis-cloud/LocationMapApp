@@ -62,7 +62,7 @@ class AppBarMenuManager(
         toolbar.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Top-bar click: '${item.title}' id=0x${item.itemId.toString(16)}")
             when (item.itemId) {
-                R.id.menu_top_gps_alerts -> { showGpsAlertsMenu(toolbar); true }
+                R.id.menu_top_weather    -> { menuEventListener.onWeatherRequested(); true }
                 R.id.menu_top_transit    -> { showTransitMenu(toolbar);    true }
                 R.id.menu_top_cams       -> { showCamsMenu(toolbar);       true }
                 R.id.menu_top_aircraft   -> { showAircraftMenu(toolbar);   true }
@@ -78,68 +78,6 @@ class AppBarMenuManager(
             }
         }
         DebugLogger.i(TAG, "Toolbar click listener wired")
-    }
-
-    // =========================================================================
-    // GPS ALERTS
-    // =========================================================================
-
-    private fun showGpsAlertsMenu(anchor: View) {
-        val popup = buildPopup(anchor, R.menu.menu_gps_alerts)
-        popup.setOnMenuItemClickListener { item ->
-            DebugLogger.i(TAG, "GPS Alerts: '${item.title}'")
-            when (item.itemId) {
-                R.id.menu_weather_alerts ->
-                    toggleBinary(item, PREF_WEATHER_ALERTS) { menuEventListener.onWeatherAlertsToggled(it) }
-
-                R.id.menu_weather_banner ->
-                    toggleBinary(item, PREF_WEATHER_BANNER) { menuEventListener.onWeatherBannerToggled(it) }
-
-                R.id.menu_highway_alerts ->
-                    toggleBinary(item, PREF_HWY_ALERTS) { menuEventListener.onHighwayAlertsToggled(it) }
-
-                R.id.menu_highway_alerts_frequency ->
-                    showSliderDialog("Highway Alert Frequency (min)", 1, 5,
-                        prefs.getInt(PREF_HWY_ALERT_FREQ, 3)) { v ->
-                        prefs.edit().putInt(PREF_HWY_ALERT_FREQ, v).apply()
-                        menuEventListener.onHighwayAlertsFrequencyChanged(v)
-                    }
-
-                R.id.menu_traffic_speed ->
-                    toggleBinary(item, PREF_TRAFFIC_SPEED) { menuEventListener.onTrafficSpeedToggled(it) }
-
-                R.id.menu_traffic_speed_frequency ->
-                    showSliderDialog("Speed Info Frequency (min)", 1, 5,
-                        prefs.getInt(PREF_TRAFFIC_SPEED_FREQ, 3)) { v ->
-                        prefs.edit().putInt(PREF_TRAFFIC_SPEED_FREQ, v).apply()
-                        menuEventListener.onTrafficSpeedFrequencyChanged(v)
-                    }
-
-                R.id.menu_metar_display ->
-                    toggleBinary(item, PREF_METAR_DISPLAY) { menuEventListener.onMetarDisplayToggled(it) }
-
-                R.id.menu_metar_frequency ->
-                    showSliderDialog("METAR Update Frequency (min)", 1, 10,
-                        prefs.getInt(PREF_METAR_FREQ, 5)) { v ->
-                        prefs.edit().putInt(PREF_METAR_FREQ, v).apply()
-                        menuEventListener.onMetarFrequencyChanged(v)
-                    }
-
-                else -> {
-                    DebugLogger.w(TAG, "GPS Alerts: unhandled id=0x${item.itemId.toString(16)}")
-                    menuEventListener.onStubAction("gps_alerts_unknown:0x${item.itemId.toString(16)}")
-                }
-            }
-            true
-        }
-        syncCheckStates(popup.menu,
-            R.id.menu_weather_alerts   to PREF_WEATHER_ALERTS,
-            R.id.menu_weather_banner   to PREF_WEATHER_BANNER,
-            R.id.menu_highway_alerts   to PREF_HWY_ALERTS,
-            R.id.menu_traffic_speed    to PREF_TRAFFIC_SPEED,
-            R.id.menu_metar_display    to PREF_METAR_DISPLAY
-        )
-        popup.show()
     }
 
     // =========================================================================
@@ -353,6 +291,16 @@ class AppBarMenuManager(
                         menuEventListener.onRadarFrequencyChanged(v)
                     }
 
+                R.id.menu_metar_display ->
+                    toggleBinary(item, PREF_METAR_DISPLAY) { menuEventListener.onMetarDisplayToggled(it) }
+
+                R.id.menu_metar_frequency ->
+                    showSliderDialog("METAR Update Frequency (min)", 1, 10,
+                        prefs.getInt(PREF_METAR_FREQ, 5)) { v ->
+                        prefs.edit().putInt(PREF_METAR_FREQ, v).apply()
+                        menuEventListener.onMetarFrequencyChanged(v)
+                    }
+
                 else -> {
                     DebugLogger.w(TAG, "Radar: unhandled id=0x${item.itemId.toString(16)}")
                     menuEventListener.onStubAction("radar_unknown:0x${item.itemId.toString(16)}")
@@ -360,7 +308,10 @@ class AppBarMenuManager(
             }
             true
         }
-        syncCheckStates(popup.menu, R.id.menu_radar_toggle to PREF_RADAR_ON)
+        syncCheckStates(popup.menu,
+            R.id.menu_radar_toggle to PREF_RADAR_ON,
+            R.id.menu_metar_display to PREF_METAR_DISPLAY
+        )
         popup.show()
     }
 
@@ -630,13 +581,7 @@ class AppBarMenuManager(
         const val PREF_RADAR_FREQ        = "radar_freq_min"
         const val DEFAULT_RADAR_FREQ_MIN = 5
 
-        // ── GPS Alerts ────────────────────────────────────────────────────────
-        const val PREF_WEATHER_ALERTS     = "weather_alerts_on"
-        const val PREF_WEATHER_BANNER     = "weather_banner_on"
-        const val PREF_HWY_ALERTS         = "highway_alerts_on"
-        const val PREF_HWY_ALERT_FREQ     = "highway_alert_freq_min"
-        const val PREF_TRAFFIC_SPEED      = "traffic_speed_on"
-        const val PREF_TRAFFIC_SPEED_FREQ = "traffic_speed_freq_min"
+        // ── Weather / METAR / Aircraft ──────────────────────────────────────
         const val PREF_METAR_DISPLAY      = "metar_display_on"
         const val PREF_METAR_FREQ         = "metar_freq_min"
         const val PREF_AIRCRAFT_DISPLAY   = "aircraft_display_on"

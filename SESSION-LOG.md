@@ -1,5 +1,83 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-02c (Weather Feature Overhaul — v1.5.34)
+
+### Changes Made
+
+#### Proxy: `/weather` Composite Endpoint (cache-proxy/server.js)
+- **`GET /weather?lat=X&lon=Y`**: makes 5 NWS API calls in parallel with per-section TTLs
+  - `/points/{lat},{lon}` → grid coordinates + nearest station (24h cache)
+  - `/stations/{stationId}/observations/latest` → current conditions (5min cache)
+  - `/gridpoints/{office}/{gridX},{gridY}/forecast/hourly` → 48 hourly periods (30min cache)
+  - `/gridpoints/{office}/{gridX},{gridY}/forecast` → 7-day daily forecast (30min cache)
+  - `/alerts/active?point={lat},{lon}` → location-specific alerts (5min cache)
+- Snaps lat/lon to 2 decimal places (~1km resolution) for cache keys
+- Extracts icon codes from NWS icon URLs (`/icons/land/day/sct,20` → `"sct"`)
+- Converts units: °C→°F, km/h→mph, Pa→inHg, m→miles
+- `degToCompass()` helper converts wind direction degrees to compass points
+- Returns merged JSON: location, current, hourly[], daily[], alerts[], fetchedAt
+
+#### Data Models (Models.kt)
+- **New data classes**: `WeatherData`, `WeatherLocation`, `CurrentConditions`, `HourlyForecast`, `DailyForecast`
+- **Updated `WeatherAlert`**: added `urgency: String = ""` and `instruction: String = ""` fields
+
+#### Repository + ViewModel (WeatherRepository.kt, MainViewModel.kt)
+- **`fetchWeather(lat, lon): WeatherData`**: calls proxy `/weather`, full JSON parser for composite response
+- **`weatherData: LiveData<WeatherData?>`**: new LiveData in ViewModel
+- **`fetchWeather(lat, lon)`**: coroutine launch method
+- **`fetchWeatherDirectly(lat, lon): WeatherData?`**: suspend call for dialog inline usage
+
+#### Weather Icon Drawables (22 files)
+- Created 22 vector XML drawables in `app/src/main/res/drawable/ic_wx_*.xml`
+- Day/night variants: clear_day, clear_night, few_clouds_day/night, partly_cloudy_day/night
+- Shared: mostly_cloudy, overcast, rain, showers, thunderstorm, snow, sleet, freezing_rain, fog, haze, wind, hot, cold, tornado, hurricane, default
+- **`WeatherIconHelper.kt`**: `drawableForCode(code, isDaytime): Int` mapping function
+
+#### Toolbar Change: Alerts → Weather (menu XML, AppBarMenuManager.kt, MenuEventListener.kt)
+- **`menu_main_toolbar.xml`**: replaced `menu_top_gps_alerts` (Alerts) → `menu_top_weather` (Weather, `ic_wx_default`)
+- **`AppBarMenuManager.kt`**: `menu_top_weather` dispatches to `menuEventListener.onWeatherRequested()` (direct dialog, no submenu); deleted `showGpsAlertsMenu()` entirely; moved METAR toggle + frequency to `showRadarMenu()`; removed dead pref constants (PREF_WEATHER_ALERTS, PREF_WEATHER_BANNER, PREF_HWY_*, PREF_TRAFFIC_*)
+- **`MenuEventListener.kt`**: added `onWeatherRequested()`; removed 6 dead stubs (onWeatherAlertsToggled, onWeatherBannerToggled, onHighwayAlertsToggled, onHighwayAlertsFrequencyChanged, onTrafficSpeedToggled, onTrafficSpeedFrequencyChanged)
+- **`menu_radar.xml`**: added `menu_metar_display` (checkable) and `menu_metar_frequency` items
+- **Deleted**: `menu_gps_alerts.xml`
+
+#### Weather Dialog + Auto-Fetch (MainActivity.kt)
+- **Auto-fetch**: on every GPS update, checks if 30 min elapsed since last fetch → `viewModel.fetchWeather(lat, lon)`
+- **Observer**: `viewModel.weatherData.observe` → `updateWeatherToolbarIcon(data)`
+- **`updateWeatherToolbarIcon()`**: sets toolbar icon to current condition drawable; when alerts exist, draws icon inside a red rounded-rect border using programmatic Bitmap+Canvas+Paint
+- **`showWeatherDialog()`**: 90%×85% dark dialog with async loading spinner
+  - Header: weather icon + "Weather for City, ST" + close button
+  - Current conditions: 48dp icon, 28sp temperature, description, feels-like, detail rows (wind, humidity, visibility, dewpoint, barometer)
+  - Alerts: severity-colored backgrounds (Extreme=dark red, Severe=red, Moderate=orange, Minor=yellow), tap to expand/collapse with headline, description, instructions, expiry
+  - 48-hour strip: HorizontalScrollView → 48 cells (60dp wide, day/night backgrounds), time label, 24dp icon, bold temperature, optional precip % in blue
+  - 7-day outlook: day/night pairs with abbreviated name, icon, hi°/lo°, short forecast, optional precip %
+  - Footer: station ID + formatted update time
+- **`buildWeatherDialogContent()`**: separated from `showWeatherDialog()` for clarity
+
+#### Cleanup (MainActivity.kt)
+- FAB speed dial: Weather entry now calls `showWeatherDialog()` instead of `viewModel.fetchWeatherAlerts()`; icon changed to `ic_wx_default`
+- Debug `/state` endpoint: added `weather` object (location, station, temperature, description, iconCode, hourly/daily/alert counts, fetchedAt)
+- Removed dead toggle map entries for `PREF_WEATHER_ALERTS` and `PREF_NAT_ALERTS` from both onStart intent handler and `debugTogglePref()`
+- Removed dead `onWeatherAlertsToggled` override and 5 stub overrides (weather banner, highway alerts/freq, traffic speed/freq)
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `cache-proxy/server.js` | Added `/weather?lat=&lon=` composite endpoint (~150 lines), `degToCompass()`, updated startup log |
+| `app/.../data/model/Models.kt` | 5 new data classes, updated WeatherAlert with urgency+instruction |
+| `app/.../data/repository/WeatherRepository.kt` | `fetchWeather()` + `parseWeatherJson()` (~100 lines) |
+| `app/.../ui/MainViewModel.kt` | `weatherData` LiveData, `fetchWeather()`, `fetchWeatherDirectly()` |
+| `app/.../ui/WeatherIconHelper.kt` | **NEW** — icon code → drawable mapping (~60 lines) |
+| `app/.../ui/MainActivity.kt` | `showWeatherDialog()`, `buildWeatherDialogContent()`, `updateWeatherToolbarIcon()`, auto-fetch, observer, cleanup |
+| `app/.../ui/menu/AppBarMenuManager.kt` | Weather dispatch, METAR in radar, deleted alerts menu, removed dead prefs |
+| `app/.../ui/menu/MenuEventListener.kt` | Added `onWeatherRequested()`, removed 6 dead stubs |
+| `app/src/main/res/menu/menu_main_toolbar.xml` | Alerts → Weather icon |
+| `app/src/main/res/menu/menu_radar.xml` | Added METAR toggle + frequency items |
+| `app/src/main/res/menu/menu_gps_alerts.xml` | **DELETED** |
+| `app/src/main/res/drawable/ic_wx_*.xml` | **NEW** — 22 weather condition vector icons |
+| `STATE.md` | Updated for v1.5.34 |
+| `SESSION-LOG.md` | This entry |
+| `CHANGELOG.md` | v1.5.34 entry |
+
 ## Session: 2026-03-02b (Idle Auto-Populate + Delta Cache — v1.5.33)
 
 ### Changes Made

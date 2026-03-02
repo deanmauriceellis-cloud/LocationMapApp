@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 33 (Idle Auto-Populate + Delta Cache)
+## Last Updated: 2026-03-02 Session 34 (Weather Feature Overhaul)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -23,7 +23,15 @@
 - Layer-aware POI LiveData — `Pair<String, List>` ensures categories don't overwrite each other
 - Unified POI pipeline — all categories use searchPoisAt() via Overpass
 - All layers default ON on fresh install (POIs, MBTA, radar, METAR, webcams) — except aircraft (OFF)
-- Weather alerts (NWS active alerts)
+- **Weather dialog** (v1.5.34) — rich graphical weather display via NWS API composite endpoint
+  - Toolbar Weather icon shows current conditions; red border when alerts exist
+  - Auto-fetches on first GPS fix and every 30 minutes
+  - Dialog sections: current conditions (temp, wind, humidity, dewpoint, visibility, barometer),
+    expandable severity-colored alerts, 48-hour hourly forecast scroll strip, 7-day daily outlook
+  - Proxy `/weather?lat=&lon=` merges 5 NWS API calls with per-section TTLs (points=24h, current=5min, forecast=30min, alerts=5min)
+  - 22 weather condition vector icons (day/night variants), `WeatherIconHelper.kt` mapping
+  - Replaced old Alerts submenu (4 stubs + 1 useless global alerts + METAR = 8 items → 1 Weather button)
+  - METAR toggle + frequency moved to Radar menu
 - METAR stations with rich text markers — temp (°F), wind arrow+speed, sky/wx, flight-category color
   - Bbox passthrough to Aviation Weather API, cached per-bbox
   - Deferred load — waits for GPS fix so map has a valid bounding box
@@ -61,8 +69,9 @@
   - Reloads on scroll/zoom with 1s debounce
   - Deferred restore like METAR — waits for GPS fix
   - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
-- **Icon toolbar** (v1.5.31): 9 icon-only buttons (was 8 text labels), long-press shows tooltip
-  - Icons: Alerts, Transit, CAMs, Air, Radar, POI, Utility, Find, Go to Location (crosshair)
+- **Icon toolbar** (v1.5.31, updated v1.5.34): 9 icon-only buttons, long-press shows tooltip
+  - Icons: Weather, Transit, CAMs, Air, Radar, POI, Utility, Find, Go to Location (crosshair)
+  - Weather icon dynamically updates to show current conditions; red border when alerts active
   - Explicit `tooltipText` set programmatically on action views after inflation (v1.5.32)
 - **Go to Location** (v1.5.32): geocode autocomplete dialog — type-ahead suggestions as you type
   - **Photon geocoder** (Komoot OSM) via proxy `/geocode` — prefix matching, US-only (bbox filter)
@@ -198,6 +207,7 @@
 |-----|-------------|-------------|-----|
 | Overpass POI | `http://10.0.0.4:3000/overpass` | POST /overpass | 365 days |
 | NWS Alerts | `http://10.0.0.4:3000/nws-alerts` | GET /nws-alerts | 1 hour |
+| NWS Weather | `http://10.0.0.4:3000/weather?lat=&lon=` | GET /weather (composite) | 5min–24h per section |
 | METAR | `http://10.0.0.4:3000/metar?bbox=...` | GET /metar?bbox=s,w,n,e | 1 hour (per bbox) |
 | Radius Hints | `http://10.0.0.4:3000/radius-hint` | GET+POST /radius-hint | persistent |
 | POI Cache | `http://10.0.0.4:3000/pois/...` | GET /pois/stats, /pois/export, /pois/bbox, /poi/:type/:id | persistent |
@@ -236,6 +246,7 @@
 - `app/src/main/java/.../ui/MainActivity.kt` — main map activity, all overlays
 - `app/src/main/java/.../ui/MainViewModel.kt` — LiveData, data fetching
 - `app/src/main/java/.../ui/MarkerIconHelper.kt` — icon/dot rendering with cache
+- `app/src/main/java/.../ui/WeatherIconHelper.kt` — NWS icon code → drawable mapping
 - `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 16 POI categories
 - `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search (injects `@ApplicationContext` for X-Client-ID)
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR

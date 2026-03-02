@@ -1,7 +1,6 @@
 package com.example.locationmapapp.data.repository
 
-import com.example.locationmapapp.data.model.MetarStation
-import com.example.locationmapapp.data.model.WeatherAlert
+import com.example.locationmapapp.data.model.*
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +71,119 @@ class WeatherRepository @Inject constructor() {
         }
         DebugLogger.i(TAG, "Parsed ${results.size} weather alerts")
         return results
+    }
+
+    // ── NWS Composite Weather (via proxy /weather) ────────────────────────────
+
+    suspend fun fetchWeather(lat: Double, lon: Double): WeatherData = withContext(Dispatchers.IO) {
+        val url = "http://10.0.0.4:3000/weather?lat=$lat&lon=$lon"
+        DebugLogger.d(TAG, "Fetching weather for $lat,$lon")
+        val t0 = System.currentTimeMillis()
+        val response = client.newCall(Request.Builder().url(url).build()).execute()
+        val elapsed = System.currentTimeMillis() - t0
+        DebugLogger.i(TAG, "Weather code=${response.code} in ${elapsed}ms")
+        if (!response.isSuccessful) {
+            val errBody = response.body?.string()?.take(300) ?: "(empty)"
+            DebugLogger.e(TAG, "Weather HTTP ${response.code} body: $errBody")
+            throw RuntimeException("HTTP ${response.code}: $errBody")
+        }
+        val bodyStr = response.body!!.string()
+        parseWeatherJson(bodyStr)
+    }
+
+    private fun parseWeatherJson(json: String): WeatherData {
+        val root = JsonParser.parseString(json).asJsonObject
+
+        // Location
+        val loc = root.getAsJsonObject("location")
+        val location = WeatherLocation(
+            city = loc["city"]?.asString ?: "",
+            state = loc["state"]?.asString ?: "",
+            station = loc["station"]?.asString ?: ""
+        )
+
+        // Current conditions
+        val cur = root.getAsJsonObject("current")
+        val current = if (cur != null && !cur.isJsonNull) CurrentConditions(
+            temperature = cur["temperature"]?.let { if (it.isJsonNull) null else it.asInt },
+            temperatureUnit = cur["temperatureUnit"]?.asString ?: "F",
+            humidity = cur["humidity"]?.let { if (it.isJsonNull) null else it.asInt },
+            windSpeed = cur["windSpeed"]?.let { if (it.isJsonNull) null else it.asInt },
+            windDirection = cur["windDirection"]?.let { if (it.isJsonNull) null else it.asString },
+            windChill = cur["windChill"]?.let { if (it.isJsonNull) null else it.asInt },
+            heatIndex = cur["heatIndex"]?.let { if (it.isJsonNull) null else it.asInt },
+            dewpoint = cur["dewpoint"]?.let { if (it.isJsonNull) null else it.asInt },
+            description = cur["description"]?.asString ?: "",
+            iconCode = cur["iconCode"]?.asString ?: "unknown",
+            isDaytime = cur["isDaytime"]?.asBoolean ?: true,
+            visibility = cur["visibility"]?.let { if (it.isJsonNull) null else it.asDouble },
+            barometer = cur["barometer"]?.let { if (it.isJsonNull) null else it.asDouble }
+        ) else null
+
+        // Hourly forecast
+        val hourlyArr = root.getAsJsonArray("hourly") ?: com.google.gson.JsonArray()
+        val hourly = mutableListOf<HourlyForecast>()
+        for (el in hourlyArr) {
+            val h = el.asJsonObject
+            hourly.add(HourlyForecast(
+                time = h["time"]?.asString ?: "",
+                temperature = h["temperature"]?.asInt ?: 0,
+                windSpeed = h["windSpeed"]?.asString ?: "",
+                windDirection = h["windDirection"]?.asString ?: "",
+                precipProbability = h["precipProbability"]?.asInt ?: 0,
+                shortForecast = h["shortForecast"]?.asString ?: "",
+                iconCode = h["iconCode"]?.asString ?: "unknown",
+                isDaytime = h["isDaytime"]?.asBoolean ?: true
+            ))
+        }
+
+        // Daily forecast
+        val dailyArr = root.getAsJsonArray("daily") ?: com.google.gson.JsonArray()
+        val daily = mutableListOf<DailyForecast>()
+        for (el in dailyArr) {
+            val d = el.asJsonObject
+            daily.add(DailyForecast(
+                name = d["name"]?.asString ?: "",
+                isDaytime = d["isDaytime"]?.asBoolean ?: true,
+                temperature = d["temperature"]?.asInt ?: 0,
+                windSpeed = d["windSpeed"]?.asString ?: "",
+                shortForecast = d["shortForecast"]?.asString ?: "",
+                detailedForecast = d["detailedForecast"]?.asString ?: "",
+                iconCode = d["iconCode"]?.asString ?: "unknown",
+                precipProbability = d["precipProbability"]?.asInt ?: 0
+            ))
+        }
+
+        // Alerts
+        val alertArr = root.getAsJsonArray("alerts") ?: com.google.gson.JsonArray()
+        val alerts = mutableListOf<WeatherAlert>()
+        for (el in alertArr) {
+            val a = el.asJsonObject
+            alerts.add(WeatherAlert(
+                id = a["id"]?.asString ?: "",
+                event = a["event"]?.asString ?: "",
+                headline = a["headline"]?.asString ?: "",
+                description = a["description"]?.asString ?: "",
+                severity = a["severity"]?.asString ?: "",
+                urgency = a["urgency"]?.asString ?: "",
+                instruction = a["instruction"]?.asString ?: "",
+                effective = a["effective"]?.asString ?: "",
+                expires = a["expires"]?.asString ?: "",
+                areaDesc = a["areaDesc"]?.asString ?: ""
+            ))
+        }
+
+        val result = WeatherData(
+            location = location,
+            current = current,
+            hourly = hourly,
+            daily = daily,
+            alerts = alerts,
+            fetchedAt = root["fetchedAt"]?.asString ?: ""
+        )
+        DebugLogger.i(TAG, "Parsed weather: ${location.city},${location.state} " +
+                "current=${current != null} hourly=${hourly.size} daily=${daily.size} alerts=${alerts.size}")
+        return result
     }
 
     // ── METAR (aviationweather.gov AWOS/ASOS) ─────────────────────────────────

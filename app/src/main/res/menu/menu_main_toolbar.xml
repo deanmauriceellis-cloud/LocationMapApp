@@ -13,10 +13,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/menu_top_gps_alerts"
-        android:title="Alerts"
-        android:tooltipText="Alerts"
-        android:icon="@drawable/ic_weather_alert"
+        android:id="@+id/menu_top_weather"
+        android:title="Weather"
+        android:tooltipText="Weather"
+        android:icon="@drawable/ic_wx_default"
         app:showAsAction="always" />
 
     <item
