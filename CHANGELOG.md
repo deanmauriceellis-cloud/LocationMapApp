@@ -1,5 +1,33 @@
 # LocationMapApp — Changelog
 
+## [1.5.31] — 2026-03-01
+
+### Added
+- **Icon toolbar** — all 8 toolbar buttons converted from text labels to icons
+  - Icons: Alerts (weather alert), Transit (rail), CAMs (camera), Air (aircraft), Radar, POI, Utility (debug), Find (search)
+  - Long-press any icon shows its name as a tooltip (built-in Android behavior)
+  - Frees toolbar space and gives a cleaner, more professional look
+- **Go to Location** — 9th toolbar button (crosshair icon) for geocoding navigation
+  - Full-screen dark dialog with text input ("City, state, address, or zip...")
+  - Uses `android.location.Geocoder` — up to 5 results displayed as tappable rows
+  - Enter key or Search button triggers geocoder lookup on background thread
+  - On result tap: switches to manual mode, animates map, triggers POI search + silent fill
+  - Auto-shows keyboard on dialog open
+- **`ic_goto_location.xml`** — new 24dp crosshair/target vector icon (circles + crosshairs)
+
+### Changed
+- Toolbar: `showAsAction="always|withText"` → `showAsAction="always"` (icon-only, no text)
+
+## [1.5.30] — 2026-03-01
+
+### Changed
+- **Smart GPS position updates** — dead zone filtering, speed-adaptive polling, 3km POI threshold
+
+## [1.5.29] — 2026-03-01
+
+### Changed
+- **Labeled vehicle markers** at zoom >= 18
+
 ## [1.5.28] — 2026-03-01
 
 ### Added

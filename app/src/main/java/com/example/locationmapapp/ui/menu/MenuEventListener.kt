@@ -164,6 +164,9 @@ interface MenuEventListener {
     /** Open the map legend dialog showing all marker types and their meanings. */
     fun onLegendRequested()
 
+    /** Open the Go to Location geocoder dialog. */
+    fun onGoToLocationRequested()
+
     // =========================================================================
     // SAFETY NET
     // =========================================================================

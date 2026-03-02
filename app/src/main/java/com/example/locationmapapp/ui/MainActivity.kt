@@ -3775,6 +3775,208 @@ class MainActivity : AppCompatActivity() {
 
     // ── Legend Dialog ─────────────────────────────────────────────────────────
 
+    // =========================================================================
+    // GO TO LOCATION — geocoder dialog
+    // =========================================================================
+
+    @SuppressLint("SetTextI18n")
+    private fun showGoToLocationDialog() {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        // ── Header ──
+        val titleText = TextView(this).apply {
+            text = "Go to Location"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), 0, dp(4), 0)
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(12), dp(12), dp(8))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        // ── Results container (scrollable) ──
+        val resultsContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), dp(16))
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(resultsContainer)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+        }
+
+        // ── Search input area ──
+        val input = android.widget.EditText(this).apply {
+            hint = "City, state, address, or zip..."
+            setHintTextColor(Color.GRAY)
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setBackgroundColor(Color.argb(50, 255, 255, 255))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setSingleLine(true)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val searchBtn = TextView(this).apply {
+            text = "Search"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setBackgroundColor(Color.argb(180, 0, 150, 136))
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+        }
+        val inputRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(input)
+            addView(searchBtn)
+        }
+
+        // ── Geocoder search logic ──
+        val doSearch = {
+            val query = input.text.toString().trim()
+            if (query.isEmpty()) {
+                toast("Enter a location to search")
+            } else {
+                resultsContainer.removeAllViews()
+                val searching = TextView(this).apply {
+                    text = "Searching..."
+                    textSize = 14f
+                    setTextColor(Color.GRAY)
+                    setPadding(0, dp(12), 0, 0)
+                }
+                resultsContainer.addView(searching)
+
+                lifecycleScope.launch {
+                    try {
+                        val geocoder = android.location.Geocoder(this@MainActivity)
+                        @Suppress("DEPRECATION")
+                        val results = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            geocoder.getFromLocationName(query, 5)
+                        }
+                        resultsContainer.removeAllViews()
+                        if (results.isNullOrEmpty()) {
+                            val noResults = TextView(this@MainActivity).apply {
+                                text = "No results found"
+                                textSize = 14f
+                                setTextColor(Color.GRAY)
+                                setPadding(0, dp(12), 0, 0)
+                            }
+                            resultsContainer.addView(noResults)
+                        } else {
+                            for (addr in results) {
+                                val label = addr.getAddressLine(0)
+                                    ?: listOfNotNull(addr.locality, addr.adminArea, addr.countryName)
+                                        .joinToString(", ")
+                                        .ifEmpty { "${addr.latitude}, ${addr.longitude}" }
+                                val row = TextView(this@MainActivity).apply {
+                                    text = label
+                                    textSize = 15f
+                                    setTextColor(Color.WHITE)
+                                    setPadding(dp(8), dp(14), dp(8), dp(14))
+                                    val bg = android.graphics.drawable.GradientDrawable().apply {
+                                        setColor(Color.argb(40, 255, 255, 255))
+                                        cornerRadius = dp(4).toFloat()
+                                    }
+                                    background = bg
+                                    val lp = LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT
+                                    )
+                                    lp.bottomMargin = dp(4)
+                                    layoutParams = lp
+                                    setOnClickListener {
+                                        val point = GeoPoint(addr.latitude, addr.longitude)
+                                        dialog.dismiss()
+                                        goToLocation(point, label)
+                                    }
+                                }
+                                resultsContainer.addView(row)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        DebugLogger.e("MainActivity", "Geocoder error: ${e.message}")
+                        resultsContainer.removeAllViews()
+                        val errView = TextView(this@MainActivity).apply {
+                            text = "Geocoder unavailable"
+                            textSize = 14f
+                            setTextColor(Color.argb(255, 255, 100, 100))
+                            setPadding(0, dp(12), 0, 0)
+                        }
+                        resultsContainer.addView(errView)
+                    }
+                }
+            }
+        }
+
+        searchBtn.setOnClickListener { doSearch() }
+        input.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                doSearch()
+                true
+            } else false
+        }
+
+        // ── Assemble layout ──
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.argb(240, 30, 30, 30))
+            addView(header)
+            addView(inputRow)
+            addView(scrollView)
+        }
+        dialog.setContentView(root)
+        dialog.show()
+
+        // Auto-show keyboard
+        input.requestFocus()
+        input.postDelayed({
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }, 200)
+    }
+
+    /**
+     * Navigate map to a geocoded location — mirrors the long-press handler pattern.
+     */
+    private fun goToLocation(point: GeoPoint, label: String) {
+        DebugLogger.i("MainActivity", "goToLocation: ${point.latitude},${point.longitude} — $label")
+        // Stop any active scanner / silent fill
+        if (populateJob != null) stopPopulatePois()
+        stopSilentFill()
+        // Switch to manual mode at new location
+        viewModel.setManualLocation(point)
+        val targetZoom = if (binding.mapView.zoomLevelDouble < 14.0) 14.0 else binding.mapView.zoomLevelDouble
+        binding.mapView.controller.animateTo(point, targetZoom, null)
+        triggerFullSearch(point)
+        // Programmatic animateTo doesn't fire onScroll — schedule bbox POI refresh
+        cachePoiJob?.cancel()
+        cachePoiJob = lifecycleScope.launch {
+            delay(2000)
+            loadCachedPoisForVisibleArea()
+        }
+        scheduleSilentFill(point, 3000)
+        toast("Moved to: $label")
+    }
+
     @SuppressLint("SetTextI18n")
     private fun showLegendDialog() {
         val density = resources.displayMetrics.density
@@ -5058,6 +5260,11 @@ class MainActivity : AppCompatActivity() {
         override fun onLegendRequested() {
             DebugLogger.i("MainActivity", "onLegendRequested")
             showLegendDialog()
+        }
+
+        override fun onGoToLocationRequested() {
+            DebugLogger.i("MainActivity", "onGoToLocationRequested")
+            showGoToLocationDialog()
         }
 
         // ── Safety net ────────────────────────────────────────────────────────

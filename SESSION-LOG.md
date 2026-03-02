@@ -1,5 +1,48 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01n (Icon Toolbar + Go to Location — v1.5.31)
+
+### Changes Made
+
+#### Icon Toolbar (menu_main_toolbar.xml)
+- Converted all 8 existing toolbar buttons from text labels to icon-only buttons
+- Added `android:icon` attribute to each item pointing to existing drawable vectors
+- Changed `app:showAsAction="always|withText"` → `app:showAsAction="always"` to drop text labels
+- Kept `android:title` — Android shows it as a long-press tooltip automatically
+- Icon mapping: Alerts→ic_weather_alert, Transit→ic_transit_rail, CAMs→ic_camera, Air→ic_aircraft, Radar→ic_radar, POI→ic_poi, Utility→ic_debug, Find→ic_search
+
+#### Go to Location (9th toolbar button)
+- **`ic_goto_location.xml`** (NEW) — 24dp crosshair/target vector icon (two concentric circles + four crosshair lines)
+- **`menu_main_toolbar.xml`** — added 9th item `menu_top_goto` with crosshair icon
+- **`AppBarMenuManager.kt`** — added `R.id.menu_top_goto` click handler → delegates to `menuEventListener.onGoToLocationRequested()`
+- **`MenuEventListener.kt`** — added `onGoToLocationRequested()` callback
+- **`MainActivity.kt`** — added ~170 lines:
+  - `onGoToLocationRequested()` override → calls `showGoToLocationDialog()`
+  - `showGoToLocationDialog()` — full-screen dark dialog matching existing Find/Legend style
+    - EditText input with hint, Search button, IME Enter key support
+    - `android.location.Geocoder` on `Dispatchers.IO` — up to 5 results
+    - Clickable result rows with formatted address
+    - Error/empty state handling, auto-show keyboard
+  - `goToLocation(point, label)` — mirrors long-press handler:
+    - Stops populate scanner + silent fill
+    - Sets MANUAL location mode
+    - Animates map (zoom 14 if < 14)
+    - Triggers full POI search + bbox cache refresh + silent fill
+    - Toast: "Moved to: <address>"
+
+### Testing
+- Build: SUCCESSFUL, no new warnings
+
+## Session: 2026-03-01m (Smart GPS — v1.5.30)
+
+### Changes Made
+- Smart GPS position updates: dead zone filtering, speed-adaptive polling, 3km POI threshold
+
+## Session: 2026-03-01l (Labeled Vehicle Markers — v1.5.29)
+
+### Changes Made
+- Labeled vehicle markers at zoom >= 18
+
 ## Session: 2026-03-01k (Silent POI Fill + Category Expansion — v1.5.28)
 
 ### Changes Made

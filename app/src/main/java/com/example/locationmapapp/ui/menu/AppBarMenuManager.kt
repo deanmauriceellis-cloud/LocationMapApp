@@ -70,6 +70,7 @@ class AppBarMenuManager(
                 R.id.menu_top_poi        -> { showPoiMenu(toolbar);        true }
                 R.id.menu_top_utility    -> { showUtilityMenu(toolbar);    true }
                 R.id.menu_top_find       -> { menuEventListener.onFindRequested();   true }
+                R.id.menu_top_goto       -> { menuEventListener.onGoToLocationRequested(); true }
                 else -> {
                     DebugLogger.w(TAG, "No sub-menu for id=0x${item.itemId.toString(16)}")
                     false

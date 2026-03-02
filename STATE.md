@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 28 (Silent POI Fill + Category Expansion)
+## Last Updated: 2026-03-01 Session 31 (Icon Toolbar + Go to Location)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -61,6 +61,10 @@
   - Reloads on scroll/zoom with 1s debounce
   - Deferred restore like METAR — waits for GPS fix
   - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
+- **Icon toolbar** (v1.5.31): 9 icon-only buttons (was 8 text labels), long-press shows tooltip
+  - Icons: Alerts, Transit, CAMs, Air, Radar, POI, Utility, Find, Go to Location (crosshair)
+- **Go to Location** (v1.5.31): geocoder dialog — type address/city/zip, pick from results, map navigates
+  - Uses `android.location.Geocoder`, up to 5 results, switches to MANUAL mode + triggers POI search
 - Aircraft follow mode: tap airplane → map tracks it globally via icao24 query
   - Dedicated icao24 refresh loop (not limited to bbox — tracks anywhere in the world)
   - Banner shows callsign, altitude, speed, heading, vertical rate, SPI flag
@@ -206,7 +210,8 @@
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
 - **Tap find filter banner**: exit filter mode, restore normal POI display
-- **Find toolbar button**: category grid → subtype grid → distance-sorted results → tap to open POI detail dialog
+- **Find toolbar icon**: category grid → subtype grid → distance-sorted results → tap to open POI detail dialog
+- **Go to Location toolbar icon**: geocoder dialog → type address → pick result → map navigates + POI search
 - **POI detail dialog**: info rows + Load Website button + action buttons (Directions, Call, Reviews, Map)
 - **Find long-press**: filter map to show only that category's POIs
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center

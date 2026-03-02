@@ -1,18 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    menu_main_toolbar.xml — top-level Windows-style menu bar
+    menu_main_toolbar.xml — top-level icon toolbar
 
-    showAsAction="always|withText":
-      "always"   — forces the item onto the toolbar (never into overflow ⋮)
-      "withText" — shows the text label alongside any icon
-      Both flags together = guaranteed visible text button on the toolbar bar.
+    showAsAction="always":
+      Forces the item onto the toolbar (never into overflow ⋮).
+      Icons only — long-press shows android:title as tooltip.
 
     WARNING: do NOT use showAsAction="never" — that buries items in the overflow
     menu and is why the menu bar was invisible in earlier builds.
-
-    Title lengths are kept short (≤8 chars) so all 6 fit on a phone-width toolbar.
-    On narrow screens Android will still push to overflow if truly no space — but
-    6 short items on a landscape tablet (as in screenshot) will always fit.
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
@@ -20,41 +15,55 @@
     <item
         android:id="@+id/menu_top_gps_alerts"
         android:title="Alerts"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_weather_alert"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_transit"
         android:title="Transit"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_transit_rail"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_cams"
         android:title="CAMs"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_camera"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_aircraft"
         android:title="Air"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_aircraft"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_radar"
         android:title="Radar"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_radar"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_poi"
         android:title="POI"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_poi"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_utility"
         android:title="Utility"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_debug"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_find"
         android:title="Find"
-        app:showAsAction="always|withText" />
+        android:icon="@drawable/ic_search"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_goto"
+        android:title="Go to Location"
+        android:icon="@drawable/ic_goto_location"
+        app:showAsAction="always" />
 
 </menu>
