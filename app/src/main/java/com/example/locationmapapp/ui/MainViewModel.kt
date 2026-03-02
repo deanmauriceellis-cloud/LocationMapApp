@@ -1,6 +1,8 @@
 package com.example.locationmapapp.ui
 
+import android.content.ContentResolver
 import android.location.Location
+import android.net.Uri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -533,6 +535,9 @@ class MainViewModel @Inject constructor(
     private val _geofenceAlerts = MutableLiveData<List<GeofenceAlert>>()
     val geofenceAlerts: LiveData<List<GeofenceAlert>> = _geofenceAlerts
 
+    private val _importResult = MutableLiveData<Pair<Boolean, String>?>()
+    val importResult: LiveData<Pair<Boolean, String>?> = _importResult
+
     val geofenceEngine = GeofenceEngine()
 
     fun loadTfrs(south: Double, west: Double, north: Double, east: Double) {
@@ -654,10 +659,53 @@ class MainViewModel @Inject constructor(
     fun fetchGeofenceCatalog() {
         viewModelScope.launch {
             runCatching { geofenceDatabaseRepository.fetchCatalog() }
-                .onSuccess { _geofenceCatalog.value = it; DebugLogger.i(TAG, "Catalog: ${it.size} databases") }
-                .onFailure { e -> DebugLogger.e(TAG, "Catalog FAILED: ${e.message}", e as? Exception) }
+                .onSuccess { catalog ->
+                    // Merge local-only databases not in remote catalog
+                    val remoteIds = catalog.map { it.id }.toSet()
+                    val localOnly = geofenceDatabaseRepository.getLocalOnlyDatabaseInfos()
+                        .filter { it.id !in remoteIds }
+                    val merged = catalog + localOnly
+                    _geofenceCatalog.value = merged
+                    DebugLogger.i(TAG, "Catalog: ${catalog.size} remote + ${localOnly.size} local-only = ${merged.size}")
+                }
+                .onFailure { e ->
+                    // Even if remote fails, show local-only databases
+                    val localOnly = geofenceDatabaseRepository.getLocalOnlyDatabaseInfos()
+                    if (localOnly.isNotEmpty()) {
+                        _geofenceCatalog.value = localOnly
+                        DebugLogger.i(TAG, "Catalog remote FAILED, showing ${localOnly.size} local-only databases")
+                    }
+                    DebugLogger.e(TAG, "Catalog FAILED: ${e.message}", e as? Exception)
+                }
         }
     }
+
+    fun importGeofenceDatabase(contentResolver: ContentResolver, uri: Uri, overwriteId: String? = null) {
+        viewModelScope.launch {
+            val result = geofenceDatabaseRepository.importSqliteDatabase(contentResolver, uri, overwriteId)
+            _importResult.value = result
+            if (result.first) fetchGeofenceCatalog()
+        }
+    }
+
+    fun importCsvAsGeofenceDatabase(
+        contentResolver: ContentResolver, uri: Uri,
+        databaseId: String, databaseName: String,
+        zoneType: ZoneType, defaultRadius: Double
+    ) {
+        viewModelScope.launch {
+            val result = geofenceDatabaseRepository.importCsvAsDatabase(
+                contentResolver, uri, databaseId, databaseName, zoneType, defaultRadius
+            )
+            _importResult.value = result
+            if (result.first) fetchGeofenceCatalog()
+        }
+    }
+
+    fun clearImportResult() { _importResult.value = null }
+
+    fun getGeofenceDatabaseFile(id: String): java.io.File? =
+        geofenceDatabaseRepository.getDatabaseFile(id)
 
     fun downloadGeofenceDatabase(id: String) {
         viewModelScope.launch {

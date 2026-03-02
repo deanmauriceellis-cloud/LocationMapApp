@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
@@ -215,6 +216,24 @@ class MainActivity : AppCompatActivity() {
         } else {
             DebugLogger.w("MainActivity", "Location permission denied — staying at default center")
         }
+    }
+
+    // ── SAF file pickers for geofence database import ─────────────────────
+    private var pendingImportUri: Uri? = null
+
+    private val dbImportLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            pendingImportUri = uri
+            viewModel.importGeofenceDatabase(contentResolver, uri)
+        }
+    }
+
+    private val csvImportLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) showCsvImportConfigDialog(uri)
     }
 
     // =========================================================================
@@ -2039,7 +2058,33 @@ class MainActivity : AppCompatActivity() {
             textSize = 20f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, dp(8))
+        })
+
+        // Import button row
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, dp(12))
+            addView(TextView(this@MainActivity).apply {
+                text = "IMPORT .DB"
+                textSize = 13f
+                setTextColor(Color.parseColor("#64B5F6"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setPadding(0, dp(4), dp(20), dp(4))
+                setOnClickListener {
+                    dbImportLauncher.launch(arrayOf("application/octet-stream", "application/x-sqlite3"))
+                }
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "IMPORT CSV"
+                textSize = 13f
+                setTextColor(Color.parseColor("#64B5F6"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setPadding(0, dp(4), 0, dp(4))
+                setOnClickListener {
+                    csvImportLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain"))
+                }
+            })
         })
 
         val scrollView = android.widget.ScrollView(this).apply {
@@ -2121,7 +2166,29 @@ class MainActivity : AppCompatActivity() {
             }
         }
         viewModel.geofenceCatalog.observe(this, observer)
-        dialog.setOnDismissListener { viewModel.geofenceCatalog.removeObserver(observer) }
+
+        // Observe import results
+        val importObserver = androidx.lifecycle.Observer<Pair<Boolean, String>?> { result ->
+            if (result == null) return@Observer
+            viewModel.clearImportResult()
+            val (success, message) = result
+            when {
+                success -> toast(message)
+                message.startsWith("DUPLICATE:") -> {
+                    val parts = message.split(":", limit = 3)
+                    val dupId = parts.getOrElse(1) { "" }
+                    val dupName = parts.getOrElse(2) { dupId }
+                    showOverwriteConfirmationDialog(dupId, dupName)
+                }
+                else -> toast("Import failed: $message")
+            }
+        }
+        viewModel.importResult.observe(this, importObserver)
+
+        dialog.setOnDismissListener {
+            viewModel.geofenceCatalog.removeObserver(observer)
+            viewModel.importResult.removeObserver(importObserver)
+        }
 
         // Fetch catalog
         viewModel.fetchGeofenceCatalog()
@@ -2200,6 +2267,16 @@ class MainActivity : AppCompatActivity() {
                     })
                 }
 
+                // Export button
+                btnRow.addView(TextView(this@MainActivity).apply {
+                    text = "EXPORT"
+                    textSize = 13f
+                    setTextColor(Color.parseColor("#4CAF50"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, dp(4), dp(16), dp(4))
+                    setOnClickListener { exportGeofenceDatabase(db.id, db.name) }
+                })
+
                 // Delete button
                 btnRow.addView(TextView(this@MainActivity).apply {
                     text = "DELETE"
@@ -2240,6 +2317,151 @@ class MainActivity : AppCompatActivity() {
             }
 
             addView(btnRow)
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showCsvImportConfigDialog(uri: Uri) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+        }
+
+        root.addView(TextView(this).apply {
+            text = "Import CSV"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, dp(16))
+        })
+
+        // Database Name
+        root.addView(TextView(this).apply {
+            text = "Database Name"
+            textSize = 13f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setPadding(0, 0, 0, dp(4))
+        })
+        val nameInput = android.widget.EditText(this).apply {
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#666666"))
+            hint = "My Custom Zones"
+            textSize = 15f
+            setBackgroundColor(Color.parseColor("#333333"))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        root.addView(nameInput)
+
+        // Zone Type spinner
+        root.addView(TextView(this).apply {
+            text = "Zone Type"
+            textSize = 13f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setPadding(0, dp(12), 0, dp(4))
+        })
+        val zoneTypes = com.example.locationmapapp.data.model.ZoneType.values()
+        val typeSpinner = android.widget.Spinner(this).apply {
+            setBackgroundColor(Color.parseColor("#333333"))
+            adapter = android.widget.ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                zoneTypes.map { it.name }
+            )
+            setSelection(zoneTypes.indexOf(com.example.locationmapapp.data.model.ZoneType.CUSTOM))
+        }
+        root.addView(typeSpinner)
+
+        // Default Radius
+        root.addView(TextView(this).apply {
+            text = "Default Radius (meters)"
+            textSize = 13f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setPadding(0, dp(12), 0, dp(4))
+        })
+        val radiusInput = android.widget.EditText(this).apply {
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#666666"))
+            hint = "500"
+            setText("500")
+            textSize = 15f
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setBackgroundColor(Color.parseColor("#333333"))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        root.addView(radiusInput)
+
+        // Import button (click listener set after dialog creation for dismiss access)
+        val importBtn = TextView(this).apply {
+            text = "IMPORT"
+            textSize = 15f
+            setTextColor(Color.parseColor("#64B5F6"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(20), 0, dp(4))
+            gravity = android.view.Gravity.CENTER
+        }
+        root.addView(importBtn)
+
+        val dialog = android.app.AlertDialog.Builder(this).setView(root).create()
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            val wlp = attributes
+            wlp.width = (resources.displayMetrics.widthPixels * 0.85).toInt()
+            attributes = wlp
+        }
+        importBtn.setOnClickListener {
+            val dbName = nameInput.text.toString().trim()
+            if (dbName.isBlank()) {
+                toast("Enter a database name")
+                return@setOnClickListener
+            }
+            val dbId = dbName.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+            val selectedType = zoneTypes[typeSpinner.selectedItemPosition]
+            val radius = radiusInput.text.toString().toDoubleOrNull() ?: 500.0
+            viewModel.importCsvAsGeofenceDatabase(contentResolver, uri, dbId, dbName, selectedType, radius)
+            dialog.dismiss()
+            toast("Importing CSV…")
+        }
+        dialog.show()
+    }
+
+    private fun showOverwriteConfirmationDialog(id: String, name: String) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Database Exists")
+            .setMessage("\"$name\" ($id) is already installed. Overwrite?")
+            .setPositiveButton("Overwrite") { _, _ ->
+                val uri = pendingImportUri
+                if (uri != null) {
+                    viewModel.importGeofenceDatabase(contentResolver, uri, overwriteId = id)
+                } else {
+                    toast("Import URI lost — try again")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun exportGeofenceDatabase(dbId: String, dbName: String) {
+        val file = viewModel.getGeofenceDatabaseFile(dbId)
+        if (file == null) {
+            toast("Database file not found")
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(this, "com.example.locationmapapp.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/x-sqlite3"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "$dbName.db")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Export $dbName"))
+        } catch (e: Exception) {
+            DebugLogger.e("MainActivity", "Export failed: ${e.message}", e)
+            toast("Export failed: ${e.message}")
         }
     }
 

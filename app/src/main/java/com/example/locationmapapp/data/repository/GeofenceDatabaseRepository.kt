@@ -1,7 +1,9 @@
 package com.example.locationmapapp.data.repository
 
+import android.content.ContentResolver
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.net.Uri
 import com.example.locationmapapp.data.model.GeofenceDatabaseInfo
 import com.example.locationmapapp.data.model.TfrShape
 import com.example.locationmapapp.data.model.TfrZone
@@ -14,8 +16,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -224,6 +228,324 @@ class GeofenceDatabaseRepository @Inject constructor(
         } finally {
             db?.close()
         }
+    }
+
+    // ── Validate ───────────────────────────────────────────────────────────
+
+    fun validateDatabase(dbPath: String): String? {
+        var db: SQLiteDatabase? = null
+        return try {
+            db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            // Check tables exist
+            val tables = mutableSetOf<String>()
+            db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null).use { c ->
+                while (c.moveToNext()) tables.add(c.getString(0))
+            }
+            if ("db_meta" !in tables) return "Missing db_meta table"
+            if ("zones" !in tables) return "Missing zones table"
+
+            // Check zones has required columns
+            val requiredCols = setOf("zone_id", "name", "zone_type", "geometry_type",
+                "lat_min", "lat_max", "lon_min", "lon_max")
+            val actualCols = mutableSetOf<String>()
+            db.rawQuery("PRAGMA table_info(zones)", null).use { c ->
+                while (c.moveToNext()) actualCols.add(c.getString(1))
+            }
+            val missing = requiredCols - actualCols
+            if (missing.isNotEmpty()) return "Missing columns: ${missing.joinToString()}"
+
+            // Check db_meta has id
+            var hasId = false
+            db.rawQuery("SELECT value FROM db_meta WHERE key='id'", null).use { c ->
+                if (c.moveToFirst()) hasId = c.getString(0).isNotBlank()
+            }
+            if (!hasId) return "Missing 'id' in db_meta"
+
+            // Check zone count > 0
+            var count = 0L
+            db.rawQuery("SELECT COUNT(*) FROM zones", null).use { c ->
+                if (c.moveToFirst()) count = c.getLong(0)
+            }
+            if (count == 0L) return "Database has no zones"
+
+            null // valid
+        } catch (e: Exception) {
+            "Not a valid SQLite database: ${e.message}"
+        } finally {
+            db?.close()
+        }
+    }
+
+    // ── Import SQLite ─────────────────────────────────────────────────────
+
+    suspend fun importSqliteDatabase(
+        contentResolver: ContentResolver, uri: Uri, overwriteId: String? = null
+    ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val tmpFile = File(dbDir, "_import_tmp.db")
+        try {
+            // Copy content URI to temp file
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(tmpFile).use { output -> input.copyTo(output) }
+            } ?: return@withContext Pair(false, "Could not open file")
+
+            // Validate
+            val error = validateDatabase(tmpFile.absolutePath)
+            if (error != null) {
+                tmpFile.delete()
+                return@withContext Pair(false, error)
+            }
+
+            // Read id and name from db_meta
+            var dbId = ""
+            var dbName = ""
+            SQLiteDatabase.openDatabase(tmpFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("SELECT key, value FROM db_meta WHERE key IN ('id','name')", null).use { c ->
+                    while (c.moveToNext()) {
+                        when (c.getString(0)) {
+                            "id" -> dbId = c.getString(1)
+                            "name" -> dbName = c.getString(1)
+                        }
+                    }
+                }
+            }
+            if (dbId.isBlank()) {
+                tmpFile.delete()
+                return@withContext Pair(false, "No database ID in metadata")
+            }
+
+            // Check for duplicate
+            val targetFile = File(dbDir, "$dbId.db")
+            if (targetFile.exists() && overwriteId != dbId) {
+                tmpFile.delete()
+                return@withContext Pair(false, "DUPLICATE:$dbId:$dbName")
+            }
+
+            // Install
+            tmpFile.renameTo(targetFile)
+            DebugLogger.i(TAG, "Imported SQLite database: $dbId ($dbName), ${targetFile.length()} bytes")
+            Pair(true, "Imported \"$dbName\" ($dbId)")
+        } catch (e: Exception) {
+            tmpFile.delete()
+            DebugLogger.e(TAG, "Import SQLite error: ${e.message}", e)
+            Pair(false, "Import failed: ${e.message}")
+        }
+    }
+
+    // ── Import CSV ────────────────────────────────────────────────────────
+
+    suspend fun importCsvAsDatabase(
+        contentResolver: ContentResolver, uri: Uri,
+        databaseId: String, databaseName: String,
+        zoneType: ZoneType, defaultRadius: Double
+    ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        try {
+            // Read all lines
+            val lines = mutableListOf<String>()
+            contentResolver.openInputStream(uri)?.use { input ->
+                BufferedReader(InputStreamReader(input)).use { reader ->
+                    reader.forEachLine { lines.add(it) }
+                }
+            } ?: return@withContext Pair(false, "Could not open file")
+
+            if (lines.size < 2) return@withContext Pair(false, "CSV has no data rows")
+
+            // Parse header
+            val header = parseCsvLine(lines[0]).map { it.lowercase().trim() }
+            val colAliases = mapOf(
+                "lat" to setOf("lat", "latitude"),
+                "lon" to setOf("lon", "lng", "longitude"),
+                "name" to setOf("name", "title", "label"),
+                "type" to setOf("type", "zone_type", "category"),
+                "radius" to setOf("radius", "radius_m"),
+                "description" to setOf("description", "desc", "notes")
+            )
+            val colIndex = mutableMapOf<String, Int>()
+            for ((key, aliases) in colAliases) {
+                val idx = header.indexOfFirst { it in aliases }
+                if (idx >= 0) colIndex[key] = idx
+            }
+            if ("lat" !in colIndex || "lon" !in colIndex) {
+                return@withContext Pair(false, "CSV must have lat and lon columns (found: ${header.joinToString()})")
+            }
+
+            // Create SQLite database
+            val targetFile = File(dbDir, "$databaseId.db")
+            val tmpFile = File(dbDir, "${databaseId}_csv_tmp.db")
+            tmpFile.delete()
+
+            val db = SQLiteDatabase.openOrCreateDatabase(tmpFile, null)
+            db.execSQL("CREATE TABLE db_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            db.execSQL("""CREATE TABLE zones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                zone_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                zone_type TEXT NOT NULL,
+                severity INTEGER DEFAULT 1,
+                geometry_type TEXT NOT NULL,
+                geometry TEXT,
+                center_lat REAL, center_lon REAL, radius_m REAL,
+                floor_alt_ft INTEGER DEFAULT 0,
+                ceil_alt_ft INTEGER DEFAULT 99999,
+                speed_limit INTEGER,
+                time_restrict TEXT,
+                metadata TEXT DEFAULT '{}',
+                lat_min REAL, lat_max REAL, lon_min REAL, lon_max REAL
+            )""")
+            db.execSQL("CREATE INDEX idx_zones_bbox ON zones (lat_min, lat_max, lon_min, lon_max)")
+            db.execSQL("CREATE INDEX idx_zones_zone_id ON zones (zone_id)")
+
+            var inserted = 0
+            var skipped = 0
+
+            db.beginTransaction()
+            try {
+                val stmt = db.compileStatement(
+                    """INSERT INTO zones (zone_id, name, description, zone_type, severity,
+                       geometry_type, center_lat, center_lon, radius_m,
+                       metadata, lat_min, lat_max, lon_min, lon_max)
+                       VALUES (?, ?, ?, ?, 1, 'circle', ?, ?, ?, '{}', ?, ?, ?, ?)"""
+                )
+
+                for (i in 1 until lines.size) {
+                    val fields = parseCsvLine(lines[i])
+                    if (fields.size <= maxOf(colIndex["lat"]!!, colIndex["lon"]!!)) {
+                        skipped++; continue
+                    }
+                    val lat = fields.getOrNull(colIndex["lat"]!!)?.toDoubleOrNull()
+                    val lon = fields.getOrNull(colIndex["lon"]!!)?.toDoubleOrNull()
+                    if (lat == null || lon == null || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                        skipped++; continue
+                    }
+                    val name = fields.getOrNull(colIndex["name"] ?: -1)?.takeIf { it.isNotBlank() }
+                        ?: "Zone ${inserted + 1}"
+                    val type = fields.getOrNull(colIndex["type"] ?: -1)?.takeIf { it.isNotBlank() }
+                        ?: zoneType.name
+                    val radius = fields.getOrNull(colIndex["radius"] ?: -1)?.toDoubleOrNull()
+                        ?: defaultRadius
+                    val desc = fields.getOrNull(colIndex["description"] ?: -1) ?: ""
+
+                    // Compute bbox from center + radius
+                    val latDelta = radius / 111320.0
+                    val lonDelta = radius / (111320.0 * Math.cos(Math.toRadians(lat)))
+
+                    stmt.clearBindings()
+                    stmt.bindString(1, "$databaseId-$inserted")  // zone_id
+                    stmt.bindString(2, name)
+                    stmt.bindString(3, desc)
+                    stmt.bindString(4, type)
+                    stmt.bindDouble(5, lat)
+                    stmt.bindDouble(6, lon)
+                    stmt.bindDouble(7, radius)
+                    stmt.bindDouble(8, lat - latDelta)   // lat_min
+                    stmt.bindDouble(9, lat + latDelta)   // lat_max
+                    stmt.bindDouble(10, lon - lonDelta)  // lon_min
+                    stmt.bindDouble(11, lon + lonDelta)  // lon_max
+                    stmt.executeInsert()
+                    inserted++
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+
+            if (inserted == 0) {
+                db.close()
+                tmpFile.delete()
+                return@withContext Pair(false, "No valid rows in CSV (skipped $skipped)")
+            }
+
+            // Write metadata
+            val metaStmt = db.compileStatement("INSERT INTO db_meta (key, value) VALUES (?, ?)")
+            val now = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+            val metaEntries = mapOf(
+                "id" to databaseId,
+                "name" to databaseName,
+                "description" to "Imported from CSV ($inserted zones)",
+                "version" to "1",
+                "zone_type" to zoneType.name,
+                "zone_count" to inserted.toString(),
+                "updated_at" to now,
+                "source" to "CSV import",
+                "license" to "User data"
+            )
+            for ((k, v) in metaEntries) {
+                metaStmt.clearBindings()
+                metaStmt.bindString(1, k)
+                metaStmt.bindString(2, v)
+                metaStmt.executeInsert()
+            }
+            db.close()
+
+            // Install
+            if (targetFile.exists()) targetFile.delete()
+            tmpFile.renameTo(targetFile)
+            val msg = "Imported $inserted zones" + if (skipped > 0) " ($skipped rows skipped)" else ""
+            DebugLogger.i(TAG, "CSV import: $databaseId → $msg")
+            Pair(true, msg)
+        } catch (e: Exception) {
+            File(dbDir, "${databaseId}_csv_tmp.db").delete()
+            DebugLogger.e(TAG, "CSV import error: ${e.message}", e)
+            Pair(false, "CSV import failed: ${e.message}")
+        }
+    }
+
+    fun parseCsvLine(line: String): List<String> {
+        val fields = mutableListOf<String>()
+        val sb = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                c == '"' && !inQuotes -> inQuotes = true
+                c == '"' && inQuotes -> {
+                    if (i + 1 < line.length && line[i + 1] == '"') {
+                        sb.append('"'); i++ // escaped quote
+                    } else {
+                        inQuotes = false
+                    }
+                }
+                c == ',' && !inQuotes -> { fields.add(sb.toString()); sb.clear() }
+                else -> sb.append(c)
+            }
+            i++
+        }
+        fields.add(sb.toString())
+        return fields
+    }
+
+    // ── Export ─────────────────────────────────────────────────────────────
+
+    fun getDatabaseFile(id: String): File? {
+        val file = File(dbDir, "$id.db")
+        return if (file.exists()) file else null
+    }
+
+    // ── Local-only databases ──────────────────────────────────────────────
+
+    fun getLocalOnlyDatabaseInfos(): List<GeofenceDatabaseInfo> {
+        val results = mutableListOf<GeofenceDatabaseInfo>()
+        val files = dbDir.listFiles()?.filter { it.extension == "db" } ?: return results
+        for (file in files) {
+            val id = file.nameWithoutExtension
+            val meta = getDatabaseMeta(id) ?: continue
+            results.add(GeofenceDatabaseInfo(
+                id = meta["id"] ?: id,
+                name = meta["name"] ?: id,
+                description = meta["description"] ?: "",
+                version = meta["version"]?.toIntOrNull() ?: 1,
+                zoneType = meta["zone_type"] ?: "CUSTOM",
+                zoneCount = meta["zone_count"]?.toIntOrNull() ?: 0,
+                fileSize = file.length(),
+                updatedAt = meta["updated_at"] ?: "",
+                source = meta["source"] ?: "Local",
+                license = meta["license"] ?: "",
+                installed = true,
+                installedVersion = meta["version"]?.toIntOrNull() ?: 1
+            ))
+        }
+        return results
     }
 
     private fun parsePolygonGeometry(json: String, floorAlt: Int, ceilAlt: Int): List<TfrShape> {

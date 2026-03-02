@@ -1,5 +1,23 @@
 # LocationMapApp — Changelog
 
+## [1.5.39] — 2026-03-02
+
+### Added
+- **Geofence Phase 4 — Database Import & Export**
+  - **Import SQLite .db files** via Android SAF file picker — validates schema (db_meta + zones tables, required columns, zone count > 0), copies to geofence_databases directory
+  - **Import CSV files** via SAF file picker — parses point-format CSV with column aliases (lat/latitude, lon/lng/longitude, name/title/label, type/zone_type/category, radius/radius_m, description/desc/notes), converts to SQLite with full schema + bbox indexes
+  - **Export installed databases** as .db files via Android share intent (FileProvider + ACTION_SEND)
+  - **CSV import config dialog**: database name, zone type spinner (all ZoneType values), default radius input; derives database ID from name
+  - **Duplicate detection**: importing a database with an existing ID shows overwrite confirmation dialog
+  - **Local-only database display**: `fetchGeofenceCatalog()` now merges locally-imported databases not in the remote catalog; works offline when proxy unreachable
+  - **FileProvider setup**: `file_paths.xml` + AndroidManifest provider declaration for secure file sharing
+  - **Database Manager UI**: "IMPORT .DB" + "IMPORT CSV" buttons below title; green "EXPORT" button on installed database cards
+
+### Changed
+- **`GeofenceDatabaseRepository.kt`** — 6 new methods: `validateDatabase()`, `importSqliteDatabase()`, `importCsvAsDatabase()`, `parseCsvLine()`, `getDatabaseFile()`, `getLocalOnlyDatabaseInfos()`
+- **`MainViewModel.kt`** — `importResult` LiveData, `importGeofenceDatabase()`, `importCsvAsGeofenceDatabase()`, `clearImportResult()`, `getGeofenceDatabaseFile()`; `fetchGeofenceCatalog()` enhanced with local-only DB merging and offline fallback
+- **`MainActivity.kt`** — SAF file picker launchers (`dbImportLauncher`, `csvImportLauncher`), `showCsvImportConfigDialog()`, `showOverwriteConfirmationDialog()`, `exportGeofenceDatabase()`, import result observer in Database Manager dialog
+
 ## [1.5.38] — 2026-03-02
 
 ### Added

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 38 (Geofence Phase 3B — Additional Database Builders)
+## Last Updated: 2026-03-02 Session 39 (Geofence Phase 4 — Database Import & Export)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -221,6 +221,13 @@
   - **Build scripts**: `build-military.js` (ArcGIS polygon), `build-excam.js` (XZ/NDJSON), `build-nces.js` (ArcGIS point), `build-dji-nofly.js` (CSV)
   - Auto-updates `catalog.json` with actual zone counts and file sizes after each build
   - `lzma-native` npm dependency for XZ decompression (ExCam cameras)
+- **Database Import & Export** (v1.5.39) — import custom zone databases, export installed databases
+  - **Import SQLite .db**: SAF file picker → schema validation (db_meta + zones tables, required columns, zone count) → install to geofence_databases
+  - **Import CSV**: SAF file picker → config dialog (name, zone type, default radius) → parsed with column aliases → converted to SQLite with full schema + bbox indexes
+  - **Export**: installed databases shareable via Android share intent (FileProvider)
+  - **Duplicate handling**: detects existing database ID, shows overwrite confirmation dialog
+  - **Local-only databases**: catalog merges locally-imported databases not in remote catalog; works offline
+  - **Database Manager UI**: "IMPORT .DB" / "IMPORT CSV" buttons at top; "EXPORT" button on installed cards
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
@@ -300,7 +307,7 @@
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
 - `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings fetch
-- `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog, download, SQLite loading
+- `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog, download, SQLite loading, import/export, CSV parsing
 - `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/geofence-databases/catalog.json` — geofence database catalog (4 databases)
@@ -481,8 +488,8 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - Phase 2: Additional Zone Types — **DONE** (v1.5.36)
 - Phase 3A: Downloadable Database Infrastructure — **DONE** (v1.5.37)
 - Phase 3B: Additional Database Builders — **DONE** (v1.5.38)
-- Phase 4: User-Created Databases + Distribution — **NEXT**
-- Phase 5: Advanced Sources
+- Phase 4: Database Import & Export — **DONE** (v1.5.39)
+- Phase 5: Advanced Sources — **NEXT**
 
 ## Other Next Steps
 - Monitor cache growth and hit rates over time
