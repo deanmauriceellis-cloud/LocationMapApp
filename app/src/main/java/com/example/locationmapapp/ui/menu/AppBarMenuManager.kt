@@ -2,14 +2,18 @@ package com.example.locationmapapp.ui.menu
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
 import com.example.locationmapapp.R
 import com.example.locationmapapp.ui.MainViewModel
 import com.example.locationmapapp.util.DebugLogger
@@ -55,6 +59,7 @@ class AppBarMenuManager(
 
     // ─────────────────────────────────────────────────────────────────────────
     // PHASE 2 — called from onCreateOptionsMenu AFTER menuInflater.inflate()
+    // (legacy single-row path — kept for compatibility)
     // ─────────────────────────────────────────────────────────────────────────
 
     fun onMenuInflated(menu: Menu) {
@@ -78,6 +83,70 @@ class AppBarMenuManager(
             }
         }
         DebugLogger.i(TAG, "Toolbar click listener wired")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // TWO-ROW TOOLBAR — 10 icon buttons in 2 rows of 5
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Build 10 icon buttons in two rows of 5, inside the toolbar's included layout.
+     * Each button: equal weight, ripple touch feedback, white tint, tooltip on long-press.
+     * Returns the Alerts icon ImageView (caller stores reference for dynamic color updates).
+     */
+    fun setupTwoRowToolbar(row1: LinearLayout, row2: LinearLayout): ImageView {
+        data class Btn(val id: Int, val iconRes: Int, val tooltip: String, val onClick: (View) -> Unit)
+
+        val row1Btns = listOf(
+            Btn(ICON_WEATHER, R.drawable.ic_wx_default, "Weather") { menuEventListener.onWeatherRequested() },
+            Btn(ICON_TRANSIT, R.drawable.ic_transit_rail, "Transit") { showTransitMenu(it) },
+            Btn(ICON_CAMS,    R.drawable.ic_camera,       "Webcams") { showCamsMenu(it) },
+            Btn(ICON_AIR,     R.drawable.ic_aircraft,     "Aircraft") { showAircraftMenu(it) },
+            Btn(ICON_RADAR,   R.drawable.ic_radar,        "Radar") { showRadarMenu(it) }
+        )
+        val row2Btns = listOf(
+            Btn(ICON_POI,     R.drawable.ic_poi,          "POI Categories") { showPoiMenu(it) },
+            Btn(ICON_UTILITY, R.drawable.ic_debug,        "Utility") { showUtilityMenu(it) },
+            Btn(ICON_FIND,    R.drawable.ic_search,       "Find POI") { menuEventListener.onFindRequested() },
+            Btn(ICON_GOTO,    R.drawable.ic_goto_location, "Go to Location") { menuEventListener.onGoToLocationRequested() },
+            Btn(ICON_ALERTS,  R.drawable.ic_alerts,        "Alerts") { menuEventListener.onAlertsRequested() }
+        )
+
+        var alertsIcon: ImageView? = null
+
+        fun addButtons(row: LinearLayout, btns: List<Btn>) {
+            for (btn in btns) {
+                val iv = ImageView(context).apply {
+                    id = btn.id
+                    setImageResource(btn.iconRes)
+                    imageTintList = ColorStateList.valueOf(Color.WHITE)
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    val ripple = android.util.TypedValue()
+                    context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, ripple, true)
+                    setBackgroundResource(ripple.resourceId)
+                    isClickable = true
+                    isFocusable = true
+                    tooltipText = btn.tooltip
+                    contentDescription = btn.tooltip
+                    val dp4 = (4 * resources.displayMetrics.density).toInt()
+                    setPadding(dp4, dp4, dp4, dp4)
+                    setOnClickListener(btn.onClick)
+                }
+                row.addView(iv)
+                if (btn.id == ICON_ALERTS) alertsIcon = iv
+            }
+        }
+
+        addButtons(row1, row1Btns)
+        addButtons(row2, row2Btns)
+        DebugLogger.i(TAG, "setupTwoRowToolbar() — 10 icons wired (5+5)")
+        return alertsIcon!!
+    }
+
+    /** Find a specific toolbar icon by its ID across both rows. */
+    fun findToolbarIcon(row1: LinearLayout, row2: LinearLayout, iconId: Int): ImageView? {
+        return row1.findViewById(iconId) ?: row2.findViewById(iconId)
     }
 
     // =========================================================================
@@ -465,6 +534,42 @@ class AppBarMenuManager(
     }
 
     // =========================================================================
+    // ALERTS / GEOFENCE
+    // =========================================================================
+
+    fun showAlertsMenu(anchor: View) {
+        val popup = buildPopup(anchor, R.menu.menu_alerts)
+        popup.setOnMenuItemClickListener { item ->
+            DebugLogger.i(TAG, "Alerts: '${item.title}'")
+            when (item.itemId) {
+                R.id.menu_tfr_overlay ->
+                    toggleBinary(item, PREF_TFR_OVERLAY) { menuEventListener.onTfrOverlayToggled(it) }
+
+                R.id.menu_alert_sound ->
+                    toggleBinary(item, PREF_ALERT_SOUND) { menuEventListener.onAlertSoundToggled(it) }
+
+                R.id.menu_alert_distance ->
+                    showSliderDialog("Alert Distance (NM)", 1, 20,
+                        prefs.getInt(PREF_ALERT_DISTANCE, 5)) { v ->
+                        prefs.edit().putInt(PREF_ALERT_DISTANCE, v).apply()
+                        menuEventListener.onAlertDistanceChanged(v)
+                    }
+
+                else -> {
+                    DebugLogger.w(TAG, "Alerts: unhandled id=0x${item.itemId.toString(16)}")
+                    menuEventListener.onStubAction("alerts_unknown:0x${item.itemId.toString(16)}")
+                }
+            }
+            true
+        }
+        syncCheckStates(popup.menu,
+            R.id.menu_tfr_overlay to PREF_TFR_OVERLAY,
+            R.id.menu_alert_sound to PREF_ALERT_SOUND
+        )
+        popup.show()
+    }
+
+    // =========================================================================
     // PRIVATE HELPERS
     // =========================================================================
 
@@ -492,7 +597,8 @@ class AppBarMenuManager(
 
     /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
     private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
-        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS, PREF_MBTA_BUS_STOPS -> false
+        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS, PREF_MBTA_BUS_STOPS,
+        PREF_ALERT_SOUND -> false
         else -> true
     }
 
@@ -575,6 +681,18 @@ class AppBarMenuManager(
 
         const val PREFS_NAME = "app_bar_menu_prefs"
 
+        // ── Toolbar icon IDs ─────────────────────────────────────────────────
+        const val ICON_WEATHER = 1001
+        const val ICON_TRANSIT = 1002
+        const val ICON_CAMS    = 1003
+        const val ICON_AIR     = 1004
+        const val ICON_RADAR   = 1005
+        const val ICON_POI     = 1006
+        const val ICON_UTILITY = 1007
+        const val ICON_FIND    = 1008
+        const val ICON_GOTO    = 1009
+        const val ICON_ALERTS  = 1010
+
         // ── Radar ─────────────────────────────────────────────────────────────
         const val PREF_RADAR_ON          = "radar_on"
         const val PREF_RADAR_VISIBILITY  = "radar_visibility"
@@ -606,6 +724,11 @@ class AppBarMenuManager(
         // ── POI ───────────────────────────────────────────────────────────────
         // POI pref keys now live in PoiCategories.ALL (PoiCategory.prefKey)
         // Old constants removed — use PoiCategories.find(id)?.prefKey
+
+        // ── Alerts / Geofence ────────────────────────────────────────────────
+        const val PREF_TFR_OVERLAY    = "tfr_overlay_on"
+        const val PREF_ALERT_SOUND    = "alert_sound_on"
+        const val PREF_ALERT_DISTANCE = "alert_distance_nm"
 
         // ── Utility ───────────────────────────────────────────────────────────
         const val PREF_RECORD_GPS            = "record_gps_on"

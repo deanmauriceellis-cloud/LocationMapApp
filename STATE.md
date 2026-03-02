@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 34 (Weather Feature Overhaul)
+## Last Updated: 2026-03-02 Session 35 (Geofence Alert System — TFR Phase 1)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -69,10 +69,12 @@
   - Reloads on scroll/zoom with 1s debounce
   - Deferred restore like METAR — waits for GPS fix
   - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
-- **Icon toolbar** (v1.5.31, updated v1.5.34): 9 icon-only buttons, long-press shows tooltip
-  - Icons: Weather, Transit, CAMs, Air, Radar, POI, Utility, Find, Go to Location (crosshair)
+- **Two-row icon toolbar** (v1.5.35): 10 icon-only buttons in 2 rows of 5, long-press shows tooltip
+  - Row 1: Weather, Transit, CAMs, Air, Radar
+  - Row 2: POI, Utility, Find, Go to Location, Alerts
+  - Programmatic ImageView creation (no more menu inflation); `setupTwoRowToolbar()` in AppBarMenuManager
   - Weather icon dynamically updates to show current conditions; red border when alerts active
-  - Explicit `tooltipText` set programmatically on action views after inflation (v1.5.32)
+  - Alerts icon dynamically colored by severity: gray (none), blue (INFO), yellow (WARNING), red (CRITICAL), pulsing red (EMERGENCY)
 - **Go to Location** (v1.5.32): geocode autocomplete dialog — type-ahead suggestions as you type
   - **Photon geocoder** (Komoot OSM) via proxy `/geocode` — prefix matching, US-only (bbox filter)
   - Auto-suggest: `TextWatcher` with 500ms debounce, fires at >= 3 characters
@@ -184,12 +186,25 @@
   - `scheduleSilentFill()` with tracked Runnable prevents double-fire
   - Debug banner toggle in Utility menu (default ON): shows fill progress, tap to cancel
   - `silentFill` boolean in debug `/state` endpoint
+- **TFR Geofence Alert System** (v1.5.35) — FAA Temporary Flight Restriction detection + alerting
+  - **GeofenceEngine** (`util/GeofenceEngine.kt`): JTS R-tree spatial index, point-in-polygon, proximity detection
+    - `loadTfrs()` builds JTS polygons, inserts into STRtree; `checkPosition()` returns `List<GeofenceAlert>`
+    - Entry detection (CRITICAL), proximity within 5nm + bearing ±60° (WARNING), exit (INFO)
+    - Cooldowns: 5min proximity, 10min entry; configurable proximity threshold
+  - **TFR overlays**: semi-transparent red polygon fill on map, tap → detail dialog (NOTAM, type, altitude, dates)
+    - Debounced viewport reload (500ms), deferred restore on startup
+  - **Proxy `/tfrs?bbox=`**: scrapes FAA `tfr.faa.gov` (5-min list cache, 10-min detail cache)
+    - Parses AIXM XML: circle, polygon, polyarc shapes; DMS→DD coordinate conversion; arc interpolation (5°)
+  - **Alert UI**: severity-colored Alerts toolbar icon, red alert banner with NOTAM info, tap → TFR detail dialog
+  - **GPS integration**: user GPS checks geofence (no altitude); followed aircraft checks with baroAltitude
+  - **Alerts menu**: TFR Overlay toggle (default ON), Alert Sound toggle, Alert Distance slider
+  - Debug: `/geofences`, `/geofences/alerts` endpoints; `tfr` field in `/state`
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
 - **Embedded debug HTTP server** (v1.5.18) — programmatic app control via `adb forward` + `curl`
   - Port 8085, raw `ServerSocket` on `Dispatchers.IO`, minimal HTTP/1.0 parser, JSON via Gson
-  - 22 endpoints: state, logs, map control, marker listing/search/tap/nearest, vehicles, stations, bus-stops, screenshot, livedata, prefs, toggle, search, refresh, follow, stop-follow, perf, overlays
+  - 24 endpoints: state, logs, map control, marker listing/search/tap/nearest, vehicles, stations, bus-stops, screenshot, livedata, prefs, toggle, search, refresh, follow, stop-follow, perf, overlays, geofences, geofences/alerts
   - `DebugHttpServer.kt` (singleton accept loop) + `DebugEndpoints.kt` (all handlers)
   - `runOnMain` helper for UI-thread access via `suspendCancellableCoroutine`
   - Marker tap invokes custom `OnMarkerClickListener` via reflection (v1.5.21)
@@ -218,6 +233,7 @@
 | POI Website | `http://10.0.0.4:3000/pois/website` | GET /pois/website?osm_type=&osm_id=&name=&lat=&lon= | permanent (DB) |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
 | DB Aircraft | `http://10.0.0.4:3000/db/aircraft/...` | GET /db/aircraft/search, /recent, /stats, /:icao24 | live |
+| FAA TFRs | `http://10.0.0.4:3000/tfrs?bbox=...` | GET /tfrs?bbox=s,w,n,e | 5min list / 10min detail |
 | Geocode | `http://10.0.0.4:3000/geocode?q=...` | GET /geocode?q=&limit= | 24 hours |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
@@ -254,6 +270,8 @@
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
 - `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
+- `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
+- `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + geofence alerting
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
@@ -360,6 +378,8 @@
 | `GET /stop-follow` | Stop following |
 | `GET /perf` | Memory, threads, uptime |
 | `GET /overlays` | List all map overlays |
+| `GET /geofences` | Loaded geofence zones, active zones, proximity threshold |
+| `GET /geofences/alerts` | Active geofence alerts with severity/type/distance |
 
 Marker types: `poi`, `stations`, `trains`, `subway`, `buses`, `aircraft`, `webcams`, `metar`, `gps`
 

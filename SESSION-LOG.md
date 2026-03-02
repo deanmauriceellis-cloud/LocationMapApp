@@ -1,5 +1,108 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-02d (Geofence Alert System — TFR Phase 1 — v1.5.35)
+
+### Context
+Phase 1 of geofence alert system: spatial engine + FAA TFR alerting. GeofenceEngine is designed for future zone types (speed cameras, flood zones, etc.) but Phase 1 implements TFR-only detection.
+
+### Changes Made
+
+#### Dependencies
+- **app/build.gradle**: Added `org.locationtech.jts:jts-core:1.19.0` (pure Java spatial library — R-tree, point-in-polygon)
+- **cache-proxy/package.json**: Added `cheerio@^1.0.0` (HTML parser), `fast-xml-parser@^4.3.0` (XML parser)
+
+#### Proxy: `/tfrs` endpoint (cache-proxy/server.js, ~280 lines)
+- `GET /tfrs?bbox=s,w,n,e` — scrapes FAA TFR list from `tfr.faa.gov/tfr2/list.jsp` (5-min cache)
+- Fetches individual TFR detail XML pages (10-min cache), parses AIXM shapes with fast-xml-parser
+- `parseFaaDms()` — converts FAA DMS coordinates (e.g., `383200N`) to decimal degrees
+- `circleToPolygon()` — generates 32-point polygon from center + radius
+- `arcToPoints()` — interpolates arc segments every 5°
+- Handles circle, polygon, polyarc shape types; filters by requested bbox
+- Returns JSON: `[{ id, notam, type, description, effectiveDate, expireDate, facility, state, shapes }]`
+
+#### Data Models (Models.kt)
+- `AlertSeverity` enum: INFO(0), WARNING(1), CRITICAL(2), EMERGENCY(3)
+- `TfrShape`: type, points [[lon,lat]], floorAltFt, ceilingAltFt, radiusNm?
+- `TfrZone`: id, notam, type, description, effectiveDate, expireDate, shapes, facility, state
+- `GeofenceAlert`: zoneId, zoneName, alertType, severity, distanceNm?, timestamp, description
+
+#### TfrRepository (NEW: data/repository/TfrRepository.kt)
+- `@Singleton class TfrRepository @Inject constructor()`
+- OkHttpClient 15s connect / 30s read; `fetchTfrs(s, w, n, e): List<TfrZone>`
+- Manual JSON parsing of nested shapes/points arrays
+
+#### GeofenceEngine (NEW: util/GeofenceEngine.kt)
+- JTS `STRtree` spatial index + `GeometryFactory` for polygon construction
+- `loadTfrs()` — builds JTS polygons, validates geometry, inserts into STRtree
+- `checkPosition(lat, lon, altFt?, bearing?)` — queries R-tree, point-in-polygon, proximity + bearing check
+- Entry (CRITICAL), proximity (WARNING, within 5nm + bearing ±60°), exit (INFO) detection
+- Cooldown maps: 5min proximity, 10min entry; configurable `proximityThresholdNm`
+- Helpers: `nmToDeg()`, `degToNm()`, `bearingTo()`, `isWithinBearingWindow()`, `isOnCooldown()`
+
+#### DI (AppModule.kt)
+- Added `provideTfrRepository()` Hilt provider
+
+#### ViewModel (MainViewModel.kt)
+- Added `TfrRepository` constructor param, `geofenceEngine` field
+- New LiveData: `tfrZones`, `geofenceAlerts`
+- Methods: `loadTfrs()`, `fetchTfrsDirectly()`, `checkGeofences()`, `clearTfrs()`
+
+#### Menu + Toolbar
+- **MenuEventListener.kt**: 4 new callbacks: `onAlertsRequested()`, `onTfrOverlayToggled()`, `onAlertSoundToggled()`, `onAlertDistanceChanged()`
+- **menu_alerts.xml** (NEW): TFR Overlay (checkable), Alert Sound (checkable), Alert Distance
+- **AppBarMenuManager.kt**: `showAlertsMenu()`, `setupTwoRowToolbar()` (10 programmatic ImageView buttons), `findToolbarIcon()`, 10 ICON_* constants, 3 PREF_* constants
+- **toolbar_two_row.xml** (NEW): 2 × LinearLayout rows (36dp each), vertical container
+- **activity_main.xml**: Toolbar height → `wrap_content`, `minHeight="0dp"`, content insets zeroed, `<include>` toolbar_two_row
+
+#### Drawables
+- **ic_alerts.xml** (NEW): 24dp warning triangle icon (gray fill, dark exclamation)
+- **ic_tfr_zone.xml** (NEW): no-fly zone icon (red circle+line with airplane)
+
+#### MainActivity.kt (~452 lines added)
+- **Two-row toolbar**: replaced `onCreateOptionsMenu` with `setupTwoRowToolbar()`, stores `alertsIconView` + `weatherIconView`
+- **TFR overlays**: `tfrOverlays` list, `renderTfrOverlays()` (semi-transparent red fill, click → detail dialog), `clearTfrOverlays()`
+- **TFR viewport loading**: `scheduleTfrReload()` (500ms debounce), `loadTfrsForVisibleArea()`, deferred restore
+- **TFR detail dialog**: `showTfrDetailDialog()` — dark dialog, red bar, NOTAM/type/description/altitude/dates
+- **Geofence GPS**: checks in `currentLocation` observer (no altitude) + followed aircraft observer (with baroAltitude)
+- **Alert icon**: `updateAlertsIcon()` — tint by max severity, pulsing AlphaAnimation for EMERGENCY
+- **Alert banner**: `showGeofenceAlertBanner()` — red background, NOTAM + description, tap → detail dialog
+- **Menu callbacks**: `onAlertsRequested()`, `onTfrOverlayToggled()`, `onAlertSoundToggled()`, `onAlertDistanceChanged()`
+- **Debug state**: `debugTfrState()` → `tfr` field in `/state`
+
+#### Debug Endpoints (DebugEndpoints.kt)
+- Added `/geofences` and `/geofences/alerts` to dispatch table
+- `handleGeofences()` — loaded zones, active zones, proximity threshold, zone details
+- `handleGeofenceAlerts()` — active alerts with severity/type/distance
+
+### Build
+- One error caught and fixed: "Only one companion object is allowed per class" in AppBarMenuManager — merged ICON_* constants into existing companion object
+- BUILD SUCCESSFUL after fix
+
+### New Files (6)
+- `app/.../data/repository/TfrRepository.kt`
+- `app/.../util/GeofenceEngine.kt`
+- `app/src/main/res/layout/toolbar_two_row.xml`
+- `app/src/main/res/drawable/ic_alerts.xml`
+- `app/src/main/res/drawable/ic_tfr_zone.xml`
+- `app/src/main/res/menu/menu_alerts.xml`
+
+### Files Modified (10)
+- `app/build.gradle` — JTS dependency
+- `app/.../data/model/Models.kt` — 4 new data classes/enums
+- `app/.../ui/MainViewModel.kt` — TfrRepository + geofence LiveData/methods
+- `app/.../ui/MainActivity.kt` — TFR overlays, geofence GPS, alert UI, two-row toolbar
+- `app/.../ui/menu/AppBarMenuManager.kt` — two-row toolbar, alerts menu, icon constants
+- `app/.../ui/menu/MenuEventListener.kt` — 4 new alert callbacks
+- `app/.../di/AppModule.kt` — TfrRepository provider
+- `app/.../util/DebugEndpoints.kt` — geofence endpoints + TFR state
+- `app/src/main/res/layout/activity_main.xml` — toolbar height/insets + include
+- `cache-proxy/server.js` + `package.json` — /tfrs endpoint, new dependencies
+
+### Version
+v1.5.35
+
+---
+
 ## Session: 2026-03-02c (Weather Feature Overhaul — v1.5.34)
 
 ### Changes Made

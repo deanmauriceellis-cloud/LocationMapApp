@@ -91,6 +91,9 @@ dependencies {
     // Gson
     implementation 'com.google.code.gson:gson:2.10.1'
 
+    // JTS (spatial indexing, point-in-polygon, geometry ops)
+    implementation 'org.locationtech.jts:jts-core:1.19.0'
+
     // Preference (PreferenceManager used in OSMDroid config)
     implementation 'androidx.preference:preference-ktx:1.2.1'
 

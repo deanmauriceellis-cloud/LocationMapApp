@@ -15,11 +15,18 @@
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
             android:background="?attr/colorPrimary"
             android:elevation="4dp"
+            app:contentInsetStart="0dp"
+            app:contentInsetEnd="0dp"
             app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-            app:title="LocationMapApp" />
+            app:title="LocationMapApp">
+
+            <include layout="@layout/toolbar_two_row" />
+
+        </androidx.appcompat.widget.Toolbar>
 
     </com.google.android.material.appbar.AppBarLayout>
 

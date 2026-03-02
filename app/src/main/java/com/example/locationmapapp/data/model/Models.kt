@@ -312,3 +312,39 @@ enum class MbtaVehicleStatus(val display: String) {
     IN_TRANSIT_TO("En route to"),
     UNKNOWN("—")
 }
+
+// ── Geofence / TFR Models ──────────────────────────────────────────────────
+
+enum class AlertSeverity(val level: Int) {
+    INFO(0), WARNING(1), CRITICAL(2), EMERGENCY(3)
+}
+
+data class TfrShape(
+    val type: String,           // "circle", "polygon", "polyarc"
+    val points: List<List<Double>>,  // [[lon, lat], ...] — GeoJSON convention
+    val floorAltFt: Int,
+    val ceilingAltFt: Int,
+    val radiusNm: Double?       // only for circle type
+)
+
+data class TfrZone(
+    val id: String,
+    val notam: String,
+    val type: String,
+    val description: String,
+    val effectiveDate: String,
+    val expireDate: String,
+    val shapes: List<TfrShape>,
+    val facility: String,
+    val state: String
+)
+
+data class GeofenceAlert(
+    val zoneId: String,
+    val zoneName: String,
+    val alertType: String,      // "entry", "proximity", "exit"
+    val severity: AlertSeverity,
+    val distanceNm: Double?,
+    val timestamp: Long,
+    val description: String
+)

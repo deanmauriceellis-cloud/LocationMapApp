@@ -54,6 +54,8 @@ class DebugEndpoints(
             "/stop-follow"      -> handleStopFollow()
             "/perf"             -> handlePerf()
             "/overlays"         -> handleOverlays()
+            "/geofences"        -> handleGeofences()
+            "/geofences/alerts" -> handleGeofenceAlerts()
             else                -> EndpointResult(404, body = gson.toJson(mapOf("error" to "Not found: $path")))
         }
     }
@@ -84,6 +86,8 @@ class DebugEndpoints(
             mapOf("path" to "/stop-follow",     "method" to "GET", "description" to "Stop following any vehicle or aircraft"),
             mapOf("path" to "/perf",            "method" to "GET", "description" to "Performance stats: memory, threads, GC info"),
             mapOf("path" to "/overlays",        "method" to "GET", "description" to "List all map overlays with types and counts"),
+            mapOf("path" to "/geofences",       "method" to "GET", "description" to "List loaded TFR geofence zones"),
+            mapOf("path" to "/geofences/alerts", "method" to "GET", "description" to "Active geofence alerts"),
         )
         return EndpointResult(body = gson.toJson(mapOf("endpoints" to endpoints)))
     }
@@ -560,6 +564,60 @@ class DebugEndpoints(
         val m = (secs % 3600) / 60
         val s = secs % 60
         return "${h}h ${m}m ${s}s"
+    }
+
+    // ── /geofences ──────────────────────────────────────────────────────────
+
+    private suspend fun handleGeofences(): EndpointResult {
+        val data = runOnMain {
+            val zones = viewModel.tfrZones.value ?: emptyList()
+            mapOf(
+                "count" to zones.size,
+                "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
+                "activeZones" to viewModel.geofenceEngine.getActiveZones(),
+                "proximityThresholdNm" to viewModel.geofenceEngine.proximityThresholdNm,
+                "zones" to zones.map { z ->
+                    mapOf(
+                        "id" to z.id,
+                        "notam" to z.notam,
+                        "type" to z.type,
+                        "description" to z.description.take(200),
+                        "effectiveDate" to z.effectiveDate,
+                        "expireDate" to z.expireDate,
+                        "facility" to z.facility,
+                        "state" to z.state,
+                        "shapeCount" to z.shapes.size,
+                        "shapes" to z.shapes.map { s ->
+                            mapOf("type" to s.type, "floorAltFt" to s.floorAltFt, "ceilingAltFt" to s.ceilingAltFt, "pointCount" to s.points.size, "radiusNm" to s.radiusNm)
+                        }
+                    )
+                }
+            )
+        }
+        return EndpointResult(body = gson.toJson(data))
+    }
+
+    // ── /geofences/alerts ────────────────────────────────────────────────────
+
+    private suspend fun handleGeofenceAlerts(): EndpointResult {
+        val data = runOnMain {
+            val alerts = viewModel.geofenceAlerts.value ?: emptyList()
+            mapOf(
+                "count" to alerts.size,
+                "alerts" to alerts.map { a ->
+                    mapOf(
+                        "zoneId" to a.zoneId,
+                        "zoneName" to a.zoneName,
+                        "alertType" to a.alertType,
+                        "severity" to a.severity.name,
+                        "distanceNm" to a.distanceNm,
+                        "timestamp" to a.timestamp,
+                        "description" to a.description
+                    )
+                }
+            )
+        }
+        return EndpointResult(body = gson.toJson(data))
     }
 
     /** Run a block on the main thread and suspend until it completes. */

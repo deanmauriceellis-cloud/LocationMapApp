@@ -15,8 +15,10 @@ import com.example.locationmapapp.data.model.*
 import com.example.locationmapapp.data.repository.AircraftRepository
 import com.example.locationmapapp.data.repository.FindRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
+import com.example.locationmapapp.data.repository.TfrRepository
 import com.example.locationmapapp.data.repository.WebcamRepository
 import com.example.locationmapapp.data.repository.WeatherRepository
+import com.example.locationmapapp.util.GeofenceEngine
 import com.example.locationmapapp.util.DebugLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -47,7 +49,8 @@ class MainViewModel @Inject constructor(
     private val mbtaRepository: MbtaRepository,
     private val aircraftRepository: AircraftRepository,
     private val webcamRepository: WebcamRepository,
-    private val findRepository: FindRepository
+    private val findRepository: FindRepository,
+    private val tfrRepository: TfrRepository
 ) : ViewModel() {
 
     private val TAG = "ViewModel"
@@ -494,6 +497,56 @@ class MainViewModel @Inject constructor(
             DebugLogger.e(TAG, "fetchPoiWebsiteDirectly FAILED: ${e.message}", e)
             null
         }
+    }
+
+    // ── TFR / Geofences ───────────────────────────────────────────────────────
+
+    private val _tfrZones = MutableLiveData<List<TfrZone>>()
+    val tfrZones: LiveData<List<TfrZone>> = _tfrZones
+
+    private val _geofenceAlerts = MutableLiveData<List<GeofenceAlert>>()
+    val geofenceAlerts: LiveData<List<GeofenceAlert>> = _geofenceAlerts
+
+    val geofenceEngine = GeofenceEngine()
+
+    fun loadTfrs(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadTfrs() bbox=$south,$west,$north,$east")
+        viewModelScope.launch {
+            runCatching { tfrRepository.fetchTfrs(south, west, north, east) }
+                .onSuccess {
+                    DebugLogger.i(TAG, "TFRs success — ${it.size}")
+                    _tfrZones.value = it
+                    geofenceEngine.loadTfrs(it)
+                }
+                .onFailure { e ->
+                    DebugLogger.e(TAG, "TFRs FAILED: ${e.message}", e as? Exception)
+                    _error.value = "TFRs failed: ${e.message}"
+                }
+        }
+    }
+
+    suspend fun fetchTfrsDirectly(south: Double, west: Double, north: Double, east: Double): List<TfrZone> {
+        return try {
+            tfrRepository.fetchTfrs(south, west, north, east)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchTfrsDirectly FAILED: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    fun checkGeofences(lat: Double, lon: Double, altFt: Double?, bearing: Double?) {
+        val alerts = geofenceEngine.checkPosition(lat, lon, altFt, bearing)
+        if (alerts.isNotEmpty()) {
+            DebugLogger.i(TAG, "Geofence alerts: ${alerts.size} — ${alerts.map { "${it.alertType}:${it.zoneName}" }}")
+            _geofenceAlerts.value = alerts
+        }
+    }
+
+    fun clearTfrs() {
+        _tfrZones.value = emptyList()
+        _geofenceAlerts.value = emptyList()
+        geofenceEngine.clear()
+        DebugLogger.i(TAG, "TFRs cleared")
     }
 }
 

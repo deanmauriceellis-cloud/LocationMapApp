@@ -1,5 +1,37 @@
 # LocationMapApp — Changelog
 
+## [1.5.35] — 2026-03-02
+
+### Added
+- **TFR Geofence Alert System** — FAA Temporary Flight Restriction detection + proximity alerting
+  - **GeofenceEngine** (`util/GeofenceEngine.kt`): JTS R-tree spatial index, point-in-polygon, proximity detection
+  - Entry detection (CRITICAL), proximity within 5nm + bearing ±60° (WARNING), exit detection (INFO)
+  - Cooldowns: 5min proximity, 10min entry; configurable proximity threshold via Alerts menu
+- **TFR map overlays** — semi-transparent red polygons for TFR zones
+  - Tap TFR polygon → detail dialog with NOTAM number, type, description, altitude range, dates
+  - Debounced viewport reload (500ms), deferred restore on startup
+- **Proxy `/tfrs?bbox=` endpoint** — scrapes FAA `tfr.faa.gov` for TFR data
+  - Parses AIXM XML: circle, polygon, polyarc shapes; DMS→DD coordinate conversion
+  - Arc interpolation every 5°; 5-min list cache, 10-min detail XML cache
+- **Alerts toolbar icon** — severity-colored warning triangle
+  - Gray (none) → Blue (INFO) → Yellow (WARNING) → Red (CRITICAL) → Pulsing red (EMERGENCY)
+- **Alert banner** — red banner with NOTAM + description when CRITICAL/EMERGENCY, tap → TFR detail
+- **Alerts popup menu** — TFR Overlay toggle (default ON), Alert Sound toggle, Alert Distance slider
+- **Two-row toolbar layout** — 10 icons in 2 rows of 5 (was 9 in 1 row)
+  - Row 1: Weather, Transit, CAMs, Air, Radar
+  - Row 2: POI, Utility, Find, Go to Location, Alerts
+  - Programmatic ImageView creation replaces menu inflation
+- **Geofence GPS integration** — user GPS checks geofence (no altitude); followed aircraft checks with baroAltitude
+- **Debug endpoints**: `/geofences` (loaded zones), `/geofences/alerts` (active alerts)
+- **TFR debug state** — `tfr` field in `/state`: tfrCount, tfrOverlays, activeAlerts, alertSeverity, activeZones
+- **JTS dependency** — `org.locationtech.jts:jts-core:1.19.0` for spatial geometry operations
+- **Data models**: `AlertSeverity`, `TfrShape`, `TfrZone`, `GeofenceAlert` in Models.kt
+
+### Changed
+- Toolbar: migrated from menu inflation (`onCreateOptionsMenu`) to programmatic two-row ImageView layout
+- `updateWeatherToolbarIcon()` rewritten to support ImageView (two-row) with MenuItem fallback
+- Debug endpoint count: 22 → 24
+
 ## [1.5.34] — 2026-03-02
 
 ### Added

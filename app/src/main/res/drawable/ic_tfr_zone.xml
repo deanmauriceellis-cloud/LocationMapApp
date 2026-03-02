@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+  <!-- No-fly zone circle with line through -->
+  <path android:strokeColor="#D32F2F" android:strokeWidth="2" android:fillColor="@android:color/transparent"
+        android:pathData="M12,12 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0"/>
+  <path android:strokeColor="#D32F2F" android:strokeWidth="2"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M6.34,6.34 L17.66,17.66"/>
+  <!-- Airplane inside -->
+  <path android:fillColor="#D32F2F"
+        android:pathData="M12,8 L12,16 M9,11 L15,11 M10,15 L14,15"/>
+</vector>

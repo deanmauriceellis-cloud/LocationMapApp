@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/menu_alerts.xml — Geofence alerts + TFR overlay -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_tfr_overlay"
+        android:title="TFR Overlay"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_alert_sound"
+        android:title="Alert Sound"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_alert_distance"
+        android:title="Alert Distance…"
+        app:showAsAction="never" />
+
+</menu>

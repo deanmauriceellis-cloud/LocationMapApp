@@ -132,9 +132,17 @@ class MainActivity : AppCompatActivity() {
 
     // Weather auto-fetch
     private var weatherMenuItem: android.view.MenuItem? = null
+    private var weatherIconView: ImageView? = null
+    private var alertsIconView: ImageView? = null
     private var lastWeatherFetchTime: Long = 0L
     private var weatherAutoFetchJob: Job? = null
     private val WEATHER_FETCH_INTERVAL_MS = 30 * 60 * 1000L  // 30 min
+
+    // TFR / Geofence
+    private val tfrOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
+    private var tfrReloadJob: Job? = null
+    private var pendingTfrRestore = false
+    private var alertPulseAnimation: android.view.animation.AlphaAnimation? = null
 
     // POI / vehicle label zoom threshold tracking
     private var poiLabelsShowing = false
@@ -221,23 +229,23 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // ── Toolbar ───────────────────────────────────────────────────────────
+        // ── Toolbar (two-row layout) ────────────────────────────────────────
         setSupportActionBar(binding.toolbar)
-        supportActionBar?.apply {
-            setDisplayShowTitleEnabled(true)
-            title = "LocationMap"   // short title to leave room for menu items
-        }
-        DebugLogger.i("MainActivity", "setSupportActionBar complete — title='LocationMap'")
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        DebugLogger.i("MainActivity", "setSupportActionBar complete — title hidden for two-row toolbar")
 
-        // ── Menu manager (Phase 1 — just wires intent, no items inflated yet) ─
+        // ── Menu manager — two-row toolbar with 10 icons ─────────────────────
         appBarMenuManager = AppBarMenuManager(
             context           = this,
             toolbar           = binding.toolbar,
             viewModel         = viewModel,
             menuEventListener = menuEventListenerImpl
         )
-        appBarMenuManager.setupToolbarMenus()
-        DebugLogger.i("MainActivity", "AppBarMenuManager.setupToolbarMenus() complete — waiting for onCreateOptionsMenu")
+        val row1 = binding.root.findViewById<LinearLayout>(R.id.toolbarRow1)
+        val row2 = binding.root.findViewById<LinearLayout>(R.id.toolbarRow2)
+        alertsIconView = appBarMenuManager.setupTwoRowToolbar(row1, row2)
+        weatherIconView = appBarMenuManager.findToolbarIcon(row1, row2, AppBarMenuManager.ICON_WEATHER)
+        DebugLogger.i("MainActivity", "Two-row toolbar wired — 10 icons")
 
         setupMap()
         buildFabSpeedDial()
@@ -251,29 +259,9 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "onCreate() complete")
     }
 
-    // ── Phase 2: items exist on toolbar NOW — wire click handlers ─────────────
+    // Two-row toolbar is set up in onCreate() — no menu inflation needed.
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        DebugLogger.i("MainActivity", "onCreateOptionsMenu() — inflating menu_main_toolbar")
-        menuInflater.inflate(R.menu.menu_main_toolbar, menu)
-        DebugLogger.i("MainActivity", "onCreateOptionsMenu() — ${menu.size()} items inflated:")
-        for (i in 0 until menu.size()) {
-            val item = menu.getItem(i)
-            DebugLogger.i("MainActivity", "  [$i] id=0x${item.itemId.toString(16)} " +
-                    "title='${item.title}' visible=${item.isVisible} enabled=${item.isEnabled}")
-        }
-        appBarMenuManager.onMenuInflated(menu)
-        weatherMenuItem = menu.findItem(R.id.menu_top_weather)
-        DebugLogger.i("MainActivity", "onCreateOptionsMenu() — onMenuInflated() called, click listeners wired")
-
-        // Set tooltips on toolbar action views (post so views are laid out)
-        binding.toolbar.post {
-            for (i in 0 until menu.size()) {
-                val item = menu.getItem(i)
-                val actionView = item.actionView ?: binding.toolbar.findViewById<View>(item.itemId)
-                actionView?.tooltipText = item.title
-            }
-        }
-
+        DebugLogger.i("MainActivity", "onCreateOptionsMenu() — skipped (using two-row toolbar)")
         return true
     }
 
@@ -348,6 +336,12 @@ class MainActivity : AppCompatActivity() {
         if (prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) {
             pendingWebcamRestore = true
             DebugLogger.i("MainActivity", "onStart() Webcam restore deferred — waiting for GPS fix")
+        }
+
+        // Defer TFR overlay restore until GPS fix
+        if (prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) {
+            pendingTfrRestore = true
+            DebugLogger.i("MainActivity", "onStart() TFR overlay restore deferred — waiting for GPS fix")
         }
 
         // Always load full cached POI coverage after GPS fix
@@ -573,6 +567,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 // Suppress webcam reloads while populate scanner is running
                 if (populateJob == null) scheduleWebcamReload()
+                scheduleTfrReload()
                 return false
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
@@ -580,6 +575,7 @@ class MainActivity : AppCompatActivity() {
                 scheduleAircraftReload()
                 scheduleBusStopReload()
                 if (populateJob == null) scheduleWebcamReload()
+                scheduleTfrReload()
                 // Hide transit markers when zoomed out to 10 or less
                 val zoom = binding.mapView.zoomLevelDouble
                 if (zoom <= 10.0) {
@@ -851,6 +847,12 @@ class MainActivity : AppCompatActivity() {
                 viewModel.fetchWeather(point.latitude, point.longitude)
             }
 
+            // ── 5b. Geofence check — if TFRs loaded, check user position ──
+            if (viewModel.geofenceEngine.getLoadedZoneCount() > 0) {
+                val bearing = update.bearing?.toDouble()
+                viewModel.checkGeofences(point.latitude, point.longitude, null, bearing)
+            }
+
             // ── 6. Deferred restores — always fire regardless of speed ──
             handleDeferredRestores(point)
 
@@ -955,6 +957,11 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "Followed aircraft update: ${state.callsign ?: state.icao24} at ${state.lat},${state.lon}")
             binding.mapView.controller.animateTo(state.toGeoPoint())
             showAircraftFollowBanner(state)
+            // Geofence check for followed aircraft (with altitude)
+            if (viewModel.geofenceEngine.getLoadedZoneCount() > 0) {
+                val altFt = state.baroAltitude?.let { it * 3.28084 }
+                viewModel.checkGeofences(state.lat, state.lon, altFt, state.track)
+            }
             // Grow the flight trail with the new position
             appendToFlightTrail(state)
             // Pre-fill POI cache at aircraft's current position
@@ -1053,6 +1060,19 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "MBTA bus stops update — ${stops.size} total stops loaded")
             allBusStops = stops
             refreshBusStopMarkersForViewport()
+        }
+        viewModel.tfrZones.observe(this) { zones ->
+            DebugLogger.i("MainActivity", "tfrZones → ${zones.size} TFRs")
+            renderTfrOverlays(zones)
+        }
+        viewModel.geofenceAlerts.observe(this) { alerts ->
+            DebugLogger.i("MainActivity", "geofenceAlerts → ${alerts.size}")
+            updateAlertsIcon(alerts)
+            // Show banner for CRITICAL/EMERGENCY
+            val critical = alerts.filter { it.severity.level >= com.example.locationmapapp.data.model.AlertSeverity.CRITICAL.level }
+            if (critical.isNotEmpty()) {
+                showGeofenceAlertBanner(critical.first())
+            }
         }
         DebugLogger.i("MainActivity", "observeViewModel() complete — all observers attached")
     }
@@ -1243,6 +1263,13 @@ class MainActivity : AppCompatActivity() {
             binding.mapView.postDelayed({
                 DebugLogger.i("MainActivity", "Webcam restore triggered — loading for visible area")
                 loadWebcamsForVisibleArea()
+            }, 2000)
+        }
+        if (pendingTfrRestore) {
+            pendingTfrRestore = false
+            binding.mapView.postDelayed({
+                DebugLogger.i("MainActivity", "TFR overlay restore triggered — loading for visible area")
+                loadTfrsForVisibleArea()
             }, 2000)
         }
     }
@@ -1768,6 +1795,245 @@ class MainActivity : AppCompatActivity() {
             delay(500)
             loadWebcamsForVisibleArea()
         }
+    }
+
+    // =========================================================================
+    // TFR OVERLAYS + GEOFENCE ALERTS
+    // =========================================================================
+
+    private fun loadTfrsForVisibleArea() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) return
+        val bb = binding.mapView.boundingBox
+        viewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+    }
+
+    /** Debounced: reload TFRs 500ms after scrolling/zooming stops. */
+    private fun scheduleTfrReload() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) return
+        tfrReloadJob?.cancel()
+        tfrReloadJob = lifecycleScope.launch {
+            delay(500)
+            loadTfrsForVisibleArea()
+        }
+    }
+
+    /** Render TFR zones as semi-transparent red polygons on the map. */
+    private fun renderTfrOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
+        clearTfrOverlays()
+        for (zone in zones) {
+            for (shape in zone.shapes) {
+                if (shape.points.size < 3) continue
+                val polygon = org.osmdroid.views.overlay.Polygon(binding.mapView).apply {
+                    fillPaint.color = Color.argb(40, 244, 67, 54)   // semi-transparent red
+                    outlinePaint.color = Color.parseColor("#F44336")
+                    outlinePaint.strokeWidth = 3f
+                    title = zone.notam
+                    snippet = "${zone.type} — ${zone.description}".take(200)
+                    relatedObject = zone
+                    // Convert [lon, lat] points to GeoPoints
+                    val geoPoints = shape.points.map { GeoPoint(it[1], it[0]) }
+                    points = geoPoints
+                    setOnClickListener { _, _, _ ->
+                        showTfrDetailDialog(zone)
+                        true
+                    }
+                }
+                // Insert behind markers but above MapEventsOverlay
+                val insertPos = minOf(1, binding.mapView.overlays.size)
+                binding.mapView.overlays.add(insertPos, polygon)
+                tfrOverlays.add(polygon)
+            }
+        }
+        binding.mapView.invalidate()
+        DebugLogger.i("MainActivity", "Rendered ${tfrOverlays.size} TFR polygon overlays from ${zones.size} zones")
+    }
+
+    private fun clearTfrOverlays() {
+        for (overlay in tfrOverlays) {
+            binding.mapView.overlays.remove(overlay)
+        }
+        tfrOverlays.clear()
+        binding.mapView.invalidate()
+    }
+
+    /** Show TFR detail dialog when user taps a TFR polygon. */
+    @SuppressLint("SetTextI18n")
+    private fun showTfrDetailDialog(zone: com.example.locationmapapp.data.model.TfrZone) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            setPadding(dp(16), dp(12), dp(16), dp(16))
+        }
+
+        // Red color bar
+        root.addView(View(this).apply {
+            setBackgroundColor(Color.parseColor("#D32F2F"))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)).apply {
+                bottomMargin = dp(12)
+            }
+        })
+
+        // NOTAM number
+        root.addView(TextView(this).apply {
+            text = zone.notam
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        })
+
+        // Type
+        if (zone.type.isNotBlank()) {
+            root.addView(TextView(this).apply {
+                text = zone.type
+                textSize = 14f
+                setTextColor(Color.parseColor("#FF5252"))
+                setPadding(0, dp(4), 0, 0)
+            })
+        }
+
+        // Description
+        if (zone.description.isNotBlank()) {
+            root.addView(TextView(this).apply {
+                text = zone.description
+                textSize = 13f
+                setTextColor(Color.parseColor("#CCCCCC"))
+                setPadding(0, dp(8), 0, 0)
+            })
+        }
+
+        // Altitude ranges
+        val altText = zone.shapes.joinToString("\n") { s ->
+            "  ${s.floorAltFt} ft — ${s.ceilingAltFt} ft (${s.type})"
+        }
+        if (altText.isNotBlank()) {
+            root.addView(TextView(this).apply {
+                text = "Altitude:"
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setPadding(0, dp(12), 0, dp(2))
+            })
+            root.addView(TextView(this).apply {
+                text = altText
+                textSize = 12f
+                setTextColor(Color.parseColor("#BBBBBB"))
+            })
+        }
+
+        // Effective / Expire dates
+        fun addInfoRow(label: String, value: String) {
+            if (value.isBlank()) return
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(4), 0, 0) }
+            row.addView(TextView(this).apply {
+                text = "$label: "
+                textSize = 12f
+                setTextColor(Color.parseColor("#999999"))
+            })
+            row.addView(TextView(this).apply {
+                text = value
+                textSize = 12f
+                setTextColor(Color.WHITE)
+            })
+            root.addView(row)
+        }
+        addInfoRow("Effective", zone.effectiveDate)
+        addInfoRow("Expires", zone.expireDate)
+        addInfoRow("Facility", zone.facility)
+        addInfoRow("State", zone.state)
+
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        dialog.setContentView(root)
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            setLayout(
+                (resources.displayMetrics.widthPixels * 0.85).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        dialog.show()
+    }
+
+    /** Update alerts icon color based on alert severity. */
+    private fun updateAlertsIcon(alerts: List<com.example.locationmapapp.data.model.GeofenceAlert>) {
+        val iv = alertsIconView ?: return
+
+        // Stop any running pulse animation
+        alertPulseAnimation?.cancel()
+        iv.clearAnimation()
+
+        if (alerts.isEmpty()) {
+            iv.imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+            return
+        }
+
+        val maxSeverity = alerts.maxByOrNull { it.severity.level }?.severity
+            ?: com.example.locationmapapp.data.model.AlertSeverity.INFO
+
+        val color = when (maxSeverity) {
+            com.example.locationmapapp.data.model.AlertSeverity.INFO -> Color.parseColor("#2196F3")       // Blue
+            com.example.locationmapapp.data.model.AlertSeverity.WARNING -> Color.parseColor("#FFC107")    // Yellow
+            com.example.locationmapapp.data.model.AlertSeverity.CRITICAL -> Color.parseColor("#F44336")   // Red
+            com.example.locationmapapp.data.model.AlertSeverity.EMERGENCY -> Color.parseColor("#F44336")  // Red + pulse
+        }
+
+        iv.imageTintList = android.content.res.ColorStateList.valueOf(color)
+
+        // Pulsing animation for EMERGENCY
+        if (maxSeverity == com.example.locationmapapp.data.model.AlertSeverity.EMERGENCY) {
+            val pulse = android.view.animation.AlphaAnimation(1.0f, 0.3f).apply {
+                duration = 500
+                repeatCount = android.view.animation.Animation.INFINITE
+                repeatMode = android.view.animation.Animation.REVERSE
+            }
+            alertPulseAnimation = pulse
+            iv.startAnimation(pulse)
+        }
+    }
+
+    /** Show a red banner at top of map for critical geofence alerts. */
+    @SuppressLint("SetTextI18n")
+    private fun showGeofenceAlertBanner(alert: com.example.locationmapapp.data.model.GeofenceAlert) {
+        // Remove existing follow banner if present
+        followBanner?.let { (it.parent as? ViewGroup)?.removeView(it) }
+
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val banner = TextView(this).apply {
+            val altText = if (alert.distanceNm != null && alert.distanceNm > 0) " — %.1f NM".format(alert.distanceNm) else ""
+            text = "\u26A0 TFR Alert: ${alert.zoneName}\n${alert.description.take(100)}$altText"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#DDD32F2F"))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            maxLines = 3
+            setOnClickListener {
+                // Dismiss banner and find TFR zone to show detail
+                (parent as? ViewGroup)?.removeView(this)
+                followBanner = null
+                val zone = viewModel.tfrZones.value?.find { it.id == alert.zoneId }
+                if (zone != null) showTfrDetailDialog(zone)
+            }
+        }
+
+        val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            anchorId = R.id.appBarLayout
+            anchorGravity = android.view.Gravity.BOTTOM
+            gravity = android.view.Gravity.TOP
+        }
+
+        (binding.root as ViewGroup).addView(banner, params)
+        followBanner = banner
+        DebugLogger.i("MainActivity", "Geofence alert banner shown: ${alert.alertType} ${alert.zoneName}")
     }
 
     @android.annotation.SuppressLint("SetJavaScriptEnabled")
@@ -4073,7 +4339,6 @@ class MainActivity : AppCompatActivity() {
      * When alerts exist, draws the icon inside a red rounded-rect border.
      */
     private fun updateWeatherToolbarIcon(data: com.example.locationmapapp.data.model.WeatherData?) {
-        val menuItem = weatherMenuItem ?: return
         if (data == null) return
 
         val current = data.current
@@ -4084,35 +4349,67 @@ class MainActivity : AppCompatActivity() {
         }
 
         val hasAlerts = data.alerts.isNotEmpty()
-        if (!hasAlerts) {
-            menuItem.setIcon(iconRes)
+
+        // Update ImageView (two-row toolbar)
+        val iv = weatherIconView
+        if (iv != null) {
+            if (!hasAlerts) {
+                iv.setImageResource(iconRes)
+                iv.imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                iv.background = run {
+                    val ripple = android.util.TypedValue()
+                    theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, ripple, true)
+                    ContextCompat.getDrawable(this, ripple.resourceId)
+                }
+            } else {
+                // Draw icon with red alert border
+                val size = (24 * resources.displayMetrics.density).toInt()
+                val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor("#D32F2F")
+                    style = Paint.Style.STROKE
+                    strokeWidth = 2f * resources.displayMetrics.density
+                }
+                val inset = borderPaint.strokeWidth / 2f
+                val r = 3f * resources.displayMetrics.density
+                canvas.drawRoundRect(RectF(inset, inset, size - inset, size - inset), r, r, borderPaint)
+                val drawable = ContextCompat.getDrawable(this, iconRes)
+                if (drawable != null) {
+                    val pad = (4 * resources.displayMetrics.density).toInt()
+                    drawable.setBounds(pad, pad, size - pad, size - pad)
+                    drawable.draw(canvas)
+                }
+                iv.setImageDrawable(android.graphics.drawable.BitmapDrawable(resources, bmp))
+                iv.imageTintList = null
+            }
             return
         }
 
-        // Draw icon with red alert border
-        val size = (24 * resources.displayMetrics.density).toInt()
-        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-
-        // Draw red rounded-rect border
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#D32F2F")
-            style = Paint.Style.STROKE
-            strokeWidth = 2f * resources.displayMetrics.density
+        // Fallback: update MenuItem if ImageView not available
+        val menuItem = weatherMenuItem ?: return
+        if (!hasAlerts) {
+            menuItem.setIcon(iconRes)
+        } else {
+            val size = (24 * resources.displayMetrics.density).toInt()
+            val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#D32F2F")
+                style = Paint.Style.STROKE
+                strokeWidth = 2f * resources.displayMetrics.density
+            }
+            val inset = borderPaint.strokeWidth / 2f
+            val r = 3f * resources.displayMetrics.density
+            canvas.drawRoundRect(RectF(inset, inset, size - inset, size - inset), r, r, borderPaint)
+            val drawable = ContextCompat.getDrawable(this, iconRes)
+            if (drawable != null) {
+                val pad = (4 * resources.displayMetrics.density).toInt()
+                drawable.setBounds(pad, pad, size - pad, size - pad)
+                drawable.draw(canvas)
+            }
+            menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, bmp)
         }
-        val inset = borderPaint.strokeWidth / 2f
-        val r = 3f * resources.displayMetrics.density
-        canvas.drawRoundRect(RectF(inset, inset, size - inset, size - inset), r, r, borderPaint)
-
-        // Draw the weather icon inside
-        val drawable = ContextCompat.getDrawable(this, iconRes)
-        if (drawable != null) {
-            val pad = (4 * resources.displayMetrics.density).toInt()
-            drawable.setBounds(pad, pad, size - pad, size - pad)
-            drawable.draw(canvas)
-        }
-
-        menuItem.icon = android.graphics.drawable.BitmapDrawable(resources, bmp)
     }
 
     /**
@@ -6014,6 +6311,36 @@ class MainActivity : AppCompatActivity() {
             toggleLocationMode()
         }
 
+        // ── Alerts / Geofence ─────────────────────────────────────────────────
+
+        override fun onAlertsRequested() {
+            DebugLogger.i("MainActivity", "onAlertsRequested")
+            val anchor = alertsIconView ?: binding.toolbar
+            appBarMenuManager.showAlertsMenu(anchor)
+        }
+
+        override fun onTfrOverlayToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onTfrOverlayToggled: $enabled")
+            if (enabled) {
+                loadTfrsForVisibleArea()
+                toast("Loading TFRs…")
+            } else {
+                viewModel.clearTfrs()
+                clearTfrOverlays()
+            }
+        }
+
+        override fun onAlertSoundToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onAlertSoundToggled: $enabled")
+            toast(if (enabled) "Alert sounds enabled" else "Alert sounds disabled")
+        }
+
+        override fun onAlertDistanceChanged(nm: Int) {
+            DebugLogger.i("MainActivity", "onAlertDistanceChanged: ${nm}nm")
+            viewModel.geofenceEngine.proximityThresholdNm = nm.toDouble()
+            toast("Alert distance: $nm NM")
+        }
+
         // ── Find / Legend ─────────────────────────────────────────────────────
 
         override fun onFindRequested() {
@@ -6112,7 +6439,16 @@ class MainActivity : AppCompatActivity() {
                     "alerts" to w.alerts.map { it.event },
                     "fetchedAt" to w.fetchedAt
                 )
-            }
+            },
+            "tfr" to mapOf(
+                "tfrCount" to (viewModel.tfrZones.value?.size ?: 0),
+                "tfrOverlays" to tfrOverlays.size,
+                "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
+                "activeAlerts" to (viewModel.geofenceAlerts.value?.size ?: 0),
+                "alertSeverity" to (viewModel.geofenceAlerts.value
+                    ?.maxByOrNull { it.severity.level }?.severity?.name ?: "NONE"),
+                "activeZones" to viewModel.geofenceEngine.getActiveZones()
+            )
         )
     }
 

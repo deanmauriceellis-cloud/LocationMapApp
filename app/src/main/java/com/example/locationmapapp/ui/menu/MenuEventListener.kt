@@ -140,6 +140,22 @@ interface MenuEventListener {
     fun onSilentFillDebugToggled(enabled: Boolean)
 
     // =========================================================================
+    // ALERTS / GEOFENCE
+    // =========================================================================
+
+    /** Open the alerts popup menu. */
+    fun onAlertsRequested()
+
+    /** TFR overlay display on map. */
+    fun onTfrOverlayToggled(enabled: Boolean)
+
+    /** Audible alert sounds for geofence events. */
+    fun onAlertSoundToggled(enabled: Boolean)
+
+    /** Proximity warning distance in nautical miles. */
+    fun onAlertDistanceChanged(nm: Int)
+
+    // =========================================================================
     // FIND / LEGEND
     // =========================================================================
 

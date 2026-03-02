@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- toolbar_two_row.xml — 2×5 icon grid inside the Toolbar -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/toolbarTwoRowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Row 1: Weather | Transit | CAMs | Air | Radar -->
+    <LinearLayout
+        android:id="@+id/toolbarRow1"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical" />
+
+    <!-- Row 2: POI | Utility | Find | GoTo | Alerts -->
+    <LinearLayout
+        android:id="@+id/toolbarRow2"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical" />
+
+</LinearLayout>
