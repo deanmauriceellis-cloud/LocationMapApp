@@ -1,5 +1,33 @@
 # LocationMapApp — Changelog
 
+## [1.5.38] — 2026-03-02
+
+### Added
+- **Geofence Phase 3B — 3 additional downloadable databases** using Phase 3A infrastructure
+  - **Speed & Red-Light Cameras** (`excam-cameras.db`): 109,500 worldwide cameras from WzSabre/ExCam dataset, 200m alert radius, SPEED_CAMERA zones
+  - **US Public Schools** (`nces-schools.db`): 101,390 K-12 schools from NCES EDGE ArcGIS, 300m school zone radius, SCHOOL_ZONE zones
+  - **DJI No-Fly Zones** (`dji-nofly.db`): 7,823 drone restriction zones from DJI NFZDB, variable radius from data, NO_FLY_ZONE zones (severity CRITICAL)
+- **`build-excam.js`** — downloads XZ-compressed NDJSON from wzsabre.rocks, decompresses with `lzma-native`, parses camera records with flag→type mapping
+- **`build-nces.js`** — paginated ArcGIS REST fetch (101 batches of 1000), extracts grades/enrollment/charter/school-level metadata
+- **`build-dji-nofly.js`** — downloads CSV from GitHub, quoted-field CSV parser, maps DJI type/level codes to human-readable labels
+- **`lzma-native`** npm dependency for XZ decompression (build-excam.js)
+
+### Notes
+- No app-side code changes — Database Manager auto-discovers new catalog entries
+- All ZoneTypes (SPEED_CAMERA, SCHOOL_ZONE, NO_FLY_ZONE) already handled by Phase 2 + 3A infrastructure
+- Catalog now lists 4 databases totaling 220,657 zones
+
+## [1.5.37] — 2026-03-02
+
+### Added
+- **Geofence Phase 3A — Downloadable database infrastructure**
+  - **`GeofenceDatabaseRepository.kt`** — catalog fetch, file download with progress, SQLite loading into GeofenceEngine
+  - **Database Manager dialog** — list available databases with download/delete actions, progress bar
+  - **`build-military.js`** — ArcGIS NTAD military base boundaries builder (1,944 polygon zones)
+  - **Proxy endpoints**: `GET /geofences/catalog` (enriched from catalog.json), `GET /geofences/database/:id/download`
+  - **3 new ZoneTypes**: MILITARY_BASE, NO_FLY_ZONE, NATIONAL_PARK with overlay colors and alert banners
+  - All when-blocks updated for 8 zone types (severity, colors, banners)
+
 ## [1.5.36] — 2026-03-02
 
 ### Added

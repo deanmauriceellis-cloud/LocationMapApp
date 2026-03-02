@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 36 (Geofence Phase 2 — Additional Zone Types)
+## Last Updated: 2026-03-02 Session 38 (Geofence Phase 3B — Additional Database Builders)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -209,6 +209,18 @@
   - **GPS integration**: user GPS checks geofence (no altitude); followed aircraft checks with baroAltitude
   - **Alerts menu**: TFR Overlay (ON), Speed Camera/School Zone/Flood Zone/Railroad Crossing toggles (OFF), Alert Sound, Alert Distance
   - Debug: `/geofences`, `/geofences/alerts` endpoints; `geofences` field in `/state` with per-type counts
+- **Downloadable Geofence Databases** (v1.5.37-38) — offline SQLite databases for pre-built zone data
+  - **Database Manager dialog**: Alerts menu → "Zone Databases", shows catalog with download/delete per database
+  - **`GeofenceDatabaseRepository.kt`**: catalog fetch, file download with progress callback, SQLite zone loading
+  - **Proxy endpoints**: `GET /geofences/catalog` (enriched with file sizes), `GET /geofences/database/:id/download`
+  - **4 databases** (220,657 zones total):
+    - `military-bases.db`: 1,944 US military installation polygon boundaries (MILITARY_BASE, severity 2)
+    - `excam-cameras.db`: 109,500 worldwide speed/red-light cameras (SPEED_CAMERA, severity 1, 200m radius)
+    - `nces-schools.db`: 101,390 US K-12 public schools (SCHOOL_ZONE, severity 1, 300m radius)
+    - `dji-nofly.db`: 7,823 DJI drone no-fly zones (NO_FLY_ZONE, severity 2, variable radius)
+  - **Build scripts**: `build-military.js` (ArcGIS polygon), `build-excam.js` (XZ/NDJSON), `build-nces.js` (ArcGIS point), `build-dji-nofly.js` (CSV)
+  - Auto-updates `catalog.json` with actual zone counts and file sizes after each build
+  - `lzma-native` npm dependency for XZ decompression (ExCam cameras)
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
@@ -248,6 +260,8 @@
 | Schools | `http://10.0.0.4:3000/schools?bbox=...` | GET /schools?bbox=s,w,n,e | 24 hours |
 | Flood Zones | `http://10.0.0.4:3000/flood-zones?bbox=...` | GET /flood-zones?bbox=s,w,n,e | 30 days |
 | Railroad Crossings | `http://10.0.0.4:3000/crossings?bbox=...` | GET /crossings?bbox=s,w,n,e | 7 days |
+| Geofence Catalog | `http://10.0.0.4:3000/geofences/catalog` | GET /geofences/catalog | live (from catalog.json) |
+| Geofence DB Download | `http://10.0.0.4:3000/geofences/database/:id/download` | GET /geofences/database/:id/download | static file |
 | Geocode | `http://10.0.0.4:3000/geocode?q=...` | GET /geocode?q=&limit= | 24 hours |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
@@ -286,8 +300,14 @@
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
 - `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings fetch
+- `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog, download, SQLite loading
 - `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
 - `cache-proxy/server.js` — Express caching proxy
+- `cache-proxy/geofence-databases/catalog.json` — geofence database catalog (4 databases)
+- `cache-proxy/geofence-databases/build-military.js` — military base polygon builder (ArcGIS NTAD)
+- `cache-proxy/geofence-databases/build-excam.js` — speed/red-light camera builder (WzSabre XZ/NDJSON)
+- `cache-proxy/geofence-databases/build-nces.js` — US public school builder (NCES ArcGIS)
+- `cache-proxy/geofence-databases/build-dji-nofly.js` — DJI no-fly zone builder (GitHub CSV)
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
 - `cache-proxy/poi-cache.json` — individual POI cache, deduped by type+id (gitignored)
@@ -459,8 +479,9 @@ overnight-runs/YYYY-MM-DD_HHMM/
 **See `PLAN.md` for full details.** Current status:
 - Phase 1: Core Engine + TFRs — **DONE** (v1.5.35)
 - Phase 2: Additional Zone Types — **DONE** (v1.5.36)
-- Phase 3: Downloadable Databases — **NEXT** (SQLite schema, proxy catalog, Database Manager dialog)
-- Phase 4: User-Created Databases + Distribution
+- Phase 3A: Downloadable Database Infrastructure — **DONE** (v1.5.37)
+- Phase 3B: Additional Database Builders — **DONE** (v1.5.38)
+- Phase 4: User-Created Databases + Distribution — **NEXT**
 - Phase 5: Advanced Sources
 
 ## Other Next Steps
