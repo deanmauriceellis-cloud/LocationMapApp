@@ -1,11 +1,15 @@
-# LocationMapApp — Active Plan: Geofence Alert System
+# LocationMapApp — Geofence Alert System Plan (COMPLETED)
 
 ## Origin
 Planned in session `54ff08bd` (2026-03-01 23:14). Research covered 40+ data sources, JTS spatial indexing, alert severity levels, database distribution formats, and UI concepts. Full research report is in that session's JSONL.
 
-## 5-Phase Roadmap
+## Status: COMPLETED (v1.5.35–v1.5.39)
 
-### Phase 1 — Core Engine + TFRs (DONE v1.5.35)
+All planned phases delivered. The geofence system provides a JTS R-tree spatial engine, 5 live zone types with map overlays, 4 pre-built downloadable databases (220k+ zones), and user import/export of custom databases. Phase 5 (Advanced Sources) was evaluated and deferred — the current source coverage is sufficient and adding more would be complexity without clear user need.
+
+## Final Phase Summary
+
+### Phase 1 — Core Engine + TFRs (v1.5.35)
 - JTS `jts-core:1.19.0` R-tree spatial engine (`GeofenceEngine.kt`)
 - FAA TFR scraping via proxy `/tfrs?bbox=` (cheerio + fast-xml-parser)
 - Semi-transparent red TFR polygon overlays on map
@@ -17,67 +21,45 @@ Planned in session `54ff08bd` (2026-03-01 23:14). Research covered 40+ data sour
 - Debug endpoints: `/geofences`, `/geofences/alerts`
 - Alert Sound toggle (stub — pref exists, no playback), Alert Distance pref
 
-### Phase 2 — Additional Zone Types (DONE v1.5.36)
-- Original plan called this "Real-Time Alert Sources" (earthquakes, wildfires, AQI)
-- User chose "Additional Zone Types" scope instead
+### Phase 2 — Additional Zone Types (v1.5.36)
 - 4 new zone types all feeding into same GeofenceEngine spatial index:
   - **Speed Cameras**: Overpass `highway=speed_camera`, 200m alert circle, orange overlays, 24h cache
   - **School Zones**: Overpass `amenity=school`, polygon or 300m circle, amber overlays, 24h cache, weekday 7-9AM/2-4PM filter
   - **Flood Zones**: FEMA NFHL ArcGIS Layer 28, high-risk SFHA, blue overlays, 30-day cache
   - **Railroad Crossings**: Overpass `railway=level_crossing`, 100m circle, dark+yellow overlays, 7-day cache
-- `ZoneType` enum, `GeofenceRepository.kt` (NEW), per-type LiveData, `rebuildGeofenceIndex()`
+- `ZoneType` enum, `GeofenceRepository.kt`, per-type LiveData, `rebuildGeofenceIndex()`
 - 4 proxy endpoints: `/cameras`, `/schools`, `/flood-zones`, `/crossings`
 - Zone-type-aware UI: detail dialog adapts color bar + metadata; alert banner color per type
 - Zoom guards: cameras ≥10, schools/flood/crossings ≥12
 - Alerts menu: 4 new toggles (all default OFF)
 
-### Phase 3A — Downloadable Databases: Foundation + Military Bases (DONE v1.5.37)
+### Phase 3A — Downloadable Databases: Foundation + Military Bases (v1.5.37)
 - **SQLite database format**: `zones` table (geometry JSON, bbox columns, severity, metadata), `db_meta` table (version, source, license)
-- **`GeofenceDatabaseRepository.kt`** (NEW): catalog fetch, streaming download with progress, SQLite bbox queries, installed database management
-- **Proxy catalog + download endpoints**:
-  - `GET /geofences/catalog` — available database catalog with actual file sizes
-  - `GET /geofences/database/:id/download` — streams `.db` file with Content-Disposition
-- **Military Bases database**: 824 MIRTA/NTAD features → 1944 polygon zones (multi-polygons split), 27MB SQLite
-  - Source: ArcGIS NTAD Military Bases feature service (HIFLD/data.gov, Public Domain)
-  - `build-military.js` — downloads GeoJSON from ArcGIS, builds SQLite with bbox index
-- **Database Manager dialog**: Alerts menu → "Zone Databases…" → dark 90%×85% dialog
-  - Installed section (name, stats, UP TO DATE/UPDATE/DELETE buttons)
-  - Available section (name, description, stats, DOWNLOAD button with progress)
-- **New ZoneTypes**: `MILITARY_BASE`, `NO_FLY_ZONE`, `CUSTOM` added to enum
-- **GeofenceDatabaseInfo** data class for catalog entries
-- **Green polygon overlays** for military bases, purple for no-fly, gray for custom
-- **All `when` blocks** updated: severity mapping, detail dialog colors, alert banner labels/colors
-- **ViewModel**: `_databaseZones` LiveData, `loadDatabaseZonesForVisibleArea()`, `fetchGeofenceCatalog()`, `downloadGeofenceDatabase()`, `deleteGeofenceDatabase()`, `hasInstalledDatabases()`
-- **Viewport reload**: database zones reload on scroll/zoom via `scheduleGeofenceReload()`
-- **Debug state**: `databaseCount` + `database` overlay count in `/geofences` endpoint
-- Storage: `filesDir/geofence_databases/{id}.db`
+- **`GeofenceDatabaseRepository.kt`**: catalog fetch, streaming download with progress, SQLite bbox queries, installed database management
+- **Proxy catalog + download endpoints**: `GET /geofences/catalog`, `GET /geofences/database/:id/download`
+- **Military Bases database**: 824 MIRTA/NTAD features → 1,944 polygon zones, 27MB SQLite
+- **Database Manager dialog**: Alerts menu → "Zone Databases…" → installed/available sections with download/delete
+- **New ZoneTypes**: `MILITARY_BASE`, `NO_FLY_ZONE`, `CUSTOM`
+- Green polygon overlays for military bases, purple for no-fly, gray for custom
 
-### Phase 3B — Additional Database Builders (NEXT)
+### Phase 3B — Additional Database Builders (v1.5.38)
+- **Speed & Red-Light Cameras** (`excam-cameras.db`): 109,500 worldwide cameras from WzSabre/ExCam
+- **US Public Schools** (`nces-schools.db`): 101,390 K-12 schools from NCES EDGE ArcGIS
+- **DJI No-Fly Zones** (`dji-nofly.db`): 7,823 drone restriction zones from DJI NFZDB
+- Build scripts: `build-excam.js`, `build-nces.js`, `build-dji-nofly.js`
+- 4 databases totaling 220,657 zones
 
-#### Key Data Sources for Phase 3
-| Source | Data | Format | Access |
-|--------|------|--------|--------|
-| WzSabre ExCam | 100k+ speed/red-light cameras | JSON-lines/XZ | `wzsabre.rocks/cameras` (free) |
-| NCES School Locations | ~130k US public schools | SHP/GeoJSON | Bulk download |
-| FRA Railroad Crossings | ~250k at-grade crossings | DBF/SHP/CSV | Bulk download |
-| Military Installations (MIRTA) | DoD base boundaries | SHP/GeoJSON | data.gov download |
-| DJI No-Fly Zones | Drone restriction zones | SQLite | GitHub static file (free) |
+### Phase 4 — Database Import & Export (v1.5.39)
+- **Import SQLite .db**: SAF file picker → schema validation → install with duplicate detection
+- **Import CSV**: SAF file picker → config dialog (name, zone type, radius) → parsed with column aliases → converted to SQLite
+- **Export**: installed databases shareable via FileProvider + Android share intent
+- **Local-only databases**: catalog merges locally-imported DBs not in remote catalog; works offline
+- Database Manager UI: IMPORT .DB / IMPORT CSV buttons, EXPORT button on installed cards
 
-### Phase 4 — User-Created Databases + Distribution
-- Create/edit zones on map (long-press to add polygon vertices)
-- Export as SQLite file
-- Import from file picker
-- Delta update system
-- Community sharing via proxy
+### Phase 5 — Advanced Sources (DEFERRED)
+Evaluated and deferred. Candidate sources (bridge weight limits, EPA facilities, NPS/BLM boundaries, real-time earthquakes/wildfires/AQI, commercial APIs) add complexity without clear immediate need. The existing 5 live zone types + 4 downloadable databases + user import/export provide comprehensive coverage. These sources can be revisited as individual features if a specific need arises.
 
-### Phase 5 — Advanced Sources
-- Bridge weight limits (National Bridge Inventory — 624k+ bridges), HOV lanes, construction zones (WZDx)
-- EPA facilities (TRI, Superfund, RCRA — 4M+ facilities), NPS/BLM boundaries
-- FEMA flood zones combined with real-time USGS gauge data
-- Commercial API evaluation: TomTom (freemium), HERE (250k tx/mo free), Geoapify speed limits (3k/day free)
-- Real-time sources deferred from Phase 2: USGS earthquakes, NIFC wildfires, AirNow AQI
-
-## Alert Severity Levels (from research)
+## Alert Severity Levels
 | Level | Color | Audio | Example |
 |-------|-------|-------|---------|
 | INFO (0) | Blue | None | Entering National Park |
@@ -89,4 +71,3 @@ Planned in session `54ff08bd` (2026-03-01 23:14). Research covered 40+ data sour
 - **JTS R-tree**: 10k polygons = <2ms per GPS update; 100k zones <10ms
 - **SQLite for distributable databases** (not SpatiaLite — too heavy): circles via center+radius columns, polygons via JSON/WKT text column, build JTS R-tree in memory at load
 - **Proxy serves catalog + downloads**: databases cached/distributed through existing proxy infrastructure
-- **Delta updates**: JSON patches when version gap <5; full snapshot for larger gaps

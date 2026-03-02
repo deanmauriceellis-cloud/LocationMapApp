@@ -482,14 +482,14 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - Memory: 9-27MB range, no trend upward
 - 0 test failures across entire run
 
-## Active Plan: Geofence Alert System (5 Phases)
-**See `PLAN.md` for full details.** Current status:
-- Phase 1: Core Engine + TFRs — **DONE** (v1.5.35)
-- Phase 2: Additional Zone Types — **DONE** (v1.5.36)
-- Phase 3A: Downloadable Database Infrastructure — **DONE** (v1.5.37)
-- Phase 3B: Additional Database Builders — **DONE** (v1.5.38)
-- Phase 4: Database Import & Export — **DONE** (v1.5.39)
-- Phase 5: Advanced Sources — **NEXT**
+## Completed Plan: Geofence Alert System (PLAN.md)
+Roadmap completed across v1.5.35–v1.5.39. See `PLAN.md` for full details.
+- Phase 1: Core Engine + TFRs (v1.5.35)
+- Phase 2: Additional Zone Types (v1.5.36)
+- Phase 3A: Downloadable Database Infrastructure (v1.5.37)
+- Phase 3B: Additional Database Builders (v1.5.38)
+- Phase 4: Database Import & Export (v1.5.39)
+- Phase 5: Advanced Sources — deferred (sufficient coverage with current sources)
 
 ## Other Next Steps
 - Monitor cache growth and hit rates over time
