@@ -5,6 +5,7 @@ import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.FindRepository
+import com.example.locationmapapp.data.repository.GeofenceDatabaseRepository
 import com.example.locationmapapp.data.repository.GeofenceRepository
 import com.example.locationmapapp.data.repository.TfrRepository
 import com.example.locationmapapp.data.repository.WebcamRepository
@@ -44,4 +45,7 @@ object AppModule {
 
     @Provides @Singleton
     fun provideGeofenceRepository(): GeofenceRepository = GeofenceRepository()
+
+    @Provides @Singleton
+    fun provideGeofenceDatabaseRepository(@ApplicationContext context: Context) = GeofenceDatabaseRepository(context)
 }

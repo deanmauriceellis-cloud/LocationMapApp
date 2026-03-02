@@ -167,6 +167,9 @@ interface MenuEventListener {
     /** Proximity warning distance in nautical miles. */
     fun onAlertDistanceChanged(nm: Int)
 
+    /** Open the geofence database manager dialog. */
+    fun onDatabaseManagerRequested()
+
     // =========================================================================
     // FIND / LEGEND
     // =========================================================================

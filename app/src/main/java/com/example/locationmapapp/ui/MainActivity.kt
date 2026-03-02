@@ -144,6 +144,7 @@ class MainActivity : AppCompatActivity() {
     private val schoolOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
     private val floodOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
     private val crossingOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
+    private val databaseOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
     private var geofenceReloadJob: Job? = null
     private var pendingGeofenceRestore = false
     private var alertPulseAnimation: android.view.animation.AlphaAnimation? = null
@@ -1090,6 +1091,10 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "crossingZones → ${zones.size}")
             renderCrossingOverlays(zones)
         }
+        viewModel.databaseZones.observe(this) { zones ->
+            DebugLogger.i("MainActivity", "databaseZones → ${zones.size}")
+            renderDatabaseOverlays(zones)
+        }
         viewModel.geofenceAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "geofenceAlerts → ${alerts.size}")
             updateAlertsIcon(alerts)
@@ -1854,6 +1859,10 @@ class MainActivity : AppCompatActivity() {
         if (prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false) && zoom >= 12) {
             viewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
         }
+        // Load database zones (offline SQLite databases)
+        if (viewModel.hasInstalledDatabases()) {
+            viewModel.loadDatabaseZonesForVisibleArea(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        }
     }
 
     /** Debounced: reload geofence zones 500ms after scrolling/zooming stops. */
@@ -1864,6 +1873,7 @@ class MainActivity : AppCompatActivity() {
             || prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false)
             || prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false)
             || prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false)
+            || viewModel.hasInstalledDatabases()
         if (!anyEnabled) return
         geofenceReloadJob?.cancel()
         geofenceReloadJob = lifecycleScope.launch {
@@ -1923,6 +1933,31 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "Rendered ${crossingOverlays.size} crossing overlays from ${zones.size} zones")
     }
 
+    // ── Database overlays ──────────────────────────────────────────────────
+
+    private fun renderDatabaseOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
+        clearOverlayList(databaseOverlays)
+        for (zone in zones) {
+            for (shape in zone.shapes) {
+                if (shape.points.size < 3) continue
+                val (fillColor, outlineColor) = when (zone.zoneType) {
+                    com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE ->
+                        Color.argb(40, 76, 175, 80) to Color.parseColor("#4CAF50")
+                    com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE ->
+                        Color.argb(40, 156, 39, 176) to Color.parseColor("#9C27B0")
+                    else ->
+                        Color.argb(35, 158, 158, 158) to Color.parseColor("#9E9E9E")
+                }
+                val polygon = buildZonePolygon(zone, shape, fillColor, outlineColor)
+                val insertPos = minOf(1, binding.mapView.overlays.size)
+                binding.mapView.overlays.add(insertPos, polygon)
+                databaseOverlays.add(polygon)
+            }
+        }
+        binding.mapView.invalidate()
+        DebugLogger.i("MainActivity", "Rendered ${databaseOverlays.size} database overlays from ${zones.size} zones")
+    }
+
     // ── Shared overlay helpers ───────────────────────────────────────────────
 
     private fun renderZoneOverlays(
@@ -1978,10 +2013,234 @@ class MainActivity : AppCompatActivity() {
     private fun clearSchoolOverlays() = clearOverlayList(schoolOverlays)
     private fun clearFloodOverlays() = clearOverlayList(floodOverlays)
     private fun clearCrossingOverlays() = clearOverlayList(crossingOverlays)
+    private fun clearDatabaseOverlays() = clearOverlayList(databaseOverlays)
 
     private fun clearAllGeofenceOverlays() {
         clearTfrOverlays(); clearCameraOverlays(); clearSchoolOverlays()
-        clearFloodOverlays(); clearCrossingOverlays()
+        clearFloodOverlays(); clearCrossingOverlays(); clearDatabaseOverlays()
+    }
+
+    // ── Database Manager Dialog ────────────────────────────────────────────
+
+    @SuppressLint("SetTextI18n")
+    private fun showDatabaseManagerDialog() {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            setPadding(dp(16), dp(12), dp(16), dp(16))
+        }
+
+        // Title
+        root.addView(TextView(this).apply {
+            text = "Zone Databases"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, dp(12))
+        })
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val contentLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Loading indicator
+        val loadingText = TextView(this).apply {
+            text = "Loading catalog…"
+            textSize = 14f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        contentLayout.addView(loadingText)
+
+        scrollView.addView(contentLayout)
+        root.addView(scrollView)
+
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setView(root)
+            .create()
+
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            val wlp = attributes
+            wlp.width = (resources.displayMetrics.widthPixels * 0.90).toInt()
+            wlp.height = (resources.displayMetrics.heightPixels * 0.85).toInt()
+            attributes = wlp
+        }
+
+        // Observe catalog
+        val observer = object : androidx.lifecycle.Observer<List<com.example.locationmapapp.data.model.GeofenceDatabaseInfo>> {
+            override fun onChanged(catalog: List<com.example.locationmapapp.data.model.GeofenceDatabaseInfo>) {
+                contentLayout.removeAllViews()
+                val installed = catalog.filter { it.installed }
+                val available = catalog.filter { !it.installed }
+
+                if (installed.isNotEmpty()) {
+                    contentLayout.addView(TextView(this@MainActivity).apply {
+                        text = "INSTALLED"
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#4CAF50"))
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setPadding(0, dp(4), 0, dp(8))
+                    })
+                    for (db in installed) {
+                        contentLayout.addView(buildDatabaseCard(db, dialog))
+                    }
+                }
+
+                if (available.isNotEmpty()) {
+                    contentLayout.addView(TextView(this@MainActivity).apply {
+                        text = "AVAILABLE"
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#64B5F6"))
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setPadding(0, dp(12), 0, dp(8))
+                    })
+                    for (db in available) {
+                        contentLayout.addView(buildDatabaseCard(db, dialog))
+                    }
+                }
+
+                if (catalog.isEmpty()) {
+                    contentLayout.addView(TextView(this@MainActivity).apply {
+                        text = "No databases available. Check proxy connection."
+                        textSize = 14f
+                        setTextColor(Color.parseColor("#AAAAAA"))
+                        setPadding(0, dp(8), 0, dp(8))
+                    })
+                }
+            }
+        }
+        viewModel.geofenceCatalog.observe(this, observer)
+        dialog.setOnDismissListener { viewModel.geofenceCatalog.removeObserver(observer) }
+
+        // Fetch catalog
+        viewModel.fetchGeofenceCatalog()
+
+        dialog.show()
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun buildDatabaseCard(
+        db: com.example.locationmapapp.data.model.GeofenceDatabaseInfo,
+        parentDialog: android.app.AlertDialog
+    ): LinearLayout {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#252525"))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+
+            // Name
+            addView(TextView(this@MainActivity).apply {
+                text = db.name
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            })
+
+            // Description
+            addView(TextView(this@MainActivity).apply {
+                text = db.description
+                textSize = 12f
+                setTextColor(Color.parseColor("#BBBBBB"))
+                setPadding(0, dp(2), 0, dp(4))
+            })
+
+            // Stats row
+            val sizeStr = if (db.fileSize > 1_048_576) "${db.fileSize / 1_048_576} MB"
+                         else "${db.fileSize / 1024} KB"
+            addView(TextView(this@MainActivity).apply {
+                text = "${db.zoneCount} zones · $sizeStr · v${db.version} · ${db.source}"
+                textSize = 11f
+                setTextColor(Color.parseColor("#999999"))
+            })
+
+            // Action buttons
+            val btnRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(8), 0, 0)
+            }
+
+            if (db.installed) {
+                // Update button (if newer version available)
+                if (db.version > db.installedVersion) {
+                    btnRow.addView(TextView(this@MainActivity).apply {
+                        text = "UPDATE"
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#64B5F6"))
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setPadding(0, dp(4), dp(16), dp(4))
+                        setOnClickListener {
+                            viewModel.downloadGeofenceDatabase(db.id)
+                            toast("Updating ${db.name}…")
+                        }
+                    })
+                } else {
+                    btnRow.addView(TextView(this@MainActivity).apply {
+                        text = "UP TO DATE"
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#4CAF50"))
+                        setPadding(0, dp(4), dp(16), dp(4))
+                    })
+                }
+
+                // Delete button
+                btnRow.addView(TextView(this@MainActivity).apply {
+                    text = "DELETE"
+                    textSize = 13f
+                    setTextColor(Color.parseColor("#FF5252"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, dp(4), 0, dp(4))
+                    setOnClickListener {
+                        viewModel.deleteGeofenceDatabase(db.id)
+                        clearDatabaseOverlays()
+                        toast("Deleted ${db.name}")
+                    }
+                })
+            } else {
+                // Download button
+                val downloadBtn = TextView(this@MainActivity).apply {
+                    text = "DOWNLOAD"
+                    textSize = 13f
+                    setTextColor(Color.parseColor("#64B5F6"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, dp(4), 0, dp(4))
+                    setOnClickListener {
+                        text = "DOWNLOADING…"
+                        setTextColor(Color.parseColor("#999999"))
+                        isEnabled = false
+                        viewModel.downloadGeofenceDatabase(db.id)
+                        toast("Downloading ${db.name}…")
+                    }
+                }
+                btnRow.addView(downloadBtn)
+
+                // Observe download progress for this db
+                viewModel.databaseDownloadProgress.observe(this@MainActivity) { progress ->
+                    if (progress != null && progress.first == db.id) {
+                        downloadBtn.text = "DOWNLOADING ${progress.second}%"
+                    }
+                }
+            }
+
+            addView(btnRow)
+        }
     }
 
     /** Show zone detail dialog — adapts content by zone type. */
@@ -2003,6 +2262,9 @@ class MainActivity : AppCompatActivity() {
             com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#FFC107"
             com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#2196F3"
             com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#FFC107"
+            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "#4CAF50"
+            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "#9C27B0"
+            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "#9E9E9E"
         }
         root.addView(View(this).apply {
             setBackgroundColor(Color.parseColor(barColor))
@@ -2026,6 +2288,9 @@ class MainActivity : AppCompatActivity() {
             com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#FFD54F"
             com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#64B5F6"
             com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#FFD54F"
+            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "#66BB6A"
+            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "#BA68C8"
+            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "#BDBDBD"
         }
         if (zone.type.isNotBlank()) {
             root.addView(TextView(this).apply {
@@ -2165,6 +2430,9 @@ class MainActivity : AppCompatActivity() {
             com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "School Zone:"
             com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "Flood Zone:"
             com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "RR Crossing:"
+            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "Military Base:"
+            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "No-Fly Zone:"
+            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "Zone Alert:"
         }
         val bannerColor = when (alert.zoneType) {
             com.example.locationmapapp.data.model.ZoneType.TFR -> "#DDD32F2F"
@@ -2172,6 +2440,9 @@ class MainActivity : AppCompatActivity() {
             com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#DDF57F17"
             com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#DD1565C0"
             com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#DD424242"
+            com.example.locationmapapp.data.model.ZoneType.MILITARY_BASE -> "#DD2E7D32"
+            com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> "#DD7B1FA2"
+            com.example.locationmapapp.data.model.ZoneType.CUSTOM -> "#DD616161"
         }
 
         val banner = TextView(this).apply {
@@ -6567,6 +6838,11 @@ class MainActivity : AppCompatActivity() {
             toast("Alert distance: $nm NM")
         }
 
+        override fun onDatabaseManagerRequested() {
+            DebugLogger.i("MainActivity", "onDatabaseManagerRequested")
+            showDatabaseManagerDialog()
+        }
+
         // ── Find / Legend ─────────────────────────────────────────────────────
 
         override fun onFindRequested() {
@@ -6672,12 +6948,14 @@ class MainActivity : AppCompatActivity() {
                 "schoolCount" to (viewModel.schoolZones.value?.size ?: 0),
                 "floodCount" to (viewModel.floodZones.value?.size ?: 0),
                 "crossingCount" to (viewModel.crossingZones.value?.size ?: 0),
+                "databaseCount" to (viewModel.databaseZones.value?.size ?: 0),
                 "overlays" to mapOf(
                     "tfr" to tfrOverlays.size,
                     "camera" to cameraOverlays.size,
                     "school" to schoolOverlays.size,
                     "flood" to floodOverlays.size,
-                    "crossing" to crossingOverlays.size
+                    "crossing" to crossingOverlays.size,
+                    "database" to databaseOverlays.size
                 ),
                 "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
                 "zoneCountByType" to viewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),

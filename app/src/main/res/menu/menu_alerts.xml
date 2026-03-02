@@ -44,4 +44,9 @@
         android:title="Alert Distance…"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_manage_databases"
+        android:title="Zone Databases…"
+        app:showAsAction="never" />
+
 </menu>

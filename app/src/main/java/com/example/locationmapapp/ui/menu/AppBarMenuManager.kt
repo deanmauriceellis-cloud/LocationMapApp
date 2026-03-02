@@ -567,6 +567,9 @@ class AppBarMenuManager(
                         menuEventListener.onAlertDistanceChanged(v)
                     }
 
+                R.id.menu_manage_databases ->
+                    menuEventListener.onDatabaseManagerRequested()
+
                 else -> {
                     DebugLogger.w(TAG, "Alerts: unhandled id=0x${item.itemId.toString(16)}")
                     menuEventListener.onStubAction("alerts_unknown:0x${item.itemId.toString(16)}")

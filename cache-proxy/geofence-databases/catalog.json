@@ -1,0 +1,14 @@
+[
+  {
+    "id": "military-bases",
+    "name": "US Military Installations",
+    "description": "US military bases, camps, forts, ranges, and installations from MIRTA/HIFLD datasets. Boundaries shown as polygon geofences.",
+    "version": 1,
+    "zoneType": "MILITARY_BASE",
+    "zoneCount": 1944,
+    "fileSize": 28069888,
+    "updatedAt": "2026-03-02",
+    "source": "HIFLD / MIRTA (data.gov)",
+    "license": "Public Domain (US Government)"
+  }
+]

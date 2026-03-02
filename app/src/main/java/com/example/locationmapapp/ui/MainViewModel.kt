@@ -15,6 +15,7 @@ import com.example.locationmapapp.data.model.*
 import com.example.locationmapapp.data.model.ZoneType
 import com.example.locationmapapp.data.repository.AircraftRepository
 import com.example.locationmapapp.data.repository.FindRepository
+import com.example.locationmapapp.data.repository.GeofenceDatabaseRepository
 import com.example.locationmapapp.data.repository.GeofenceRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.TfrRepository
@@ -53,7 +54,8 @@ class MainViewModel @Inject constructor(
     private val webcamRepository: WebcamRepository,
     private val findRepository: FindRepository,
     private val tfrRepository: TfrRepository,
-    private val geofenceRepository: GeofenceRepository
+    private val geofenceRepository: GeofenceRepository,
+    private val geofenceDatabaseRepository: GeofenceDatabaseRepository
 ) : ViewModel() {
 
     private val TAG = "ViewModel"
@@ -519,6 +521,15 @@ class MainViewModel @Inject constructor(
     private val _crossingZones = MutableLiveData<List<TfrZone>>()
     val crossingZones: LiveData<List<TfrZone>> = _crossingZones
 
+    private val _databaseZones = MutableLiveData<List<TfrZone>>()
+    val databaseZones: LiveData<List<TfrZone>> = _databaseZones
+
+    private val _geofenceCatalog = MutableLiveData<List<GeofenceDatabaseInfo>>()
+    val geofenceCatalog: LiveData<List<GeofenceDatabaseInfo>> = _geofenceCatalog
+
+    private val _databaseDownloadProgress = MutableLiveData<Pair<String, Int>?>()
+    val databaseDownloadProgress: LiveData<Pair<String, Int>?> = _databaseDownloadProgress
+
     private val _geofenceAlerts = MutableLiveData<List<GeofenceAlert>>()
     val geofenceAlerts: LiveData<List<GeofenceAlert>> = _geofenceAlerts
 
@@ -584,6 +595,7 @@ class MainViewModel @Inject constructor(
         _schoolZones.value?.let { all.addAll(it) }
         _floodZones.value?.let { all.addAll(it) }
         _crossingZones.value?.let { all.addAll(it) }
+        _databaseZones.value?.let { all.addAll(it) }
         geofenceEngine.loadZones(all)
     }
 
@@ -595,6 +607,7 @@ class MainViewModel @Inject constructor(
             ZoneType.SCHOOL_ZONE -> _schoolZones.value = emptyList()
             ZoneType.FLOOD_ZONE -> _floodZones.value = emptyList()
             ZoneType.RAILROAD_CROSSING -> _crossingZones.value = emptyList()
+            ZoneType.MILITARY_BASE, ZoneType.NO_FLY_ZONE, ZoneType.CUSTOM -> { /* database zones not per-type cleared */ }
         }
         rebuildGeofenceIndex()
         DebugLogger.i(TAG, "Cleared zone type $zoneType")
@@ -630,10 +643,69 @@ class MainViewModel @Inject constructor(
         _schoolZones.value = emptyList()
         _floodZones.value = emptyList()
         _crossingZones.value = emptyList()
+        _databaseZones.value = emptyList()
         _geofenceAlerts.value = emptyList()
         geofenceEngine.clear()
         DebugLogger.i(TAG, "All geofences cleared")
     }
+
+    // ── Geofence Databases ───────────────────────────────────────────────────
+
+    fun fetchGeofenceCatalog() {
+        viewModelScope.launch {
+            runCatching { geofenceDatabaseRepository.fetchCatalog() }
+                .onSuccess { _geofenceCatalog.value = it; DebugLogger.i(TAG, "Catalog: ${it.size} databases") }
+                .onFailure { e -> DebugLogger.e(TAG, "Catalog FAILED: ${e.message}", e as? Exception) }
+        }
+    }
+
+    fun downloadGeofenceDatabase(id: String) {
+        viewModelScope.launch {
+            _databaseDownloadProgress.value = Pair(id, 0)
+            val success = geofenceDatabaseRepository.downloadDatabase(id) { pct ->
+                _databaseDownloadProgress.postValue(Pair(id, pct))
+            }
+            _databaseDownloadProgress.value = null
+            if (success) {
+                DebugLogger.i(TAG, "Database $id downloaded, refreshing catalog")
+                fetchGeofenceCatalog()
+            } else {
+                _error.value = "Failed to download database: $id"
+            }
+        }
+    }
+
+    fun deleteGeofenceDatabase(id: String) {
+        geofenceDatabaseRepository.deleteDatabase(id)
+        _databaseZones.value = _databaseZones.value?.filter {
+            val meta = it.metadata
+            meta["database_id"] != id
+        } ?: emptyList()
+        rebuildGeofenceIndex()
+        fetchGeofenceCatalog()
+        DebugLogger.i(TAG, "Database $id deleted")
+    }
+
+    fun loadDatabaseZonesForVisibleArea(s: Double, w: Double, n: Double, e: Double) {
+        viewModelScope.launch {
+            val installed = geofenceDatabaseRepository.getInstalledDatabases()
+            if (installed.isEmpty()) return@launch
+            val allZones = mutableListOf<TfrZone>()
+            for (dbId in installed) {
+                val zones = geofenceDatabaseRepository.loadZonesFromDatabaseInBbox(dbId, s, w, n, e)
+                // Tag each zone with its source database
+                allZones.addAll(zones.map { zone ->
+                    zone.copy(metadata = zone.metadata + ("database_id" to dbId))
+                })
+            }
+            _databaseZones.value = allZones
+            rebuildGeofenceIndex()
+            DebugLogger.i(TAG, "Database zones: ${allZones.size} from ${installed.size} databases")
+        }
+    }
+
+    fun hasInstalledDatabases(): Boolean =
+        geofenceDatabaseRepository.getInstalledDatabases().isNotEmpty()
 }
 
 enum class LocationMode { GPS, MANUAL }

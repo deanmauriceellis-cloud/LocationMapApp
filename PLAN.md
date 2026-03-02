@@ -31,17 +31,28 @@ Planned in session `54ff08bd` (2026-03-01 23:14). Research covered 40+ data sour
 - Zoom guards: cameras ≥10, schools/flood/crossings ≥12
 - Alerts menu: 4 new toggles (all default OFF)
 
-### Phase 3 — Downloadable Databases (NEXT)
-- **SQLite database format**: schema for zones table (geometry, severity, speed_limit, time restrictions, category), categories table, db_meta table (version, author, license, update URL), update_log for delta sync
-- **JTS index builder**: load SQLite zones into R-tree at startup/download
+### Phase 3A — Downloadable Databases: Foundation + Military Bases (DONE v1.5.37)
+- **SQLite database format**: `zones` table (geometry JSON, bbox columns, severity, metadata), `db_meta` table (version, source, license)
+- **`GeofenceDatabaseRepository.kt`** (NEW): catalog fetch, streaming download with progress, SQLite bbox queries, installed database management
 - **Proxy catalog + download endpoints**:
-  - `GET /geofences/catalog` — available database catalog
-  - `GET /geofences/database/:id/download` — full database file
-  - `GET /geofences/database/:id/delta?from=N` — incremental update
-- **Bundled databases**: school zones, railroad crossings, speed cameras (WzSabre ExCam — 100k+ cameras worldwide, free), military bases
-- **Database Manager dialog**: UI with categories + search, download/update/delete databases
-- **New ZoneTypes**: extend enum for database-sourced zone types (MILITARY_BASE, etc.)
-- **Storage**: databases stored in app internal storage or external files dir
+  - `GET /geofences/catalog` — available database catalog with actual file sizes
+  - `GET /geofences/database/:id/download` — streams `.db` file with Content-Disposition
+- **Military Bases database**: 824 MIRTA/NTAD features → 1944 polygon zones (multi-polygons split), 27MB SQLite
+  - Source: ArcGIS NTAD Military Bases feature service (HIFLD/data.gov, Public Domain)
+  - `build-military.js` — downloads GeoJSON from ArcGIS, builds SQLite with bbox index
+- **Database Manager dialog**: Alerts menu → "Zone Databases…" → dark 90%×85% dialog
+  - Installed section (name, stats, UP TO DATE/UPDATE/DELETE buttons)
+  - Available section (name, description, stats, DOWNLOAD button with progress)
+- **New ZoneTypes**: `MILITARY_BASE`, `NO_FLY_ZONE`, `CUSTOM` added to enum
+- **GeofenceDatabaseInfo** data class for catalog entries
+- **Green polygon overlays** for military bases, purple for no-fly, gray for custom
+- **All `when` blocks** updated: severity mapping, detail dialog colors, alert banner labels/colors
+- **ViewModel**: `_databaseZones` LiveData, `loadDatabaseZonesForVisibleArea()`, `fetchGeofenceCatalog()`, `downloadGeofenceDatabase()`, `deleteGeofenceDatabase()`, `hasInstalledDatabases()`
+- **Viewport reload**: database zones reload on scroll/zoom via `scheduleGeofenceReload()`
+- **Debug state**: `databaseCount` + `database` overlay count in `/geofences` endpoint
+- Storage: `filesDir/geofence_databases/{id}.db`
+
+### Phase 3B — Additional Database Builders (NEXT)
 
 #### Key Data Sources for Phase 3
 | Source | Data | Format | Access |

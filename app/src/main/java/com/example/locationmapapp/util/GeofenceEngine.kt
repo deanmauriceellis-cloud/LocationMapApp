@@ -242,6 +242,9 @@ class GeofenceEngine {
             ZoneType.SCHOOL_ZONE -> AlertSeverity.WARNING
             ZoneType.FLOOD_ZONE -> if (alertType == "entry") AlertSeverity.WARNING else AlertSeverity.INFO
             ZoneType.RAILROAD_CROSSING -> AlertSeverity.WARNING
+            ZoneType.MILITARY_BASE -> if (alertType == "entry") AlertSeverity.CRITICAL else AlertSeverity.WARNING
+            ZoneType.NO_FLY_ZONE -> if (alertType == "entry") AlertSeverity.CRITICAL else AlertSeverity.WARNING
+            ZoneType.CUSTOM -> AlertSeverity.WARNING
         }
     }
 

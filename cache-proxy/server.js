@@ -2632,12 +2632,58 @@ app.post('/cache/clear', (req, res) => {
   res.json({ cleared: count, hintsCleared: hintCount, poisCleared: poiCount });
 });
 
+// ── Geofence Database Catalog & Download ────────────────────────────────────
+
+app.get('/geofences/catalog', (req, res) => {
+  const catalogPath = path.join(__dirname, 'geofence-databases', 'catalog.json');
+  try {
+    if (!fs.existsSync(catalogPath)) {
+      return res.json([]);
+    }
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+    // Enrich with actual file sizes
+    const enriched = catalog.map(entry => {
+      const dbPath = path.join(__dirname, 'geofence-databases', `${entry.id}.db`);
+      let fileSize = entry.fileSize || 0;
+      try {
+        const stat = fs.statSync(dbPath);
+        fileSize = stat.size;
+      } catch (_) {}
+      return { ...entry, fileSize };
+    });
+    log('/geofences/catalog', false, 0, `${enriched.length} databases`);
+    res.json(enriched);
+  } catch (e) {
+    console.error('Catalog error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/geofences/database/:id/download', (req, res) => {
+  const { id } = req.params;
+  // Sanitize: only allow alphanumeric, hyphens, underscores
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid database ID' });
+  }
+  const dbPath = path.join(__dirname, 'geofence-databases', `${id}.db`);
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: `Database not found: ${id}` });
+  }
+  const stat = fs.statSync(dbPath);
+  res.setHeader('Content-Type', 'application/x-sqlite3');
+  res.setHeader('Content-Disposition', `attachment; filename="${id}.db"`);
+  res.setHeader('Content-Length', stat.size);
+  log(`/geofences/database/${id}/download`, false, 0, `${stat.size} bytes`);
+  fs.createReadStream(dbPath).pipe(res);
+});
+
 // ── Start ───────────────────────────────────────────────────────────────────
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
   console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft, GET /webcams, GET /weather, GET /tfrs');
   console.log('Zones:  GET /cameras, GET /schools, GET /flood-zones, GET /crossings');
+  console.log('GeoDb:  GET /geofences/catalog, GET /geofences/database/:id/download');
   console.log('Radius: GET /radius-hint, POST /radius-hint, GET /radius-hints');
   console.log('POIs:   GET /pois/stats, GET /pois/export, GET /pois/bbox, GET /poi/:type/:id');
   console.log('DB:     GET /db/pois/search, /db/pois/nearby, /db/poi/:type/:id, /db/pois/stats, /db/pois/categories, /db/pois/coverage');

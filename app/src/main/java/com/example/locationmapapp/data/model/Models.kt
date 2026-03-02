@@ -315,7 +315,22 @@ enum class MbtaVehicleStatus(val display: String) {
 
 // ── Geofence / TFR Models ──────────────────────────────────────────────────
 
-enum class ZoneType { TFR, SPEED_CAMERA, SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING }
+enum class ZoneType { TFR, SPEED_CAMERA, SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING, MILITARY_BASE, NO_FLY_ZONE, CUSTOM }
+
+data class GeofenceDatabaseInfo(
+    val id: String,
+    val name: String,
+    val description: String,
+    val version: Int,
+    val zoneType: String,
+    val zoneCount: Int,
+    val fileSize: Long,
+    val updatedAt: String,
+    val source: String,
+    val license: String,
+    val installed: Boolean = false,
+    val installedVersion: Int = 0
+)
 
 enum class AlertSeverity(val level: Int) {
     INFO(0), WARNING(1), CRITICAL(2), EMERGENCY(3)
