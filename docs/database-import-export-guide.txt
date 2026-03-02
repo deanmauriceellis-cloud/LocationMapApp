@@ -1,0 +1,170 @@
+LocationMapApp — Zone Database Import & Export Guide
+====================================================
+
+The app supports importing custom geofence zone databases from local
+files and exporting installed databases to share with others. You can
+import pre-built SQLite databases or simple CSV files with point data.
+
+
+OPENING THE DATABASE MANAGER
+-----------------------------
+1. Tap the Alerts icon on the toolbar (bottom row, far right).
+2. Tap "Zone Databases" in the menu.
+3. The Database Manager dialog opens, showing installed and available
+   databases. The IMPORT .DB and IMPORT CSV buttons are at the top.
+
+
+IMPORTING A SQLITE DATABASE (.db)
+----------------------------------
+Use this when you have a pre-built .db file that follows the app's
+geofence database schema (e.g., one exported from this app or built
+with the included build scripts).
+
+1. Open the Database Manager (see above).
+2. Tap "IMPORT .DB".
+3. The Android file picker opens. Browse to and select your .db file.
+4. The app validates the file automatically:
+   - It must be a valid SQLite database.
+   - It must contain a "db_meta" table with an "id" entry.
+   - It must contain a "zones" table with the required columns.
+   - It must have at least one zone.
+5. If validation passes, the database is installed and appears in the
+   INSTALLED section. A confirmation toast shows the database name.
+6. If a database with the same ID is already installed, you will be
+   asked whether to overwrite it. Tap "Overwrite" to replace it or
+   "Cancel" to keep the existing one.
+7. If validation fails, a toast explains what went wrong (e.g.,
+   "Missing zones table", "Database has no zones").
+
+
+IMPORTING A CSV FILE
+---------------------
+Use this to turn a simple spreadsheet or CSV into a zone database.
+Each row becomes a circular geofence zone on the map.
+
+Step 1 — Prepare your CSV file
+
+   Your CSV needs at minimum a latitude and longitude column. The app
+   recognizes these column name aliases (case-insensitive):
+
+     Column      Accepted names
+     --------    ---------------------------------
+     Latitude    lat, latitude
+     Longitude   lon, lng, longitude
+     Name        name, title, label
+     Zone type   type, zone_type, category
+     Radius (m)  radius, radius_m
+     Description description, desc, notes
+
+   Example CSV:
+
+     lat,lon,name,radius
+     42.3601,-71.0589,Boston Common,200
+     42.3736,-71.1190,Harvard Yard,150
+     42.3467,-71.0972,Fenway Park,300
+
+   - Latitude must be between -90 and 90.
+   - Longitude must be between -180 and 180.
+   - If a row is missing name, the app assigns "Zone 1", "Zone 2", etc.
+   - If a row is missing radius, the default radius you set is used.
+   - Rows with invalid or missing lat/lon are skipped automatically.
+
+Step 2 — Import
+
+   1. Open the Database Manager.
+   2. Tap "IMPORT CSV".
+   3. The file picker opens. Select your .csv or .txt file.
+   4. A configuration dialog appears with three fields:
+
+      Database Name — Give your database a descriptive name
+                      (e.g., "My Custom Zones"). This is what appears
+                      in the Database Manager.
+
+      Zone Type     — Pick from the dropdown: TFR, SPEED_CAMERA,
+                      SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING,
+                      MILITARY_BASE, NO_FLY_ZONE, or CUSTOM.
+                      This controls the color and alert behavior of
+                      the zones on the map.
+
+      Default Radius — The radius in meters for zones that don't have
+                       a radius column in the CSV. Default is 500m.
+
+   5. Tap "IMPORT".
+   6. A toast confirms how many zones were imported (and how many rows
+      were skipped, if any).
+   7. The new database appears in the INSTALLED section.
+
+
+EXPORTING A DATABASE
+---------------------
+You can share any installed database as a .db file via email, messaging
+apps, cloud storage, or any app that accepts file sharing.
+
+1. Open the Database Manager.
+2. Find the database you want to export in the INSTALLED section.
+3. Tap the green "EXPORT" button on its card.
+4. The Android share sheet opens. Choose where to send the file
+   (e.g., Gmail, Google Drive, Bluetooth, Files).
+5. The recipient can then import the .db file using the IMPORT .DB
+   steps above.
+
+
+VIEWING IMPORTED ZONES ON THE MAP
+-----------------------------------
+Imported zones load automatically when you scroll or zoom the map,
+just like the built-in downloadable databases. The zones appear as
+colored overlays matching their zone type:
+
+  - TFR: red
+  - Speed cameras: orange
+  - School zones: amber
+  - Flood zones: blue
+  - Railroad crossings: dark with yellow outline
+  - Military bases: dark green
+  - No-fly zones: purple
+  - Custom: gray
+
+Tap any zone overlay to see its detail dialog with name, type, and
+any metadata included in the database.
+
+
+DELETING AN IMPORTED DATABASE
+------------------------------
+1. Open the Database Manager.
+2. Find the database in the INSTALLED section.
+3. Tap the red "DELETE" button.
+4. The database is removed and its zones disappear from the map.
+
+
+OFFLINE USE
+------------
+Locally imported databases always appear in the Database Manager, even
+if the proxy server is unreachable. You do not need a network connection
+to view or manage databases that are already installed on the device.
+
+
+TROUBLESHOOTING
+----------------
+"Not a valid SQLite database"
+   The file you selected is not a SQLite database. Make sure you are
+   selecting a .db file, not a .csv or other format.
+
+"Missing zones table" / "Missing db_meta table"
+   The SQLite file exists but does not have the expected schema. It may
+   be a different kind of database. Zone databases need both a db_meta
+   table (with an id key) and a zones table.
+
+"Database has no zones"
+   The file has the correct schema but the zones table is empty.
+
+"CSV must have lat and lon columns"
+   Your CSV header row does not contain a recognized latitude or
+   longitude column name. Check the column name aliases listed above.
+
+"No valid rows in CSV"
+   Every data row in your CSV had invalid coordinates (non-numeric,
+   out of range, or missing). Check your data format.
+
+"Import failed: Could not open file"
+   The app could not read the selected file. Try copying it to a
+   different location (e.g., Downloads) and selecting it again.
