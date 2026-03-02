@@ -1,5 +1,28 @@
 # LocationMapApp — Changelog
 
+## [1.5.33] — 2026-03-02
+
+### Added
+- **Idle auto-populate** — full probe-calibrate-spiral scanner starts automatically after 60s of GPS stationarity
+  - Detects idle state via existing 100m dead zone: no significant GPS movement for 60s triggers scan
+  - Scans centered on GPS position (never map center or followed objects)
+  - 45s inter-cell delay (gentler than manual 30s); "Idle scan:" banner prefix distinguishes from manual
+  - Guards: no manual populate running, not following vehicle/aircraft, speed <= 20mph
+  - Cancels on: GPS moves >100m, long-press, vehicle/aircraft tap, manual populate, banner tap, Go to Location
+  - `idlePopulateJob`, `lastSignificantMoveTime` state variables; `startIdlePopulate()`, `stopIdlePopulate()`
+  - Debug state: `idlePopulate` (boolean), `idleTimeSec` (seconds since last significant move), `populate` (manual scanner)
+- **X-Client-ID header** — per-device UUID sent on all Overpass requests for proxy fair queuing
+  - Generated on first launch, stored in SharedPreferences (`places_repo_prefs`)
+  - PlacesRepository now injects `@ApplicationContext` for SharedPreferences access
+- **Delta cache optimization** (proxy)
+  - `findCoveringCache()` — before Overpass upstream, checks if a larger-radius cached result covers the requested area
+  - Content hash delta detection — MD5 of sorted element IDs; skips `cacheIndividualPois()` if data unchanged
+  - Per-client fair queuing — round-robin across X-Client-ID headers, 5-request per-client cap, 429 on overflow
+
+### Changed
+- Proxy Overpass queue: `shiftFairQueue()` replaces FIFO `shift()` for round-robin client fairness
+- AppModule: `providePlacesRepository()` now passes `@ApplicationContext` to PlacesRepository constructor
+
 ## [1.5.32] — 2026-03-02
 
 ### Added

@@ -23,7 +23,7 @@ object AppModule {
         LocationManager(context)
 
     @Provides @Singleton
-    fun providePlacesRepository(): PlacesRepository = PlacesRepository()
+    fun providePlacesRepository(@ApplicationContext context: Context): PlacesRepository = PlacesRepository(context)
 
     @Provides @Singleton
     fun provideWeatherRepository(): WeatherRepository = WeatherRepository()

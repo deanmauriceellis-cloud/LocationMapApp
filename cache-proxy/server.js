@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
@@ -406,8 +407,10 @@ async function overpassWorker() {
   overpassWorkerRunning = true;
 
   while (overpassQueue.length > 0) {
-    const { dataField, cacheKey, resolve } = overpassQueue.shift();
-    console.log(`[Overpass queue] processing (${overpassQueue.length} remaining)`);
+    const item = shiftFairQueue();
+    if (!item) break;
+    const { dataField, cacheKey, resolve, clientId } = item;
+    console.log(`[Overpass queue] processing client=${clientId || 'unknown'} (${overpassQueue.length} remaining)`);
 
     // Wait for minimum interval since last upstream request
     const elapsed = Date.now() - overpassLastUpstream;
@@ -424,6 +427,22 @@ async function overpassWorker() {
         console.log(`[Overpass queue] cache hit while queued — ${cacheKey}`);
         resolve({ hit: true, data: cached.data, contentType: cached.headers['content-type'] || 'application/json' });
         continue;
+      }
+
+      // Check if a larger-radius cached result covers this area
+      const aroundMatch = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
+      if (aroundMatch) {
+        const lat = parseFloat(aroundMatch[2]).toFixed(3);
+        const lon = parseFloat(aroundMatch[3]).toFixed(3);
+        const radius = parseInt(aroundMatch[1]);
+        const tagMatches = [...dataField.matchAll(/\["([^"]+)"(?:="([^"]+)")?\]/g)];
+        const tags = [...new Set(tagMatches.map(m => m[2] ? `${m[1]}=${m[2]}` : m[1]))].sort();
+        const covering = findCoveringCache(lat, lon, radius, tags);
+        if (covering) {
+          console.log(`[Overpass queue] covered by larger cache — ${covering.key}`);
+          resolve({ hit: true, data: covering.cached.data, contentType: covering.cached.headers['content-type'] || 'application/json' });
+          continue;
+        }
       }
     }
 
@@ -444,7 +463,17 @@ async function overpassWorker() {
       let poiStats = { added: 0, updated: 0 };
       if (upstream.ok && cacheKey) {
         cacheSet(cacheKey, body, { 'content-type': contentType });
-        poiStats = cacheIndividualPois(body);
+
+        // Content hash delta detection — skip POI cache update if data unchanged
+        const newHash = computeElementHash(body);
+        const oldHash = contentHashes.get(cacheKey);
+        if (newHash && oldHash && newHash === oldHash) {
+          console.log(`[POI Cache] content unchanged (hash=${newHash.slice(0, 8)}) — skipping update`);
+          poiStats = { added: 0, updated: 0 };
+        } else {
+          poiStats = cacheIndividualPois(body);
+          if (newHash) contentHashes.set(cacheKey, newHash);
+        }
       }
 
       resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.added, poiKnown: poiStats.updated });
@@ -474,6 +503,92 @@ function parseOverpassCacheKey(dataField) {
   return `overpass:${lat}:${lon}:r${radius}:${tags.join(',')}`;
 }
 
+/**
+ * Check if a larger-radius cached result already covers the requested area.
+ * Same grid point at radius >= requested radius is a superset.
+ */
+function findCoveringCache(lat, lon, radius, tags) {
+  const tagStr = tags.join(',');
+  const checkRadii = [radius * 2, radius * 4];
+  for (const r of checkRadii) {
+    if (r > 5000) continue; // don't check unreasonably large
+    const key = `overpass:${lat}:${lon}:r${r}:${tagStr}`;
+    const cached = cacheGet(key, OVERPASS_TTL);
+    if (cached) return { key, cached };
+  }
+  return null;
+}
+
+/**
+ * Compute a fast content hash of Overpass elements for delta detection.
+ * Hash is based on sorted element type+id pairs — stable across re-fetches of identical data.
+ */
+function computeElementHash(jsonBody) {
+  try {
+    const parsed = JSON.parse(jsonBody);
+    if (!parsed.elements || !Array.isArray(parsed.elements)) return null;
+    const ids = parsed.elements
+      .filter(e => e.type && e.id)
+      .map(e => `${e.type}:${e.id}`)
+      .sort();
+    return crypto.createHash('md5').update(ids.join(',')).digest('hex');
+  } catch (_) {
+    return null;
+  }
+}
+
+// Content hash store — maps cache key to last known element hash
+const contentHashes = new Map();
+
+// ── Per-client fair queuing ──────────────────────────────────────────────────
+
+const CLIENT_QUEUE_CAP = 5;  // max queued requests per client
+
+/**
+ * Enqueue an Overpass request with per-client fair ordering.
+ * Round-robin: worker picks from the client with fewest processed items.
+ */
+function enqueueOverpassRequest(clientId, item) {
+  // Count existing queued items for this client
+  const clientCount = overpassQueue.filter(q => q.clientId === clientId).length;
+  if (clientCount >= CLIENT_QUEUE_CAP) {
+    console.log(`[Overpass queue] client ${clientId} at cap (${CLIENT_QUEUE_CAP}) — rejecting`);
+    return false;
+  }
+  item.clientId = clientId;
+  overpassQueue.push(item);
+  return true;
+}
+
+/**
+ * Shift the next item from the queue using round-robin across clients.
+ * Picks from the client whose item appears earliest but hasn't been overserved.
+ */
+function shiftFairQueue() {
+  if (overpassQueue.length === 0) return null;
+
+  // Group by clientId and find the client with fewest items already in front
+  const clientOrder = [];
+  const seen = new Set();
+  for (const item of overpassQueue) {
+    const cid = item.clientId || 'unknown';
+    if (!seen.has(cid)) {
+      seen.add(cid);
+      clientOrder.push(cid);
+    }
+  }
+
+  // Round-robin: pick the first item from the first client in order
+  // This naturally interleaves — ABAB instead of AABB
+  for (const cid of clientOrder) {
+    const idx = overpassQueue.findIndex(q => (q.clientId || 'unknown') === cid);
+    if (idx !== -1) {
+      return overpassQueue.splice(idx, 1)[0];
+    }
+  }
+  return overpassQueue.shift(); // fallback
+}
+
 app.post('/overpass', async (req, res) => {
   const dataField = req.body.data || '';
   const cacheKey = parseOverpassCacheKey(dataField);
@@ -487,6 +602,24 @@ app.post('/overpass', async (req, res) => {
       res.set('Content-Type', cached.headers['content-type'] || 'application/json');
       res.set('X-Cache', 'HIT');
       return res.send(cached.data);
+    }
+
+    // Check if a larger-radius cached result covers this area
+    const aroundMatch = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
+    if (aroundMatch) {
+      const lat = parseFloat(aroundMatch[2]).toFixed(3);
+      const lon = parseFloat(aroundMatch[3]).toFixed(3);
+      const radius = parseInt(aroundMatch[1]);
+      const tagMatches = [...dataField.matchAll(/\["([^"]+)"(?:="([^"]+)")?\]/g)];
+      const tags = [...new Set(tagMatches.map(m => m[2] ? `${m[1]}=${m[2]}` : m[1]))].sort();
+      const covering = findCoveringCache(lat, lon, radius, tags);
+      if (covering) {
+        stats.hits++;
+        log('/overpass (covering-cache)', true, 0, covering.key);
+        res.set('Content-Type', covering.cached.headers['content-type'] || 'application/json');
+        res.set('X-Cache', 'HIT');
+        return res.send(covering.cached.data);
+      }
     }
   }
 
@@ -531,15 +664,26 @@ app.post('/overpass', async (req, res) => {
   }
 
   stats.misses++;
+  const clientId = req.headers['x-client-id'] || 'unknown';
   // Queue the upstream request — worker processes one at a time, 10s apart
   const queuePos = overpassQueue.length + 1;
   if (queuePos > 0) {
-    console.log(`[Overpass queue] enqueued (position ${queuePos}, ~${queuePos * 10}s wait)`);
+    console.log(`[Overpass queue] enqueued client=${clientId} (position ${queuePos}, ~${queuePos * 10}s wait)`);
   }
   const result = await new Promise(resolve => {
-    overpassQueue.push({ dataField, cacheKey, resolve });
+    const accepted = enqueueOverpassRequest(clientId, { dataField, cacheKey, resolve });
+    if (!accepted) {
+      // Client at queue cap — return 429
+      resolve({ hit: false, error: true, rateLimited: true, message: 'Per-client queue cap reached' });
+      return;
+    }
     overpassWorker();
   });
+
+  if (result.rateLimited) {
+    res.set('Retry-After', '30');
+    return res.status(429).json({ error: 'Too many queued requests', detail: result.message });
+  }
 
   if (result.error) {
     return res.status(502).json({ error: 'Upstream request failed', detail: result.message });

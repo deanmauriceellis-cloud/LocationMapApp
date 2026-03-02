@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 32 (Geocode Autocomplete + Tooltips)
+## Last Updated: 2026-03-02 Session 33 (Idle Auto-Populate + Delta Cache)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34

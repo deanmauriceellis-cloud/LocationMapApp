@@ -126,6 +126,10 @@ class MainActivity : AppCompatActivity() {
     private var silentFillJob: Job? = null
     private var silentFillRunnable: Runnable? = null
 
+    // Idle auto-populate — full scanner triggered after 60s of GPS stationarity
+    private var idlePopulateJob: Job? = null
+    private var lastSignificantMoveTime: Long = System.currentTimeMillis()
+
     // POI / vehicle label zoom threshold tracking
     private var poiLabelsShowing = false
     private var vehicleLabelsShowing = false
@@ -492,8 +496,9 @@ class MainActivity : AppCompatActivity() {
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
                 DebugLogger.i("MainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
-                // Stop populate scanner and silent fill — user is moving to a new location
+                // Stop populate scanner, idle scanner, and silent fill — user is moving to a new location
                 if (populateJob != null) stopPopulatePois()
+                stopIdlePopulate()
                 stopSilentFill()
                 viewModel.setManualLocation(p)
                 // Zoom to 14 if currently zoomed out; leave alone if already 14+
@@ -795,12 +800,32 @@ class MainActivity : AppCompatActivity() {
                 DebugLogger.d("MainActivity", "GPS jitter <100m — skipped")
                 // Still handle deferred restores even during jitter
                 handleDeferredRestores(point)
+
+                // ── Idle auto-populate: start full scanner after 60s stationary ──
+                val idleMs = System.currentTimeMillis() - lastSignificantMoveTime
+                if (idleMs > 60_000L
+                    && idlePopulateJob?.isActive != true
+                    && populateJob == null
+                    && followedVehicleId == null && followedAircraftIcao == null
+                    && (speedMph ?: 0.0) <= 20.0
+                ) {
+                    DebugLogger.i("MainActivity", "Idle ${idleMs / 1000}s — starting idle auto-populate at GPS ${point.latitude},${point.longitude}")
+                    startIdlePopulate(point)
+                }
+
                 return@observe
             }
 
             // ── 3. Update GPS marker ──
             updateGpsMarker(point)
             lastGpsPoint = point
+
+            // ── 3b. Significant move — reset idle timer and cancel idle populate ──
+            lastSignificantMoveTime = System.currentTimeMillis()
+            if (idlePopulateJob?.isActive == true) {
+                DebugLogger.i("MainActivity", "GPS moved >100m — stopping idle auto-populate")
+                stopIdlePopulate()
+            }
 
             // ── 4. Initial center — first fix only ──
             if (followedVehicleId == null && !initialCenterDone) {
@@ -2587,8 +2612,9 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun onVehicleMarkerTapped(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
-        // Stop populate scanner and silent fill — user is interacting with an object
+        // Stop populate scanner, idle scanner, and silent fill — user is interacting with an object
         if (populateJob != null) stopPopulatePois()
+        stopIdlePopulate()
         stopSilentFill()
         showVehicleDetailDialog(vehicle)
     }
@@ -4003,8 +4029,9 @@ class MainActivity : AppCompatActivity() {
      */
     private fun goToLocation(point: GeoPoint, label: String) {
         DebugLogger.i("MainActivity", "goToLocation: ${point.latitude},${point.longitude} — $label")
-        // Stop any active scanner / silent fill
+        // Stop any active scanner / idle scanner / silent fill
         if (populateJob != null) stopPopulatePois()
+        stopIdlePopulate()
         stopSilentFill()
         // Switch to manual mode at new location
         viewModel.setManualLocation(point)
@@ -4342,8 +4369,9 @@ class MainActivity : AppCompatActivity() {
     // ── Aircraft follow ─────────────────────────────────────────────────────
 
     private fun onAircraftMarkerTapped(state: com.example.locationmapapp.data.model.AircraftState) {
-        // Stop populate scanner and silent fill — user is interacting with an object
+        // Stop populate scanner, idle scanner, and silent fill — user is interacting with an object
         if (populateJob != null) stopPopulatePois()
+        stopIdlePopulate()
         stopSilentFill()
         if (followedAircraftIcao == state.icao24) {
             stopFollowing()
@@ -4651,6 +4679,176 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================================
+    // IDLE AUTO-POPULATE — full scanner triggered after 60s of GPS stationarity
+    // =========================================================================
+
+    private fun startIdlePopulate(center: GeoPoint) {
+        if (idlePopulateJob?.isActive == true) return
+        // Cancel silent fill — idle scanner takes over
+        stopSilentFill()
+
+        val centerLat = center.latitude
+        val centerLon = center.longitude
+        DebugLogger.i("MainActivity", "startIdlePopulate() center=$centerLat,$centerLon")
+
+        val stats = PopulateStats()
+        var consecutiveErrors = 0
+
+        idlePopulateJob = lifecycleScope.launch {
+            // ── Phase 1: Probe center to discover settled radius ──
+            val probePoint = GeoPoint(centerLat, centerLon)
+            placeScanningMarker(probePoint)
+            stats.status = "Probing center to calibrate grid…"
+            showIdlePopulateBanner(0, stats, 0)
+
+            var probeResult: com.example.locationmapapp.data.model.PopulateSearchResult? = null
+            for (probeAttempt in 1..3) {
+                probeResult = viewModel.populateSearchAt(probePoint)
+                if (probeResult != null) break
+                DebugLogger.w("MainActivity", "Idle probe attempt $probeAttempt failed — retrying in 45s")
+                stats.status = "Probe attempt $probeAttempt failed — retrying…"
+                for (sec in 45 downTo 1) {
+                    showIdlePopulateBanner(0, stats, sec)
+                    delay(1_000L)
+                }
+            }
+            if (probeResult == null) {
+                DebugLogger.w("MainActivity", "Idle probe failed after 3 attempts")
+                stopIdlePopulate()
+                return@launch
+            }
+
+            val settledRadius = probeResult.radiusM
+            stats.pois += probeResult.results.size
+            stats.newPois += probeResult.poiNew
+            stats.knownPois += probeResult.poiKnown
+            stats.searches++
+            stats.cells++
+            loadCachedPoisForVisibleArea()
+
+            // ── Phase 2: Calculate grid from settled radius ──
+            val stepLat = 0.8 * 2 * settledRadius.toDouble() / 111320.0
+            val stepLon = stepLat / Math.cos(Math.toRadians(centerLat))
+            DebugLogger.i("MainActivity",
+                "Idle populate grid calibrated: settledRadius=${settledRadius}m, stepLat=${"%.5f".format(stepLat)}°, stepLon=${"%.5f".format(stepLon)}°")
+            stats.gridRadius = settledRadius
+            stats.currentRadius = settledRadius
+            stats.status = "Grid calibrated at ${settledRadius}m — ${probeResult.results.size} POIs (${probeResult.poiNew} new)"
+
+            // Countdown after probe (45s — gentler than manual scanner)
+            for (sec in 45 downTo 1) {
+                showIdlePopulateBanner(0, stats, sec)
+                delay(1_000L)
+            }
+
+            // ── Phase 3: Spiral outward using calibrated grid ──
+            for (ring in 1..15) {
+                val points = generateRingPoints(ring, centerLat, centerLon, stepLat, stepLon)
+                var pointIdx = 0
+                while (pointIdx < points.size) {
+                    kotlinx.coroutines.yield()
+
+                    val (gridLat, gridLon) = points[pointIdx]
+                    val point = GeoPoint(gridLat, gridLon)
+
+                    stats.depth = 0
+                    stats.currentRadius = settledRadius
+                    stats.status = "Searching cell ${pointIdx + 1}/${points.size} at ${settledRadius}m…"
+                    placeScanningMarker(point)
+                    showIdlePopulateBanner(ring, stats, 0)
+
+                    val result = viewModel.populateSearchAt(point)
+
+                    if (result != null) {
+                        consecutiveErrors = 0
+                        stats.pois += result.results.size
+                        stats.newPois += result.poiNew
+                        stats.knownPois += result.poiKnown
+                        stats.searches++
+                        stats.cells++
+                        stats.currentRadius = result.radiusM
+                        pointIdx++
+                        loadCachedPoisForVisibleArea()
+
+                        val newStr = if (result.poiNew > 0) "${result.poiNew} new" else "all known"
+                        stats.status = "Found ${result.results.size} POIs ($newStr) at ${result.radiusM}m"
+
+                        // Recursive subdivision if settled smaller than grid radius
+                        if (result.radiusM < settledRadius) {
+                            stats.status = "Dense area! ${settledRadius}m→${result.radiusM}m — filling 8 gaps"
+                            showIdlePopulateBanner(ring, stats, 0)
+                            searchCellSubdivisions(point, settledRadius, result.radiusM, 0, ring, stats)
+                            stats.depth = 0
+                            stats.currentRadius = settledRadius
+                            stats.status = "Subdivision done — back to main grid"
+                        }
+                    } else {
+                        stats.fails++
+                        stats.status = "Search failed — retrying…"
+                        consecutiveErrors++
+                        if (consecutiveErrors >= 5) {
+                            DebugLogger.w("MainActivity", "Idle populate auto-stopped after 5 consecutive errors")
+                            break
+                        }
+                    }
+
+                    // Countdown 45s between main grid cells (gentler than manual 30s)
+                    for (sec in 45 downTo 1) {
+                        showIdlePopulateBanner(ring, stats, sec)
+                        delay(1_000L)
+                    }
+                }
+                if (consecutiveErrors >= 5) break
+            }
+
+            DebugLogger.i("MainActivity",
+                "Idle populate complete: ${stats.cells} cells, ${stats.pois} POIs, ${stats.searches} searches, ${stats.fails} fail, ${stats.subdivs} subdivisions")
+            stopIdlePopulate()
+        }
+    }
+
+    private fun stopIdlePopulate() {
+        idlePopulateJob?.cancel()
+        idlePopulateJob = null
+        removeScanningMarker()
+        hideFollowBanner()
+        DebugLogger.i("MainActivity", "stopIdlePopulate()")
+    }
+
+    private fun showIdlePopulateBanner(ring: Int, stats: PopulateStats, countdown: Int) {
+        val countdownStr = if (countdown > 0) "  Next in ${countdown}s" else ""
+        val failStr = if (stats.fails > 0) " \u26A0${stats.fails}err" else ""
+        val gridStr = if (stats.gridRadius > 0) "grid ${stats.gridRadius}m" else "probing"
+        val line1 = "Idle scan: R$ring | ${stats.cells} cells | ${stats.pois} POIs (${stats.newPois} new)$failStr | $gridStr"
+        val line2 = stats.status + countdownStr
+        val text = "$line1\n$line2 — tap to stop"
+
+        runOnUiThread {
+            if (followBanner == null) {
+                followBanner = TextView(this).apply {
+                    setBackgroundColor(Color.parseColor("#DD212121"))
+                    setTextColor(Color.WHITE)
+                    textSize = 13f
+                    setPadding(32, 20, 32, 20)
+                    val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
+                    }
+                    layoutParams = params
+                    elevation = 12f
+                    setOnClickListener { stopIdlePopulate() }
+                }
+                (binding.root as ViewGroup).addView(followBanner)
+            }
+            followBanner?.setOnClickListener { stopIdlePopulate() }
+            followBanner?.text = text
+            followBanner?.visibility = View.VISIBLE
+        }
+    }
+
+    // =========================================================================
     // POPULATE POIs — SYSTEMATIC GRID SCANNER
     // =========================================================================
 
@@ -4678,7 +4876,8 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
             return
         }
-        // Cancel silent fill — full scanner takes over
+        // Cancel idle populate and silent fill — manual scanner takes over
+        stopIdlePopulate()
         stopSilentFill()
 
         val center = binding.mapView.mapCenter
@@ -5370,6 +5569,9 @@ class MainActivity : AppCompatActivity() {
                 "tags" to findFilterTags
             ),
             "silentFill" to (silentFillJob?.isActive == true),
+            "idlePopulate" to (idlePopulateJob?.isActive == true),
+            "idleTimeSec" to ((System.currentTimeMillis() - lastSignificantMoveTime) / 1000),
+            "populate" to (populateJob?.isActive == true),
             "gpsSpeedMph" to lastGpsSpeedMph,
             "gpsIntervalMs" to currentGpsIntervalMs,
             "lastPoiFetchDistanceM" to lastPoiFetchPoint?.let { from ->

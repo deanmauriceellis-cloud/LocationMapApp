@@ -1,9 +1,11 @@
 package com.example.locationmapapp.data.repository
 
+import android.content.Context
 import com.example.locationmapapp.data.model.PlaceResult
 import com.example.locationmapapp.data.model.PopulateSearchResult
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -12,15 +14,27 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.osmdroid.util.GeoPoint
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class PlacesRepository @Inject constructor() {
+class PlacesRepository @Inject constructor(
+    @ApplicationContext private val appContext: Context
+) {
 
     private val TAG = "PlacesRepository"
+
+    /** Stable per-device client ID for fair queuing at the proxy. */
+    private val clientId: String by lazy {
+        val prefs = appContext.getSharedPreferences("places_repo_prefs", Context.MODE_PRIVATE)
+        prefs.getString("client_id", null) ?: UUID.randomUUID().toString().also {
+            prefs.edit().putString("client_id", it).apply()
+            DebugLogger.i(TAG, "Generated new client ID: $it")
+        }
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -123,7 +137,7 @@ class PlacesRepository @Inject constructor() {
                 val query = buildOverpassQuery(center, categories, radiusM)
                 DebugLogger.d(TAG, "Overpass POST query (${query.length} chars, radius=${radiusM}m, attempt=$attempts)")
                 val body = FormBody.Builder().add("data", query).build()
-                val request = Request.Builder().url(OVERPASS_URL).post(body).build()
+                val request = Request.Builder().url(OVERPASS_URL).post(body).header("X-Client-ID", clientId).build()
                 val t0 = System.currentTimeMillis()
                 val response = client.newCall(request).execute()
                 val elapsed = System.currentTimeMillis() - t0
@@ -176,6 +190,7 @@ class PlacesRepository @Inject constructor() {
                 .url(OVERPASS_URL)
                 .post(body)
                 .header("X-Cache-Only", "true")
+                .header("X-Client-ID", clientId)
                 .build()
             val response = client.newCall(request).execute()
             if (response.code == 204) {
@@ -274,7 +289,7 @@ class PlacesRepository @Inject constructor() {
                 val query = buildOverpassQuery(center, categories, radiusM)
                 DebugLogger.d(TAG, "Populate search at $key (radius=${radiusM}m, attempt=$attempts)")
                 val body = FormBody.Builder().add("data", query).build()
-                val request = Request.Builder().url(OVERPASS_URL).post(body).build()
+                val request = Request.Builder().url(OVERPASS_URL).post(body).header("X-Client-ID", clientId).build()
                 val response = client.newCall(request).execute()
                 if (!response.isSuccessful) {
                     postRadiusFeedback(center, 0, error = true)
