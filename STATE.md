@@ -9,66 +9,23 @@
 - **Split**: App → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
 
 ## What's Working
-- Map display with osmdroid (OpenStreetMap tiles)
-- GPS location tracking with manual override (long-press)
-- Custom zoom slider (right edge)
-- POI search via Overpass — 16 categories with submenu refinement
-  - Food & Drink, Fuel & Charging, Transit, Civic & Gov, Parks & Rec, Shopping,
-    Healthcare, Education, Lodging, Parking, Finance, Places of Worship,
-    Tourism & History, Emergency Svc, Auto Services, Entertainment
-  - Categories with subtypes show AlertDialog with multi-choice checkboxes
-  - All categories driven from central config (PoiCategories.kt)
-- POI markers as small colored category dots (5dp), unified marker tracking per layer
-  - **Zoom ≥ 18**: dots switch to labeled icons showing category type above and business name below
-- Layer-aware POI LiveData — `Pair<String, List>` ensures categories don't overwrite each other
-- Unified POI pipeline — all categories use searchPoisAt() via Overpass
-- All layers default ON on fresh install (POIs, MBTA, radar, METAR, webcams) — except aircraft (OFF)
-- **Weather dialog** (v1.5.34) — rich graphical weather display via NWS API composite endpoint
-  - Toolbar Weather icon shows current conditions; red border when alerts exist
-  - Auto-fetches on first GPS fix and every 30 minutes
-  - Dialog sections: current conditions (temp, wind, humidity, dewpoint, visibility, barometer),
-    expandable severity-colored alerts, 48-hour hourly forecast scroll strip, 7-day daily outlook
-  - Proxy `/weather?lat=&lon=` merges 5 NWS API calls with per-section TTLs (points=24h, current=5min, forecast=30min, alerts=5min)
-  - 22 weather condition vector icons (day/night variants), `WeatherIconHelper.kt` mapping
-  - Replaced old Alerts submenu (4 stubs + 1 useless global alerts + METAR = 8 items → 1 Weather button)
-  - METAR toggle + frequency moved to Radar menu
-- METAR stations with rich text markers — temp (°F), wind arrow+speed, sky/wx, flight-category color
-  - Bbox passthrough to Aviation Weather API, cached per-bbox
-  - Deferred load — waits for GPS fix so map has a valid bounding box
-  - Tap shows human-readable decoded METAR (compass wind, decoded sky/wx, flight category explained)
-  - Handles HTTP 204 (no content) gracefully
-- NWS NEXRAD radar tiles (Iowa State Mesonet — replaced RainViewer)
-- MBTA live vehicles: buses, commuter rail, subway (with auto-refresh)
-  - Directional arrows on vehicle markers showing bearing/heading
-- **MBTA train station markers** (v1.5.17) — ~270 subway + commuter rail stations on map
-  - Station building icon (26dp, tinted per line); multi-line stations use neutral dark gray
-  - Tap station → **arrival board dialog**: real-time predictions with route dots, headsign, "Now/X min/H:MM" times
-  - Auto-refreshes every 30s while dialog is open
-  - Tap a train row → **trip schedule dialog**: full timetable with stop names, times, track numbers (CR)
-  - `routeColor()` / `routeAbbrev()` helpers extract duplicated color logic
-  - Toggle in Transit menu ("Train Stations"), defaults ON, persisted with `PREF_MBTA_STATIONS`
-  - Fetches via 2 MBTA API calls (subway routes + CR route_type=2), merges by stop ID
-  - No interference with vehicle/aircraft follow mode
-- **MBTA bus stop markers** (v1.5.19) — ~7,900 bus stops, viewport-filtered client-side
-  - Fetched via proxy `/mbta/bus-stops` (24h cache TTL), held in memory (~500KB)
-  - Only shown at zoom >= 15; 300ms debounced viewport filter on scroll/zoom
-  - Bus stop sign icon (20dp, teal tint), tap → reuses arrival board dialog
-  - Toggle in Transit menu ("Bus Stops"), defaults OFF (opt-in), persisted with `PREF_MBTA_BUS_STOPS`
-- **Vehicle detail dialog** (v1.5.19) — replaces direct tap-to-follow for all vehicles
-  - Tapping bus/train/subway shows info dialog: route, vehicle ID, status, speed, staleness
-  - Three buttons: Follow (teal), View Route (trip schedule), Arrivals (arrival board)
-  - Route color bar under header; buttons dimmed when trip/stop info unavailable
-- Aircraft tracking (OpenSky Network) — live airplane positions
-  - Rotated airplane icon pointing to heading, callsign label, vertical rate indicator (↑↓—)
-  - SPI emergency flag: thick red circle around marker, warning in tap info
-  - Altitude-colored markers: green (<5k ft), blue (5–20k ft), purple (>20k ft), gray (ground)
-  - All 18 state vector fields parsed (added: timePosition, lastContact, spi, positionSource)
-  - Tap shows: altitude, speed, heading, vertical rate, squawk, origin, category, source (ADS-B/MLAT), position age
-  - Auto-refresh at configurable interval (30s–5min, default 60s)
-  - Zoom guard: only fetches at zoom ≥ 10 to avoid massive queries
-  - Reloads on scroll/zoom with 1s debounce
-  - Deferred restore like METAR — waits for GPS fix
-  - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
+- Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
+- **16 POI categories** with submenu refinement (central config in `PoiCategories.kt`)
+  - 5dp colored dots; zoom ≥ 18: labeled icons with type + name
+  - Layer-aware LiveData `Pair<String, List>`, viewport-only display via `/pois/bbox`
+  - All layers default ON except aircraft (OFF)
+- **Weather dialog** (v1.5.34): current conditions, 48-hour hourly, 7-day outlook, expandable alerts
+  - Proxy `/weather?lat=&lon=` (5 NWS calls), 22 vector icons, auto-fetch every 30min
+  - Toolbar icon shows current conditions; red border when alerts active
+- **METAR** — rich text markers (temp, wind, sky), bbox passthrough, deferred load, human-readable tap info
+- **NWS NEXRAD radar** tiles (Iowa State Mesonet)
+- **MBTA transit** — live vehicles (buses, CR, subway) with directional arrows + staleness detection
+  - ~270 train stations: tap → arrival board (30s auto-refresh) → trip schedule
+  - ~7,900 bus stops: viewport-filtered, zoom ≥ 15, tap → arrival board
+  - Vehicle detail dialog: info + Follow/View Route/Arrivals buttons
+- **Aircraft tracking** (OpenSky) — rotated airplane icons, callsign, altitude-colored, SPI emergency
+  - 18 state vector fields, configurable refresh (30s–5min), zoom ≥ 10 guard
+  - Dedicated **Air** menu (toggle, frequency, auto-follow)
 - **Slim toolbar + status line + grid dropdown** (v1.5.40): replaced 2×5 icon grid with compact 3-icon bar
   - **Toolbar** (40dp): Weather icon (left) | spacer | Alerts icon + Grid menu button (right)
   - **Status line** (24dp): priority-based info bar — GPS coords+weather when idle, follow/scan/alert info when active
@@ -81,117 +38,21 @@
   - Weather icon dynamically updates to show current conditions; red border when alerts active
   - Alerts icon dynamically colored by severity: gray (none), blue (INFO), yellow (WARNING), red (CRITICAL), pulsing red (EMERGENCY)
   - Debug `/state` includes `statusLine` field with text + priority name
-- **Go to Location** (v1.5.32): geocode autocomplete dialog — type-ahead suggestions as you type
-  - **Photon geocoder** (Komoot OSM) via proxy `/geocode` — prefix matching, US-only (bbox filter)
-  - Auto-suggest: `TextWatcher` with 500ms debounce, fires at >= 3 characters
-  - Replaced `android.location.Geocoder` (no prefix matching) with Photon (proper autocomplete)
-  - Results cached 24h at proxy; `GeocodeSuggestion` data class in Models.kt
-  - On result tap: MANUAL mode, animateTo, triggerFullSearch, bbox refresh, scheduleSilentFill
-- Aircraft follow mode: tap airplane → map tracks it globally via icao24 query
-  - Dedicated icao24 refresh loop (not limited to bbox — tracks anywhere in the world)
-  - Banner shows callsign, altitude, speed, heading, vertical rate, SPI flag
-  - POI prefetch at aircraft position each refresh cycle
-  - 3-strike failure tolerance on position queries (handles 429 rate limits)
-  - Auto-stops with toast when aircraft disappears after 3 consecutive failures
-  - **Flight path trail** (v1.5.24): altitude-colored polyline drawn on map during follow
-    - Loads DB sighting history on follow start (2 points per sighting), grows live each 60s refresh
-    - Colors: gray (ground), green (<5k ft), blue (5–20k ft), purple (>20k ft)
-    - Skips >30min gaps (separate flights); caps at 1000 points; z-ordered under markers
-    - Clears on stop-follow; debug state reports trail point/segment counts
-- **Auto-follow aircraft (POI Builder)**: Utility menu toggle for passive POI cache building
-  - Picks random aircraft ≥ 10,000 ft from wide bbox (~zoom 8, 6°×8° span), follows via aircraft follow mode
-  - Rotates every 20 minutes; prioritizes westbound aircraft (stays over land)
-  - Smart switching triggers:
-    - **Below 10,000 ft** → picks any new aircraft
-    - **0 POIs returned** (over water) → picks furthest-west aircraft
-    - **Outside US bounds** (>49°N, <25°N, >-66°W, <-125°W) → picks aircraft closest to US interior center
-  - Banner shows "Auto-following ✈" prefix; restores on app restart
-- **Webcam layer** (Windy Webcams API) — live camera markers on map
-  - 18 webcam categories (matches Windy API v3): traffic, city, village, beach, coast, port, lake, river, mountain, forest, landscape, indoor, airport, building, square, observatory, meteo, sportArea
-  - Camera icon markers, tap opens 90% fullscreen dark dialog with preview image, info, and "View Live" button
-  - "View Live" loads Windy player in in-app WebView (no browser fork)
-  - Viewport reload on scroll AND zoom (500ms debounce, same pattern as POIs)
-  - Minimum 0.5° bbox span enforced (Windy API returns 0 for small viewports)
-  - Proxy `/webcams` endpoint with 10-min cache TTL, includes `playerUrl` and `detailUrl` fields
-  - Deferred restore on app restart, defaults ON with "traffic" pre-selected
-- **Automatic cap detection & retry-to-fit** (v1.5.15): all POI searches self-correct in dense areas
-  - Overpass `out center 500` cap — when hit, `searchPois()` halves radius and retries in-place
-  - Keeps halving until results fit or 100m floor reached — no subdivision queue needed
-  - Radius hint halved on cap feedback so future searches at that location start small
-  - **20km fuzzy radius hints**: nearest known hint within 20km used as starting radius
-    - Eliminates retry chains in known dense metro areas (e.g., Boston downtown → all of metro area)
-  - Tested: downtown Boston settles at 250m (5 attempts first time, 1 attempt after hint saved)
-- **Populate POIs v2** (grid scanner, v1.5.16): Utility menu for systematic cache building
-  - **Three-phase approach**: probe center → calibrate grid → spiral with recursive subdivision
-  - Phase 1: probes map center to discover settled radius (retries up to 3× on transient errors)
-  - Phase 2: calculates grid step from settled radius (not hardcoded 3000m)
-  - Phase 3: spirals outward; each cell has retry-to-fit; dense cells trigger recursive 3×3 subdivision
-  - **Recursive 3×3 subdivision**: when a cell settles at smaller radius than grid, fills 8 surrounding points
-    - Recurses further if fill points also settle smaller; stops at MIN_RADIUS (100m)
-    - Dense pockets get fine coverage; sparse areas stay at 1 search per cell
-  - **Narrative banner**: two-line status showing grid radius, current action, POI counts (new vs known)
-    - "Searching cell 3/8 at 1500m…", "Dense area! 1500m→750m — filling 8 gaps", "Fill 3/8: 45 POIs (8 new)"
-  - Orange crosshair marker shows current scan position
-  - Guards: refuses while vehicle/aircraft follow is active; tap banner to stop
-  - Stops on user interaction: long-press, vehicle tap, aircraft tap
-  - Never auto-restarts on app launch — pref cleared in `onStart()`
-  - Webcam reloads suppressed during scanning; POI markers hidden at zoom ≤ 8
-  - Proxy `X-Cache` header (HIT/MISS) on `/overpass` responses
-  - Proxy cache key includes radius to prevent cache collisions on cap-retry
-- Vehicle follow mode: tap a bus/train → map tracks it, banner shows status
-  - **Staleness detection**: banner and tap snippet show "STALE (Xm ago)" when vehicle GPS update is >2 min old
-- POI prefetch along followed vehicle/aircraft routes
-- **Find dialog** (v1.5.26) — POI discovery feature on toolbar
-  - Category grid (4×4) → subtype grid → distance-sorted results list → tap to navigate
-  - Long-press category/subtype → map filter mode with "Showing: X ✕" banner
-  - DB-backed: `/db/pois/counts` (10-min cache) + `/db/pois/find` (Haversine-sorted, 50→200km auto-expand)
-  - `FindRepository.kt` with client-side counts cache; `FindResult`/`FindCounts`/`FindResponse` models
-  - "All POIs On" button in POI menu for quick recovery after filtering
-- **POI Detail Dialog** (v1.5.27) — rich info view when tapping Find results
-  - Header: category color dot + compact GPS distance + POI name + close
-  - Info rows: Distance, Type (with cuisine/brand detail), Address, Phone (tappable → dialer), Hours
-  - "Load Website" button → full-screen in-app WebView (deferred init avoids ANR)
-  - Proxy `/pois/website` endpoint: 3-tier waterfall (OSM tags → Wikidata P856 → DuckDuckGo)
-  - Resolved URLs cached permanently in DB as `_resolved_website` JSONB tag
-  - `duck-duck-scrape` npm dependency for Tier 3 search
-  - 4 action buttons: Directions (Google Maps), Call (dialer), Reviews (Yelp in WebView), Map (zoom 18)
-  - External intents use `FLAG_ACTIVITY_NO_HISTORY` — auto-killed on return to app
-  - Full-screen WebView: back/close bar, pinch-to-zoom, `onRenderProcessGone` crash handler
-- **Legend dialog** (v1.5.25) — accessible via Utility → Map Legend
-  - 7 sections: GPS, 16 POI categories, METAR/radar, transit vehicles, transit stops, aircraft, webcams
-  - POI section driven from `PoiCategories.ALL` — stays in sync automatically
-- **Transit zoom guard** (v1.5.25) — all transit markers hidden at zoom ≤ 10, restored on zoom in
-- Cached POI coverage display: proxy `/pois/bbox` endpoint returns POIs within visible map area
-  - Loads on startup, refreshes on scroll/zoom (500ms debounce), refreshes after follow prefetch
-  - Also triggered explicitly after long-press location change (programmatic moves don't fire onScroll)
-- Adaptive POI search radius — proxy stores per-grid-cell hints, app fetches/reports, 20km fuzzy matching
-- Individual POI cache (poi-cache.json) — deduped by OSM type+id, with first/last seen timestamps
-- POI database (PostgreSQL) — permanent storage with JSONB tags, category indexing, upsert import
-- Cache proxy with disk persistence (cache-data.json, radius-hints.json, poi-cache.json, 365-day Overpass TTL)
-- **Idle auto-populate** (v1.5.33) — full probe-calibrate-spiral scanner starts after 60s GPS stationarity
-  - GPS observer jitter branch (<100m) checks idle time; significant-move branch resets timer + cancels scan
-  - `startIdlePopulate(center)` / `stopIdlePopulate()`; `idlePopulateJob` + `lastSignificantMoveTime` state vars
-  - 45s inter-cell delay (gentler than manual 30s); "Idle scan:" banner prefix
-  - Guards: no manual populate, not following, speed ≤20mph; always uses GPS position (never map center)
-  - Cancels on: GPS >100m move, long-press, vehicle/aircraft tap, manual populate, banner tap, Go to Location
-  - Debug state: `idlePopulate` (boolean), `idleTimeSec`, `populate` (manual scanner)
-- **Overpass request queue** (v1.5.16): proxy serializes upstream Overpass requests, 10s minimum gap
-  - Cache hits return instantly; cache misses queued and processed one at a time
-  - Prevents Overpass 429/504 storms from parallel requests
-  - Queue depth visible in `/cache/stats` → `overpassQueue`
-  - `X-POI-New` / `X-POI-Known` response headers report new vs existing POIs per request
-  - **Per-client fair queuing** (v1.5.33): round-robin across `X-Client-ID` headers, 5-request per-client cap
-  - **Covering cache check** (v1.5.33): before Overpass upstream, checks if larger-radius cached result covers area
-  - **Content hash delta** (v1.5.33): MD5 of sorted element IDs skips `cacheIndividualPois()` when data unchanged
-- **Bbox snapping for cache hit rate** (v1.5.23): coordinates rounded to grid for reuse across small scrolls
-  - METAR: 0.01° (~1km), webcams: 0.01° (~1km), aircraft: 0.1° (~11km)
-  - South/west snap down, north/east snap up to fully contain original viewport
-- **Silent background POI fill** (v1.5.28): automatic single Overpass search on startup/restore/long-press
-  - Fires at center position after delay (3-4s), uses adaptive radius with cap-retry
-  - Cancels on: new long-press, vehicle/aircraft tap, full populate scanner start
-  - `scheduleSilentFill()` with tracked Runnable prevents double-fire
-  - Debug banner toggle in Utility menu (default ON): shows fill progress, tap to cancel
-  - `silentFill` boolean in debug `/state` endpoint
+- **Go to Location** (v1.5.32): Photon geocoder autocomplete via proxy `/geocode`, US-only, 500ms debounce
+- **Aircraft follow mode**: global icao24 tracking, 3-strike tolerance, flight path trail (altitude-colored polyline, DB history + live, 1000-point cap)
+- **Auto-follow aircraft (POI Builder)**: ≥10k ft, 20-min rotation, smart switching (altitude/POI/US bounds)
+- **Webcam layer** (Windy API): 18 categories, preview + live player, 0.5° min bbox, 10-min cache
+- **Cap detection & retry-to-fit**: halves radius on 500-element cap, 20km fuzzy hints, MIN_RADIUS 100m
+- **Populate POIs v2** (grid scanner): probe-calibrate-spiral with recursive 3×3 subdivision, narrative banner
+- **Vehicle follow**: tap → track, staleness detection (>2 min), POI prefetch along route
+- **Find dialog** (v1.5.26): category grid → subtype grid → distance-sorted results, long-press filter mode
+- **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map)
+- **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
+- Transit zoom guard (zoom ≤ 10 hides markers), POI bbox viewport display, adaptive radius hints
+- **Idle auto-populate** (v1.5.33): 60s GPS stationarity → full scanner, 45s delays, GPS-centered
+- **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta
+- **Bbox snapping**: METAR/webcams 0.01°, aircraft 0.1° for cache hit rate
+- **Silent fill** (v1.5.28): single Overpass search on startup/restore/long-press (3-4s delay)
 - **Geofence Alert System** (v1.5.35-36) — multi-zone spatial alerting with 5 zone types
   - **GeofenceEngine** (`util/GeofenceEngine.kt`): JTS R-tree spatial index, point-in-polygon, proximity detection
     - `loadZones()` builds JTS polygons, inserts into STRtree; `checkPosition()` returns `List<GeofenceAlert>`
@@ -234,23 +95,11 @@
   - **Duplicate handling**: detects existing database ID, shows overwrite confirmation dialog
   - **Local-only databases**: catalog merges locally-imported databases not in remote catalog; works offline
   - **Database Manager UI**: "IMPORT .DB" / "IMPORT CSV" buttons at top; "EXPORT" button on installed cards
-- **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
-- **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
-- Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
-- **Embedded debug HTTP server** (v1.5.18) — programmatic app control via `adb forward` + `curl`
-  - Port 8085, raw `ServerSocket` on `Dispatchers.IO`, minimal HTTP/1.0 parser, JSON via Gson
-  - 24 endpoints: state, logs, map control, marker listing/search/tap/nearest, vehicles, stations, bus-stops, screenshot, livedata, prefs, toggle, search, refresh, follow, stop-follow, perf, overlays, geofences, geofences/alerts
-  - `DebugHttpServer.kt` (singleton accept loop) + `DebugEndpoints.kt` (all handlers)
-  - `runOnMain` helper for UI-thread access via `suspendCancellableCoroutine`
-  - Marker tap invokes custom `OnMarkerClickListener` via reflection (v1.5.21)
-  - `relatedObject` stored on all markers for rich data access (v1.5.21)
-  - Automated test suite: `./test-app.sh` (30+ tests, curl + jq)
-  - **Overnight test harness**: `./overnight-test.sh` (~1,850 lines), `./morning-transit-test.sh`, `./run-full-test-suite.sh`
-  - Lifecycle-aware: endpoints registered in `onResume`, nulled in `onPause`
-  - **Double-start guard**: `start()` returns early if job already active; `stop()` cancels job + closes socket
-  - **`onDestroy()` cleanup**: MainActivity calls `DebugHttpServer.stop()` to release port on Activity recreation
-  - Bind exceptions always logged (no more silent swallowing behind `isActive` check)
-  - Usage: `adb forward tcp:8085 tcp:8085 && curl localhost:8085/state | jq .`
+- **Startup**: loads cached bbox only (no per-category Overpass queries); 504/429 don't shrink radius hints
+- **Debug HTTP server** (v1.5.18): port 8085, 24 endpoints, `adb forward` + `curl`
+  - `DebugHttpServer.kt` (singleton) + `DebugEndpoints.kt`; lifecycle-aware, double-start guard
+  - `relatedObject` on all markers; reflection-based marker tap; `runOnMain` helper
+  - Test suite: `test-app.sh` (30+ tests), `overnight-test.sh`, `morning-transit-test.sh`
 
 ## External API Routing
 | API | App Endpoint | Proxy Route | TTL |
@@ -360,9 +209,7 @@
   - Without OPENSKY_*: aircraft requests use anonymous access (100 req/day)
 
 ## GPS Centering
-- Map only auto-centers on **first** GPS fix (`initialCenterDone` flag)
-- Subsequent GPS updates move the GPS marker but don't pan the map
-- Vehicle follow mode still pans to tracked vehicle
+- Auto-centers on **first** GPS fix only (`initialCenterDone` flag); follow mode still pans
 
 ## OpenSky OAuth2
 - Registered account: `DeanMauriceEllis`
@@ -387,20 +234,16 @@
   - Build command: `JAVA_HOME=/home/witchdoctor/AndroidStudio/android-studio/jbr ./gradlew assembleDebug`
   - System Java 17 is NOT sufficient — Gradle daemon requires Java 21 (`gradle/gradle-daemon-jvm.properties`)
 
-## POI Marker Memory Management (v1.5.9)
-- **Viewport-only display**: POI markers are evicted on every scroll/zoom and replaced with only what the proxy returns for the visible bbox
-- `places` observer: `"bbox"` layerId → `replaceAllPoiMarkers()` clears ALL POI markers, adds only viewport results
-- Non-bbox results (user searches, category restores) go to proxy cache silently; next bbox refresh picks them up
-- Category toggles control *searching* (Overpass queries), not *display* — display is always driven by `/pois/bbox`
-- `MarkerIconHelper` icon cache: LRU LinkedHashMap capped at 500 entries (was unbounded HashMap)
-- Estimated POI marker count: ~100-400 (viewport) vs ~22,000 (previous accumulated)
+## POI Marker Memory Management
+- Viewport-only display: `replaceAllPoiMarkers()` on bbox refresh, ~100-400 markers (was 22k)
+- Category toggles control *searching*, not *display* — display always from `/pois/bbox`
+- LRU icon cache capped at 500 entries
 
 ## Known Issues
 - MBTA API key hardcoded in MbtaRepository.kt (should be in BuildConfig/secrets)
 - Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
-- ~~**test-app.sh ANSI grep**~~ — fixed in v1.5.23, strips ANSI before counting
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |
@@ -489,8 +332,8 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - Memory: 9-27MB range, no trend upward
 - 0 test failures across entire run
 
-## Completed Plan: Geofence Alert System (PLAN.md)
-Roadmap completed across v1.5.35–v1.5.39. See `PLAN.md` for full details.
+## Completed Plan: Geofence Alert System
+Roadmap completed across v1.5.35–v1.5.39. See `PLAN-ARCHIVE.md` for full details.
 - Phase 1: Core Engine + TFRs (v1.5.35)
 - Phase 2: Additional Zone Types (v1.5.36)
 - Phase 3A: Downloadable Database Infrastructure (v1.5.37)
