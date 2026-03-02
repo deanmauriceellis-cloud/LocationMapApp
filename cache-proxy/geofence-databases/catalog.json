@@ -10,5 +10,41 @@
     "updatedAt": "2026-03-02",
     "source": "HIFLD / MIRTA (data.gov)",
     "license": "Public Domain (US Government)"
+  },
+  {
+    "id": "excam-cameras",
+    "name": "Speed & Red-Light Cameras",
+    "description": "Worldwide speed cameras, red-light cameras, and enforcement cameras from WzSabre/ExCam dataset. 200m alert radius.",
+    "version": 1,
+    "zoneType": "SPEED_CAMERA",
+    "zoneCount": 109500,
+    "fileSize": 37687296,
+    "updatedAt": "2026-03-02",
+    "source": "WzSabre (wzsabre.rocks)",
+    "license": "Community-contributed data"
+  },
+  {
+    "id": "nces-schools",
+    "name": "US Public Schools",
+    "description": "US K-12 public school locations from NCES EDGE. 300m school zone radius around each school.",
+    "version": 1,
+    "zoneType": "SCHOOL_ZONE",
+    "zoneCount": 101390,
+    "fileSize": 46641152,
+    "updatedAt": "2026-03-02",
+    "source": "NCES EDGE (nces.ed.gov)",
+    "license": "Public Domain (US Government)"
+  },
+  {
+    "id": "dji-nofly",
+    "name": "DJI No-Fly Zones",
+    "description": "DJI drone no-fly zones — airports, restricted areas, and authorization zones worldwide.",
+    "version": 1,
+    "zoneType": "NO_FLY_ZONE",
+    "zoneCount": 7823,
+    "fileSize": 3108864,
+    "updatedAt": "2026-03-02",
+    "source": "DJI NFZDB (GitHub/MAVProxyUser)",
+    "license": "Community data (unofficial)"
   }
 ]

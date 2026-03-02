@@ -13,6 +13,7 @@
     "duck-duck-scrape": "^2.2.5",
     "express": "^4.21.0",
     "fast-xml-parser": "^4.3.0",
+    "lzma-native": "^8.0.6",
     "pg": "^8.13.0",
     "undici": "^6.23.0"
   }
