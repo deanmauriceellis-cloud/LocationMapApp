@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 40 (Slim Toolbar + Status Line + Grid Dropdown)
+## Last Updated: 2026-03-02 Session 41 (Idle Populate Improvements)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
