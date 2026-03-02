@@ -455,7 +455,15 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - Memory: 9-27MB range, no trend upward
 - 0 test failures across entire run
 
-## Next Steps
+## Active Plan: Geofence Alert System (5 Phases)
+**See `PLAN.md` for full details.** Current status:
+- Phase 1: Core Engine + TFRs — **DONE** (v1.5.35)
+- Phase 2: Additional Zone Types — **DONE** (v1.5.36)
+- Phase 3: Downloadable Databases — **NEXT** (SQLite schema, proxy catalog, Database Manager dialog)
+- Phase 4: User-Created Databases + Distribution
+- Phase 5: Advanced Sources
+
+## Other Next Steps
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)
