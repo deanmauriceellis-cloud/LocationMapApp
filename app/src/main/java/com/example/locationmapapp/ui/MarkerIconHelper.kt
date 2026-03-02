@@ -345,6 +345,195 @@ object MarkerIconHelper {
     }
 
     /**
+     * Labeled vehicle marker for high zoom levels (≥18): status pill above, arrow+icon center,
+     * speed badge + route pill below.
+     *
+     * @return Pair(BitmapDrawable, anchorY) — anchorY points at the icon center (geographic position)
+     */
+    fun labeledVehicle(
+        context: Context,
+        resId: Int,
+        sizeDp: Int,
+        tintColor: Int,
+        bearingDeg: Int,
+        routeName: String,
+        headsign: String?,
+        stopName: String?,
+        statusDisplay: String,
+        speedDisplay: String,
+        isStale: Boolean
+    ): Pair<BitmapDrawable, Float> {
+        val density = context.resources.displayMetrics.density
+
+        // ── Truncation helper ─────────────────────────────────────────────────
+        fun trunc(s: String, max: Int = 18): String =
+            if (s.length > max) s.take(max) + "…" else s
+
+        // ── Prepare text ──────────────────────────────────────────────────────
+        val statusPrefix = when {
+            statusDisplay.startsWith("En route")  -> "→"
+            statusDisplay.startsWith("Stopped")   -> "●"
+            statusDisplay.startsWith("Arriving")  -> "↓"
+            else -> ""
+        }
+        val topText = trunc(if (stopName != null) "$statusPrefix $stopName" else statusDisplay)
+        val bottomText = trunc(if (headsign != null) "$routeName · To $headsign" else routeName)
+        val speedText = if (speedDisplay != "—") speedDisplay else ""
+
+        val key = "lv|$resId|$sizeDp|$tintColor|$bearingDeg|$topText|$bottomText|$speedText|$isStale"
+        cache[key]?.let {
+            // Recompute anchorY from cached bitmap dimensions
+            val iconPx = (sizeDp * density).toInt()
+            val arrowSz = (8 * density).toInt()
+            val arrowGap = (2 * density).toInt()
+            val pillH = (10 * density + 2 * density + 2 * 2 * density).toInt() // textSize + padding
+            val gap = (2 * density).toInt()
+            val iconCenterFromTop = pillH + gap + arrowSz + arrowGap + iconPx / 2f
+            val anchorY = iconCenterFromTop / it.bitmap.height.toFloat()
+            return Pair(it, anchorY)
+        }
+
+        val iconPx = (sizeDp * density).toInt()
+        val arrowSz = (8 * density).toInt()
+        val arrowGap = (2 * density).toInt()
+
+        // ── Text paints ───────────────────────────────────────────────────────
+        val topPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = tintColor
+            textSize = 10 * density
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        val bottomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.DKGRAY
+            textSize = 10 * density
+            typeface = Typeface.DEFAULT
+            textAlign = Paint.Align.CENTER
+        }
+        val speedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 10 * density
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+
+        val pillPadH = 3 * density
+        val pillPadV = 2 * density
+        val pillCorner = 3 * density
+
+        // ── Measure pills ─────────────────────────────────────────────────────
+        val topTextW = topPaint.measureText(topText)
+        val topPillW = topTextW + 2 * pillPadH
+        val topPillH = (topPaint.textSize + 2 * pillPadV).toInt()
+
+        val bottomTextW = bottomPaint.measureText(bottomText)
+        val bottomPillW = bottomTextW + 2 * pillPadH
+        val bottomPillH = (bottomPaint.textSize + 2 * pillPadV).toInt()
+
+        val speedW = if (speedText.isNotEmpty()) speedPaint.measureText(speedText) else 0f
+        val speedPillW = if (speedText.isNotEmpty()) speedW + 2 * pillPadH else 0f
+        val speedGap = if (speedText.isNotEmpty()) 2 * density else 0f
+
+        // ── Total dimensions ──────────────────────────────────────────────────
+        val gap = (2 * density).toInt()
+        val arrowArea = iconPx + arrowSz * 2  // width for rotated arrow
+        val bottomRowW = speedPillW + speedGap + bottomPillW
+
+        val totalW = maxOf(topPillW, arrowArea.toFloat(), bottomRowW).toInt() + (4 * density).toInt()
+        val totalH = topPillH + gap + arrowSz + arrowGap + iconPx + gap + bottomPillH
+
+        val workBitmap = Bitmap.createBitmap(totalW, totalH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(workBitmap)
+        val cx = totalW / 2f
+
+        // ── Top pill (status + stop name) ─────────────────────────────────────
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; alpha = 210; style = Paint.Style.FILL
+        }
+        val topRect = RectF(
+            cx - topPillW / 2, 0f,
+            cx + topPillW / 2, topPillH.toFloat()
+        )
+        canvas.drawRoundRect(topRect, pillCorner, pillCorner, bgPaint)
+        canvas.drawText(topText, cx, topPillH - pillPadV - 1 * density, topPaint)
+
+        // ── Arrow + icon (inlined from withArrow logic) ───────────────────────
+        val iconLeft = (totalW - iconPx) / 2
+        val iconTop = topPillH + gap + arrowSz + arrowGap
+        val drawable: Drawable = ContextCompat.getDrawable(context, resId)!!.mutate()
+        DrawableCompat.setTint(drawable, tintColor)
+        drawable.setBounds(iconLeft, iconTop, iconLeft + iconPx, iconTop + iconPx)
+        drawable.draw(canvas)
+
+        // Rotated arrow above icon
+        val arrowCx = totalW / 2f
+        val arrowCy = (topPillH + gap + arrowSz).toFloat()
+        canvas.save()
+        canvas.rotate(bearingDeg.toFloat(), arrowCx, arrowCy)
+        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = tintColor; style = Paint.Style.FILL
+        }
+        val path = Path().apply {
+            moveTo(arrowCx, arrowCy - arrowSz * 0.7f)
+            lineTo(arrowCx - arrowSz * 0.4f, arrowCy + arrowSz * 0.3f)
+            lineTo(arrowCx + arrowSz * 0.4f, arrowCy + arrowSz * 0.3f)
+            close()
+        }
+        canvas.drawPath(path, arrowPaint)
+        canvas.restore()
+
+        // ── Bottom row: speed badge (optional) + route pill ───────────────────
+        val bottomY = (topPillH + gap + arrowSz + arrowGap + iconPx + gap).toFloat()
+        val bottomRowCenter = cx + (speedPillW + speedGap) / 2f  // shift right when speed present
+
+        // Route pill
+        val bottomRect = RectF(
+            cx + (speedPillW + speedGap) / 2f - bottomPillW / 2,
+            bottomY,
+            cx + (speedPillW + speedGap) / 2f + bottomPillW / 2,
+            bottomY + bottomPillH
+        )
+        bgPaint.alpha = 210
+        canvas.drawRoundRect(bottomRect, pillCorner, pillCorner, bgPaint)
+        canvas.drawText(bottomText, bottomRect.centerX(), bottomY + bottomPillH - pillPadV - 1 * density, bottomPaint)
+
+        // Speed badge (left of route pill)
+        if (speedText.isNotEmpty()) {
+            val speedRect = RectF(
+                bottomRect.left - speedGap - speedPillW,
+                bottomY,
+                bottomRect.left - speedGap,
+                bottomY + bottomPillH
+            )
+            val speedBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = tintColor; style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(speedRect, pillCorner, pillCorner, speedBgPaint)
+            canvas.drawText(speedText, speedRect.centerX(), bottomY + bottomPillH - pillPadV - 1 * density, speedPaint)
+        }
+
+        // ── Staleness dimming ─────────────────────────────────────────────────
+        val finalBitmap = if (isStale) {
+            val out = Bitmap.createBitmap(totalW, totalH, Bitmap.Config.ARGB_8888)
+            val c = Canvas(out)
+            val dimPaint = Paint().apply { alpha = 128 }
+            c.drawBitmap(workBitmap, 0f, 0f, dimPaint)
+            workBitmap.recycle()
+            out
+        } else {
+            workBitmap
+        }
+
+        val result = BitmapDrawable(context.resources, finalBitmap)
+        cache[key] = result
+
+        // anchorY: icon center relative to total height
+        val iconCenterFromTop = topPillH + gap + arrowSz + arrowGap + iconPx / 2f
+        val anchorY = iconCenterFromTop / totalH
+        return Pair(result, anchorY)
+    }
+
+    /**
      * Render an aircraft marker: rotated airplane icon pointing to [headingDeg],
      * callsign label, vertical rate indicator (arrow up/down/dash), and an optional
      * thick red circle when [spi] (Special Purpose Indicator / emergency) is active.

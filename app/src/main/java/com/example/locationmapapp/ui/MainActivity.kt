@@ -125,8 +125,9 @@ class MainActivity : AppCompatActivity() {
     private var silentFillJob: Job? = null
     private var silentFillRunnable: Runnable? = null
 
-    // POI label zoom threshold tracking
+    // POI / vehicle label zoom threshold tracking
     private var poiLabelsShowing = false
+    private var vehicleLabelsShowing = false
     private var transitMarkersVisible = true
 
     // Deferred restore — wait for first real GPS fix so the map has a valid bounding box
@@ -562,6 +563,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else if (!transitMarkersVisible) {
                     transitMarkersVisible = true
+                    vehicleLabelsShowing = zoom >= 18.0
                     // Re-add from latest LiveData values
                     viewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
                     viewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
@@ -575,6 +577,11 @@ class MainActivity : AppCompatActivity() {
                 if (nowLabeled != poiLabelsShowing) {
                     poiLabelsShowing = nowLabeled
                     refreshPoiMarkerIcons()
+                }
+                // Refresh vehicle marker icons when crossing the zoom-18 label threshold
+                if (nowLabeled != vehicleLabelsShowing) {
+                    vehicleLabelsShowing = nowLabeled
+                    refreshVehicleMarkerIcons()
                 }
                 return false
             }
@@ -1103,6 +1110,35 @@ class MainActivity : AppCompatActivity() {
                 MarkerIconHelper.dot(this, place.category)
             }
         }
+        binding.mapView.invalidate()
+    }
+
+    /** Swap all vehicle marker icons between plain arrow and labeled when crossing zoom 18. */
+    private fun refreshVehicleMarkerIcons() {
+        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        DebugLogger.i("MainActivity", "refreshVehicleMarkerIcons labeled=$labeled")
+        fun refreshList(markers: List<Marker>, resId: Int, sizeDp: Int) {
+            markers.forEach { marker ->
+                val v = marker.relatedObject as? com.example.locationmapapp.data.model.MbtaVehicle ?: return@forEach
+                val tint = vehicleRouteColor(v)
+                val isStale = vehicleStalenessTag(v.updatedAt).isNotEmpty()
+                if (labeled) {
+                    val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
+                        this, resId, sizeDp, tint, v.bearing,
+                        v.routeName, v.headsign, v.stopName,
+                        v.currentStatus.display, v.speedDisplay, isStale
+                    )
+                    marker.icon = icon
+                    marker.setAnchor(Marker.ANCHOR_CENTER, anchorY)
+                } else {
+                    marker.icon = MarkerIconHelper.withArrow(this, resId, sizeDp, tint, v.bearing)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                }
+            }
+        }
+        refreshList(trainMarkers, R.drawable.ic_transit_rail, 30)
+        refreshList(subwayMarkers, R.drawable.ic_transit_rail, 26)
+        refreshList(busMarkers, R.drawable.ic_bus, 22)
         binding.mapView.invalidate()
     }
 
@@ -1766,19 +1802,23 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun addTrainMarker(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
-        val tint = when {
-            vehicle.routeId.startsWith("CR-") -> Color.parseColor("#6A1B9A")  // Purple — Commuter Rail
-            vehicle.routeId.startsWith("Green") -> Color.parseColor("#2E7D32")
-            vehicle.routeId == "Red"    -> Color.parseColor("#C62828")
-            vehicle.routeId == "Orange" -> Color.parseColor("#E65100")
-            vehicle.routeId == "Blue"   -> Color.parseColor("#1565C0")
-            vehicle.routeId == "Silver" -> Color.parseColor("#546E7A")
-            else -> Color.parseColor("#37474F")
-        }
+        val tint = vehicleRouteColor(vehicle)
+        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
         val m = Marker(binding.mapView).apply {
             position = vehicle.toGeoPoint()
-            icon     = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_transit_rail, 30, tint, vehicle.bearing)
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            if (labeled) {
+                val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
+                    this@MainActivity, R.drawable.ic_transit_rail, 30, tint, vehicle.bearing,
+                    vehicle.routeName, vehicle.headsign, vehicle.stopName,
+                    vehicle.currentStatus.display, vehicle.speedDisplay, isStale
+                )
+                this.icon = icon
+                setAnchor(Marker.ANCHOR_CENTER, anchorY)
+            } else {
+                icon = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_transit_rail, 30, tint, vehicle.bearing)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            }
             title   = "Train ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
             relatedObject = vehicle
@@ -1853,18 +1893,23 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun addSubwayMarker(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
-        val tint = when {
-            vehicle.routeId.startsWith("Green") -> Color.parseColor("#2E7D32")
-            vehicle.routeId == "Red"    -> Color.parseColor("#C62828")
-            vehicle.routeId == "Orange" -> Color.parseColor("#E65100")
-            vehicle.routeId == "Blue"   -> Color.parseColor("#1565C0")
-            vehicle.routeId == "Mattapan" -> Color.parseColor("#C62828")
-            else -> Color.parseColor("#37474F")
-        }
+        val tint = vehicleRouteColor(vehicle)
+        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
         val m = Marker(binding.mapView).apply {
             position = vehicle.toGeoPoint()
-            icon     = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_transit_rail, 26, tint, vehicle.bearing)
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            if (labeled) {
+                val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
+                    this@MainActivity, R.drawable.ic_transit_rail, 26, tint, vehicle.bearing,
+                    vehicle.routeName, vehicle.headsign, vehicle.stopName,
+                    vehicle.currentStatus.display, vehicle.speedDisplay, isStale
+                )
+                this.icon = icon
+                setAnchor(Marker.ANCHOR_CENTER, anchorY)
+            } else {
+                icon = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_transit_rail, 26, tint, vehicle.bearing)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            }
             title   = "Subway ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
             relatedObject = vehicle
@@ -1906,11 +1951,23 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun addBusMarker(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
-        val tint = Color.parseColor("#00695C")  // Teal for buses
+        val tint = vehicleRouteColor(vehicle)
+        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
         val m = Marker(binding.mapView).apply {
             position = vehicle.toGeoPoint()
-            icon     = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_bus, 22, tint, vehicle.bearing)
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            if (labeled) {
+                val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
+                    this@MainActivity, R.drawable.ic_bus, 22, tint, vehicle.bearing,
+                    vehicle.routeName, vehicle.headsign, vehicle.stopName,
+                    vehicle.currentStatus.display, vehicle.speedDisplay, isStale
+                )
+                this.icon = icon
+                setAnchor(Marker.ANCHOR_CENTER, anchorY)
+            } else {
+                icon = MarkerIconHelper.withArrow(this@MainActivity, R.drawable.ic_bus, 22, tint, vehicle.bearing)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            }
             title   = "Bus ${vehicle.label} — ${vehicle.routeName}"
             snippet = buildTrainSnippet(vehicle)
             relatedObject = vehicle
