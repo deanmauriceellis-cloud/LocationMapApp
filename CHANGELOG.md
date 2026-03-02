@@ -2,6 +2,18 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.41] — 2026-03-02
+
+### Changed
+- **Idle auto-populate** — reworked with several improvements:
+  - Threshold increased from 60s to 5 minutes of GPS stationarity
+  - Touch-to-stop: any map tap cancels idle populate and resets the 5-min idle timer
+  - State preservation: stopped idle scanner resumes from last ring/point instead of restarting
+  - No auto-pan: crosshair marker moves silently without hijacking map position
+  - State cleared on long-press, GPS move >100m, goToLocation, or manual populate start
+- **Long press** now fetches weather + alerts at the new location
+- **Idle populate** blocked while utility populate is active (guard already existed, now documented)
+
 ## [1.5.40] — 2026-03-02
 
 ### Added
