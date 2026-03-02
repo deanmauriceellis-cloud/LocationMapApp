@@ -488,6 +488,9 @@ class AppBarMenuManager(
                 R.id.menu_util_gps_mode ->
                     toggleBinary(item, PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
 
+                R.id.menu_util_silent_fill_debug ->
+                    toggleBinary(item, PREF_SILENT_FILL_DEBUG) { menuEventListener.onSilentFillDebugToggled(it) }
+
                 R.id.menu_util_legend -> menuEventListener.onLegendRequested()
 
                 else -> {
@@ -498,8 +501,9 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_util_record_gps     to PREF_RECORD_GPS,
-            R.id.menu_util_gps_mode       to PREF_GPS_MODE
+            R.id.menu_util_record_gps          to PREF_RECORD_GPS,
+            R.id.menu_util_gps_mode            to PREF_GPS_MODE,
+            R.id.menu_util_silent_fill_debug   to PREF_SILENT_FILL_DEBUG
         )
         // Update populate title to reflect running state
         val popRunning = prefs.getBoolean(PREF_POPULATE_POIS, false)
@@ -662,5 +666,6 @@ class AppBarMenuManager(
         const val PREF_GPS_MODE              = "gps_mode_auto"
         const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
         const val PREF_POPULATE_POIS         = "populate_pois_on"
+        const val PREF_SILENT_FILL_DEBUG     = "silent_fill_debug_on"
     }
 }

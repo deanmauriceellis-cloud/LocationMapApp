@@ -55,6 +55,13 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <!-- Silent POI fill debug banner (checkable — shows banner when background fill is running) -->
+    <item
+        android:id="@+id/menu_util_silent_fill_debug"
+        android:title="Silent Fill Debug Banner"
+        android:checkable="true"
+        app:showAsAction="never" />
+
     <!-- Map legend dialog -->
     <item
         android:id="@+id/menu_util_legend"

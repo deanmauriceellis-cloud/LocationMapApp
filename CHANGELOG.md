@@ -1,5 +1,29 @@
 # LocationMapApp — Changelog
 
+## [1.5.28] — 2026-03-01
+
+### Added
+- **Silent background POI fill** — automatic single Overpass search at center position
+  - Fires on startup (first GPS fix), saved position restore, and long-press location change
+  - Uses existing `populateSearchAt()` with adaptive radius and cap-retry
+  - Cancels on: long-press (new position), vehicle/aircraft tap, full populate scanner start
+  - `scheduleSilentFill()` with tracked `Runnable` prevents double-fire on rapid moves
+  - `silentFill` boolean in debug `/state` endpoint
+- **Silent Fill Debug Banner** toggle in Utility menu (default ON)
+  - Shows `🔍 Filling POIs…` → `🔍 Fill: X POIs (Y new) at Zm` banner, auto-dismisses after 3s
+  - Tap banner to cancel; toggle only controls banner visibility, fill always runs silently
+- **23 new POI subtypes** added to 7 existing categories (~3,571 previously uncategorized POIs)
+  - **Food & Drink**: +Bakeries, Liquor Stores, Delis
+  - **Civic & Gov**: +Community Centres, Social Services
+  - **Parks & Rec**: +Gardens, Picnic Sites, Drinking Water, Restrooms
+  - **Shopping**: +Hair Salons, Beauty & Spa
+  - **Tourism & History**: +Public Art, Galleries, Info Points, Cemeteries, Historic Bldgs
+  - **Auto Services**: +Dealerships, Parts Stores (now has subtypes: Repair, Car Wash, Rentals, Tires, Dealers, Parts)
+  - **Entertainment**: +Theatres, Cinemas, Nightclubs, Event Venues, Arts Centres
+
+### Changed
+- POI database re-imported: 23,343 → 39,266 POIs (Hollywood/LA scanning session)
+
 ## [1.5.27] — 2026-03-01
 
 ### Added

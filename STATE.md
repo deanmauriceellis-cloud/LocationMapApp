@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 27 (POI Detail Dialog)
+## Last Updated: 2026-03-01 Session 28 (Silent POI Fill + Category Expansion)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -150,6 +150,12 @@
 - **Bbox snapping for cache hit rate** (v1.5.23): coordinates rounded to grid for reuse across small scrolls
   - METAR: 0.01° (~1km), webcams: 0.01° (~1km), aircraft: 0.1° (~11km)
   - South/west snap down, north/east snap up to fully contain original viewport
+- **Silent background POI fill** (v1.5.28): automatic single Overpass search on startup/restore/long-press
+  - Fires at center position after delay (3-4s), uses adaptive radius with cap-retry
+  - Cancels on: new long-press, vehicle/aircraft tap, full populate scanner start
+  - `scheduleSilentFill()` with tracked Runnable prevents double-fire
+  - Debug banner toggle in Utility menu (default ON): shows fill progress, tap to cancel
+  - `silentFill` boolean in debug `/state` endpoint
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
@@ -229,7 +235,7 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
-  - 23,343 POIs as of 2026-03-01 (re-imported via `import-pois.js`)
+  - 39,266 POIs as of 2026-03-01 (re-imported after Hollywood/LA scanning)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)

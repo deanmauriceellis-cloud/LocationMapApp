@@ -121,6 +121,10 @@ class MainActivity : AppCompatActivity() {
     private var populateJob: Job? = null
     private var scanningMarker: Marker? = null
 
+    // Silent background POI fill — single center search on startup / position change
+    private var silentFillJob: Job? = null
+    private var silentFillRunnable: Runnable? = null
+
     // POI label zoom threshold tracking
     private var poiLabelsShowing = false
     private var transitMarkersVisible = true
@@ -469,8 +473,9 @@ class MainActivity : AppCompatActivity() {
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
                 DebugLogger.i("MainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
-                // Stop populate scanner if running — user is interacting with a new location
+                // Stop populate scanner and silent fill — user is moving to a new location
                 if (populateJob != null) stopPopulatePois()
+                stopSilentFill()
                 viewModel.setManualLocation(p)
                 // Zoom to 14 if currently zoomed out; leave alone if already 14+
                 val targetZoom = if (binding.mapView.zoomLevelDouble < 14.0) 14.0 else binding.mapView.zoomLevelDouble
@@ -482,6 +487,8 @@ class MainActivity : AppCompatActivity() {
                     delay(2000)
                     loadCachedPoisForVisibleArea()
                 }
+                // Silent fill at new position — runs after triggerFullSearch settles
+                scheduleSilentFill(p, 3000)
                 toast("Manual mode — searching POIs…")
                 return true
             }
@@ -759,6 +766,8 @@ class MainActivity : AppCompatActivity() {
                 pendingPoiRestore = false
                 DebugLogger.i("MainActivity", "POI restore — loading cached POIs for visible area")
                 binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 1500)
+                // Silent background fill — search Overpass at GPS position to populate cache
+                scheduleSilentFill(point, 3000)
             }
             // Fire deferred METAR load after the map animation settles
             if (pendingMetarRestore) {
@@ -791,6 +800,8 @@ class MainActivity : AppCompatActivity() {
                     DebugLogger.i("MainActivity", "Loading cached POIs for visible area")
                     loadCachedPoisForVisibleArea()
                 }, 2000)
+                // Silent fill to ensure cache is populated at restored position
+                scheduleSilentFill(point, 4000)
             }
             // Webcam restore
             if (pendingWebcamRestore) {
@@ -2455,8 +2466,9 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun onVehicleMarkerTapped(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
-        // Stop populate scanner if running — user is interacting with an object
+        // Stop populate scanner and silent fill — user is interacting with an object
         if (populateJob != null) stopPopulatePois()
+        stopSilentFill()
         showVehicleDetailDialog(vehicle)
     }
 
@@ -3965,8 +3977,9 @@ class MainActivity : AppCompatActivity() {
     // ── Aircraft follow ─────────────────────────────────────────────────────
 
     private fun onAircraftMarkerTapped(state: com.example.locationmapapp.data.model.AircraftState) {
-        // Stop populate scanner if running — user is interacting with an object
+        // Stop populate scanner and silent fill — user is interacting with an object
         if (populateJob != null) stopPopulatePois()
+        stopSilentFill()
         if (followedAircraftIcao == state.icao24) {
             stopFollowing()
         } else {
@@ -4173,6 +4186,106 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================================
+    // SILENT BACKGROUND POI FILL
+    // =========================================================================
+
+    /**
+     * Starts a single background Overpass search at [center] to fill POI cache
+     * for the current viewport. Cancels any previous silent fill in progress.
+     * Shows a debug banner if PREF_SILENT_FILL_DEBUG is enabled.
+     */
+    private fun startSilentFill(center: org.osmdroid.util.GeoPoint) {
+        silentFillJob?.cancel()
+        // Don't run if full populate scanner is active
+        if (populateJob != null) return
+        // Don't run if following something (follow has its own POI prefetch)
+        if (followedVehicleId != null || followedAircraftIcao != null) return
+
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        val showDebug = prefs.getBoolean(AppBarMenuManager.PREF_SILENT_FILL_DEBUG, true)
+
+        silentFillJob = lifecycleScope.launch {
+            DebugLogger.i("MainActivity", "Silent fill starting at ${center.latitude},${center.longitude}")
+            if (showDebug) showSilentFillBanner("Filling POIs\u2026")
+            try {
+                val result = viewModel.populateSearchAt(center)
+                if (result != null) {
+                    DebugLogger.i("MainActivity", "Silent fill complete — ${result.results.size} POIs (${result.poiNew} new) at ${result.radiusM}m")
+                    loadCachedPoisForVisibleArea()
+                    if (showDebug) {
+                        showSilentFillBanner("Fill: ${result.results.size} POIs (${result.poiNew} new) at ${result.radiusM}m")
+                        delay(3000)
+                        hideSilentFillBanner()
+                    }
+                } else {
+                    DebugLogger.w("MainActivity", "Silent fill returned null (error)")
+                    if (showDebug) {
+                        showSilentFillBanner("Fill failed")
+                        delay(2000)
+                        hideSilentFillBanner()
+                    }
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                DebugLogger.i("MainActivity", "Silent fill cancelled")
+                if (showDebug) hideSilentFillBanner()
+            } catch (e: Exception) {
+                DebugLogger.e("MainActivity", "Silent fill error: ${e.message}", e)
+                if (showDebug) {
+                    showSilentFillBanner("Fill error")
+                    delay(2000)
+                    hideSilentFillBanner()
+                }
+            }
+        }
+    }
+
+    /** Schedule a silent fill after a delay, cancelling any pending/running fill first. */
+    private fun scheduleSilentFill(center: org.osmdroid.util.GeoPoint, delayMs: Long) {
+        silentFillRunnable?.let { binding.mapView.removeCallbacks(it) }
+        val runnable = Runnable { startSilentFill(center) }
+        silentFillRunnable = runnable
+        binding.mapView.postDelayed(runnable, delayMs)
+    }
+
+    private fun stopSilentFill() {
+        silentFillRunnable?.let { binding.mapView.removeCallbacks(it) }
+        silentFillRunnable = null
+        silentFillJob?.cancel()
+        silentFillJob = null
+        hideSilentFillBanner()
+    }
+
+    private fun showSilentFillBanner(text: String) {
+        runOnUiThread {
+            if (followBanner == null) {
+                followBanner = TextView(this).apply {
+                    setBackgroundColor(Color.parseColor("#DD212121"))
+                    setTextColor(Color.WHITE)
+                    textSize = 13f
+                    setPadding(32, 20, 32, 20)
+                    val params = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        behavior = com.google.android.material.appbar.AppBarLayout.ScrollingViewBehavior()
+                    }
+                    layoutParams = params
+                    elevation = 12f
+                    setOnClickListener { stopSilentFill() }
+                }
+                (binding.root as ViewGroup).addView(followBanner)
+            }
+            followBanner?.setOnClickListener { stopSilentFill() }
+            followBanner?.text = "\uD83D\uDD0D $text"
+            followBanner?.visibility = View.VISIBLE
+        }
+    }
+
+    private fun hideSilentFillBanner() {
+        runOnUiThread { followBanner?.visibility = View.GONE }
+    }
+
+    // =========================================================================
     // POPULATE POIs — SYSTEMATIC GRID SCANNER
     // =========================================================================
 
@@ -4200,6 +4313,8 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
             return
         }
+        // Cancel silent fill — full scanner takes over
+        stopSilentFill()
 
         val center = binding.mapView.mapCenter
         val centerLat = center.latitude
@@ -4803,6 +4918,12 @@ class MainActivity : AppCompatActivity() {
             if (enabled) startPopulatePois() else stopPopulatePois()
         }
 
+        override fun onSilentFillDebugToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onSilentFillDebugToggled: $enabled")
+            // Toggle only controls banner visibility — silent fill always runs
+            if (!enabled) hideSilentFillBanner()
+        }
+
         override fun onGpsModeToggled(autoGps: Boolean) {
             DebugLogger.i("MainActivity", "onGpsModeToggled: autoGps=$autoGps")
             toggleLocationMode()
@@ -4878,6 +4999,7 @@ class MainActivity : AppCompatActivity() {
                 "label" to findFilterLabel,
                 "tags" to findFilterTags
             ),
+            "silentFill" to (silentFillJob?.isActive == true),
             "overlays" to map.overlays.size
         )
     }

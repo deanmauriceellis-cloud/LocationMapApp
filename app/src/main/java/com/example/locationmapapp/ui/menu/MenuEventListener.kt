@@ -151,6 +151,9 @@ interface MenuEventListener {
     /** Switch between automatic GPS centering and manual tap-to-set-location mode. */
     fun onGpsModeToggled(autoGps: Boolean)
 
+    /** Toggle debug banner visibility for silent background POI fill. */
+    fun onSilentFillDebugToggled(enabled: Boolean)
+
     // =========================================================================
     // FIND / LEGEND
     // =========================================================================

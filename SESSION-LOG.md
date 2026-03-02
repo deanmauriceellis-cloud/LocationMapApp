@@ -1,5 +1,46 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-01k (Silent POI Fill + Category Expansion — v1.5.28)
+
+### Changes Made
+
+#### Silent Background POI Fill (MainActivity.kt, ~100 lines)
+- **`silentFillJob: Job?`** + **`silentFillRunnable: Runnable?`** — trackable coroutine + delayed post
+- **`startSilentFill(center)`** — single `populateSearchAt()` call, guards against populate/follow active
+- **`scheduleSilentFill(center, delayMs)`** — cancels pending runnable before posting new one (prevents double-fire)
+- **`stopSilentFill()`** — cancels both pending runnable and running coroutine, hides banner
+- **`showSilentFillBanner(text)` / `hideSilentFillBanner()`** — reuses `followBanner` TextView pattern
+- **Trigger points**: first GPS fix (3s delay), saved position restore (4s delay), long-press (3s delay)
+- **Cancellation points**: long-press, vehicle tap, aircraft tap, full populate scanner start, banner tap
+- **Debug state**: `silentFill` boolean added to `/state` endpoint
+
+#### Menu Infrastructure
+- **`menu_utility.xml`** — added `menu_util_silent_fill_debug` checkable item
+- **`AppBarMenuManager.kt`** — added `PREF_SILENT_FILL_DEBUG` constant, handler, checkbox sync
+- **`MenuEventListener.kt`** — added `onSilentFillDebugToggled(enabled)` callback
+- **`MainActivity.kt`** — `onSilentFillDebugToggled` implementation (hides banner when disabled)
+
+#### POI Category Expansion (PoiCategories.kt)
+- **Food & Drink**: +`shop=bakery`, `shop=alcohol`, `shop=deli` (3 subtypes)
+- **Civic & Gov**: +`amenity=community_centre`, `amenity=social_facility` (2 subtypes)
+- **Parks & Rec**: +`leisure=garden`, `tourism=picnic_site`, `amenity=drinking_water`, `amenity=toilets` (4 subtypes)
+- **Shopping**: +`shop=hairdresser`, `shop=beauty` (2 subtypes)
+- **Tourism & History**: +`tourism=artwork`, `tourism=gallery`, `tourism=information`, `historic=cemetery`, `historic=building` (5 subtypes)
+- **Auto Services**: +`shop=car`, `shop=car_parts` — now has subtypes (was null): 6 subtypes total
+- **Entertainment**: +`amenity=theatre`, `amenity=cinema`, `amenity=nightclub`, `amenity=events_venue`, `amenity=arts_centre` (5 subtypes)
+- Total: +23 new tags, ~3,571 previously uncategorized POIs now visible
+
+#### Database
+- POI cache re-imported after Hollywood/LA populate session: 23,343 → 39,266 POIs
+
+### Testing
+- Startup silent fill: verified at home location (14 POIs at 1500m) and LA (174 POIs at 750m, 555 new)
+- Long-press silent fill: verified in rural MA (118 POIs at 3000m), NYC (192 POIs at 750m, cap-retry)
+- Saved position restore: verified at LA defaults (174 POIs at 750m)
+- Double-fire bug: fixed with tracked Runnable, confirmed no duplicate in NYC test
+- Cancellation: silent fill correctly skipped during active populate scanner
+- Build: SUCCESSFUL, no new warnings
+
 ## Session: 2026-03-01j (POI Detail Dialog — v1.5.27)
 
 ### Changes Made

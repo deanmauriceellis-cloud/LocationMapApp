@@ -27,14 +27,18 @@ object PoiCategories {
             label = "Food & Drink",
             prefKey = "poi_food_drink_on",
             tags = listOf("amenity=restaurant", "amenity=fast_food", "amenity=cafe",
-                           "amenity=bar", "amenity=pub", "amenity=ice_cream"),
+                           "amenity=bar", "amenity=pub", "amenity=ice_cream",
+                           "shop=bakery", "shop=alcohol", "shop=deli"),
             subtypes = listOf(
                 PoiSubtype("Restaurants",  listOf("amenity=restaurant")),
                 PoiSubtype("Fast Food",    listOf("amenity=fast_food")),
                 PoiSubtype("Cafes",        listOf("amenity=cafe")),
                 PoiSubtype("Bars",         listOf("amenity=bar")),
                 PoiSubtype("Pubs",         listOf("amenity=pub")),
-                PoiSubtype("Ice Cream",    listOf("amenity=ice_cream"))
+                PoiSubtype("Ice Cream",    listOf("amenity=ice_cream")),
+                PoiSubtype("Bakeries",     listOf("shop=bakery")),
+                PoiSubtype("Liquor Stores", listOf("shop=alcohol")),
+                PoiSubtype("Delis",        listOf("shop=deli"))
             ),
             color = Color.parseColor("#BF360C")
         ),
@@ -67,12 +71,15 @@ object PoiCategories {
             id = PoiLayerId.CIVIC,
             label = "Civic & Gov",
             prefKey = "poi_civic_on",
-            tags = listOf("amenity=townhall", "amenity=courthouse", "amenity=post_office", "office=government"),
+            tags = listOf("amenity=townhall", "amenity=courthouse", "amenity=post_office", "office=government",
+                           "amenity=community_centre", "amenity=social_facility"),
             subtypes = listOf(
-                PoiSubtype("Town Halls",    listOf("amenity=townhall")),
-                PoiSubtype("Courthouses",   listOf("amenity=courthouse")),
-                PoiSubtype("Post Offices",  listOf("amenity=post_office")),
-                PoiSubtype("Gov Offices",   listOf("office=government"))
+                PoiSubtype("Town Halls",        listOf("amenity=townhall")),
+                PoiSubtype("Courthouses",       listOf("amenity=courthouse")),
+                PoiSubtype("Post Offices",      listOf("amenity=post_office")),
+                PoiSubtype("Gov Offices",       listOf("office=government")),
+                PoiSubtype("Community Centres", listOf("amenity=community_centre")),
+                PoiSubtype("Social Services",   listOf("amenity=social_facility"))
             ),
             color = Color.parseColor("#1A237E")
         ),
@@ -83,13 +90,19 @@ object PoiCategories {
             label = "Parks & Rec",
             prefKey = "poi_parks_rec_on",
             tags = listOf("leisure=park", "leisure=nature_reserve", "leisure=playground",
-                           "leisure=pitch", "leisure=swimming_pool"),
+                           "leisure=pitch", "leisure=swimming_pool",
+                           "leisure=garden", "tourism=picnic_site",
+                           "amenity=drinking_water", "amenity=toilets"),
             subtypes = listOf(
                 PoiSubtype("Parks",          listOf("leisure=park")),
                 PoiSubtype("Nature Reserves", listOf("leisure=nature_reserve")),
                 PoiSubtype("Playgrounds",    listOf("leisure=playground")),
                 PoiSubtype("Sports Fields",  listOf("leisure=pitch")),
-                PoiSubtype("Pools",          listOf("leisure=swimming_pool"))
+                PoiSubtype("Pools",          listOf("leisure=swimming_pool")),
+                PoiSubtype("Gardens",        listOf("leisure=garden")),
+                PoiSubtype("Picnic Sites",   listOf("tourism=picnic_site")),
+                PoiSubtype("Drinking Water", listOf("amenity=drinking_water")),
+                PoiSubtype("Restrooms",      listOf("amenity=toilets"))
             ),
             color = Color.parseColor("#2E7D32")
         ),
@@ -100,13 +113,16 @@ object PoiCategories {
             label = "Shopping",
             prefKey = "poi_shopping_on",
             tags = listOf("shop=supermarket", "shop=convenience", "shop=mall",
-                           "shop=department_store", "shop=clothes"),
+                           "shop=department_store", "shop=clothes",
+                           "shop=hairdresser", "shop=beauty"),
             subtypes = listOf(
                 PoiSubtype("Supermarkets",       listOf("shop=supermarket")),
                 PoiSubtype("Convenience Stores",  listOf("shop=convenience")),
                 PoiSubtype("Malls",              listOf("shop=mall")),
                 PoiSubtype("Department Stores",   listOf("shop=department_store")),
-                PoiSubtype("Clothing",           listOf("shop=clothes"))
+                PoiSubtype("Clothing",           listOf("shop=clothes")),
+                PoiSubtype("Hair Salons",        listOf("shop=hairdresser")),
+                PoiSubtype("Beauty & Spa",       listOf("shop=beauty"))
             ),
             color = Color.parseColor("#F57F17")
         ),
@@ -193,13 +209,20 @@ object PoiCategories {
             label = "Tourism & History",
             prefKey = "poi_tourism_history_on",
             tags = listOf("tourism=museum", "tourism=attraction", "tourism=viewpoint",
-                           "historic=memorial", "historic=monument"),
+                           "historic=memorial", "historic=monument",
+                           "tourism=artwork", "tourism=gallery", "tourism=information",
+                           "historic=cemetery", "historic=building"),
             subtypes = listOf(
                 PoiSubtype("Museums",     listOf("tourism=museum")),
                 PoiSubtype("Attractions", listOf("tourism=attraction")),
                 PoiSubtype("Viewpoints",  listOf("tourism=viewpoint")),
                 PoiSubtype("Memorials",   listOf("historic=memorial")),
-                PoiSubtype("Monuments",   listOf("historic=monument"))
+                PoiSubtype("Monuments",   listOf("historic=monument")),
+                PoiSubtype("Public Art",  listOf("tourism=artwork")),
+                PoiSubtype("Galleries",   listOf("tourism=gallery")),
+                PoiSubtype("Info Points", listOf("tourism=information")),
+                PoiSubtype("Cemeteries",  listOf("historic=cemetery")),
+                PoiSubtype("Historic Bldgs", listOf("historic=building"))
             ),
             color = Color.parseColor("#FF6F00")
         ),
@@ -222,8 +245,16 @@ object PoiCategories {
             id = PoiLayerId.AUTO_SERVICES,
             label = "Auto Services",
             prefKey = "poi_auto_services_on",
-            tags = listOf("shop=car_repair", "amenity=car_wash", "amenity=car_rental", "shop=tyres"),
-            subtypes = null,
+            tags = listOf("shop=car_repair", "amenity=car_wash", "amenity=car_rental", "shop=tyres",
+                           "shop=car", "shop=car_parts"),
+            subtypes = listOf(
+                PoiSubtype("Repair Shops",  listOf("shop=car_repair")),
+                PoiSubtype("Car Washes",    listOf("amenity=car_wash")),
+                PoiSubtype("Rentals",       listOf("amenity=car_rental")),
+                PoiSubtype("Tire Shops",    listOf("shop=tyres")),
+                PoiSubtype("Dealerships",   listOf("shop=car")),
+                PoiSubtype("Parts Stores",  listOf("shop=car_parts"))
+            ),
             color = Color.parseColor("#37474F")
         ),
 
@@ -233,13 +264,20 @@ object PoiCategories {
             label = "Entertainment",
             prefKey = "poi_entertainment_on",
             tags = listOf("leisure=fitness_centre", "leisure=sports_centre", "leisure=golf_course",
-                           "leisure=marina", "leisure=stadium"),
+                           "leisure=marina", "leisure=stadium",
+                           "amenity=theatre", "amenity=cinema", "amenity=nightclub",
+                           "amenity=events_venue", "amenity=arts_centre"),
             subtypes = listOf(
                 PoiSubtype("Fitness",       listOf("leisure=fitness_centre")),
                 PoiSubtype("Sports Centres", listOf("leisure=sports_centre")),
                 PoiSubtype("Golf Courses",  listOf("leisure=golf_course")),
                 PoiSubtype("Marinas",       listOf("leisure=marina")),
-                PoiSubtype("Stadiums",      listOf("leisure=stadium"))
+                PoiSubtype("Stadiums",      listOf("leisure=stadium")),
+                PoiSubtype("Theatres",      listOf("amenity=theatre")),
+                PoiSubtype("Cinemas",       listOf("amenity=cinema")),
+                PoiSubtype("Nightclubs",    listOf("amenity=nightclub")),
+                PoiSubtype("Event Venues",  listOf("amenity=events_venue")),
+                PoiSubtype("Arts Centres",  listOf("amenity=arts_centre"))
             ),
             color = Color.parseColor("#00838F")
         )
