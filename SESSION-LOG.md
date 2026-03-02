@@ -1,5 +1,41 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-02a (Geocode Autocomplete + Tooltips — v1.5.32)
+
+### Changes Made
+
+#### Toolbar Tooltips (menu_main_toolbar.xml + MainActivity.kt)
+- Added `android:tooltipText` attribute to all 9 menu items in XML
+- Added programmatic tooltip setup in `onCreateOptionsMenu()`: posts Runnable after layout, iterates menu items, sets `tooltipText` on action views found via `findViewById(item.itemId)`
+- Tooltips: Alerts, Transit, Webcams, Aircraft, Radar, POI Categories, Utility, Find POI, Go to Location
+
+#### Geocode Autocomplete (MainActivity.kt)
+- **Auto-suggest TextWatcher**: added to Go to Location input field
+  - 500ms debounce via `autoSearchJob` (cancels previous on each keystroke)
+  - Fires at >= 3 characters, clears results below threshold
+  - Calls same `doSearch` lambda used by Search button and Enter key
+- **Replaced Android Geocoder with Photon**: `android.location.Geocoder` does literal name matching (no prefix/fuzzy), Photon does proper autocomplete
+  - OkHttp call to proxy `GET /geocode?q=&limit=5`
+  - Parses JSON array of `GeocodeSuggestion` via Gson
+  - On tap: uses `city, state` for short toast label, `display_name` for row text
+  - Added `import com.example.locationmapapp.data.model.GeocodeSuggestion`
+
+#### GeocodeSuggestion Data Class (Models.kt)
+- New `data class GeocodeSuggestion(lat, lon, display_name, type, city, state)`
+
+#### Proxy Geocode Endpoint (cache-proxy/server.js)
+- **`GET /geocode?q=&limit=`** — forwards to Photon (photon.komoot.io) with US bbox
+  - Bounding box: `-125,24,-66,50` (continental US)
+  - Extracts: lat, lon, display_name (assembled from name/city/state/country), type, city, state
+  - 24h in-memory cache keyed by `geocode:query:limit`
+  - Logs query and result count
+
+### Testing
+- "roch" → Rochester NY, Rochester MN, Rochester Hills MI, RIT, Rochelle IL (all US)
+- Tapped Rochester NY → map navigated, POIs populated, toast "Moved to: Rochester, New York"
+- Auto-suggest fires after typing pause, no double-fire, results update live
+- Build: SUCCESSFUL, no new warnings
+
 ## Session: 2026-03-01n (Icon Toolbar + Go to Location — v1.5.31)
 
 ### Changes Made

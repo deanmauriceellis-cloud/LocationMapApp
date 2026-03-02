@@ -240,6 +240,15 @@ data class PoiWebsite(
     val address: String?
 )
 
+data class GeocodeSuggestion(
+    val lat: Double,
+    val lon: Double,
+    val display_name: String,
+    val type: String?,
+    val city: String?,
+    val state: String?
+)
+
 enum class MbtaVehicleStatus(val display: String) {
     INCOMING_AT("Arriving"),
     STOPPED_AT("Stopped at"),

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-01 Session 31 (Icon Toolbar + Go to Location)
+## Last Updated: 2026-03-02 Session 32 (Geocode Autocomplete + Tooltips)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -63,8 +63,13 @@
   - FAB speed dial toggle + dedicated **Air** top-level menu (toggle, frequency slider, auto-follow)
 - **Icon toolbar** (v1.5.31): 9 icon-only buttons (was 8 text labels), long-press shows tooltip
   - Icons: Alerts, Transit, CAMs, Air, Radar, POI, Utility, Find, Go to Location (crosshair)
-- **Go to Location** (v1.5.31): geocoder dialog — type address/city/zip, pick from results, map navigates
-  - Uses `android.location.Geocoder`, up to 5 results, switches to MANUAL mode + triggers POI search
+  - Explicit `tooltipText` set programmatically on action views after inflation (v1.5.32)
+- **Go to Location** (v1.5.32): geocode autocomplete dialog — type-ahead suggestions as you type
+  - **Photon geocoder** (Komoot OSM) via proxy `/geocode` — prefix matching, US-only (bbox filter)
+  - Auto-suggest: `TextWatcher` with 500ms debounce, fires at >= 3 characters
+  - Replaced `android.location.Geocoder` (no prefix matching) with Photon (proper autocomplete)
+  - Results cached 24h at proxy; `GeocodeSuggestion` data class in Models.kt
+  - On result tap: MANUAL mode, animateTo, triggerFullSearch, bbox refresh, scheduleSilentFill
 - Aircraft follow mode: tap airplane → map tracks it globally via icao24 query
   - Dedicated icao24 refresh loop (not limited to bbox — tracks anywhere in the world)
   - Banner shows callsign, altitude, speed, heading, vertical rate, SPI flag
@@ -193,6 +198,7 @@
 | POI Website | `http://10.0.0.4:3000/pois/website` | GET /pois/website?osm_type=&osm_id=&name=&lat=&lon= | permanent (DB) |
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
 | DB Aircraft | `http://10.0.0.4:3000/db/aircraft/...` | GET /db/aircraft/search, /recent, /stats, /:icao24 | live |
+| Geocode | `http://10.0.0.4:3000/geocode?q=...` | GET /geocode?q=&limit= | 24 hours |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
 | MBTA Stations | direct (api-v3.mbta.com/stops) | not proxied | — |

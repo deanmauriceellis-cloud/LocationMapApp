@@ -29,6 +29,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.locationmapapp.R
+import com.example.locationmapapp.data.model.GeocodeSuggestion
 import com.example.locationmapapp.ui.menu.PoiCategories
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.locationmapapp.databinding.ActivityMainBinding
@@ -252,6 +253,16 @@ class MainActivity : AppCompatActivity() {
         }
         appBarMenuManager.onMenuInflated(menu)
         DebugLogger.i("MainActivity", "onCreateOptionsMenu() — onMenuInflated() called, click listeners wired")
+
+        // Set tooltips on toolbar action views (post so views are laid out)
+        binding.toolbar.post {
+            for (i in 0 until menu.size()) {
+                val item = menu.getItem(i)
+                val actionView = item.actionView ?: binding.toolbar.findViewById<View>(item.itemId)
+                actionView?.tooltipText = item.title
+            }
+        }
+
         return true
     }
 
@@ -3849,7 +3860,12 @@ class MainActivity : AppCompatActivity() {
             addView(searchBtn)
         }
 
-        // ── Geocoder search logic ──
+        // ── Nominatim geocode via proxy ──
+        val geocodeClient = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
         val doSearch = {
             val query = input.text.toString().trim()
             if (query.isEmpty()) {
@@ -3866,13 +3882,23 @@ class MainActivity : AppCompatActivity() {
 
                 lifecycleScope.launch {
                     try {
-                        val geocoder = android.location.Geocoder(this@MainActivity)
-                        @Suppress("DEPRECATION")
                         val results = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            geocoder.getFromLocationName(query, 5)
+                            val url = okhttp3.HttpUrl.Builder()
+                                .scheme("http").host("10.0.0.4").port(3000)
+                                .addPathSegment("geocode")
+                                .addQueryParameter("q", query)
+                                .addQueryParameter("limit", "5")
+                                .build()
+                            val request = okhttp3.Request.Builder().url(url).build()
+                            val response = geocodeClient.newCall(request).execute()
+                            if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+                            val body = response.body?.string() ?: "[]"
+                            com.google.gson.Gson().fromJson(
+                                body, Array<GeocodeSuggestion>::class.java
+                            ).toList()
                         }
                         resultsContainer.removeAllViews()
-                        if (results.isNullOrEmpty()) {
+                        if (results.isEmpty()) {
                             val noResults = TextView(this@MainActivity).apply {
                                 text = "No results found"
                                 textSize = 14f
@@ -3881,11 +3907,8 @@ class MainActivity : AppCompatActivity() {
                             }
                             resultsContainer.addView(noResults)
                         } else {
-                            for (addr in results) {
-                                val label = addr.getAddressLine(0)
-                                    ?: listOfNotNull(addr.locality, addr.adminArea, addr.countryName)
-                                        .joinToString(", ")
-                                        .ifEmpty { "${addr.latitude}, ${addr.longitude}" }
+                            for (geo in results) {
+                                val label = geo.display_name
                                 val row = TextView(this@MainActivity).apply {
                                     text = label
                                     textSize = 15f
@@ -3903,16 +3926,18 @@ class MainActivity : AppCompatActivity() {
                                     lp.bottomMargin = dp(4)
                                     layoutParams = lp
                                     setOnClickListener {
-                                        val point = GeoPoint(addr.latitude, addr.longitude)
+                                        val point = GeoPoint(geo.lat, geo.lon)
+                                        val shortLabel = listOfNotNull(geo.city, geo.state)
+                                            .joinToString(", ").ifEmpty { label }
                                         dialog.dismiss()
-                                        goToLocation(point, label)
+                                        goToLocation(point, shortLabel)
                                     }
                                 }
                                 resultsContainer.addView(row)
                             }
                         }
                     } catch (e: Exception) {
-                        DebugLogger.e("MainActivity", "Geocoder error: ${e.message}")
+                        DebugLogger.e("MainActivity", "Geocode error: ${e.message}")
                         resultsContainer.removeAllViews()
                         val errView = TextView(this@MainActivity).apply {
                             text = "Geocoder unavailable"
@@ -3934,6 +3959,25 @@ class MainActivity : AppCompatActivity() {
                 true
             } else false
         }
+
+        // ── Auto-suggest as you type (500ms debounce, >= 3 chars) ──
+        var autoSearchJob: kotlinx.coroutines.Job? = null
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                autoSearchJob?.cancel()
+                val query = s?.toString()?.trim() ?: ""
+                if (query.length < 3) {
+                    resultsContainer.removeAllViews()
+                    return
+                }
+                autoSearchJob = lifecycleScope.launch {
+                    delay(500)
+                    doSearch()
+                }
+            }
+        })
 
         // ── Assemble layout ──
         val root = LinearLayout(this).apply {

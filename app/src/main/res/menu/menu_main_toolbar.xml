@@ -15,54 +15,63 @@
     <item
         android:id="@+id/menu_top_gps_alerts"
         android:title="Alerts"
+        android:tooltipText="Alerts"
         android:icon="@drawable/ic_weather_alert"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_transit"
         android:title="Transit"
+        android:tooltipText="Transit"
         android:icon="@drawable/ic_transit_rail"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_cams"
         android:title="CAMs"
+        android:tooltipText="Webcams"
         android:icon="@drawable/ic_camera"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_aircraft"
         android:title="Air"
+        android:tooltipText="Aircraft"
         android:icon="@drawable/ic_aircraft"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_radar"
         android:title="Radar"
+        android:tooltipText="Radar"
         android:icon="@drawable/ic_radar"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_poi"
         android:title="POI"
+        android:tooltipText="POI Categories"
         android:icon="@drawable/ic_poi"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_utility"
         android:title="Utility"
+        android:tooltipText="Utility"
         android:icon="@drawable/ic_debug"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_find"
         android:title="Find"
+        android:tooltipText="Find POI"
         android:icon="@drawable/ic_search"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_top_goto"
         android:title="Go to Location"
+        android:tooltipText="Go to Location"
         android:icon="@drawable/ic_goto_location"
         app:showAsAction="always" />
 

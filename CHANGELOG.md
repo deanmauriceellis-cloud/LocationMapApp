@@ -1,5 +1,22 @@
 # LocationMapApp — Changelog
 
+## [1.5.32] — 2026-03-02
+
+### Added
+- **Geocode autocomplete** — Go to Location dialog now auto-suggests as you type
+  - Photon geocoder (Komoot OSM) via proxy `/geocode` endpoint — proper prefix matching
+  - Type "roch" → Rochester NY, Rochester MN, Rochester Hills MI, etc.
+  - `TextWatcher` with 500ms debounce, fires at >= 3 characters typed
+  - US-only results via continental US bounding box filter
+  - Results cached 24h at proxy level
+- **`GeocodeSuggestion`** data class in Models.kt (lat, lon, display_name, type, city, state)
+- **Proxy `/geocode` endpoint** — forwards to Photon API with US bbox, 24h cache
+- **Toolbar tooltips** — explicit `tooltipText` set programmatically on all 9 toolbar action views
+
+### Changed
+- Go to Location: replaced `android.location.Geocoder` with Photon (Geocoder lacks prefix matching)
+- Toolbar menu XML: added `android:tooltipText` attributes on all items
+
 ## [1.5.31] — 2026-03-01
 
 ### Added
