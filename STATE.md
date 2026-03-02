@@ -49,7 +49,10 @@
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map)
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
 - Transit zoom guard (zoom ≤ 10 hides markers), POI bbox viewport display, adaptive radius hints
-- **Idle auto-populate** (v1.5.33): 60s GPS stationarity → full scanner, 45s delays, GPS-centered
+- **Idle auto-populate** (v1.5.33): 5-min GPS stationarity → full scanner, 45s delays, GPS-centered
+  - Touch-to-stop: any map tap cancels idle populate, resets 5-min idle timer
+  - State preservation: stopped idle scanner resumes from last ring/point (not from scratch)
+  - State cleared on: long-press, GPS move >100m, goToLocation, manual populate start
 - **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta
 - **Bbox snapping**: METAR/webcams 0.01°, aircraft 0.1° for cache hit rate
 - **Silent fill** (v1.5.28): single Overpass search on startup/restore/long-press (3-4s delay)
@@ -134,7 +137,7 @@
 
 ## Map Interaction Model
 - **Single tap**: no action
-- **Long press (~2s)**: enter manual mode, center map (auto-zoom to 14 if <14), search POIs at location
+- **Long press (~2s)**: enter manual mode, center map (auto-zoom to 14 if <14), search POIs at location, fetch weather + alerts
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: vehicle detail dialog (route, status, speed) with Follow / View Route / Arrivals buttons
 - **Tap station marker**: arrival board dialog (real-time predictions), tap train → trip schedule dialog
