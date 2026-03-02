@@ -140,8 +140,12 @@ class MainActivity : AppCompatActivity() {
 
     // TFR / Geofence
     private val tfrOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
-    private var tfrReloadJob: Job? = null
-    private var pendingTfrRestore = false
+    private val cameraOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
+    private val schoolOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
+    private val floodOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
+    private val crossingOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
+    private var geofenceReloadJob: Job? = null
+    private var pendingGeofenceRestore = false
     private var alertPulseAnimation: android.view.animation.AlphaAnimation? = null
 
     // POI / vehicle label zoom threshold tracking
@@ -338,10 +342,15 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onStart() Webcam restore deferred — waiting for GPS fix")
         }
 
-        // Defer TFR overlay restore until GPS fix
-        if (prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) {
-            pendingTfrRestore = true
-            DebugLogger.i("MainActivity", "onStart() TFR overlay restore deferred — waiting for GPS fix")
+        // Defer geofence overlay restore until GPS fix
+        val anyGeofence = prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)
+            || prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false)
+            || prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false)
+            || prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false)
+            || prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false)
+        if (anyGeofence) {
+            pendingGeofenceRestore = true
+            DebugLogger.i("MainActivity", "onStart() Geofence overlay restore deferred — waiting for GPS fix")
         }
 
         // Always load full cached POI coverage after GPS fix
@@ -567,7 +576,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 // Suppress webcam reloads while populate scanner is running
                 if (populateJob == null) scheduleWebcamReload()
-                scheduleTfrReload()
+                scheduleGeofenceReload()
                 return false
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
@@ -575,7 +584,7 @@ class MainActivity : AppCompatActivity() {
                 scheduleAircraftReload()
                 scheduleBusStopReload()
                 if (populateJob == null) scheduleWebcamReload()
-                scheduleTfrReload()
+                scheduleGeofenceReload()
                 // Hide transit markers when zoomed out to 10 or less
                 val zoom = binding.mapView.zoomLevelDouble
                 if (zoom <= 10.0) {
@@ -1065,6 +1074,22 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "tfrZones → ${zones.size} TFRs")
             renderTfrOverlays(zones)
         }
+        viewModel.cameraZones.observe(this) { zones ->
+            DebugLogger.i("MainActivity", "cameraZones → ${zones.size}")
+            renderCameraOverlays(zones)
+        }
+        viewModel.schoolZones.observe(this) { zones ->
+            DebugLogger.i("MainActivity", "schoolZones → ${zones.size}")
+            renderSchoolOverlays(zones)
+        }
+        viewModel.floodZones.observe(this) { zones ->
+            DebugLogger.i("MainActivity", "floodZones → ${zones.size}")
+            renderFloodOverlays(zones)
+        }
+        viewModel.crossingZones.observe(this) { zones ->
+            DebugLogger.i("MainActivity", "crossingZones → ${zones.size}")
+            renderCrossingOverlays(zones)
+        }
         viewModel.geofenceAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "geofenceAlerts → ${alerts.size}")
             updateAlertsIcon(alerts)
@@ -1265,11 +1290,11 @@ class MainActivity : AppCompatActivity() {
                 loadWebcamsForVisibleArea()
             }, 2000)
         }
-        if (pendingTfrRestore) {
-            pendingTfrRestore = false
+        if (pendingGeofenceRestore) {
+            pendingGeofenceRestore = false
             binding.mapView.postDelayed({
-                DebugLogger.i("MainActivity", "TFR overlay restore triggered — loading for visible area")
-                loadTfrsForVisibleArea()
+                DebugLogger.i("MainActivity", "Geofence overlay restore triggered — loading for visible area")
+                loadGeofenceZonesForVisibleArea()
             }, 2000)
         }
     }
@@ -1798,7 +1823,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================================
-    // TFR OVERLAYS + GEOFENCE ALERTS
+    // GEOFENCE OVERLAYS + ALERTS
     // =========================================================================
 
     private fun loadTfrsForVisibleArea() {
@@ -1808,59 +1833,160 @@ class MainActivity : AppCompatActivity() {
         viewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
 
-    /** Debounced: reload TFRs 500ms after scrolling/zooming stops. */
-    private fun scheduleTfrReload() {
+    /** Load all enabled geofence zone types for the visible viewport. */
+    private fun loadGeofenceZonesForVisibleArea() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-        if (!prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) return
-        tfrReloadJob?.cancel()
-        tfrReloadJob = lifecycleScope.launch {
-            delay(500)
-            loadTfrsForVisibleArea()
+        val bb = binding.mapView.boundingBox
+        val zoom = binding.mapView.zoomLevelDouble
+
+        if (prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) {
+            viewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        }
+        if (prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false) && zoom >= 10) {
+            viewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        }
+        if (prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false) && zoom >= 12) {
+            viewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        }
+        if (prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false) && zoom >= 12) {
+            viewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        }
+        if (prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false) && zoom >= 12) {
+            viewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
         }
     }
 
-    /** Render TFR zones as semi-transparent red polygons on the map. */
+    /** Debounced: reload geofence zones 500ms after scrolling/zooming stops. */
+    private fun scheduleGeofenceReload() {
+        val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
+        val anyEnabled = prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)
+            || prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false)
+            || prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false)
+            || prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false)
+            || prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false)
+        if (!anyEnabled) return
+        geofenceReloadJob?.cancel()
+        geofenceReloadJob = lifecycleScope.launch {
+            delay(500)
+            loadGeofenceZonesForVisibleArea()
+        }
+    }
+
+    // ── TFR overlays ─────────────────────────────────────────────────────────
+
     private fun renderTfrOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
-        clearTfrOverlays()
+        clearOverlayList(tfrOverlays)
+        renderZoneOverlays(zones, tfrOverlays, Color.argb(40, 244, 67, 54), Color.parseColor("#F44336"))
+        DebugLogger.i("MainActivity", "Rendered ${tfrOverlays.size} TFR overlays from ${zones.size} zones")
+    }
+
+    // ── Camera overlays ──────────────────────────────────────────────────────
+
+    private fun renderCameraOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
+        clearOverlayList(cameraOverlays)
+        renderZoneOverlays(zones, cameraOverlays, Color.argb(50, 255, 152, 0), Color.parseColor("#FF9800"))
+        DebugLogger.i("MainActivity", "Rendered ${cameraOverlays.size} camera overlays from ${zones.size} zones")
+    }
+
+    // ── School overlays ──────────────────────────────────────────────────────
+
+    private fun renderSchoolOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
+        clearOverlayList(schoolOverlays)
+        renderZoneOverlays(zones, schoolOverlays, Color.argb(40, 255, 193, 7), Color.parseColor("#FFC107"))
+        DebugLogger.i("MainActivity", "Rendered ${schoolOverlays.size} school overlays from ${zones.size} zones")
+    }
+
+    // ── Flood overlays ───────────────────────────────────────────────────────
+
+    private fun renderFloodOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
+        clearOverlayList(floodOverlays)
         for (zone in zones) {
             for (shape in zone.shapes) {
                 if (shape.points.size < 3) continue
-                val polygon = org.osmdroid.views.overlay.Polygon(binding.mapView).apply {
-                    fillPaint.color = Color.argb(40, 244, 67, 54)   // semi-transparent red
-                    outlinePaint.color = Color.parseColor("#F44336")
-                    outlinePaint.strokeWidth = 3f
-                    title = zone.notam
-                    snippet = "${zone.type} — ${zone.description}".take(200)
-                    relatedObject = zone
-                    // Convert [lon, lat] points to GeoPoints
-                    val geoPoints = shape.points.map { GeoPoint(it[1], it[0]) }
-                    points = geoPoints
-                    setOnClickListener { _, _, _ ->
-                        showTfrDetailDialog(zone)
-                        true
-                    }
-                }
-                // Insert behind markers but above MapEventsOverlay
+                val isHighRisk = zone.metadata["zoneCode"]?.let { it.startsWith("A") || it.startsWith("V") } == true
+                val fillColor = if (isHighRisk) Color.argb(50, 33, 150, 243) else Color.argb(35, 33, 150, 243)
+                val polygon = buildZonePolygon(zone, shape, fillColor, Color.parseColor("#2196F3"))
                 val insertPos = minOf(1, binding.mapView.overlays.size)
                 binding.mapView.overlays.add(insertPos, polygon)
-                tfrOverlays.add(polygon)
+                floodOverlays.add(polygon)
             }
         }
         binding.mapView.invalidate()
-        DebugLogger.i("MainActivity", "Rendered ${tfrOverlays.size} TFR polygon overlays from ${zones.size} zones")
+        DebugLogger.i("MainActivity", "Rendered ${floodOverlays.size} flood overlays from ${zones.size} zones")
     }
 
-    private fun clearTfrOverlays() {
-        for (overlay in tfrOverlays) {
-            binding.mapView.overlays.remove(overlay)
+    // ── Crossing overlays ────────────────────────────────────────────────────
+
+    private fun renderCrossingOverlays(zones: List<com.example.locationmapapp.data.model.TfrZone>) {
+        clearOverlayList(crossingOverlays)
+        renderZoneOverlays(zones, crossingOverlays, Color.argb(50, 33, 33, 33), Color.parseColor("#FFC107"))
+        DebugLogger.i("MainActivity", "Rendered ${crossingOverlays.size} crossing overlays from ${zones.size} zones")
+    }
+
+    // ── Shared overlay helpers ───────────────────────────────────────────────
+
+    private fun renderZoneOverlays(
+        zones: List<com.example.locationmapapp.data.model.TfrZone>,
+        overlayList: MutableList<org.osmdroid.views.overlay.Polygon>,
+        fillColor: Int,
+        outlineColor: Int
+    ) {
+        for (zone in zones) {
+            for (shape in zone.shapes) {
+                if (shape.points.size < 3) continue
+                val polygon = buildZonePolygon(zone, shape, fillColor, outlineColor)
+                val insertPos = minOf(1, binding.mapView.overlays.size)
+                binding.mapView.overlays.add(insertPos, polygon)
+                overlayList.add(polygon)
+            }
         }
-        tfrOverlays.clear()
         binding.mapView.invalidate()
     }
 
-    /** Show TFR detail dialog when user taps a TFR polygon. */
+    private fun buildZonePolygon(
+        zone: com.example.locationmapapp.data.model.TfrZone,
+        shape: com.example.locationmapapp.data.model.TfrShape,
+        fillColor: Int,
+        outlineColor: Int
+    ): org.osmdroid.views.overlay.Polygon {
+        return org.osmdroid.views.overlay.Polygon(binding.mapView).apply {
+            fillPaint.color = fillColor
+            outlinePaint.color = outlineColor
+            outlinePaint.strokeWidth = 3f
+            title = zone.notam
+            snippet = "${zone.type} — ${zone.description}".take(200)
+            relatedObject = zone
+            val geoPoints = shape.points.map { GeoPoint(it[1], it[0]) }
+            points = geoPoints
+            setOnClickListener { _, _, _ ->
+                showZoneDetailDialog(zone)
+                true
+            }
+        }
+    }
+
+    private fun clearOverlayList(list: MutableList<org.osmdroid.views.overlay.Polygon>) {
+        for (overlay in list) {
+            binding.mapView.overlays.remove(overlay)
+        }
+        list.clear()
+        binding.mapView.invalidate()
+    }
+
+    private fun clearTfrOverlays() = clearOverlayList(tfrOverlays)
+    private fun clearCameraOverlays() = clearOverlayList(cameraOverlays)
+    private fun clearSchoolOverlays() = clearOverlayList(schoolOverlays)
+    private fun clearFloodOverlays() = clearOverlayList(floodOverlays)
+    private fun clearCrossingOverlays() = clearOverlayList(crossingOverlays)
+
+    private fun clearAllGeofenceOverlays() {
+        clearTfrOverlays(); clearCameraOverlays(); clearSchoolOverlays()
+        clearFloodOverlays(); clearCrossingOverlays()
+    }
+
+    /** Show zone detail dialog — adapts content by zone type. */
     @SuppressLint("SetTextI18n")
-    private fun showTfrDetailDialog(zone: com.example.locationmapapp.data.model.TfrZone) {
+    private fun showZoneDetailDialog(zone: com.example.locationmapapp.data.model.TfrZone) {
         val density = resources.displayMetrics.density
         val dp = { v: Int -> (v * density).toInt() }
 
@@ -1870,15 +1996,22 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(16), dp(12), dp(16), dp(16))
         }
 
-        // Red color bar
+        // Color bar — zone-type-aware
+        val barColor = when (zone.zoneType) {
+            com.example.locationmapapp.data.model.ZoneType.TFR -> "#D32F2F"
+            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "#FF9800"
+            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#FFC107"
+            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#2196F3"
+            com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#FFC107"
+        }
         root.addView(View(this).apply {
-            setBackgroundColor(Color.parseColor("#D32F2F"))
+            setBackgroundColor(Color.parseColor(barColor))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)).apply {
                 bottomMargin = dp(12)
             }
         })
 
-        // NOTAM number
+        // Header
         root.addView(TextView(this).apply {
             text = zone.notam
             textSize = 20f
@@ -1887,11 +2020,18 @@ class MainActivity : AppCompatActivity() {
         })
 
         // Type
+        val typeColor = when (zone.zoneType) {
+            com.example.locationmapapp.data.model.ZoneType.TFR -> "#FF5252"
+            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "#FFB74D"
+            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#FFD54F"
+            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#64B5F6"
+            com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#FFD54F"
+        }
         if (zone.type.isNotBlank()) {
             root.addView(TextView(this).apply {
                 text = zone.type
                 textSize = 14f
-                setTextColor(Color.parseColor("#FF5252"))
+                setTextColor(Color.parseColor(typeColor))
                 setPadding(0, dp(4), 0, 0)
             })
         }
@@ -1906,26 +2046,28 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        // Altitude ranges
-        val altText = zone.shapes.joinToString("\n") { s ->
-            "  ${s.floorAltFt} ft — ${s.ceilingAltFt} ft (${s.type})"
-        }
-        if (altText.isNotBlank()) {
-            root.addView(TextView(this).apply {
-                text = "Altitude:"
-                textSize = 13f
-                setTextColor(Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, dp(12), 0, dp(2))
-            })
-            root.addView(TextView(this).apply {
-                text = altText
-                textSize = 12f
-                setTextColor(Color.parseColor("#BBBBBB"))
-            })
+        // Altitude ranges (TFR only)
+        if (zone.zoneType == com.example.locationmapapp.data.model.ZoneType.TFR) {
+            val altText = zone.shapes.joinToString("\n") { s ->
+                "  ${s.floorAltFt} ft — ${s.ceilingAltFt} ft (${s.type})"
+            }
+            if (altText.isNotBlank()) {
+                root.addView(TextView(this).apply {
+                    text = "Altitude:"
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, dp(12), 0, dp(2))
+                })
+                root.addView(TextView(this).apply {
+                    text = altText
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#BBBBBB"))
+                })
+            }
         }
 
-        // Effective / Expire dates
+        // Info rows
         fun addInfoRow(label: String, value: String) {
             if (value.isBlank()) return
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(4), 0, 0) }
@@ -1941,10 +2083,19 @@ class MainActivity : AppCompatActivity() {
             })
             root.addView(row)
         }
-        addInfoRow("Effective", zone.effectiveDate)
-        addInfoRow("Expires", zone.expireDate)
-        addInfoRow("Facility", zone.facility)
-        addInfoRow("State", zone.state)
+
+        // TFR-specific fields
+        if (zone.zoneType == com.example.locationmapapp.data.model.ZoneType.TFR) {
+            addInfoRow("Effective", zone.effectiveDate)
+            addInfoRow("Expires", zone.expireDate)
+            addInfoRow("Facility", zone.facility)
+            addInfoRow("State", zone.state)
+        }
+
+        // Metadata fields for all zone types
+        for ((key, value) in zone.metadata) {
+            addInfoRow(key.replaceFirstChar { it.uppercase() }, value)
+        }
 
         val dialog = android.app.Dialog(this)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
@@ -1958,6 +2109,9 @@ class MainActivity : AppCompatActivity() {
         }
         dialog.show()
     }
+
+    /** Backward-compatible wrapper. */
+    private fun showTfrDetailDialog(zone: com.example.locationmapapp.data.model.TfrZone) = showZoneDetailDialog(zone)
 
     /** Update alerts icon color based on alert severity. */
     private fun updateAlertsIcon(alerts: List<com.example.locationmapapp.data.model.GeofenceAlert>) {
@@ -1996,7 +2150,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Show a red banner at top of map for critical geofence alerts. */
+    /** Show a banner at top of map for critical geofence alerts. Color varies by zone type. */
     @SuppressLint("SetTextI18n")
     private fun showGeofenceAlertBanner(alert: com.example.locationmapapp.data.model.GeofenceAlert) {
         // Remove existing follow banner if present
@@ -2005,20 +2159,35 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         val dp = { v: Int -> (v * density).toInt() }
 
+        val alertLabel = when (alert.zoneType) {
+            com.example.locationmapapp.data.model.ZoneType.TFR -> "TFR Alert:"
+            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "Camera Alert:"
+            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "School Zone:"
+            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "Flood Zone:"
+            com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "RR Crossing:"
+        }
+        val bannerColor = when (alert.zoneType) {
+            com.example.locationmapapp.data.model.ZoneType.TFR -> "#DDD32F2F"
+            com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA -> "#DDE65100"
+            com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE -> "#DDF57F17"
+            com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE -> "#DD1565C0"
+            com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING -> "#DD424242"
+        }
+
         val banner = TextView(this).apply {
             val altText = if (alert.distanceNm != null && alert.distanceNm > 0) " — %.1f NM".format(alert.distanceNm) else ""
-            text = "\u26A0 TFR Alert: ${alert.zoneName}\n${alert.description.take(100)}$altText"
+            text = "\u26A0 $alertLabel ${alert.zoneName}\n${alert.description.take(100)}$altText"
             textSize = 12f
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#DDD32F2F"))
+            setBackgroundColor(Color.parseColor(bannerColor))
             setPadding(dp(12), dp(8), dp(12), dp(8))
             maxLines = 3
             setOnClickListener {
-                // Dismiss banner and find TFR zone to show detail
+                // Dismiss banner and find zone to show detail
                 (parent as? ViewGroup)?.removeView(this)
                 followBanner = null
-                val zone = viewModel.tfrZones.value?.find { it.id == alert.zoneId }
-                if (zone != null) showTfrDetailDialog(zone)
+                val zone = findZoneById(alert.zoneId)
+                if (zone != null) showZoneDetailDialog(zone)
             }
         }
 
@@ -2034,6 +2203,15 @@ class MainActivity : AppCompatActivity() {
         (binding.root as ViewGroup).addView(banner, params)
         followBanner = banner
         DebugLogger.i("MainActivity", "Geofence alert banner shown: ${alert.alertType} ${alert.zoneName}")
+    }
+
+    /** Find a zone by ID across all zone type lists. */
+    private fun findZoneById(zoneId: String): com.example.locationmapapp.data.model.TfrZone? {
+        return viewModel.tfrZones.value?.find { it.id == zoneId }
+            ?: viewModel.cameraZones.value?.find { it.id == zoneId }
+            ?: viewModel.schoolZones.value?.find { it.id == zoneId }
+            ?: viewModel.floodZones.value?.find { it.id == zoneId }
+            ?: viewModel.crossingZones.value?.find { it.id == zoneId }
     }
 
     @android.annotation.SuppressLint("SetJavaScriptEnabled")
@@ -6325,8 +6503,56 @@ class MainActivity : AppCompatActivity() {
                 loadTfrsForVisibleArea()
                 toast("Loading TFRs…")
             } else {
-                viewModel.clearTfrs()
+                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.TFR)
                 clearTfrOverlays()
+            }
+        }
+
+        override fun onCameraOverlayToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onCameraOverlayToggled: $enabled")
+            if (enabled) {
+                val bb = binding.mapView.boundingBox
+                viewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                toast("Loading speed cameras…")
+            } else {
+                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA)
+                clearCameraOverlays()
+            }
+        }
+
+        override fun onSchoolOverlayToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onSchoolOverlayToggled: $enabled")
+            if (enabled) {
+                val bb = binding.mapView.boundingBox
+                viewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                toast("Loading school zones…")
+            } else {
+                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE)
+                clearSchoolOverlays()
+            }
+        }
+
+        override fun onFloodOverlayToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onFloodOverlayToggled: $enabled")
+            if (enabled) {
+                val bb = binding.mapView.boundingBox
+                viewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                toast("Loading flood zones…")
+            } else {
+                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE)
+                clearFloodOverlays()
+            }
+        }
+
+        override fun onCrossingOverlayToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onCrossingOverlayToggled: $enabled")
+            if (enabled) {
+                val bb = binding.mapView.boundingBox
+                viewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                toast("Loading railroad crossings…")
+            } else {
+                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING)
+                clearCrossingOverlays()
             }
         }
 
@@ -6440,10 +6666,21 @@ class MainActivity : AppCompatActivity() {
                     "fetchedAt" to w.fetchedAt
                 )
             },
-            "tfr" to mapOf(
+            "geofences" to mapOf(
                 "tfrCount" to (viewModel.tfrZones.value?.size ?: 0),
-                "tfrOverlays" to tfrOverlays.size,
+                "cameraCount" to (viewModel.cameraZones.value?.size ?: 0),
+                "schoolCount" to (viewModel.schoolZones.value?.size ?: 0),
+                "floodCount" to (viewModel.floodZones.value?.size ?: 0),
+                "crossingCount" to (viewModel.crossingZones.value?.size ?: 0),
+                "overlays" to mapOf(
+                    "tfr" to tfrOverlays.size,
+                    "camera" to cameraOverlays.size,
+                    "school" to schoolOverlays.size,
+                    "flood" to floodOverlays.size,
+                    "crossing" to crossingOverlays.size
+                ),
                 "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
+                "zoneCountByType" to viewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),
                 "activeAlerts" to (viewModel.geofenceAlerts.value?.size ?: 0),
                 "alertSeverity" to (viewModel.geofenceAlerts.value
                     ?.maxByOrNull { it.severity.level }?.severity?.name ?: "NONE"),

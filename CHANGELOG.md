@@ -1,5 +1,28 @@
 # LocationMapApp — Changelog
 
+## [1.5.36] — 2026-03-02
+
+### Added
+- **Geofence Phase 2 — 4 additional zone types** extending the Phase 1 TFR foundation
+  - **Speed/Red Light Cameras**: Overpass `highway=speed_camera` + surveillance enforcement, 200m alert circle, orange overlays
+  - **School Zones**: Overpass `amenity=school` with polygon geometry support (ways) or 300m circle (nodes), amber overlays
+  - **Flood Zones**: FEMA NFHL ArcGIS Layer 28, high-risk SFHA zones only, 2000-record pagination, blue overlays (darker A/V codes)
+  - **Railroad Crossings**: Overpass `railway=level_crossing` + `railway=crossing`, 100m alert circle, dark fill/yellow outline
+- **`ZoneType` enum** in Models.kt: TFR, SPEED_CAMERA, SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING
+- **`GeofenceRepository.kt`** (NEW) — consolidated fetching for 4 non-TFR zone types with `generateCircleShape()` helper
+- **4 proxy endpoints**: `/cameras`, `/schools`, `/flood-zones`, `/crossings` (all bbox-based, various cache TTLs)
+- **Per-zone-type severity mapping** — TFR entry=CRITICAL, others=WARNING; school-zone weekday time filter (7-9 AM, 2-4 PM)
+- **Zone-type-aware UI**: detail dialog adapts color bar + metadata by type; alert banner color per zone type
+- **Zoom guards**: cameras ≥ 10, schools/flood/crossings ≥ 12 (prevents loading at low zoom)
+- **Alerts menu**: 4 new toggles (Speed Camera, School Zone, Flood Zone, Railroad Crossing), all default OFF
+
+### Changed
+- **GeofenceEngine**: `loadTfrs()` → `loadZones()` (alias kept); `IndexedZone` now carries `zoneType`
+- **`rebuildGeofenceIndex()`** in ViewModel combines all 5 zone type lists into unified spatial index
+- **`scheduleGeofenceReload()`** replaces `scheduleTfrReload()` — loads all enabled zone types on viewport change
+- **Debug `/state`**: `tfr` → `geofences` with per-type counts, overlay counts, `zoneCountByType`
+- **Debug `/geofences`**: reports all zone types with counts; `/geofences/alerts` includes `zoneType` field
+
 ## [1.5.35] — 2026-03-02
 
 ### Added

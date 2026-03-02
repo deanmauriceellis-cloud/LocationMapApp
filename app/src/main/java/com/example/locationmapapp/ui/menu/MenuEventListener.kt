@@ -149,6 +149,18 @@ interface MenuEventListener {
     /** TFR overlay display on map. */
     fun onTfrOverlayToggled(enabled: Boolean)
 
+    /** Speed/red-light camera zone overlay. */
+    fun onCameraOverlayToggled(enabled: Boolean)
+
+    /** School zone overlay (weekday hours only). */
+    fun onSchoolOverlayToggled(enabled: Boolean)
+
+    /** FEMA flood zone overlay. */
+    fun onFloodOverlayToggled(enabled: Boolean)
+
+    /** Railroad crossing zone overlay. */
+    fun onCrossingOverlayToggled(enabled: Boolean)
+
     /** Audible alert sounds for geofence events. */
     fun onAlertSoundToggled(enabled: Boolean)
 

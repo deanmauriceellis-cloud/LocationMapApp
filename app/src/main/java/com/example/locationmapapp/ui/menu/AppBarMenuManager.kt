@@ -545,6 +545,18 @@ class AppBarMenuManager(
                 R.id.menu_tfr_overlay ->
                     toggleBinary(item, PREF_TFR_OVERLAY) { menuEventListener.onTfrOverlayToggled(it) }
 
+                R.id.menu_camera_overlay ->
+                    toggleBinary(item, PREF_CAMERA_OVERLAY) { menuEventListener.onCameraOverlayToggled(it) }
+
+                R.id.menu_school_overlay ->
+                    toggleBinary(item, PREF_SCHOOL_OVERLAY) { menuEventListener.onSchoolOverlayToggled(it) }
+
+                R.id.menu_flood_overlay ->
+                    toggleBinary(item, PREF_FLOOD_OVERLAY) { menuEventListener.onFloodOverlayToggled(it) }
+
+                R.id.menu_crossing_overlay ->
+                    toggleBinary(item, PREF_CROSSING_OVERLAY) { menuEventListener.onCrossingOverlayToggled(it) }
+
                 R.id.menu_alert_sound ->
                     toggleBinary(item, PREF_ALERT_SOUND) { menuEventListener.onAlertSoundToggled(it) }
 
@@ -564,6 +576,10 @@ class AppBarMenuManager(
         }
         syncCheckStates(popup.menu,
             R.id.menu_tfr_overlay to PREF_TFR_OVERLAY,
+            R.id.menu_camera_overlay to PREF_CAMERA_OVERLAY,
+            R.id.menu_school_overlay to PREF_SCHOOL_OVERLAY,
+            R.id.menu_flood_overlay to PREF_FLOOD_OVERLAY,
+            R.id.menu_crossing_overlay to PREF_CROSSING_OVERLAY,
             R.id.menu_alert_sound to PREF_ALERT_SOUND
         )
         popup.show()
@@ -598,7 +614,7 @@ class AppBarMenuManager(
     /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
     private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
         PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS, PREF_MBTA_BUS_STOPS,
-        PREF_ALERT_SOUND -> false
+        PREF_ALERT_SOUND, PREF_CAMERA_OVERLAY, PREF_SCHOOL_OVERLAY, PREF_FLOOD_OVERLAY, PREF_CROSSING_OVERLAY -> false
         else -> true
     }
 
@@ -726,9 +742,13 @@ class AppBarMenuManager(
         // Old constants removed — use PoiCategories.find(id)?.prefKey
 
         // ── Alerts / Geofence ────────────────────────────────────────────────
-        const val PREF_TFR_OVERLAY    = "tfr_overlay_on"
-        const val PREF_ALERT_SOUND    = "alert_sound_on"
-        const val PREF_ALERT_DISTANCE = "alert_distance_nm"
+        const val PREF_TFR_OVERLAY      = "tfr_overlay_on"
+        const val PREF_CAMERA_OVERLAY   = "camera_overlay_on"
+        const val PREF_SCHOOL_OVERLAY   = "school_overlay_on"
+        const val PREF_FLOOD_OVERLAY    = "flood_overlay_on"
+        const val PREF_CROSSING_OVERLAY = "crossing_overlay_on"
+        const val PREF_ALERT_SOUND      = "alert_sound_on"
+        const val PREF_ALERT_DISTANCE   = "alert_distance_nm"
 
         // ── Utility ───────────────────────────────────────────────────────────
         const val PREF_RECORD_GPS            = "record_gps_on"

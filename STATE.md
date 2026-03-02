@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 35 (Geofence Alert System — TFR Phase 1)
+## Last Updated: 2026-03-02 Session 36 (Geofence Phase 2 — Additional Zone Types)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -186,19 +186,29 @@
   - `scheduleSilentFill()` with tracked Runnable prevents double-fire
   - Debug banner toggle in Utility menu (default ON): shows fill progress, tap to cancel
   - `silentFill` boolean in debug `/state` endpoint
-- **TFR Geofence Alert System** (v1.5.35) — FAA Temporary Flight Restriction detection + alerting
+- **Geofence Alert System** (v1.5.35-36) — multi-zone spatial alerting with 5 zone types
   - **GeofenceEngine** (`util/GeofenceEngine.kt`): JTS R-tree spatial index, point-in-polygon, proximity detection
-    - `loadTfrs()` builds JTS polygons, inserts into STRtree; `checkPosition()` returns `List<GeofenceAlert>`
-    - Entry detection (CRITICAL), proximity within 5nm + bearing ±60° (WARNING), exit (INFO)
+    - `loadZones()` builds JTS polygons, inserts into STRtree; `checkPosition()` returns `List<GeofenceAlert>`
+    - Entry detection (CRITICAL for TFR, WARNING for others), proximity within 5nm + bearing ±60°, exit (INFO)
     - Cooldowns: 5min proximity, 10min entry; configurable proximity threshold
-  - **TFR overlays**: semi-transparent red polygon fill on map, tap → detail dialog (NOTAM, type, altitude, dates)
-    - Debounced viewport reload (500ms), deferred restore on startup
-  - **Proxy `/tfrs?bbox=`**: scrapes FAA `tfr.faa.gov` (5-min list cache, 10-min detail cache)
-    - Parses AIXM XML: circle, polygon, polyarc shapes; DMS→DD coordinate conversion; arc interpolation (5°)
-  - **Alert UI**: severity-colored Alerts toolbar icon, red alert banner with NOTAM info, tap → TFR detail dialog
+    - `ZoneType` enum: TFR, SPEED_CAMERA, SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING
+    - Severity mapping per zone type; school-zone time filter (weekdays 7-9 AM, 2-4 PM)
+    - `getZoneCountByType()` for per-type counts in debug
+  - **5 zone types** with map overlays (all default OFF except TFR):
+    - **TFR** (v1.5.35): red fill/outline, FAA TFR data via `tfr.faa.gov` scraping
+    - **Speed cameras** (v1.5.36): orange fill/outline, Overpass `highway=speed_camera`, 200m alert radius
+    - **School zones** (v1.5.36): amber fill/outline, Overpass `amenity=school`, polygon or 300m circle
+    - **Flood zones** (v1.5.36): blue fill/outline (darker for A/V codes), FEMA NFHL ArcGIS Layer 28
+    - **Railroad crossings** (v1.5.36): dark fill/yellow outline, Overpass `railway=level_crossing|crossing`, 100m radius
+  - **Zone-type-aware UI**: detail dialog adapts color bar + metadata by zone type; alert banner color per type
+  - **Proxy endpoints**: `/tfrs`, `/cameras`, `/schools`, `/flood-zones`, `/crossings` (all bbox-based)
+  - **GeofenceRepository** (`data/repository/GeofenceRepository.kt`): consolidated fetch for 4 non-TFR zone types
+    - `generateCircleShape()` companion helper for point → polygon conversion
+  - **Viewport loading**: `scheduleGeofenceReload()` loads all enabled zone types with zoom guards
+    - Cameras: zoom ≥ 10; Schools/Flood/Crossings: zoom ≥ 12
   - **GPS integration**: user GPS checks geofence (no altitude); followed aircraft checks with baroAltitude
-  - **Alerts menu**: TFR Overlay toggle (default ON), Alert Sound toggle, Alert Distance slider
-  - Debug: `/geofences`, `/geofences/alerts` endpoints; `tfr` field in `/state`
+  - **Alerts menu**: TFR Overlay (ON), Speed Camera/School Zone/Flood Zone/Railroad Crossing toggles (OFF), Alert Sound, Alert Distance
+  - Debug: `/geofences`, `/geofences/alerts` endpoints; `geofences` field in `/state` with per-type counts
 - **Startup POI fix** (v1.5.16): no per-category Overpass queries on launch, just loads cached bbox
 - **Error radius immunity** (v1.5.16): 504/429 errors no longer shrink radius hints (transient, not density)
 - Debug logging (TcpLogStreamer disabled — superseded by debug HTTP server `/logs`)
@@ -234,6 +244,10 @@
 | DB POI Lookup | `http://10.0.0.4:3000/db/poi/...` | GET /db/poi/:type/:id | live |
 | DB Aircraft | `http://10.0.0.4:3000/db/aircraft/...` | GET /db/aircraft/search, /recent, /stats, /:icao24 | live |
 | FAA TFRs | `http://10.0.0.4:3000/tfrs?bbox=...` | GET /tfrs?bbox=s,w,n,e | 5min list / 10min detail |
+| Speed Cameras | `http://10.0.0.4:3000/cameras?bbox=...` | GET /cameras?bbox=s,w,n,e | 24 hours |
+| Schools | `http://10.0.0.4:3000/schools?bbox=...` | GET /schools?bbox=s,w,n,e | 24 hours |
+| Flood Zones | `http://10.0.0.4:3000/flood-zones?bbox=...` | GET /flood-zones?bbox=s,w,n,e | 30 days |
+| Railroad Crossings | `http://10.0.0.4:3000/crossings?bbox=...` | GET /crossings?bbox=s,w,n,e | 7 days |
 | Geocode | `http://10.0.0.4:3000/geocode?q=...` | GET /geocode?q=&limit= | 24 hours |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
@@ -271,7 +285,8 @@
 - `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
-- `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + geofence alerting
+- `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings fetch
+- `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
 - `cache-proxy/server.js` — Express caching proxy
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)

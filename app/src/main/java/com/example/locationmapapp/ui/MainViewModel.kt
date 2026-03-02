@@ -12,8 +12,10 @@ import com.example.locationmapapp.data.model.MbtaVehicle
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.model.*
+import com.example.locationmapapp.data.model.ZoneType
 import com.example.locationmapapp.data.repository.AircraftRepository
 import com.example.locationmapapp.data.repository.FindRepository
+import com.example.locationmapapp.data.repository.GeofenceRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.TfrRepository
 import com.example.locationmapapp.data.repository.WebcamRepository
@@ -50,7 +52,8 @@ class MainViewModel @Inject constructor(
     private val aircraftRepository: AircraftRepository,
     private val webcamRepository: WebcamRepository,
     private val findRepository: FindRepository,
-    private val tfrRepository: TfrRepository
+    private val tfrRepository: TfrRepository,
+    private val geofenceRepository: GeofenceRepository
 ) : ViewModel() {
 
     private val TAG = "ViewModel"
@@ -504,6 +507,18 @@ class MainViewModel @Inject constructor(
     private val _tfrZones = MutableLiveData<List<TfrZone>>()
     val tfrZones: LiveData<List<TfrZone>> = _tfrZones
 
+    private val _cameraZones = MutableLiveData<List<TfrZone>>()
+    val cameraZones: LiveData<List<TfrZone>> = _cameraZones
+
+    private val _schoolZones = MutableLiveData<List<TfrZone>>()
+    val schoolZones: LiveData<List<TfrZone>> = _schoolZones
+
+    private val _floodZones = MutableLiveData<List<TfrZone>>()
+    val floodZones: LiveData<List<TfrZone>> = _floodZones
+
+    private val _crossingZones = MutableLiveData<List<TfrZone>>()
+    val crossingZones: LiveData<List<TfrZone>> = _crossingZones
+
     private val _geofenceAlerts = MutableLiveData<List<GeofenceAlert>>()
     val geofenceAlerts: LiveData<List<GeofenceAlert>> = _geofenceAlerts
 
@@ -516,13 +531,73 @@ class MainViewModel @Inject constructor(
                 .onSuccess {
                     DebugLogger.i(TAG, "TFRs success — ${it.size}")
                     _tfrZones.value = it
-                    geofenceEngine.loadTfrs(it)
+                    rebuildGeofenceIndex()
                 }
                 .onFailure { e ->
                     DebugLogger.e(TAG, "TFRs FAILED: ${e.message}", e as? Exception)
                     _error.value = "TFRs failed: ${e.message}"
                 }
         }
+    }
+
+    fun loadCameras(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadCameras() bbox=$south,$west,$north,$east")
+        viewModelScope.launch {
+            runCatching { geofenceRepository.fetchCameras(south, west, north, east) }
+                .onSuccess { DebugLogger.i(TAG, "Cameras success — ${it.size}"); _cameraZones.value = it; rebuildGeofenceIndex() }
+                .onFailure { e -> DebugLogger.e(TAG, "Cameras FAILED: ${e.message}", e as? Exception); _error.value = "Cameras failed: ${e.message}" }
+        }
+    }
+
+    fun loadSchools(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadSchools() bbox=$south,$west,$north,$east")
+        viewModelScope.launch {
+            runCatching { geofenceRepository.fetchSchools(south, west, north, east) }
+                .onSuccess { DebugLogger.i(TAG, "Schools success — ${it.size}"); _schoolZones.value = it; rebuildGeofenceIndex() }
+                .onFailure { e -> DebugLogger.e(TAG, "Schools FAILED: ${e.message}", e as? Exception); _error.value = "Schools failed: ${e.message}" }
+        }
+    }
+
+    fun loadFloodZones(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadFloodZones() bbox=$south,$west,$north,$east")
+        viewModelScope.launch {
+            runCatching { geofenceRepository.fetchFloodZones(south, west, north, east) }
+                .onSuccess { DebugLogger.i(TAG, "FloodZones success — ${it.size}"); _floodZones.value = it; rebuildGeofenceIndex() }
+                .onFailure { e -> DebugLogger.e(TAG, "FloodZones FAILED: ${e.message}", e as? Exception); _error.value = "Flood zones failed: ${e.message}" }
+        }
+    }
+
+    fun loadCrossings(south: Double, west: Double, north: Double, east: Double) {
+        DebugLogger.i(TAG, "loadCrossings() bbox=$south,$west,$north,$east")
+        viewModelScope.launch {
+            runCatching { geofenceRepository.fetchCrossings(south, west, north, east) }
+                .onSuccess { DebugLogger.i(TAG, "Crossings success — ${it.size}"); _crossingZones.value = it; rebuildGeofenceIndex() }
+                .onFailure { e -> DebugLogger.e(TAG, "Crossings FAILED: ${e.message}", e as? Exception); _error.value = "Crossings failed: ${e.message}" }
+        }
+    }
+
+    /** Rebuild the spatial index from all zone type lists. */
+    private fun rebuildGeofenceIndex() {
+        val all = mutableListOf<TfrZone>()
+        _tfrZones.value?.let { all.addAll(it) }
+        _cameraZones.value?.let { all.addAll(it) }
+        _schoolZones.value?.let { all.addAll(it) }
+        _floodZones.value?.let { all.addAll(it) }
+        _crossingZones.value?.let { all.addAll(it) }
+        geofenceEngine.loadZones(all)
+    }
+
+    /** Clear a specific zone type. */
+    fun clearZoneType(zoneType: ZoneType) {
+        when (zoneType) {
+            ZoneType.TFR -> _tfrZones.value = emptyList()
+            ZoneType.SPEED_CAMERA -> _cameraZones.value = emptyList()
+            ZoneType.SCHOOL_ZONE -> _schoolZones.value = emptyList()
+            ZoneType.FLOOD_ZONE -> _floodZones.value = emptyList()
+            ZoneType.RAILROAD_CROSSING -> _crossingZones.value = emptyList()
+        }
+        rebuildGeofenceIndex()
+        DebugLogger.i(TAG, "Cleared zone type $zoneType")
     }
 
     suspend fun fetchTfrsDirectly(south: Double, west: Double, north: Double, east: Double): List<TfrZone> {
@@ -547,6 +622,17 @@ class MainViewModel @Inject constructor(
         _geofenceAlerts.value = emptyList()
         geofenceEngine.clear()
         DebugLogger.i(TAG, "TFRs cleared")
+    }
+
+    fun clearAllGeofences() {
+        _tfrZones.value = emptyList()
+        _cameraZones.value = emptyList()
+        _schoolZones.value = emptyList()
+        _floodZones.value = emptyList()
+        _crossingZones.value = emptyList()
+        _geofenceAlerts.value = emptyList()
+        geofenceEngine.clear()
+        DebugLogger.i(TAG, "All geofences cleared")
     }
 }
 

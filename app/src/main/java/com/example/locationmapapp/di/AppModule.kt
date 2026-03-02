@@ -5,6 +5,7 @@ import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.FindRepository
+import com.example.locationmapapp.data.repository.GeofenceRepository
 import com.example.locationmapapp.data.repository.TfrRepository
 import com.example.locationmapapp.data.repository.WebcamRepository
 import com.example.locationmapapp.data.repository.WeatherRepository
@@ -40,4 +41,7 @@ object AppModule {
 
     @Provides @Singleton
     fun provideTfrRepository(): TfrRepository = TfrRepository()
+
+    @Provides @Singleton
+    fun provideGeofenceRepository(): GeofenceRepository = GeofenceRepository()
 }

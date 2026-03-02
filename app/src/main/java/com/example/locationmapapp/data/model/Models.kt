@@ -315,6 +315,8 @@ enum class MbtaVehicleStatus(val display: String) {
 
 // ── Geofence / TFR Models ──────────────────────────────────────────────────
 
+enum class ZoneType { TFR, SPEED_CAMERA, SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING }
+
 enum class AlertSeverity(val level: Int) {
     INFO(0), WARNING(1), CRITICAL(2), EMERGENCY(3)
 }
@@ -336,7 +338,9 @@ data class TfrZone(
     val expireDate: String,
     val shapes: List<TfrShape>,
     val facility: String,
-    val state: String
+    val state: String,
+    val zoneType: ZoneType = ZoneType.TFR,
+    val metadata: Map<String, String> = emptyMap()
 )
 
 data class GeofenceAlert(
@@ -346,5 +350,6 @@ data class GeofenceAlert(
     val severity: AlertSeverity,
     val distanceNm: Double?,
     val timestamp: Long,
-    val description: String
+    val description: String,
+    val zoneType: ZoneType = ZoneType.TFR
 )

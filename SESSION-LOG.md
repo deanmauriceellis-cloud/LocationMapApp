@@ -1,5 +1,104 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-02e (Geofence Phase 2 — Additional Zone Types — v1.5.36)
+
+### Context
+Phase 2 of the geofence system: extends Phase 1's TFR-only foundation with 4 additional zone types (speed cameras, school zones, flood zones, railroad crossings). All feed into the same GeofenceEngine spatial index and alert pipeline.
+
+### Changes Made
+
+#### Models.kt
+- Added `ZoneType` enum: `TFR, SPEED_CAMERA, SCHOOL_ZONE, FLOOD_ZONE, RAILROAD_CROSSING`
+- Added `zoneType: ZoneType = ZoneType.TFR` and `metadata: Map<String, String> = emptyMap()` to `TfrZone`
+- Added `zoneType: ZoneType = ZoneType.TFR` to `GeofenceAlert`
+
+#### GeofenceEngine.kt (rewrite)
+- Added `zoneType: ZoneType` to `IndexedZone` data class
+- Renamed `loadTfrs()` → `loadZones()`, kept alias
+- Zone type propagated through `checkPosition()` into emitted alerts
+- `severityForZoneType()`: TFR entry=CRITICAL, others=WARNING
+- `isSchoolHours()`: weekday 7-9 AM, 2-4 PM filter — school zones only alert during school hours
+- `getZoneCountByType()`: per-type zone counts for debug
+
+#### Proxy: 4 new endpoints (cache-proxy/server.js)
+- `GET /cameras?bbox=s,w,n,e` — Overpass `highway=speed_camera` + `man_made=surveillance[surveillance:type=camera][surveillance=enforcement]`, 24h cache
+- `GET /schools?bbox=s,w,n,e` — Overpass `amenity=school` (nodes+ways+relations), `out body; >; out skel qt;` for polygon geometry, 24h cache
+- `GET /flood-zones?bbox=s,w,n,e` — FEMA NFHL ArcGIS Layer 28, `SFHA_TF='T'` (high-risk), 2000-record pagination via `resultOffset`, 30-day cache
+- `GET /crossings?bbox=s,w,n,e` — Overpass `railway=level_crossing` + `railway=crossing`, warning device extraction from tags, 7-day cache
+- Note: Originally planned FRA ArcGIS for crossings, but endpoint was 404/regional-only. Switched to Overpass.
+- Pinned `cheerio@1.0.0` for Node.js v18 compatibility (undici@7 requires Node 20+)
+- Added `Zones:` line to startup banner
+
+#### GeofenceRepository.kt (NEW)
+- `@Singleton` repository with 4 fetch methods
+- `fetchCameras()`: point → 200m circle, ZoneType.SPEED_CAMERA, metadata: cameraType, maxspeed, direction
+- `fetchSchools()`: polygon schools use points directly, point-only → 300m circle, ZoneType.SCHOOL_ZONE, metadata: grades, operator
+- `fetchFloodZones()`: FEMA polygon rings → TfrShape points, ZoneType.FLOOD_ZONE, metadata: zoneCode, zoneSubtype, bfe
+- `fetchCrossings()`: point → 100m circle, ZoneType.RAILROAD_CROSSING, metadata: warningDevices, crossingType, railroad, street
+- `generateCircleShape()` companion helper: lat/lon + radius → 36-point circle polygon
+
+#### AppModule.kt
+- Added `@Provides @Singleton` for `GeofenceRepository`
+
+#### MainViewModel.kt
+- Injected `GeofenceRepository`
+- 4 per-type LiveData: `_cameraZones`, `_schoolZones`, `_floodZones`, `_crossingZones` (+ public accessors)
+- 4 load methods: `loadCameras()`, `loadSchools()`, `loadFloodZones()`, `loadCrossings()`
+- `rebuildGeofenceIndex()`: combines all 5 zone type lists → `geofenceEngine.loadZones(all)`
+- Updated `loadTfrs()` to call `rebuildGeofenceIndex()` on success
+- `clearZoneType()` / `clearAllGeofences()` for toggle-off behavior
+
+#### MenuEventListener.kt
+- Added 4 callbacks: `onCameraOverlayToggled()`, `onSchoolOverlayToggled()`, `onFloodOverlayToggled()`, `onCrossingOverlayToggled()`
+
+#### AppBarMenuManager.kt
+- 4 new pref constants: `PREF_CAMERA_OVERLAY`, `PREF_SCHOOL_OVERLAY`, `PREF_FLOOD_OVERLAY`, `PREF_CROSSING_OVERLAY`
+- All default OFF; wired to `toggleBinary()` in `showAlertsMenu()`
+- Added to `syncCheckStates()` for menu state sync
+
+#### menu_alerts.xml
+- 4 new checkable items: Speed Camera Alerts, School Zone Alerts, Flood Zone Overlay, Railroad Crossing Alerts
+
+#### MainActivity.kt (extensive)
+- 4 new overlay lists: `cameraOverlays`, `schoolOverlays`, `floodOverlays`, `crossingOverlays`
+- Renamed `tfrReloadJob` → `geofenceReloadJob`, `pendingTfrRestore` → `pendingGeofenceRestore`
+- `loadGeofenceZonesForVisibleArea()`: loads all enabled zone types with zoom guards (cameras≥10, others≥12)
+- `scheduleGeofenceReload()`: checks any zone enabled before debouncing
+- 4 render methods + shared helpers `renderZoneOverlays()`, `buildZonePolygon()`, `clearOverlayList()`
+- Color schemes: cameras=orange, schools=amber, flood=blue (darker A/V), crossings=dark+yellow
+- `showZoneDetailDialog()`: zone-type-aware detail dialog (color bar, type icon, metadata rows)
+- `showGeofenceAlertBanner()`: zone-type-aware label and banner color
+- `findZoneById()`: searches all 5 zone type lists
+- 4 new LiveData observers for per-type zone rendering
+- 5 toggle callback implementations (TFR updated to use `clearZoneType()`)
+- Debug state: `"tfr"` → `"geofences"` with per-type counts, overlay counts, zoneCountByType
+
+#### DebugEndpoints.kt
+- `/geofences`: reports all zone types with counts, `zoneCountByType`, serializes zones per type
+- `/geofences/alerts`: added `zoneType` field to alert JSON
+
+### Proxy Endpoint Testing
+- Cameras: 0 results (valid — no OSM speed cameras in Boston-area test bbox)
+- Schools: 157 results ✓
+- Flood zones: 1 result ✓
+- Crossings: 227 results ✓
+
+### Files Changed
+- `app/src/main/java/.../data/model/Models.kt`
+- `app/src/main/java/.../util/GeofenceEngine.kt`
+- `cache-proxy/server.js`
+- `cache-proxy/package.json`
+- `app/src/main/java/.../data/repository/GeofenceRepository.kt` (NEW)
+- `app/src/main/java/.../di/AppModule.kt`
+- `app/src/main/java/.../ui/MainViewModel.kt`
+- `app/src/main/java/.../ui/menu/MenuEventListener.kt`
+- `app/src/main/java/.../ui/menu/AppBarMenuManager.kt`
+- `app/src/main/res/menu/menu_alerts.xml`
+- `app/src/main/java/.../ui/MainActivity.kt`
+- `app/src/main/java/.../util/DebugEndpoints.kt`
+
+---
+
 ## Session: 2026-03-02d (Geofence Alert System — TFR Phase 1 — v1.5.35)
 
 ### Context

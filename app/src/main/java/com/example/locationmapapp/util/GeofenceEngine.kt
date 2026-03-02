@@ -3,16 +3,18 @@ package com.example.locationmapapp.util
 import com.example.locationmapapp.data.model.AlertSeverity
 import com.example.locationmapapp.data.model.GeofenceAlert
 import com.example.locationmapapp.data.model.TfrZone
+import com.example.locationmapapp.data.model.ZoneType
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.Envelope
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.Polygon
 import org.locationtech.jts.index.strtree.STRtree
+import java.util.Calendar
 
 /**
  * GeofenceEngine — spatial geofence checking using JTS R-tree.
  *
- * Designed to accept any zone type (TFRs now, speed cameras / flood zones later).
+ * Designed to accept any zone type (TFRs, speed cameras, school zones, flood zones, railroad crossings).
  * Uses STRtree for fast spatial indexing and JTS Polygon for point-in-polygon tests.
  */
 class GeofenceEngine {
@@ -30,7 +32,8 @@ class GeofenceEngine {
         val description: String,
         val polygon: Polygon,
         val floorAltFt: Int,
-        val ceilingAltFt: Int
+        val ceilingAltFt: Int,
+        val zoneType: ZoneType = ZoneType.TFR
     )
 
     private val zones = mutableListOf<IndexedZone>()
@@ -52,14 +55,14 @@ class GeofenceEngine {
     }
 
     /**
-     * Load TFR zones into the spatial index. Clears any previous data.
+     * Load all zone types into the spatial index. Clears any previous data.
      */
-    fun loadTfrs(tfrs: List<TfrZone>) {
+    fun loadZones(allZones: List<TfrZone>) {
         clear()
         tree = STRtree()
         treeBuilt = false
 
-        for (tfr in tfrs) {
+        for (tfr in allZones) {
             for (shape in tfr.shapes) {
                 if (shape.points.size < 3) continue
                 try {
@@ -79,19 +82,23 @@ class GeofenceEngine {
                         description = tfr.description,
                         polygon = polygon,
                         floorAltFt = shape.floorAltFt,
-                        ceilingAltFt = shape.ceilingAltFt
+                        ceilingAltFt = shape.ceilingAltFt,
+                        zoneType = tfr.zoneType
                     )
                     zones.add(indexed)
                     tree.insert(polygon.envelopeInternal, indexed)
                 } catch (e: Exception) {
-                    DebugLogger.w(TAG, "Skipping invalid TFR shape in ${tfr.id}: ${e.message}")
+                    DebugLogger.w(TAG, "Skipping invalid zone shape in ${tfr.id}: ${e.message}")
                 }
             }
         }
         tree.build()
         treeBuilt = true
-        DebugLogger.i(TAG, "Loaded ${zones.size} zone shapes from ${tfrs.size} TFRs")
+        DebugLogger.i(TAG, "Loaded ${zones.size} zone shapes from ${allZones.size} zones (${getZoneCountByType()})")
     }
+
+    /** Alias — backward compatibility. */
+    fun loadTfrs(tfrs: List<TfrZone>) = loadZones(tfrs)
 
     /**
      * Check a GPS position against all loaded zones.
@@ -121,12 +128,16 @@ class GeofenceEngine {
         val currentlyInside = mutableSetOf<String>()
 
         for (zone in candidates) {
+            // School zone time filter — only alert during weekday school hours
+            if (zone.zoneType == ZoneType.SCHOOL_ZONE && !isSchoolHours()) continue
+
             // Altitude check — skip if we know altitude and it's outside the zone's vertical range
             if (altitudeFt != null && (altitudeFt < zone.floorAltFt || altitudeFt > zone.ceilingAltFt)) {
                 continue
             }
 
             val inside = zone.polygon.contains(point)
+            val severity = severityForZoneType(zone.zoneType, if (inside) "entry" else "proximity")
 
             if (inside) {
                 currentlyInside.add(zone.zoneId)
@@ -138,10 +149,11 @@ class GeofenceEngine {
                             zoneId = zone.zoneId,
                             zoneName = zone.zoneName,
                             alertType = "entry",
-                            severity = AlertSeverity.CRITICAL,
+                            severity = severity,
                             distanceNm = 0.0,
                             timestamp = now,
-                            description = zone.description
+                            description = zone.description,
+                            zoneType = zone.zoneType
                         ))
                         entryCooldowns[zone.zoneId] = now
                     }
@@ -166,10 +178,11 @@ class GeofenceEngine {
                             zoneId = zone.zoneId,
                             zoneName = zone.zoneName,
                             alertType = "proximity",
-                            severity = AlertSeverity.WARNING,
+                            severity = severity,
                             distanceNm = distanceNm,
                             timestamp = now,
-                            description = zone.description
+                            description = zone.description,
+                            zoneType = zone.zoneType
                         ))
                         proximityCooldowns[zone.zoneId] = now
                     }
@@ -189,7 +202,8 @@ class GeofenceEngine {
                     severity = AlertSeverity.INFO,
                     distanceNm = null,
                     timestamp = now,
-                    description = "Exited ${zone.zoneName}"
+                    description = "Exited ${zone.zoneName}",
+                    zoneType = zone.zoneType
                 ))
             }
         }
@@ -213,7 +227,32 @@ class GeofenceEngine {
 
     fun getActiveZones(): Set<String> = activeZones.toSet()
 
+    /** Returns count of loaded zone shapes grouped by ZoneType. */
+    fun getZoneCountByType(): Map<ZoneType, Int> =
+        zones.groupBy { it.zoneType }.mapValues { it.value.size }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
+
+    /** Map zone type + alert type → severity level. */
+    private fun severityForZoneType(zoneType: ZoneType, alertType: String): AlertSeverity {
+        if (alertType == "exit") return AlertSeverity.INFO
+        return when (zoneType) {
+            ZoneType.TFR -> if (alertType == "entry") AlertSeverity.CRITICAL else AlertSeverity.WARNING
+            ZoneType.SPEED_CAMERA -> AlertSeverity.WARNING
+            ZoneType.SCHOOL_ZONE -> AlertSeverity.WARNING
+            ZoneType.FLOOD_ZONE -> if (alertType == "entry") AlertSeverity.WARNING else AlertSeverity.INFO
+            ZoneType.RAILROAD_CROSSING -> AlertSeverity.WARNING
+        }
+    }
+
+    /** Returns true during weekday school hours (Mon–Fri, 7–9 AM or 2–4 PM). */
+    private fun isSchoolHours(): Boolean {
+        val cal = Calendar.getInstance()
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) return false
+        val hour = cal.get(Calendar.HOUR_OF_DAY)
+        return (hour in 7..8) || (hour in 14..15)
+    }
 
     private fun nmToDeg(nm: Double): Double = nm / 60.0
 

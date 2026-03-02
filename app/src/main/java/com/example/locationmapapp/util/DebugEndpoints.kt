@@ -86,8 +86,8 @@ class DebugEndpoints(
             mapOf("path" to "/stop-follow",     "method" to "GET", "description" to "Stop following any vehicle or aircraft"),
             mapOf("path" to "/perf",            "method" to "GET", "description" to "Performance stats: memory, threads, GC info"),
             mapOf("path" to "/overlays",        "method" to "GET", "description" to "List all map overlays with types and counts"),
-            mapOf("path" to "/geofences",       "method" to "GET", "description" to "List loaded TFR geofence zones"),
-            mapOf("path" to "/geofences/alerts", "method" to "GET", "description" to "Active geofence alerts"),
+            mapOf("path" to "/geofences",       "method" to "GET", "description" to "List all loaded geofence zones (TFR, cameras, schools, floods, crossings)"),
+            mapOf("path" to "/geofences/alerts", "method" to "GET", "description" to "Active geofence alerts with zone type"),
         )
         return EndpointResult(body = gson.toJson(mapOf("endpoints" to endpoints)))
     }
@@ -570,28 +570,50 @@ class DebugEndpoints(
 
     private suspend fun handleGeofences(): EndpointResult {
         val data = runOnMain {
-            val zones = viewModel.tfrZones.value ?: emptyList()
-            mapOf(
-                "count" to zones.size,
-                "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
-                "activeZones" to viewModel.geofenceEngine.getActiveZones(),
-                "proximityThresholdNm" to viewModel.geofenceEngine.proximityThresholdNm,
-                "zones" to zones.map { z ->
+            fun serializeZones(zones: List<com.example.locationmapapp.data.model.TfrZone>): List<Map<String, Any?>> {
+                return zones.map { z ->
                     mapOf(
                         "id" to z.id,
                         "notam" to z.notam,
                         "type" to z.type,
+                        "zoneType" to z.zoneType.name,
                         "description" to z.description.take(200),
                         "effectiveDate" to z.effectiveDate,
                         "expireDate" to z.expireDate,
                         "facility" to z.facility,
                         "state" to z.state,
+                        "metadata" to z.metadata,
                         "shapeCount" to z.shapes.size,
                         "shapes" to z.shapes.map { s ->
                             mapOf("type" to s.type, "floorAltFt" to s.floorAltFt, "ceilingAltFt" to s.ceilingAltFt, "pointCount" to s.points.size, "radiusNm" to s.radiusNm)
                         }
                     )
                 }
+            }
+            val tfrZones = viewModel.tfrZones.value ?: emptyList()
+            val cameraZones = viewModel.cameraZones.value ?: emptyList()
+            val schoolZones = viewModel.schoolZones.value ?: emptyList()
+            val floodZones = viewModel.floodZones.value ?: emptyList()
+            val crossingZones = viewModel.crossingZones.value ?: emptyList()
+            val totalCount = tfrZones.size + cameraZones.size + schoolZones.size + floodZones.size + crossingZones.size
+            mapOf(
+                "totalCount" to totalCount,
+                "counts" to mapOf(
+                    "tfr" to tfrZones.size,
+                    "camera" to cameraZones.size,
+                    "school" to schoolZones.size,
+                    "flood" to floodZones.size,
+                    "crossing" to crossingZones.size
+                ),
+                "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
+                "zoneCountByType" to viewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),
+                "activeZones" to viewModel.geofenceEngine.getActiveZones(),
+                "proximityThresholdNm" to viewModel.geofenceEngine.proximityThresholdNm,
+                "tfrs" to serializeZones(tfrZones),
+                "cameras" to serializeZones(cameraZones),
+                "schools" to serializeZones(schoolZones),
+                "floodZones" to serializeZones(floodZones),
+                "crossings" to serializeZones(crossingZones)
             )
         }
         return EndpointResult(body = gson.toJson(data))
@@ -610,6 +632,7 @@ class DebugEndpoints(
                         "zoneName" to a.zoneName,
                         "alertType" to a.alertType,
                         "severity" to a.severity.name,
+                        "zoneType" to a.zoneType.name,
                         "distanceNm" to a.distanceNm,
                         "timestamp" to a.timestamp,
                         "description" to a.description
