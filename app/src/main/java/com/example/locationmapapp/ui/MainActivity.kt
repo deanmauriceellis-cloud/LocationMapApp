@@ -6191,7 +6191,7 @@ class MainActivity : AppCompatActivity() {
         idlePopulateJob = lifecycleScope.launch {
             // ── Phase 1: Probe center to discover settled radius ──
             val probePoint = GeoPoint(centerLat, centerLon)
-            placeScanningMarker(probePoint)
+            placeScanningMarker(probePoint, panMap = false)
             state.stats.status = "Probing center to calibrate grid…"
             showIdlePopulateBanner(0, state.stats, 0)
 
@@ -6281,7 +6281,7 @@ class MainActivity : AppCompatActivity() {
                 state.stats.depth = 0
                 state.stats.currentRadius = state.settledRadius
                 state.stats.status = "Searching cell ${pointIdx + 1}/${points.size} at ${state.settledRadius}m…"
-                placeScanningMarker(point)
+                placeScanningMarker(point, panMap = false)
                 showIdlePopulateBanner(ring, state.stats, 0)
 
                 val result = viewModel.populateSearchAt(point)
@@ -6626,7 +6626,7 @@ class MainActivity : AppCompatActivity() {
         return points
     }
 
-    private fun placeScanningMarker(point: GeoPoint) {
+    private fun placeScanningMarker(point: GeoPoint, panMap: Boolean = true) {
         runOnUiThread {
             if (scanningMarker == null) {
                 scanningMarker = Marker(binding.mapView).apply {
@@ -6637,11 +6637,13 @@ class MainActivity : AppCompatActivity() {
                 binding.mapView.overlays.add(scanningMarker)
             }
             scanningMarker?.position = point
-            // Zoom to 14 if zoomed out; leave alone if already 14+
-            if (binding.mapView.zoomLevelDouble < 14.0) {
-                binding.mapView.controller.setZoom(14.0)
+            if (panMap) {
+                if (binding.mapView.zoomLevelDouble < 14.0) {
+                    binding.mapView.controller.setZoom(14.0)
+                }
+                binding.mapView.controller.animateTo(point)
             }
-            binding.mapView.controller.animateTo(point)
+            binding.mapView.invalidate()
         }
     }
 
