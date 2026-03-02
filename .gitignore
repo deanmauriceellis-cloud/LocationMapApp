@@ -15,3 +15,4 @@
 local.properties
 poi-cache.json
 overnight-runs/
+cache-proxy/geofence-databases/*.db
