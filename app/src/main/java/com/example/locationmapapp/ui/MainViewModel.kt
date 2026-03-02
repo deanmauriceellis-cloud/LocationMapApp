@@ -24,6 +24,14 @@ import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import javax.inject.Inject
 
+/** Rich GPS update — carries speed/bearing/accuracy alongside the map point. */
+data class LocationUpdate(
+    val point: GeoPoint,
+    val speedMps: Float?,
+    val bearing: Float?,
+    val accuracy: Float
+)
+
 /**
  * MainViewModel — owns all UI state for MainActivity.
  *
@@ -44,8 +52,8 @@ class MainViewModel @Inject constructor(
 
     private val TAG = "ViewModel"
 
-    private val _currentLocation = MutableLiveData<GeoPoint>()
-    val currentLocation: LiveData<GeoPoint> = _currentLocation
+    private val _currentLocation = MutableLiveData<LocationUpdate>()
+    val currentLocation: LiveData<LocationUpdate> = _currentLocation
 
     private val _locationMode = MutableLiveData<LocationMode>(LocationMode.GPS)
     val locationMode: LiveData<LocationMode> = _locationMode
@@ -96,6 +104,8 @@ class MainViewModel @Inject constructor(
 
     // ── Location ──────────────────────────────────────────────────────────────
 
+    private var currentIntervalMs: Long = 60_000L
+
     /** Called by MainActivity after location permission is confirmed. Safe to call multiple times. */
     fun onPermissionGranted() {
         if (locationJob?.isActive == true) {
@@ -104,12 +114,41 @@ class MainViewModel @Inject constructor(
         }
         DebugLogger.i(TAG, "onPermissionGranted() — starting GMS location flow")
         _locationMode.value = LocationMode.GPS
+        currentIntervalMs = 60_000L
         locationJob = viewModelScope.launch {
             locationManager.getLocationUpdates(intervalMs = 60_000L, minIntervalMs = 30_000L)
                 .collect { loc ->
-                    DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m")
+                    DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
                     if (_locationMode.value == LocationMode.GPS) {
-                        _currentLocation.value = GeoPoint(loc.latitude, loc.longitude)
+                        _currentLocation.value = LocationUpdate(
+                            point = GeoPoint(loc.latitude, loc.longitude),
+                            speedMps = if (loc.hasSpeed()) loc.speed else null,
+                            bearing = if (loc.hasBearing()) loc.bearing else null,
+                            accuracy = loc.accuracy
+                        )
+                    }
+                }
+            DebugLogger.w(TAG, "GMS location flow ended — 0 updates (permission denied or GMS error)")
+        }
+    }
+
+    /** Restart GPS flow with a new interval. No-op if interval is unchanged. */
+    fun restartLocationUpdates(intervalMs: Long, minIntervalMs: Long) {
+        if (intervalMs == currentIntervalMs) return
+        DebugLogger.i(TAG, "restartLocationUpdates() — interval ${currentIntervalMs}ms → ${intervalMs}ms")
+        currentIntervalMs = intervalMs
+        locationJob?.cancel()
+        locationJob = viewModelScope.launch {
+            locationManager.getLocationUpdates(intervalMs = intervalMs, minIntervalMs = minIntervalMs)
+                .collect { loc ->
+                    DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
+                    if (_locationMode.value == LocationMode.GPS) {
+                        _currentLocation.value = LocationUpdate(
+                            point = GeoPoint(loc.latitude, loc.longitude),
+                            speedMps = if (loc.hasSpeed()) loc.speed else null,
+                            bearing = if (loc.hasBearing()) loc.bearing else null,
+                            accuracy = loc.accuracy
+                        )
                     }
                 }
             DebugLogger.w(TAG, "GMS location flow ended — 0 updates (permission denied or GMS error)")
@@ -121,12 +160,17 @@ class MainViewModel @Inject constructor(
 
     fun onGpsLocationUpdate(location: Location) {
         if (_locationMode.value == LocationMode.GPS) {
-            _currentLocation.value = GeoPoint(location.latitude, location.longitude)
+            _currentLocation.value = LocationUpdate(
+                point = GeoPoint(location.latitude, location.longitude),
+                speedMps = if (location.hasSpeed()) location.speed else null,
+                bearing = if (location.hasBearing()) location.bearing else null,
+                accuracy = location.accuracy
+            )
         }
     }
 
     fun setManualLocation(point: GeoPoint) {
-        _currentLocation.value = point
+        _currentLocation.value = LocationUpdate(point, null, null, 0f)
         _locationMode.value = LocationMode.MANUAL
         DebugLogger.i(TAG, "Manual location: ${point.latitude}, ${point.longitude}")
     }
@@ -137,7 +181,12 @@ class MainViewModel @Inject constructor(
         locationManager.getLastKnownLocation { loc ->
             if (loc != null && _locationMode.value == LocationMode.GPS) {
                 DebugLogger.i(TAG, "lastKnownLocation: lat=${loc.latitude} lon=${loc.longitude} — centering map now")
-                _currentLocation.value = GeoPoint(loc.latitude, loc.longitude)
+                _currentLocation.value = LocationUpdate(
+                    point = GeoPoint(loc.latitude, loc.longitude),
+                    speedMps = null,
+                    bearing = null,
+                    accuracy = loc.accuracy
+                )
             } else {
                 DebugLogger.w(TAG, "lastKnownLocation: null — map stays at default until first GPS fix")
             }

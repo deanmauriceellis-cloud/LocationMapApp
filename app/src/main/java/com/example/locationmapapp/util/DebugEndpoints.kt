@@ -269,7 +269,8 @@ class DebugEndpoints(
         val data = runOnMain {
             mapOf(
                 "currentLocation" to viewModel.currentLocation.value?.let {
-                    mapOf("lat" to it.latitude, "lon" to it.longitude)
+                    mapOf("lat" to it.point.latitude, "lon" to it.point.longitude,
+                        "speedMps" to it.speedMps, "bearing" to it.bearing, "accuracy" to it.accuracy)
                 },
                 "locationMode" to viewModel.locationMode.value?.name,
                 "places" to viewModel.places.value?.let {

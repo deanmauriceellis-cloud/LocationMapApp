@@ -139,6 +139,13 @@ class MainActivity : AppCompatActivity() {
     private var pendingAutoFollowRestore = false
     private var initialCenterDone = false   // only auto-center map on FIRST GPS fix
 
+    // Smart GPS position tracking
+    private var lastGpsPoint: GeoPoint? = null
+    private var lastPoiFetchPoint: GeoPoint? = null
+    private var lastApiCallTime: Long = 0
+    private var currentGpsIntervalMs: Long = 60_000L
+    private var lastGpsSpeedMph: Double? = null
+
     /** Load METARs for the current visible map bounding box. */
     private fun loadMetarsForVisibleArea() {
         val bb = binding.mapView.boundingBox
@@ -756,67 +763,67 @@ class MainActivity : AppCompatActivity() {
     private fun observeViewModel() {
         DebugLogger.i("MainActivity", "observeViewModel() — attaching all observers")
 
-        viewModel.currentLocation.observe(this) { point ->
+        viewModel.currentLocation.observe(this) { update ->
+            val point = update.point
+            val speedMph = update.speedMps?.let { it * 2.23694 }
+            lastGpsSpeedMph = speedMph
+
+            // ── 1. Adaptive GPS interval: fast → 10s, slow → 60s ──
+            val desiredInterval = if ((speedMph ?: 0.0) > 20.0) 10_000L else 60_000L
+            if (desiredInterval != currentGpsIntervalMs) {
+                currentGpsIntervalMs = desiredInterval
+                val minInterval = if (desiredInterval == 10_000L) 5_000L else 30_000L
+                DebugLogger.i("MainActivity", "GPS interval → ${desiredInterval}ms (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
+                viewModel.restartLocationUpdates(desiredInterval, minInterval)
+            }
+
+            // ── 2. 100m dead zone — skip jitter when stationary ──
+            if (!initialCenterDone) {
+                // First fix always processes — fall through
+            } else if (distanceBetween(lastGpsPoint, point) < 100f) {
+                DebugLogger.d("MainActivity", "GPS jitter <100m — skipped")
+                // Still handle deferred restores even during jitter
+                handleDeferredRestores(point)
+                return@observe
+            }
+
+            // ── 3. Update GPS marker ──
             updateGpsMarker(point)
-            // Only auto-center on the first GPS fix
+            lastGpsPoint = point
+
+            // ── 4. Initial center — first fix only ──
             if (followedVehicleId == null && !initialCenterDone) {
                 initialCenterDone = true
+                lastPoiFetchPoint = point
+                lastApiCallTime = System.currentTimeMillis()
                 DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=14")
                 binding.mapView.controller.animateTo(point)
                 binding.mapView.controller.setZoom(14.0)
             } else {
-                DebugLogger.d("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (marker only)")
+                DebugLogger.d("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
             }
-            // Fire deferred POI display now that we have a real GPS position
-            // Display is driven by /pois/bbox — no need to fire per-category Overpass queries on startup
-            if (pendingPoiRestore) {
-                pendingPoiRestore = false
-                DebugLogger.i("MainActivity", "POI restore — loading cached POIs for visible area")
-                binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 1500)
-                // Silent background fill — search Overpass at GPS position to populate cache
-                scheduleSilentFill(point, 3000)
+
+            // ── 5. Deferred restores — always fire regardless of speed ──
+            handleDeferredRestores(point)
+
+            // ── 6. Fast speed guard — no API calls when driving ──
+            if ((speedMph ?: 0.0) > 20.0) {
+                DebugLogger.d("MainActivity", "Speed >20mph — skipping API calls")
+                return@observe
             }
-            // Fire deferred METAR load after the map animation settles
-            if (pendingMetarRestore) {
-                pendingMetarRestore = false
-                binding.mapView.postDelayed({
-                    DebugLogger.i("MainActivity", "METAR restore triggered — loading for visible area")
-                    loadMetarsForVisibleArea()
-                }, 1500)
-            }
-            // Fire deferred Aircraft load after the map animation settles
-            if (pendingAircraftRestore) {
-                pendingAircraftRestore = false
-                binding.mapView.postDelayed({
-                    DebugLogger.i("MainActivity", "Aircraft restore triggered — starting refresh")
-                    startAircraftRefresh()
-                }, 1500)
-            }
-            // Restore auto-follow after aircraft data has had time to load
-            if (pendingAutoFollowRestore) {
-                pendingAutoFollowRestore = false
-                binding.mapView.postDelayed({
-                    DebugLogger.i("MainActivity", "Auto-follow restore triggered")
-                    startAutoFollowAircraft()
-                }, 5000)  // extra delay so aircraft list is populated
-            }
-            // Load cached POIs for visible area
-            if (pendingCachedPoiLoad) {
-                pendingCachedPoiLoad = false
-                binding.mapView.postDelayed({
-                    DebugLogger.i("MainActivity", "Loading cached POIs for visible area")
-                    loadCachedPoisForVisibleArea()
-                }, 2000)
-                // Silent fill to ensure cache is populated at restored position
-                scheduleSilentFill(point, 4000)
-            }
-            // Webcam restore
-            if (pendingWebcamRestore) {
-                pendingWebcamRestore = false
-                binding.mapView.postDelayed({
-                    DebugLogger.i("MainActivity", "Webcam restore triggered — loading for visible area")
-                    loadWebcamsForVisibleArea()
-                }, 2000)
+
+            // ── 7. 3km POI threshold + 1-min cooldown ──
+            val now = System.currentTimeMillis()
+            val distFromLastFetch = distanceBetween(lastPoiFetchPoint, point)
+            if (distFromLastFetch > 3000f && (now - lastApiCallTime) > 60_000L) {
+                DebugLogger.i("MainActivity", "GPS moved ${distFromLastFetch.toInt()}m from last POI fetch — refreshing layers")
+                lastPoiFetchPoint = point
+                lastApiCallTime = now
+                if (followedVehicleId == null) {
+                    binding.mapView.controller.animateTo(point)
+                }
+                binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 500)
+                scheduleSilentFill(point, 2000)
             }
         }
         viewModel.places.observe(this) { (layerId, places) ->
@@ -1051,7 +1058,7 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
 
     private fun searchFromCurrentLocation() {
-        val loc = viewModel.currentLocation.value ?: GeoPoint(42.3601, -71.0589)
+        val loc = viewModel.currentLocation.value?.point ?: GeoPoint(42.3601, -71.0589)
         DebugLogger.i("MainActivity", "searchFromCurrentLocation() lat=${loc.latitude} lon=${loc.longitude}")
         viewModel.searchPoisAt(loc)
         toast("Searching POIs…")
@@ -1140,6 +1147,52 @@ class MainActivity : AppCompatActivity() {
         refreshList(subwayMarkers, R.drawable.ic_transit_rail, 26)
         refreshList(busMarkers, R.drawable.ic_bus, 22)
         binding.mapView.invalidate()
+    }
+
+    /** Process deferred restore flags on GPS update (startup layer restoration). */
+    private fun handleDeferredRestores(point: GeoPoint) {
+        if (pendingPoiRestore) {
+            pendingPoiRestore = false
+            DebugLogger.i("MainActivity", "POI restore — loading cached POIs for visible area")
+            binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 1500)
+            scheduleSilentFill(point, 3000)
+        }
+        if (pendingMetarRestore) {
+            pendingMetarRestore = false
+            binding.mapView.postDelayed({
+                DebugLogger.i("MainActivity", "METAR restore triggered — loading for visible area")
+                loadMetarsForVisibleArea()
+            }, 1500)
+        }
+        if (pendingAircraftRestore) {
+            pendingAircraftRestore = false
+            binding.mapView.postDelayed({
+                DebugLogger.i("MainActivity", "Aircraft restore triggered — starting refresh")
+                startAircraftRefresh()
+            }, 1500)
+        }
+        if (pendingAutoFollowRestore) {
+            pendingAutoFollowRestore = false
+            binding.mapView.postDelayed({
+                DebugLogger.i("MainActivity", "Auto-follow restore triggered")
+                startAutoFollowAircraft()
+            }, 5000)
+        }
+        if (pendingCachedPoiLoad) {
+            pendingCachedPoiLoad = false
+            binding.mapView.postDelayed({
+                DebugLogger.i("MainActivity", "Loading cached POIs for visible area")
+                loadCachedPoisForVisibleArea()
+            }, 2000)
+            scheduleSilentFill(point, 4000)
+        }
+        if (pendingWebcamRestore) {
+            pendingWebcamRestore = false
+            binding.mapView.postDelayed({
+                DebugLogger.i("MainActivity", "Webcam restore triggered — loading for visible area")
+                loadWebcamsForVisibleArea()
+            }, 2000)
+        }
     }
 
     /** Ask the proxy for cached POIs within the visible map bounding box.
@@ -3226,7 +3279,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         // Compact distance from current GPS: "1.4mi(NE)"
-        val gpsLoc = viewModel.currentLocation.value
+        val gpsLoc = viewModel.currentLocation.value?.point
         val compactDist = if (gpsLoc != null) {
             val results = FloatArray(2)
             android.location.Location.distanceBetween(
@@ -3610,6 +3663,15 @@ class MainActivity : AppCompatActivity() {
         }
         dialog.setOnDismissListener { wv.destroy() }
         dialog.show()
+    }
+
+    /** Distance in meters between two GeoPoints (null-safe — returns MAX_VALUE if from is null). */
+    private fun distanceBetween(from: GeoPoint?, to: GeoPoint): Float {
+        if (from == null) return Float.MAX_VALUE
+        val results = FloatArray(1)
+        android.location.Location.distanceBetween(
+            from.latitude, from.longitude, to.latitude, to.longitude, results)
+        return results[0]
     }
 
     /** Format distance + cardinal direction between two points. */
@@ -4923,7 +4985,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             val tags = appBarMenuManager.getActiveTags(layerId)
-            val loc = viewModel.currentLocation.value ?: GeoPoint(42.3601, -71.0589)
+            val loc = viewModel.currentLocation.value?.point ?: GeoPoint(42.3601, -71.0589)
             viewModel.searchPoisAt(loc, tags, layerId)
             toast("Loading ${cat.label}…")
         }
@@ -5057,6 +5119,11 @@ class MainActivity : AppCompatActivity() {
                 "tags" to findFilterTags
             ),
             "silentFill" to (silentFillJob?.isActive == true),
+            "gpsSpeedMph" to lastGpsSpeedMph,
+            "gpsIntervalMs" to currentGpsIntervalMs,
+            "lastPoiFetchDistanceM" to lastPoiFetchPoint?.let { from ->
+                lastGpsPoint?.let { to -> distanceBetween(from, to).toInt() }
+            },
             "overlays" to map.overlays.size
         )
     }
