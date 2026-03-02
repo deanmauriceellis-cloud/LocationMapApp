@@ -151,11 +151,21 @@
 - Individual POI cache (poi-cache.json) — deduped by OSM type+id, with first/last seen timestamps
 - POI database (PostgreSQL) — permanent storage with JSONB tags, category indexing, upsert import
 - Cache proxy with disk persistence (cache-data.json, radius-hints.json, poi-cache.json, 365-day Overpass TTL)
+- **Idle auto-populate** (v1.5.33) — full probe-calibrate-spiral scanner starts after 60s GPS stationarity
+  - GPS observer jitter branch (<100m) checks idle time; significant-move branch resets timer + cancels scan
+  - `startIdlePopulate(center)` / `stopIdlePopulate()`; `idlePopulateJob` + `lastSignificantMoveTime` state vars
+  - 45s inter-cell delay (gentler than manual 30s); "Idle scan:" banner prefix
+  - Guards: no manual populate, not following, speed ≤20mph; always uses GPS position (never map center)
+  - Cancels on: GPS >100m move, long-press, vehicle/aircraft tap, manual populate, banner tap, Go to Location
+  - Debug state: `idlePopulate` (boolean), `idleTimeSec`, `populate` (manual scanner)
 - **Overpass request queue** (v1.5.16): proxy serializes upstream Overpass requests, 10s minimum gap
   - Cache hits return instantly; cache misses queued and processed one at a time
   - Prevents Overpass 429/504 storms from parallel requests
   - Queue depth visible in `/cache/stats` → `overpassQueue`
   - `X-POI-New` / `X-POI-Known` response headers report new vs existing POIs per request
+  - **Per-client fair queuing** (v1.5.33): round-robin across `X-Client-ID` headers, 5-request per-client cap
+  - **Covering cache check** (v1.5.33): before Overpass upstream, checks if larger-radius cached result covers area
+  - **Content hash delta** (v1.5.33): MD5 of sorted element IDs skips `cacheIndividualPois()` when data unchanged
 - **Bbox snapping for cache hit rate** (v1.5.23): coordinates rounded to grid for reuse across small scrolls
   - METAR: 0.01° (~1km), webcams: 0.01° (~1km), aircraft: 0.1° (~11km)
   - South/west snap down, north/east snap up to fully contain original viewport
@@ -227,7 +237,7 @@
 - `app/src/main/java/.../ui/MainViewModel.kt` — LiveData, data fetching
 - `app/src/main/java/.../ui/MarkerIconHelper.kt` — icon/dot rendering with cache
 - `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 16 POI categories
-- `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search
+- `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search (injects `@ApplicationContext` for X-Client-ID)
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
 - `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles

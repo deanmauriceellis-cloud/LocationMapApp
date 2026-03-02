@@ -1,5 +1,50 @@
 # LocationMapApp — Session Log
 
+## Session: 2026-03-02b (Idle Auto-Populate + Delta Cache — v1.5.33)
+
+### Changes Made
+
+#### Idle Auto-Populate (MainActivity.kt)
+- **New state variables**: `idlePopulateJob: Job?`, `lastSignificantMoveTime: Long`
+- **GPS observer idle detection**: in jitter branch (<100m), checks `now - lastSignificantMoveTime > 60s` with guards (no manual populate, no follow, speed ≤20mph). Starts `startIdlePopulate(gpsPoint)` when conditions met
+- **GPS observer movement cancellation**: in significant-move branch (≥100m), resets `lastSignificantMoveTime` and cancels any active idle populate
+- **`startIdlePopulate(center: GeoPoint)`**: full probe-calibrate-spiral scanner identical to manual `startPopulatePois()` but uses passed GPS center (not map center), 45s inter-cell delays (not 30s), stored in `idlePopulateJob`, "Idle scan:" banner prefix
+- **`stopIdlePopulate()`**: cancels job, removes scanning marker, hides banner
+- **`showIdlePopulateBanner()`**: like `showPopulateBanner` but "Idle scan:" prefix and banner tap calls `stopIdlePopulate()`
+- **6 cancellation points**: long-press, vehicle tap, aircraft tap, goToLocation, startPopulatePois, GPS movement >100m
+- **Debug state**: added `idlePopulate` (boolean), `idleTimeSec` (seconds since last significant move), `populate` (manual scanner active)
+
+#### X-Client-ID Header (PlacesRepository.kt + AppModule.kt)
+- **PlacesRepository constructor**: now takes `@ApplicationContext private val appContext: Context`
+- **`clientId: String` lazy property**: generates UUID on first launch, stores in `places_repo_prefs` SharedPreferences
+- **Header sent on all 3 Overpass methods**: `searchPois()`, `searchPoisCacheOnly()`, `searchPoisForPopulate()` — `.header("X-Client-ID", clientId)`
+- **AppModule**: `providePlacesRepository()` updated to pass `@ApplicationContext context`
+
+#### Delta Cache Optimization (cache-proxy/server.js)
+- **`crypto` import**: added for MD5 content hashing
+- **`findCoveringCache(lat, lon, radius, tags)`**: checks cache at 2x and 4x radius (up to 5000m) at same grid point — a larger-radius cached result is a superset
+- **Covering cache check at 2 points**: (1) in initial `/overpass` handler before queuing, (2) in `overpassWorker()` before upstream fetch
+- **`computeElementHash(jsonBody)`**: MD5 of sorted `type:id` pairs for delta detection
+- **Content hash in worker**: after upstream response, if new hash matches previous for that key, skips `cacheIndividualPois()` entirely (logs "content unchanged — skipping update")
+- **`contentHashes` Map**: stores cache key → last known element hash (in-memory only)
+
+#### Per-Client Fair Queuing (cache-proxy/server.js)
+- **`CLIENT_QUEUE_CAP = 5`**: max queued requests per client
+- **`enqueueOverpassRequest(clientId, item)`**: checks per-client count, rejects at cap
+- **`shiftFairQueue()`**: round-robin across client IDs instead of FIFO — naturally interleaves ABAB instead of AABB
+- **`/overpass` handler**: reads `X-Client-ID` header, uses `enqueueOverpassRequest()`, returns 429 with `Retry-After: 30` when client at cap
+- **Worker**: uses `shiftFairQueue()` instead of `overpassQueue.shift()`, logs client ID in queue processing
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `app/.../ui/MainActivity.kt` | Idle detection in GPS observer, `startIdlePopulate()`, `stopIdlePopulate()`, `showIdlePopulateBanner()`, 6 cancellation points, debug state fields |
+| `app/.../data/repository/PlacesRepository.kt` | `@ApplicationContext` injection, `clientId` UUID generation, `X-Client-ID` header on 3 methods |
+| `app/.../di/AppModule.kt` | `providePlacesRepository()` passes context |
+| `cache-proxy/server.js` | `crypto` import, `findCoveringCache()`, `computeElementHash()`, `contentHashes`, `enqueueOverpassRequest()`, `shiftFairQueue()`, covering cache in handler+worker, content hash in worker, client ID in queue |
+| `CHANGELOG.md` | v1.5.33 entry |
+| `STATE.md` | Updated header, added idle auto-populate + proxy delta cache sections |
+
 ## Session: 2026-03-02a (Geocode Autocomplete + Tooltips — v1.5.32)
 
 ### Changes Made
