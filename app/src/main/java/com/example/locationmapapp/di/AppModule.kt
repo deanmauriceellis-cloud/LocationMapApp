@@ -5,6 +5,9 @@ import com.example.locationmapapp.data.location.LocationManager
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.data.repository.FindRepository
+import com.example.locationmapapp.data.repository.AuthRepository
+import com.example.locationmapapp.data.repository.ChatRepository
+import com.example.locationmapapp.data.repository.CommentRepository
 import com.example.locationmapapp.data.repository.GeofenceDatabaseRepository
 import com.example.locationmapapp.data.repository.GeofenceRepository
 import com.example.locationmapapp.data.repository.TfrRepository
@@ -48,4 +51,13 @@ object AppModule {
 
     @Provides @Singleton
     fun provideGeofenceDatabaseRepository(@ApplicationContext context: Context) = GeofenceDatabaseRepository(context)
+
+    @Provides @Singleton
+    fun provideAuthRepository(@ApplicationContext context: Context) = AuthRepository(context)
+
+    @Provides @Singleton
+    fun provideCommentRepository(authRepository: AuthRepository) = CommentRepository(authRepository)
+
+    @Provides @Singleton
+    fun provideChatRepository(authRepository: AuthRepository) = ChatRepository(authRepository)
 }

@@ -6,8 +6,24 @@ const { Pool } = require('pg');
 const DDG = require('duck-duck-scrape');
 const cheerio = require('cheerio');
 const { XMLParser } = require('fast-xml-parser');
+const argon2 = require('argon2');
+const jwt = require('jsonwebtoken');
+const http = require('http');
+const { Server: SocketServer } = require('socket.io');
 const app = express();
+const server = http.createServer(app);
+const io = new SocketServer(server, { cors: { origin: '*' } });
 const PORT = 3000;
+
+// ── JWT Configuration ────────────────────────────────────────────────────────
+
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  const generated = crypto.randomBytes(32).toString('hex');
+  console.warn('[Auth] WARNING: JWT_SECRET not set — using random secret (tokens won\'t survive restarts)');
+  return generated;
+})();
+const JWT_ACCESS_EXPIRY  = '15m';
+const JWT_REFRESH_DAYS   = 30;
 
 // ── PostgreSQL pool (optional — /db/* endpoints require DATABASE_URL) ────────
 
@@ -2711,9 +2727,635 @@ app.get('/geofences/database/:id/download', (req, res) => {
   fs.createReadStream(dbPath).pipe(res);
 });
 
+// ── Auth Helpers ─────────────────────────────────────────────────────────────
+
+function sha256(str) {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
+
+async function generateTokens(user) {
+  const accessToken = jwt.sign(
+    { sub: user.id, name: user.display_name, role: user.platform_role },
+    JWT_SECRET,
+    { expiresIn: JWT_ACCESS_EXPIRY }
+  );
+  const refreshToken = crypto.randomBytes(40).toString('hex');
+  const familyId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + JWT_REFRESH_DAYS * 86400000);
+
+  await pgPool.query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [user.id, sha256(refreshToken), familyId, expiresAt]
+  );
+  return { accessToken, refreshToken, expiresAt: expiresAt.toISOString() };
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+  try {
+    const decoded = jwt.verify(header.slice(7), JWT_SECRET);
+    req.user = { id: decoded.sub, displayName: decoded.name, role: decoded.role };
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// ── Auth Endpoints ───────────────────────────────────────────────────────────
+
+app.post('/auth/register', requirePg, async (req, res) => {
+  try {
+    const { displayName, email, password } = req.body;
+    if (!displayName || !password) {
+      return res.status(400).json({ error: 'displayName and password are required' });
+    }
+    if (displayName.length > 50) {
+      return res.status(400).json({ error: 'displayName must be 50 characters or less' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Check email uniqueness via auth_lookup
+    if (email) {
+      const emailHash = sha256(email.toLowerCase().trim());
+      const existing = await pgPool.query('SELECT user_id FROM auth_lookup WHERE email_hash = $1', [emailHash]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+    }
+
+    const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+    const result = await pgPool.query(
+      `INSERT INTO users (display_name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, display_name, platform_role, created_at`,
+      [displayName.trim(), email ? email.toLowerCase().trim() : null, passwordHash]
+    );
+    const user = result.rows[0];
+
+    // Store email lookup
+    if (email) {
+      await pgPool.query(
+        'INSERT INTO auth_lookup (email_hash, user_id) VALUES ($1, $2)',
+        [sha256(email.toLowerCase().trim()), user.id]
+      );
+    }
+
+    const tokens = await generateTokens(user);
+    console.log(`[Auth] Registered user ${user.display_name} (${user.id})`);
+    res.status(201).json({
+      user: { id: user.id, displayName: user.display_name, role: user.platform_role, createdAt: user.created_at },
+      ...tokens
+    });
+  } catch (err) {
+    console.error('[Auth] Register error:', err.message);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+app.post('/auth/login', requirePg, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+
+    const emailHash = sha256(email.toLowerCase().trim());
+    const lookup = await pgPool.query('SELECT user_id FROM auth_lookup WHERE email_hash = $1', [emailHash]);
+    if (lookup.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const result = await pgPool.query(
+      'SELECT id, display_name, email, password_hash, platform_role, is_banned, created_at FROM users WHERE id = $1',
+      [lookup.rows[0].user_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    const user = result.rows[0];
+
+    if (user.is_banned) {
+      return res.status(403).json({ error: 'Account is banned' });
+    }
+
+    const valid = await argon2.verify(user.password_hash, password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const tokens = await generateTokens(user);
+    console.log(`[Auth] Login: ${user.display_name} (${user.id})`);
+    res.json({
+      user: { id: user.id, displayName: user.display_name, role: user.platform_role, createdAt: user.created_at },
+      ...tokens
+    });
+  } catch (err) {
+    console.error('[Auth] Login error:', err.message);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+app.post('/auth/refresh', requirePg, async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'refreshToken is required' });
+    }
+
+    const tokenHash = sha256(refreshToken);
+    const result = await pgPool.query(
+      `SELECT rt.id, rt.user_id, rt.family_id, rt.revoked_at, rt.expires_at,
+              u.display_name, u.platform_role, u.is_banned
+       FROM refresh_tokens rt JOIN users u ON rt.user_id = u.id
+       WHERE rt.token_hash = $1`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+    const row = result.rows[0];
+
+    // Family-based revocation: if this token was already used, revoke the whole family
+    if (row.revoked_at) {
+      await pgPool.query(
+        'UPDATE refresh_tokens SET revoked_at = NOW() WHERE family_id = $1 AND revoked_at IS NULL',
+        [row.family_id]
+      );
+      console.warn(`[Auth] Refresh token reuse detected — revoked family ${row.family_id}`);
+      return res.status(401).json({ error: 'Token reuse detected — all sessions revoked' });
+    }
+
+    if (new Date(row.expires_at) < new Date()) {
+      return res.status(401).json({ error: 'Refresh token expired' });
+    }
+
+    if (row.is_banned) {
+      return res.status(403).json({ error: 'Account is banned' });
+    }
+
+    // Revoke the old token
+    await pgPool.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1', [row.id]);
+
+    // Issue new token pair in the same family
+    const newAccessToken = jwt.sign(
+      { sub: row.user_id, name: row.display_name, role: row.platform_role },
+      JWT_SECRET,
+      { expiresIn: JWT_ACCESS_EXPIRY }
+    );
+    const newRefreshToken = crypto.randomBytes(40).toString('hex');
+    const expiresAt = new Date(Date.now() + JWT_REFRESH_DAYS * 86400000);
+    await pgPool.query(
+      `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [row.user_id, sha256(newRefreshToken), row.family_id, expiresAt]
+    );
+
+    console.log(`[Auth] Token refreshed for ${row.display_name}`);
+    res.json({
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      expiresAt: expiresAt.toISOString()
+    });
+  } catch (err) {
+    console.error('[Auth] Refresh error:', err.message);
+    res.status(500).json({ error: 'Token refresh failed' });
+  }
+});
+
+app.post('/auth/logout', requirePg, requireAuth, async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      const tokenHash = sha256(refreshToken);
+      const result = await pgPool.query(
+        'SELECT family_id FROM refresh_tokens WHERE token_hash = $1 AND user_id = $2',
+        [tokenHash, req.user.id]
+      );
+      if (result.rows.length > 0) {
+        await pgPool.query(
+          'UPDATE refresh_tokens SET revoked_at = NOW() WHERE family_id = $1 AND revoked_at IS NULL',
+          [result.rows[0].family_id]
+        );
+      }
+    }
+    console.log(`[Auth] Logout: ${req.user.displayName}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Auth] Logout error:', err.message);
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+app.get('/auth/me', requirePg, requireAuth, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      'SELECT id, display_name, platform_role, is_banned, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const u = result.rows[0];
+    res.json({ id: u.id, displayName: u.display_name, role: u.platform_role, createdAt: u.created_at });
+  } catch (err) {
+    console.error('[Auth] /me error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// ── Comment Endpoints ────────────────────────────────────────────────────────
+
+app.get('/comments/:osm_type/:osm_id', requirePg, async (req, res) => {
+  try {
+    const { osm_type, osm_id } = req.params;
+    // Optionally include viewer's votes
+    let viewerUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+        viewerUserId = decoded.sub;
+      } catch (_) {}
+    }
+
+    let query, params;
+    if (viewerUserId) {
+      query = `
+        SELECT c.id, c.osm_type, c.osm_id, c.user_id, c.parent_id, c.content,
+               c.rating, c.upvotes, c.downvotes, c.is_deleted, c.created_at,
+               u.display_name AS author_name,
+               cv.vote AS viewer_vote
+        FROM poi_comments c
+        JOIN users u ON c.user_id = u.id
+        LEFT JOIN comment_votes cv ON cv.comment_id = c.id AND cv.user_id = $3
+        WHERE c.osm_type = $1 AND c.osm_id = $2
+        ORDER BY c.created_at DESC
+        LIMIT 100`;
+      params = [osm_type, osm_id, viewerUserId];
+    } else {
+      query = `
+        SELECT c.id, c.osm_type, c.osm_id, c.user_id, c.parent_id, c.content,
+               c.rating, c.upvotes, c.downvotes, c.is_deleted, c.created_at,
+               u.display_name AS author_name
+        FROM poi_comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.osm_type = $1 AND c.osm_id = $2
+        ORDER BY c.created_at DESC
+        LIMIT 100`;
+      params = [osm_type, osm_id];
+    }
+
+    const result = await pgPool.query(query, params);
+    const comments = result.rows.map(r => ({
+      id: r.id,
+      osmType: r.osm_type,
+      osmId: r.osm_id,
+      userId: r.user_id,
+      parentId: r.parent_id,
+      content: r.is_deleted ? '[deleted]' : r.content,
+      rating: r.rating,
+      upvotes: r.upvotes,
+      downvotes: r.downvotes,
+      isDeleted: r.is_deleted,
+      createdAt: r.created_at,
+      authorName: r.author_name,
+      viewerVote: r.viewer_vote || 0
+    }));
+    res.json({ comments, total: comments.length });
+  } catch (err) {
+    console.error('[Comments] GET error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+app.post('/comments', requirePg, requireAuth, async (req, res) => {
+  try {
+    const { osmType, osmId, content, rating, parentId } = req.body;
+    if (!osmType || !osmId || !content) {
+      return res.status(400).json({ error: 'osmType, osmId, and content are required' });
+    }
+    if (content.length > 2000) {
+      return res.status(400).json({ error: 'Content must be 2000 characters or less' });
+    }
+    if (rating !== undefined && rating !== null && (rating < 1 || rating > 5)) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    const result = await pgPool.query(
+      `INSERT INTO poi_comments (osm_type, osm_id, user_id, parent_id, content, rating)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, created_at`,
+      [osmType, osmId, req.user.id, parentId || null, content, rating || null]
+    );
+    console.log(`[Comments] New comment by ${req.user.displayName} on ${osmType}/${osmId}`);
+    res.status(201).json({
+      id: result.rows[0].id,
+      createdAt: result.rows[0].created_at,
+      authorName: req.user.displayName
+    });
+  } catch (err) {
+    console.error('[Comments] POST error:', err.message);
+    res.status(500).json({ error: 'Failed to post comment' });
+  }
+});
+
+app.post('/comments/:id/vote', requirePg, requireAuth, async (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id);
+    const { vote } = req.body;
+    if (vote !== 1 && vote !== -1) {
+      return res.status(400).json({ error: 'vote must be 1 or -1' });
+    }
+
+    // Upsert vote
+    await pgPool.query(
+      `INSERT INTO comment_votes (comment_id, user_id, vote)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (comment_id, user_id) DO UPDATE SET vote = $3`,
+      [commentId, req.user.id, vote]
+    );
+
+    // Recount aggregates
+    const counts = await pgPool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END), 0) AS upvotes,
+         COALESCE(SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END), 0) AS downvotes
+       FROM comment_votes WHERE comment_id = $1`,
+      [commentId]
+    );
+    const { upvotes, downvotes } = counts.rows[0];
+    await pgPool.query(
+      'UPDATE poi_comments SET upvotes = $1, downvotes = $2 WHERE id = $3',
+      [upvotes, downvotes, commentId]
+    );
+    res.json({ upvotes: parseInt(upvotes), downvotes: parseInt(downvotes) });
+  } catch (err) {
+    console.error('[Comments] Vote error:', err.message);
+    res.status(500).json({ error: 'Failed to vote' });
+  }
+});
+
+app.delete('/comments/:id', requirePg, requireAuth, async (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id);
+    // Only comment owner or platform support/owner can delete
+    const result = await pgPool.query('SELECT user_id FROM poi_comments WHERE id = $1', [commentId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+    const isOwner = result.rows[0].user_id === req.user.id;
+    const isAdmin = ['owner', 'support'].includes(req.user.role);
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to delete this comment' });
+    }
+    await pgPool.query('UPDATE poi_comments SET is_deleted = TRUE WHERE id = $1', [commentId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Comments] Delete error:', err.message);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// Debug-only: list registered users (remove in production)
+app.get('/auth/debug/users', requirePg, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      'SELECT id, display_name, platform_role, is_banned, created_at FROM users ORDER BY created_at DESC LIMIT 50'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Chat REST Endpoints ─────────────────────────────────────────────────────
+
+// Ensure "Global" room exists
+async function ensureGlobalRoom() {
+  if (!pgPool) return;
+  try {
+    const existing = await pgPool.query("SELECT id FROM chat_rooms WHERE name = 'Global'");
+    if (existing.rows.length === 0) {
+      await pgPool.query(
+        "INSERT INTO chat_rooms (room_type, name, description) VALUES ('public', 'Global', 'Global chat room for all users')"
+      );
+      console.log('[Chat] Created Global room');
+    }
+  } catch (err) {
+    console.error('[Chat] Failed to ensure Global room:', err.message);
+  }
+}
+
+app.get('/chat/rooms', requirePg, async (req, res) => {
+  try {
+    // Optionally include membership info for authed user
+    let viewerUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+        viewerUserId = decoded.sub;
+      } catch (_) {}
+    }
+
+    let query;
+    if (viewerUserId) {
+      query = `
+        SELECT r.id, r.room_type, r.name, r.description, r.member_count,
+               r.last_message_at, r.created_at,
+               CASE WHEN rm.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_member,
+               rm.role AS member_role
+        FROM chat_rooms r
+        LEFT JOIN room_memberships rm ON rm.room_id = r.id AND rm.user_id = $1
+        ORDER BY r.last_message_at DESC NULLS LAST, r.created_at DESC`;
+      const result = await pgPool.query(query, [viewerUserId]);
+      res.json(result.rows.map(r => ({
+        id: r.id, roomType: r.room_type, name: r.name, description: r.description,
+        memberCount: r.member_count, lastMessageAt: r.last_message_at,
+        createdAt: r.created_at, isMember: r.is_member, memberRole: r.member_role
+      })));
+    } else {
+      query = `SELECT id, room_type, name, description, member_count, last_message_at, created_at
+               FROM chat_rooms ORDER BY last_message_at DESC NULLS LAST, created_at DESC`;
+      const result = await pgPool.query(query);
+      res.json(result.rows.map(r => ({
+        id: r.id, roomType: r.room_type, name: r.name, description: r.description,
+        memberCount: r.member_count, lastMessageAt: r.last_message_at, createdAt: r.created_at
+      })));
+    }
+  } catch (err) {
+    console.error('[Chat] GET rooms error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch rooms' });
+  }
+});
+
+app.post('/chat/rooms', requirePg, requireAuth, async (req, res) => {
+  try {
+    const { name, description, roomType } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    if (name.length > 100) return res.status(400).json({ error: 'name must be 100 chars or less' });
+    const type = roomType || 'public';
+
+    const result = await pgPool.query(
+      `INSERT INTO chat_rooms (room_type, name, description, created_by, member_count)
+       VALUES ($1, $2, $3, $4, 1) RETURNING id, created_at`,
+      [type, name, description || null, req.user.id]
+    );
+    const room = result.rows[0];
+
+    // Auto-join creator as admin
+    await pgPool.query(
+      'INSERT INTO room_memberships (room_id, user_id, role) VALUES ($1, $2, $3)',
+      [room.id, req.user.id, 'admin']
+    );
+    console.log(`[Chat] Room created: "${name}" by ${req.user.displayName}`);
+    res.status(201).json({ id: room.id, name, createdAt: room.created_at });
+  } catch (err) {
+    console.error('[Chat] POST room error:', err.message);
+    res.status(500).json({ error: 'Failed to create room' });
+  }
+});
+
+app.get('/chat/rooms/:id/messages', requirePg, async (req, res) => {
+  try {
+    const roomId = req.params.id;
+    const before = req.query.before;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+
+    let query, params;
+    if (before) {
+      query = `
+        SELECT m.id, m.room_id, m.user_id, m.content, m.reply_to_id, m.is_deleted, m.sent_at,
+               u.display_name AS author_name
+        FROM messages m JOIN users u ON m.user_id = u.id
+        WHERE m.room_id = $1 AND m.id < $2
+        ORDER BY m.sent_at DESC LIMIT $3`;
+      params = [roomId, before, limit];
+    } else {
+      query = `
+        SELECT m.id, m.room_id, m.user_id, m.content, m.reply_to_id, m.is_deleted, m.sent_at,
+               u.display_name AS author_name
+        FROM messages m JOIN users u ON m.user_id = u.id
+        WHERE m.room_id = $1
+        ORDER BY m.sent_at DESC LIMIT $2`;
+      params = [roomId, limit];
+    }
+
+    const result = await pgPool.query(query, params);
+    // Return in chronological order (oldest first)
+    res.json(result.rows.reverse().map(r => ({
+      id: r.id, roomId: r.room_id, userId: r.user_id,
+      content: r.is_deleted ? '[deleted]' : r.content,
+      replyToId: r.reply_to_id, isDeleted: r.is_deleted,
+      sentAt: r.sent_at, authorName: r.author_name
+    })));
+  } catch (err) {
+    console.error('[Chat] GET messages error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// ── Socket.IO Chat ──────────────────────────────────────────────────────────
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Authentication required'));
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.user = { id: decoded.sub, displayName: decoded.name, role: decoded.role };
+    next();
+  } catch (err) {
+    next(new Error('Invalid token'));
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log(`[Socket.IO] Connected: ${socket.user.displayName} (${socket.id})`);
+
+  socket.on('join_room', async (roomId) => {
+    if (!pgPool) return;
+    socket.join(roomId);
+
+    // Ensure membership exists
+    try {
+      await pgPool.query(
+        `INSERT INTO room_memberships (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [roomId, socket.user.id]
+      );
+      // Update member count
+      const countResult = await pgPool.query(
+        'SELECT COUNT(*) FROM room_memberships WHERE room_id = $1', [roomId]
+      );
+      await pgPool.query(
+        'UPDATE chat_rooms SET member_count = $1 WHERE id = $2',
+        [countResult.rows[0].count, roomId]
+      );
+    } catch (err) {
+      console.error('[Socket.IO] join_room DB error:', err.message);
+    }
+
+    console.log(`[Socket.IO] ${socket.user.displayName} joined room ${roomId}`);
+  });
+
+  socket.on('leave_room', (roomId) => {
+    socket.leave(roomId);
+    console.log(`[Socket.IO] ${socket.user.displayName} left room ${roomId}`);
+  });
+
+  socket.on('send_message', async (data) => {
+    if (!pgPool) return;
+    const { roomId, content, replyToId } = data;
+    if (!roomId || !content || content.length > 2000) return;
+
+    try {
+      const result = await pgPool.query(
+        `INSERT INTO messages (room_id, user_id, content, reply_to_id)
+         VALUES ($1, $2, $3, $4) RETURNING id, sent_at`,
+        [roomId, socket.user.id, content, replyToId || null]
+      );
+      const msg = result.rows[0];
+
+      await pgPool.query(
+        'UPDATE chat_rooms SET last_message_at = $1 WHERE id = $2',
+        [msg.sent_at, roomId]
+      );
+
+      const outMsg = {
+        id: msg.id,
+        roomId,
+        userId: socket.user.id,
+        authorName: socket.user.displayName,
+        content,
+        replyToId: replyToId || null,
+        sentAt: msg.sent_at
+      };
+      io.to(roomId).emit('new_message', outMsg);
+    } catch (err) {
+      console.error('[Socket.IO] send_message error:', err.message);
+    }
+  });
+
+  socket.on('typing', (roomId) => {
+    socket.to(roomId).emit('user_typing', {
+      userId: socket.user.id,
+      displayName: socket.user.displayName
+    });
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket.IO] Disconnected: ${socket.user.displayName}`);
+  });
+});
+
 // ── Start ───────────────────────────────────────────────────────────────────
 
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
+  ensureGlobalRoom();
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
   console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft, GET /webcams, GET /weather, GET /tfrs');
   console.log('Zones:  GET /cameras, GET /schools, GET /flood-zones, GET /crossings');
@@ -2724,5 +3366,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`        PostgreSQL: ${pgPool ? 'connected' : 'not configured (set DATABASE_URL)'}`);
   console.log(`        OpenSky:    ${openskyConfigured ? 'OAuth2 configured' : 'anonymous — set OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET'}`);
   console.log(`        OpenSky:    rate limiter active — ${OPENSKY_EFFECTIVE_LIMIT} req/day (${OPENSKY_DAILY_LIMIT} limit × ${OPENSKY_SAFETY_MARGIN} safety), min interval ${OPENSKY_MIN_INTERVAL_MS}ms`);
+  console.log('Auth:   POST /auth/register, /auth/login, /auth/refresh, /auth/logout, GET /auth/me');
+  console.log('Chat:   GET /chat/rooms, POST /chat/rooms, GET /chat/rooms/:id/messages, Socket.IO');
+  console.log('Social: GET/POST /comments/:osm_type/:osm_id, POST /comments/:id/vote, DELETE /comments/:id');
+  console.log(`        JWT: ${process.env.JWT_SECRET ? 'secret configured' : 'WARNING — using random secret'}`);
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });

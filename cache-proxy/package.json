@@ -8,13 +8,16 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "better-sqlite3": "^11.10.0",
     "cheerio": "^1.0.0",
     "duck-duck-scrape": "^2.2.5",
     "express": "^4.21.0",
     "fast-xml-parser": "^4.3.0",
+    "jsonwebtoken": "^9.0.3",
     "lzma-native": "^8.0.6",
     "pg": "^8.13.0",
+    "socket.io": "^4.8.3",
     "undici": "^6.23.0"
   }
 }

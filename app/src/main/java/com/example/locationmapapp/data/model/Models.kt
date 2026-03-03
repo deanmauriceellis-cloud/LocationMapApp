@@ -405,3 +405,73 @@ data class GeofenceAlert(
     val description: String,
     val zoneType: ZoneType = ZoneType.TFR
 )
+
+// ── Social / Auth Models ────────────────────────────────────────────────────
+
+data class AuthUser(
+    val id: String,
+    val displayName: String,
+    val role: String,
+    val createdAt: String? = null
+)
+
+data class AuthTokens(
+    val accessToken: String,
+    val refreshToken: String,
+    val expiresAt: String
+)
+
+data class AuthResponse(
+    val user: AuthUser,
+    val accessToken: String,
+    val refreshToken: String,
+    val expiresAt: String
+)
+
+// ── POI Comments Models ─────────────────────────────────────────────────────
+
+data class PoiComment(
+    val id: Long,
+    val osmType: String,
+    val osmId: Long,
+    val userId: String,
+    val parentId: Long?,
+    val content: String,
+    val rating: Int?,
+    val upvotes: Int,
+    val downvotes: Int,
+    val isDeleted: Boolean,
+    val createdAt: String,
+    val authorName: String,
+    val viewerVote: Int = 0
+)
+
+data class CommentsResponse(
+    val comments: List<PoiComment>,
+    val total: Int
+)
+
+// ── Chat Models ─────────────────────────────────────────────────────────────
+
+data class ChatRoom(
+    val id: String,
+    val roomType: String,
+    val name: String,
+    val description: String?,
+    val memberCount: Int,
+    val lastMessageAt: String?,
+    val createdAt: String,
+    val isMember: Boolean = false,
+    val memberRole: String? = null
+)
+
+data class ChatMessage(
+    val id: Long,
+    val roomId: String,
+    val userId: String,
+    val authorName: String,
+    val content: String,
+    val replyToId: Long?,
+    val isDeleted: Boolean = false,
+    val sentAt: String
+)

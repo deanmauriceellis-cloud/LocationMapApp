@@ -203,6 +203,19 @@ interface MenuEventListener {
     fun onGoToLocationRequested()
 
     // =========================================================================
+    // SOCIAL
+    // =========================================================================
+
+    /** Open the Social hub (auth dialog if not logged in, profile if logged in). */
+    fun onSocialRequested()
+
+    /** Open the chat room list. */
+    fun onChatRequested()
+
+    /** Open the user profile dialog. */
+    fun onProfileRequested()
+
+    // =========================================================================
     // SAFETY NET
     // =========================================================================
 

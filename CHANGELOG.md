@@ -2,6 +2,52 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.45] — 2026-03-03
+
+### Added
+- **Social layer prototype** — auth, POI comments, real-time chat
+- **Auth system** — register/login with Argon2id + JWT (15min access + 30d refresh tokens)
+  - Family-based refresh token rotation with reuse revocation
+  - `AuthRepository.kt`: auto-refresh expired tokens, SharedPreferences token storage
+  - Proxy endpoints: POST /auth/register, /auth/login, /auth/refresh, /auth/logout, GET /auth/me
+  - Debug endpoint: GET /auth/debug/users
+- **POI Comments** — comments on any POI with star ratings and voting
+  - `CommentRepository.kt`: fetch, post, vote, delete with authenticated requests
+  - Comments section in POI detail dialog: author name, relative time, star ratings, vote arrows
+  - "Add Comment" sub-dialog with 5-star rating selector and text input
+  - Proxy endpoints: GET/POST /comments, POST /comments/:id/vote, DELETE /comments/:id
+  - Soft delete, role-based authorization (own comments or platform support/owner)
+- **Chat rooms** — real-time messaging via Socket.IO
+  - `ChatRepository.kt`: Socket.IO connect/disconnect, room join/leave, send/receive messages
+  - Auto-creates "Global" room on proxy startup
+  - Room list dialog with member counts, create room dialog
+  - Chat room dialog with message bubbles, author names, relative timestamps, send bar
+  - Proxy: Socket.IO auth middleware (JWT), REST endpoints for rooms and message history
+- **Grid dropdown Row 3** — Social, Chat, Profile, Legend (3×4 grid, 12 buttons)
+- **Profile dialog** — avatar initial circle, display name, role badge, user ID, logout button
+- **Login/Register dialog** — email+password form with toggle, validation, error display
+
+### New Files
+- `app/src/main/java/.../data/repository/AuthRepository.kt`
+- `app/src/main/java/.../data/repository/CommentRepository.kt`
+- `app/src/main/java/.../data/repository/ChatRepository.kt`
+- `app/src/main/res/drawable/ic_social.xml`, `ic_chat.xml`, `ic_profile.xml`, `ic_legend.xml`
+
+### Dependencies
+- Proxy: argon2, jsonwebtoken, socket.io
+- Android: io.socket:socket.io-client:2.1.0
+
+### Database (DDL — run as sudo -u postgres)
+- 6 new tables: users, auth_lookup, refresh_tokens, poi_comments, comment_votes, chat_rooms, room_memberships, messages
+- Proxy startup now accepts JWT_SECRET env var for token persistence
+
+### Changed
+- `server.js`: refactored from `app.listen()` to `http.createServer()` + Socket.IO attach
+- `grid_dropdown_panel.xml`: added gridRow3
+- `MenuEventListener.kt`: 3 new callbacks (onSocialRequested, onChatRequested, onProfileRequested)
+- `MainViewModel.kt`: auth, comment, and chat LiveData + methods
+- `AppModule.kt`: 3 new DI providers (AuthRepository, CommentRepository, ChatRepository)
+
 ## [1.5.44] — 2026-03-03
 
 ### Added

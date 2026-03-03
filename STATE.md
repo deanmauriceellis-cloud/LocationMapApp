@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 44 (Share, Dark Mode, Favorites, Text Search, Animated Radar)
+## Last Updated: 2026-03-03 Session 45 (Social Layer Prototype — Auth, Comments, Chat)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -47,6 +47,27 @@
 - **Aircraft follow mode**: global icao24 tracking, 3-strike tolerance, flight path trail (altitude-colored polyline, DB history + live, 1000-point cap)
 - **Auto-follow aircraft (POI Builder)**: ≥10k ft, 20-min rotation, smart switching (altitude/POI/US bounds)
 - **Webcam layer** (Windy API): 18 categories, preview + live player, 0.5° min bbox, 10-min cache
+- **Social layer** (v1.5.45) — auth, POI comments, real-time chat
+  - **Auth**: register/login with email+password, Argon2id hashing, JWT access tokens (15min) + refresh tokens (30d)
+    - Family-based refresh token rotation with reuse revocation
+    - `AuthRepository.kt`: auto-refresh expired tokens, SharedPreferences storage
+    - Profile dialog: avatar initial, display name, role badge, logout
+    - Login/Register toggle dialog from grid dropdown "Social" button
+  - **POI Comments**: star ratings (1-5), upvote/downvote, threaded (parent_id), soft delete
+    - `CommentRepository.kt`: fetch/post/vote/delete with auth
+    - Comments section in POI detail dialog: author, relative time, rating stars, vote arrows
+    - "Add Comment" sub-dialog with star rating selector
+  - **Chat**: Socket.IO real-time messaging, REST room list/create/history
+    - `ChatRepository.kt`: Socket.IO connect/disconnect, room join/leave, send/receive
+    - Auto-creates "Global" room on proxy startup
+    - Room list dialog: name, member count, description, tap to enter
+    - Chat room dialog: message bubbles (own=blue, others=gray), author name, send bar
+    - Create room dialog: name + optional description
+  - **Grid dropdown**: expanded to 3×4 (12 buttons) — Row 3: Social, Chat, Profile, Legend
+  - **Proxy deps**: argon2, jsonwebtoken, socket.io; `http.createServer` + Socket.IO attach
+  - **Android dep**: `io.socket:socket.io-client:2.1.0`
+  - **6 DB tables**: users, auth_lookup, refresh_tokens, poi_comments, comment_votes, chat_rooms, room_memberships, messages
+  - **Skipped for now**: COPPA age gate, email encryption, content moderation, OAuth, monthly partitioning
 - **Cap detection & retry-to-fit**: halves radius on 500-element cap, 20km fuzzy hints, MIN_RADIUS 100m
 - **Populate POIs v2** (grid scanner): probe-calibrate-spiral with recursive 3×3 subdivision, 10km initial probe, narrative banner
 - **10km Probe Populate** (v1.5.42): expanding spiral of 10km wide probes for low-density POI discovery
@@ -141,6 +162,10 @@
 | Geofence Catalog | `http://10.0.0.4:3000/geofences/catalog` | GET /geofences/catalog | live (from catalog.json) |
 | Geofence DB Download | `http://10.0.0.4:3000/geofences/database/:id/download` | GET /geofences/database/:id/download | static file |
 | Geocode | `http://10.0.0.4:3000/geocode?q=...` | GET /geocode?q=&limit= | 24 hours |
+| Auth | `http://10.0.0.4:3000/auth/*` | POST /auth/register, /login, /refresh, /logout; GET /auth/me | — |
+| Comments | `http://10.0.0.4:3000/comments/*` | GET /comments/:type/:id; POST /comments, /comments/:id/vote; DELETE /comments/:id | live |
+| Chat Rooms | `http://10.0.0.4:3000/chat/*` | GET /chat/rooms, /chat/rooms/:id/messages; POST /chat/rooms | live |
+| Chat Socket.IO | `ws://10.0.0.4:3000` | join_room, leave_room, send_message, typing; new_message, user_typing | real-time |
 | MBTA Bus Stops | `http://10.0.0.4:3000/mbta/bus-stops` | GET /mbta/bus-stops | 24 hours |
 | MBTA Vehicles | direct (api-v3.mbta.com) | not proxied | — |
 | MBTA Stations | direct (api-v3.mbta.com/stops) | not proxied | — |
@@ -182,7 +207,10 @@
 - `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings fetch
 - `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog, download, SQLite loading, import/export, CSV parsing
 - `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
-- `cache-proxy/server.js` — Express caching proxy
+- `app/src/main/java/.../data/repository/AuthRepository.kt` — JWT auth, token storage, auto-refresh
+- `app/src/main/java/.../data/repository/CommentRepository.kt` — POI comments CRUD
+- `app/src/main/java/.../data/repository/ChatRepository.kt` — Socket.IO chat + REST rooms/messages
+- `cache-proxy/server.js` — Express caching proxy + auth + comments + chat (Socket.IO)
 - `cache-proxy/geofence-databases/catalog.json` — geofence database catalog (4 databases)
 - `cache-proxy/geofence-databases/build-military.js` — military base polygon builder (ArcGIS NTAD)
 - `cache-proxy/geofence-databases/build-excam.js` — speed/red-light camera builder (WzSabre XZ/NDJSON)
@@ -220,9 +248,12 @@
   - `GET /db/aircraft/stats` — totals, unique aircraft, top countries/callsigns, altitude distribution
   - `GET /db/aircraft/recent` — most recently seen aircraft, deduplicated by icao24
   - `GET /db/aircraft/:icao24` — full sighting history + flight path for one aircraft
+- **Social tables** (v1.5.45): `users`, `auth_lookup`, `refresh_tokens`, `poi_comments`, `comment_votes`, `chat_rooms`, `room_memberships`, `messages`
+  - All granted to `witchdoctor` user; DDL runs as `sudo -u postgres`
 - Import: `DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp node import-pois.js`
-- Proxy startup: `DATABASE_URL=... OPENSKY_CLIENT_ID=... OPENSKY_CLIENT_SECRET=... node server.js`
-  - Without DATABASE_URL: proxy starts normally, `/db/*` returns 503
+- Proxy startup: `DATABASE_URL=... JWT_SECRET=... OPENSKY_CLIENT_ID=... OPENSKY_CLIENT_SECRET=... node server.js`
+  - Without DATABASE_URL: proxy starts normally, `/db/*` and social endpoints return 503
+  - Without JWT_SECRET: random secret generated (tokens don't survive restarts)
   - Without OPENSKY_*: aircraft requests use anonymous access (100 req/day)
 
 ## GPS Centering
@@ -357,6 +388,15 @@ Roadmap completed across v1.5.35–v1.5.39. See `PLAN-ARCHIVE.md` for full detai
 - Phase 3B: Additional Database Builders (v1.5.38)
 - Phase 4: Database Import & Export (v1.5.39)
 - Phase 5: Advanced Sources — deferred (sufficient coverage with current sources)
+
+## Active Plan: Social Layer
+See `SOCIAL-PLAN.md` for full plan. Current status:
+- **Phase A (Auth)**: DONE — register/login, JWT, profile, 3×4 grid
+- **Phase B (Comments)**: DONE — POI comments, ratings, votes
+- **Phase C (Chat)**: DONE — real-time Socket.IO chat, rooms
+- **Phase D (Room Management)**: NOT STARTED — mod tools, bans, room settings
+- **Governance checkpoints**: NOT STARTED — COPPA, encryption, moderation (see GOVERNANCE.md)
+- **DDL not yet run** — 6 tables need `sudo -u postgres` before testing
 
 ## Other Next Steps
 - Monitor cache growth and hit rates over time
