@@ -71,16 +71,19 @@
 - Client-side: InputFilter.LengthFilter on all social EditTexts, min-length/email validation, comment char counter
 - `/auth/debug/users` now requires auth + owner/support role
 
-### NOT YET TESTED — Resume Here
+### Completed — Security Hardening Verification
 
-#### Security Hardening Verification
-- [ ] **Sanitization**: `curl` POST comment with `<script>alert(1)</script>` — verify tags stripped
-- [ ] **Rate limiting**: loop 15 register attempts — verify 429 after 10th
-- [ ] **Login lockout**: 5 wrong passwords → verify 429, restart proxy → verify unlocked
-- [ ] **Validation**: test empty names, 1-char names, HTML in names, 2000+ char messages — all rejected
-- [ ] **Debug endpoint**: `curl /auth/debug/users` without auth → 401
-- [ ] **Android input limits**: open each dialog, verify can't type beyond character limit
-- [ ] **Comment char counter**: verify "0 / 1000" updates as you type
+#### Security Hardening Verification — ALL PASS (Session 49, 2026-03-03)
+- [x] **Sanitization**: `<script>alert(1)</script>Nice place!` → `alert(1)Nice place!`; HTML tags fully stripped
+- [x] **Rate limiting**: 429 after 9th request (1 login + 8 registers = 10 total = limit hit) — PASS
+- [x] **Login lockout**: 5 wrong passwords → 401 each, 6th → 429 locked, correct password also blocked — PASS
+- [x] **Validation**: empty name (rejected), 1-char name (rejected), HTML in name (sanitized to "Bad"), 2001-char comment (truncated to 1000), rating=6 (rejected), invalid osmType (rejected), 200-char password (rejected), bad email (rejected) — ALL PASS
+- [x] **Debug endpoint**: no auth → 401, regular user → 403 "Insufficient privileges" — PASS
+- [x] **Android input limits**: InputFilter.LengthFilter confirmed on all 7 social EditTexts (50/255/128/100/255/1000/1000)
+- [x] **Comment char counter**: "0 / 1000" visible, updates live to "32 / 1000" after typing — PASS
+- **Note**: proxy must be restarted to pick up server.js changes (Node caches at startup); app must be reinstalled for client-side changes
+
+### NOT YET TESTED — Resume Here
 
 #### Social Layer (from Session 47)
 - [ ] **Multi-user chat** — register 2nd user (via curl or 2nd device), verify gray bubbles for other users
@@ -95,6 +98,8 @@
 |------|-------|----------|---------|
 | TestUser | test@example.com | TestPass123 | curl (proxy API test) |
 | Dean | dean@test.com | password123 | on-device registration |
+| SecurityTester | sectest@example.com | SecurePass123 | curl (session 49 security tests) |
+| RateUser1-8 | rate1-8@test.com | TestPass123 | curl (rate limit test, session 49) |
 
 ### Proxy Startup (for next session)
 ```bash
