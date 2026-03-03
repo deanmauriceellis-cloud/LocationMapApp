@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 42 (10km Probe Populate + POI Display)
+## Last Updated: 2026-03-02 Session 43 (Train ETA, POI Categories, Find Radius)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -10,7 +10,7 @@
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
-- **16 POI categories** with submenu refinement (central config in `PoiCategories.kt`)
+- **17 POI categories** with submenu refinement (central config in `PoiCategories.kt`)
   - 5dp colored dots; zoom ≥ 18: labeled icons with type + name
   - Layer-aware LiveData `Pair<String, List>`, viewport-only display via `/pois/bbox`
   - All layers default ON except aircraft (OFF)
@@ -20,6 +20,7 @@
 - **METAR** — rich text markers (temp, wind, sky), bbox passthrough, deferred load, human-readable tap info
 - **NWS NEXRAD radar** tiles (Iowa State Mesonet)
 - **MBTA transit** — live vehicles (buses, CR, subway) with directional arrows + staleness detection
+  - Commuter rail: next-stop ETA badge on labeled markers (batch predictions API)
   - ~270 train stations: tap → arrival board (30s auto-refresh) → trip schedule
   - ~7,900 bus stops: viewport-filtered, zoom ≥ 15, tap → arrival board
   - Vehicle detail dialog: info + Follow/View Route/Arrivals buttons
@@ -50,6 +51,7 @@
   - Fill Probe Populate: stub for future implementation
 - **Vehicle follow**: tap → track, staleness detection (>2 min), POI prefetch along route
 - **Find dialog** (v1.5.26): category grid → subtype grid → distance-sorted results, long-press filter mode
+  - Counts scoped to 10km radius around map center; auto-fit cell heights for all screen sizes
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map)
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
 - Transit zoom guard (zoom ≤ 10 hides markers), POI display (zoom ≥ 10 + max 5000 markers), adaptive radius hints
@@ -190,7 +192,7 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
-  - 39,266 POIs as of 2026-03-01 (re-imported after Hollywood/LA scanning)
+  - 89,622 POIs as of 2026-03-02 (re-imported after multi-region scanning)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)

@@ -2,6 +2,32 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.43] — 2026-03-02
+
+### Added
+- **Train next-stop ETA** — batch predictions API enriches commuter rail vehicles with arrival minutes
+  - Colored ETA badge rendered to the right of train icon at zoom ≥ 18 (e.g., "3m")
+  - `enrichWithNextStopEta()` in MbtaRepository: single API call for all active trips
+- **17 POI categories** (was 16) — new "Offices & Services" category (Companies, Real Estate, Law, Insurance, Tax)
+- **46 new subtypes** across 9 existing categories:
+  - Shopping: +15 (Gift, Laundry, Books, Furniture, Jewelry, Florist, Hardware, etc.)
+  - Parks & Rec: +5 (Shelters, Fountains, Dog Parks, Tracks, Rec Grounds)
+  - Entertainment: +5 (Studios, Dance, Arcades, Ice Rinks, Bowling)
+  - Food & Drink: +3 (Pastry, Candy, Marketplaces)
+  - Lodging: +3 (Campgrounds, Guest Houses, RV Parks)
+  - Transit: +2 (Bike Rentals, Ferry Terminals)
+  - Tourism & History: +2 (Ruins, Maritime)
+  - Education: +2 (Childcare, Kindergartens)
+  - Healthcare: +1 (Nursing Homes), Civic: +1 (Post Boxes)
+- **Find dialog radius-scoped counts** — category counts filtered to 10km around map center
+  - Proxy `/db/pois/counts` gains `lat`, `lon`, `radius` params with Haversine filter
+  - Client-side cache invalidates on 500m move
+- **Find dialog auto-fit cells** — cell heights calculated from screen size and row count, no scrolling needed
+
+### Fixed
+- **10km probe zoom** — `placeScanningMarker` panOnly calls now explicitly set `panMap=false`
+- **GoTo + 10km probe** — `goToLocation()` now calls `stopProbe10km()` to cancel running probe
+
 ## [1.5.42] — 2026-03-02
 
 ### Added
