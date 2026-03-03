@@ -23,7 +23,7 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
   return generated;
 })();
 const JWT_ACCESS_EXPIRY  = '15m';
-const JWT_REFRESH_DAYS   = 30;
+const JWT_REFRESH_DAYS   = 365;  // device-bonded accounts — effectively permanent
 
 // ── PostgreSQL pool (optional — /db/* endpoints require DATABASE_URL) ────────
 

@@ -1438,10 +1438,38 @@ class MainActivity : AppCompatActivity() {
             title    = place.name
             snippet  = buildPlaceSnippet(place)
             relatedObject = place  // retained for icon refresh on zoom threshold
+            setOnMarkerClickListener { _, _ ->
+                openPoiDetailFromPlace(place)
+                true
+            }
         }
         poiMarkers.getOrPut(layerId) { mutableListOf() }.add(m)
         binding.mapView.overlays.add(m)
         binding.mapView.invalidate()
+    }
+
+    /** Convert a PlaceResult to FindResult and open the POI detail dialog. */
+    private fun openPoiDetailFromPlace(place: com.example.locationmapapp.data.model.PlaceResult) {
+        val parts = place.id.split(":", limit = 2)
+        val osmType = if (parts.size == 2) parts[0] else "node"
+        val osmId = (if (parts.size == 2) parts[1] else parts[0]).toLongOrNull() ?: return
+        val center = binding.mapView.mapCenter
+        val distResults = FloatArray(1)
+        android.location.Location.distanceBetween(center.latitude, center.longitude, place.lat, place.lon, distResults)
+        val findResult = com.example.locationmapapp.data.model.FindResult(
+            id = osmId,
+            type = osmType,
+            name = place.name,
+            lat = place.lat,
+            lon = place.lon,
+            category = place.category,
+            distanceM = distResults[0].toInt(),
+            tags = emptyMap(),
+            address = place.address,
+            phone = place.phone,
+            openingHours = place.openingHours
+        )
+        showPoiDetailDialog(findResult)
     }
 
     /** Swap all POI marker icons between dot and labeled-dot when crossing zoom 18. */
@@ -5311,9 +5339,9 @@ class MainActivity : AppCompatActivity() {
                 voteRow.addView(upBtn)
                 voteRow.addView(downBtn)
 
-                // Delete button for own comments
+                // Delete button for own comments (hide if already deleted)
                 val currentUser = viewModel.authUser.value
-                if (currentUser != null && (currentUser.id == comment.userId || currentUser.role in listOf("owner", "support"))) {
+                if (!comment.isDeleted && currentUser != null && (currentUser.id == comment.userId || currentUser.role in listOf("owner", "support"))) {
                     voteRow.addView(View(this).apply {
                         layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
                     })
@@ -8049,7 +8077,7 @@ class MainActivity : AppCompatActivity() {
             resetIdleTimer()
             DebugLogger.i("MainActivity", "onChatRequested")
             if (!viewModel.isLoggedIn()) {
-                toast("Log in first to use Chat")
+                toast("Register first to use Chat")
                 showAuthDialog()
             } else {
                 showChatDialog()
@@ -8091,11 +8119,9 @@ class MainActivity : AppCompatActivity() {
         val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
 
-        var isRegisterMode = false
-
         // ── Header ──
         val titleText = TextView(this).apply {
-            text = "Login"
+            text = "Register"
             textSize = 18f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
@@ -8127,7 +8153,6 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 bottomMargin = dp(8)
             }
-            visibility = View.GONE
         }
 
         val emailField = android.widget.EditText(this).apply {
@@ -8162,7 +8187,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val submitBtn = TextView(this).apply {
-            text = "Login"
+            text = "Register"
             textSize = 16f
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.parseColor("#1E88E5"))
@@ -8173,78 +8198,46 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val toggleText = TextView(this).apply {
-            text = "Don't have an account? Register"
-            textSize = 13f
-            setTextColor(Color.parseColor("#64B5F6"))
+        val infoText = TextView(this).apply {
+            text = "Your account is bonded to this device"
+            textSize = 12f
+            setTextColor(Color.parseColor("#80FFFFFF"))
             gravity = android.view.Gravity.CENTER
         }
 
-        // ── Toggle login/register mode ──
-        fun updateMode(register: Boolean) {
-            isRegisterMode = register
-            titleText.text = if (register) "Register" else "Login"
-            submitBtn.text = if (register) "Register" else "Login"
-            displayNameField.visibility = if (register) View.VISIBLE else View.GONE
-            toggleText.text = if (register) "Already have an account? Login" else "Don't have an account? Register"
-            errorText.visibility = View.GONE
-        }
-
-        toggleText.setOnClickListener { updateMode(!isRegisterMode) }
-
         // ── Submit action ──
         submitBtn.setOnClickListener {
+            val displayName = displayNameField.text.toString().trim()
             val email = emailField.text.toString().trim()
             val password = passwordField.text.toString()
 
+            if (displayName.isEmpty()) {
+                errorText.text = "Display name is required"
+                errorText.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
             if (email.isEmpty() || password.isEmpty()) {
                 errorText.text = "Email and password are required"
                 errorText.visibility = View.VISIBLE
                 return@setOnClickListener
             }
-
-            if (isRegisterMode) {
-                val displayName = displayNameField.text.toString().trim()
-                if (displayName.isEmpty()) {
-                    errorText.text = "Display name is required"
-                    errorText.visibility = View.VISIBLE
-                    return@setOnClickListener
-                }
-                if (password.length < 8) {
-                    errorText.text = "Password must be at least 8 characters"
-                    errorText.visibility = View.VISIBLE
-                    return@setOnClickListener
-                }
-                submitBtn.isEnabled = false
-                submitBtn.text = "Registering..."
-                viewModel.register(displayName, email, password) { success, err ->
-                    runOnUiThread {
-                        submitBtn.isEnabled = true
-                        if (success) {
-                            toast("Welcome, ${displayName}!")
-                            dialog.dismiss()
-                        } else {
-                            errorText.text = err ?: "Registration failed"
-                            errorText.visibility = View.VISIBLE
-                            submitBtn.text = "Register"
-                        }
-                    }
-                }
-            } else {
-                submitBtn.isEnabled = false
-                submitBtn.text = "Logging in..."
-                viewModel.login(email, password) { success, err ->
-                    runOnUiThread {
-                        submitBtn.isEnabled = true
-                        if (success) {
-                            val user = viewModel.authUser.value
-                            toast("Welcome back, ${user?.displayName ?: ""}!")
-                            dialog.dismiss()
-                        } else {
-                            errorText.text = err ?: "Login failed"
-                            errorText.visibility = View.VISIBLE
-                            submitBtn.text = "Login"
-                        }
+            if (password.length < 8) {
+                errorText.text = "Password must be at least 8 characters"
+                errorText.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
+            submitBtn.isEnabled = false
+            submitBtn.text = "Registering..."
+            viewModel.register(displayName, email, password) { success, err ->
+                runOnUiThread {
+                    submitBtn.isEnabled = true
+                    if (success) {
+                        toast("Welcome, ${displayName}!")
+                        dialog.dismiss()
+                    } else {
+                        errorText.text = err ?: "Registration failed"
+                        errorText.visibility = View.VISIBLE
+                        submitBtn.text = "Register"
                     }
                 }
             }
@@ -8259,7 +8252,7 @@ class MainActivity : AppCompatActivity() {
             addView(passwordField)
             addView(errorText)
             addView(submitBtn)
-            addView(toggleText)
+            addView(infoText)
         }
 
         val rootLayout = LinearLayout(this).apply {
@@ -8895,25 +8888,6 @@ class MainActivity : AppCompatActivity() {
         }
         infoRow("User ID", user.id.take(8) + "...")
         infoRow("Role", user.role)
-
-        // Logout button
-        val logoutBtn = TextView(this).apply {
-            text = "Logout"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#C62828"))
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = dp(32)
-            }
-        }
-        logoutBtn.setOnClickListener {
-            viewModel.logout()
-            toast("Logged out")
-            dialog.dismiss()
-        }
-        content.addView(logoutBtn)
 
         // ── Root layout ──
         val rootLayout = LinearLayout(this).apply {

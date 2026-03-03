@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 46 (Social Layer Testing + Fixes)
+## Last Updated: 2026-03-03 Session 47 (POI Marker Click-Through, Device-Bonded Auth, Chat Testing)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -48,11 +48,11 @@
 - **Auto-follow aircraft (POI Builder)**: ≥10k ft, 20-min rotation, smart switching (altitude/POI/US bounds)
 - **Webcam layer** (Windy API): 18 categories, preview + live player, 0.5° min bbox, 10-min cache
 - **Social layer** (v1.5.45) — auth, POI comments, real-time chat
-  - **Auth**: register/login with email+password, Argon2id hashing, JWT access tokens (15min) + refresh tokens (30d)
+  - **Auth**: device-bonded registration (register once, no login/logout), Argon2id hashing, JWT access tokens (15min) + refresh tokens (365d)
     - Family-based refresh token rotation with reuse revocation
     - `AuthRepository.kt`: auto-refresh expired tokens, SharedPreferences storage
-    - Profile dialog: avatar initial, display name, role badge, logout
-    - Login/Register toggle dialog from grid dropdown "Social" button
+    - Profile dialog: avatar initial, display name, role badge (no logout — device-bonded)
+    - Register-only dialog from grid dropdown "Social" button (no login toggle)
   - **POI Comments**: star ratings (1-5), upvote/downvote, threaded (parent_id), soft delete
     - `CommentRepository.kt`: fetch/post/vote/delete with auth
     - Comments section in POI detail dialog: author, relative time, rating stars, vote arrows
@@ -81,6 +81,7 @@
   - Text search bar (v1.5.44): debounced name search above category grid, 500ms delay, min 2 chars
   - Favorites cell (v1.5.44): gold star, first in grid, shows count badge, tap for sorted favorites list
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map/Share)
+  - Tap any POI marker on map → opens detail dialog directly (v1.5.46)
   - Star icon in header (v1.5.44): tap to add/remove from favorites, filled/outline toggle
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
 - Transit zoom guard (zoom ≤ 10 hides markers), POI display (zoom ≥ 10 + max 5000 markers), adaptive radius hints
@@ -176,7 +177,7 @@
 | Radar tiles | direct (mesonet.agron.iastate.edu) | not proxied | — |
 
 ## Map Interaction Model
-- **Single tap**: no action
+- **Tap POI marker**: opens POI detail dialog directly (info, comments, actions)
 - **Long press (~2s)**: enter manual mode, center map (auto-zoom to 14 if <14), search POIs at location, fetch weather + alerts
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: vehicle detail dialog (route, status, speed) with Follow / View Route / Arrivals buttons
@@ -398,7 +399,8 @@ See `SOCIAL-PLAN.md` for full plan. Current status:
 - **Phase C (Chat)**: DONE — real-time Socket.IO chat, rooms
 - **Phase D (Room Management)**: NOT STARTED — mod tools, bans, room settings
 - **Governance checkpoints**: NOT STARTED — COPPA, encryption, moderation (see GOVERNANCE.md)
-- **DDL not yet run** — 6 tables need `sudo -u postgres` before testing
+- **DDL done** — 8 tables created, testing in progress (see CURRENT_TESTING.md)
+- **Auth model**: device-bonded (register once, no login/logout, 365d refresh tokens)
 
 ## Other Next Steps
 - Monitor cache growth and hit rates over time

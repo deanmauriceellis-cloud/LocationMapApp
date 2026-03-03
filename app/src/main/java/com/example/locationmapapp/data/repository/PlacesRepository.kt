@@ -254,8 +254,9 @@ class PlacesRepository @Inject constructor(
                     ?: tags["historic"]?.asString
                     ?: tags["office"]?.asString
                     ?: "place"
+                val osmType = obj["type"]?.asString ?: "node"
                 results.add(PlaceResult(
-                    id           = obj["id"].asString,
+                    id           = "$osmType:${obj["id"].asString}",
                     name         = name,
                     lat          = lat,
                     lon          = lon,
@@ -376,8 +377,10 @@ class PlacesRepository @Inject constructor(
                     ?: tags["office"]?.asString
                     ?: "place"
                 val name = tags["name"]?.asString ?: category
+                val osmType = el["type"]?.asString ?: "node"
+                val osmId = el["id"]?.asString ?: continue
                 results.add(PlaceResult(
-                    id       = el["id"]?.asString ?: continue,
+                    id       = "$osmType:$osmId",
                     name     = name,
                     lat      = lat,
                     lon      = lon,

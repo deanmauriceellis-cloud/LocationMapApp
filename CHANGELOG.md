@@ -2,6 +2,25 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.46] — 2026-03-03
+
+### Added
+- **POI marker click-through** — tapping any POI marker on the map now opens the full detail dialog
+  - `openPoiDetailFromPlace()`: converts PlaceResult → FindResult for detail dialog
+  - Previously, marker tap only showed a basic info bubble with no click-through
+
+### Changed
+- **Device-bonded auth model** — accounts are permanently tied to the device
+  - Auth dialog is now Register-only (no login/logout toggle)
+  - Profile dialog: Logout button removed
+  - Refresh token lifetime extended from 30 days to 365 days
+  - Info text: "Your account is bonded to this device"
+- **PlaceResult.id format** — now stores `"type:id"` (e.g., "way:292110841") for OSM type preservation
+  - Both `parseOverpassJson` and `parsePoiExportJson` updated
+
+### Fixed
+- **Delete button on deleted comments** — now hidden when comment `isDeleted` is true
+
 ## [1.5.45] — 2026-03-03
 
 ### Added
