@@ -2,6 +2,33 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03b (v1.5.49 — Automated POI DB Import)
+
+### Context
+POI imports from proxy's in-memory cache into PostgreSQL required manually running `node import-pois.js`. Automated this on a 15-minute cycle with delta approach — only imports POIs updated since last successful run. Follows existing `setInterval` timer patterns (aircraft sighting purge, login lockout cleanup).
+
+### Changes Made
+
+#### Automated Delta Import (server.js)
+- **State variables**: `lastDbImportTime`, `dbImportRunning` mutex, `dbImportStats` tracking
+- **Helper functions**: `derivePoiCategory()`, `extractPoiCoords()` — inlined from `import-pois.js`
+- **`runPoiDbImport(manual)`**: filters `poiCache` for entries with `lastSeen >= lastDbImportTime`, upserts in batches of 500, per-batch transactions, timestamp-only-on-success
+- **Timer**: `setTimeout` 30s (initial full import), `setInterval` 15min (delta imports), guarded by `if (pgPool)`
+- **Endpoints**: `POST /db/import` (manual trigger), `GET /db/import/status` (read-only status)
+- **Stats**: `dbImport` object in `/cache/stats` response
+- **Startup banner**: shows auto-import enabled/disabled state
+
+### Test Results
+- Full import: 178,395 POIs in 217s (~3.6 min)
+- Delta import: 1,996 POIs in 9s (only new arrivals)
+- `pendingDelta` drops to 0 after import; `totalRuns` counter increments correctly
+- DB verified: `SELECT count(*) FROM pois` = 180,059
+
+### Files Modified
+- `cache-proxy/server.js` — 185 lines added (import logic, endpoints, stats, banner)
+
+---
+
 ## Session: 2026-03-03 (v1.5.48 — Startup/Behavior Tuning)
 
 ### Context

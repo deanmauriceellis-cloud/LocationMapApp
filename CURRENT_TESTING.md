@@ -97,6 +97,16 @@
 - [x] **Idle auto-populate POI density guard** — queries `/db/pois/counts` 10km radius; skips if ≥100 POIs nearby
 - [x] **Build passes** — assembleDebug succeeds
 
+### Completed — Automated POI DB Import (Session 51)
+- [x] **Full import** — 178,395 POIs upserted in 217s on manual trigger
+- [x] **Delta import** — 1,996 new POIs in 9s (only recent arrivals)
+- [x] **GET /db/import/status** — returns lastImportTime, pendingDelta, running, stats
+- [x] **POST /db/import** — manual trigger returns `{ upserted, skipped, totalInDb, elapsed }`
+- [x] **GET /cache/stats** — `dbImport` object included with import stats
+- [x] **DB verified** — `SELECT count(*) FROM pois` = 180,059 after imports
+- [x] **pendingDelta** — drops to 0 after successful import
+- [x] **15-min timer** — setInterval registered at startup (guarded by pgPool)
+
 ### NOT YET TESTED — Resume Here
 
 #### v1.5.48 Tunings

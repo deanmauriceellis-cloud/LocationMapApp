@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 50 (Startup/Behavior Tuning — Zoom 18, Radar 35%, Idle Populate Guard)
+## Last Updated: 2026-03-03 Session 51 (Automated POI DB Import — Delta Every 15min)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -161,6 +161,7 @@
 | POI Cache | `http://10.0.0.4:3000/pois/...` | GET /pois/stats, /pois/export, /pois/bbox, /poi/:type/:id | persistent |
 | Aircraft | `http://10.0.0.4:3000/aircraft?...` | GET /aircraft?bbox=s,w,n,e or ?icao24=hex | 15 seconds |
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
+| DB Import | `http://10.0.0.4:3000/db/import` | POST /db/import (manual), GET /db/import/status | live |
 | DB POI Query | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/search, /nearby, /stats, /categories, /coverage | live |
 | DB POI Find | `http://10.0.0.4:3000/db/pois/...` | GET /db/pois/counts (10-min cache), /db/pois/find | 10 min / live |
 | POI Website | `http://10.0.0.4:3000/pois/website` | GET /pois/website?osm_type=&osm_id=&name=&lat=&lon= | permanent (DB) |
@@ -240,14 +241,19 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
-  - 89,622 POIs as of 2026-03-02 (re-imported after multi-region scanning)
+  - 180,059 POIs as of 2026-03-03 (auto-imported from 180k cache)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)
   - Indexes: icao24, callsign, first_seen, last_seen, last_lat+lon
   - 501+ sightings as of 2026-03-01, 195 unique aircraft (accumulates in real-time)
   - Real-time: proxy writes to DB on every aircraft API response (cache hits and misses)
-- **DB query API** (`/db/*` prefix): 12 endpoints — 8 POI + 4 aircraft
+- **Automated POI import** (v1.5.49): delta upsert every 15min, inline in server.js
+  - Initial full import 30s after startup; subsequent runs only import POIs updated since last success
+  - Batches of 500, per-batch transactions, mutex against overlap, timestamp-only-on-success
+  - `POST /db/import` (manual trigger), `GET /db/import/status` (read-only status)
+  - Stats in `/cache/stats` → `dbImport` object
+- **DB query API** (`/db/*` prefix): 14 endpoints — 8 POI + 4 aircraft + 2 import
   - `GET /db/pois/search` — name search (ILIKE), category filter, bbox, tag queries, distance sort
   - `GET /db/pois/nearby` — Haversine distance sort with bbox pre-filter
   - `GET /db/poi/:type/:id` — single POI with timestamps
@@ -262,9 +268,9 @@
   - `GET /db/aircraft/:icao24` — full sighting history + flight path for one aircraft
 - **Social tables** (v1.5.45): `users`, `auth_lookup`, `refresh_tokens`, `poi_comments`, `comment_votes`, `chat_rooms`, `room_memberships`, `messages`
   - All granted to `witchdoctor` user; DDL runs as `sudo -u postgres`
-- Import: `DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp node import-pois.js`
+- Import: automated every 15min when `DATABASE_URL` set (manual: `node import-pois.js` or `POST /db/import`)
 - Proxy startup: `DATABASE_URL=... JWT_SECRET=... OPENSKY_CLIENT_ID=... OPENSKY_CLIENT_SECRET=... node server.js`
-  - Without DATABASE_URL: proxy starts normally, `/db/*` and social endpoints return 503
+  - Without DATABASE_URL: proxy starts normally, `/db/*` and social endpoints return 503, auto-import disabled
   - Without JWT_SECRET: random secret generated (tokens don't survive restarts)
   - Without OPENSKY_*: aircraft requests use anonymous access (100 req/day)
 
@@ -414,5 +420,4 @@ See `SOCIAL-PLAN.md` for full plan. Current status:
 ## Other Next Steps
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
-- Automate periodic POI imports (cron or proxy hook)
 - Find dialog enhancements: pagination (load more), search within results, recent searches

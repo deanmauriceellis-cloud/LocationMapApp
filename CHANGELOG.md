@@ -2,6 +2,19 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.49] — 2026-03-03
+
+### Added
+- **Automated POI database import** — delta upsert every 15 minutes, inline in server.js
+  - Initial full import 30s after proxy startup (cache loaded from disk by then)
+  - Delta approach: only imports POIs with `lastSeen >= lastDbImportTime`, avoiding redundant full-cache upserts
+  - Batched in groups of 500 with individual transactions (short DB locks)
+  - Mutex prevents overlapping runs; failed imports retry next cycle without advancing timestamp
+  - `POST /db/import` — manual trigger, returns `{ upserted, skipped, totalInDb, elapsed }`
+  - `GET /db/import/status` — read-only: lastImportTime, running, pendingDelta, cacheSize, interval, stats
+  - `dbImport` object added to `GET /cache/stats` response
+  - Startup banner shows auto-import enabled/disabled state
+
 ## [1.5.48] — 2026-03-03
 
 ### Changed
