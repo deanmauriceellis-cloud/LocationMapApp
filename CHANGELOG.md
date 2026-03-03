@@ -2,6 +2,49 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.44] — 2026-03-03
+
+### Added
+- **Share POI** — 5th action button in POI detail dialog (teal)
+  - Shares name, address, phone, hours + Google Maps link via Android share sheet
+  - Button text sizes reduced from 13f to 11f to fit 5 buttons
+- **Dark mode** — toolbar moon icon toggles between MAPNIK and CartoDB Dark Matter tiles
+  - Persisted via `PREF_DARK_MODE` pref, restored on startup
+  - Icon alpha indicates state (0.4 = light, 1.0 = dark)
+  - CartoDB Dark Matter: `https://cartodb-basemaps-{a-d}.global.ssl.fastly.net/dark_all/`
+- **Favorites** — star/save POIs from detail dialog, access from Find dialog
+  - Star icon in POI detail dialog header (filled gold when saved, white outline when not)
+  - `FavoritesManager.kt`: SharedPreferences + Gson JSON storage, full CRUD
+  - `FavoriteEntry` data class in Models.kt with Haversine distance calculation
+  - Gold "Favorites" cell as first item in Find category grid with count badge
+  - `showFavoritesResults()`: sorted by distance from map center
+- **Text search** — search bar in Find dialog for name-based POI search
+  - `EditText` above category grid with 500ms debounce, min 2 chars
+  - Clear button (X) returns to category grid
+  - Results show color dot + distance + name; tap opens POI detail dialog
+  - `searchByName()` in FindRepository, `searchPoisByName()` in MainViewModel
+- **Animated radar** — 7-frame NEXRAD loop showing 35 min of storm movement
+  - "Animate Radar" + "Animation Speed..." items in Radar menu
+  - Iowa State Mesonet timestamped tiles (5-min intervals, client-side timestamp generation)
+  - Handler-based animation loop with configurable speed (300-2000ms, default 800ms)
+  - Status line shows time range + speed; tap to stop
+  - Stops in `onStop()`, `toggleRadar()` for lifecycle safety
+  - Restores static radar overlay when animation stops
+
+### Changed
+- **Proxy `/db/pois/search`** — now includes `name` and `category` columns in SELECT
+- **Toolbar layout** — added dark mode icon between spacer and Alerts icon
+- **MenuEventListener** — 3 new callbacks: `onDarkModeToggled()`, `onRadarAnimateToggled()`, `onRadarAnimSpeedChanged()`
+
+### New Files
+- `app/src/main/res/drawable/ic_share.xml` — teal share icon
+- `app/src/main/res/drawable/ic_dark_mode.xml` — white crescent moon
+- `app/src/main/res/drawable/ic_star.xml` — filled gold star
+- `app/src/main/res/drawable/ic_star_outline.xml` — white outline star
+- `app/src/main/res/drawable/ic_play.xml` — white play triangle
+- `app/src/main/res/drawable/ic_pause.xml` — white pause bars
+- `app/src/main/java/.../util/FavoritesManager.kt` — favorites CRUD manager
+
 ## [1.5.43] — 2026-03-02
 
 ### Added

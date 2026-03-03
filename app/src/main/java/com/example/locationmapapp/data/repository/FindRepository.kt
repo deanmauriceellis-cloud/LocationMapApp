@@ -145,6 +145,68 @@ class FindRepository @Inject constructor() {
         }
     }
 
+    suspend fun searchByName(
+        query: String,
+        lat: Double,
+        lon: Double,
+        radiusM: Int = 50000,
+        limit: Int = 50
+    ): FindResponse? = withContext(Dispatchers.IO) {
+        val q = URLEncoder.encode(query, "UTF-8")
+        val url = "http://10.0.0.4:3000/db/pois/search?q=$q&lat=$lat&lon=$lon&radius=$radiusM&limit=$limit"
+        DebugLogger.d(TAG, "searchByName q=$query lat=$lat lon=$lon radius=${radiusM}m")
+        try {
+            val t0 = System.currentTimeMillis()
+            val response = client.newCall(Request.Builder().url(url).build()).execute()
+            val elapsed = System.currentTimeMillis() - t0
+            DebugLogger.i(TAG, "searchByName response code=${response.code} in ${elapsed}ms")
+            if (!response.isSuccessful) {
+                DebugLogger.e(TAG, "searchByName HTTP ${response.code}")
+                return@withContext null
+            }
+            val body = response.body?.string() ?: return@withContext null
+            val root = JsonParser.parseString(body).asJsonObject
+            val count = root["count"]?.asInt ?: 0
+            val elements = root.getAsJsonArray("elements") ?: return@withContext FindResponse(emptyList(), 0, radiusM)
+
+            val results = elements.mapNotNull { el ->
+                try {
+                    val obj = el.asJsonObject
+                    val tags = mutableMapOf<String, String>()
+                    obj.getAsJsonObject("tags")?.entrySet()?.forEach { (k, v) ->
+                        if (!v.isJsonNull) tags[k] = v.asString
+                    }
+                    FindResult(
+                        id = obj["id"].asLong,
+                        type = obj["type"]?.asString ?: "node",
+                        name = obj["name"]?.let { if (it.isJsonNull) null else it.asString },
+                        lat = obj["lat"].asDouble,
+                        lon = obj["lon"].asDouble,
+                        category = obj["category"]?.asString ?: "",
+                        distanceM = obj["distance_m"]?.asInt ?: 0,
+                        tags = tags,
+                        address = tags["addr:street"]?.let { street ->
+                            val num = tags["addr:housenumber"]
+                            if (num != null) "$num $street" else street
+                        },
+                        cuisine = tags["cuisine"],
+                        phone = tags["phone"],
+                        openingHours = tags["opening_hours"]
+                    )
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "Search parse error: ${e.message}")
+                    null
+                }
+            }
+
+            DebugLogger.i(TAG, "searchByName: ${results.size} results for '$query'")
+            FindResponse(results, count, radiusM)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "searchByName error", e)
+            null
+        }
+    }
+
     suspend fun fetchWebsite(
         osmType: String,
         osmId: Long,

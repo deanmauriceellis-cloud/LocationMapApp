@@ -22,6 +22,17 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_radar_animate"
+        android:title="Animate Radar"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_radar_anim_speed"
+        android:title="Animation Speed…"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_metar_display"
         android:title="METAR Information Display"
         android:checkable="true"

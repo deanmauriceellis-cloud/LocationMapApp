@@ -35,6 +35,20 @@
             android:layout_weight="1" />
 
         <ImageView
+            android:id="@+id/toolbarDarkModeIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_dark_mode"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="Dark Mode"
+            android:tooltipText="Dark Mode" />
+
+        <ImageView
             android:id="@+id/toolbarAlertsIcon"
             android:layout_width="36dp"
             android:layout_height="36dp"

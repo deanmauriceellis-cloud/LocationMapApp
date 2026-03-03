@@ -497,6 +497,15 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    suspend fun searchPoisByName(query: String, lat: Double, lon: Double, radiusM: Int = 50000, limit: Int = 50): FindResponse? {
+        return try {
+            findRepository.searchByName(query, lat, lon, radiusM, limit)
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "searchPoisByName FAILED: ${e.message}", e)
+            null
+        }
+    }
+
     suspend fun fetchPoiWebsiteDirectly(osmType: String, osmId: Long, name: String?, lat: Double, lon: Double): PoiWebsite? {
         return try {
             findRepository.fetchWebsite(osmType, osmId, name, lat, lon)

@@ -95,6 +95,19 @@ interface MenuEventListener {
     /** How often the radar tile URL is invalidated and re-fetched. [minutes] in 5..15 */
     fun onRadarFrequencyChanged(minutes: Int)
 
+    /** Toggle animated radar (multi-frame NEXRAD loop). */
+    fun onRadarAnimateToggled(enabled: Boolean)
+
+    /** Speed of radar animation loop. [ms] frame interval. */
+    fun onRadarAnimSpeedChanged(ms: Int)
+
+    // =========================================================================
+    // DARK MODE
+    // =========================================================================
+
+    /** Toggle dark map tiles (CartoDB Dark Matter). */
+    fun onDarkModeToggled(dark: Boolean)
+
     // =========================================================================
     // POINTS OF INTEREST
     // =========================================================================

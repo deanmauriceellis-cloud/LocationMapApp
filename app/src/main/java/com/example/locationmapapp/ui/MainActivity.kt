@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarMenuManager: AppBarMenuManager
     private val radarScheduler = RadarRefreshScheduler()
+    private lateinit var favoritesManager: com.example.locationmapapp.util.FavoritesManager
 
     private val metarMarkers      = mutableListOf<Marker>()
     private val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
@@ -69,6 +70,14 @@ class MainActivity : AppCompatActivity() {
     private var radarTileOverlay: TilesOverlay? = null
     private var radarAlphaPercent: Int = 70  // 0–100, default 70%
     private var fabMenuOpen = false
+
+    // Radar animation
+    private val radarAnimFrames = mutableListOf<TilesOverlay>()
+    private var radarAnimIndex: Int = 0
+    private var radarAnimHandler: android.os.Handler? = null
+    private var radarAnimRunnable: Runnable? = null
+    private var radarAnimating: Boolean = false
+    private var radarAnimSpeedMs: Int = 800
 
     // MBTA auto-refresh
     private var trainRefreshJob: Job? = null
@@ -283,14 +292,16 @@ class MainActivity : AppCompatActivity() {
             menuEventListener = menuEventListenerImpl
         )
         val toolbarRefs = appBarMenuManager.setupSlimToolbar(
-            weatherIcon = binding.root.findViewById(R.id.toolbarWeatherIcon),
-            alertsIcon  = binding.root.findViewById(R.id.toolbarAlertsIcon),
-            gridButton  = binding.root.findViewById(R.id.toolbarGridButton),
-            statusLine  = binding.root.findViewById(R.id.toolbarStatusLine)
+            weatherIcon  = binding.root.findViewById(R.id.toolbarWeatherIcon),
+            alertsIcon   = binding.root.findViewById(R.id.toolbarAlertsIcon),
+            gridButton   = binding.root.findViewById(R.id.toolbarGridButton),
+            statusLine   = binding.root.findViewById(R.id.toolbarStatusLine),
+            darkModeIcon = binding.root.findViewById(R.id.toolbarDarkModeIcon)
         )
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
         statusLineManager = StatusLineManager(toolbarRefs.statusLine)
+        favoritesManager = com.example.locationmapapp.util.FavoritesManager(this)
         DebugLogger.i("MainActivity", "Slim toolbar wired — Weather, Alerts, Grid + StatusLine")
 
         setupMap()
@@ -398,7 +409,7 @@ class MainActivity : AppCompatActivity() {
         pendingCachedPoiLoad = true
     }
 
-    override fun onStop()   { super.onStop();   radarScheduler.stop(); DebugLogger.i("MainActivity","onStop()") }
+    override fun onStop()   { super.onStop();   if (radarAnimating) stopRadarAnimation(); radarScheduler.stop(); DebugLogger.i("MainActivity","onStop()") }
     override fun onResume() {
         super.onResume(); binding.mapView.onResume()
         DebugHttpServer.endpoints = DebugEndpoints(this, viewModel)
@@ -527,8 +538,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupMap() {
         DebugLogger.i("MainActivity", "setupMap() — initial center=US_DEFAULT zoom=6 (will update on GPS fix)")
+        val darkModePrefs = getSharedPreferences(AppBarMenuManager.PREFS_NAME, MODE_PRIVATE)
+        val isDarkMode = darkModePrefs.getBoolean(AppBarMenuManager.PREF_DARK_MODE, false)
         binding.mapView.apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(if (isDarkMode) buildDarkTileSource() else TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             // Disable built-in zoom buttons — we use the custom slider instead
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
@@ -1182,6 +1195,7 @@ class MainActivity : AppCompatActivity() {
 
     fun toggleRadar() {
         DebugLogger.i("MainActivity", "toggleRadar() — currently ${if (radarTileOverlay != null) "ON" else "OFF"}")
+        if (radarAnimating) stopRadarAnimation()
         if (radarTileOverlay != null) {
             binding.mapView.overlays.remove(radarTileOverlay); radarTileOverlay = null
             binding.mapView.invalidate()
@@ -1216,12 +1230,152 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun buildDarkTileSource(): org.osmdroid.tileprovider.tilesource.XYTileSource {
+        return org.osmdroid.tileprovider.tilesource.XYTileSource(
+            "CartoDB-DarkMatter", 0, 19, 256, ".png",
+            arrayOf(
+                "https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/",
+                "https://cartodb-basemaps-b.global.ssl.fastly.net/dark_all/",
+                "https://cartodb-basemaps-c.global.ssl.fastly.net/dark_all/",
+                "https://cartodb-basemaps-d.global.ssl.fastly.net/dark_all/"
+            )
+        )
+    }
+
     private fun refreshRadarOverlay() {
         if (radarTileOverlay != null) {
             binding.mapView.overlays.remove(radarTileOverlay); radarTileOverlay = null
             addRadarOverlay()
             DebugLogger.i("MainActivity", "Radar tiles refreshed")
         }
+    }
+
+    private fun generateRadarTimestamps(count: Int): List<String> {
+        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+        // Round down to nearest 5 minutes
+        val min = cal.get(java.util.Calendar.MINUTE)
+        cal.set(java.util.Calendar.MINUTE, (min / 5) * 5)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+
+        val timestamps = mutableListOf<String>()
+        val fmt = java.text.SimpleDateFormat("yyyyMMddHHmm", java.util.Locale.US)
+        fmt.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        for (i in count - 1 downTo 0) {
+            val t = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+            t.timeInMillis = cal.timeInMillis - (i * 5 * 60 * 1000L)
+            timestamps.add(fmt.format(t.time))
+        }
+        return timestamps
+    }
+
+    private fun startRadarAnimation() {
+        if (radarAnimating) return
+        DebugLogger.i("MainActivity", "startRadarAnimation()")
+
+        // Remove static radar overlay if present
+        radarTileOverlay?.let { binding.mapView.overlays.remove(it) }
+        radarTileOverlay = null
+        radarScheduler.stop()
+
+        // Read speed from prefs
+        val prefs = getSharedPreferences(AppBarMenuManager.PREFS_NAME, MODE_PRIVATE)
+        radarAnimSpeedMs = prefs.getInt(AppBarMenuManager.PREF_RADAR_ANIM_SPEED, AppBarMenuManager.DEFAULT_RADAR_ANIM_SPEED)
+
+        // Generate 7 timestamps (35 min of history)
+        val timestamps = generateRadarTimestamps(7)
+        DebugLogger.i("MainActivity", "Radar animation: ${timestamps.size} frames, ${timestamps.first()} → ${timestamps.last()}")
+
+        // Create overlay for each timestamp
+        radarAnimFrames.clear()
+        for (ts in timestamps) {
+            try {
+                val src = org.osmdroid.tileprovider.tilesource.XYTileSource(
+                    "NEXRAD-$ts", 0, 12, 256, ".png",
+                    arrayOf("https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-$ts-900913/")
+                )
+                val tp = org.osmdroid.tileprovider.MapTileProviderBasic(applicationContext)
+                tp.tileSource = src
+                val overlay = TilesOverlay(tp, applicationContext).apply {
+                    loadingBackgroundColor = Color.TRANSPARENT
+                    loadingLineColor       = Color.TRANSPARENT
+                    val alpha = radarAlphaPercent / 100f
+                    val matrix = android.graphics.ColorMatrix().apply { setScale(1f, 1f, 1f, alpha) }
+                    setColorFilter(android.graphics.ColorMatrixColorFilter(matrix))
+                    isEnabled = false  // hidden initially
+                }
+                radarAnimFrames.add(overlay)
+                binding.mapView.overlays.add(overlay)
+            } catch (e: Exception) {
+                DebugLogger.e("MainActivity", "Radar anim frame error: ${e.message}")
+            }
+        }
+
+        if (radarAnimFrames.isEmpty()) {
+            DebugLogger.e("MainActivity", "No radar animation frames created")
+            toast("Radar animation failed")
+            return
+        }
+
+        // Start animation loop
+        radarAnimating = true
+        radarAnimIndex = 0
+        radarAnimHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        radarAnimRunnable = object : Runnable {
+            override fun run() {
+                if (!radarAnimating) return
+                // Hide all frames
+                for (frame in radarAnimFrames) frame.isEnabled = false
+                // Show current frame
+                radarAnimFrames[radarAnimIndex].isEnabled = true
+                binding.mapView.invalidate()
+                radarAnimIndex = (radarAnimIndex + 1) % radarAnimFrames.size
+                radarAnimHandler?.postDelayed(this, radarAnimSpeedMs.toLong())
+            }
+        }
+        radarAnimHandler?.post(radarAnimRunnable!!)
+
+        // Show time range on status line
+        val timeFmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+        timeFmt.timeZone = java.util.TimeZone.getDefault()
+        val parseFmt = java.text.SimpleDateFormat("yyyyMMddHHmm", java.util.Locale.US)
+        parseFmt.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        val startLocal = timeFmt.format(parseFmt.parse(timestamps.first())!!)
+        val endLocal = timeFmt.format(parseFmt.parse(timestamps.last())!!)
+        statusLineManager.set(StatusLineManager.Priority.SILENT_FILL,
+            "\u25B6 Radar $startLocal–$endLocal (${radarAnimSpeedMs}ms)") { stopRadarAnimation() }
+
+        DebugLogger.i("MainActivity", "Radar animation started: ${radarAnimFrames.size} frames @ ${radarAnimSpeedMs}ms")
+    }
+
+    private fun stopRadarAnimation() {
+        if (!radarAnimating) return
+        DebugLogger.i("MainActivity", "stopRadarAnimation()")
+        radarAnimating = false
+        radarAnimRunnable?.let { radarAnimHandler?.removeCallbacks(it) }
+        radarAnimRunnable = null
+        radarAnimHandler = null
+
+        // Remove all frame overlays
+        for (frame in radarAnimFrames) {
+            binding.mapView.overlays.remove(frame)
+        }
+        radarAnimFrames.clear()
+        radarAnimIndex = 0
+
+        // Clear status line
+        statusLineManager.clear(StatusLineManager.Priority.SILENT_FILL)
+
+        // Restore static radar if it was enabled
+        val prefs = getSharedPreferences(AppBarMenuManager.PREFS_NAME, MODE_PRIVATE)
+        prefs.edit().putBoolean(AppBarMenuManager.PREF_RADAR_ANIMATE, false).apply()
+        if (prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, true)) {
+            addRadarOverlay()
+            radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { viewModel.refreshRadar() }
+        }
+
+        binding.mapView.invalidate()
+        DebugLogger.i("MainActivity", "Radar animation stopped, static overlay restored")
     }
 
     // =========================================================================
@@ -3864,18 +4018,66 @@ class MainActivity : AppCompatActivity() {
 
         // ── Category Grid — auto-fit cell height ──
         val colCount = 4
-        val rowCount = (PoiCategories.ALL.size + colCount - 1) / colCount
+        val totalCells = PoiCategories.ALL.size + 1 // +1 for Favorites
+        val rowCount = (totalCells + colCount - 1) / colCount
         val screenH = resources.displayMetrics.heightPixels
         val headerH = dp(40)     // header area
+        val searchBarH = dp(50)  // search bar area
         val gridPadV = dp(20)    // grid vertical padding
         val marginPerRow = dp(6) // top+bottom margins per cell
-        val availH = screenH - headerH - gridPadV
+        val availH = screenH - headerH - searchBarH - gridPadV
         val cellH = maxOf(dp(36), (availH / rowCount) - marginPerRow)
 
         val grid = android.widget.GridLayout(this).apply {
             columnCount = colCount
             setPadding(dp(8), 0, dp(8), dp(8))
         }
+
+        // ── Favorites cell (first in grid) ──
+        val favCount = favoritesManager.getCount()
+        val favCell = android.widget.FrameLayout(this).apply {
+            val lp = android.widget.GridLayout.LayoutParams().apply {
+                width = 0
+                height = cellH
+                columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                setMargins(dp(3), dp(3), dp(3), dp(3))
+            }
+            layoutParams = lp
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.argb(77, 0xFF, 0xD7, 0x00))
+                cornerRadius = dp(6).toFloat()
+            }
+            background = bg
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+        }
+        val favLabel = TextView(this).apply {
+            text = "Favorites"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            maxLines = 2
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.BOTTOM
+            )
+        }
+        if (favCount > 0) {
+            val favBadge = TextView(this).apply {
+                text = favCount.toString()
+                textSize = 10f
+                setTextColor(Color.parseColor("#FFD700"))
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.TOP or android.view.Gravity.END
+                )
+            }
+            favCell.addView(favBadge)
+        }
+        favCell.addView(favLabel)
+        favCell.setOnClickListener { showFavoritesResults(dialog) }
+        grid.addView(favCell)
 
         for (cat in PoiCategories.ALL) {
             val catCount = counts?.let { c ->
@@ -3948,11 +4150,157 @@ class MainActivity : AppCompatActivity() {
             grid.addView(cell)
         }
 
+        // ── Search bar + grid in a FrameLayout ──
+        val searchResultsList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), 0, dp(8), dp(8))
+            visibility = View.GONE
+        }
+        val searchScroll = android.widget.ScrollView(this).apply {
+            addView(searchResultsList)
+            visibility = View.GONE
+        }
+
+        val searchBar = android.widget.EditText(this).apply {
+            hint = "Search by name..."
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#757575"))
+            setBackgroundColor(Color.parseColor("#2A2A2A"))
+            setPadding(dp(12), dp(10), dp(40), dp(10))
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dp(8), dp(4), dp(8), dp(4)) }
+        }
+
+        // Clear button overlaid on search bar
+        val searchBarContainer = android.widget.FrameLayout(this).apply {
+            addView(searchBar)
+        }
+        val clearBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 16f
+            setTextColor(Color.parseColor("#9E9E9E"))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
+            )
+            visibility = View.GONE
+            setOnClickListener {
+                searchBar.text.clear()
+                visibility = View.GONE
+                searchScroll.visibility = View.GONE
+                searchResultsList.removeAllViews()
+                grid.visibility = View.VISIBLE
+            }
+        }
+        searchBarContainer.addView(clearBtn)
+
+        // Debounced search
+        var searchJob: Job? = null
+        searchBar.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val query = s?.toString()?.trim() ?: ""
+                searchJob?.cancel()
+                if (query.length < 2) {
+                    clearBtn.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
+                    searchScroll.visibility = View.GONE
+                    searchResultsList.removeAllViews()
+                    grid.visibility = View.VISIBLE
+                    return
+                }
+                clearBtn.visibility = View.VISIBLE
+                grid.visibility = View.GONE
+                searchScroll.visibility = View.VISIBLE
+                searchResultsList.removeAllViews()
+                // Show spinner
+                val spinner = android.widget.ProgressBar(this@MainActivity).apply {
+                    setPadding(0, dp(24), 0, dp(24))
+                }
+                searchResultsList.addView(spinner)
+
+                searchJob = lifecycleScope.launch {
+                    delay(500)
+                    val mapCenter = binding.mapView.mapCenter
+                    val response = viewModel.searchPoisByName(query, mapCenter.latitude, mapCenter.longitude)
+                    searchResultsList.removeAllViews()
+                    if (response == null || response.results.isEmpty()) {
+                        searchResultsList.addView(TextView(this@MainActivity).apply {
+                            text = "No results for \"$query\""
+                            textSize = 14f
+                            setTextColor(Color.parseColor("#9E9E9E"))
+                            setPadding(dp(16), dp(24), dp(16), dp(24))
+                        })
+                        return@launch
+                    }
+                    for (result in response.results) {
+                        val row = LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            setPadding(dp(4), dp(8), dp(4), dp(8))
+                            gravity = android.view.Gravity.CENTER_VERTICAL
+                        }
+                        // Color dot
+                        val catColor = poiCategoryColor(result.category)
+                        val colorDot = View(this@MainActivity).apply {
+                            val size = dp(10)
+                            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(8) }
+                            background = android.graphics.drawable.GradientDrawable().apply {
+                                shape = android.graphics.drawable.GradientDrawable.OVAL
+                                setColor(catColor)
+                            }
+                        }
+                        // Distance
+                        val distText = TextView(this@MainActivity).apply {
+                            text = formatDistanceDirection(
+                                mapCenter.latitude, mapCenter.longitude, result.lat, result.lon
+                            )
+                            textSize = 12f
+                            setTextColor(Color.parseColor("#4FC3F7"))
+                            layoutParams = LinearLayout.LayoutParams(dp(55), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                                marginEnd = dp(6)
+                            }
+                        }
+                        // Name
+                        val nameText = TextView(this@MainActivity).apply {
+                            text = result.name ?: result.typeValue.replaceFirstChar { it.uppercase() }
+                            textSize = 14f
+                            setTextColor(Color.WHITE)
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            maxLines = 1
+                            ellipsize = android.text.TextUtils.TruncateAt.END
+                        }
+                        row.addView(colorDot)
+                        row.addView(distText)
+                        row.addView(nameText)
+                        row.setOnClickListener {
+                            dialog.dismiss()
+                            showPoiDetailDialog(result)
+                        }
+                        searchResultsList.addView(row)
+                        searchResultsList.addView(View(this@MainActivity).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, 1
+                            ).apply { setMargins(dp(18), 0, 0, 0) }
+                            setBackgroundColor(Color.parseColor("#2A2A2A"))
+                        })
+                    }
+                }
+            }
+        })
+
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1A1A1A"))
             addView(header)
+            addView(searchBarContainer)
             addView(grid)
+            addView(searchScroll)
         }
 
         dialog.setContentView(container)
@@ -4293,6 +4641,155 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("SetTextI18n")
+    private fun showFavoritesResults(dialog: android.app.Dialog) {
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        val center = binding.mapView.mapCenter
+
+        // ── Header with back ──
+        val backBtn = TextView(this).apply {
+            text = "\u2190"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(0, 0, dp(12), 0)
+            setOnClickListener { showFindCategoryGrid(dialog) }
+        }
+        val titleText = TextView(this).apply {
+            text = "Favorites"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "\u2715"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), 0, dp(4), 0)
+            setOnClickListener { dialog.dismiss() }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(12), dp(12), dp(8))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(backBtn)
+            addView(titleText)
+            addView(closeBtn)
+        }
+
+        val resultsList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), 0, dp(8), dp(8))
+        }
+
+        val favorites = favoritesManager.getFavorites()
+        if (favorites.isEmpty()) {
+            resultsList.addView(TextView(this).apply {
+                text = "No favorites yet — tap the star in any POI detail"
+                textSize = 14f
+                setTextColor(Color.parseColor("#9E9E9E"))
+                setPadding(dp(16), dp(24), dp(16), dp(24))
+            })
+        } else {
+            val results = favorites.map { it.toFindResult(center.latitude, center.longitude) }
+                .sortedBy { it.distanceM }
+            for (result in results) {
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(dp(4), dp(8), dp(4), dp(8))
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+                val distText = TextView(this).apply {
+                    text = formatDistanceDirection(
+                        center.latitude, center.longitude, result.lat, result.lon
+                    )
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#FFD700"))
+                    layoutParams = LinearLayout.LayoutParams(dp(65), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        marginEnd = dp(8)
+                    }
+                }
+                val infoCol = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                infoCol.addView(TextView(this).apply {
+                    text = result.name ?: result.typeValue.replaceFirstChar { it.uppercase() }
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+                val detailStr = result.detail ?: result.typeValue.replaceFirstChar { it.uppercase() }
+                infoCol.addView(TextView(this).apply {
+                    text = detailStr
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#9E9E9E"))
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+                if (result.address != null) {
+                    infoCol.addView(TextView(this).apply {
+                        text = result.address
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#616161"))
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    })
+                }
+                row.addView(distText)
+                row.addView(infoCol)
+                row.setOnClickListener {
+                    dialog.dismiss()
+                    showPoiDetailDialog(result)
+                }
+                resultsList.addView(row)
+                resultsList.addView(View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 1
+                    ).apply { setMargins(dp(65), 0, 0, 0) }
+                    setBackgroundColor(Color.parseColor("#2A2A2A"))
+                })
+            }
+        }
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            addView(resultsList)
+        }
+
+        val footer = TextView(this).apply {
+            text = "${favorites.size} favorites"
+            textSize = 11f
+            setTextColor(Color.parseColor("#757575"))
+            setPadding(dp(16), dp(8), dp(16), dp(12))
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            addView(header)
+            addView(scrollView)
+            addView(footer)
+        }
+
+        dialog.setContentView(container)
+        dialog.window?.let { win ->
+            val dm = resources.displayMetrics
+            win.setLayout((dm.widthPixels * 0.90).toInt(), (dm.heightPixels * 0.75).toInt())
+            win.setBackgroundDrawableResource(android.R.color.transparent)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+    }
+
     private fun poiCategoryColor(categoryTag: String): Int {
         return PoiCategories.ALL.firstOrNull { it.tags.contains(categoryTag) }?.color
             ?: Color.parseColor("#757575")
@@ -4347,6 +4844,36 @@ class MainActivity : AppCompatActivity() {
             maxLines = 2
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
+        val isFav = favoritesManager.isFavorite(result.type, result.id)
+        val starIcon = ImageView(this).apply {
+            setImageResource(if (isFav) R.drawable.ic_star else R.drawable.ic_star_outline)
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                marginStart = dp(4)
+                marginEnd = dp(4)
+            }
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setOnClickListener {
+                if (favoritesManager.isFavorite(result.type, result.id)) {
+                    favoritesManager.removeFavorite(result.type, result.id)
+                    setImageResource(R.drawable.ic_star_outline)
+                    toast("Removed from favorites")
+                } else {
+                    favoritesManager.addFavorite(com.example.locationmapapp.data.model.FavoriteEntry(
+                        osmType = result.type,
+                        osmId = result.id,
+                        name = result.name,
+                        lat = result.lat,
+                        lon = result.lon,
+                        category = result.category,
+                        address = result.address,
+                        phone = result.phone,
+                        openingHours = result.openingHours
+                    ))
+                    setImageResource(R.drawable.ic_star)
+                    toast("Added to favorites")
+                }
+            }
+        }
         val closeBtn = TextView(this).apply {
             text = "\u2715"
             textSize = 20f
@@ -4361,6 +4888,7 @@ class MainActivity : AppCompatActivity() {
             addView(dot)
             addView(distLabel)
             addView(titleText)
+            addView(starIcon)
             addView(closeBtn)
         }
 
@@ -4505,7 +5033,7 @@ class MainActivity : AppCompatActivity() {
         // Directions button
         buttonContainer.addView(TextView(this).apply {
             text = "Directions"
-            textSize = 13f
+            textSize = 11f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             gravity = android.view.Gravity.CENTER
@@ -4530,7 +5058,7 @@ class MainActivity : AppCompatActivity() {
         // Call button
         buttonContainer.addView(TextView(this).apply {
             text = "Call"
-            textSize = 13f
+            textSize = 11f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             gravity = android.view.Gravity.CENTER
@@ -4552,7 +5080,7 @@ class MainActivity : AppCompatActivity() {
         // Reviews button
         buttonContainer.addView(TextView(this).apply {
             text = "Reviews"
-            textSize = 13f
+            textSize = 11f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             gravity = android.view.Gravity.CENTER
@@ -4570,7 +5098,7 @@ class MainActivity : AppCompatActivity() {
         // Map button
         buttonContainer.addView(TextView(this).apply {
             text = "Map"
-            textSize = 13f
+            textSize = 11f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             gravity = android.view.Gravity.CENTER
@@ -4585,6 +5113,33 @@ class MainActivity : AppCompatActivity() {
                     delay(1000)
                     loadCachedPoisForVisibleArea()
                 }
+            }
+        })
+
+        // Share button
+        buttonContainer.addView(TextView(this).apply {
+            text = "Share"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#00796B"))
+            layoutParams = buttonLp
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            setOnClickListener {
+                val shareText = buildString {
+                    append(result.name ?: result.typeValue.replaceFirstChar { it.uppercase() })
+                    if (result.address != null) append("\n${result.address}")
+                    if (result.phone != null) append("\nPhone: ${result.phone}")
+                    if (result.openingHours != null) append("\nHours: ${result.openingHours}")
+                    append("\nhttps://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}")
+                }
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                    putExtra(Intent.EXTRA_SUBJECT, result.name ?: "Shared Location")
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share POI"))
             }
         })
 
@@ -6876,6 +7431,31 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onRadarFrequencyChanged: ${minutes}min")
             radarScheduler.setInterval(minutes)
             toast("Radar refresh: every $minutes min")
+        }
+
+        override fun onRadarAnimateToggled(enabled: Boolean) {
+            DebugLogger.i("MainActivity", "onRadarAnimateToggled: $enabled")
+            if (enabled) startRadarAnimation() else stopRadarAnimation()
+        }
+
+        override fun onRadarAnimSpeedChanged(ms: Int) {
+            DebugLogger.i("MainActivity", "onRadarAnimSpeedChanged: ${ms}ms")
+            radarAnimSpeedMs = ms
+            toast("Radar animation speed: ${ms}ms")
+        }
+
+        // ── Dark Mode ────────────────────────────────────────────────────────
+
+        override fun onDarkModeToggled(dark: Boolean) {
+            DebugLogger.i("MainActivity", "onDarkModeToggled: $dark")
+            if (dark) {
+                binding.mapView.setTileSource(buildDarkTileSource())
+                toast("Dark mode enabled")
+            } else {
+                binding.mapView.setTileSource(TileSourceFactory.MAPNIK)
+                toast("Light mode enabled")
+            }
+            binding.mapView.invalidate()
         }
 
         // ── Weather ───────────────────────────────────────────────────────────

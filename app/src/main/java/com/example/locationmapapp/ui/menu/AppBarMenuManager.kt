@@ -109,7 +109,8 @@ class AppBarMenuManager(
         weatherIcon: ImageView,
         alertsIcon: ImageView,
         gridButton: ImageView,
-        statusLine: TextView
+        statusLine: TextView,
+        darkModeIcon: ImageView? = null
     ): SlimToolbarRefs {
         weatherIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
         alertsIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
@@ -118,7 +119,21 @@ class AppBarMenuManager(
         alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         gridButton.setOnClickListener { showGridDropdown(it) }
 
-        DebugLogger.i(TAG, "setupSlimToolbar() — 3 icons wired (Weather, Alerts, Grid)")
+        // Dark mode toggle icon
+        darkModeIcon?.let { icon ->
+            val isDark = prefs.getBoolean(PREF_DARK_MODE, false)
+            icon.alpha = if (isDark) 1.0f else 0.4f
+            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            icon.setOnClickListener {
+                val newState = !prefs.getBoolean(PREF_DARK_MODE, false)
+                prefs.edit().putBoolean(PREF_DARK_MODE, newState).apply()
+                icon.alpha = if (newState) 1.0f else 0.4f
+                DebugLogger.i(TAG, "Dark mode toggled → $newState")
+                menuEventListener.onDarkModeToggled(newState)
+            }
+        }
+
+        DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, DarkMode, Alerts, Grid)")
         return SlimToolbarRefs(weatherIcon, alertsIcon, gridButton, statusLine)
     }
 
@@ -415,6 +430,16 @@ class AppBarMenuManager(
                         menuEventListener.onRadarFrequencyChanged(v)
                     }
 
+                R.id.menu_radar_animate ->
+                    toggleBinary(item, PREF_RADAR_ANIMATE) { menuEventListener.onRadarAnimateToggled(it) }
+
+                R.id.menu_radar_anim_speed ->
+                    showSliderDialog("Animation Speed (ms)", 300, 2000,
+                        prefs.getInt(PREF_RADAR_ANIM_SPEED, DEFAULT_RADAR_ANIM_SPEED)) { v ->
+                        prefs.edit().putInt(PREF_RADAR_ANIM_SPEED, v).apply()
+                        menuEventListener.onRadarAnimSpeedChanged(v)
+                    }
+
                 R.id.menu_metar_display ->
                     toggleBinary(item, PREF_METAR_DISPLAY) { menuEventListener.onMetarDisplayToggled(it) }
 
@@ -434,6 +459,7 @@ class AppBarMenuManager(
         }
         syncCheckStates(popup.menu,
             R.id.menu_radar_toggle to PREF_RADAR_ON,
+            R.id.menu_radar_animate to PREF_RADAR_ANIMATE,
             R.id.menu_metar_display to PREF_METAR_DISPLAY
         )
         popup.show()
@@ -674,7 +700,8 @@ class AppBarMenuManager(
     /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
     private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
         PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS, PREF_MBTA_BUS_STOPS,
-        PREF_ALERT_SOUND, PREF_CAMERA_OVERLAY, PREF_SCHOOL_OVERLAY, PREF_FLOOD_OVERLAY, PREF_CROSSING_OVERLAY -> false
+        PREF_ALERT_SOUND, PREF_CAMERA_OVERLAY, PREF_SCHOOL_OVERLAY, PREF_FLOOD_OVERLAY, PREF_CROSSING_OVERLAY,
+        PREF_RADAR_ANIMATE, PREF_DARK_MODE -> false
         else -> true
     }
 
@@ -797,6 +824,14 @@ class AppBarMenuManager(
         const val PREF_CROSSING_OVERLAY = "crossing_overlay_on"
         const val PREF_ALERT_SOUND      = "alert_sound_on"
         const val PREF_ALERT_DISTANCE   = "alert_distance_nm"
+
+        // ── Dark Mode ────────────────────────────────────────────────────────
+        const val PREF_DARK_MODE = "dark_mode_enabled"
+
+        // ── Radar Animation ──────────────────────────────────────────────────
+        const val PREF_RADAR_ANIMATE    = "radar_animate_on"
+        const val PREF_RADAR_ANIM_SPEED = "radar_anim_speed_ms"
+        const val DEFAULT_RADAR_ANIM_SPEED = 800
 
         // ── Utility ───────────────────────────────────────────────────────────
         const val PREF_RECORD_GPS            = "record_gps_on"

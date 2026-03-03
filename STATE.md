@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 43 (Train ETA, POI Categories, Find Radius)
+## Last Updated: 2026-03-03 Session 44 (Share, Dark Mode, Favorites, Text Search, Animated Radar)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -18,7 +18,11 @@
   - Proxy `/weather?lat=&lon=` (5 NWS calls), 22 vector icons, auto-fetch every 30min
   - Toolbar icon shows current conditions; red border when alerts active
 - **METAR** — rich text markers (temp, wind, sky), bbox passthrough, deferred load, human-readable tap info
-- **NWS NEXRAD radar** tiles (Iowa State Mesonet)
+- **NWS NEXRAD radar** tiles (Iowa State Mesonet) + animated radar (7-frame 35-min loop)
+- **Dark mode** (v1.5.44): toolbar moon icon toggles between MAPNIK and CartoDB Dark Matter tiles, persisted
+- **Share POI** (v1.5.44): 5th action button in POI detail dialog, shares name/address/phone/hours + Google Maps link
+- **Favorites** (v1.5.44): star icon in POI detail dialog, SharedPreferences+JSON storage, dedicated Favorites cell in Find dialog
+- **Text search** (v1.5.44): search bar in Find dialog, debounced name search via `/db/pois/search`, color dot + distance results
 - **MBTA transit** — live vehicles (buses, CR, subway) with directional arrows + staleness detection
   - Commuter rail: next-stop ETA badge on labeled markers (batch predictions API)
   - ~270 train stations: tap → arrival board (30s auto-refresh) → trip schedule
@@ -28,7 +32,7 @@
   - 18 state vector fields, configurable refresh (30s–5min), zoom ≥ 10 guard
   - Dedicated **Air** menu (toggle, frequency, auto-follow)
 - **Slim toolbar + status line + grid dropdown** (v1.5.40): replaced 2×5 icon grid with compact 3-icon bar
-  - **Toolbar** (40dp): Weather icon (left) | spacer | Alerts icon + Grid menu button (right)
+  - **Toolbar** (40dp): Weather icon (left) | spacer | Dark Mode toggle | Alerts icon + Grid menu button (right)
   - **Status line** (24dp): priority-based info bar — GPS coords+weather when idle, follow/scan/alert info when active
     - `StatusLineManager.kt`: 7 priority levels (GPS_IDLE → GEOFENCE_ALERT), set/clear/updateIdle API
     - All banner functions migrated from dynamic TextView creation to StatusLineManager
@@ -52,7 +56,10 @@
 - **Vehicle follow**: tap → track, staleness detection (>2 min), POI prefetch along route
 - **Find dialog** (v1.5.26): category grid → subtype grid → distance-sorted results, long-press filter mode
   - Counts scoped to 10km radius around map center; auto-fit cell heights for all screen sizes
-- **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map)
+  - Text search bar (v1.5.44): debounced name search above category grid, 500ms delay, min 2 chars
+  - Favorites cell (v1.5.44): gold star, first in grid, shows count badge, tap for sorted favorites list
+- **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map/Share)
+  - Star icon in header (v1.5.44): tap to add/remove from favorites, filled/outline toggle
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
 - Transit zoom guard (zoom ≤ 10 hides markers), POI display (zoom ≥ 10 + max 5000 markers), adaptive radius hints
 - **Idle auto-populate** (v1.5.33): 5-min GPS stationarity → full scanner, 45s delays, GPS-centered
@@ -151,9 +158,9 @@
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
 - **Tap find filter banner**: exit filter mode, restore normal POI display
-- **Find toolbar icon**: category grid → subtype grid → distance-sorted results → tap to open POI detail dialog
+- **Find toolbar icon**: search bar + favorites cell + category grid → subtype grid → distance-sorted results → tap to open POI detail dialog
 - **Go to Location toolbar icon**: geocoder dialog → type address → pick result → map navigates + POI search
-- **POI detail dialog**: info rows + Load Website button + action buttons (Directions, Call, Reviews, Map)
+- **POI detail dialog**: info rows + star (favorite) + Load Website button + action buttons (Directions, Call, Reviews, Map, Share)
 - **Find long-press**: filter map to show only that category's POIs
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center
 
@@ -168,7 +175,8 @@
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
 - `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
-- `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries
+- `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries + text search
+- `app/src/main/java/.../util/FavoritesManager.kt` — SharedPreferences+JSON favorites CRUD
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
 - `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings fetch
@@ -354,4 +362,4 @@ Roadmap completed across v1.5.35–v1.5.39. See `PLAN-ARCHIVE.md` for full detai
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
 - Automate periodic POI imports (cron or proxy hook)
-- Find dialog enhancements: pagination (load more), search within results, recent/favorites
+- Find dialog enhancements: pagination (load more), search within results, recent searches

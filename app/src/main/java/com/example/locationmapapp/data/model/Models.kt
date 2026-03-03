@@ -279,6 +279,42 @@ data class FindResult(
     )
 }
 
+data class FavoriteEntry(
+    val osmType: String,
+    val osmId: Long,
+    val name: String?,
+    val lat: Double,
+    val lon: Double,
+    val category: String,
+    val address: String? = null,
+    val phone: String? = null,
+    val openingHours: String? = null,
+    val savedAt: Long = System.currentTimeMillis()
+) {
+    fun toFindResult(fromLat: Double, fromLon: Double): FindResult {
+        val R = 6371000.0
+        val dLat = Math.toRadians(lat - fromLat)
+        val dLon = Math.toRadians(lon - fromLon)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(lat)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val dist = (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toInt()
+        return FindResult(
+            id = osmId,
+            type = osmType,
+            name = name,
+            lat = lat,
+            lon = lon,
+            category = category,
+            distanceM = dist,
+            tags = emptyMap(),
+            address = address,
+            phone = phone,
+            openingHours = openingHours
+        )
+    }
+}
+
 data class FindCounts(
     val counts: Map<String, Int>,
     val total: Int

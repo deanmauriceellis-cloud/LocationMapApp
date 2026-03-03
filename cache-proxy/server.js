@@ -1127,10 +1127,15 @@ app.get('/db/pois/search', requirePg, async (req, res) => {
     const lim = Math.min(parseInt(limit) || 100, 500);
     const off = parseInt(offset) || 0;
 
-    const sql = `SELECT osm_type, osm_id, lat, lon, tags${distExpr} FROM pois ${where} ${orderClause} LIMIT ${lim} OFFSET ${off}`;
+    const sql = `SELECT osm_type, osm_id, name, category, lat, lon, tags${distExpr} FROM pois ${where} ${orderClause} LIMIT ${lim} OFFSET ${off}`;
     const result = await pgPool.query(sql, params);
 
-    res.json({ count: result.rows.length, elements: result.rows.map(toOverpassElement) });
+    res.json({ count: result.rows.length, elements: result.rows.map(r => {
+      const el = toOverpassElement(r);
+      if (r.name) el.name = r.name;
+      if (r.category) el.category = r.category;
+      return el;
+    }) });
   } catch (err) {
     console.error('[/db/pois/search]', err.message);
     res.status(500).json({ error: err.message });
