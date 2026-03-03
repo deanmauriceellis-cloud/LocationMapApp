@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 45 (Social Layer Prototype — Auth, Comments, Chat)
+## Last Updated: 2026-03-03 Session 46 (Social Layer Testing + Fixes)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -61,12 +61,13 @@
     - `ChatRepository.kt`: Socket.IO connect/disconnect, room join/leave, send/receive
     - Auto-creates "Global" room on proxy startup
     - Room list dialog: name, member count, description, tap to enter
-    - Chat room dialog: message bubbles (own=blue, others=gray), author name, send bar
+    - Chat room dialog: message bubbles (own=blue, others=gray), author name, send bar, fitsSystemWindows
+    - Socket.IO connect-before-join: suspendCancellableCoroutine waits for actual connection
     - Create room dialog: name + optional description
   - **Grid dropdown**: expanded to 3×4 (12 buttons) — Row 3: Social, Chat, Profile, Legend
   - **Proxy deps**: argon2, jsonwebtoken, socket.io; `http.createServer` + Socket.IO attach
   - **Android dep**: `io.socket:socket.io-client:2.1.0`
-  - **6 DB tables**: users, auth_lookup, refresh_tokens, poi_comments, comment_votes, chat_rooms, room_memberships, messages
+  - **8 DB tables**: users, auth_lookup, refresh_tokens, poi_comments, comment_votes, chat_rooms, room_memberships, messages
   - **Skipped for now**: COPPA age gate, email encryption, content moderation, OAuth, monthly partitioning
 - **Cap detection & retry-to-fit**: halves radius on 500-element cap, 20km fuzzy hints, MIN_RADIUS 100m
 - **Populate POIs v2** (grid scanner): probe-calibrate-spiral with recursive 3×3 subdivision, 10km initial probe, narrative banner
@@ -83,8 +84,9 @@
   - Star icon in header (v1.5.44): tap to add/remove from favorites, filled/outline toggle
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
 - Transit zoom guard (zoom ≤ 10 hides markers), POI display (zoom ≥ 10 + max 5000 markers), adaptive radius hints
-- **Idle auto-populate** (v1.5.33): 5-min GPS stationarity → full scanner, 45s delays, GPS-centered
-  - Touch-to-stop: any map tap cancels idle populate, resets 5-min idle timer
+- **Idle auto-populate** (v1.5.33): 10-min GPS stationarity → full scanner, 45s delays, GPS-centered
+  - Touch-to-stop: any map tap cancels idle populate, resets 10-min idle timer
+  - Any UI activity (grid dropdown, dialogs, toolbar buttons) also resets idle timer
   - State preservation: stopped idle scanner resumes from last ring/point (not from scratch)
   - State cleared on: long-press, GPS move >100m, goToLocation, manual populate start
 - **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta

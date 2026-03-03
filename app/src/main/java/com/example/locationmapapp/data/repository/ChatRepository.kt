@@ -7,7 +7,9 @@ import com.google.gson.JsonParser
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
@@ -80,10 +82,6 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                socket?.on(Socket.EVENT_CONNECT) {
-                    DebugLogger.i(TAG, "Socket.IO connected")
-                }
-
                 socket?.on(Socket.EVENT_DISCONNECT) { args ->
                     val reason = if (args.isNotEmpty()) args[0].toString() else "unknown"
                     DebugLogger.i(TAG, "Socket.IO disconnected: $reason")
@@ -94,8 +92,17 @@ class ChatRepository @Inject constructor(
                     DebugLogger.e(TAG, "Socket.IO connect error: $err")
                 }
 
-                socket?.connect()
+                // Wait for actual connection before returning
                 DebugLogger.i(TAG, "Socket.IO connecting to $BASE")
+                suspendCancellableCoroutine { cont ->
+                    socket?.on(Socket.EVENT_CONNECT) {
+                        DebugLogger.i(TAG, "Socket.IO connected")
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                    socket?.connect()
+                    // Timeout: don't block forever
+                    cont.invokeOnCancellation { socket?.off(Socket.EVENT_CONNECT) }
+                }
             } catch (e: Exception) {
                 DebugLogger.e(TAG, "Socket.IO init error: ${e.message}")
             }

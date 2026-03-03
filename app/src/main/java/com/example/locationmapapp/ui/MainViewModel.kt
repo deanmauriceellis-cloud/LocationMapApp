@@ -893,8 +893,19 @@ class MainViewModel @Inject constructor(
 
     fun joinRoom(roomId: String) {
         _currentRoomId.value = roomId
-        chatRepository.joinRoom(roomId)
         viewModelScope.launch {
+            // Ensure socket is connected before joining
+            if (!chatRepository.isConnected()) {
+                chatRepository.connect()
+                chatRepository.setOnMessageListener { msg ->
+                    if (msg.roomId == _currentRoomId.value) {
+                        val current = _chatMessages.value?.toMutableList() ?: mutableListOf()
+                        current.add(msg)
+                        _chatMessages.postValue(current)
+                    }
+                }
+            }
+            chatRepository.joinRoom(roomId)
             val messages = chatRepository.fetchMessages(roomId)
             _chatMessages.value = messages
         }

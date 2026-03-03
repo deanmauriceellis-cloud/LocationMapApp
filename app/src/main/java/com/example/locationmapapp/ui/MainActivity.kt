@@ -138,9 +138,18 @@ class MainActivity : AppCompatActivity() {
     private var silentFillJob: Job? = null
     private var silentFillRunnable: Runnable? = null
 
-    // Idle auto-populate — full scanner triggered after 5 min of GPS stationarity
+    // Idle auto-populate — full scanner triggered after 10 min of GPS stationarity
     private var idlePopulateJob: Job? = null
     private var lastSignificantMoveTime: Long = System.currentTimeMillis()
+
+    /** Reset idle timer on any UI activity — grid, dialogs, etc. */
+    private fun resetIdleTimer() {
+        lastSignificantMoveTime = System.currentTimeMillis()
+        if (idlePopulateJob?.isActive == true) {
+            DebugLogger.i("MainActivity", "UI activity — stopping idle auto-populate")
+            stopIdlePopulate()
+        }
+    }
     private var idlePopulateState: IdlePopulateState? = null
 
     /** Mutable state for idle populate — persists across stop/resume cycles. */
@@ -584,13 +593,10 @@ class MainActivity : AppCompatActivity() {
         }
         binding.mapView.overlays.add(0, MapEventsOverlay(eventsReceiver))
 
-        // Stop idle populate on any user touch — reset idle timer so it takes another 5 min
+        // Stop idle populate on any user touch — reset idle timer so it takes another 10 min
         binding.mapView.setOnTouchListener { _, event ->
-            if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN
-                && idlePopulateJob?.isActive == true) {
-                DebugLogger.i("MainActivity", "User touch — stopping idle auto-populate")
-                stopIdlePopulate()
-                lastSignificantMoveTime = System.currentTimeMillis()
+            if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                resetIdleTimer()
             }
             false // don't consume — let map handle normally
         }
@@ -885,7 +891,7 @@ class MainActivity : AppCompatActivity() {
 
                 // ── Idle auto-populate: start full scanner after 5 min stationary ──
                 val idleMs = System.currentTimeMillis() - lastSignificantMoveTime
-                if (idleMs > 300_000L
+                if (idleMs > 600_000L
                     && idlePopulateJob?.isActive != true
                     && populateJob == null
                     && followedVehicleId == null && followedAircraftIcao == null
@@ -7664,6 +7670,7 @@ class MainActivity : AppCompatActivity() {
         // ── Weather ───────────────────────────────────────────────────────────
 
         override fun onWeatherRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onWeatherRequested")
             showWeatherDialog()
         }
@@ -7928,6 +7935,7 @@ class MainActivity : AppCompatActivity() {
         // ── Alerts / Geofence ─────────────────────────────────────────────────
 
         override fun onAlertsRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onAlertsRequested")
             val anchor = alertsIconView ?: binding.toolbar
             appBarMenuManager.showAlertsMenu(anchor)
@@ -8004,6 +8012,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onDatabaseManagerRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onDatabaseManagerRequested")
             showDatabaseManagerDialog()
         }
@@ -8011,16 +8020,19 @@ class MainActivity : AppCompatActivity() {
         // ── Find / Legend ─────────────────────────────────────────────────────
 
         override fun onFindRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onFindRequested")
             showFindDialog()
         }
 
         override fun onLegendRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onLegendRequested")
             showLegendDialog()
         }
 
         override fun onGoToLocationRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onGoToLocationRequested")
             showGoToLocationDialog()
         }
@@ -8028,11 +8040,13 @@ class MainActivity : AppCompatActivity() {
         // ── Social ────────────────────────────────────────────────────────────
 
         override fun onSocialRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onSocialRequested")
             if (viewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
         }
 
         override fun onChatRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onChatRequested")
             if (!viewModel.isLoggedIn()) {
                 toast("Log in first to use Chat")
@@ -8043,6 +8057,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onProfileRequested() {
+            resetIdleTimer()
             DebugLogger.i("MainActivity", "onProfileRequested")
             if (viewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
         }
@@ -8350,7 +8365,7 @@ class MainActivity : AppCompatActivity() {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
                 nameRow.addView(TextView(this).apply {
-                    text = "${room.memberCount} members"
+                    text = "${room.memberCount} ${if (room.memberCount == 1) "member" else "members"}"
                     textSize = 11f
                     setTextColor(Color.parseColor("#666666"))
                 })
@@ -8625,6 +8640,7 @@ class MainActivity : AppCompatActivity() {
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#FF1A1A1A"))
+            fitsSystemWindows = true
             addView(header)
             addView(View(this@MainActivity).apply {
                 setBackgroundColor(Color.parseColor("#333333"))
