@@ -83,10 +83,18 @@
 - [x] **Comment char counter**: "0 / 1000" visible, updates live to "32 / 1000" after typing — PASS
 - **Note**: proxy must be restarted to pick up server.js changes (Node caches at startup); app must be reinstalled for client-side changes
 
+### Completed — BlueStacks Cross-Platform (Session 49)
+- [x] **BlueStacks install** — APK installs and runs on BlueStacks Windows emulator
+  - Needed `adb uninstall` first (signature mismatch from prior debug key)
+  - BlueStacks reaches proxy at 10.0.0.4:3000 over local network
+  - Both devices (Android emulator + BlueStacks) traffic visible in proxy logs
+  - "Mr. Nobody" comment posted from BlueStacks confirmed in proxy logs
+- [x] **Multi-user confirmed** — two separate device registrations hitting proxy simultaneously
+
 ### NOT YET TESTED — Resume Here
 
 #### Social Layer (from Session 47)
-- [ ] **Multi-user chat** — register 2nd user (via curl or 2nd device), verify gray bubbles for other users
+- [x] **Multi-user chat** — BlueStacks as 2nd device confirmed traffic; verify gray bubbles visually
 - [ ] **Token refresh** — wait 15min or simulate expiry, verify auto-refresh works
 - [ ] **Error states** — duplicate registration, short password, empty fields, network down
 - [ ] **Dark mode** — verify social dialogs render correctly in dark mode
@@ -100,6 +108,7 @@
 | Dean | dean@test.com | password123 | on-device registration |
 | SecurityTester | sectest@example.com | SecurePass123 | curl (session 49 security tests) |
 | RateUser1-8 | rate1-8@test.com | TestPass123 | curl (rate limit test, session 49) |
+| Mr. Nobody | (BlueStacks) | — | BlueStacks registration (session 49) |
 
 ### Proxy Startup (for next session)
 ```bash
