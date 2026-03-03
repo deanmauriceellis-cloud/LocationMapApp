@@ -1,0 +1,699 @@
+================================================================================
+                    LOCATIONMAPAPP v1.5 — USER GUIDE
+================================================================================
+
+                        Last updated: March 2026
+
+TABLE OF CONTENTS
+-----------------
+  1.  Getting Started
+  2.  Map Navigation
+  3.  Toolbar & Status Line
+  4.  Grid Menu
+  5.  Points of Interest (POI)
+  6.  Find & Search
+  7.  Favorites
+  8.  Weather
+  9.  MBTA Transit (Buses, Trains, Subway)
+  10. Aircraft Tracking
+  11. Webcams
+  12. Radar
+  13. Geofence Alerts
+  14. Zone Databases
+  15. Dark Mode
+  16. Go to Location
+  17. Populate POIs
+  18. Social Features (Registration, Comments, Chat)
+  19. Legend
+  20. Tips & Tricks
+
+
+================================================================================
+1.  GETTING STARTED
+================================================================================
+
+LocationMapApp is an Android map application that displays points of interest,
+live transit vehicles, aircraft, weather, webcams, radar, and geofence alerts
+on an interactive map. The app uses OpenStreetMap data and connects to multiple
+live data sources.
+
+When you first open the app:
+  - The map centers on your GPS location automatically.
+  - Points of interest (POIs) load for your visible area.
+  - Weather data fetches automatically and appears in the toolbar.
+  - The status line at the top shows your GPS coordinates and weather summary.
+
+Requirements:
+  - Android device running Android 14 (API 34) or later.
+  - GPS/Location services enabled.
+  - Network connection to the cache proxy server.
+
+
+================================================================================
+2.  MAP NAVIGATION
+================================================================================
+
+PANNING
+  Drag the map with one finger to scroll in any direction. As you pan, POIs
+  for the visible area load automatically from the cache.
+
+ZOOMING
+  - Pinch to zoom in or out.
+  - Use the zoom slider on the right edge of the screen (+ and - buttons).
+  - Double-tap to zoom in.
+
+LONG PRESS (Manual Mode)
+  Press and hold on any point on the map for about 2 seconds to:
+  - Center the map on that location.
+  - Auto-zoom to level 14 if currently zoomed out further.
+  - Search for POIs at that location.
+  - Fetch fresh weather data and alerts for that area.
+  This is useful for exploring areas away from your current GPS position.
+
+ZOOM LEVEL BEHAVIOR
+  Different layers appear at different zoom levels:
+  - Zoom 10+: POIs and aircraft appear.
+  - Zoom 12+: School zones, flood zones, and railroad crossings appear.
+  - Zoom 15+: Bus stops appear.
+  - Zoom 18+: POI markers switch from colored dots to labeled icons with
+    the place name and type.
+
+
+================================================================================
+3.  TOOLBAR & STATUS LINE
+================================================================================
+
+The toolbar is the slim bar at the very top of the screen.
+
+TOOLBAR ICONS (left to right):
+  - Weather icon (left): Shows current conditions. Tap to open the full
+    weather dialog. A red border appears when weather alerts are active.
+  - Dark Mode toggle (moon icon): Tap to switch between light and dark
+    map tiles.
+  - Alerts icon: Shows the severity of active geofence alerts.
+      Gray = no alerts
+      Blue = informational
+      Yellow = warning
+      Red = critical
+      Pulsing red = emergency
+    Tap to open the Alerts menu.
+  - Grid Menu button (grid icon, far right): Tap to open the main menu
+    with all feature buttons.
+
+STATUS LINE
+  The thin line just below the toolbar shows context-sensitive information:
+  - When idle: Your GPS coordinates and a brief weather summary.
+  - When following a vehicle or aircraft: Follow status and info.
+  - When scanning for POIs: Scan progress.
+  - When a geofence alert is active: Alert details with a color-coded
+    background matching the zone type.
+
+
+================================================================================
+4.  GRID MENU
+================================================================================
+
+Tap the grid icon (top-right) to open the main dropdown menu. It contains
+12 buttons arranged in a 3x4 grid:
+
+  Row 1:  Transit  |  Webcams  |  Aircraft  |  Radar
+  Row 2:  POI      |  Utility  |  Find      |  Go To
+  Row 3:  Social   |  Chat     |  Profile   |  Legend
+
+TRANSIT    — Open the transit layer menu (buses, trains, subway).
+WEBCAMS    — Toggle the webcam layer on or off.
+AIRCRAFT   — Open the aircraft menu (toggle, refresh frequency, auto-follow).
+RADAR      — Toggle the animated NEXRAD weather radar overlay.
+POI        — Open the POI categories menu to toggle which types are searched.
+UTILITY    — Access utilities: Populate POIs, 10km Probe, Legend.
+FIND       — Open the Find dialog to search for POIs by category or name.
+GO TO      — Open the Go to Location dialog to navigate to an address.
+SOCIAL     — Register an account or view your profile.
+CHAT       — Open the chat room list for real-time messaging.
+PROFILE    — View your user profile (display name, role, user ID).
+LEGEND     — View the map legend showing all POI categories and colors.
+
+
+================================================================================
+5.  POINTS OF INTEREST (POI)
+================================================================================
+
+The app displays 17 categories of POIs sourced from OpenStreetMap:
+
+  1.  Food & Drink — restaurants, fast food, cafes, bars, bakeries, delis
+  2.  Fuel & Charging — gas stations, EV charging stations
+  3.  Transit — train stations, bus stations, bike rentals, ferry terminals
+  4.  Civic & Gov — town halls, post offices, courthouses, libraries, police
+  5.  Parks & Rec — parks, playgrounds, beaches, trails, sports fields, pools
+  6.  Shopping — supermarkets, malls, clothing, hardware, convenience stores
+  7.  Healthcare — hospitals, pharmacies, clinics, dentists, veterinarians
+  8.  Education — schools, universities, colleges, kindergartens
+  9.  Lodging — hotels, motels, hostels, guest houses, campgrounds
+  10. Parking — parking lots and garages
+  11. Finance — banks, ATMs, credit unions
+  12. Places of Worship — churches, mosques, synagogues, temples
+  13. Tourism & History — museums, monuments, attractions, viewpoints, zoos
+  14. Emergency Services — fire stations, hospitals, emergency rooms
+  15. Auto Services — car repair, car wash, car rental, car dealers
+  16. Entertainment — cinemas, theaters, nightclubs, casinos, arcades
+  17. Offices & Services — post boxes, laundry, dry cleaning, tailors
+
+POI DISPLAY
+  - At low zoom: POIs appear as small colored dots (each category has a
+    unique color).
+  - At zoom 18+: POIs display as labeled icons showing the type and name.
+  - Only POIs within the visible area are shown (viewport-only display).
+
+TAPPING A POI MARKER
+  Tap any POI marker on the map to open the POI Detail Dialog showing:
+  - Distance and direction from your position.
+  - Type (category).
+  - Address.
+  - Phone number (if available).
+  - Operating hours (if available).
+  - Website (with a "Load Website" button if available).
+  - Comments section (see Section 18).
+  - Action buttons at the bottom:
+      DIRECTIONS — Open turn-by-turn directions in Google Maps.
+      CALL       — Dial the phone number (if available).
+      REVIEWS    — Open Google reviews for this place.
+      MAP        — Open in Google Maps.
+      SHARE      — Share the POI details (name, address, phone, hours,
+                   and a Google Maps link) via any sharing app.
+
+FAVORITE A POI
+  In the POI Detail Dialog, tap the star icon in the header to add or remove
+  the POI from your favorites. A filled star means it is a favorite; an
+  outline star means it is not. See Section 7 for more on Favorites.
+
+
+================================================================================
+6.  FIND & SEARCH
+================================================================================
+
+Open the Find dialog from the grid menu (FIND button).
+
+TEXT SEARCH
+  At the top of the Find dialog is a search bar. Type at least 2 characters
+  to search POIs by name. Results appear with a colored category dot and
+  the distance from the map center. Tap any result to open its detail dialog.
+
+FAVORITES CELL
+  The first cell in the category grid is a gold star labeled "Favorites"
+  with a count badge. Tap it to see all your saved favorites sorted by
+  distance.
+
+CATEGORY GRID
+  Below the search bar is a grid of all 17 POI categories, each showing
+  the count of POIs within a 10-kilometer radius of the map center.
+  - Tap a category to see its subtypes (e.g., Food & Drink breaks down
+    into Restaurants, Fast Food, Cafes, etc.).
+  - Tap a subtype to see a distance-sorted list of matching POIs.
+  - Tap any result to open its detail dialog.
+
+FILTER MODE (Long Press)
+  Long-press a category cell to enter filter mode. The map will show ONLY
+  POIs from that category. A banner appears at the top — tap the banner
+  to exit filter mode and restore all POIs.
+
+
+================================================================================
+7.  FAVORITES
+================================================================================
+
+You can save any POI as a favorite for quick access later.
+
+ADDING A FAVORITE
+  Open any POI Detail Dialog (by tapping a marker or finding it via search)
+  and tap the star icon in the header. The star fills in to confirm.
+
+REMOVING A FAVORITE
+  Tap the filled star icon again in the POI Detail Dialog. The star returns
+  to an outline.
+
+VIEWING FAVORITES
+  Open the Find dialog and tap the "Favorites" cell (gold star, first in the
+  grid). Your favorites appear sorted by distance from the current map center.
+
+
+================================================================================
+8.  WEATHER
+================================================================================
+
+TOOLBAR WEATHER ICON
+  The weather icon on the left side of the toolbar shows the current
+  conditions at your location. It updates automatically every 30 minutes
+  and whenever you get a new GPS fix. A red border around the icon means
+  there are active weather alerts in your area.
+
+WEATHER DIALOG
+  Tap the weather icon to open the full Weather Dialog with four sections:
+
+  CURRENT CONDITIONS
+    Temperature, feels-like, wind speed and direction, humidity, dewpoint,
+    visibility, barometric pressure, and a description of sky conditions.
+
+  HOURLY FORECAST (48 hours)
+    Hour-by-hour breakdown showing temperature, precipitation chance, wind,
+    and conditions for the next 2 days.
+
+  7-DAY OUTLOOK
+    Daily forecast with high/low temperatures, precipitation, and conditions.
+
+  WEATHER ALERTS
+    Active NWS alerts for your area (severe thunderstorm warnings, flood
+    watches, etc.). Alerts are expandable — tap to read full details.
+
+METAR MARKERS
+  Aviation weather (METAR) stations appear on the map as markers showing
+  temperature, wind, and sky conditions in a compact format. Tap a METAR
+  marker for a human-readable weather summary from that station.
+
+
+================================================================================
+9.  MBTA TRANSIT (Buses, Trains, Subway)
+================================================================================
+
+The Transit layer shows live Massachusetts Bay Transportation Authority
+(MBTA) vehicles on the map in real time.
+
+ENABLING TRANSIT
+  Open the grid menu and tap TRANSIT to access transit layer controls.
+
+LIVE VEHICLES
+  - Buses appear as directional arrow markers.
+  - Commuter rail trains show with next-stop ETA badges.
+  - Subway trains appear on their respective lines.
+  - Stale vehicles (no update for 2+ minutes) are detected and flagged.
+
+TRAIN STATIONS (~270 stations)
+  Tap any train station marker to open its Arrival Board showing:
+  - Real-time predictions for arriving trains.
+  - Auto-refreshes every 30 seconds.
+  - Tap a specific train to view its full Trip Schedule.
+
+BUS STOPS (~7,900 stops)
+  Bus stops appear at zoom level 15 and above. Tap any bus stop marker
+  to see its Arrival Board with real-time bus predictions.
+
+VEHICLE DETAIL DIALOG
+  Tap any vehicle marker (bus, train, or subway) to see:
+  - Route, headsign, speed, and current status.
+  - Three action buttons:
+      FOLLOW     — Track this vehicle on the map. The map pans to follow
+                   it as it moves. Tap the banner at the top to stop.
+      VIEW ROUTE — See the full route on the map.
+      ARRIVALS   — See arrival predictions for this vehicle's next stops.
+
+FOLLOWING A VEHICLE
+  When following a vehicle, the map automatically pans to keep it centered.
+  POIs along the route are prefetched. If the vehicle data becomes stale
+  (no update for 2+ minutes), you are notified. Tap the status banner to
+  stop following.
+
+
+================================================================================
+10. AIRCRAFT TRACKING
+================================================================================
+
+The Aircraft layer shows live aircraft positions from the OpenSky Network.
+
+ENABLING AIRCRAFT
+  Open the grid menu and tap AIRCRAFT to access aircraft controls:
+  - Toggle aircraft layer on/off (default: off).
+  - Set refresh frequency (30 seconds to 5 minutes).
+  - Enable auto-follow mode.
+
+AIRCRAFT DISPLAY
+  - Aircraft appear at zoom level 10 and above.
+  - Each aircraft shows as a rotated airplane icon pointing in its
+    direction of travel.
+  - Callsign is displayed next to the icon.
+  - Icons are color-coded by altitude (lower = warmer colors,
+    higher = cooler colors).
+  - SPI emergency status is highlighted when active.
+
+TAPPING AN AIRCRAFT
+  Tap any aircraft marker to enter Follow Mode:
+  - The map tracks the aircraft globally (even as it flies to new areas).
+  - A flight path trail draws behind the aircraft, color-coded by altitude.
+  - Flight info appears in the status banner.
+  - The map pans automatically to keep the aircraft centered.
+  - Tap the status banner to stop following.
+  - If the aircraft disappears (lands or goes out of range), the app
+    tolerates up to 3 missed updates before stopping.
+
+AUTO-FOLLOW MODE
+  When enabled in the Aircraft menu, the app automatically selects and
+  follows aircraft:
+  - Only follows aircraft above 10,000 feet.
+  - Rotates to a new aircraft every 20 minutes.
+  - Smart switching based on altitude, POI proximity, and US bounds.
+
+
+================================================================================
+11. WEBCAMS
+================================================================================
+
+The Webcam layer shows live webcam locations from the Windy network across
+18 categories.
+
+ENABLING WEBCAMS
+  Open the grid menu and tap WEBCAMS to toggle the webcam layer.
+
+USING WEBCAMS
+  Webcam markers appear on the map. Tap a webcam marker to see:
+  - A preview image from the camera.
+  - A button to open the live video player.
+
+
+================================================================================
+12. RADAR
+================================================================================
+
+The Radar overlay shows NWS NEXRAD weather radar imagery on the map.
+
+ENABLING RADAR
+  Open the grid menu and tap RADAR to toggle the radar overlay.
+
+ANIMATED RADAR
+  When enabled, the radar displays as an animated loop:
+  - 7 frames covering the last 35 minutes of radar data.
+  - The animation loops continuously so you can see precipitation movement.
+  - Useful for tracking storms, rain, and snow in real time.
+
+
+================================================================================
+13. GEOFENCE ALERTS
+================================================================================
+
+The Geofence Alert System warns you when you (or an aircraft you are
+following) approaches or enters certain zones.
+
+ACCESSING ALERTS
+  Tap the Alerts icon in the toolbar (bell icon, right side) to open the
+  Alerts menu.
+
+FIVE ZONE TYPES
+
+  TFR (Temporary Flight Restrictions)
+    Red overlay. Sourced from FAA data. Warns pilots about restricted
+    airspace. Enabled by default.
+
+  Speed Cameras
+    Orange overlay. Shows locations of speed cameras and red-light cameras.
+    200-meter alert radius. Disabled by default.
+
+  School Zones
+    Amber overlay. Shows school locations with 300-meter alert zones.
+    Time-filtered: alerts only active on weekdays 7-9 AM and 2-4 PM.
+    Disabled by default.
+
+  Flood Zones
+    Blue overlay. FEMA National Flood Hazard Layer data. Darker blue for
+    high-risk A/V flood zones. Disabled by default.
+
+  Railroad Crossings
+    Dark overlay with yellow outline. 100-meter alert radius around
+    at-grade railroad crossings. Disabled by default.
+
+ENABLING ZONE OVERLAYS
+  In the Alerts menu, toggle each zone type on or off. You can also:
+  - Toggle alert sounds on/off.
+  - Adjust the alert distance.
+
+HOW ALERTS WORK
+  - Entry alerts trigger when you enter a zone (CRITICAL for TFRs,
+    WARNING for others).
+  - Proximity alerts trigger within 5 nautical miles when heading toward
+    a zone (within 60 degrees of bearing).
+  - Exit alerts trigger when you leave a zone (informational).
+  - Cooldowns prevent repeated alerts: 5 minutes for proximity, 10 minutes
+    for entry alerts.
+  - Alerts appear in the status line with a color-coded background matching
+    the zone type.
+
+GPS AND AIRCRAFT
+  - Your GPS position is checked against all enabled geofence zones.
+  - When following an aircraft, its position (including altitude) is also
+    checked against zones.
+
+
+================================================================================
+14. ZONE DATABASES
+================================================================================
+
+In addition to live zone data, you can download pre-built geofence databases
+for offline use and expanded coverage.
+
+ACCESSING THE DATABASE MANAGER
+  Alerts menu (toolbar bell icon) -> "Zone Databases".
+
+AVAILABLE DATABASES (4 total, 220,000+ zones)
+
+  Military Bases (1,944 zones)
+    US military installation polygon boundaries.
+
+  Speed/Red-Light Cameras (109,500 zones)
+    Worldwide camera locations with 200-meter alert radius.
+
+  US K-12 Schools (101,390 zones)
+    Public school locations with 300-meter alert zones.
+
+  DJI No-Fly Zones (7,823 zones)
+    Drone no-fly zones with variable radius.
+
+DOWNLOADING
+  In the Database Manager, each database shows its name, zone count, and
+  file size. Tap "Download" to download and install. A progress indicator
+  shows download status. Once installed, zones from the database are loaded
+  into the geofence engine and checked alongside live data.
+
+DELETING
+  Tap "Delete" on any installed database to remove it and free storage.
+
+IMPORTING CUSTOM DATABASES
+  At the top of the Database Manager are two import buttons:
+
+  IMPORT .DB
+    Import a pre-built SQLite geofence database file (.db format).
+    The file must contain the correct schema (db_meta and zones tables).
+    The app validates the schema before importing.
+
+  IMPORT CSV
+    Import a CSV file of zone locations. A configuration dialog lets you:
+    - Set a name for the database.
+    - Choose the zone type.
+    - Set a default radius for point-based zones.
+    The CSV is parsed and converted to SQLite format automatically.
+
+EXPORTING
+  Tap "Export" on any installed database to share it via Android's share
+  system (email, messaging, file manager, etc.).
+
+DUPLICATE HANDLING
+  If you import a database with the same ID as an existing one, the app
+  asks whether you want to overwrite it.
+
+
+================================================================================
+15. DARK MODE
+================================================================================
+
+Tap the moon icon in the toolbar (between the weather icon and alerts icon)
+to toggle dark mode.
+
+  Light mode: Standard OpenStreetMap (MAPNIK) tiles.
+  Dark mode:  CartoDB Dark Matter tiles with a dark color scheme.
+
+Your preference is saved and persists across app restarts.
+
+
+================================================================================
+16. GO TO LOCATION
+================================================================================
+
+Open the grid menu and tap GO TO to navigate to a specific address.
+
+HOW TO USE
+  1. Type an address, place name, or landmark in the search field.
+  2. Results appear as you type (autocomplete with a 500ms debounce).
+  3. Tap a result to navigate the map to that location.
+  4. The app automatically searches for POIs at the new location.
+
+Notes:
+  - Uses the Photon geocoder (US locations only).
+  - Results include address, city, and state for disambiguation.
+
+
+================================================================================
+17. POPULATE POIs
+================================================================================
+
+The Populate feature systematically searches for POIs across a wide area,
+building up the local database. Access it from the grid menu: Utility ->
+Populate POIs.
+
+MANUAL POPULATE
+  Starts a grid scanner that spirals outward from the map center:
+  - Begins with a 10km probe to assess POI density.
+  - Calibrates the search radius based on results.
+  - Spirals outward in a grid pattern, searching each cell.
+  - Progress appears in the status line.
+  - Tap the status banner to stop at any time.
+
+10KM PROBE POPULATE
+  An expanding spiral of 10km wide probes for discovering POIs in
+  low-density areas:
+  - Crosshairs show the probe location (map pans but does not zoom).
+  - 30-second countdown between probes.
+  - Status line shows the last probe count and recommended fill radius.
+
+IDLE AUTO-POPULATE
+  When your GPS position is stationary for 10 minutes, the app automatically
+  begins populating POIs around your location:
+  - Uses longer delays (45 seconds) between searches to be gentle on APIs.
+  - Any interaction (map tap, opening a menu, tapping a button) stops the
+    auto-populate and resets the 10-minute idle timer.
+  - If stopped, it resumes from where it left off (not from scratch).
+  - State is cleared when you long-press, move more than 100 meters,
+    use Go To Location, or start a manual populate.
+
+SILENT FILL
+  On app startup, restore, or long-press, a single background POI search
+  runs automatically after a short delay to quietly fill in the immediate
+  area.
+
+
+================================================================================
+18. SOCIAL FEATURES
+================================================================================
+
+The social layer lets you register an account, comment on POIs, rate places,
+and chat with other users in real time.
+
+--------
+REGISTRATION
+--------
+  Open the grid menu and tap SOCIAL.
+  - If you have not registered, a Register dialog appears.
+  - Enter a Display Name (2-50 characters), Email, and Password.
+  - Tap Register. Your account is created and bonded to your device.
+  - You only need to register once. There is no login/logout — your
+    device stays authenticated automatically.
+
+  Your profile shows in the PROFILE button (grid menu): avatar initial,
+  display name, role, and user ID.
+
+--------
+POI COMMENTS
+--------
+  When you open a POI Detail Dialog (by tapping a marker or via Find),
+  a Comments section appears below the POI information.
+
+  VIEWING COMMENTS
+    Existing comments show the author name, relative time (e.g., "5m ago"),
+    star rating (if given), and the comment text.
+
+  ADDING A COMMENT
+    Tap "+ Add" next to the "Comments" header.
+    - Select a star rating (1-5, optional).
+    - Write your comment (up to 1,000 characters).
+    - A character counter ("0 / 1000") shows how many characters you
+      have used.
+    - Tap "Post" to submit.
+
+  VOTING
+    Each comment has upvote and downvote arrows.
+    - Tap the up arrow to upvote (turns green with count).
+    - Tap the down arrow to downvote.
+
+  DELETING
+    You can delete your own comments. Deleted comments show as "[deleted]"
+    but preserve the author name and rating.
+
+--------
+CHAT
+--------
+  Open the grid menu and tap CHAT to open the Room List.
+
+  ROOM LIST
+    Shows all available chat rooms with name, member count, and description.
+    A "Global" room is always available for all users.
+
+  JOINING A ROOM
+    Tap any room to enter it. Messages load from history and new messages
+    appear in real time.
+
+  SENDING MESSAGES
+    Type in the message bar at the bottom and tap send. Your messages
+    appear as blue bubbles on the right. Other users' messages appear as
+    gray bubbles on the left with their name above.
+
+  CREATING A ROOM
+    Tap the "+ New" button in the Room List.
+    - Enter a room name (required, up to 100 characters).
+    - Enter an optional description (up to 255 characters).
+    - Tap Create.
+
+  NAVIGATING ROOMS
+    Use the back arrow at the top of a chat room to return to the Room List.
+    Each room preserves its message history.
+
+
+================================================================================
+19. LEGEND
+================================================================================
+
+Open the grid menu and tap LEGEND (or Utility -> Legend) to see a visual
+guide to all map markers:
+  - All 17 POI categories with their colors.
+  - Transit marker types.
+  - Aircraft marker explanation.
+  - Geofence zone type colors.
+  - Weather and METAR marker formats.
+
+
+================================================================================
+20. TIPS & TRICKS
+================================================================================
+
+  - Long-press anywhere on the map to quickly explore that area. The app
+    will search for POIs and fetch weather for the pressed location.
+
+  - Use Find + text search to quickly locate a specific place by name
+    instead of scrolling through categories.
+
+  - Add frequently visited places to Favorites for one-tap access later.
+
+  - Enable aircraft tracking and tap an airplane to watch its flight path
+    draw in real time. The trail is color-coded by altitude.
+
+  - Turn on Radar before a storm to watch precipitation movement with the
+    animated 35-minute radar loop.
+
+  - Download the Zone Databases (Military Bases, Speed Cameras, Schools,
+    No-Fly Zones) for comprehensive offline geofence coverage with over
+    220,000 zones.
+
+  - In dark mode, the map uses CartoDB Dark Matter tiles which are easier
+    on the eyes at night and make colored markers stand out more.
+
+  - The idle auto-populate feature is great for building up POI coverage
+    while you are stationary. Just leave the app open and it will
+    automatically search your surroundings after 10 minutes of inactivity.
+
+  - Share a POI with friends using the Share button in the detail dialog.
+    It sends the name, address, phone, hours, and a Google Maps link.
+
+  - Use Go To Location to jump directly to an address without scrolling.
+    POIs at the destination load automatically.
+
+  - Filter mode (long-press a category in Find) is useful when you only
+    want to see one type of POI on the map, such as just restaurants or
+    just gas stations.
+
+
+================================================================================
+                           END OF USER GUIDE
+================================================================================
