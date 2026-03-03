@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
     private val busMarkers        = mutableListOf<Marker>()
     private var gpsMarker: Marker? = null
     private var radarTileOverlay: TilesOverlay? = null
-    private var radarAlphaPercent: Int = 70  // 0–100, default 70%
+    private var radarAlphaPercent: Int = 35  // 0–100, default 35%
     private var fabMenuOpen = false
 
     // Radar animation
@@ -574,7 +574,7 @@ class MainActivity : AppCompatActivity() {
                 stopSilentFill()
                 viewModel.setManualLocation(p)
                 // Zoom to 14 if currently zoomed out; leave alone if already 14+
-                val targetZoom = if (binding.mapView.zoomLevelDouble < 14.0) 14.0 else binding.mapView.zoomLevelDouble
+                val targetZoom = if (binding.mapView.zoomLevelDouble < 18.0) 18.0 else binding.mapView.zoomLevelDouble
                 binding.mapView.controller.animateTo(p, targetZoom, null)
                 triggerFullSearch(p)
                 // Programmatic animateTo doesn't fire onScroll — schedule bbox POI refresh
@@ -897,8 +897,15 @@ class MainActivity : AppCompatActivity() {
                     && followedVehicleId == null && followedAircraftIcao == null
                     && (speedMph ?: 0.0) <= 20.0
                 ) {
-                    DebugLogger.i("MainActivity", "Idle ${idleMs / 1000}s — starting idle auto-populate at GPS ${point.latitude},${point.longitude}")
-                    startIdlePopulate(point)
+                    lifecycleScope.launch {
+                        val nearbyCount = viewModel.fetchNearbyPoiCount(point.latitude, point.longitude)
+                        if (nearbyCount >= 100) {
+                            DebugLogger.i("MainActivity", "Idle ${idleMs / 1000}s — skipping idle auto-populate: $nearbyCount POIs within 10km (≥100)")
+                        } else {
+                            DebugLogger.i("MainActivity", "Idle ${idleMs / 1000}s — starting idle auto-populate at GPS ${point.latitude},${point.longitude} ($nearbyCount POIs within 10km)")
+                            startIdlePopulate(point)
+                        }
+                    }
                 }
 
                 return@observe
@@ -921,9 +928,9 @@ class MainActivity : AppCompatActivity() {
                 initialCenterDone = true
                 lastPoiFetchPoint = point
                 lastApiCallTime = System.currentTimeMillis()
-                DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=14")
+                DebugLogger.i("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=18")
                 binding.mapView.controller.animateTo(point)
-                binding.mapView.controller.setZoom(14.0)
+                binding.mapView.controller.setZoom(18.0)
             } else {
                 DebugLogger.d("MainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
             }
@@ -5830,7 +5837,7 @@ class MainActivity : AppCompatActivity() {
         stopSilentFill()
         // Switch to manual mode at new location
         viewModel.setManualLocation(point)
-        val targetZoom = if (binding.mapView.zoomLevelDouble < 14.0) 14.0 else binding.mapView.zoomLevelDouble
+        val targetZoom = if (binding.mapView.zoomLevelDouble < 18.0) 18.0 else binding.mapView.zoomLevelDouble
         binding.mapView.controller.animateTo(point, targetZoom, null)
         triggerFullSearch(point)
         // Programmatic animateTo doesn't fire onScroll — schedule bbox POI refresh
@@ -7604,8 +7611,8 @@ class MainActivity : AppCompatActivity() {
             }
             scanningMarker?.position = point
             if (panMap) {
-                if (binding.mapView.zoomLevelDouble < 14.0) {
-                    binding.mapView.controller.setZoom(14.0)
+                if (binding.mapView.zoomLevelDouble < 18.0) {
+                    binding.mapView.controller.setZoom(18.0)
                 }
                 binding.mapView.controller.animateTo(point)
             } else if (panOnly) {

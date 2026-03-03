@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 49 (Security Verification + User Guide + BlueStacks Cross-Platform)
+## Last Updated: 2026-03-03 Session 50 (Startup/Behavior Tuning — Zoom 18, Radar 35%, Idle Populate Guard)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -18,7 +18,7 @@
   - Proxy `/weather?lat=&lon=` (5 NWS calls), 22 vector icons, auto-fetch every 30min
   - Toolbar icon shows current conditions; red border when alerts active
 - **METAR** — rich text markers (temp, wind, sky), bbox passthrough, deferred load, human-readable tap info
-- **NWS NEXRAD radar** tiles (Iowa State Mesonet) + animated radar (7-frame 35-min loop)
+- **NWS NEXRAD radar** tiles (Iowa State Mesonet) + animated radar (7-frame 35-min loop), default 35% opacity
 - **Dark mode** (v1.5.44): toolbar moon icon toggles between MAPNIK and CartoDB Dark Matter tiles, persisted
 - **Share POI** (v1.5.44): 5th action button in POI detail dialog, shares name/address/phone/hours + Google Maps link
 - **Favorites** (v1.5.44): star icon in POI detail dialog, SharedPreferences+JSON storage, dedicated Favorites cell in Find dialog
@@ -94,6 +94,7 @@
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
 - Transit zoom guard (zoom ≤ 10 hides markers), POI display (zoom ≥ 10 + max 5000 markers), adaptive radius hints
 - **Idle auto-populate** (v1.5.33): 10-min GPS stationarity → full scanner, 45s delays, GPS-centered
+  - **POI density guard** (v1.5.48): checks `/db/pois/counts` 10km radius before starting; skips if ≥100 POIs nearby
   - Touch-to-stop: any map tap cancels idle populate, resets 10-min idle timer
   - Any UI activity (grid dropdown, dialogs, toolbar buttons) also resets idle timer
   - State preservation: stopped idle scanner resumes from last ring/point (not from scratch)
@@ -186,7 +187,7 @@
 
 ## Map Interaction Model
 - **Tap POI marker**: opens POI detail dialog directly (info, comments, actions)
-- **Long press (~2s)**: enter manual mode, center map (auto-zoom to 14 if <14), search POIs at location, fetch weather + alerts
+- **Long press (~2s)**: enter manual mode, center map (auto-zoom to 18 if <18), search POIs at location, fetch weather + alerts
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: vehicle detail dialog (route, status, speed) with Follow / View Route / Arrivals buttons
 - **Tap station marker**: arrival board dialog (real-time predictions), tap train → trip schedule dialog
@@ -268,7 +269,7 @@
   - Without OPENSKY_*: aircraft requests use anonymous access (100 req/day)
 
 ## GPS Centering
-- Auto-centers on **first** GPS fix only (`initialCenterDone` flag); follow mode still pans
+- Auto-centers on **first** GPS fix only (`initialCenterDone` flag) at **zoom 18**; follow mode still pans
 
 ## OpenSky OAuth2
 - Registered account: `DeanMauriceEllis`

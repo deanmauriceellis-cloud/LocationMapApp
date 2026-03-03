@@ -91,7 +91,19 @@
   - "Mr. Nobody" comment posted from BlueStacks confirmed in proxy logs
 - [x] **Multi-user confirmed** — two separate device registrations hitting proxy simultaneously
 
+### Completed — Startup/Behavior Tuning (Session 50)
+- [x] **Default zoom 14 → 18** — first GPS fix, goToLocation, long-press all zoom to 18
+- [x] **Radar alpha 70% → 35%** — default radar overlay now 50% more translucent
+- [x] **Idle auto-populate POI density guard** — queries `/db/pois/counts` 10km radius; skips if ≥100 POIs nearby
+- [x] **Build passes** — assembleDebug succeeds
+
 ### NOT YET TESTED — Resume Here
+
+#### v1.5.48 Tunings
+- [ ] **Zoom 18 on first GPS fix** — verify street-level view on fresh app start
+- [ ] **Zoom 18 on Go To** — navigate to a city, verify zooms to 18
+- [ ] **Radar transparency** — toggle radar on, verify noticeably more transparent
+- [ ] **Idle populate skip** — in a dense area (DC), verify idle populate does NOT trigger after 10 min
 
 #### Social Layer (from Session 47)
 - [x] **Multi-user chat** — BlueStacks as 2nd device confirmed traffic; verify gray bubbles visually

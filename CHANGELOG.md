@@ -2,6 +2,13 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.48] — 2026-03-03
+
+### Changed
+- **Default zoom level 14 → 18** — first GPS fix, Go To location, and long-press all zoom to 18 for a street-level default view
+- **Radar transparency 70% → 35%** — NEXRAD radar overlay is now 50% more translucent by default; user can still adjust via menu
+- **Idle auto-populate POI density guard** — before starting the idle scanner, queries `/db/pois/counts` for a 10km radius; skips if ≥100 POIs already exist nearby (prevents redundant scanning in dense areas)
+
 ## [1.5.47] — 2026-03-03
 
 ### Added

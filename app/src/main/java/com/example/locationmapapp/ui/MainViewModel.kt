@@ -521,6 +521,17 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /** Returns total POI count within [radiusM] of (lat, lon), or -1 on error. */
+    suspend fun fetchNearbyPoiCount(lat: Double, lon: Double, radiusM: Int = 10000): Int {
+        return try {
+            val counts = findRepository.fetchCounts(lat, lon, radiusM)
+            counts?.total ?: -1
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "fetchNearbyPoiCount FAILED: ${e.message}", e)
+            -1
+        }
+    }
+
     // ── TFR / Geofences ───────────────────────────────────────────────────────
 
     private val _tfrZones = MutableLiveData<List<TfrZone>>()

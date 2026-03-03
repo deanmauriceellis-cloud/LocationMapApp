@@ -2,6 +2,36 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03 (v1.5.48 — Startup/Behavior Tuning)
+
+### Context
+Running on BlueStacks (Washington DC) and physical Android device. Three quality-of-life tunings for a better default experience: zoomed-in startup, less opaque radar, and smarter idle populate.
+
+### Changes Made
+
+#### 1. Default Zoom 14 → 18
+- **First GPS fix** (`MainActivity.kt` ~line 926): `setZoom(18.0)`
+- **Long-press** (~line 577): threshold `< 18.0`, zoom to 18
+- **goToLocation** (~line 5833): threshold `< 18.0`, zoom to 18
+- **Populate scanning marker** (~line 7607): threshold `< 18.0`, zoom to 18
+
+#### 2. Radar Transparency 70% → 35%
+- `radarAlphaPercent` default changed from 70 to 35 (`MainActivity.kt` line 71)
+- Applies to both static and animated radar (shared variable)
+- User can still adjust via menu slider
+
+#### 3. Idle Auto-Populate POI Density Guard
+- **`MainViewModel.fetchNearbyPoiCount()`**: new suspend function, delegates to `FindRepository.fetchCounts()`, returns total POI count or -1 on error
+- **`MainActivity.kt` idle trigger** (~line 892): wraps `startIdlePopulate()` in a `lifecycleScope.launch` coroutine that first queries `/db/pois/counts?lat=&lon=&radius=10000`
+  - If total ≥ 100: logs skip reason, does not start scanner
+  - If total < 100 or query fails (-1): proceeds as normal
+
+### Files Modified
+- `app/src/main/java/com/example/locationmapapp/ui/MainActivity.kt` — zoom, radar alpha, idle guard
+- `app/src/main/java/com/example/locationmapapp/ui/MainViewModel.kt` — `fetchNearbyPoiCount()`
+
+---
+
 ## Session: 2026-03-02 (v1.5.40 — Slim Toolbar + Status Line + Grid Dropdown)
 
 ### Context
