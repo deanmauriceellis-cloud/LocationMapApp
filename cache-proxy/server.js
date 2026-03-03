@@ -10,6 +10,7 @@ const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const http = require('http');
 const { Server: SocketServer } = require('socket.io');
+const rateLimit = require('express-rate-limit');
 const app = express();
 const server = http.createServer(app);
 const io = new SocketServer(server, { cors: { origin: '*' } });
@@ -147,7 +148,36 @@ function openskyRecordSuccess() {
 
 // Parse URL-encoded bodies (Overpass POST sends form data)
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-app.use(express.json());
+app.use(express.json({ limit: '16kb' }));
+
+// ── Rate limiters (social endpoints) ────────────────────────────────────────
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 10,
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many auth requests — try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const commentLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: 10,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many comments — slow down' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const roomCreateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,  // 1 hour
+  max: 5,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many rooms created — try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── In-memory cache with disk persistence ───────────────────────────────────
 
@@ -2733,6 +2763,39 @@ function sha256(str) {
   return crypto.createHash('sha256').update(str).digest('hex');
 }
 
+/**
+ * Sanitize single-line text: strip HTML tags, control chars, collapse whitespace, trim, enforce max length.
+ * Returns null if empty after sanitization.
+ */
+function sanitizeText(str, maxLen) {
+  if (typeof str !== 'string') return null;
+  let s = str
+    .replace(/<[^>]*>/g, '')                       // strip HTML tags
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')  // strip control chars (keep \t \n \r)
+    .replace(/[\t\n\r]/g, ' ')                     // convert remaining whitespace to spaces
+    .replace(/ {2,}/g, ' ')                        // collapse multiple spaces
+    .trim();
+  if (s.length === 0) return null;
+  return s.slice(0, maxLen);
+}
+
+/**
+ * Sanitize multiline text: strip HTML tags, control chars, normalize line endings, cap consecutive newlines, enforce max length.
+ * Returns null if empty after sanitization.
+ */
+function sanitizeMultiline(str, maxLen) {
+  if (typeof str !== 'string') return null;
+  let s = str
+    .replace(/<[^>]*>/g, '')                       // strip HTML tags
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')  // strip control chars (keep \n via exclusion — \n is \x0A, kept)
+    .replace(/\r\n/g, '\n').replace(/\r/g, '\n')   // normalize line endings
+    .replace(/\n{3,}/g, '\n\n')                    // max 2 consecutive newlines
+    .replace(/[ \t]{2,}/g, ' ')                    // collapse horizontal whitespace
+    .trim();
+  if (s.length === 0) return null;
+  return s.slice(0, maxLen);
+}
+
 async function generateTokens(user) {
   const accessToken = jwt.sign(
     { sub: user.id, name: user.display_name, role: user.platform_role },
@@ -2751,6 +2814,45 @@ async function generateTokens(user) {
   return { accessToken, refreshToken, expiresAt: expiresAt.toISOString() };
 }
 
+// ── Failed login tracking (IP-based lockout) ────────────────────────────────
+
+const loginAttempts = new Map();  // IP → { count, lockedUntil }
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;  // 15 minutes
+
+function checkLoginLockout(ip) {
+  const entry = loginAttempts.get(ip);
+  if (!entry) return false;
+  if (entry.lockedUntil && Date.now() < entry.lockedUntil) return true;
+  if (entry.lockedUntil && Date.now() >= entry.lockedUntil) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+  return false;
+}
+
+function recordLoginFailure(ip) {
+  const entry = loginAttempts.get(ip) || { count: 0, lockedUntil: null };
+  entry.count++;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
+    console.warn(`[Auth] IP ${ip} locked out after ${entry.count} failed login attempts`);
+  }
+  loginAttempts.set(ip, entry);
+}
+
+function clearLoginFailures(ip) {
+  loginAttempts.delete(ip);
+}
+
+// Cleanup stale lockout entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (entry.lockedUntil && now >= entry.lockedUntil) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000);
+
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -2767,17 +2869,27 @@ function requireAuth(req, res, next) {
 
 // ── Auth Endpoints ───────────────────────────────────────────────────────────
 
-app.post('/auth/register', requirePg, async (req, res) => {
+app.post('/auth/register', requirePg, authLimiter, async (req, res) => {
   try {
-    const { displayName, email, password } = req.body;
-    if (!displayName || !password) {
+    const { displayName: rawName, email, password } = req.body;
+    if (!rawName || !password) {
       return res.status(400).json({ error: 'displayName and password are required' });
     }
-    if (displayName.length > 50) {
-      return res.status(400).json({ error: 'displayName must be 50 characters or less' });
+    const displayName = sanitizeText(rawName, 50);
+    if (!displayName || displayName.length < 2) {
+      return res.status(400).json({ error: 'displayName must be 2-50 characters' });
+    }
+    if (!/^[\p{L}\p{N} '\-\.]+$/u.test(displayName)) {
+      return res.status(400).json({ error: 'displayName contains invalid characters' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (password.length > 128) {
+      return res.status(400).json({ error: 'Password must be 128 characters or less' });
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Check email uniqueness via auth_lookup
@@ -2792,7 +2904,7 @@ app.post('/auth/register', requirePg, async (req, res) => {
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
     const result = await pgPool.query(
       `INSERT INTO users (display_name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, display_name, platform_role, created_at`,
-      [displayName.trim(), email ? email.toLowerCase().trim() : null, passwordHash]
+      [displayName, email ? email.toLowerCase().trim() : null, passwordHash]
     );
     const user = result.rows[0];
 
@@ -2816,16 +2928,25 @@ app.post('/auth/register', requirePg, async (req, res) => {
   }
 });
 
-app.post('/auth/login', requirePg, async (req, res) => {
+app.post('/auth/login', requirePg, authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'email and password are required' });
     }
+    if (password.length > 128) {
+      return res.status(400).json({ error: 'Password must be 128 characters or less' });
+    }
+
+    // Check IP lockout
+    if (checkLoginLockout(req.ip)) {
+      return res.status(429).json({ error: 'Too many failed login attempts — try again later' });
+    }
 
     const emailHash = sha256(email.toLowerCase().trim());
     const lookup = await pgPool.query('SELECT user_id FROM auth_lookup WHERE email_hash = $1', [emailHash]);
     if (lookup.rows.length === 0) {
+      recordLoginFailure(req.ip);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -2834,6 +2955,7 @@ app.post('/auth/login', requirePg, async (req, res) => {
       [lookup.rows[0].user_id]
     );
     if (result.rows.length === 0) {
+      recordLoginFailure(req.ip);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     const user = result.rows[0];
@@ -2844,9 +2966,11 @@ app.post('/auth/login', requirePg, async (req, res) => {
 
     const valid = await argon2.verify(user.password_hash, password);
     if (!valid) {
+      recordLoginFailure(req.ip);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    clearLoginFailures(req.ip);
     const tokens = await generateTokens(user);
     console.log(`[Auth] Login: ${user.display_name} (${user.id})`);
     res.json({
@@ -2859,7 +2983,7 @@ app.post('/auth/login', requirePg, async (req, res) => {
   }
 });
 
-app.post('/auth/refresh', requirePg, async (req, res) => {
+app.post('/auth/refresh', requirePg, authLimiter, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -3033,17 +3157,21 @@ app.get('/comments/:osm_type/:osm_id', requirePg, async (req, res) => {
   }
 });
 
-app.post('/comments', requirePg, requireAuth, async (req, res) => {
+app.post('/comments', requirePg, requireAuth, commentLimiter, async (req, res) => {
   try {
-    const { osmType, osmId, content, rating, parentId } = req.body;
-    if (!osmType || !osmId || !content) {
+    const { osmType, osmId, content: rawContent, rating, parentId } = req.body;
+    if (!osmType || !osmId || !rawContent) {
       return res.status(400).json({ error: 'osmType, osmId, and content are required' });
     }
-    if (content.length > 2000) {
-      return res.status(400).json({ error: 'Content must be 2000 characters or less' });
+    if (!['node', 'way', 'relation'].includes(osmType)) {
+      return res.status(400).json({ error: 'osmType must be node, way, or relation' });
     }
-    if (rating !== undefined && rating !== null && (rating < 1 || rating > 5)) {
-      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    const content = sanitizeMultiline(rawContent, 1000);
+    if (!content) {
+      return res.status(400).json({ error: 'Content cannot be empty' });
+    }
+    if (rating !== undefined && rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+      return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
     }
 
     const result = await pgPool.query(
@@ -3064,7 +3192,7 @@ app.post('/comments', requirePg, requireAuth, async (req, res) => {
   }
 });
 
-app.post('/comments/:id/vote', requirePg, requireAuth, async (req, res) => {
+app.post('/comments/:id/vote', requirePg, requireAuth, commentLimiter, async (req, res) => {
   try {
     const commentId = parseInt(req.params.id);
     const { vote } = req.body;
@@ -3122,7 +3250,10 @@ app.delete('/comments/:id', requirePg, requireAuth, async (req, res) => {
 });
 
 // Debug-only: list registered users (remove in production)
-app.get('/auth/debug/users', requirePg, async (req, res) => {
+app.get('/auth/debug/users', requirePg, requireAuth, async (req, res) => {
+  if (!['owner', 'support'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Insufficient privileges' });
+  }
   try {
     const result = await pgPool.query(
       'SELECT id, display_name, platform_role, is_banned, created_at FROM users ORDER BY created_at DESC LIMIT 50'
@@ -3194,17 +3325,23 @@ app.get('/chat/rooms', requirePg, async (req, res) => {
   }
 });
 
-app.post('/chat/rooms', requirePg, requireAuth, async (req, res) => {
+app.post('/chat/rooms', requirePg, requireAuth, roomCreateLimiter, async (req, res) => {
   try {
-    const { name, description, roomType } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required' });
-    if (name.length > 100) return res.status(400).json({ error: 'name must be 100 chars or less' });
+    const { name: rawName, description: rawDesc, roomType } = req.body;
+    const name = sanitizeText(rawName, 100);
+    if (!name || name.length < 2) {
+      return res.status(400).json({ error: 'name must be 2-100 characters' });
+    }
+    const description = rawDesc ? sanitizeText(rawDesc, 255) : null;
     const type = roomType || 'public';
+    if (!['public', 'private'].includes(type)) {
+      return res.status(400).json({ error: 'roomType must be public or private' });
+    }
 
     const result = await pgPool.query(
       `INSERT INTO chat_rooms (room_type, name, description, created_by, member_count)
        VALUES ($1, $2, $3, $4, 1) RETURNING id, created_at`,
-      [type, name, description || null, req.user.id]
+      [type, name, description, req.user.id]
     );
     const room = result.rows[0];
 
@@ -3277,6 +3414,11 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   console.log(`[Socket.IO] Connected: ${socket.user.displayName} (${socket.id})`);
 
+  // Per-socket message rate limiting: 30 messages per 60 seconds
+  const msgTimestamps = [];
+  const SOCKET_MSG_WINDOW = 60 * 1000;
+  const SOCKET_MSG_MAX = 30;
+
   socket.on('join_room', async (roomId) => {
     if (!pgPool) return;
     socket.join(roomId);
@@ -3309,8 +3451,19 @@ io.on('connection', (socket) => {
 
   socket.on('send_message', async (data) => {
     if (!pgPool) return;
-    const { roomId, content, replyToId } = data;
-    if (!roomId || !content || content.length > 2000) return;
+    const { roomId, content: rawContent, replyToId } = data;
+
+    // Rate limit check
+    const now = Date.now();
+    while (msgTimestamps.length > 0 && now - msgTimestamps[0] > SOCKET_MSG_WINDOW) msgTimestamps.shift();
+    if (msgTimestamps.length >= SOCKET_MSG_MAX) {
+      socket.emit('error_message', { error: 'Rate limit exceeded — slow down' });
+      return;
+    }
+    msgTimestamps.push(now);
+
+    const content = sanitizeMultiline(rawContent, 1000);
+    if (!roomId || !content) return;
 
     try {
       const result = await pgPool.query(

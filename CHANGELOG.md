@@ -2,6 +2,24 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.47] — 2026-03-03
+
+### Added
+- **Security hardening — social layer input protection**
+  - **Server-side sanitization**: `sanitizeText()` and `sanitizeMultiline()` strip HTML tags, control chars, collapse whitespace, enforce length caps
+  - **Rate limiting** (express-rate-limit): auth 10/15min per IP, comments 10/1min per user, room create 5/1hr per user
+  - **Socket.IO rate limiting**: 30 messages/60s sliding window per connection, emits `error_message` on exceed
+  - **Failed login lockout**: 5 attempts → 15min IP lockout, auto-cleanup every 30min
+  - **Endpoint validation**: displayName 2-50 chars unicode whitelist, password max 128 chars, email format check, osmType enum validation, rating integer check, roomType enum validation, comment content reduced from 2000→1000 chars
+  - **JSON body limit**: 16kb (was unlimited)
+  - **Debug endpoint protected**: `/auth/debug/users` now requires auth + owner/support role
+  - **Client-side input limits**: `InputFilter.LengthFilter` on all social EditTexts (displayName 50, email 255, password 128, room name 100, room desc 255, message 1000, comment 1000)
+  - **Client-side validation**: displayName min 2 chars, email format check, room name min 2 chars
+  - **Comment character counter**: "0 / 1000" live counter in add-comment dialog
+
+### Dependencies
+- Proxy: express-rate-limit ^7.5.1
+
 ## [1.5.46] — 2026-03-03
 
 ### Added

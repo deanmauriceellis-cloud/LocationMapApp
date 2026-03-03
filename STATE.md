@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 47 (POI Marker Click-Through, Device-Bonded Auth, Chat Testing)
+## Last Updated: 2026-03-03 Session 48 (Security Hardening — Input Sanitization, Rate Limiting, Login Lockout)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -68,6 +68,14 @@
   - **Proxy deps**: argon2, jsonwebtoken, socket.io; `http.createServer` + Socket.IO attach
   - **Android dep**: `io.socket:socket.io-client:2.1.0`
   - **8 DB tables**: users, auth_lookup, refresh_tokens, poi_comments, comment_votes, chat_rooms, room_memberships, messages
+  - **Security hardening** (v1.5.47): server-side sanitization + validation + rate limiting + login lockout
+    - `sanitizeText(str, maxLen)` / `sanitizeMultiline(str, maxLen)`: strip HTML, control chars, enforce caps
+    - Rate limiting: auth 10/15min (IP), comments 10/1min (user), rooms 5/1hr (user), Socket.IO 30/60s (socket)
+    - Login lockout: 5 fails → 15min IP lock, auto-cleanup 30min interval
+    - Validation: displayName 2-50 chars unicode whitelist, password max 128, email format, osmType/roomType enums, rating integer
+    - JSON body limit 16kb; `/auth/debug/users` requires auth + owner/support role
+    - Client-side: `InputFilter.LengthFilter` on all social EditTexts, min-length checks, email format, comment char counter
+    - Proxy dep: express-rate-limit ^7.5.1
   - **Skipped for now**: COPPA age gate, email encryption, content moderation, OAuth, monthly partitioning
 - **Cap detection & retry-to-fit**: halves radius on 500-element cap, 20km fuzzy hints, MIN_RADIUS 100m
 - **Populate POIs v2** (grid scanner): probe-calibrate-spiral with recursive 3×3 subdivision, 10km initial probe, narrative banner

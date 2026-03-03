@@ -8148,6 +8148,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#80FFFFFF"))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            filters = arrayOf(android.text.InputFilter.LengthFilter(50))
             setBackgroundColor(Color.parseColor("#33FFFFFF"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -8160,6 +8161,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#80FFFFFF"))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            filters = arrayOf(android.text.InputFilter.LengthFilter(255))
             setBackgroundColor(Color.parseColor("#33FFFFFF"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -8172,6 +8174,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#80FFFFFF"))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            filters = arrayOf(android.text.InputFilter.LengthFilter(128))
             setBackgroundColor(Color.parseColor("#33FFFFFF"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -8211,13 +8214,18 @@ class MainActivity : AppCompatActivity() {
             val email = emailField.text.toString().trim()
             val password = passwordField.text.toString()
 
-            if (displayName.isEmpty()) {
-                errorText.text = "Display name is required"
+            if (displayName.length < 2) {
+                errorText.text = "Display name must be at least 2 characters"
                 errorText.visibility = View.VISIBLE
                 return@setOnClickListener
             }
             if (email.isEmpty() || password.isEmpty()) {
                 errorText.text = "Email and password are required"
+                errorText.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
+            if (!email.contains("@") || !email.contains(".")) {
+                errorText.text = "Invalid email format"
                 errorText.visibility = View.VISIBLE
                 return@setOnClickListener
             }
@@ -8404,6 +8412,7 @@ class MainActivity : AppCompatActivity() {
                 setHintTextColor(Color.parseColor("#80FFFFFF"))
                 setBackgroundColor(Color.parseColor("#33FFFFFF"))
                 setPadding(dp(12), dp(10), dp(12), dp(10))
+                filters = arrayOf(android.text.InputFilter.LengthFilter(100))
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     bottomMargin = dp(8)
                 }
@@ -8414,6 +8423,7 @@ class MainActivity : AppCompatActivity() {
                 setHintTextColor(Color.parseColor("#80FFFFFF"))
                 setBackgroundColor(Color.parseColor("#33FFFFFF"))
                 setPadding(dp(12), dp(10), dp(12), dp(10))
+                filters = arrayOf(android.text.InputFilter.LengthFilter(255))
             }
             content.addView(nameInput)
             content.addView(descInput)
@@ -8437,7 +8447,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(dp(16), dp(8), dp(16), dp(8))
                 setOnClickListener {
                     val name = nameInput.text.toString().trim()
-                    if (name.isEmpty()) return@setOnClickListener
+                    if (name.length < 2) return@setOnClickListener
                     viewModel.createRoom(name, descInput.text.toString().trim().ifEmpty { null }) { id ->
                         runOnUiThread {
                             dlg.dismiss()
@@ -8602,6 +8612,7 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#33FFFFFF"))
             setPadding(dp(12), dp(8), dp(12), dp(8))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1000))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             maxLines = 3
         }
@@ -8712,6 +8723,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
             minLines = 3
             maxLines = 6
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1000))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                     android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
                     android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
@@ -8721,6 +8733,22 @@ class MainActivity : AppCompatActivity() {
             )
         }
         content.addView(commentInput)
+
+        val charCounter = TextView(this).apply {
+            text = "0 / 1000"
+            textSize = 11f
+            setTextColor(Color.parseColor("#80FFFFFF"))
+            gravity = android.view.Gravity.END
+            setPadding(0, dp(2), 0, 0)
+        }
+        commentInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                charCounter.text = "${s?.length ?: 0} / 1000"
+            }
+        })
+        content.addView(charCounter)
 
         val errorText = TextView(this).apply {
             setTextColor(Color.parseColor("#FF6B6B"))

@@ -66,7 +66,23 @@
 5. **Refresh token lifetime** — 30 days → 365 days (device-bonded accounts)
 6. **Chat toast** — "Log in first" → "Register first"
 
+### Security Hardening (Session 48 — v1.5.47)
+- Server-side: sanitizeText/sanitizeMultiline, rate limiting (express-rate-limit), login lockout, tightened validation
+- Client-side: InputFilter.LengthFilter on all social EditTexts, min-length/email validation, comment char counter
+- `/auth/debug/users` now requires auth + owner/support role
+
 ### NOT YET TESTED — Resume Here
+
+#### Security Hardening Verification
+- [ ] **Sanitization**: `curl` POST comment with `<script>alert(1)</script>` — verify tags stripped
+- [ ] **Rate limiting**: loop 15 register attempts — verify 429 after 10th
+- [ ] **Login lockout**: 5 wrong passwords → verify 429, restart proxy → verify unlocked
+- [ ] **Validation**: test empty names, 1-char names, HTML in names, 2000+ char messages — all rejected
+- [ ] **Debug endpoint**: `curl /auth/debug/users` without auth → 401
+- [ ] **Android input limits**: open each dialog, verify can't type beyond character limit
+- [ ] **Comment char counter**: verify "0 / 1000" updates as you type
+
+#### Social Layer (from Session 47)
 - [ ] **Multi-user chat** — register 2nd user (via curl or 2nd device), verify gray bubbles for other users
 - [ ] **Token refresh** — wait 15min or simulate expiry, verify auto-refresh works
 - [ ] **Error states** — duplicate registration, short password, empty fields, network down
