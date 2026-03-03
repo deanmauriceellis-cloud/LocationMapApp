@@ -478,10 +478,10 @@ class MainViewModel @Inject constructor(
     private val _findCounts = MutableLiveData<FindCounts?>()
     val findCounts: LiveData<FindCounts?> = _findCounts
 
-    fun loadFindCounts() {
-        DebugLogger.i(TAG, "loadFindCounts()")
+    fun loadFindCounts(lat: Double, lon: Double) {
+        DebugLogger.i(TAG, "loadFindCounts() at $lat,$lon")
         viewModelScope.launch {
-            runCatching { findRepository.fetchCounts() }
+            runCatching { findRepository.fetchCounts(lat, lon) }
                 .onSuccess { _findCounts.value = it }
                 .onFailure { e -> DebugLogger.e(TAG, "FindCounts FAILED: ${e.message}", e as? Exception) }
         }

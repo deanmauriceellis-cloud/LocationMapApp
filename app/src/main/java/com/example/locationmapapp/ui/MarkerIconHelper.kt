@@ -361,7 +361,8 @@ object MarkerIconHelper {
         stopName: String?,
         statusDisplay: String,
         speedDisplay: String,
-        isStale: Boolean
+        isStale: Boolean,
+        nextStopMinutes: Int? = null
     ): Pair<BitmapDrawable, Float> {
         val density = context.resources.displayMetrics.density
 
@@ -379,8 +380,9 @@ object MarkerIconHelper {
         val topText = trunc(if (stopName != null) "$statusPrefix $stopName" else statusDisplay)
         val bottomText = trunc(if (headsign != null) "$routeName · To $headsign" else routeName)
         val speedText = if (speedDisplay != "—") speedDisplay else ""
+        val etaText = nextStopMinutes?.let { "${it}m" } ?: ""
 
-        val key = "lv|$resId|$sizeDp|$tintColor|$bearingDeg|$topText|$bottomText|$speedText|$isStale"
+        val key = "lv|$resId|$sizeDp|$tintColor|$bearingDeg|$topText|$bottomText|$speedText|$isStale|$etaText"
         cache[key]?.let {
             // Recompute anchorY from cached bitmap dimensions
             val iconPx = (sizeDp * density).toInt()
@@ -434,12 +436,25 @@ object MarkerIconHelper {
         val speedPillW = if (speedText.isNotEmpty()) speedW + 2 * pillPadH else 0f
         val speedGap = if (speedText.isNotEmpty()) 2 * density else 0f
 
+        // ── ETA pill measurement ────────────────────────────────────────────
+        val etaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 10 * density
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        val etaW = if (etaText.isNotEmpty()) etaPaint.measureText(etaText) else 0f
+        val etaPillW = if (etaText.isNotEmpty()) etaW + 2 * pillPadH else 0f
+        val etaPillH = if (etaText.isNotEmpty()) (etaPaint.textSize + 2 * pillPadV).toInt() else 0
+        val etaGap = if (etaText.isNotEmpty()) 3 * density else 0f  // gap between icon and eta
+
         // ── Total dimensions ──────────────────────────────────────────────────
         val gap = (2 * density).toInt()
         val arrowArea = iconPx + arrowSz * 2  // width for rotated arrow
+        val arrowAreaWithEta = arrowArea + etaGap + etaPillW  // icon area + eta badge
         val bottomRowW = speedPillW + speedGap + bottomPillW
 
-        val totalW = maxOf(topPillW, arrowArea.toFloat(), bottomRowW).toInt() + (4 * density).toInt()
+        val totalW = maxOf(topPillW, arrowAreaWithEta, bottomRowW).toInt() + (4 * density).toInt()
         val totalH = topPillH + gap + arrowSz + arrowGap + iconPx + gap + bottomPillH
 
         val workBitmap = Bitmap.createBitmap(totalW, totalH, Bitmap.Config.ARGB_8888)
@@ -481,6 +496,19 @@ object MarkerIconHelper {
         }
         canvas.drawPath(path, arrowPaint)
         canvas.restore()
+
+        // ── ETA badge (right of icon, vertically centered with icon) ────────
+        if (etaText.isNotEmpty()) {
+            val iconCenterY = iconTop + iconPx / 2f
+            val etaLeft = iconLeft + iconPx + etaGap
+            val etaTop = iconCenterY - etaPillH / 2f
+            val etaRect = RectF(etaLeft, etaTop, etaLeft + etaPillW, etaTop + etaPillH)
+            val etaBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = tintColor; style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(etaRect, pillCorner, pillCorner, etaBgPaint)
+            canvas.drawText(etaText, etaRect.centerX(), etaTop + etaPillH - pillPadV - 1 * density, etaPaint)
+        }
 
         // ── Bottom row: speed badge (optional) + route pill ───────────────────
         val bottomY = (topPillH + gap + arrowSz + arrowGap + iconPx + gap).toFloat()

@@ -28,19 +28,23 @@ class FindRepository @Inject constructor() {
     // Client-side counts cache (10 min) — avoids repeated network on dialog reopen
     private var cachedCounts: FindCounts? = null
     private var countsCachedAt: Long = 0
+    private var countsCachedLat: Double = 0.0
+    private var countsCachedLon: Double = 0.0
     private val COUNTS_TTL_MS = 10 * 60 * 1000L
+    private val COUNTS_MOVE_THRESHOLD_M = 500.0  // invalidate cache if moved >500m
 
-    suspend fun fetchCounts(): FindCounts? = withContext(Dispatchers.IO) {
+    suspend fun fetchCounts(lat: Double, lon: Double, radiusM: Int = 10000): FindCounts? = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         cachedCounts?.let {
-            if (now - countsCachedAt < COUNTS_TTL_MS) {
-                DebugLogger.d(TAG, "Counts from client cache")
+            val moved = haversineM(lat, lon, countsCachedLat, countsCachedLon)
+            if (now - countsCachedAt < COUNTS_TTL_MS && moved < COUNTS_MOVE_THRESHOLD_M) {
+                DebugLogger.d(TAG, "Counts from client cache (moved ${moved.toInt()}m)")
                 return@withContext it
             }
         }
 
-        val url = "http://10.0.0.4:3000/db/pois/counts"
-        DebugLogger.d(TAG, "Fetching counts")
+        val url = "http://10.0.0.4:3000/db/pois/counts?lat=$lat&lon=$lon&radius=$radiusM"
+        DebugLogger.d(TAG, "Fetching counts lat=$lat lon=$lon radius=${radiusM}m")
         try {
             val response = client.newCall(Request.Builder().url(url).build()).execute()
             if (!response.isSuccessful) {
@@ -58,12 +62,24 @@ class FindRepository @Inject constructor() {
             val result = FindCounts(counts, total)
             cachedCounts = result
             countsCachedAt = now
-            DebugLogger.i(TAG, "Counts loaded: ${counts.size} categories, $total total")
+            countsCachedLat = lat
+            countsCachedLon = lon
+            DebugLogger.i(TAG, "Counts loaded: ${counts.size} categories, $total total within ${radiusM}m")
             result
         } catch (e: Exception) {
             DebugLogger.e(TAG, "Counts error", e)
             null
         }
+    }
+
+    private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val R = 6371000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
 
     suspend fun findNearby(

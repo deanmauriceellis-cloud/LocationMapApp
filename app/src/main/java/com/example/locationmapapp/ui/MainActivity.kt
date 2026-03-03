@@ -2884,7 +2884,8 @@ class MainActivity : AppCompatActivity() {
                 val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
                     this@MainActivity, R.drawable.ic_transit_rail, 30, tint, vehicle.bearing,
                     vehicle.routeName, vehicle.headsign, vehicle.stopName,
-                    vehicle.currentStatus.display, vehicle.speedDisplay, isStale
+                    vehicle.currentStatus.display, vehicle.speedDisplay, isStale,
+                    vehicle.nextStopMinutes
                 )
                 this.icon = icon
                 setAnchor(Marker.ANCHOR_CENTER, anchorY)
@@ -3824,7 +3825,8 @@ class MainActivity : AppCompatActivity() {
     private fun showFindDialog() {
         // Auto-exit filter mode when reopening Find
         if (findFilterActive) exitFindFilterMode()
-        viewModel.loadFindCounts()
+        val center = binding.mapView.mapCenter
+        viewModel.loadFindCounts(center.latitude, center.longitude)
         val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         showFindCategoryGrid(dialog)
@@ -3860,10 +3862,19 @@ class MainActivity : AppCompatActivity() {
             addView(closeBtn)
         }
 
-        // ── 4×4 Category Grid ──
+        // ── Category Grid — auto-fit cell height ──
+        val colCount = 4
+        val rowCount = (PoiCategories.ALL.size + colCount - 1) / colCount
+        val screenH = resources.displayMetrics.heightPixels
+        val headerH = dp(40)     // header area
+        val gridPadV = dp(20)    // grid vertical padding
+        val marginPerRow = dp(6) // top+bottom margins per cell
+        val availH = screenH - headerH - gridPadV
+        val cellH = maxOf(dp(36), (availH / rowCount) - marginPerRow)
+
         val grid = android.widget.GridLayout(this).apply {
-            columnCount = 4
-            setPadding(dp(8), 0, dp(8), dp(12))
+            columnCount = colCount
+            setPadding(dp(8), 0, dp(8), dp(8))
         }
 
         for (cat in PoiCategories.ALL) {
@@ -3874,7 +3885,7 @@ class MainActivity : AppCompatActivity() {
             val cell = android.widget.FrameLayout(this).apply {
                 val lp = android.widget.GridLayout.LayoutParams().apply {
                     width = 0
-                    height = dp(64)
+                    height = cellH
                     columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
                     setMargins(dp(3), dp(3), dp(3), dp(3))
                 }
@@ -3991,15 +4002,22 @@ class MainActivity : AppCompatActivity() {
             addView(closeBtn)
         }
 
-        // ── Dynamic column count ──
+        // ── Dynamic column count + auto-fit cell height ──
         val colCount = when {
             subtypes.size <= 4 -> 2
             else -> 3
         }
+        val subRowCount = (subtypes.size + colCount - 1) / colCount
+        val screenH = resources.displayMetrics.heightPixels
+        val headerH = dp(40)
+        val gridPadV = dp(20)
+        val marginPerRow = dp(6)
+        val availH = screenH - headerH - gridPadV
+        val subCellH = maxOf(dp(36), (availH / subRowCount) - marginPerRow)
 
         val grid = android.widget.GridLayout(this).apply {
             columnCount = colCount
-            setPadding(dp(8), 0, dp(8), dp(12))
+            setPadding(dp(8), 0, dp(8), dp(8))
         }
 
         for (sub in subtypes) {
@@ -4010,7 +4028,7 @@ class MainActivity : AppCompatActivity() {
             val cell = android.widget.FrameLayout(this).apply {
                 val lp = android.widget.GridLayout.LayoutParams().apply {
                     width = 0
-                    height = dp(56)
+                    height = subCellH
                     columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
                     setMargins(dp(3), dp(3), dp(3), dp(3))
                 }
@@ -5015,6 +5033,7 @@ class MainActivity : AppCompatActivity() {
         DebugLogger.i("MainActivity", "goToLocation: ${point.latitude},${point.longitude} — $label")
         // Stop any active scanner / idle scanner / silent fill
         if (populateJob != null) stopPopulatePois()
+        stopProbe10km()
         stopIdlePopulate(clearState = true)
         stopSilentFill()
         // Switch to manual mode at new location
@@ -6432,7 +6451,7 @@ class MainActivity : AppCompatActivity() {
         probe10kmJob = lifecycleScope.launch {
             // ── Probe center first ──
             val centerPt = GeoPoint(centerLat, centerLon)
-            placeScanningMarker(centerPt, panOnly = true)
+            placeScanningMarker(centerPt, panMap = false, panOnly = true)
             showProbe10kmBanner(0, 0, probes, totalPois, totalNew, fails, lastCount, lastFillRadius, "Probing center…", 0)
 
             val centerResult = viewModel.populateSearchAt(centerPt, radiusOverride = 10_000)
@@ -6468,7 +6487,7 @@ class MainActivity : AppCompatActivity() {
                     val (gridLat, gridLon) = pair
                     val point = GeoPoint(gridLat, gridLon)
 
-                    placeScanningMarker(point, panOnly = true)
+                    placeScanningMarker(point, panMap = false, panOnly = true)
                     showProbe10kmBanner(ring, idx + 1, probes, totalPois, totalNew, fails, lastCount, lastFillRadius,
                         "Probing ${idx + 1}/${points.size}…", 0)
 

@@ -1269,22 +1269,51 @@ const POI_COUNTS_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 app.get('/db/pois/counts', requirePg, async (req, res) => {
   try {
-    const now = Date.now();
-    if (poiCountsCache && (now - poiCountsCachedAt) < POI_COUNTS_TTL_MS) {
-      return res.json(poiCountsCache);
+    const lat = parseFloat(req.query.lat);
+    const lon = parseFloat(req.query.lon);
+    const radiusM = parseInt(req.query.radius) || 10000;
+    const hasLocation = !isNaN(lat) && !isNaN(lon);
+
+    // Use cache only for global (non-location) queries
+    if (!hasLocation) {
+      const now = Date.now();
+      if (poiCountsCache && (now - poiCountsCachedAt) < POI_COUNTS_TTL_MS) {
+        return res.json(poiCountsCache);
+      }
     }
-    const result = await pgPool.query(
-      `SELECT category, COUNT(*)::int AS count FROM pois WHERE category IS NOT NULL GROUP BY category ORDER BY count DESC`
-    );
+
+    let result;
+    if (hasLocation) {
+      // Haversine distance filter — count only POIs within radius
+      const radiusKm = radiusM / 1000;
+      result = await pgPool.query(
+        `SELECT category, COUNT(*)::int AS count FROM pois
+         WHERE category IS NOT NULL
+           AND (6371 * acos(LEAST(1.0, cos(radians($1)) * cos(radians(lat)) * cos(radians(lon) - radians($2)) + sin(radians($1)) * sin(radians(lat))))) <= $3
+         GROUP BY category ORDER BY count DESC`,
+        [lat, lon, radiusKm]
+      );
+    } else {
+      result = await pgPool.query(
+        `SELECT category, COUNT(*)::int AS count FROM pois WHERE category IS NOT NULL GROUP BY category ORDER BY count DESC`
+      );
+    }
+
     const counts = {};
     let total = 0;
     for (const row of result.rows) {
       counts[row.category] = row.count;
       total += row.count;
     }
-    poiCountsCache = { counts, total, cachedAt: new Date().toISOString() };
-    poiCountsCachedAt = now;
-    res.json(poiCountsCache);
+    const response = { counts, total, cachedAt: new Date().toISOString() };
+    if (hasLocation) response.radiusM = radiusM;
+
+    // Cache only global queries
+    if (!hasLocation) {
+      poiCountsCache = response;
+      poiCountsCachedAt = Date.now();
+    }
+    res.json(response);
   } catch (err) {
     console.error('[/db/pois/counts]', err.message);
     res.status(500).json({ error: err.message });

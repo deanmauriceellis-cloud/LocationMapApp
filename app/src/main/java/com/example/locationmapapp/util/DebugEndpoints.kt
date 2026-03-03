@@ -374,7 +374,8 @@ class DebugEndpoints(
             "speedMph" to v.speedMph,
             "currentStatus" to v.currentStatus.display,
             "updatedAt" to v.updatedAt,
-            "routeType" to v.routeType
+            "routeType" to v.routeType,
+            "nextStopMinutes" to v.nextStopMinutes
         )
     }
 

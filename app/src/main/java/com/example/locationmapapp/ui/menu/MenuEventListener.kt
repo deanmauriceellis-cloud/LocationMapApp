@@ -221,4 +221,5 @@ object PoiLayerId {
     const val EMERGENCY       = "emergency"
     const val AUTO_SERVICES   = "auto_services"
     const val ENTERTAINMENT   = "entertainment"
+    const val OFFICES         = "offices"
 }

@@ -132,7 +132,8 @@ data class MbtaVehicle(
     val speedMps: Double?,       // Speed in m/s, null if not moving/unknown
     val currentStatus: MbtaVehicleStatus,
     val updatedAt: String,
-    val routeType: Int           // 0=Light Rail, 1=Heavy Rail, 2=Commuter Rail, 3=Bus
+    val routeType: Int,          // 0=Light Rail, 1=Heavy Rail, 2=Commuter Rail, 3=Bus
+    val nextStopMinutes: Int? = null  // Minutes until arrival at next stop (from predictions)
 ) {
     val speedMph: Double? get() = speedMps?.let { it * 2.237 }
     val speedDisplay: String get() = speedMph?.let { "%.0f mph".format(it) } ?: "—"

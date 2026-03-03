@@ -52,9 +52,11 @@ class MbtaRepository @Inject constructor() {
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
-    /** Fetch all active Commuter Rail vehicles (route_type=2) */
-    suspend fun fetchCommuterRailVehicles(): List<MbtaVehicle> =
-        fetchVehicles(routeType = 2)
+    /** Fetch all active Commuter Rail vehicles (route_type=2), enriched with next-stop ETA */
+    suspend fun fetchCommuterRailVehicles(): List<MbtaVehicle> {
+        val vehicles = fetchVehicles(routeType = 2)
+        return enrichWithNextStopEta(vehicles)
+    }
 
     /** Fetch all active Subway vehicles (route_type=0 Light Rail + route_type=1 Heavy Rail) */
     suspend fun fetchSubwayVehicles(): List<MbtaVehicle> =
@@ -139,6 +141,64 @@ class MbtaRepository @Inject constructor() {
                 "&api_key=$API_KEY"
         val json = executeGet(url, "schedule trip=$tripId")
         parseTripSchedule(json)
+    }
+
+    /**
+     * Batch-fetch predictions for vehicles' trips, returning vehicles enriched with nextStopMinutes.
+     * Uses filter[trip]=trip1,trip2,... to get all predictions in one API call.
+     * Matches by vehicleId relationship to find each vehicle's next-stop ETA.
+     */
+    private suspend fun enrichWithNextStopEta(vehicles: List<MbtaVehicle>): List<MbtaVehicle> {
+        if (vehicles.isEmpty()) return vehicles
+        val tripIds = vehicles.mapNotNull { it.tripId }.distinct()
+        if (tripIds.isEmpty()) return vehicles
+
+        return try {
+            withContext(Dispatchers.IO) {
+                val tripFilter = tripIds.joinToString(",")
+                val url = "$BASE_URL/predictions" +
+                        "?filter%5Btrip%5D=$tripFilter" +
+                        "&api_key=$API_KEY"
+                val json = executeGet(url, "predictions ${tripIds.size} trips")
+
+                // Parse: build map of vehicleId → minutes until arrival
+                val etaByVehicle = mutableMapOf<String, Int>()
+                val root = JsonParser.parseString(json).asJsonObject
+                val dataArray = root.getAsJsonArray("data") ?: return@withContext vehicles
+                val now = System.currentTimeMillis()
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+
+                dataArray.forEach { element ->
+                    try {
+                        val obj = element.asJsonObject
+                        val attrs = obj.getAsJsonObject("attributes") ?: return@forEach
+                        val rels = obj.getAsJsonObject("relationships") ?: return@forEach
+                        val vehicleId = rels.getAsJsonObject("vehicle")
+                            ?.get("data")?.takeIf { !it.isJsonNull }?.asJsonObject?.get("id")?.asString
+                            ?: return@forEach
+                        // Skip if we already have a closer ETA for this vehicle
+                        if (etaByVehicle.containsKey(vehicleId)) return@forEach
+
+                        val timeStr = attrs.get("arrival_time")?.takeIf { !it.isJsonNull }?.asString
+                            ?: attrs.get("departure_time")?.takeIf { !it.isJsonNull }?.asString
+                            ?: return@forEach
+                        val timeMs = sdf.parse(timeStr)?.time ?: return@forEach
+                        val minutes = ((timeMs - now) / 60_000).toInt()
+                        if (minutes >= 0) {
+                            etaByVehicle[vehicleId] = minutes
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                DebugLogger.i(TAG, "Next-stop ETA: ${etaByVehicle.size}/${vehicles.size} vehicles matched")
+                vehicles.map { v ->
+                    etaByVehicle[v.id]?.let { v.copy(nextStopMinutes = it) } ?: v
+                }
+            }
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Failed to fetch next-stop ETAs: ${e.message}")
+            vehicles  // return un-enriched on failure
+        }
     }
 
     // ── Internal ───────────────────────────────────────────────────────────────
