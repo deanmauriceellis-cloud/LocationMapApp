@@ -2,6 +2,23 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.42] — 2026-03-02
+
+### Added
+- **10km Probe Populate** — new Utility menu item for wide-area POI discovery
+  - Expanding spiral of 10km probes: center → ring 1 (8 pts) → ring 2 (16 pts) → forever
+  - Crosshairs pan to each probe point without changing zoom level
+  - Status line shows: ring, probe count, total POIs, new POIs, last probe count, recommended fill radius
+  - `estimateFillRadius()` calculates ideal fill radius based on POI density (targets ~200 per search)
+  - 30s countdown between probes; tap status line or re-select menu to stop
+  - 0.8 overlap factor on grid spacing to prevent diagonal gaps
+- **Fill Probe Populate** — stub menu item for future fill implementation
+
+### Changed
+- **Utility populate** initial probe now starts at 10km radius (was 3km default), halves down via cap-retry
+- **POI display** — zoom guard lowered from 13 to 10; added 5000-marker count guard to prevent OOM at wide zoom
+- `placeScanningMarker()` gains `panOnly` mode (pan without zoom change) used by 10km probe
+
 ## [1.5.41] — 2026-03-02
 
 ### Changed

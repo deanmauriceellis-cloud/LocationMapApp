@@ -133,6 +133,12 @@ interface MenuEventListener {
     /** Systematic grid scanner: spiral outward from map center, searching every cell for POIs. */
     fun onPopulatePoisToggled(enabled: Boolean)
 
+    /** Single 10km probe at map center — wide POI discovery + radius hint creation. */
+    fun onProbe10kmRequested()
+
+    /** Fill gaps using existing radius hints (stub — future implementation). */
+    fun onFillProbeRequested()
+
     /** Switch between automatic GPS centering and manual tap-to-set-location mode. */
     fun onGpsModeToggled(autoGps: Boolean)
 

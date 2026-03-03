@@ -547,6 +547,7 @@ class MainActivity : AppCompatActivity() {
                 DebugLogger.i("MainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
                 // Stop populate scanner, idle scanner, and silent fill — user is moving to a new location
                 if (populateJob != null) stopPopulatePois()
+                stopProbe10km()
                 stopIdlePopulate(clearState = true)
                 stopSilentFill()
                 viewModel.setManualLocation(p)
@@ -950,6 +951,11 @@ class MainActivity : AppCompatActivity() {
         viewModel.places.observe(this) { (layerId, places) ->
             DebugLogger.i("MainActivity", "places → ${places.size} results layerId=$layerId")
             if (layerId == "bbox") {
+                if (places.size > 5000) {
+                    DebugLogger.i("MainActivity", "POI count ${places.size} > 5000 — suppressing display")
+                    replaceAllPoiMarkers(emptyList())
+                    return@observe
+                }
                 // Viewport bbox fetch — replace ALL POI markers with only visible results
                 replaceAllPoiMarkers(places)
             } else {
@@ -1378,8 +1384,8 @@ class MainActivity : AppCompatActivity() {
     /** Ask the proxy for cached POIs within the visible map bounding box.
      *  Skips loading at zoom ≤ 8 — viewport too large, too many markers. */
     private fun loadCachedPoisForVisibleArea() {
-        if (binding.mapView.zoomLevelDouble <= 8.0) {
-            // Clear POI markers when zoomed out too far
+        if (binding.mapView.zoomLevelDouble < 10.0) {
+            // Safety floor — very wide bbox would fetch too many POIs and risk OOM
             replaceAllPoiMarkers(emptyList())
             return
         }
@@ -6376,6 +6382,153 @@ class MainActivity : AppCompatActivity() {
         var status = ""     // narrative status line
     }
 
+    // =========================================================================
+    // 10km PROBE POPULATE — expanding spiral of 10km probes for POI discovery
+    // =========================================================================
+
+    private var probe10kmJob: Job? = null
+
+    /** Estimate a reasonable fill radius from a 10km probe result.
+     *  Target: ~200 POIs per search. Scale radius proportionally to density. */
+    private fun estimateFillRadius(poiCount: Int, probeRadiusM: Int): Int {
+        if (poiCount == 0) return probeRadiusM  // no data — keep wide
+        val targetPois = 200.0
+        // Area scales with radius², so ideal radius = probeRadius * sqrt(target/actual)
+        val ideal = probeRadiusM * Math.sqrt(targetPois / poiCount)
+        return ideal.toInt().coerceIn(100, 10_000)
+    }
+
+    private fun startProbe10km() {
+        if (probe10kmJob?.isActive == true) {
+            stopProbe10km()
+            return
+        }
+        if (populateJob != null) {
+            toast("Populate already running — stop it first")
+            return
+        }
+        if (followedVehicleId != null || followedAircraftIcao != null) {
+            toast("Stop following first")
+            return
+        }
+        stopIdlePopulate()
+        stopSilentFill()
+
+        val center = binding.mapView.mapCenter
+        val centerLat = center.latitude
+        val centerLon = center.longitude
+        // 10km grid spacing with 0.8 overlap factor to prevent diagonal gaps
+        val stepLat = 0.8 * 2 * 10000.0 / 111320.0  // ~0.1438°
+        val stepLon = stepLat / Math.cos(Math.toRadians(centerLat))
+        DebugLogger.i("MainActivity", "startProbe10km() center=$centerLat,$centerLon stepLat=${"%.5f".format(stepLat)} stepLon=${"%.5f".format(stepLon)}")
+
+        var totalPois = 0
+        var totalNew = 0
+        var probes = 0
+        var fails = 0
+        var lastCount = 0
+        var lastFillRadius = 0
+
+        probe10kmJob = lifecycleScope.launch {
+            // ── Probe center first ──
+            val centerPt = GeoPoint(centerLat, centerLon)
+            placeScanningMarker(centerPt, panOnly = true)
+            showProbe10kmBanner(0, 0, probes, totalPois, totalNew, fails, lastCount, lastFillRadius, "Probing center…", 0)
+
+            val centerResult = viewModel.populateSearchAt(centerPt, radiusOverride = 10_000)
+            if (centerResult != null) {
+                probes++
+                totalPois += centerResult.results.size
+                totalNew += centerResult.poiNew
+                lastCount = centerResult.results.size
+                lastFillRadius = if (centerResult.capped) centerResult.radiusM
+                    else estimateFillRadius(centerResult.results.size, 10_000)
+                loadCachedPoisForVisibleArea()
+                DebugLogger.i("MainActivity",
+                    "10km Probe center: ${lastCount} POIs, settled=${centerResult.radiusM}m, fillRadius=${lastFillRadius}m")
+                showProbe10kmBanner(0, 0, probes, totalPois, totalNew, fails, lastCount, lastFillRadius,
+                    "${lastCount} POIs (${centerResult.poiNew} new)", 0)
+            } else {
+                fails++
+                showProbe10kmBanner(0, 0, probes, totalPois, totalNew, fails, lastCount, lastFillRadius, "Center FAILED", 0)
+            }
+
+            // Countdown between probes
+            for (sec in 30 downTo 1) {
+                showProbe10kmBanner(0, 0, probes, totalPois, totalNew, fails, lastCount, lastFillRadius, "Next ring in", sec)
+                delay(1_000L)
+            }
+
+            // ── Expanding rings forever ──
+            var ring = 1
+            while (true) {
+                val points = generateRingPoints(ring, centerLat, centerLon, stepLat, stepLon)
+                for ((idx, pair) in points.withIndex()) {
+                    kotlinx.coroutines.yield()
+                    val (gridLat, gridLon) = pair
+                    val point = GeoPoint(gridLat, gridLon)
+
+                    placeScanningMarker(point, panOnly = true)
+                    showProbe10kmBanner(ring, idx + 1, probes, totalPois, totalNew, fails, lastCount, lastFillRadius,
+                        "Probing ${idx + 1}/${points.size}…", 0)
+
+                    val result = viewModel.populateSearchAt(point, radiusOverride = 10_000)
+                    if (result != null) {
+                        probes++
+                        totalPois += result.results.size
+                        totalNew += result.poiNew
+                        lastCount = result.results.size
+                        lastFillRadius = if (result.capped) result.radiusM
+                            else estimateFillRadius(result.results.size, 10_000)
+                        loadCachedPoisForVisibleArea()
+                        DebugLogger.i("MainActivity",
+                            "10km Probe R$ring pt${idx + 1}/${points.size}: ${lastCount} POIs, settled=${result.radiusM}m, fillRadius=${lastFillRadius}m")
+                        showProbe10kmBanner(ring, idx + 1, probes, totalPois, totalNew, fails, lastCount, lastFillRadius,
+                            "${lastCount} POIs (${result.poiNew} new)", 0)
+                    } else {
+                        fails++
+                        lastCount = 0
+                        showProbe10kmBanner(ring, idx + 1, probes, totalPois, totalNew, fails, lastCount, lastFillRadius, "FAILED", 0)
+                    }
+
+                    // Countdown between probes (30s)
+                    for (sec in 30 downTo 1) {
+                        showProbe10kmBanner(ring, idx + 1, probes, totalPois, totalNew, fails, lastCount, lastFillRadius, "Next in", sec)
+                        delay(1_000L)
+                    }
+                }
+                ring++
+            }
+        }
+    }
+
+    private fun stopProbe10km() {
+        probe10kmJob?.cancel()
+        probe10kmJob = null
+        removeScanningMarker()
+        statusLineManager.clear(StatusLineManager.Priority.POPULATE)
+        DebugLogger.i("MainActivity", "stopProbe10km()")
+    }
+
+    private fun showProbe10kmBanner(ring: Int, ptInRing: Int, probes: Int, pois: Int, newPois: Int,
+                                     fails: Int, lastCount: Int, fillRadius: Int,
+                                     status: String, countdown: Int) {
+        val failStr = if (fails > 0) " \u26A0${fails}" else ""
+        val countdownStr = if (countdown > 0) " ${countdown}s" else ""
+        val ringStr = if (ptInRing > 0) "R$ring:$ptInRing" else "R$ring"
+        val fillStr = if (fillRadius > 0) " fill:${fillRadius}m" else ""
+        val text = "10km: $ringStr | ${probes}pr | ${pois}POIs(${newPois}new)$failStr | last:$lastCount$fillStr | $status$countdownStr"
+        runOnUiThread {
+            statusLineManager.set(StatusLineManager.Priority.POPULATE, text) { stopProbe10km() }
+        }
+    }
+
+    private fun Double.format(digits: Int) = "%.${digits}f".format(this)
+
+    // =========================================================================
+    // POPULATE POIs — SYSTEMATIC GRID SCANNER
+    // =========================================================================
+
     private fun startPopulatePois() {
         // Guard: don't allow while following something
         if (followedVehicleId != null || followedAircraftIcao != null) {
@@ -6404,9 +6557,10 @@ class MainActivity : AppCompatActivity() {
             stats.status = "Probing center to calibrate grid\u2026"
             showPopulateBanner(0, stats, 0)
 
+            // Start wide at 10km — cap-retry halves down to find the right radius
             var probeResult: com.example.locationmapapp.data.model.PopulateSearchResult? = null
             for (probeAttempt in 1..3) {
-                probeResult = viewModel.populateSearchAt(probePoint)
+                probeResult = viewModel.populateSearchAt(probePoint, radiusOverride = 10_000)
                 if (probeResult != null) break
                 DebugLogger.w("MainActivity", "Probe attempt $probeAttempt failed — retrying in 30s")
                 stats.status = "Probe attempt $probeAttempt failed — retrying\u2026"
@@ -6626,7 +6780,8 @@ class MainActivity : AppCompatActivity() {
         return points
     }
 
-    private fun placeScanningMarker(point: GeoPoint, panMap: Boolean = true) {
+    /** Place crosshair marker. [panMap]=true pans+zooms, [panOnly]=true pans without zoom, both false = no map movement. */
+    private fun placeScanningMarker(point: GeoPoint, panMap: Boolean = true, panOnly: Boolean = false) {
         runOnUiThread {
             if (scanningMarker == null) {
                 scanningMarker = Marker(binding.mapView).apply {
@@ -6641,6 +6796,8 @@ class MainActivity : AppCompatActivity() {
                 if (binding.mapView.zoomLevelDouble < 14.0) {
                     binding.mapView.controller.setZoom(14.0)
                 }
+                binding.mapView.controller.animateTo(point)
+            } else if (panOnly) {
                 binding.mapView.controller.animateTo(point)
             }
             binding.mapView.invalidate()
@@ -6938,6 +7095,21 @@ class MainActivity : AppCompatActivity() {
         override fun onPopulatePoisToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onPopulatePoisToggled: $enabled")
             if (enabled) startPopulatePois() else stopPopulatePois()
+        }
+
+        override fun onProbe10kmRequested() {
+            if (probe10kmJob?.isActive == true) {
+                DebugLogger.i("MainActivity", "onProbe10kmRequested — stopping")
+                stopProbe10km()
+            } else {
+                DebugLogger.i("MainActivity", "onProbe10kmRequested — starting")
+                startProbe10km()
+            }
+        }
+
+        override fun onFillProbeRequested() {
+            DebugLogger.i("MainActivity", "onFillProbeRequested — stub")
+            toast("Fill Probe Populate — coming soon")
         }
 
         override fun onSilentFillDebugToggled(enabled: Boolean) {

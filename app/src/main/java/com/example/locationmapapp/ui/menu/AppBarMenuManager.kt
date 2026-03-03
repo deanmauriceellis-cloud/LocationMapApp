@@ -559,6 +559,8 @@ class AppBarMenuManager(
                     menuEventListener.onPopulatePoisToggled(newState)
                 }
 
+                R.id.menu_util_probe_10km    -> menuEventListener.onProbe10kmRequested()
+                R.id.menu_util_fill_probe    -> menuEventListener.onFillProbeRequested()
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
 
                 R.id.menu_util_gps_mode ->

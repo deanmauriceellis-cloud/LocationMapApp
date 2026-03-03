@@ -42,6 +42,18 @@
         android:title="Populate POIs"
         app:showAsAction="never" />
 
+    <!-- 10km Probe: single wide search at map center to discover POIs in low-density areas -->
+    <item
+        android:id="@+id/menu_util_probe_10km"
+        android:title="10km Probe Populate"
+        app:showAsAction="never" />
+
+    <!-- Fill Probe: use existing radius hints to fill gaps (stub for now) -->
+    <item
+        android:id="@+id/menu_util_fill_probe"
+        android:title="Fill Probe Populate"
+        app:showAsAction="never" />
+
     <!-- Debug log viewer (existing feature surfaced here) -->
     <item
         android:id="@+id/menu_util_debug_log"

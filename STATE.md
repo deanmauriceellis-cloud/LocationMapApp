@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-02 Session 41 (Idle Populate Improvements)
+## Last Updated: 2026-03-02 Session 42 (10km Probe Populate + POI Display)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -43,12 +43,16 @@
 - **Auto-follow aircraft (POI Builder)**: ≥10k ft, 20-min rotation, smart switching (altitude/POI/US bounds)
 - **Webcam layer** (Windy API): 18 categories, preview + live player, 0.5° min bbox, 10-min cache
 - **Cap detection & retry-to-fit**: halves radius on 500-element cap, 20km fuzzy hints, MIN_RADIUS 100m
-- **Populate POIs v2** (grid scanner): probe-calibrate-spiral with recursive 3×3 subdivision, narrative banner
+- **Populate POIs v2** (grid scanner): probe-calibrate-spiral with recursive 3×3 subdivision, 10km initial probe, narrative banner
+- **10km Probe Populate** (v1.5.42): expanding spiral of 10km wide probes for low-density POI discovery
+  - Crosshairs pan (no zoom), 30s countdown, status line with last probe count + recommended fill radius
+  - `estimateFillRadius()`: targets ~200 POIs per search area, scales by density
+  - Fill Probe Populate: stub for future implementation
 - **Vehicle follow**: tap → track, staleness detection (>2 min), POI prefetch along route
 - **Find dialog** (v1.5.26): category grid → subtype grid → distance-sorted results, long-press filter mode
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map)
 - **Legend dialog** (v1.5.25): 7 sections, Utility menu, driven from `PoiCategories.ALL`
-- Transit zoom guard (zoom ≤ 10 hides markers), POI bbox viewport display, adaptive radius hints
+- Transit zoom guard (zoom ≤ 10 hides markers), POI display (zoom ≥ 10 + max 5000 markers), adaptive radius hints
 - **Idle auto-populate** (v1.5.33): 5-min GPS stationarity → full scanner, 45s delays, GPS-centered
   - Touch-to-stop: any map tap cancels idle populate, resets 5-min idle timer
   - State preservation: stopped idle scanner resumes from last ring/point (not from scratch)
