@@ -326,6 +326,13 @@ data class FindResponse(
     val scopeM: Int
 )
 
+data class SearchResponse(
+    val results: List<FindResult>,
+    val totalCount: Int,
+    val scopeM: Int,
+    val categoryHint: String?
+)
+
 data class PoiWebsite(
     val url: String?,
     val source: String,   // "osm", "wikidata", "search", "cached", "none"

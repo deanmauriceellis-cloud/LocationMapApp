@@ -2,6 +2,30 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.51] — 2026-03-03
+
+### Added
+- **Smart fuzzy search** — Find dialog search bar now handles typos, partial matches, and category keywords
+  - **pg_trgm fuzzy matching**: `similarity()` scoring with GIN trigram index — "Dunkin Donts" finds "Dunkin' Donuts", "Starbcks" finds "Starbucks"
+  - **Keyword→category hints**: ~80 keyword mappings (e.g., "historic" → Tourism & History, "gas" → Fuel & Charging, "food italian" → Food & Drink + fuzzy "italian")
+  - **Distance expansion**: auto-expands 50km → 200km → 1000km → global until ≥3 results found
+  - **Category hint chip**: cyan "Showing Tourism & History" label above results when keyword detected
+  - **Rich result rows**: 3-line layout — bold name (13f), detail line (cuisine/brand/type, 11f gray), category label (10f, category color)
+  - **Result footer**: count + scope label + farthest result distance
+  - **Composite scoring**: exact substring matches rank above fuzzy-only; keyword-only queries browse by distance
+- **`SearchResponse` model** — new data class with `categoryHint` and `scopeM` fields
+
+### Changed
+- **Search debounce** — 500ms → 1000ms to reduce server load during typing
+- **Search bar hint** — "Search by name..." → "Search by name or keyword (e.g., historic, food)..."
+- **`/db/pois/search` endpoint** — rewritten: requires `q`+`lat`+`lon`, returns `category_hint`, `scope_m`, per-result `score`
+- **`FindRepository.searchByName()`** — removed `radiusM` param (server handles expansion), returns `SearchResponse`
+- **`MainViewModel.searchPoisByName()`** — updated signature and return type
+
+### Database (DDL — run as sudo -u postgres)
+- `CREATE EXTENSION IF NOT EXISTS pg_trgm` — trigram similarity functions
+- `CREATE INDEX idx_pois_name_trgm ON pois USING GIN (name gin_trgm_ops)` — fuzzy search index
+
 ## [1.5.50] — 2026-03-03
 
 ### Changed

@@ -20,6 +20,10 @@ CREATE INDEX IF NOT EXISTS idx_pois_tags ON pois USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_pois_lat_lon ON pois (lat, lon);
 CREATE INDEX IF NOT EXISTS idx_pois_category_lat_lon ON pois (category, lat, lon);
 
+-- Fuzzy search: pg_trgm trigram index for similarity() queries
+-- Requires: CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_pois_name_trgm ON pois USING GIN (name gin_trgm_ops) WHERE name IS NOT NULL;
+
 -- Aircraft sightings — each continuous observation is a separate row
 CREATE TABLE IF NOT EXISTS aircraft_sightings (
   id              SERIAL PRIMARY KEY,

@@ -4,6 +4,7 @@ import com.example.locationmapapp.data.model.FindCounts
 import com.example.locationmapapp.data.model.FindResponse
 import com.example.locationmapapp.data.model.FindResult
 import com.example.locationmapapp.data.model.PoiWebsite
+import com.example.locationmapapp.data.model.SearchResponse
 import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
@@ -149,12 +150,11 @@ class FindRepository @Inject constructor() {
         query: String,
         lat: Double,
         lon: Double,
-        radiusM: Int = 50000,
         limit: Int = 50
-    ): FindResponse? = withContext(Dispatchers.IO) {
+    ): SearchResponse? = withContext(Dispatchers.IO) {
         val q = URLEncoder.encode(query, "UTF-8")
-        val url = "http://10.0.0.4:3000/db/pois/search?q=$q&lat=$lat&lon=$lon&radius=$radiusM&limit=$limit"
-        DebugLogger.d(TAG, "searchByName q=$query lat=$lat lon=$lon radius=${radiusM}m")
+        val url = "http://10.0.0.4:3000/db/pois/search?q=$q&lat=$lat&lon=$lon&limit=$limit"
+        DebugLogger.d(TAG, "searchByName q=$query lat=$lat lon=$lon")
         try {
             val t0 = System.currentTimeMillis()
             val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -167,7 +167,9 @@ class FindRepository @Inject constructor() {
             val body = response.body?.string() ?: return@withContext null
             val root = JsonParser.parseString(body).asJsonObject
             val count = root["count"]?.asInt ?: 0
-            val elements = root.getAsJsonArray("elements") ?: return@withContext FindResponse(emptyList(), 0, radiusM)
+            val scopeM = root["scope_m"]?.asInt ?: 50000
+            val categoryHint = root["category_hint"]?.let { if (it.isJsonNull) null else it.asString }
+            val elements = root.getAsJsonArray("elements") ?: return@withContext SearchResponse(emptyList(), 0, scopeM, categoryHint)
 
             val results = elements.mapNotNull { el ->
                 try {
@@ -199,8 +201,8 @@ class FindRepository @Inject constructor() {
                 }
             }
 
-            DebugLogger.i(TAG, "searchByName: ${results.size} results for '$query'")
-            FindResponse(results, count, radiusM)
+            DebugLogger.i(TAG, "searchByName: ${results.size} results for '$query' (hint=$categoryHint scope=${scopeM}m)")
+            SearchResponse(results, count, scopeM, categoryHint)
         } catch (e: Exception) {
             DebugLogger.e(TAG, "searchByName error", e)
             null

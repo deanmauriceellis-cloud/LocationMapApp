@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 52 (Find Dialog Overhaul — ScrollView, Unlimited Distance, 16 New Subtypes)
+## Last Updated: 2026-03-03 Session 53 (Smart Fuzzy Search — pg_trgm, Keyword Hints, Rich Results)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -22,7 +22,13 @@
 - **Dark mode** (v1.5.44): toolbar moon icon toggles between MAPNIK and CartoDB Dark Matter tiles, persisted
 - **Share POI** (v1.5.44): 5th action button in POI detail dialog, shares name/address/phone/hours + Google Maps link
 - **Favorites** (v1.5.44): star icon in POI detail dialog, SharedPreferences+JSON storage, dedicated Favorites cell in Find dialog
-- **Text search** (v1.5.44): search bar in Find dialog, debounced name search via `/db/pois/search`, color dot + distance results
+- **Smart fuzzy search** (v1.5.51): pg_trgm similarity + keyword→category hints in Find dialog search bar
+  - Typo-tolerant: "Starbcks" finds Starbucks, "Dunkin Donts" finds Dunkin' Donuts
+  - ~80 keyword→category mappings: "historic" → Tourism & History, "gas" → Fuel & Charging, etc.
+  - Combined queries: "food italian" → Food & Drink category + fuzzy "italian" name match
+  - Distance expansion: 50km → 200km → 1000km → global (stops at ≥3 results)
+  - Rich result rows: bold name, detail line (cuisine/brand), category label in category color
+  - Category hint chip + result footer with count/scope
 - **MBTA transit** — live vehicles (buses, CR, subway) with directional arrows + staleness detection
   - Commuter rail: next-stop ETA badge on labeled markers (batch predictions API)
   - ~270 train stations: tap → arrival board (30s auto-refresh) → trip schedule
@@ -89,7 +95,7 @@
   - ScrollView wrapping on both grids — large categories (26 Shopping, 18 Entertainment) scroll instead of clipping
   - Dialog height 85% of screen; search bar fixed above scrollable grid
   - Unlimited distance on `/db/pois/find`: scope expands 50km → 200km → 1000km → global (no bbox)
-  - Text search bar (v1.5.44): debounced name search above category grid, 500ms delay, min 2 chars
+  - Smart fuzzy search bar (v1.5.51): pg_trgm fuzzy + keyword hints, 1000ms debounce, rich 3-line result rows
   - Favorites cell (v1.5.44): gold star, first in grid, shows count badge, tap for sorted favorites list
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map/Share)
   - Tap any POI marker on map → opens detail dialog directly (v1.5.46)
@@ -243,7 +249,7 @@
 ## PostgreSQL Database
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
-  - Indexes: category, name (partial), tags (GIN), lat+lon (compound)
+  - Indexes: category, name (partial), tags (GIN), lat+lon (compound), **name trigram (GIN pg_trgm)** for fuzzy search
   - 180,059 POIs as of 2026-03-03 (auto-imported from 180k cache)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
@@ -257,7 +263,7 @@
   - `POST /db/import` (manual trigger), `GET /db/import/status` (read-only status)
   - Stats in `/cache/stats` → `dbImport` object
 - **DB query API** (`/db/*` prefix): 14 endpoints — 8 POI + 4 aircraft + 2 import
-  - `GET /db/pois/search` — name search (ILIKE), category filter, bbox, tag queries, distance sort
+  - `GET /db/pois/search` — smart fuzzy search (pg_trgm similarity + ILIKE), keyword→category hints, distance expansion, composite scoring
   - `GET /db/pois/nearby` — Haversine distance sort with bbox pre-filter
   - `GET /db/poi/:type/:id` — single POI with timestamps
   - `GET /db/pois/stats` — totals, named count, top categories, bounds, time range
@@ -423,4 +429,4 @@ See `SOCIAL-PLAN.md` for full plan. Current status:
 ## Other Next Steps
 - Monitor cache growth and hit rates over time
 - Evaluate proxy → remote deployment for non-local testing
-- Find dialog enhancements: pagination (load more), search within results, recent searches
+- Find dialog enhancements: pagination (load more), recent searches, search history

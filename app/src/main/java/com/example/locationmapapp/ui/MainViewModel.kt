@@ -503,9 +503,9 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    suspend fun searchPoisByName(query: String, lat: Double, lon: Double, radiusM: Int = 50000, limit: Int = 50): FindResponse? {
+    suspend fun searchPoisByName(query: String, lat: Double, lon: Double, limit: Int = 50): SearchResponse? {
         return try {
-            findRepository.searchByName(query, lat, lon, radiusM, limit)
+            findRepository.searchByName(query, lat, lon, limit)
         } catch (e: Exception) {
             DebugLogger.e(TAG, "searchPoisByName FAILED: ${e.message}", e)
             null

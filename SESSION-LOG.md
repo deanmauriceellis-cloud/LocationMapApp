@@ -2,6 +2,52 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03d (v1.5.51 — Smart Fuzzy Search)
+
+### Context
+The Find dialog search bar used strict `ILIKE '%query%'` substring matching — typos like "Dunkin Donts" returned nothing, and natural keywords like "historic" or "gas" couldn't browse categories. Implemented pg_trgm fuzzy matching with keyword→category hints so a single search bar handles typos, partial matches, and category browsing.
+
+### Changes Made
+
+#### 1. PostgreSQL DDL
+- `pg_trgm` extension enabled, GIN trigram index on `pois.name`
+- Index documented in `cache-proxy/schema.sql`
+
+#### 2. Server — Keyword Maps + Fuzzy Endpoint (server.js)
+- `KEYWORD_CATEGORIES`: ~80 keyword→category label mappings across all 17 categories
+- `CATEGORY_LABEL_TAGS`: maps 17 category labels to their OSM tag arrays (mirrors PoiCategories.kt)
+- `parseSearchKeywords(query)`: tokenizes query, tries 2-word then 1-word prefix match, returns `{ keyword, categoryLabel, categoryTags, remainingQuery }`
+- `/db/pois/search` rewritten: requires `q`+`lat`+`lon`, applies fuzzy `similarity() > 0.2` + ILIKE substring, composite scoring (exact=1.0 + similarity), distance expansion (50km→200km→1000km→global), category filter from keyword, keyword-only browse mode
+
+#### 3. Client — SearchResponse Model (Models.kt)
+- New `SearchResponse(results, totalCount, scopeM, categoryHint)` data class
+
+#### 4. Client — FindRepository
+- `searchByName()`: removed `radiusM` param, parses `scope_m` and `category_hint` from JSON, returns `SearchResponse`
+
+#### 5. Client — MainViewModel
+- `searchPoisByName()`: updated signature/return type to match
+
+#### 6. Client — Search UI (MainActivity.kt)
+- Debounce: 500ms → 1000ms
+- Hint: "Search by name or keyword (e.g., historic, food)..."
+- Category hint chip: cyan "Showing {category}" above results
+- Rich rows: 8dp color dot + 60dp distance (11f) + info column (name 13f bold, detail 11f gray, category 10f colored)
+- Footer: result count + scope label + farthest distance
+
+### Files Modified (6)
+- `cache-proxy/schema.sql` — trigram index
+- `cache-proxy/server.js` — keyword maps + rewritten search handler
+- `app/.../data/model/Models.kt` — SearchResponse
+- `app/.../data/repository/FindRepository.kt` — new return type + parsing
+- `app/.../ui/MainViewModel.kt` — signature update
+- `app/.../ui/MainActivity.kt` — UI overhaul
+
+### Build
+- `assembleDebug` — BUILD SUCCESSFUL
+
+---
+
 ## Session: 2026-03-03c (v1.5.50 — Find Dialog Overhaul)
 
 ### Context

@@ -4203,7 +4203,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val searchBar = android.widget.EditText(this).apply {
-            hint = "Search by name..."
+            hint = "Search by name or keyword (e.g., historic, food)..."
             textSize = 14f
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#757575"))
@@ -4267,7 +4267,7 @@ class MainActivity : AppCompatActivity() {
                 searchResultsList.addView(spinner)
 
                 searchJob = lifecycleScope.launch {
-                    delay(500)
+                    delay(1000)
                     val mapCenter = binding.mapView.mapCenter
                     val response = viewModel.searchPoisByName(query, mapCenter.latitude, mapCenter.longitude)
                     searchResultsList.removeAllViews()
@@ -4280,17 +4280,33 @@ class MainActivity : AppCompatActivity() {
                         })
                         return@launch
                     }
+                    // Category hint chip
+                    if (response.categoryHint != null) {
+                        searchResultsList.addView(TextView(this@MainActivity).apply {
+                            text = "Showing ${response.categoryHint}"
+                            textSize = 12f
+                            setTextColor(Color.parseColor("#00BCD4"))
+                            setPadding(dp(4), dp(4), dp(4), dp(4))
+                        })
+                    }
+                    // Get category label lookup for display
+                    val catLabelMap = mutableMapOf<String, Pair<String, Int>>()
+                    for (cat in com.example.locationmapapp.ui.menu.PoiCategories.ALL) {
+                        for (tag in cat.tags) { catLabelMap[tag] = Pair(cat.label, cat.color) }
+                    }
                     for (result in response.results) {
                         val row = LinearLayout(this@MainActivity).apply {
                             orientation = LinearLayout.HORIZONTAL
-                            setPadding(dp(4), dp(8), dp(4), dp(8))
+                            setPadding(dp(4), dp(6), dp(4), dp(6))
                             gravity = android.view.Gravity.CENTER_VERTICAL
                         }
                         // Color dot
-                        val catColor = poiCategoryColor(result.category)
+                        val catInfo = catLabelMap[result.category]
+                        val catColor = catInfo?.second ?: Color.parseColor("#757575")
+                        val catLabel = catInfo?.first
                         val colorDot = View(this@MainActivity).apply {
-                            val size = dp(10)
-                            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(8) }
+                            val size = dp(8)
+                            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(6) }
                             background = android.graphics.drawable.GradientDrawable().apply {
                                 shape = android.graphics.drawable.GradientDrawable.OVAL
                                 setColor(catColor)
@@ -4301,24 +4317,48 @@ class MainActivity : AppCompatActivity() {
                             text = formatDistanceDirection(
                                 mapCenter.latitude, mapCenter.longitude, result.lat, result.lon
                             )
-                            textSize = 12f
+                            textSize = 11f
                             setTextColor(Color.parseColor("#4FC3F7"))
-                            layoutParams = LinearLayout.LayoutParams(dp(55), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(60), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                                 marginEnd = dp(6)
                             }
                         }
-                        // Name
+                        // Info column: name + detail + category
+                        val infoCol = LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.VERTICAL
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                        }
                         val nameText = TextView(this@MainActivity).apply {
                             text = result.name ?: result.typeValue.replaceFirstChar { it.uppercase() }
-                            textSize = 14f
+                            textSize = 13f
                             setTextColor(Color.WHITE)
-                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            setTypeface(typeface, android.graphics.Typeface.BOLD)
                             maxLines = 1
                             ellipsize = android.text.TextUtils.TruncateAt.END
                         }
+                        infoCol.addView(nameText)
+                        // Detail line: cuisine/brand/typeValue
+                        val detailStr = result.detail ?: result.typeValue.replaceFirstChar { it.uppercase() }
+                        val detailText = TextView(this@MainActivity).apply {
+                            text = detailStr
+                            textSize = 11f
+                            setTextColor(Color.parseColor("#9E9E9E"))
+                            maxLines = 1
+                            ellipsize = android.text.TextUtils.TruncateAt.END
+                        }
+                        infoCol.addView(detailText)
+                        // Category label
+                        if (catLabel != null) {
+                            infoCol.addView(TextView(this@MainActivity).apply {
+                                text = catLabel
+                                textSize = 10f
+                                setTextColor(catColor)
+                                maxLines = 1
+                            })
+                        }
                         row.addView(colorDot)
                         row.addView(distText)
-                        row.addView(nameText)
+                        row.addView(infoCol)
                         row.setOnClickListener {
                             dialog.dismiss()
                             showPoiDetailDialog(result)
@@ -4331,6 +4371,22 @@ class MainActivity : AppCompatActivity() {
                             setBackgroundColor(Color.parseColor("#2A2A2A"))
                         })
                     }
+                    // Footer: result count + scope
+                    val scopeLabel = when {
+                        response.scopeM >= 99999000 -> "global"
+                        response.scopeM >= 1000000 -> "${response.scopeM / 1000}km"
+                        response.scopeM >= 1000 -> "${response.scopeM / 1000}km"
+                        else -> "${response.scopeM}m"
+                    }
+                    val farthest = response.results.lastOrNull()?.let {
+                        formatDistanceDirection(mapCenter.latitude, mapCenter.longitude, it.lat, it.lon)
+                    } ?: ""
+                    searchResultsList.addView(TextView(this@MainActivity).apply {
+                        text = "${response.totalCount} results within $scopeLabel${if (farthest.isNotEmpty()) " (farthest: $farthest)" else ""}"
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#757575"))
+                        setPadding(dp(4), dp(8), dp(4), dp(8))
+                    })
                 }
             }
         })

@@ -117,7 +117,26 @@
 - [x] **Unlimited distance** — zoo search returned 5 results at 694–1413km (`scope_m: 0` global fallback)
 - [x] **`craft` category key** — added to server.js POI_CATEGORY_KEYS (breweries etc. will appear after next import)
 
+### Completed — Smart Fuzzy Search DDL (Session 53 — v1.5.51)
+- [x] **pg_trgm extension** — created via `sudo -u postgres`
+- [x] **GIN trigram index** — `idx_pois_name_trgm` on pois.name
+- [x] **Build passes** — assembleDebug succeeds
+
 ### NOT YET TESTED — Resume Here
+
+#### v1.5.51 Smart Fuzzy Search
+- [ ] **Proxy restart** — restart proxy to load new `/db/pois/search` handler
+- [ ] **Fuzzy typo search** — `curl "localhost:3000/db/pois/search?q=starbcks&lat=42.36&lon=-71.06&limit=5"` returns Starbucks results with similarity scores
+- [ ] **Keyword category hint** — `curl "localhost:3000/db/pois/search?q=historic&lat=42.36&lon=-71.06&limit=10"` returns `category_hint: "Tourism & History"` with tourism POIs
+- [ ] **Combined keyword+name** — `curl "localhost:3000/db/pois/search?q=historic+church&lat=42.36&lon=-71.06"` returns Tourism & History + fuzzy "church"
+- [ ] **Keyword-only browse** — `curl "localhost:3000/db/pois/search?q=gas&lat=42.36&lon=-71.06"` returns Fuel & Charging POIs by distance
+- [ ] **Distance expansion** — rare query expands beyond 50km scope
+- [ ] **On-device: keyword search** — type "gas" in Find search bar → shows "Showing Fuel & Charging" hint + nearby gas stations
+- [ ] **On-device: fuzzy search** — type "Dunkin" → fuzzy-matches Dunkin' Donuts by distance
+- [ ] **On-device: rich result rows** — verify 3-line layout (bold name, gray detail, colored category)
+- [ ] **On-device: result footer** — verify count + scope label at bottom
+- [ ] **On-device: category hint chip** — verify cyan "Showing X" label on keyword searches
+- [ ] **On-device: debounce** — verify 1s delay before search fires (not 500ms)
 
 #### v1.5.48 Tunings
 - [x] **Zoom 18 on first GPS fix** — verified by user, street-level view on fresh app start
