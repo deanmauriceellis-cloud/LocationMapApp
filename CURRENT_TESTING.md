@@ -18,8 +18,20 @@
 - v1.5.56: Distance-sorted search, Filter and Map button at top, adaptive zoom
 - Refactoring: server.js decomposition (18 modules), 6 ViewModels, MenuPrefs.kt — build passes, pure structural
 - v1.5.58: Overpass retry (proxy + app), zoom 16 labels, single-tap stop — build passes
+- v1.5.59: Scan cell coverage + queue cancel — build passes, partial live testing (cells marking correctly, persistence working)
 
 ## NOT YET TESTED — Resume Here
+
+### v1.5.59 (proxy restarted + app reinstalled)
+- [ ] Scan cell CELL hits — navigate to previously-scanned area, check proxy logs for `X-Cache: CELL`
+- [ ] Idle populate skip — start idle populate in well-scanned area, verify FRESH cells are skipped (no countdown, instant advance)
+- [ ] Queue cancel — start populate, tap to stop, check proxy logs for `cancelled N queued requests`
+- [ ] Silent fill FRESH — trigger silent fill in scanned area, verify "Coverage fresh" banner (1.5s)
+- [ ] `/scan-cells` endpoint — verify `curl localhost:3000/scan-cells` returns cells
+- [ ] `/scan-cells?lat=42.55&lon=-70.89` — verify specific cell query works
+- [ ] `/cache/stats` — verify `scanCells` count present
+- [ ] `/cache/clear` — verify scan cells cleared + file deleted
+- [ ] Freshness expiry — set `SCAN_FRESHNESS_MS=1000`, verify cells go STALE and upstream resumes
 
 ### v1.5.58 (proxy restarted + app reinstalled)
 - [ ] Overpass retry — run 10km Probe scan, check proxy logs for `[Overpass retry]` messages

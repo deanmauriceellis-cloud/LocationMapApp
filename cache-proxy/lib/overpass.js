@@ -9,7 +9,8 @@
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module overpass.js';
 
 module.exports = function(app, deps) {
-  const { cacheGet, cacheSet, stats, log, poiCache, contentHashes, cacheIndividualPois, computeElementHash } = deps;
+  const { cacheGet, cacheSet, stats, log, poiCache, contentHashes, cacheIndividualPois, computeElementHash,
+          checkCoverage, markScanned, collectPoisInRadius } = deps;
 
   const OVERPASS_TTL = 365 * 24 * 60 * 60 * 1000;  // 365 days
   const OVERPASS_MIN_INTERVAL_MS = 10_000;  // 10s between upstream requests
@@ -146,6 +147,18 @@ module.exports = function(app, deps) {
             }
           }
 
+          // Mark scan cells as covered after successful upstream
+          if (markScanned) {
+            const aroundMatch2 = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
+            if (aroundMatch2) {
+              const rMark = parseInt(aroundMatch2[1]);
+              const latMark = parseFloat(aroundMatch2[2]);
+              const lonMark = parseFloat(aroundMatch2[3]);
+              const totalPois = poiStats.added + poiStats.updated;
+              markScanned(latMark, lonMark, rMark, totalPois);
+            }
+          }
+
           resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.added, poiKnown: poiStats.updated });
           break;
         } catch (err) {
@@ -249,6 +262,13 @@ module.exports = function(app, deps) {
     const cacheKey = parseOverpassCacheKey(dataField);
     const cacheOnly = req.headers['x-cache-only'] === 'true';
 
+    // Determine coverage status for this request's location
+    let coverageStatus = 'EMPTY';
+    const aroundForCoverage = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
+    if (checkCoverage && aroundForCoverage) {
+      coverageStatus = checkCoverage(parseFloat(aroundForCoverage[2]), parseFloat(aroundForCoverage[3])).coverage;
+    }
+
     if (cacheKey) {
       const cached = cacheGet(cacheKey, OVERPASS_TTL);
       if (cached) {
@@ -256,6 +276,7 @@ module.exports = function(app, deps) {
         log('/overpass', true);
         res.set('Content-Type', cached.headers['content-type'] || 'application/json');
         res.set('X-Cache', 'HIT');
+        res.set('X-Coverage', coverageStatus);
         return res.send(cached.data);
       }
 
@@ -273,6 +294,7 @@ module.exports = function(app, deps) {
           log('/overpass (covering-cache)', true, 0, covering.key);
           res.set('Content-Type', covering.cached.headers['content-type'] || 'application/json');
           res.set('X-Cache', 'HIT');
+          res.set('X-Coverage', coverageStatus);
           return res.send(covering.cached.data);
         }
       }
@@ -318,6 +340,28 @@ module.exports = function(app, deps) {
       return res.status(204).end();
     }
 
+    // ── Scan cell coverage check — skip upstream if area recently scanned ──
+    if (checkCoverage) {
+      const aroundMatch = dataField.match(/around:(\d+),([-\d.]+),([-\d.]+)/);
+      if (aroundMatch) {
+        const radius = parseInt(aroundMatch[1]);
+        const lat = parseFloat(aroundMatch[2]);
+        const lon = parseFloat(aroundMatch[3]);
+        const coverage = checkCoverage(lat, lon);
+        if (coverage.fresh) {
+          const elements = collectPoisInRadius(lat, lon, radius);
+          if (elements.length > 0) {
+            stats.hits++;
+            log('/overpass (scan-cell)', true, 0, `FRESH — ${elements.length} POIs from poiCache`);
+            res.set('Content-Type', 'application/json');
+            res.set('X-Cache', 'CELL');
+            res.set('X-Coverage', 'FRESH');
+            return res.json({ elements });
+          }
+        }
+      }
+    }
+
     stats.misses++;
     const clientId = req.headers['x-client-id'] || 'unknown';
     // Queue the upstream request — worker processes one at a time, 10s apart
@@ -340,15 +384,37 @@ module.exports = function(app, deps) {
       return res.status(429).json({ error: 'Too many queued requests', detail: result.message });
     }
 
+    if (result.cancelled) {
+      return res.status(499).json({ error: 'Cancelled', detail: result.message });
+    }
+
     if (result.error) {
       return res.status(502).json({ error: 'Upstream request failed', detail: result.message });
     }
     res.status(result.status || 200)
       .set('Content-Type', result.contentType)
       .set('X-Cache', result.hit ? 'HIT' : 'MISS')
+      .set('X-Coverage', coverageStatus)
       .set('X-POI-New', String(result.poiNew || 0))
       .set('X-POI-Known', String(result.poiKnown || 0))
       .send(result.data);
+  });
+
+  // Cancel all queued requests for a specific client
+  app.post('/overpass/cancel', (req, res) => {
+    const clientId = req.headers['x-client-id'] || req.body.clientId;
+    if (!clientId) return res.status(400).json({ error: 'Missing X-Client-ID header or clientId body' });
+
+    let cancelled = 0;
+    for (let i = overpassQueue.length - 1; i >= 0; i--) {
+      if (overpassQueue[i].clientId === clientId) {
+        const item = overpassQueue.splice(i, 1)[0];
+        item.resolve({ hit: false, error: true, cancelled: true, message: 'Cancelled by client' });
+        cancelled++;
+      }
+    }
+    console.log(`[Overpass queue] client ${clientId} cancelled ${cancelled} queued requests (${overpassQueue.length} remaining)`);
+    res.json({ cancelled, remaining: overpassQueue.length });
   });
 
   // Expose queue length for admin

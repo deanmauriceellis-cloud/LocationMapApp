@@ -2,6 +2,64 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04g (v1.5.59 — Scan Cell Coverage + Queue Cancel)
+
+### Context
+App made redundant Overpass API calls in areas already well-mapped (211k+ POIs). Overpass cache keys use exact 3dp lat/lon + radius + tags, so moving ~100m creates a cache miss. Also, stopping follow/populate left already-queued proxy requests executing wastefully.
+
+### Changes Made
+
+#### 1. Scan Cell Coverage (`cache-proxy/lib/scan-cells.js` — NEW, ~160 lines)
+- Divides world into ~1.1km grid cells (2dp lat:lon), tracks `lastScanned` timestamp + `poiCount`
+- `checkCoverage()` returns FRESH/STALE/EMPTY; `markScanned()` marks all cells in a circle
+- `collectPoisInRadius()` bbox-scans poiCache to serve POIs without upstream call
+- Persists to `scan-cells.json` (debounced write, same pattern as radius-hints.json)
+- `GET /scan-cells` debug endpoint (all cells or specific lat/lon query)
+
+#### 2. Overpass Integration (`cache-proxy/lib/overpass.js`)
+- Coverage check inserted after cache-only merge, before queue: if FRESH, returns from poiCache with `X-Cache: CELL`
+- `X-Coverage` header added to all response paths (HIT, covering-cache, scan-cell, MISS)
+- `markScanned()` called after successful upstream with lat/lon/radius/poiCount
+- `POST /overpass/cancel` — flushes queued requests for a client ID, resolves with 499
+
+#### 3. Server Wiring (`cache-proxy/server.js`)
+- scan-cells loaded before overpass (exports checkCoverage, markScanned, collectPoisInRadius into deps)
+- `GET /scan-cells` route registered; startup log updated
+
+#### 4. Admin (`cache-proxy/lib/admin.js`)
+- `scanCells` count in `/cache/stats`; scan cells cleared + file deleted in `/cache/clear`
+
+#### 5. App: Coverage-Aware Behavior
+- `PopulateSearchResult` — new `coverageStatus: String` field
+- `PlacesRepository.kt` — reads `X-Coverage` header, treats `X-Cache: CELL` as cache hit
+- `MainViewModel.kt` — new `cancelPendingOverpass()` method (fire-and-forget via IO dispatcher)
+- `MainActivityPopulate.kt`:
+  - Silent fill: 1.5s "Coverage fresh" banner for FRESH (vs 3s)
+  - Idle populate spiral: FRESH cells skipped entirely (`continue` — no search, no countdown, no subdivision)
+  - Manual populate spiral: same skip behavior
+  - `stopIdlePopulate()`, `stopPopulatePois()`, `stopProbe10km()` all call `cancelPendingOverpass()`
+
+### Live Testing Results
+- 185 scan cells marked after first populate spiral run
+- `[Scan Cells] Marked 63 cells (500 POIs, ~8/cell)` — correct cell marking
+- Persistence working: `Saved 185 scan cells to disk`
+- `/scan-cells` endpoint returns correct cell data with age/config
+- `/cache/stats` shows `scanCells: 185`
+
+### Files Created (1)
+- `cache-proxy/lib/scan-cells.js` — scan cell coverage tracking module
+
+### Files Modified (7)
+- `cache-proxy/lib/overpass.js` — coverage check, mark scanned, X-Coverage header, cancel endpoint
+- `cache-proxy/server.js` — wire scan-cells module
+- `cache-proxy/lib/admin.js` — stats + clear
+- `app/.../data/model/Models.kt` — coverageStatus field on PopulateSearchResult
+- `app/.../data/repository/PlacesRepository.kt` — read X-Coverage, cancelPendingOverpass()
+- `app/.../ui/MainViewModel.kt` — cancelPendingOverpass(), Dispatchers import
+- `app/.../ui/MainActivityPopulate.kt` — FRESH skip, cancel on stop, shorter banners
+
+---
+
 ## Session: 2026-03-04f (Overpass Retry + Zoom 16 Labels + Tap-to-Stop)
 
 ### Context

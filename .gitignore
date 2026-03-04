@@ -14,5 +14,6 @@
 .cxx
 local.properties
 poi-cache.json
+scan-cells.json
 overnight-runs/
 cache-proxy/geofence-databases/*.db

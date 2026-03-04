@@ -19,6 +19,7 @@ import com.example.locationmapapp.data.model.*
 import com.example.locationmapapp.data.repository.PlacesRepository
 import com.example.locationmapapp.util.DebugLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
@@ -208,7 +209,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
-
+    /** Cancel all queued Overpass requests at the proxy. Call on follow/move/stop. */
+    fun cancelPendingOverpass() {
+        viewModelScope.launch(Dispatchers.IO) {
+            placesRepository.cancelPendingOverpass()
+        }
+    }
 
 }
 

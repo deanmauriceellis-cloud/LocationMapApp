@@ -246,7 +246,8 @@ data class PopulateSearchResult(
     val radiusM: Int = 3000,
     val capped: Boolean = false,
     val poiNew: Int = 0,
-    val poiKnown: Int = 0
+    val poiKnown: Int = 0,
+    val coverageStatus: String = ""
 )
 
 // ── Find Feature Models ─────────────────────────────────────────────────────

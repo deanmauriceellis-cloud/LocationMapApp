@@ -2,6 +2,27 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.59] — 2026-03-04
+
+### Added
+- **Scan cell coverage tracking** — proxy divides the world into ~1.1km grid cells (2 decimal places of lat/lon), tracks when each was last successfully scanned via Overpass and how many POIs it contains
+  - `cache-proxy/lib/scan-cells.js` — new module with persistence to `scan-cells.json`
+  - Decision flow: exact cache → covering cache → cache-only merge → **scan cell FRESH → serve from poiCache** → upstream
+  - `X-Cache: CELL` header when served from scan cell coverage (instant ~10ms response)
+  - `X-Coverage: FRESH/STALE/EMPTY` header on all `/overpass` responses
+  - Config: `SCAN_FRESHNESS_MS` (default 24h), `MIN_COVERAGE_POIS` (default 10)
+  - Debug: `GET /scan-cells` dumps all cells; `GET /scan-cells?lat=X&lon=Y` checks specific cell
+  - Admin: scan cell count in `/cache/stats`, cleared by `/cache/clear`
+- **Overpass queue cancel** — `POST /overpass/cancel` flushes all queued requests for a client ID
+  - Called automatically on: stop following, stop populate, stop idle populate, stop probe 10km
+  - Prevents wasted upstream Overpass calls when user navigates away
+
+### Changed
+- **Idle populate skips FRESH cells** — cells with fresh coverage are skipped entirely (no search, no countdown, no subdivision); scanner advances instantly to next cell
+- **Manual populate skips FRESH cells** — same behavior; FRESH cells produce no upstream Overpass call
+- **Silent fill FRESH banner** — shows brief "Coverage fresh" (1.5s) instead of full "Filling POIs" (3s) when coverage is fresh
+- **PopulateSearchResult** — new `coverageStatus` field passes proxy coverage state to app
+
 ## [1.5.58] — 2026-03-04
 
 ### Added

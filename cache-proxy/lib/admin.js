@@ -13,6 +13,7 @@ const fs = require('fs');
 module.exports = function(app, deps) {
   const { cache, stats, radiusHints, poiCache,
           CACHE_FILE, RADIUS_HINTS_FILE, POI_CACHE_FILE,
+          scanCells, SCAN_CELLS_FILE,
           openskyRateState, openskyConfigured,
           OPENSKY_EFFECTIVE_LIMIT, OPENSKY_MIN_INTERVAL_MS,
           getImportState, getOverpassQueueLength } = deps;
@@ -27,6 +28,7 @@ module.exports = function(app, deps) {
       entries: cache.size,
       radiusHints: radiusHints.size,
       pois: poiCache.size,
+      scanCells: scanCells ? scanCells.size : 0,
       dbImport: {
         lastImportTime: importState.lastDbImportTime > 0 ? new Date(importState.lastDbImportTime).toISOString() : null,
         running: importState.dbImportRunning,
@@ -59,15 +61,18 @@ module.exports = function(app, deps) {
     const count = cache.size;
     const hintCount = radiusHints.size;
     const poiCount = poiCache.size;
+    const scanCellCount = scanCells ? scanCells.size : 0;
     cache.clear();
     radiusHints.clear();
     poiCache.clear();
+    if (scanCells) scanCells.clear();
     stats.hits = 0;
     stats.misses = 0;
     try { fs.unlinkSync(CACHE_FILE); } catch (_) {}
     try { fs.unlinkSync(RADIUS_HINTS_FILE); } catch (_) {}
     try { fs.unlinkSync(POI_CACHE_FILE); } catch (_) {}
-    console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints + ${poiCount} POIs, disk files removed)`);
-    res.json({ cleared: count, hintsCleared: hintCount, poisCleared: poiCount });
+    if (SCAN_CELLS_FILE) { try { fs.unlinkSync(SCAN_CELLS_FILE); } catch (_) {} }
+    console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints + ${poiCount} POIs + ${scanCellCount} scan cells, disk files removed)`);
+    res.json({ cleared: count, hintsCleared: hintCount, poisCleared: poiCount, scanCellsCleared: scanCellCount });
   });
 };

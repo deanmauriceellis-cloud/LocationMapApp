@@ -359,6 +359,7 @@ class PlacesRepository @Inject constructor(
             var lastCacheHit = false
             var totalNew = 0
             var totalKnown = 0
+            var lastCoverageStatus = ""
 
             while (true) {
                 attempts++
@@ -368,7 +369,8 @@ class PlacesRepository @Inject constructor(
                 val request = Request.Builder().url(OVERPASS_URL).post(body).header("X-Client-ID", clientId).build()
                 val (response, bodyStr) = executeOverpassWithRetry(request, center, "Populate")
                 val cacheHeader = response.header("X-Cache") ?: "MISS"
-                lastCacheHit = cacheHeader.equals("HIT", ignoreCase = true)
+                lastCacheHit = cacheHeader.equals("HIT", ignoreCase = true) || cacheHeader.equals("CELL", ignoreCase = true)
+                lastCoverageStatus = response.header("X-Coverage") ?: ""
                 totalNew += response.header("X-POI-New")?.toIntOrNull() ?: 0
                 totalKnown += response.header("X-POI-Known")?.toIntOrNull() ?: 0
                 val (results, rawCount) = parseOverpassJson(bodyStr)
@@ -390,12 +392,29 @@ class PlacesRepository @Inject constructor(
                     if (attempts > 1) {
                         DebugLogger.i(TAG, "Populate settled at radius=${radiusM}m after $attempts attempts")
                     }
-                    return@withContext PopulateSearchResult(results, lastCacheHit, key, radiusM, capped, totalNew, totalKnown)
+                    return@withContext PopulateSearchResult(results, lastCacheHit, key, radiusM, capped, totalNew, totalKnown, lastCoverageStatus)
                 }
             }
             @Suppress("UNREACHABLE_CODE")
             PopulateSearchResult(emptyList(), false, key, radiusM, false)
         }
+
+    /** Cancel all queued Overpass requests for this client at the proxy. Fire-and-forget. */
+    fun cancelPendingOverpass() {
+        try {
+            val request = Request.Builder()
+                .url("$PROXY_BASE/overpass/cancel")
+                .post("{}".toRequestBody("application/json".toMediaType()))
+                .header("X-Client-ID", clientId)
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: ""
+                DebugLogger.i(TAG, "Overpass cancel: ${response.code} $body")
+            }
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Overpass cancel error: ${e.message}")
+        }
+    }
 
     companion object {
         const val DEFAULT_RADIUS_M = 3000

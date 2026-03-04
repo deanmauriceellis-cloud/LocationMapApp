@@ -72,11 +72,14 @@ internal fun MainActivity.startSilentFill(center: org.osmdroid.util.GeoPoint) {
         try {
             val result = viewModel.populateSearchAt(center)
             if (result != null) {
-                DebugLogger.i("MainActivity", "Silent fill complete — ${result.results.size} POIs (${result.poiNew} new) at ${result.radiusM}m")
+                val isFresh = result.coverageStatus.equals("FRESH", ignoreCase = true)
+                DebugLogger.i("MainActivity", "Silent fill complete — ${result.results.size} POIs (${result.poiNew} new) at ${result.radiusM}m coverage=${result.coverageStatus}")
                 loadCachedPoisForVisibleArea()
                 if (showDebug) {
-                    showSilentFillBanner("Fill: ${result.results.size} POIs (${result.poiNew} new) at ${result.radiusM}m")
-                    delay(3000)
+                    val bannerText = if (isFresh) "Coverage fresh — ${result.results.size} POIs"
+                        else "Fill: ${result.results.size} POIs (${result.poiNew} new) at ${result.radiusM}m"
+                    showSilentFillBanner(bannerText)
+                    delay(if (isFresh) 1500 else 3000)
                     hideSilentFillBanner()
                 }
             } else {
@@ -254,6 +257,8 @@ internal suspend fun MainActivity.runIdlePopulateSpiral(state: IdlePopulateState
 
             if (result != null) {
                 state.consecutiveErrors = 0
+                val isFresh = result.coverageStatus.equals("FRESH", ignoreCase = true)
+
                 state.stats.pois += result.results.size
                 state.stats.newPois += result.poiNew
                 state.stats.knownPois += result.poiKnown
@@ -262,8 +267,16 @@ internal suspend fun MainActivity.runIdlePopulateSpiral(state: IdlePopulateState
                 state.stats.currentRadius = result.radiusM
                 pointIdx++
                 state.pointIdx = pointIdx
-                loadCachedPoisForVisibleArea()
 
+                // FRESH cell — already well-mapped, skip entirely (no subdivision, no countdown)
+                if (isFresh) {
+                    state.stats.status = "FRESH — skipped (${result.results.size} POIs cached)"
+                    DebugLogger.d("MainActivity", "Idle R$ring pt$pointIdx: FRESH — skipping")
+                    showIdlePopulateBanner(ring, state.stats, 0)
+                    continue
+                }
+
+                loadCachedPoisForVisibleArea()
                 val newStr = if (result.poiNew > 0) "${result.poiNew} new" else "all known"
                 state.stats.status = "Found ${result.results.size} POIs ($newStr) at ${result.radiusM}m"
 
@@ -286,7 +299,7 @@ internal suspend fun MainActivity.runIdlePopulateSpiral(state: IdlePopulateState
                 }
             }
 
-            // Countdown 45s between main grid cells (gentler than manual 30s)
+            // Countdown 45s between main grid cells
             for (sec in 45 downTo 1) {
                 showIdlePopulateBanner(ring, state.stats, sec)
                 delay(1_000L)
@@ -305,6 +318,7 @@ internal fun MainActivity.stopIdlePopulate(clearState: Boolean = false) {
     idlePopulateJob?.cancel()
     idlePopulateJob = null
     if (clearState) idlePopulateState = null
+    viewModel.cancelPendingOverpass()
     removeScanningMarker()
     statusLineManager.clear(StatusLineManager.Priority.IDLE_POPULATE)
     val resumeInfo = idlePopulateState?.let { s ->
@@ -465,6 +479,7 @@ internal fun MainActivity.startProbe10km() {
 internal fun MainActivity.stopProbe10km() {
     probe10kmJob?.cancel()
     probe10kmJob = null
+    viewModel.cancelPendingOverpass()
     removeScanningMarker()
     statusLineManager.clear(StatusLineManager.Priority.POPULATE)
     DebugLogger.i("MainActivity", "stopProbe10km()")
@@ -581,6 +596,8 @@ internal fun MainActivity.startPopulatePois() {
 
                 if (result != null) {
                     consecutiveErrors = 0
+                    val isFresh = result.coverageStatus.equals("FRESH", ignoreCase = true)
+
                     stats.pois += result.results.size
                     stats.newPois += result.poiNew
                     stats.knownPois += result.poiKnown
@@ -588,26 +605,34 @@ internal fun MainActivity.startPopulatePois() {
                     stats.cells++
                     stats.currentRadius = result.radiusM
                     pointIdx++
-                    loadCachedPoisForVisibleArea()
 
+                    // FRESH cell — already well-mapped, skip entirely
+                    if (isFresh) {
+                        stats.status = "FRESH \u2014 skipped (${result.results.size} POIs cached)"
+                        DebugLogger.d("MainActivity", "Populate R$ring pt$pointIdx: FRESH \u2014 skipping")
+                        showPopulateBanner(ring, stats, 0)
+                        continue
+                    }
+
+                    loadCachedPoisForVisibleArea()
                     val newStr = if (result.poiNew > 0) "${result.poiNew} new" else "all known"
                     stats.status = "Found ${result.results.size} POIs ($newStr) at ${result.radiusM}m"
 
                     // Recursive subdivision if settled smaller than grid radius
                     if (result.radiusM < settledRadius) {
-                        stats.status = "Dense area! ${settledRadius}m\u2192${result.radiusM}m — filling 8 gaps"
+                        stats.status = "Dense area! ${settledRadius}m\u2192${result.radiusM}m \u2014 filling 8 gaps"
                         showPopulateBanner(ring, stats, 0)
                         searchCellSubdivisions(point, settledRadius, result.radiusM, 0, ring, stats)
                         stats.depth = 0
                         stats.currentRadius = settledRadius
-                        stats.status = "Subdivision done — back to main grid"
+                        stats.status = "Subdivision done \u2014 back to main grid"
                     }
                 } else {
                     stats.fails++
-                    stats.status = "Search failed — retrying\u2026"
+                    stats.status = "Search failed \u2014 retrying\u2026"
                     consecutiveErrors++
                     if (consecutiveErrors >= 5) {
-                        toast("Populate stopped — 5 consecutive errors")
+                        toast("Populate stopped \u2014 5 consecutive errors")
                         DebugLogger.w("MainActivity", "Populate auto-stopped after 5 consecutive errors")
                         break
                     }
@@ -698,6 +723,7 @@ internal suspend fun MainActivity.searchCellSubdivisions(
 internal fun MainActivity.stopPopulatePois() {
     populateJob?.cancel()
     populateJob = null
+    viewModel.cancelPendingOverpass()
     removeScanningMarker()
     statusLineManager.clear(StatusLineManager.Priority.POPULATE)
     loadCachedPoisForVisibleArea()

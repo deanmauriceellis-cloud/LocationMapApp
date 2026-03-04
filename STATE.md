@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 60 (Overpass Retry + Zoom 16 Labels + Tap-to-Stop)
+## Last Updated: 2026-03-04 Session 61 (Scan Cell Coverage + Queue Cancel)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -118,6 +118,14 @@
   - State preservation: stopped idle scanner resumes from last ring/point (not from scratch)
   - State cleared on: long-press, GPS move >100m, goToLocation, manual populate start
 - **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta, **retry with 3-endpoint rotation + exponential backoff** (proxy + app-side)
+  - **Queue cancel** (`POST /overpass/cancel`): flushes all queued requests for a client; called on stop follow, stop populate, GPS move
+- **Scan cell coverage** (v1.5.59): ~1.1km grid cells track when areas were last scanned
+  - Decision flow: exact cache → covering cache → cache-only merge → **scan cell FRESH → serve from poiCache** → upstream Overpass
+  - `X-Cache: CELL` + `X-Coverage: FRESH/STALE/EMPTY` headers on all `/overpass` responses
+  - Configurable: `SCAN_FRESHNESS_MS` (default 24h), `MIN_COVERAGE_POIS` (default 10)
+  - Persisted to `scan-cells.json`; debug endpoint `GET /scan-cells`
+  - Idle/manual populate: FRESH cells **skipped entirely** (no search, no countdown, no subdivision)
+  - Silent fill: FRESH cells show brief "Coverage fresh" banner (1.5s vs 3s)
 - **Bbox snapping**: METAR/webcams 0.01°, aircraft 0.1° for cache hit rate
 - **Silent fill** (v1.5.28): single Overpass search on startup/restore/long-press (3-4s delay)
 - **Geofence Alert System** (v1.5.35-36) — multi-zone spatial alerting with 5 zone types
@@ -280,12 +288,13 @@
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 
-### Cache Proxy (decomposed into 18 modules)
-- `cache-proxy/server.js` — Express bootstrap, middleware, module loader (156 lines)
+### Cache Proxy (decomposed into 19 modules)
+- `cache-proxy/server.js` — Express bootstrap, middleware, module loader (164 lines)
 - `cache-proxy/lib/config.js` — environment vars, constants
 - `cache-proxy/lib/cache.js` — file-based cache engine
 - `cache-proxy/lib/opensky.js` — OpenSky OAuth2 token management
-- `cache-proxy/lib/overpass.js` — POST /overpass (queue, cache, content hash)
+- `cache-proxy/lib/scan-cells.js` — scan cell coverage tracking (~1.1km grid, persistence, debug endpoint)
+- `cache-proxy/lib/overpass.js` — POST /overpass (queue, cache, scan cells, content hash, cancel)
 - `cache-proxy/lib/db-pois.js` — 8 /db/pois/* routes + /pois/website
 - `cache-proxy/lib/db-aircraft.js` — 4 /db/aircraft/* routes
 - `cache-proxy/lib/aircraft.js` — /aircraft endpoint
@@ -304,6 +313,7 @@
 - `cache-proxy/cache-data.json` — persistent cache (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
 - `cache-proxy/poi-cache.json` — individual POI cache, deduped by type+id (gitignored)
+- `cache-proxy/scan-cells.json` — scan cell coverage timestamps + POI counts (gitignored)
 - `cache-proxy/schema.sql` — PostgreSQL schema for permanent POI storage
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — all debug endpoint handlers

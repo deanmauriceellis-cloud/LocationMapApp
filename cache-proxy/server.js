@@ -110,7 +110,15 @@ require('./lib/db-aircraft')(app, deps);
 // Aircraft (needs opensky + cache)
 require('./lib/aircraft')(app, deps);
 
-// Overpass (needs cache + POI cache; returns queue length accessor)
+// Scan cells (coverage tracking — must load before overpass)
+const scanCellsModule = require('./lib/scan-cells')(app, deps);
+deps.scanCells = scanCellsModule.scanCells;
+deps.checkCoverage = scanCellsModule.checkCoverage;
+deps.markScanned = scanCellsModule.markScanned;
+deps.collectPoisInRadius = scanCellsModule.collectPoisInRadius;
+deps.SCAN_CELLS_FILE = scanCellsModule.SCAN_CELLS_FILE;
+
+// Overpass (needs cache + POI cache + scan cells; returns queue length accessor)
 const overpassModule = require('./lib/overpass')(app, deps);
 deps.getOverpassQueueLength = overpassModule.getOverpassQueueLength;
 
@@ -152,5 +160,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Chat:   GET /chat/rooms, POST /chat/rooms, GET /chat/rooms/:id/messages, Socket.IO');
   console.log('Social: GET/POST /comments/:osm_type/:osm_id, POST /comments/:id/vote, DELETE /comments/:id');
   console.log(`        JWT: ${process.env.JWT_SECRET ? 'secret configured' : 'WARNING — using random secret'}`);
+  console.log('Scan:   GET /scan-cells');
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });
