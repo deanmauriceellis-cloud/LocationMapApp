@@ -2,6 +2,47 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04d (COMMERCIALIZATION.md v2.0 — Lawyer-Ready Enhancement)
+
+### Context
+Rewrote COMMERCIALIZATION.md from a 15-section technical reference (1,019 lines) into a 27-section, 3-part lawyer-ready document (1,897 lines). Goal: hand the document to an attorney who has never seen the app and have them understand the product, business model, legal risks, and give actionable advice.
+
+### Changes Made
+
+#### 1. COMMERCIALIZATION.md — Complete Restructure (1,019 → 1,897 lines)
+
+**Part A — What the Lawyer Needs to Know (4 new/enhanced sections)**
+- §1 Product Description: plain-English app overview, features, tech stack, audience, dev status
+- §2 Revenue Model & Freemium Design: free+ads / paid tier ($2.99–$4.99/mo), Google's cut, ad revenue estimates, legal implications
+- §3 Data Flow Description: what's collected, ASCII data flow diagram, what users see about each other, what third parties receive, encryption status
+- §4 Executive Summary: enhanced with Likelihood column and reading guide
+
+**Part B — Legal Analysis (6 new sections + expanded privacy)**
+- §5 Finding the Right Attorney: type needed, where to find (MA Bar, SCORE, meetups), what to bring, budget, red flags, timing
+- §9.7–9.10 International Privacy: GDPR, UK GDPR, 5 other jurisdictions, phased expansion roadmap
+- §11 Dependency Inventory: 22 Android + 12 Node.js libraries with license + risk (flagged: osmbonuspack LGPL, JTS EPL-2.0, duck-duck-scrape ToS risk)
+- §12 Ad Network Compliance: AdMob requirements, UMP consent, COPPA+ads, ad content filtering, revenue estimates
+- §13 In-App Purchase & Google Play Billing: Billing Library, 15%/30% commission, post-Epic v. Google, subscription legal requirements
+- §14 Tax Considerations: sales tax (Google collects), income tax, S-Corp election, quarterly estimates, deductible expenses, CPA timing
+- §15 Social Media Integration: current status (none), future options, social login legal requirements
+- §17 Competitor Analysis: 8 comparable apps (Google Maps, Yelp, Flightradar24, Waze, Transit, AllTrails, RadarScope, Aloft) with legal approach
+
+**Part C — Implementation & Execution (3 new sections + expanded checklist)**
+- §24 Cost Summary: updated with Google Play dev ($25), CPA ($200–500), revenue projections vs costs, breakeven analysis (~1,500–2,500 MAU)
+- §25 Risk Matrix: 14 risks scored by Probability × Impact (1–5 scale), priority actions ranked by score
+- §26 Specific Questions for Attorney: 17 questions in 3 tiers (Must/Should/Can defer), serves as meeting agenda
+- §27 Master Checklist: expanded from 8 → 10 phases, added Monetization Setup + Future Growth phases, ~70 items
+
+All 15 original sections preserved (renumbered, Cloud Deployment moved to Part C as §23).
+
+### Files Modified (4)
+- `COMMERCIALIZATION.md` — complete rewrite (1,019 → 1,897 lines)
+- `STATE.md` — updated Commercialization section + Next Steps
+- `SESSION-LOG.md` — added this session entry
+- `memory/MEMORY.md` — updated commercialization references
+
+---
+
 ## Session: 2026-03-04c (v1.5.57 — POI Coverage Expansion + Cuisine Search)
 
 ### Context
