@@ -122,21 +122,38 @@
 - [x] **GIN trigram index** — `idx_pois_name_trgm` on pois.name
 - [x] **Build passes** — assembleDebug succeeds
 
-### NOT YET TESTED — Resume Here
+### Completed — Smart Fuzzy Search (Session 54 — v1.5.52)
 
-#### v1.5.51 Smart Fuzzy Search
-- [ ] **Proxy restart** — restart proxy to load new `/db/pois/search` handler
-- [ ] **Fuzzy typo search** — `curl "localhost:3000/db/pois/search?q=starbcks&lat=42.36&lon=-71.06&limit=5"` returns Starbucks results with similarity scores
-- [ ] **Keyword category hint** — `curl "localhost:3000/db/pois/search?q=historic&lat=42.36&lon=-71.06&limit=10"` returns `category_hint: "Tourism & History"` with tourism POIs
-- [ ] **Combined keyword+name** — `curl "localhost:3000/db/pois/search?q=historic+church&lat=42.36&lon=-71.06"` returns Tourism & History + fuzzy "church"
-- [ ] **Keyword-only browse** — `curl "localhost:3000/db/pois/search?q=gas&lat=42.36&lon=-71.06"` returns Fuel & Charging POIs by distance
-- [ ] **Distance expansion** — rare query expands beyond 50km scope
-- [ ] **On-device: keyword search** — type "gas" in Find search bar → shows "Showing Fuel & Charging" hint + nearby gas stations
-- [ ] **On-device: fuzzy search** — type "Dunkin" → fuzzy-matches Dunkin' Donuts by distance
-- [ ] **On-device: rich result rows** — verify 3-line layout (bold name, gray detail, colored category)
-- [ ] **On-device: result footer** — verify count + scope label at bottom
-- [ ] **On-device: category hint chip** — verify cyan "Showing X" label on keyword searches
-- [ ] **On-device: debounce** — verify 1s delay before search fires (not 500ms)
+#### Proxy API Tests — ALL PASS
+- [x] **Proxy restart** — proxy loaded with all social/search routes
+- [x] **Fuzzy typo search** — "starbcks" → 5 Starbucks results, similarity 0.583, sorted by distance (96m–644m)
+- [x] **Keyword category hint** — "historic" → `category_hint: "Tourism & History"`, monuments/memorials/attractions
+- [x] **Combined keyword+name** — "historic church" → Tourism & History + fuzzy "church" (Old North Church, First Church in Malden)
+- [x] **Keyword-only browse** — "gas" → `category_hint: "Fuel & Charging"`, ChargePoint/Shell/fuel stations by distance
+- [x] **Distance expansion** — "observatory" from remote lat/lon expanded to 200km scope; "antiques" expanded to 160km (100mi max)
+- [x] **Dunkin Donts typo** — fuzzy matched "Dunkin' Donuts" at 18–50km, score 0.667
+
+#### On-Device UI Tests — ALL PASS
+- [x] **Keyword search "gas"** — cyan "Showing Fuel & Charging" hint in header bar + ChargePoint/Shell results
+- [x] **Fuzzy search "Dunkin"** — matched Dunkin' locations, "donut, coffee_shop" detail, "Food & Drink" category
+- [x] **Fuzzy "starbcks" (with typo prefix)** — still found Starbucks (resilient to noise)
+- [x] **Keyword "historic"** — "Showing Tourism & History" + Birthplace of Telephone, Golden Teapot, Upper Plaza
+- [x] **Rich result rows** — 3-line layout: bold name, gray detail (cuisine/brand), colored category label
+- [x] **Header hint** — count + category + "refine to narrow" in title bar next to "Find"
+- [x] **Result count** — "200+ Fuel & Charging · refine to narrow" for broad queries, "6" for narrow "antiques"
+- [x] **Clear button** — ✕ clears search, restores category grid, clears header hint
+- [x] **Debounce** — 1s delay confirmed (results don't appear during typing)
+
+#### Bugs Fixed (Session 54)
+1. **Search results invisible** — `gridScroll` (weight=1f) consumed all space; `searchScroll` had no weight and was pushed offscreen. Fixed by toggling `gridScroll.visibility` and giving `searchScroll` matching weight.
+2. **`searchResultsList` stuck GONE** — inner LinearLayout had `visibility = View.GONE` that was never set back. Removed initial GONE since parent `searchScroll` handles visibility.
+
+#### Enhancements (Session 54)
+- **Header hint**: result count/category moved from buried footer to title bar ("Find  200+ Fuel & Charging · refine to narrow")
+- **Search limit**: 50 → 200 results (server already capped at 200)
+- **Distance expansion**: radii changed to [50km, 100km, 160,934m (100mi)], threshold ≥50 results (was ≥3)
+
+### NOT YET TESTED — Resume Here
 
 #### v1.5.48 Tunings
 - [x] **Zoom 18 on first GPS fix** — verified by user, street-level view on fresh app start

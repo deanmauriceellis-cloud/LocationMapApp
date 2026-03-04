@@ -503,7 +503,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    suspend fun searchPoisByName(query: String, lat: Double, lon: Double, limit: Int = 50): SearchResponse? {
+    suspend fun searchPoisByName(query: String, lat: Double, lon: Double, limit: Int = 200): SearchResponse? {
         return try {
             findRepository.searchByName(query, lat, lon, limit)
         } catch (e: Exception) {

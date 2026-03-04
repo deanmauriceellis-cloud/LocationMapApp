@@ -4040,7 +4040,14 @@ class MainActivity : AppCompatActivity() {
             textSize = 18f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val headerHint = TextView(this).apply {
+            textSize = 12f
+            setTextColor(Color.parseColor("#9E9E9E"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(10)
+            }
+            visibility = View.GONE
         }
         val closeBtn = TextView(this).apply {
             text = "\u2715"
@@ -4054,6 +4061,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(16), dp(12), dp(12), dp(8))
             gravity = android.view.Gravity.CENTER_VERTICAL
             addView(titleText)
+            addView(headerHint)
             addView(closeBtn)
         }
 
@@ -4195,11 +4203,21 @@ class MainActivity : AppCompatActivity() {
         val searchResultsList = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), 0, dp(8), dp(8))
-            visibility = View.GONE
         }
         val searchScroll = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
             addView(searchResultsList)
             visibility = View.GONE
+        }
+
+        // Define gridScroll early so text watcher can toggle it
+        val gridScroll = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            visibility = View.VISIBLE
         }
 
         val searchBar = android.widget.EditText(this).apply {
@@ -4236,7 +4254,8 @@ class MainActivity : AppCompatActivity() {
                 visibility = View.GONE
                 searchScroll.visibility = View.GONE
                 searchResultsList.removeAllViews()
-                grid.visibility = View.VISIBLE
+                gridScroll.visibility = View.VISIBLE
+                headerHint.visibility = View.GONE
             }
         }
         searchBarContainer.addView(clearBtn)
@@ -4253,13 +4272,15 @@ class MainActivity : AppCompatActivity() {
                     clearBtn.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
                     searchScroll.visibility = View.GONE
                     searchResultsList.removeAllViews()
-                    grid.visibility = View.VISIBLE
+                    gridScroll.visibility = View.VISIBLE
+                    headerHint.visibility = View.GONE
                     return
                 }
                 clearBtn.visibility = View.VISIBLE
-                grid.visibility = View.GONE
+                gridScroll.visibility = View.GONE
                 searchScroll.visibility = View.VISIBLE
                 searchResultsList.removeAllViews()
+                headerHint.visibility = View.GONE
                 // Show spinner
                 val spinner = android.widget.ProgressBar(this@MainActivity).apply {
                     setPadding(0, dp(24), 0, dp(24))
@@ -4272,6 +4293,9 @@ class MainActivity : AppCompatActivity() {
                     val response = viewModel.searchPoisByName(query, mapCenter.latitude, mapCenter.longitude)
                     searchResultsList.removeAllViews()
                     if (response == null || response.results.isEmpty()) {
+                        headerHint.text = "No results"
+                        headerHint.setTextColor(Color.parseColor("#9E9E9E"))
+                        headerHint.visibility = View.VISIBLE
                         searchResultsList.addView(TextView(this@MainActivity).apply {
                             text = "No results for \"$query\""
                             textSize = 14f
@@ -4280,15 +4304,13 @@ class MainActivity : AppCompatActivity() {
                         })
                         return@launch
                     }
-                    // Category hint chip
-                    if (response.categoryHint != null) {
-                        searchResultsList.addView(TextView(this@MainActivity).apply {
-                            text = "Showing ${response.categoryHint}"
-                            textSize = 12f
-                            setTextColor(Color.parseColor("#00BCD4"))
-                            setPadding(dp(4), dp(4), dp(4), dp(4))
-                        })
-                    }
+                    // Update header hint with count + category
+                    val countLabel = if (response.totalCount >= 200) "200+" else "${response.totalCount}"
+                    val catPart = if (response.categoryHint != null) " ${response.categoryHint}" else ""
+                    val refineHint = if (response.totalCount >= 50) " · refine to narrow" else ""
+                    headerHint.text = "$countLabel$catPart$refineHint"
+                    headerHint.setTextColor(if (response.categoryHint != null) Color.parseColor("#00BCD4") else Color.parseColor("#9E9E9E"))
+                    headerHint.visibility = View.VISIBLE
                     // Get category label lookup for display
                     val catLabelMap = mutableMapOf<String, Pair<String, Int>>()
                     for (cat in com.example.locationmapapp.ui.menu.PoiCategories.ALL) {
@@ -4391,12 +4413,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        val gridScroll = android.widget.ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-            )
-            addView(grid)
-        }
+        gridScroll.addView(grid)
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

@@ -1403,8 +1403,8 @@ app.get('/db/pois/search', requirePg, async (req, res) => {
     const { keyword, categoryLabel, categoryTags, remainingQuery } = parseSearchKeywords(q);
     const hasNameQuery = remainingQuery.length >= 2;
 
-    // Distance expansion radii
-    const radii = [50000, 200000, 1000000, 0]; // 0 = global
+    // Distance expansion radii — expand until ≥50 results, max 100 miles (160,934m)
+    const radii = [50000, 100000, 160934];
     let finalRows = [];
     let scopeM = 0;
 
@@ -1466,7 +1466,7 @@ app.get('/db/pois/search', requirePg, async (req, res) => {
       finalRows = result.rows;
       scopeM = radiusM || 99999000;
 
-      if (finalRows.length >= 3) break; // enough results
+      if (finalRows.length >= 50) break; // enough results
     }
 
     res.json({

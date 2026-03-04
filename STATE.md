@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 53 (Smart Fuzzy Search — pg_trgm, Keyword Hints, Rich Results)
+## Last Updated: 2026-03-03 Session 54 (Fuzzy Search Testing & Fixes — Header Hints, 200 Limit, 100mi Expansion)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -26,9 +26,9 @@
   - Typo-tolerant: "Starbcks" finds Starbucks, "Dunkin Donts" finds Dunkin' Donuts
   - ~80 keyword→category mappings: "historic" → Tourism & History, "gas" → Fuel & Charging, etc.
   - Combined queries: "food italian" → Food & Drink category + fuzzy "italian" name match
-  - Distance expansion: 50km → 200km → 1000km → global (stops at ≥3 results)
+  - Distance expansion: 50km → 100km → 100mi/160,934m (stops at ≥50 results)
   - Rich result rows: bold name, detail line (cuisine/brand), category label in category color
-  - Category hint chip + result footer with count/scope
+  - Header hint bar: count + category + "refine to narrow" in title bar next to "Find" (200 result limit)
 - **MBTA transit** — live vehicles (buses, CR, subway) with directional arrows + staleness detection
   - Commuter rail: next-stop ETA badge on labeled markers (batch predictions API)
   - ~270 train stations: tap → arrival board (30s auto-refresh) → trip schedule

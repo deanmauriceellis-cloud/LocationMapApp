@@ -2,16 +2,26 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.52] — 2026-03-03
+
+### Fixed
+- **Search results not showing** — `gridScroll` consumed all space with weight=1f, `searchScroll` had no weight and was pushed offscreen; now both toggle visibility with matching weight
+- **`searchResultsList` invisible** — inner LinearLayout started with `visibility = GONE` that was never restored; removed initial GONE (parent ScrollView handles visibility)
+
+### Changed
+- **Header hint bar** — result count + category + "refine to narrow" now shown in title bar next to "Find" (was buried in scrollable footer)
+- **Search result limit** — 50 → 200 (server already capped at 200)
+- **Distance expansion** — radii changed to 50km → 100km → 160,934m (100 miles max); expansion threshold ≥50 results (was ≥3)
+
 ## [1.5.51] — 2026-03-03
 
 ### Added
 - **Smart fuzzy search** — Find dialog search bar now handles typos, partial matches, and category keywords
   - **pg_trgm fuzzy matching**: `similarity()` scoring with GIN trigram index — "Dunkin Donts" finds "Dunkin' Donuts", "Starbcks" finds "Starbucks"
   - **Keyword→category hints**: ~80 keyword mappings (e.g., "historic" → Tourism & History, "gas" → Fuel & Charging, "food italian" → Food & Drink + fuzzy "italian")
-  - **Distance expansion**: auto-expands 50km → 200km → 1000km → global until ≥3 results found
-  - **Category hint chip**: cyan "Showing Tourism & History" label above results when keyword detected
+  - **Distance expansion**: auto-expands 50km → 100km → 100mi until ≥50 results found
+  - **Header hint**: cyan "Showing Tourism & History" + count in title bar when keyword detected
   - **Rich result rows**: 3-line layout — bold name (13f), detail line (cuisine/brand/type, 11f gray), category label (10f, category color)
-  - **Result footer**: count + scope label + farthest result distance
   - **Composite scoring**: exact substring matches rank above fuzzy-only; keyword-only queries browse by distance
 - **`SearchResponse` model** — new data class with `categoryHint` and `scopeM` fields
 

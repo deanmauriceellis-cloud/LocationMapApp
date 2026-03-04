@@ -2,6 +2,51 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03e (v1.5.52 — Fuzzy Search Testing & Fixes)
+
+### Context
+Testing the v1.5.51 fuzzy search on-device revealed the search results were invisible — two layout bugs prevented the results ScrollView from displaying. Also improved UX with header hints and expanded search limits.
+
+### Bugs Fixed
+
+#### 1. Search results invisible (MainActivity.kt)
+- `gridScroll` had `weight=1f` and consumed all vertical space even when its child `grid` was set to GONE
+- `searchScroll` had no layout weight, defaulted to WRAP_CONTENT, pushed off screen below gridScroll
+- Fix: created `gridScroll` early, toggle its visibility (not just `grid`); gave `searchScroll` matching `weight=1f`
+
+#### 2. searchResultsList stuck GONE (MainActivity.kt)
+- Inner `searchResultsList` LinearLayout was initialized with `visibility = View.GONE` and never set back
+- Fix: removed initial GONE since parent `searchScroll` handles visibility
+
+### Enhancements
+
+#### 3. Header hint bar (MainActivity.kt)
+- Moved result count/category from inline list item (buried under 200 results) to title bar next to "Find"
+- Shows: "200+ Fuel & Charging · refine to narrow" (cyan for keyword, gray for name-only)
+- Clears when search is cleared or query < 2 chars
+
+#### 4. Search limit 50 → 200 (MainViewModel.kt)
+- Default limit param changed from 50 to 200 (server already capped at 200)
+- Header shows "200+" when at limit, exact count otherwise
+
+#### 5. Distance expansion tuning (server.js)
+- Radii: `[50000, 200000, 1000000, 0]` → `[50000, 100000, 160934]` (100 miles max)
+- Threshold: ≥3 → ≥50 results before stopping expansion
+
+### Testing — ALL PASS
+- **Proxy API**: 7 curl tests (typo, keyword, combined, browse, expansion, Dunkin Donts)
+- **On-device**: keyword search, fuzzy search, rich rows, header hint, clear button, debounce
+
+### Files Modified (3)
+- `cache-proxy/server.js` — distance expansion radii + threshold
+- `app/.../ui/MainViewModel.kt` — limit 50→200
+- `app/.../ui/MainActivity.kt` — gridScroll/searchScroll fix, headerHint bar
+
+### Build
+- `assembleDebug` — BUILD SUCCESSFUL
+
+---
+
 ## Session: 2026-03-03d (v1.5.51 — Smart Fuzzy Search)
 
 ### Context
