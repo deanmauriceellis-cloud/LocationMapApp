@@ -2,6 +2,23 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.50] — 2026-03-03
+
+### Changed
+- **Find dialog ScrollView wrapping** — main category grid and subtype grids wrapped in ScrollView with weight=1f layout; dialog height now 85% of screen; all 18 cells (Favorites + 17 categories) and large subtype grids (26 Shopping, 18 Entertainment) scroll smoothly instead of clipping at screen bottom
+- **Cell height cap** — auto-fit cell height now capped at dp(120) max to prevent oversized cells on categories with few subtypes
+- **Find distance unlimited** — `/db/pois/find` scope expands through 50km → 200km → 1000km → global (no bbox); rare POIs like zoos and theme parks now return results regardless of distance
+
+### Added
+- **16 new POI subtypes** across 6 categories (122 → 138 total subtypes):
+  - Food & Drink: Breweries (`craft=brewery`), Wineries (`craft=winery`), Distilleries (`craft=distillery`)
+  - Civic & Gov: Recycling (`amenity=recycling`), Embassies (`office=diplomatic`)
+  - Shopping: Pet Stores, Electronics, Bicycle Shops, Garden Centers
+  - Tourism & History: Zoos, Aquariums, Theme Parks
+  - Entertainment: Water Parks, Mini Golf, Escape Rooms
+  - Parks & Rec: Beaches (`leisure=beach_resort`)
+- **`craft` category key** — added to `POI_CATEGORY_KEYS` in server.js for brewery/winery/distillery POI import recognition
+
 ## [1.5.49] — 2026-03-03
 
 ### Added

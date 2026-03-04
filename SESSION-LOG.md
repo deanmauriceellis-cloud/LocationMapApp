@@ -2,6 +2,44 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03c (v1.5.50 — Find Dialog Overhaul)
+
+### Context
+Find dialog had three issues: bottom rows clipped (5-row main grid, 8+ row subtype grids overflow screen), 200km distance cap preventing results for rare POIs (zoos, theme parks), and missing useful subtypes. Wrapped grids in ScrollView, removed distance cap, and added 16 new subtypes.
+
+### Changes Made
+
+#### 1. ScrollView Wrapping (MainActivity.kt)
+- **Main category grid** (`showFindCategoryGrid`): wrapped `grid` in `ScrollView` with `layoutParams = LayoutParams(MATCH_PARENT, 0, 1f)`; search bar stays fixed above
+- **Subtype grid** (`showFindSubtypeGrid`): same ScrollView wrapping pattern
+- **Dialog height**: changed from `WRAP_CONTENT` to `(dm.heightPixels * 0.85).toInt()` for both grids
+- **Cell height cap**: added `minOf(dp(120), ...)` to prevent oversized cells on small categories
+
+#### 2. Unlimited Distance (server.js)
+- Changed scope array from `[50, 200]` to `[50, 200, 1000, 0]`
+- When `tryKm === 0`: skips bbox WHERE clause entirely, queries full database ordered by distance
+- Verified: zoo search from Beverly MA returned results at 694–1413km (previously 0 results)
+
+#### 3. New Subtypes (PoiCategories.kt + server.js)
+- Added `'craft'` to `POI_CATEGORY_KEYS` array in server.js
+- 16 new subtypes added to PoiCategories.kt across 6 categories (tags + subtypes lists)
+- Total subtypes: 122 → 138
+
+### Test Results
+- Build passes, APK installed successfully
+- Find main grid: all 18 cells visible, scrolls to Entertainment/Offices row
+- Shopping: all 26 subtypes visible with scroll (Pet Stores 6, Electronics 2, Bicycle Shops 3, Garden Centers 9)
+- Entertainment: all 18 subtypes visible with scroll (Water Parks, Mini Golf 1, Escape Rooms 1)
+- Count badges displaying correctly on all cells
+- `/db/pois/find` zoo search: 5 results returned at 694–1413km with `scope_m: 0` (global fallback)
+
+### Files Modified
+- `app/.../ui/MainActivity.kt` — ScrollView wrapping + cell height cap (~20 lines changed)
+- `app/.../ui/menu/PoiCategories.kt` — 16 new subtypes + tags (~50 lines added)
+- `cache-proxy/server.js` — `craft` key + unlimited distance find (~40 lines changed)
+
+---
+
 ## Session: 2026-03-03b (v1.5.49 — Automated POI DB Import)
 
 ### Context

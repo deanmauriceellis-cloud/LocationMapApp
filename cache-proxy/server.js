@@ -414,7 +414,7 @@ let dbImportStats = { lastUpserted: 0, lastSkipped: 0, lastElapsedMs: 0, totalRu
 const DB_IMPORT_INTERVAL_MS = 15 * 60 * 1000;
 const DB_IMPORT_BATCH_SIZE = 500;
 
-const POI_CATEGORY_KEYS = ['amenity', 'shop', 'tourism', 'leisure', 'historic', 'office'];
+const POI_CATEGORY_KEYS = ['amenity', 'shop', 'tourism', 'leisure', 'historic', 'office', 'craft'];
 
 function derivePoiCategory(tags) {
   if (!tags) return null;
@@ -1561,15 +1561,48 @@ app.get('/db/pois/find', requirePg, async (req, res) => {
     const catList = categories ? categories.split(',').map(c => c.trim()).filter(Boolean) : [];
     if (catList.length === 0) return res.status(400).json({ error: 'categories required (comma-separated)' });
 
-    // Try 50km first, expand to 200km if too few results
+    // Try expanding scopes: 50km → 200km → 1000km → global (0 = no bbox)
     let scopeKm = 50;
     let rows, totalInRange;
 
     // Inline lat/lon in Haversine to avoid pg type inference issues
     const distExpr = haversine(String(userLat), String(userLon));
 
-    for (const tryKm of [50, 200]) {
+    for (const tryKm of [50, 200, 1000, 0]) {
       scopeKm = tryKm;
+
+      if (tryKm === 0) {
+        // Global fallback — no bbox filter, just closest by distance
+        const catPlaceholders = catList.map((_, i) => `$${i + 1}`).join(', ');
+        const params = [...catList];
+        const limitIdx = params.length + 1;
+        const offsetIdx = params.length + 2;
+        params.push(maxResults, skip);
+
+        const sql = `
+          SELECT osm_type, osm_id, lat, lon, name, category, tags,
+                 ${distExpr} AS distance_m
+          FROM pois
+          WHERE category IN (${catPlaceholders})
+          ORDER BY distance_m
+          LIMIT $${limitIdx} OFFSET $${offsetIdx}
+        `;
+        const countSql = `
+          SELECT COUNT(*)::int AS total
+          FROM pois
+          WHERE category IN (${catPlaceholders})
+        `;
+        const countParams = catList;
+
+        const [dataResult, countResult] = await Promise.all([
+          pgPool.query(sql, params),
+          pgPool.query(countSql, countParams)
+        ]);
+        rows = dataResult.rows;
+        totalInRange = countResult.rows[0]?.total || 0;
+        break;
+      }
+
       const degLat = tryKm / 111.0;
       const degLon = degLat / Math.cos(userLat * Math.PI / 180);
 
@@ -1616,7 +1649,7 @@ app.get('/db/pois/find', requirePg, async (req, res) => {
       rows = dataResult.rows;
       totalInRange = countResult.rows[0]?.total || 0;
 
-      if (rows.length >= maxResults || tryKm >= 200) break;
+      if (rows.length >= maxResults || tryKm === 0) break;
     }
 
     const elements = rows.map(row => ({

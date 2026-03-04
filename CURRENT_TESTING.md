@@ -107,13 +107,30 @@
 - [x] **pendingDelta** — drops to 0 after successful import
 - [x] **15-min timer** — setInterval registered at startup (guarded by pgPool)
 
+### Completed — Find Dialog Overhaul (Session 52 — v1.5.50)
+- [x] **ScrollView main grid** — all 18 cells visible, scrolls to bottom row (Entertainment, Offices)
+- [x] **ScrollView subtype grid** — Shopping (26 subtypes), Entertainment (18 subtypes) all scrollable
+- [x] **Cell height cap** — cells properly sized with 120dp max, no oversized cells
+- [x] **Count badges** — all categories show counts after back-navigation (Food 271, Parks 1.1k, Shopping 274, etc.)
+- [x] **New Shopping subtypes** — Pet Stores (6), Electronics (2), Bicycle Shops (3), Garden Centers (9) visible
+- [x] **New Entertainment subtypes** — Water Parks, Mini Golf (1), Escape Rooms (1) visible
+- [x] **Unlimited distance** — zoo search returned 5 results at 694–1413km (`scope_m: 0` global fallback)
+- [x] **`craft` category key** — added to server.js POI_CATEGORY_KEYS (breweries etc. will appear after next import)
+
 ### NOT YET TESTED — Resume Here
 
 #### v1.5.48 Tunings
-- [ ] **Zoom 18 on first GPS fix** — verify street-level view on fresh app start
-- [ ] **Zoom 18 on Go To** — navigate to a city, verify zooms to 18
-- [ ] **Radar transparency** — toggle radar on, verify noticeably more transparent
+- [x] **Zoom 18 on first GPS fix** — verified by user, street-level view on fresh app start
+- [x] **Zoom 18 on Go To** — verified by user, zooms to 18
+- [x] **Radar transparency** — verified by user, noticeably more transparent
 - [ ] **Idle populate skip** — in a dense area (DC), verify idle populate does NOT trigger after 10 min
+
+#### v1.5.50 Find Dialog (remaining)
+- [ ] **Food & Drink subtypes** — verify Breweries/Wineries/Distilleries visible (15 subtypes)
+- [ ] **Civic & Gov subtypes** — verify Recycling/Embassies visible (9 subtypes)
+- [ ] **Tourism & History subtypes** — verify Zoos/Aquariums/Theme Parks visible (15 subtypes)
+- [ ] **Parks & Rec subtypes** — verify Beaches visible (15 subtypes)
+- [ ] **Find results tap** — tap a subtype, verify distance-sorted results load + tap opens POI detail
 
 #### Social Layer (from Session 47)
 - [x] **Multi-user chat** — BlueStacks as 2nd device confirmed traffic; verify gray bubbles visually

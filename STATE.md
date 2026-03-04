@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 51 (Automated POI DB Import — Delta Every 15min)
+## Last Updated: 2026-03-03 Session 52 (Find Dialog Overhaul — ScrollView, Unlimited Distance, 16 New Subtypes)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -10,7 +10,7 @@
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
-- **17 POI categories** with submenu refinement (central config in `PoiCategories.kt`)
+- **17 POI categories, 138 subtypes** with submenu refinement (central config in `PoiCategories.kt`)
   - 5dp colored dots; zoom ≥ 18: labeled icons with type + name
   - Layer-aware LiveData `Pair<String, List>`, viewport-only display via `/pois/bbox`
   - All layers default ON except aircraft (OFF)
@@ -84,8 +84,11 @@
   - `estimateFillRadius()`: targets ~200 POIs per search area, scales by density
   - Fill Probe Populate: stub for future implementation
 - **Vehicle follow**: tap → track, staleness detection (>2 min), POI prefetch along route
-- **Find dialog** (v1.5.26): category grid → subtype grid → distance-sorted results, long-press filter mode
-  - Counts scoped to 10km radius around map center; auto-fit cell heights for all screen sizes
+- **Find dialog** (v1.5.26, overhauled v1.5.50): category grid → subtype grid → distance-sorted results, long-press filter mode
+  - Counts scoped to 10km radius around map center; auto-fit cell heights (36dp min, 120dp max cap)
+  - ScrollView wrapping on both grids — large categories (26 Shopping, 18 Entertainment) scroll instead of clipping
+  - Dialog height 85% of screen; search bar fixed above scrollable grid
+  - Unlimited distance on `/db/pois/find`: scope expands 50km → 200km → 1000km → global (no bbox)
   - Text search bar (v1.5.44): debounced name search above category grid, 500ms delay, min 2 chars
   - Favorites cell (v1.5.44): gold star, first in grid, shows count badge, tap for sorted favorites list
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map/Share)
@@ -208,7 +211,7 @@
 - `app/src/main/java/.../ui/MarkerIconHelper.kt` — icon/dot rendering with cache
 - `app/src/main/java/.../ui/WeatherIconHelper.kt` — NWS icon code → drawable mapping
 - `app/src/main/java/.../ui/StatusLineManager.kt` — priority-based toolbar status line manager
-- `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 16 POI categories
+- `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 17 POI categories (138 subtypes)
 - `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search (injects `@ApplicationContext` for X-Client-ID)
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
 - `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft

@@ -4067,7 +4067,7 @@ class MainActivity : AppCompatActivity() {
         val gridPadV = dp(20)    // grid vertical padding
         val marginPerRow = dp(6) // top+bottom margins per cell
         val availH = screenH - headerH - searchBarH - gridPadV
-        val cellH = maxOf(dp(36), (availH / rowCount) - marginPerRow)
+        val cellH = maxOf(dp(36), minOf(dp(120), (availH / rowCount) - marginPerRow))
 
         val grid = android.widget.GridLayout(this).apply {
             columnCount = colCount
@@ -4335,19 +4335,26 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        val gridScroll = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            addView(grid)
+        }
+
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1A1A1A"))
             addView(header)
             addView(searchBarContainer)
-            addView(grid)
+            addView(gridScroll)
             addView(searchScroll)
         }
 
         dialog.setContentView(container)
         dialog.window?.let { win ->
             val dm = resources.displayMetrics
-            win.setLayout((dm.widthPixels * 0.90).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            win.setLayout((dm.widthPixels * 0.90).toInt(), (dm.heightPixels * 0.85).toInt())
             win.setBackgroundDrawableResource(android.R.color.transparent)
             win.setGravity(android.view.Gravity.CENTER)
         }
@@ -4402,7 +4409,7 @@ class MainActivity : AppCompatActivity() {
         val gridPadV = dp(20)
         val marginPerRow = dp(6)
         val availH = screenH - headerH - gridPadV
-        val subCellH = maxOf(dp(36), (availH / subRowCount) - marginPerRow)
+        val subCellH = maxOf(dp(36), minOf(dp(120), (availH / subRowCount) - marginPerRow))
 
         val grid = android.widget.GridLayout(this).apply {
             columnCount = colCount
@@ -4472,17 +4479,24 @@ class MainActivity : AppCompatActivity() {
             grid.addView(cell)
         }
 
+        val gridScroll = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+            addView(grid)
+        }
+
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1A1A1A"))
             addView(header)
-            addView(grid)
+            addView(gridScroll)
         }
 
         dialog.setContentView(container)
         dialog.window?.let { win ->
             val dm = resources.displayMetrics
-            win.setLayout((dm.widthPixels * 0.90).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            win.setLayout((dm.widthPixels * 0.90).toInt(), (dm.heightPixels * 0.85).toInt())
             win.setBackgroundDrawableResource(android.R.color.transparent)
             win.setGravity(android.view.Gravity.CENTER)
         }
