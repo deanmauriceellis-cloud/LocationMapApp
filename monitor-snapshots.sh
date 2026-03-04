@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# LocationMapApp v1.5
+# Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+#
+# This source code is proprietary and confidential.
+# Unauthorized copying, modification, or distribution is
+# strictly prohibited.
 #
 # monitor-snapshots.sh — 30-minute snapshot monitor
 # Runs alongside overnight test, captures screenshots + log analysis for morning review.

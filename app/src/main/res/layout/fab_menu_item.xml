@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
 <!-- layout/fab_menu_item.xml
      Single speed-dial row: small icon + text label, semi-transparent pill background.
      No filled circles — icon sits clean against whatever is behind it. -->

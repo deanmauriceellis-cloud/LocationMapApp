@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+/*
+ * LocationMapApp v1.5
+ * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ *
+ * This source code is proprietary and confidential.
+ * Unauthorized copying, modification, or distribution is
+ * strictly prohibited.
+ */
+
 // Import POIs from cache proxy into PostgreSQL
 // Usage: DATABASE_URL=postgres://user:pass@localhost/locationmapapp node import-pois.js
 

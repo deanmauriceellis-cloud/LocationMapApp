@@ -1,3 +1,12 @@
+/*
+ * LocationMapApp v1.5
+ * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ *
+ * This source code is proprietary and confidential.
+ * Unauthorized copying, modification, or distribution is
+ * strictly prohibited.
+ */
+
 package com.example.locationmapapp.ui.radar
 
 import android.os.Handler
