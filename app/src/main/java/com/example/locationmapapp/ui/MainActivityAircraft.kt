@@ -285,6 +285,8 @@ internal fun MainActivity.vehicleRouteColor(vehicle: com.example.locationmapapp.
 internal fun MainActivity.startFollowing(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
     followedAircraftIcao = null   // stop any aircraft follow
     followedVehicleId = vehicle.id
+    lastFollowedVehicleLat = vehicle.lat
+    lastFollowedVehicleLon = vehicle.lon
     DebugLogger.i("MainActivity", "Following vehicle ${vehicle.id} (${vehicle.label} — ${vehicle.routeName})")
 
     binding.mapView.controller.animateTo(vehicle.toGeoPoint())
@@ -298,6 +300,8 @@ internal fun MainActivity.stopFollowing() {
     clearFlightTrail()
     followedVehicleId = null
     followedAircraftIcao = null
+    lastFollowedVehicleLat = 0.0
+    lastFollowedVehicleLon = 0.0
     followedAircraftFailCount = 0
     autoFollowEmptyPoiCount = 0
     stopFollowedAircraftRefresh()
@@ -308,15 +312,23 @@ internal fun MainActivity.updateFollowedVehicle(vehicles: List<com.example.locat
     val id = followedVehicleId ?: return
     val vehicle = vehicles.find { it.id == id }
     if (vehicle != null) {
-        DebugLogger.i("MainActivity", "Follow update: ${vehicle.label} at ${vehicle.lat},${vehicle.lon}")
-        binding.mapView.controller.animateTo(vehicle.toGeoPoint())
+        // Always update the banner (staleness tag changes even if position doesn't)
         showFollowBanner(vehicle)
-        // Pre-fill cache: search POIs around the vehicle's current position
-        val point = vehicle.toGeoPoint()
-        DebugLogger.i("MainActivity", "Follow POI prefetch at ${point.latitude},${point.longitude}")
-        viewModel.searchPoisAt(point)
-        // Refresh full cache display after prefetch
-        binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 3000)
+
+        // Skip map animation and POI prefetch if position hasn't changed (stale vehicle)
+        val moved = vehicle.lat != lastFollowedVehicleLat || vehicle.lon != lastFollowedVehicleLon
+        if (moved) {
+            lastFollowedVehicleLat = vehicle.lat
+            lastFollowedVehicleLon = vehicle.lon
+            DebugLogger.i("MainActivity", "Follow update: ${vehicle.label} at ${vehicle.lat},${vehicle.lon}")
+            binding.mapView.controller.animateTo(vehicle.toGeoPoint())
+            // Pre-fill cache: search POIs around the vehicle's current position
+            val point = vehicle.toGeoPoint()
+            DebugLogger.i("MainActivity", "Follow POI prefetch at ${point.latitude},${point.longitude}")
+            viewModel.searchPoisAt(point)
+            // Refresh full cache display after prefetch
+            binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 3000)
+        }
     }
     // If not found in this list, it may be in another vehicle type's list — don't stop yet
 }

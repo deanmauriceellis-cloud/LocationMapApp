@@ -109,6 +109,8 @@ class MainActivity : AppCompatActivity() {
     // Vehicle / aircraft follow mode
     internal var followedVehicleId: String? = null
     internal var followedAircraftIcao: String? = null
+    internal var lastFollowedVehicleLat: Double = 0.0
+    internal var lastFollowedVehicleLon: Double = 0.0
 
     // Status line manager (priority-based, replaces followBanner)
     internal lateinit var statusLineManager: StatusLineManager
@@ -1096,24 +1098,30 @@ class MainActivity : AppCompatActivity() {
                 return@observe
             }
             followedAircraftFailCount = 0  // reset on successful update
+            val prevState = lastFollowedAircraftState
             lastFollowedAircraftState = state
-            DebugLogger.i("MainActivity", "Followed aircraft update: ${state.callsign ?: state.icao24} at ${state.lat},${state.lon}")
-            binding.mapView.controller.animateTo(state.toGeoPoint())
+            // Always update the banner (altitude/speed/heading change even if position doesn't)
             showAircraftFollowBanner(state)
-            // Geofence check for followed aircraft (with altitude)
-            if (geofenceViewModel.geofenceEngine.getLoadedZoneCount() > 0) {
-                val altFt = state.baroAltitude?.let { it * 3.28084 }
-                geofenceViewModel.checkGeofences(state.lat, state.lon, altFt, state.track)
+            // Skip heavy work (animation, POI prefetch, trail, geofence) if position hasn't changed
+            val moved = prevState == null || state.lat != prevState.lat || state.lon != prevState.lon
+            if (moved) {
+                DebugLogger.i("MainActivity", "Followed aircraft update: ${state.callsign ?: state.icao24} at ${state.lat},${state.lon}")
+                binding.mapView.controller.animateTo(state.toGeoPoint())
+                // Geofence check for followed aircraft (with altitude)
+                if (geofenceViewModel.geofenceEngine.getLoadedZoneCount() > 0) {
+                    val altFt = state.baroAltitude?.let { it * 3.28084 }
+                    geofenceViewModel.checkGeofences(state.lat, state.lon, altFt, state.track)
+                }
+                // Grow the flight trail with the new position
+                appendToFlightTrail(state)
+                // Pre-fill POI cache at aircraft's current position
+                val point = state.toGeoPoint()
+                DebugLogger.i("MainActivity", "Aircraft follow POI prefetch at ${point.latitude},${point.longitude}")
+                viewModel.searchPoisAt(point)
             }
-            // Grow the flight trail with the new position
-            appendToFlightTrail(state)
-            // Pre-fill POI cache at aircraft's current position
-            val point = state.toGeoPoint()
-            DebugLogger.i("MainActivity", "Aircraft follow POI prefetch at ${point.latitude},${point.longitude}")
-            viewModel.searchPoisAt(point)
             // Refresh full cache display after prefetch; check for empty POI zone (auto-follow)
             binding.mapView.postDelayed({
-                loadCachedPoisForVisibleArea()
+                if (moved) loadCachedPoisForVisibleArea()
                 // If auto-follow is active, check altitude and boundary bounce
                 if (autoFollowAircraftJob?.isActive == true) {
                     val lat = state.lat
