@@ -51,7 +51,7 @@ internal fun MainActivity.loadTfrsForVisibleArea() {
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
     if (!prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) return
     val bb = binding.mapView.boundingBox
-    viewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+    geofenceViewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
 }
 
 /** Load all enabled geofence zone types for the visible viewport. */
@@ -61,23 +61,23 @@ internal fun MainActivity.loadGeofenceZonesForVisibleArea() {
     val zoom = binding.mapView.zoomLevelDouble
 
     if (prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) {
-        viewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        geofenceViewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
     if (prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false) && zoom >= 10) {
-        viewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        geofenceViewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
     if (prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false) && zoom >= 12) {
-        viewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        geofenceViewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
     if (prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false) && zoom >= 12) {
-        viewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        geofenceViewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
     if (prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false) && zoom >= 12) {
-        viewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        geofenceViewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
     // Load database zones (offline SQLite databases)
-    if (viewModel.hasInstalledDatabases()) {
-        viewModel.loadDatabaseZonesForVisibleArea(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+    if (geofenceViewModel.hasInstalledDatabases()) {
+        geofenceViewModel.loadDatabaseZonesForVisibleArea(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
 }
 
@@ -89,7 +89,7 @@ internal fun MainActivity.scheduleGeofenceReload() {
         || prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false)
         || prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false)
         || prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false)
-        || viewModel.hasInstalledDatabases()
+        || geofenceViewModel.hasInstalledDatabases()
     if (!anyEnabled) return
     geofenceReloadJob?.cancel()
     geofenceReloadJob = lifecycleScope.launch {
@@ -362,12 +362,12 @@ internal fun MainActivity.showDatabaseManagerDialog() {
             }
         }
     }
-    viewModel.geofenceCatalog.observe(this, observer)
+    geofenceViewModel.geofenceCatalog.observe(this, observer)
 
     // Observe import results
     val importObserver = androidx.lifecycle.Observer<Pair<Boolean, String>?> { result ->
         if (result == null) return@Observer
-        viewModel.clearImportResult()
+        geofenceViewModel.clearImportResult()
         val (success, message) = result
         when {
             success -> toast(message)
@@ -380,15 +380,15 @@ internal fun MainActivity.showDatabaseManagerDialog() {
             else -> toast("Import failed: $message")
         }
     }
-    viewModel.importResult.observe(this, importObserver)
+    geofenceViewModel.importResult.observe(this, importObserver)
 
     dialog.setOnDismissListener {
-        viewModel.geofenceCatalog.removeObserver(observer)
-        viewModel.importResult.removeObserver(importObserver)
+        geofenceViewModel.geofenceCatalog.removeObserver(observer)
+        geofenceViewModel.importResult.removeObserver(importObserver)
     }
 
     // Fetch catalog
-    viewModel.fetchGeofenceCatalog()
+    geofenceViewModel.fetchGeofenceCatalog()
 
     dialog.show()
 }
@@ -451,7 +451,7 @@ internal fun MainActivity.buildDatabaseCard(
                     setTypeface(null, android.graphics.Typeface.BOLD)
                     setPadding(0, dp(4), dp(16), dp(4))
                     setOnClickListener {
-                        viewModel.downloadGeofenceDatabase(db.id)
+                        geofenceViewModel.downloadGeofenceDatabase(db.id)
                         toast("Updating ${db.name}…")
                     }
                 })
@@ -482,7 +482,7 @@ internal fun MainActivity.buildDatabaseCard(
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setPadding(0, dp(4), 0, dp(4))
                 setOnClickListener {
-                    viewModel.deleteGeofenceDatabase(db.id)
+                    geofenceViewModel.deleteGeofenceDatabase(db.id)
                     clearDatabaseOverlays()
                     toast("Deleted ${db.name}")
                 }
@@ -499,14 +499,14 @@ internal fun MainActivity.buildDatabaseCard(
                     text = "DOWNLOADING…"
                     setTextColor(Color.parseColor("#999999"))
                     isEnabled = false
-                    viewModel.downloadGeofenceDatabase(db.id)
+                    geofenceViewModel.downloadGeofenceDatabase(db.id)
                     toast("Downloading ${db.name}…")
                 }
             }
             btnRow.addView(downloadBtn)
 
             // Observe download progress for this db
-            viewModel.databaseDownloadProgress.observe(this@buildDatabaseCard) { progress ->
+            geofenceViewModel.databaseDownloadProgress.observe(this@buildDatabaseCard) { progress ->
                 if (progress != null && progress.first == db.id) {
                     downloadBtn.text = "DOWNLOADING ${progress.second}%"
                 }
@@ -618,7 +618,7 @@ internal fun MainActivity.showCsvImportConfigDialog(uri: Uri) {
         val dbId = dbName.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
         val selectedType = zoneTypes[typeSpinner.selectedItemPosition]
         val radius = radiusInput.text.toString().toDoubleOrNull() ?: 500.0
-        viewModel.importCsvAsGeofenceDatabase(contentResolver, uri, dbId, dbName, selectedType, radius)
+        geofenceViewModel.importCsvAsGeofenceDatabase(contentResolver, uri, dbId, dbName, selectedType, radius)
         dialog.dismiss()
         toast("Importing CSV…")
     }
@@ -632,7 +632,7 @@ internal fun MainActivity.showOverwriteConfirmationDialog(id: String, name: Stri
         .setPositiveButton("Overwrite") { _, _ ->
             val uri = pendingImportUri
             if (uri != null) {
-                viewModel.importGeofenceDatabase(contentResolver, uri, overwriteId = id)
+                geofenceViewModel.importGeofenceDatabase(contentResolver, uri, overwriteId = id)
             } else {
                 toast("Import URI lost — try again")
             }
@@ -642,7 +642,7 @@ internal fun MainActivity.showOverwriteConfirmationDialog(id: String, name: Stri
 }
 
 internal fun MainActivity.exportGeofenceDatabase(dbId: String, dbName: String) {
-    val file = viewModel.getGeofenceDatabaseFile(dbId)
+    val file = geofenceViewModel.getGeofenceDatabaseFile(dbId)
     if (file == null) {
         toast("Database file not found")
         return
@@ -870,11 +870,11 @@ internal fun MainActivity.showGeofenceAlertBanner(alert: com.example.locationmap
 
 /** Find a zone by ID across all zone type lists. */
 internal fun MainActivity.findZoneById(zoneId: String): com.example.locationmapapp.data.model.TfrZone? {
-    return viewModel.tfrZones.value?.find { it.id == zoneId }
-        ?: viewModel.cameraZones.value?.find { it.id == zoneId }
-        ?: viewModel.schoolZones.value?.find { it.id == zoneId }
-        ?: viewModel.floodZones.value?.find { it.id == zoneId }
-        ?: viewModel.crossingZones.value?.find { it.id == zoneId }
+    return geofenceViewModel.tfrZones.value?.find { it.id == zoneId }
+        ?: geofenceViewModel.cameraZones.value?.find { it.id == zoneId }
+        ?: geofenceViewModel.schoolZones.value?.find { it.id == zoneId }
+        ?: geofenceViewModel.floodZones.value?.find { it.id == zoneId }
+        ?: geofenceViewModel.crossingZones.value?.find { it.id == zoneId }
 }
 
 @android.annotation.SuppressLint("SetJavaScriptEnabled")

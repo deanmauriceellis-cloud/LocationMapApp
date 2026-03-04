@@ -80,7 +80,7 @@ internal fun MainActivity.debugState(): Map<String, Any?> {
             lastGpsPoint?.let { to -> distanceBetween(from, to).toInt() }
         },
         "overlays" to map.overlays.size,
-        "weather" to viewModel.weatherData.value?.let { w ->
+        "weather" to weatherViewModel.weatherData.value?.let { w ->
             mapOf(
                 "location" to "${w.location.city}, ${w.location.state}",
                 "station" to w.location.station,
@@ -95,12 +95,12 @@ internal fun MainActivity.debugState(): Map<String, Any?> {
             )
         },
         "geofences" to mapOf(
-            "tfrCount" to (viewModel.tfrZones.value?.size ?: 0),
-            "cameraCount" to (viewModel.cameraZones.value?.size ?: 0),
-            "schoolCount" to (viewModel.schoolZones.value?.size ?: 0),
-            "floodCount" to (viewModel.floodZones.value?.size ?: 0),
-            "crossingCount" to (viewModel.crossingZones.value?.size ?: 0),
-            "databaseCount" to (viewModel.databaseZones.value?.size ?: 0),
+            "tfrCount" to (geofenceViewModel.tfrZones.value?.size ?: 0),
+            "cameraCount" to (geofenceViewModel.cameraZones.value?.size ?: 0),
+            "schoolCount" to (geofenceViewModel.schoolZones.value?.size ?: 0),
+            "floodCount" to (geofenceViewModel.floodZones.value?.size ?: 0),
+            "crossingCount" to (geofenceViewModel.crossingZones.value?.size ?: 0),
+            "databaseCount" to (geofenceViewModel.databaseZones.value?.size ?: 0),
             "overlays" to mapOf(
                 "tfr" to tfrOverlays.size,
                 "camera" to cameraOverlays.size,
@@ -109,12 +109,12 @@ internal fun MainActivity.debugState(): Map<String, Any?> {
                 "crossing" to crossingOverlays.size,
                 "database" to databaseOverlays.size
             ),
-            "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
-            "zoneCountByType" to viewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),
-            "activeAlerts" to (viewModel.geofenceAlerts.value?.size ?: 0),
-            "alertSeverity" to (viewModel.geofenceAlerts.value
+            "loadedZoneShapes" to geofenceViewModel.geofenceEngine.getLoadedZoneCount(),
+            "zoneCountByType" to geofenceViewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),
+            "activeAlerts" to (geofenceViewModel.geofenceAlerts.value?.size ?: 0),
+            "alertSeverity" to (geofenceViewModel.geofenceAlerts.value
                 ?.maxByOrNull { it.severity.level }?.severity?.name ?: "NONE"),
-            "activeZones" to viewModel.geofenceEngine.getActiveZones()
+            "activeZones" to geofenceViewModel.geofenceEngine.getActiveZones()
         )
     )
 }
@@ -254,16 +254,16 @@ internal fun MainActivity.debugTogglePref(pref: String, value: Boolean) {
 /** Force refresh a specific data layer. */
 internal fun MainActivity.debugRefreshLayer(layer: String) {
     when (layer) {
-        "trains"   -> viewModel.fetchMbtaTrains()
-        "subway"   -> viewModel.fetchMbtaSubway()
-        "buses"    -> viewModel.fetchMbtaBuses()
-        "stations"  -> viewModel.fetchMbtaStations()
-        "bus_stops" -> viewModel.fetchMbtaBusStops()
+        "trains"   -> transitViewModel.fetchMbtaTrains()
+        "subway"   -> transitViewModel.fetchMbtaSubway()
+        "buses"    -> transitViewModel.fetchMbtaBuses()
+        "stations"  -> transitViewModel.fetchMbtaStations()
+        "bus_stops" -> transitViewModel.fetchMbtaBusStops()
         "aircraft"  -> loadAircraftForVisibleArea()
         "metar"    -> loadMetarsForVisibleArea()
         "webcams"  -> loadWebcamsForVisibleArea()
         "pois"     -> loadCachedPoisForVisibleArea()
-        "radar"    -> viewModel.refreshRadar()
+        "radar"    -> weatherViewModel.refreshRadar()
         else -> DebugLogger.w("DebugHttp", "debugRefreshLayer: unknown layer '$layer'")
     }
 }
@@ -276,7 +276,7 @@ internal fun MainActivity.debugFollowAircraft(icao24: String) {
     followedAircraftFailCount = 0
     clearFlightTrail()
     loadFlightTrailHistory(icao24)
-    viewModel.loadFollowedAircraft(icao24)
+    aircraftViewModel.loadFollowedAircraft(icao24)
     startFollowedAircraftRefresh(icao24)
 }
 
@@ -313,16 +313,16 @@ internal fun MainActivity.debugStopFollow() {
 /** Returns raw MbtaVehicle list from LiveData for /vehicles endpoint. */
 internal fun MainActivity.debugVehicles(type: String): List<com.example.locationmapapp.data.model.MbtaVehicle> {
     return when (type) {
-        "trains" -> viewModel.mbtaTrains.value ?: emptyList()
-        "subway" -> viewModel.mbtaSubway.value ?: emptyList()
-        "buses"  -> viewModel.mbtaBuses.value ?: emptyList()
+        "trains" -> transitViewModel.mbtaTrains.value ?: emptyList()
+        "subway" -> transitViewModel.mbtaSubway.value ?: emptyList()
+        "buses"  -> transitViewModel.mbtaBuses.value ?: emptyList()
         else     -> emptyList()
     }
 }
 
 /** Returns raw MbtaStop list from LiveData for /stations endpoint. */
 internal fun MainActivity.debugStations(): List<com.example.locationmapapp.data.model.MbtaStop> {
-    return viewModel.mbtaStations.value ?: emptyList()
+    return transitViewModel.mbtaStations.value ?: emptyList()
 }
 
 /** Returns all cached bus stops for /bus-stops endpoint. */

@@ -14,6 +14,10 @@ import android.os.Handler
 import android.os.Looper
 import com.example.locationmapapp.ui.MainActivity
 import com.example.locationmapapp.ui.MainViewModel
+import com.example.locationmapapp.ui.AircraftViewModel
+import com.example.locationmapapp.ui.GeofenceViewModel
+import com.example.locationmapapp.ui.TransitViewModel
+import com.example.locationmapapp.ui.WeatherViewModel
 import com.example.locationmapapp.ui.debugBusStops
 import com.example.locationmapapp.ui.debugFollowAircraft
 import com.example.locationmapapp.ui.debugFollowVehicleByIndex
@@ -51,7 +55,11 @@ data class EndpointResult(
  */
 class DebugEndpoints(
     private val activity: MainActivity,
-    private val viewModel: MainViewModel
+    private val viewModel: MainViewModel,
+    private val transitViewModel: TransitViewModel,
+    private val aircraftViewModel: AircraftViewModel,
+    private val weatherViewModel: WeatherViewModel,
+    private val geofenceViewModel: GeofenceViewModel
 ) {
     private val gson: Gson = GsonBuilder().setPrettyPrinting().serializeNulls().create()
 
@@ -305,17 +313,17 @@ class DebugEndpoints(
                 "places" to viewModel.places.value?.let {
                     mapOf("layerId" to it.first, "count" to it.second.size)
                 },
-                "mbtaTrains" to (viewModel.mbtaTrains.value?.size ?: 0),
-                "mbtaSubway" to (viewModel.mbtaSubway.value?.size ?: 0),
-                "mbtaBuses" to (viewModel.mbtaBuses.value?.size ?: 0),
-                "mbtaStations" to (viewModel.mbtaStations.value?.size ?: 0),
-                "aircraft" to (viewModel.aircraft.value?.size ?: 0),
-                "followedAircraft" to viewModel.followedAircraft.value?.let {
+                "mbtaTrains" to (transitViewModel.mbtaTrains.value?.size ?: 0),
+                "mbtaSubway" to (transitViewModel.mbtaSubway.value?.size ?: 0),
+                "mbtaBuses" to (transitViewModel.mbtaBuses.value?.size ?: 0),
+                "mbtaStations" to (transitViewModel.mbtaStations.value?.size ?: 0),
+                "aircraft" to (aircraftViewModel.aircraft.value?.size ?: 0),
+                "followedAircraft" to aircraftViewModel.followedAircraft.value?.let {
                     mapOf("icao24" to it.icao24, "callsign" to it.callsign, "lat" to it.lat, "lon" to it.lon)
                 },
-                "webcams" to (viewModel.webcams.value?.size ?: 0),
-                "metars" to (viewModel.metars.value?.size ?: 0),
-                "weatherAlerts" to (viewModel.weatherAlerts.value?.size ?: 0),
+                "webcams" to (weatherViewModel.webcams.value?.size ?: 0),
+                "metars" to (weatherViewModel.metars.value?.size ?: 0),
+                "weatherAlerts" to (weatherViewModel.weatherAlerts.value?.size ?: 0),
                 "error" to viewModel.error.value
             )
         }
@@ -616,11 +624,11 @@ class DebugEndpoints(
                     )
                 }
             }
-            val tfrZones = viewModel.tfrZones.value ?: emptyList()
-            val cameraZones = viewModel.cameraZones.value ?: emptyList()
-            val schoolZones = viewModel.schoolZones.value ?: emptyList()
-            val floodZones = viewModel.floodZones.value ?: emptyList()
-            val crossingZones = viewModel.crossingZones.value ?: emptyList()
+            val tfrZones = geofenceViewModel.tfrZones.value ?: emptyList()
+            val cameraZones = geofenceViewModel.cameraZones.value ?: emptyList()
+            val schoolZones = geofenceViewModel.schoolZones.value ?: emptyList()
+            val floodZones = geofenceViewModel.floodZones.value ?: emptyList()
+            val crossingZones = geofenceViewModel.crossingZones.value ?: emptyList()
             val totalCount = tfrZones.size + cameraZones.size + schoolZones.size + floodZones.size + crossingZones.size
             mapOf(
                 "totalCount" to totalCount,
@@ -631,10 +639,10 @@ class DebugEndpoints(
                     "flood" to floodZones.size,
                     "crossing" to crossingZones.size
                 ),
-                "loadedZoneShapes" to viewModel.geofenceEngine.getLoadedZoneCount(),
-                "zoneCountByType" to viewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),
-                "activeZones" to viewModel.geofenceEngine.getActiveZones(),
-                "proximityThresholdNm" to viewModel.geofenceEngine.proximityThresholdNm,
+                "loadedZoneShapes" to geofenceViewModel.geofenceEngine.getLoadedZoneCount(),
+                "zoneCountByType" to geofenceViewModel.geofenceEngine.getZoneCountByType().map { (k, v) -> k.name to v }.toMap(),
+                "activeZones" to geofenceViewModel.geofenceEngine.getActiveZones(),
+                "proximityThresholdNm" to geofenceViewModel.geofenceEngine.proximityThresholdNm,
                 "tfrs" to serializeZones(tfrZones),
                 "cameras" to serializeZones(cameraZones),
                 "schools" to serializeZones(schoolZones),
@@ -649,7 +657,7 @@ class DebugEndpoints(
 
     private suspend fun handleGeofenceAlerts(): EndpointResult {
         val data = runOnMain {
-            val alerts = viewModel.geofenceAlerts.value ?: emptyList()
+            val alerts = geofenceViewModel.geofenceAlerts.value ?: emptyList()
             mapOf(
                 "count" to alerts.size,
                 "alerts" to alerts.map { a ->

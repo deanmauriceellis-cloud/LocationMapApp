@@ -112,7 +112,7 @@ internal fun MainActivity.startTrainRefresh() {
     DebugLogger.i("MainActivity", "Starting MBTA train refresh every ${trainRefreshIntervalSec}s")
     trainRefreshJob = lifecycleScope.launch {
         while (true) {
-            viewModel.fetchMbtaTrains()
+            transitViewModel.fetchMbtaTrains()
             delay(trainRefreshIntervalSec * 1000L)
         }
     }
@@ -170,7 +170,7 @@ internal fun MainActivity.startSubwayRefresh() {
     DebugLogger.i("MainActivity", "Starting MBTA subway refresh every ${subwayRefreshIntervalSec}s")
     subwayRefreshJob = lifecycleScope.launch {
         while (true) {
-            viewModel.fetchMbtaSubway()
+            transitViewModel.fetchMbtaSubway()
             delay(subwayRefreshIntervalSec * 1000L)
         }
     }
@@ -228,7 +228,7 @@ internal fun MainActivity.startBusRefresh() {
     DebugLogger.i("MainActivity", "Starting MBTA bus refresh every ${busRefreshIntervalSec}s")
     busRefreshJob = lifecycleScope.launch {
         while (true) {
-            viewModel.fetchMbtaBuses()
+            transitViewModel.fetchMbtaBuses()
             delay(busRefreshIntervalSec * 1000L)
         }
     }
@@ -453,7 +453,7 @@ internal fun MainActivity.showArrivalBoardDialog(stop: com.example.locationmapap
     // ── Load predictions and auto-refresh ──
     fun loadPredictions() {
         lifecycleScope.launch {
-            val predictions = viewModel.fetchPredictionsDirectly(stop.id)
+            val predictions = transitViewModel.fetchPredictionsDirectly(stop.id)
             if (!dialog.isShowing) return@launch
             listContainer.removeAllViews()
             // Update lines subtitle from actual prediction data
@@ -669,7 +669,7 @@ internal fun MainActivity.showTripScheduleDialog(pred: com.example.locationmapap
     // ── Load schedule ──
     val tripId = pred.tripId ?: return
     lifecycleScope.launch {
-        val entries = viewModel.fetchTripScheduleDirectly(tripId)
+        val entries = transitViewModel.fetchTripScheduleDirectly(tripId)
         if (!dialog.isShowing) return@launch
         listContainer.removeAllViews()
         if (entries.isEmpty()) {

@@ -202,7 +202,7 @@ internal fun MainActivity.stopRadarAnimation() {
     prefs.edit().putBoolean(AppBarMenuManager.PREF_RADAR_ANIMATE, false).apply()
     if (prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, true)) {
         addRadarOverlay()
-        radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { viewModel.refreshRadar() }
+        radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { weatherViewModel.refreshRadar() }
     }
 
     binding.mapView.invalidate()

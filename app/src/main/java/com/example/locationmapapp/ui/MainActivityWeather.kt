@@ -162,7 +162,7 @@ internal fun MainActivity.showWeatherDialog() {
     // Fetch weather async
     lifecycleScope.launch {
         val loc = viewModel.currentLocation.value?.point ?: GeoPoint(42.3601, -71.0589)
-        val data = viewModel.fetchWeatherDirectly(loc.latitude, loc.longitude)
+        val data = weatherViewModel.fetchWeatherDirectly(loc.latitude, loc.longitude)
 
         if (data == null) {
             loadingText.text = "Failed to load weather data."

@@ -236,7 +236,7 @@ internal fun MainActivity.clearFlightTrail() {
 /** Load DB history for an aircraft and draw initial trail. */
 internal fun MainActivity.loadFlightTrailHistory(icao24: String, currentState: com.example.locationmapapp.data.model.AircraftState? = null) {
     lifecycleScope.launch {
-        val history = viewModel.fetchFlightHistoryDirectly(icao24)
+        val history = aircraftViewModel.fetchFlightHistoryDirectly(icao24)
         if (history.isNotEmpty()) {
             flightTrailPoints.addAll(history)
         }
@@ -379,7 +379,7 @@ internal fun MainActivity.startFollowedAircraftRefresh(icao24: String) {
     followedAircraftRefreshJob = lifecycleScope.launch {
         while (true) {
             delay(aircraftRefreshIntervalSec * 1000L)
-            viewModel.loadFollowedAircraft(icao24)
+            aircraftViewModel.loadFollowedAircraft(icao24)
         }
     }
 }
@@ -387,7 +387,7 @@ internal fun MainActivity.startFollowedAircraftRefresh(icao24: String) {
 internal fun MainActivity.stopFollowedAircraftRefresh() {
     followedAircraftRefreshJob?.cancel()
     followedAircraftRefreshJob = null
-    viewModel.clearFollowedAircraft()
+    aircraftViewModel.clearFollowedAircraft()
     lastFollowedAircraftState = null
 }
 
@@ -429,7 +429,7 @@ internal fun MainActivity.stopAutoFollowAircraft() {
 internal fun MainActivity.pickAndFollowRandomAircraft() {
     val dirLabel = "${if (autoFollowPreferWest) "W" else "E"}${if (autoFollowPreferSouth) "S" else "N"}"
     // First check already-loaded aircraft
-    val currentList = viewModel.aircraft.value ?: emptyList()
+    val currentList = aircraftViewModel.aircraft.value ?: emptyList()
     val candidates = filterHighAltitude(currentList)
     if (candidates.isNotEmpty()) {
         selectAndFollow(candidates)
@@ -444,11 +444,11 @@ internal fun MainActivity.pickAndFollowRandomAircraft() {
     val west  = center.longitude - halfLon
     val east  = center.longitude + halfLon
     DebugLogger.i("MainActivity", "Auto-follow: wide bbox query ${south},${west},${north},${east} pref=$dirLabel")
-    viewModel.loadAircraft(south, west, north, east)
+    aircraftViewModel.loadAircraft(south, west, north, east)
     // Wait for the network response then pick
     lifecycleScope.launch {
         delay(3000)
-        val freshList = viewModel.aircraft.value ?: emptyList()
+        val freshList = aircraftViewModel.aircraft.value ?: emptyList()
         val freshCandidates = filterHighAltitude(freshList)
         if (freshCandidates.isNotEmpty()) {
             selectAndFollow(freshCandidates)

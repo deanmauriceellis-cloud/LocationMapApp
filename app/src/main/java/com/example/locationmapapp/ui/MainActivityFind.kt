@@ -72,7 +72,7 @@ internal fun MainActivity.showFindDialog() {
     if (findFilterActive) exitFindFilterMode()
     if (filterAndMapActive) exitFilterAndMapMode()
     val center = binding.mapView.mapCenter
-    viewModel.loadFindCounts(center.latitude, center.longitude)
+    findViewModel.loadFindCounts(center.latitude, center.longitude)
     val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
     dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
     showFindCategoryGrid(dialog)
@@ -83,7 +83,7 @@ internal fun MainActivity.showFindDialog() {
 internal fun MainActivity.showFindCategoryGrid(dialog: android.app.Dialog) {
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
-    val counts = viewModel.findCounts.value
+    val counts = findViewModel.findCounts.value
 
     // ── Header ──
     val titleText = TextView(this).apply {
@@ -341,7 +341,7 @@ internal fun MainActivity.showFindCategoryGrid(dialog: android.app.Dialog) {
             searchJob = lifecycleScope.launch {
                 delay(1000)
                 val mapCenter = binding.mapView.mapCenter
-                val response = viewModel.searchPoisByName(query, mapCenter.latitude, mapCenter.longitude)
+                val response = findViewModel.searchPoisByName(query, mapCenter.latitude, mapCenter.longitude)
                 searchResultsList.removeAllViews()
                 if (response == null || response.results.isEmpty()) {
                     headerHint.text = "No results"
@@ -510,7 +510,7 @@ internal fun MainActivity.showFindCategoryGrid(dialog: android.app.Dialog) {
 internal fun MainActivity.showFindSubtypeGrid(dialog: android.app.Dialog, cat: com.example.locationmapapp.ui.menu.PoiCategory) {
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
-    val counts = viewModel.findCounts.value
+    val counts = findViewModel.findCounts.value
     val subtypes = cat.subtypes ?: return
 
     // ── Header with back ──
@@ -742,7 +742,7 @@ internal fun MainActivity.showFindResults(
     // Fetch results
     val center = binding.mapView.mapCenter
     lifecycleScope.launch {
-        val response = viewModel.findNearbyDirectly(center.latitude, center.longitude, tags, 50)
+        val response = findViewModel.findNearbyDirectly(center.latitude, center.longitude, tags, 50)
         spinner.visibility = View.GONE
 
         if (response == null || response.results.isEmpty()) {
@@ -1211,7 +1211,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
 
     // Async resolve → show big button or "no website"
     lifecycleScope.launch {
-        val websiteInfo = viewModel.fetchPoiWebsiteDirectly(
+        val websiteInfo = findViewModel.fetchPoiWebsiteDirectly(
             result.type, result.id, result.name, result.lat, result.lon
         )
         websiteArea.removeAllViews()
@@ -1388,7 +1388,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
         text = "+ Add"
         textSize = 13f
         setTextColor(Color.parseColor("#64B5F6"))
-        visibility = if (viewModel.isLoggedIn()) View.VISIBLE else View.GONE
+        visibility = if (socialViewModel.isLoggedIn()) View.VISIBLE else View.GONE
     }
     commentsHeader.addView(commentsTitle)
     commentsHeader.addView(addCommentBtn)
@@ -1409,7 +1409,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
     // Load comments from server
     val osmType = result.type
     val osmId = result.id
-    viewModel.loadComments(osmType, osmId)
+    socialViewModel.loadComments(osmType, osmId)
 
     fun renderComments(comments: List<com.example.locationmapapp.data.model.PoiComment>) {
         commentsList.removeAllViews()
@@ -1499,9 +1499,9 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
                 textSize = 11f
                 setTextColor(if (comment.viewerVote == -1) Color.parseColor("#F44336") else Color.parseColor("#666666"))
             }
-            if (viewModel.isLoggedIn()) {
+            if (socialViewModel.isLoggedIn()) {
                 upBtn.setOnClickListener {
-                    viewModel.voteOnComment(comment.id, 1) { counts ->
+                    socialViewModel.voteOnComment(comment.id, 1) { counts ->
                         runOnUiThread {
                             if (counts != null) {
                                 upBtn.text = "\u25B2 ${counts.first}"
@@ -1513,7 +1513,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
                     }
                 }
                 downBtn.setOnClickListener {
-                    viewModel.voteOnComment(comment.id, -1) { counts ->
+                    socialViewModel.voteOnComment(comment.id, -1) { counts ->
                         runOnUiThread {
                             if (counts != null) {
                                 upBtn.text = "\u25B2 ${counts.first}"
@@ -1529,7 +1529,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
             voteRow.addView(downBtn)
 
             // Delete button for own comments (hide if already deleted)
-            val currentUser = viewModel.authUser.value
+            val currentUser = socialViewModel.authUser.value
             if (!comment.isDeleted && currentUser != null && (currentUser.id == comment.userId || currentUser.role in listOf("owner", "support"))) {
                 voteRow.addView(View(this).apply {
                     layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
@@ -1539,7 +1539,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
                     textSize = 11f
                     setTextColor(Color.parseColor("#EF5350"))
                     setOnClickListener {
-                        viewModel.deleteComment(comment.id, osmType, osmId)
+                        socialViewModel.deleteComment(comment.id, osmType, osmId)
                     }
                 })
             }
@@ -1549,7 +1549,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
         }
     }
 
-    viewModel.poiComments.observe(this) { comments ->
+    socialViewModel.poiComments.observe(this) { comments ->
         renderComments(comments ?: emptyList())
     }
 
@@ -1775,7 +1775,7 @@ internal fun MainActivity.removeFindFilterBanner() {
 internal fun MainActivity.loadFilteredPois() {
     val center = binding.mapView.mapCenter
     lifecycleScope.launch {
-        val response = viewModel.findNearbyDirectly(center.latitude, center.longitude, findFilterTags, 200)
+        val response = findViewModel.findNearbyDirectly(center.latitude, center.longitude, findFilterTags, 200)
         if (response != null) {
             val places = response.results.map { it.toPlaceResult() }
             replaceAllPoiMarkers(places)

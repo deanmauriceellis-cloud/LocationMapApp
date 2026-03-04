@@ -161,7 +161,7 @@ internal fun MainActivity.showAuthDialog() {
         }
         submitBtn.isEnabled = false
         submitBtn.text = "Registering..."
-        viewModel.register(displayName, email, password) { success, err ->
+        socialViewModel.register(displayName, email, password) { success, err ->
             runOnUiThread {
                 submitBtn.isEnabled = true
                 if (success) {
@@ -310,8 +310,8 @@ internal fun MainActivity.showChatDialog() {
         }
     }
 
-    viewModel.loadChatRooms()
-    viewModel.chatRooms.observe(this) { rooms ->
+    socialViewModel.loadChatRooms()
+    socialViewModel.chatRooms.observe(this) { rooms ->
         renderRooms(rooms ?: emptyList())
     }
 
@@ -373,7 +373,7 @@ internal fun MainActivity.showChatDialog() {
             setOnClickListener {
                 val name = nameInput.text.toString().trim()
                 if (name.length < 2) return@setOnClickListener
-                viewModel.createRoom(name, descInput.text.toString().trim().ifEmpty { null }) { id ->
+                socialViewModel.createRoom(name, descInput.text.toString().trim().ifEmpty { null }) { id ->
                     runOnUiThread {
                         dlg.dismiss()
                         if (id != null) toast("Room created") else toast("Failed to create room")
@@ -423,7 +423,7 @@ internal fun MainActivity.showChatRoomDialog(roomId: String, roomName: String) {
         setTextColor(Color.WHITE)
         setPadding(dp(8), 0, dp(12), 0)
         setOnClickListener {
-            viewModel.leaveRoom(roomId)
+            socialViewModel.leaveRoom(roomId)
             dialog.dismiss()
             showChatDialog()
         }
@@ -441,8 +441,8 @@ internal fun MainActivity.showChatRoomDialog(roomId: String, roomName: String) {
         setTextColor(Color.WHITE)
         setPadding(dp(12), 0, dp(4), 0)
         setOnClickListener {
-            viewModel.leaveRoom(roomId)
-            viewModel.disconnectChat()
+            socialViewModel.leaveRoom(roomId)
+            socialViewModel.disconnectChat()
             dialog.dismiss()
         }
     }
@@ -466,7 +466,7 @@ internal fun MainActivity.showChatRoomDialog(roomId: String, roomName: String) {
         isFillViewport = true
     }
 
-    val currentUserId = viewModel.authUser.value?.id
+    val currentUserId = socialViewModel.authUser.value?.id
 
     fun renderMessages(messages: List<com.example.locationmapapp.data.model.ChatMessage>) {
         messagesContainer.removeAllViews()
@@ -522,10 +522,10 @@ internal fun MainActivity.showChatRoomDialog(roomId: String, roomName: String) {
     }
 
     // Connect and join
-    viewModel.connectChat()
-    viewModel.joinRoom(roomId)
+    socialViewModel.connectChat()
+    socialViewModel.joinRoom(roomId)
 
-    viewModel.chatMessages.observe(this) { messages ->
+    socialViewModel.chatMessages.observe(this) { messages ->
         renderMessages(messages ?: emptyList())
     }
 
@@ -552,7 +552,7 @@ internal fun MainActivity.showChatRoomDialog(roomId: String, roomName: String) {
     sendBtn.setOnClickListener {
         val text = messageInput.text.toString().trim()
         if (text.isNotEmpty()) {
-            viewModel.sendChatMessage(roomId, text)
+            socialViewModel.sendChatMessage(roomId, text)
             messageInput.text.clear()
         }
     }
@@ -580,7 +580,7 @@ internal fun MainActivity.showChatRoomDialog(roomId: String, roomName: String) {
     }
 
     dialog.setOnDismissListener {
-        viewModel.leaveRoom(roomId)
+        socialViewModel.leaveRoom(roomId)
     }
 
     dialog.setContentView(rootLayout)
@@ -712,7 +712,7 @@ internal fun MainActivity.showAddCommentDialog(osmType: String, osmId: Long) {
         }
         submitBtn.isEnabled = false
         submitBtn.text = "Posting..."
-        viewModel.postComment(osmType, osmId, text, if (selectedRating > 0) selectedRating else null) { success ->
+        socialViewModel.postComment(osmType, osmId, text, if (selectedRating > 0) selectedRating else null) { success ->
             runOnUiThread {
                 if (success) {
                     toast("Comment posted")
@@ -739,7 +739,7 @@ internal fun MainActivity.showAddCommentDialog(osmType: String, osmId: Long) {
 }
 
 internal fun MainActivity.showProfileDialog() {
-    val user = viewModel.authUser.value
+    val user = socialViewModel.authUser.value
     if (user == null) {
         showAuthDialog()
         return

@@ -68,6 +68,12 @@ class MainActivity : AppCompatActivity() {
 
     internal lateinit var binding: ActivityMainBinding
     internal val viewModel: MainViewModel by viewModels()
+    internal val socialViewModel: SocialViewModel by viewModels()
+    internal val transitViewModel: TransitViewModel by viewModels()
+    internal val aircraftViewModel: AircraftViewModel by viewModels()
+    internal val findViewModel: FindViewModel by viewModels()
+    internal val weatherViewModel: WeatherViewModel by viewModels()
+    internal val geofenceViewModel: GeofenceViewModel by viewModels()
 
     internal lateinit var appBarMenuManager: AppBarMenuManager
     internal val radarScheduler = RadarRefreshScheduler()
@@ -207,7 +213,7 @@ class MainActivity : AppCompatActivity() {
     /** Load METARs for the current visible map bounding box. */
     internal fun loadMetarsForVisibleArea() {
         val bb = binding.mapView.boundingBox
-        viewModel.loadMetars(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        weatherViewModel.loadMetars(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
 
     /** Debounced: reload aircraft 1s after user stops scrolling/zooming. */
@@ -229,7 +235,7 @@ class MainActivity : AppCompatActivity() {
         }
         val bb = binding.mapView.boundingBox
         DebugLogger.i("MainActivity", "loadAircraftForVisibleArea zoom=${zoom.toInt()} bbox=${bb.latSouth},${bb.lonWest},${bb.latNorth},${bb.lonEast}")
-        viewModel.loadAircraft(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+        aircraftViewModel.loadAircraft(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
 
     // v1.4: guard to prevent startGpsUpdatesAndCenter() running twice
@@ -259,7 +265,7 @@ class MainActivity : AppCompatActivity() {
     ) { uri ->
         if (uri != null) {
             pendingImportUri = uri
-            viewModel.importGeofenceDatabase(contentResolver, uri)
+            geofenceViewModel.importGeofenceDatabase(contentResolver, uri)
         }
     }
 
@@ -347,7 +353,7 @@ class MainActivity : AppCompatActivity() {
                 addRadarOverlay()
                 DebugLogger.i("MainActivity", "Radar overlay restored from onStart()")
             }
-            radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { viewModel.refreshRadar() }
+            radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { weatherViewModel.refreshRadar() }
             DebugLogger.i("MainActivity", "Radar scheduler restarted from onStart()")
         }
 
@@ -366,11 +372,11 @@ class MainActivity : AppCompatActivity() {
         }
         if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_STATIONS, true) && stationMarkers.isEmpty()) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA stations")
-            viewModel.fetchMbtaStations()
+            transitViewModel.fetchMbtaStations()
         }
         if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUS_STOPS, false) && allBusStops.isEmpty()) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA bus stops")
-            viewModel.fetchMbtaBusStops()
+            transitViewModel.fetchMbtaBusStops()
         }
 
         // Defer METAR restore until GPS fix so the map has a real bounding box
@@ -421,7 +427,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStop()   { super.onStop();   if (radarAnimating) stopRadarAnimation(); radarScheduler.stop(); DebugLogger.i("MainActivity","onStop()") }
     override fun onResume() {
         super.onResume(); binding.mapView.onResume()
-        DebugHttpServer.endpoints = DebugEndpoints(this, viewModel)
+        DebugHttpServer.endpoints = DebugEndpoints(this, viewModel, transitViewModel, aircraftViewModel, weatherViewModel, geofenceViewModel)
         DebugLogger.i("MainActivity","onResume()")
     }
     override fun onPause() {
@@ -586,7 +592,7 @@ class MainActivity : AppCompatActivity() {
                 // Silent fill at new position — runs after triggerFullSearch settles
                 scheduleSilentFill(p, 3000)
                 // Fetch weather + alerts at the new location
-                viewModel.fetchWeather(p.latitude, p.longitude)
+                weatherViewModel.fetchWeather(p.latitude, p.longitude)
                 toast("Manual mode — searching POIs…")
                 return true
             }
@@ -677,10 +683,10 @@ class MainActivity : AppCompatActivity() {
                         transitMarkersVisible = true
                         vehicleLabelsShowing = zoom >= 18.0
                         // Re-add from latest LiveData values
-                        viewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
-                        viewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
-                        viewModel.mbtaBuses.value?.let { it.forEach { v -> addBusMarker(v) } }
-                        viewModel.mbtaStations.value?.let { it.forEach { s -> addStationMarker(s) } }
+                        transitViewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
+                        transitViewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
+                        transitViewModel.mbtaBuses.value?.let { it.forEach { v -> addBusMarker(v) } }
+                        transitViewModel.mbtaStations.value?.let { it.forEach { s -> addStationMarker(s) } }
                         refreshBusStopMarkersForViewport()
                         binding.mapView.invalidate()
                     }
@@ -796,7 +802,7 @@ class MainActivity : AppCompatActivity() {
             toast("Aircraft tracking ON")
         } else {
             stopAircraftRefresh()
-            viewModel.clearAircraft()
+            aircraftViewModel.clearAircraft()
             clearAircraftMarkers()
             // Cancel auto-follow if aircraft layer toggled off via FAB
             if (autoFollowAircraftJob?.isActive == true) {
@@ -907,7 +913,7 @@ class MainActivity : AppCompatActivity() {
                     && (speedMph ?: 0.0) <= 20.0
                 ) {
                     lifecycleScope.launch {
-                        val nearbyCount = viewModel.fetchNearbyPoiCount(point.latitude, point.longitude)
+                        val nearbyCount = findViewModel.fetchNearbyPoiCount(point.latitude, point.longitude)
                         if (nearbyCount >= 100) {
                             DebugLogger.i("MainActivity", "Idle ${idleMs / 1000}s — skipping idle auto-populate: $nearbyCount POIs within 10km (≥100)")
                         } else {
@@ -948,13 +954,13 @@ class MainActivity : AppCompatActivity() {
             val nowMs = System.currentTimeMillis()
             if (nowMs - lastWeatherFetchTime > WEATHER_FETCH_INTERVAL_MS) {
                 lastWeatherFetchTime = nowMs
-                viewModel.fetchWeather(point.latitude, point.longitude)
+                weatherViewModel.fetchWeather(point.latitude, point.longitude)
             }
 
             // ── 5b. Geofence check — if TFRs loaded, check user position ──
-            if (viewModel.geofenceEngine.getLoadedZoneCount() > 0) {
+            if (geofenceViewModel.geofenceEngine.getLoadedZoneCount() > 0) {
                 val bearing = update.bearing?.toDouble()
-                viewModel.checkGeofences(point.latitude, point.longitude, null, bearing)
+                geofenceViewModel.checkGeofences(point.latitude, point.longitude, null, bearing)
             }
 
             // ── 5c. Update status line with GPS position ──
@@ -1003,26 +1009,26 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        viewModel.metars.observe(this) { metars ->
+        weatherViewModel.metars.observe(this) { metars ->
             DebugLogger.i("MainActivity", "metars → ${metars.size} stations")
             clearMetarMarkers(); metars.forEach { addMetarMarker(it) }
             bringStationMarkersToFront()
         }
-        viewModel.weatherAlerts.observe(this) { alerts ->
+        weatherViewModel.weatherAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "weatherAlerts → ${alerts.size} alerts")
             if (alerts.isNotEmpty()) toast("${alerts.size} weather alert(s) active")
         }
-        viewModel.weatherData.observe(this) { data ->
+        weatherViewModel.weatherData.observe(this) { data ->
             DebugLogger.i("MainActivity", "weatherData → ${data?.location?.city ?: "null"}")
             updateWeatherToolbarIcon(data)
             // Refresh idle status line with latest weather info
             lastGpsPoint?.let { pt -> updateIdleStatusLine(pt.latitude, pt.longitude, lastGpsSpeedMph) }
         }
-        viewModel.radarRefreshTick.observe(this) {
+        weatherViewModel.radarRefreshTick.observe(this) {
             DebugLogger.i("MainActivity", "radarRefreshTick → refreshing overlay")
             refreshRadarOverlay()
         }
-        viewModel.webcams.observe(this) { webcams ->
+        weatherViewModel.webcams.observe(this) { webcams ->
             DebugLogger.i("MainActivity", "webcams → ${webcams.size} on map")
             clearWebcamMarkers()
             webcams.forEach { addWebcamMarker(it) }
@@ -1032,7 +1038,7 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.e("MainActivity", "VM error: $msg")
             toast(msg)
         }
-        viewModel.aircraft.observe(this) { aircraft ->
+        aircraftViewModel.aircraft.observe(this) { aircraft ->
             DebugLogger.i("MainActivity", "aircraft → ${aircraft.size} on map")
             clearAircraftMarkers()
             // Merge followed aircraft into list if it's outside the bbox results
@@ -1044,7 +1050,7 @@ class MainActivity : AppCompatActivity() {
             merged.forEach { addAircraftMarker(it) }
             updateFollowedAircraft(merged)
         }
-        viewModel.followedAircraft.observe(this) { state ->
+        aircraftViewModel.followedAircraft.observe(this) { state ->
             if (state == null) {
                 if (followedAircraftIcao != null) {
                     followedAircraftFailCount++
@@ -1072,9 +1078,9 @@ class MainActivity : AppCompatActivity() {
             binding.mapView.controller.animateTo(state.toGeoPoint())
             showAircraftFollowBanner(state)
             // Geofence check for followed aircraft (with altitude)
-            if (viewModel.geofenceEngine.getLoadedZoneCount() > 0) {
+            if (geofenceViewModel.geofenceEngine.getLoadedZoneCount() > 0) {
                 val altFt = state.baroAltitude?.let { it * 3.28084 }
-                viewModel.checkGeofences(state.lat, state.lon, altFt, state.track)
+                geofenceViewModel.checkGeofences(state.lat, state.lon, altFt, state.track)
             }
             // Grow the flight trail with the new position
             appendToFlightTrail(state)
@@ -1147,59 +1153,59 @@ class MainActivity : AppCompatActivity() {
                 }
             }, 3000)
         }
-        viewModel.mbtaTrains.observe(this) { vehicles ->
+        transitViewModel.mbtaTrains.observe(this) { vehicles ->
             DebugLogger.i("MainActivity", "MBTA trains update — ${vehicles.size} vehicles")
             clearTrainMarkers()
             if (transitMarkersVisible) vehicles.forEach { addTrainMarker(it) }
             updateFollowedVehicle(vehicles)
         }
-        viewModel.mbtaSubway.observe(this) { vehicles ->
+        transitViewModel.mbtaSubway.observe(this) { vehicles ->
             DebugLogger.i("MainActivity", "MBTA subway update — ${vehicles.size} vehicles")
             clearSubwayMarkers()
             if (transitMarkersVisible) vehicles.forEach { addSubwayMarker(it) }
             updateFollowedVehicle(vehicles)
         }
-        viewModel.mbtaBuses.observe(this) { vehicles ->
+        transitViewModel.mbtaBuses.observe(this) { vehicles ->
             DebugLogger.i("MainActivity", "MBTA buses update — ${vehicles.size} vehicles")
             clearBusMarkers()
             if (transitMarkersVisible) vehicles.forEach { addBusMarker(it) }
             updateFollowedVehicle(vehicles)
         }
-        viewModel.mbtaStations.observe(this) { stations ->
+        transitViewModel.mbtaStations.observe(this) { stations ->
             DebugLogger.i("MainActivity", "MBTA stations update — ${stations.size} stations")
             clearStationMarkers()
             if (transitMarkersVisible) stations.forEach { addStationMarker(it) }
         }
-        viewModel.mbtaBusStops.observe(this) { stops ->
+        transitViewModel.mbtaBusStops.observe(this) { stops ->
             DebugLogger.i("MainActivity", "MBTA bus stops update — ${stops.size} total stops loaded")
             allBusStops = stops
             refreshBusStopMarkersForViewport()
         }
-        viewModel.tfrZones.observe(this) { zones ->
+        geofenceViewModel.tfrZones.observe(this) { zones ->
             DebugLogger.i("MainActivity", "tfrZones → ${zones.size} TFRs")
             renderTfrOverlays(zones)
         }
-        viewModel.cameraZones.observe(this) { zones ->
+        geofenceViewModel.cameraZones.observe(this) { zones ->
             DebugLogger.i("MainActivity", "cameraZones → ${zones.size}")
             renderCameraOverlays(zones)
         }
-        viewModel.schoolZones.observe(this) { zones ->
+        geofenceViewModel.schoolZones.observe(this) { zones ->
             DebugLogger.i("MainActivity", "schoolZones → ${zones.size}")
             renderSchoolOverlays(zones)
         }
-        viewModel.floodZones.observe(this) { zones ->
+        geofenceViewModel.floodZones.observe(this) { zones ->
             DebugLogger.i("MainActivity", "floodZones → ${zones.size}")
             renderFloodOverlays(zones)
         }
-        viewModel.crossingZones.observe(this) { zones ->
+        geofenceViewModel.crossingZones.observe(this) { zones ->
             DebugLogger.i("MainActivity", "crossingZones → ${zones.size}")
             renderCrossingOverlays(zones)
         }
-        viewModel.databaseZones.observe(this) { zones ->
+        geofenceViewModel.databaseZones.observe(this) { zones ->
             DebugLogger.i("MainActivity", "databaseZones → ${zones.size}")
             renderDatabaseOverlays(zones)
         }
-        viewModel.geofenceAlerts.observe(this) { alerts ->
+        geofenceViewModel.geofenceAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "geofenceAlerts → ${alerts.size}")
             updateAlertsIcon(alerts)
             // Show banner for CRITICAL/EMERGENCY
@@ -1247,7 +1253,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Update the GPS idle status line with current position + weather info. */
     internal fun updateIdleStatusLine(lat: Double, lon: Double, speedMph: Double?) {
-        val weather = viewModel.weatherData.value
+        val weather = weatherViewModel.weatherData.value
         val tempF = weather?.current?.temperature
         val desc = weather?.current?.description
         statusLineManager.updateIdle(lat, lon, speedMph, tempF, desc)
@@ -1480,7 +1486,7 @@ class MainActivity : AppCompatActivity() {
         val centerLon = (bb.lonEast + bb.lonWest) / 2.0
         val halfLat = maxOf((bb.latNorth - bb.latSouth) / 2.0, 0.25)
         val halfLon = maxOf((bb.lonEast - bb.lonWest) / 2.0, 0.25)
-        viewModel.loadWebcams(centerLat - halfLat, centerLon - halfLon, centerLat + halfLat, centerLon + halfLon, cats.joinToString(","))
+        weatherViewModel.loadWebcams(centerLat - halfLat, centerLon - halfLon, centerLat + halfLat, centerLon + halfLon, cats.joinToString(","))
     }
 
     /** Debounced: reload webcams 500ms after user stops scrolling/zooming. */
@@ -1517,7 +1523,7 @@ class MainActivity : AppCompatActivity() {
         override fun onRadarToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onRadarToggled: enabled=$enabled")
             toggleRadar()
-            if (enabled) radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { viewModel.refreshRadar() }
+            if (enabled) radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { weatherViewModel.refreshRadar() }
             else         radarScheduler.stop()
         }
 
@@ -1593,7 +1599,7 @@ class MainActivity : AppCompatActivity() {
                 toast("Loading aircraft…")
             } else {
                 stopAircraftRefresh()
-                viewModel.clearAircraft()
+                aircraftViewModel.clearAircraft()
                 clearAircraftMarkers()
                 if (followedAircraftIcao != null) stopFollowing()
                 // Cancel auto-follow if aircraft layer turned off
@@ -1621,10 +1627,10 @@ class MainActivity : AppCompatActivity() {
         override fun onMbtaStationsToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onMbtaStationsToggled: $enabled")
             if (enabled) {
-                viewModel.fetchMbtaStations()
+                transitViewModel.fetchMbtaStations()
                 toast("Loading train stations…")
             } else {
-                viewModel.clearMbtaStations()
+                transitViewModel.clearMbtaStations()
                 clearStationMarkers()
             }
         }
@@ -1632,10 +1638,10 @@ class MainActivity : AppCompatActivity() {
         override fun onMbtaBusStopsToggled(enabled: Boolean) {
             DebugLogger.i("MainActivity", "onMbtaBusStopsToggled: $enabled")
             if (enabled) {
-                viewModel.fetchMbtaBusStops()
+                transitViewModel.fetchMbtaBusStops()
                 toast("Loading bus stops…")
             } else {
-                viewModel.clearMbtaBusStops()
+                transitViewModel.clearMbtaBusStops()
                 allBusStops = emptyList()
                 clearBusStopMarkers()
             }
@@ -1647,7 +1653,7 @@ class MainActivity : AppCompatActivity() {
                 startTrainRefresh()
             } else {
                 stopTrainRefresh()
-                viewModel.clearMbtaTrains()
+                transitViewModel.clearMbtaTrains()
                 if (followedVehicleId != null) stopFollowing()
             }
         }
@@ -1667,7 +1673,7 @@ class MainActivity : AppCompatActivity() {
                 startSubwayRefresh()
             } else {
                 stopSubwayRefresh()
-                viewModel.clearMbtaSubway()
+                transitViewModel.clearMbtaSubway()
                 if (followedVehicleId != null) stopFollowing()
             }
         }
@@ -1686,7 +1692,7 @@ class MainActivity : AppCompatActivity() {
                 startBusRefresh()
             } else {
                 stopBusRefresh()
-                viewModel.clearMbtaBuses()
+                transitViewModel.clearMbtaBuses()
                 if (followedVehicleId != null) stopFollowing()
             }
         }
@@ -1719,7 +1725,7 @@ class MainActivity : AppCompatActivity() {
                 toast("Loading webcams…")
             } else {
                 webcamReloadJob?.cancel()
-                viewModel.clearWebcams()
+                weatherViewModel.clearWebcams()
                 clearWebcamMarkers()
             }
         }
@@ -1729,7 +1735,7 @@ class MainActivity : AppCompatActivity() {
             val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
             if (prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) {
                 if (categories.isEmpty()) {
-                    viewModel.clearWebcams()
+                    weatherViewModel.clearWebcams()
                     clearWebcamMarkers()
                 } else {
                     loadWebcamsForVisibleArea()
@@ -1844,7 +1850,7 @@ class MainActivity : AppCompatActivity() {
                 loadTfrsForVisibleArea()
                 toast("Loading TFRs…")
             } else {
-                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.TFR)
+                geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.TFR)
                 clearTfrOverlays()
             }
         }
@@ -1853,10 +1859,10 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onCameraOverlayToggled: $enabled")
             if (enabled) {
                 val bb = binding.mapView.boundingBox
-                viewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                geofenceViewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
                 toast("Loading speed cameras…")
             } else {
-                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA)
+                geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA)
                 clearCameraOverlays()
             }
         }
@@ -1865,10 +1871,10 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onSchoolOverlayToggled: $enabled")
             if (enabled) {
                 val bb = binding.mapView.boundingBox
-                viewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                geofenceViewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
                 toast("Loading school zones…")
             } else {
-                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE)
+                geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SCHOOL_ZONE)
                 clearSchoolOverlays()
             }
         }
@@ -1877,10 +1883,10 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onFloodOverlayToggled: $enabled")
             if (enabled) {
                 val bb = binding.mapView.boundingBox
-                viewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                geofenceViewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
                 toast("Loading flood zones…")
             } else {
-                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE)
+                geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.FLOOD_ZONE)
                 clearFloodOverlays()
             }
         }
@@ -1889,10 +1895,10 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onCrossingOverlayToggled: $enabled")
             if (enabled) {
                 val bb = binding.mapView.boundingBox
-                viewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
+                geofenceViewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
                 toast("Loading railroad crossings…")
             } else {
-                viewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING)
+                geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.RAILROAD_CROSSING)
                 clearCrossingOverlays()
             }
         }
@@ -1904,7 +1910,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onAlertDistanceChanged(nm: Int) {
             DebugLogger.i("MainActivity", "onAlertDistanceChanged: ${nm}nm")
-            viewModel.geofenceEngine.proximityThresholdNm = nm.toDouble()
+            geofenceViewModel.geofenceEngine.proximityThresholdNm = nm.toDouble()
             toast("Alert distance: $nm NM")
         }
 
@@ -1939,13 +1945,13 @@ class MainActivity : AppCompatActivity() {
         override fun onSocialRequested() {
             resetIdleTimer()
             DebugLogger.i("MainActivity", "onSocialRequested")
-            if (viewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
+            if (socialViewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
         }
 
         override fun onChatRequested() {
             resetIdleTimer()
             DebugLogger.i("MainActivity", "onChatRequested")
-            if (!viewModel.isLoggedIn()) {
+            if (!socialViewModel.isLoggedIn()) {
                 toast("Register first to use Chat")
                 showAuthDialog()
             } else {
@@ -1956,7 +1962,7 @@ class MainActivity : AppCompatActivity() {
         override fun onProfileRequested() {
             resetIdleTimer()
             DebugLogger.i("MainActivity", "onProfileRequested")
-            if (viewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
+            if (socialViewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
         }
 
         // ── Toolbar actions ───────────────────────────────────────────────────
