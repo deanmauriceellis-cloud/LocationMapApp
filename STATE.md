@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 54 (Fuzzy Search Testing & Fixes — Header Hints, 200 Limit, 100mi Expansion)
+## Last Updated: 2026-03-03 Session 55 (Filter and Map Mode)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -40,7 +40,7 @@
 - **Slim toolbar + status line + grid dropdown** (v1.5.40): replaced 2×5 icon grid with compact 3-icon bar
   - **Toolbar** (40dp): Weather icon (left) | spacer | Dark Mode toggle | Alerts icon + Grid menu button (right)
   - **Status line** (24dp): priority-based info bar — GPS coords+weather when idle, follow/scan/alert info when active
-    - `StatusLineManager.kt`: 7 priority levels (GPS_IDLE → GEOFENCE_ALERT), set/clear/updateIdle API
+    - `StatusLineManager.kt`: 8 priority levels (GPS_IDLE → GEOFENCE_ALERT), set/clear/updateIdle API
     - All banner functions migrated from dynamic TextView creation to StatusLineManager
     - Geofence alerts show zone-type-colored background on status line
   - **Grid dropdown**: PopupWindow with 8 labeled buttons (icon+text) in 2×4 grid
@@ -97,6 +97,11 @@
   - Unlimited distance on `/db/pois/find`: scope expands 50km → 200km → 1000km → global (no bbox)
   - Smart fuzzy search bar (v1.5.51): pg_trgm fuzzy + keyword hints, 1000ms debounce, rich 3-line result rows
   - Favorites cell (v1.5.44): gold star, first in grid, shows count badge, tap for sorted favorites list
+  - **Filter and Map** (v1.5.53): teal button in category/subtype/fuzzy results → exclusive map view
+    - Clears all other layers (transit, aircraft, webcams, METAR, geofences, radar), stops background jobs
+    - Force-labels all result markers at any zoom; centroid-centered at zoom 15
+    - Status line "Showing N label — tap to clear" with FIND_FILTER priority; tap exits and restores layers
+    - Scroll/zoom handlers guarded — no layer reloads while active
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map/Share)
   - Tap any POI marker on map → opens detail dialog directly (v1.5.46)
   - Star icon in header (v1.5.44): tap to add/remove from favorites, filled/outline toggle
@@ -205,7 +210,9 @@
 - **Tap aircraft marker**: follow mode (map tracks globally via icao24, banner shows flight info)
 - **Tap follow/populate banner**: stop following or stop populate scan
 - **Tap find filter banner**: exit filter mode, restore normal POI display
+- **Tap filter-and-map status line**: exit exclusive filter view, restore all layers
 - **Find toolbar icon**: search bar + favorites cell + category grid → subtype grid → distance-sorted results → tap to open POI detail dialog
+- **Find results "Filter and Map" button**: enter exclusive map view showing only those results with forced labels
 - **Go to Location toolbar icon**: geocoder dialog → type address → pick result → map navigates + POI search
 - **POI detail dialog**: info rows + star (favorite) + Load Website button + action buttons (Directions, Call, Reviews, Map, Share)
 - **Find long-press**: filter map to show only that category's POIs

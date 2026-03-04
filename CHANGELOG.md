@@ -2,6 +2,23 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.53] — 2026-03-03
+
+### Added
+- **Filter and Map mode** — teal button at bottom of Find results (category, subtype, and fuzzy search) enters exclusive map view
+  - Clears all other layers (transit, aircraft, webcams, METAR, geofences, radar) and stops background jobs
+  - Places only the filtered POIs on the map with force-labeled markers at any zoom level
+  - Zooms to 15 centered on results centroid
+  - Status line shows "Showing N label — tap to clear" at FIND_FILTER priority; tap exits mode
+  - Scroll/zoom handlers guarded — no layer reloads or POI cache updates while active
+  - Saves and restores radar state on exit
+  - Auto-exits when reopening Find dialog
+  - Debug `/state` includes `filterAndMap` block (active, label, resultCount)
+- **`FIND_FILTER` priority level** — new StatusLineManager priority (level 3) between IDLE_POPULATE and POPULATE
+
+### Changed
+- **StatusLineManager priorities** — renumbered: POPULATE(3→4), AIRCRAFT_FOLLOW(4→5), VEHICLE_FOLLOW(5→6), GEOFENCE_ALERT(6→7)
+
 ## [1.5.52] — 2026-03-03
 
 ### Fixed

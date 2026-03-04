@@ -2,6 +2,56 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03f (v1.5.53 — Filter and Map Mode)
+
+### Context
+When viewing Find results (category, subtype, or fuzzy search), the user wanted a button to place ONLY those results on the map, hiding everything else — creating a focused view with full detail labels.
+
+### Changes Made
+
+#### 1. StatusLineManager.kt
+- Added `FIND_FILTER(3)` priority between IDLE_POPULATE and POPULATE
+- Renumbered POPULATE(4), AIRCRAFT_FOLLOW(5), VEHICLE_FOLLOW(6), GEOFENCE_ALERT(7)
+
+#### 2. MainActivity.kt — State Variables
+- `filterAndMapActive`, `filterAndMapResults`, `filterAndMapLabel`, `savedRadarWasOn`, `savedRadarWasAnimating`
+
+#### 3. MainActivity.kt — enterFilterAndMapMode()
+- Exits existing filter modes, stops all background jobs (populate, silent fill, idle populate, aircraft, transit, auto-follow)
+- Clears follow state, saves/clears radar, clears ALL overlays except GPS marker
+- Converts FindResult → PlaceResult, adds as force-labeled POI markers under "filter-map" layer
+- Zooms to 15 centered on results centroid
+- Sets FIND_FILTER status line with tap-to-exit
+
+#### 4. MainActivity.kt — exitFilterAndMapMode()
+- Clears state, status line, and filter-map markers
+- Restores POI display, radar, and label state; other layers restore on next scroll/zoom
+
+#### 5. MainActivity.kt — Scroll/Zoom Guards
+- Scroll: wrapped scheduleAircraftReload/BusStop/Webcam/Geofence in `if (!filterAndMapActive)`; POI cache reload returns early
+- Zoom: wrapped layer reloads and transit guard; force labels via `zoom >= 18.0 || filterAndMapActive`; skip refreshPoiMarkerIcons when active
+
+#### 6. MainActivity.kt — Buttons
+- Teal "Filter and Map" button at bottom of showFindResults() (category/subtype results)
+- Teal "Filter and Map" button at bottom of fuzzy search results (uses categoryHint or quoted query as label)
+- showFindDialog() auto-exits filterAndMapMode on reopen
+
+#### 7. Debug Endpoint
+- `filterAndMap` block in `/state` with active, label, resultCount
+
+### Testing
+- **On-device**: Find → Parks & Rec → Parks → teal button visible → tap → map shows 50 parks only, force-labeled, status line "Showing 50 Parks — tap to clear", all other layers gone, zoomed to 15
+
+### Files Modified (2)
+- `app/.../ui/StatusLineManager.kt` — FIND_FILTER priority
+- `app/.../ui/MainActivity.kt` — state vars, enter/exit functions, scroll/zoom guards, buttons, debug
+
+### Build
+- `assembleDebug` — BUILD SUCCESSFUL
+- POI DB updated: 207,655 POIs
+
+---
+
 ## Session: 2026-03-03e (v1.5.52 — Fuzzy Search Testing & Fixes)
 
 ### Context

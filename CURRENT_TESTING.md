@@ -153,6 +153,25 @@
 - **Search limit**: 50 → 200 results (server already capped at 200)
 - **Distance expansion**: radii changed to [50km, 100km, 160,934m (100mi)], threshold ≥50 results (was ≥3)
 
+### In Progress — Filter and Map Mode (Session 55 — v1.5.53)
+
+#### On-Device Tests — Verified
+- [x] **Find → Parks → "Filter and Map" button visible** — teal button at bottom of results list
+- [x] **Tap button** — dialog closes, map shows only 50 parks with forced labels, status line "Showing 50 Parks — tap to clear"
+- [x] **All other layers cleared** — no transit, aircraft, webcams, METAR, geofences, radar visible
+- [x] **Zoom level** — set to 15, centered on results centroid
+- [x] **Debug endpoint** — `filterAndMap` block in `/state` with active=true, label="Parks", resultCount=50
+
+#### Still Needs Testing
+- [ ] **Tap status line to exit** — verify mode exits, normal layers restore, POI labels revert to zoom-based
+- [ ] **Scroll/zoom while in filter mode** — verify no other layers appear, markers stay labeled
+- [ ] **Fuzzy search "Filter and Map" button** — verify button appears in search results too
+- [ ] **Re-open Find while in filter mode** — verify auto-exit clears filter mode first
+- [ ] **Filter and Map from subtype** — e.g. Food & Drink → Cafes → Filter and Map
+- [ ] **Filter and Map with few results** — verify centroid + zoom still work with 1-2 results
+- [ ] **Radar restore** — enable radar, enter filter mode (radar clears), exit → radar restores
+- [ ] **POI detail from filtered marker** — tap a filtered marker → verify POI detail dialog opens
+
 ### NOT YET TESTED — Resume Here
 
 #### v1.5.48 Tunings

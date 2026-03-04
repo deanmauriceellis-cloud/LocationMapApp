@@ -641,55 +641,64 @@ class MainActivity : AppCompatActivity() {
         // Listen for zoom/scroll changes from pinch-to-zoom, programmatic changes, or panning
         map.addMapListener(object : org.osmdroid.events.MapListener {
             override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
-                scheduleAircraftReload()
-                scheduleBusStopReload()
+                if (!filterAndMapActive) {
+                    scheduleAircraftReload()
+                    scheduleBusStopReload()
+                    // Suppress webcam reloads while populate scanner is running
+                    if (populateJob == null) scheduleWebcamReload()
+                    scheduleGeofenceReload()
+                }
                 // Debounce: load cached POIs for visible bbox 500ms after scrolling stops
                 cachePoiJob?.cancel()
                 cachePoiJob = lifecycleScope.launch {
                     delay(500)
+                    if (filterAndMapActive) return@launch
                     if (findFilterActive) loadFilteredPois() else loadCachedPoisForVisibleArea()
                 }
-                // Suppress webcam reloads while populate scanner is running
-                if (populateJob == null) scheduleWebcamReload()
-                scheduleGeofenceReload()
                 return false
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 updateZoomBubble()
-                scheduleAircraftReload()
-                scheduleBusStopReload()
-                if (populateJob == null) scheduleWebcamReload()
-                scheduleGeofenceReload()
-                // Hide transit markers when zoomed out to 10 or less
                 val zoom = binding.mapView.zoomLevelDouble
-                if (zoom <= 10.0) {
-                    if (transitMarkersVisible) {
-                        transitMarkersVisible = false
-                        clearTrainMarkers(); clearSubwayMarkers(); clearBusMarkers()
-                        clearStationMarkers(); clearBusStopMarkers()
+                if (!filterAndMapActive) {
+                    scheduleAircraftReload()
+                    scheduleBusStopReload()
+                    if (populateJob == null) scheduleWebcamReload()
+                    scheduleGeofenceReload()
+                    // Hide transit markers when zoomed out to 10 or less
+                    if (zoom <= 10.0) {
+                        if (transitMarkersVisible) {
+                            transitMarkersVisible = false
+                            clearTrainMarkers(); clearSubwayMarkers(); clearBusMarkers()
+                            clearStationMarkers(); clearBusStopMarkers()
+                            binding.mapView.invalidate()
+                        }
+                    } else if (!transitMarkersVisible) {
+                        transitMarkersVisible = true
+                        vehicleLabelsShowing = zoom >= 18.0
+                        // Re-add from latest LiveData values
+                        viewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
+                        viewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
+                        viewModel.mbtaBuses.value?.let { it.forEach { v -> addBusMarker(v) } }
+                        viewModel.mbtaStations.value?.let { it.forEach { s -> addStationMarker(s) } }
+                        refreshBusStopMarkersForViewport()
                         binding.mapView.invalidate()
                     }
-                } else if (!transitMarkersVisible) {
-                    transitMarkersVisible = true
-                    vehicleLabelsShowing = zoom >= 18.0
-                    // Re-add from latest LiveData values
-                    viewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
-                    viewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
-                    viewModel.mbtaBuses.value?.let { it.forEach { v -> addBusMarker(v) } }
-                    viewModel.mbtaStations.value?.let { it.forEach { s -> addStationMarker(s) } }
-                    refreshBusStopMarkersForViewport()
-                    binding.mapView.invalidate()
                 }
                 // Refresh POI marker icons when crossing the zoom-18 label threshold
-                val nowLabeled = zoom >= 18.0
+                // In filter-and-map mode, always force labels
+                val nowLabeled = zoom >= 18.0 || filterAndMapActive
                 if (nowLabeled != poiLabelsShowing) {
                     poiLabelsShowing = nowLabeled
-                    refreshPoiMarkerIcons()
+                    if (!filterAndMapActive) refreshPoiMarkerIcons()
                 }
                 // Refresh vehicle marker icons when crossing the zoom-18 label threshold
-                if (nowLabeled != vehicleLabelsShowing) {
-                    vehicleLabelsShowing = nowLabeled
-                    refreshVehicleMarkerIcons()
+                if (!filterAndMapActive) {
+                    val vehicleLabeled = zoom >= 18.0
+                    if (vehicleLabeled != vehicleLabelsShowing) {
+                        vehicleLabelsShowing = vehicleLabeled
+                        refreshVehicleMarkerIcons()
+                    }
                 }
                 return false
             }
@@ -4016,10 +4025,18 @@ class MainActivity : AppCompatActivity() {
     private var findFilterLabel = ""
     private var findFilterBanner: View? = null
 
+    // Filter-and-map mode state (exclusive map view of find results)
+    private var filterAndMapActive = false
+    private var filterAndMapResults = listOf<com.example.locationmapapp.data.model.FindResult>()
+    private var filterAndMapLabel = ""
+    private var savedRadarWasOn = false
+    private var savedRadarWasAnimating = false
+
     @SuppressLint("SetTextI18n")
     private fun showFindDialog() {
-        // Auto-exit filter mode when reopening Find
+        // Auto-exit filter modes when reopening Find
         if (findFilterActive) exitFindFilterMode()
+        if (filterAndMapActive) exitFilterAndMapMode()
         val center = binding.mapView.mapCenter
         viewModel.loadFindCounts(center.latitude, center.longitude)
         val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
@@ -4409,6 +4426,28 @@ class MainActivity : AppCompatActivity() {
                         setTextColor(Color.parseColor("#757575"))
                         setPadding(dp(4), dp(8), dp(4), dp(8))
                     })
+
+                    // "Filter and Map" button in search results
+                    searchResultsList.addView(TextView(this@MainActivity).apply {
+                        text = "Filter and Map"
+                        textSize = 14f
+                        setTextColor(Color.WHITE)
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        gravity = android.view.Gravity.CENTER
+                        setPadding(dp(16), dp(10), dp(16), dp(10))
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(Color.parseColor("#00897B"))
+                            cornerRadius = dp(6).toFloat()
+                        }
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { setMargins(dp(4), dp(8), dp(4), dp(8)) }
+                        setOnClickListener {
+                            dialog.dismiss()
+                            val filterLabel = response.categoryHint ?: "\"$query\""
+                            enterFilterAndMapMode(response.results, filterLabel)
+                        }
+                    })
                 }
             }
         })
@@ -4766,6 +4805,28 @@ class MainActivity : AppCompatActivity() {
                 response.results.last().distanceM / 1609.34
             } else 0.0
             footer.text = "Showing ${response.results.size} nearest (within %.1f mi)".format(maxDistMi)
+
+            // "Filter and Map" button
+            val filterMapBtn = TextView(this@MainActivity).apply {
+                text = "Filter and Map"
+                textSize = 14f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp(16), dp(10), dp(16), dp(10))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.parseColor("#00897B"))
+                    cornerRadius = dp(6).toFloat()
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(dp(16), dp(4), dp(16), dp(12)) }
+                setOnClickListener {
+                    dialog.dismiss()
+                    enterFilterAndMapMode(response.results, title)
+                }
+            }
+            (footer.parent as? LinearLayout)?.addView(filterMapBtn)
         }
     }
 
@@ -5696,6 +5757,123 @@ class MainActivity : AppCompatActivity() {
         removeFindFilterBanner()
         // Restore normal POI display
         loadCachedPoisForVisibleArea()
+    }
+
+    // ── Filter and Map Mode ──────────────────────────────────────────────────
+
+    @SuppressLint("SetTextI18n")
+    private fun enterFilterAndMapMode(results: List<com.example.locationmapapp.data.model.FindResult>, label: String) {
+        // Exit existing filter modes
+        if (findFilterActive) exitFindFilterMode()
+        if (filterAndMapActive) exitFilterAndMapMode()
+
+        filterAndMapActive = true
+        filterAndMapResults = results
+        filterAndMapLabel = label
+        DebugLogger.i("MainActivity", "enterFilterAndMapMode: $label (${results.size} results)")
+
+        // Stop all background jobs
+        stopSilentFill()
+        if (populateJob != null) stopPopulatePois()
+        if (idlePopulateJob?.isActive == true) stopIdlePopulate()
+        stopAircraftRefresh()
+        trainRefreshJob?.cancel(); trainRefreshJob = null
+        subwayRefreshJob?.cancel(); subwayRefreshJob = null
+        busRefreshJob?.cancel(); busRefreshJob = null
+        followedAircraftRefreshJob?.cancel(); followedAircraftRefreshJob = null
+        autoFollowAircraftJob?.cancel(); autoFollowAircraftJob = null
+
+        // Clear follow state
+        followedVehicleId = null
+        followedAircraftIcao = null
+        statusLineManager.clear(StatusLineManager.Priority.VEHICLE_FOLLOW)
+        statusLineManager.clear(StatusLineManager.Priority.AIRCRAFT_FOLLOW)
+
+        // Save and clear radar state
+        savedRadarWasAnimating = radarAnimating
+        savedRadarWasOn = radarTileOverlay != null || radarAnimating
+        if (radarAnimating) stopRadarAnimation()
+        if (radarTileOverlay != null) {
+            binding.mapView.overlays.remove(radarTileOverlay); radarTileOverlay = null
+        }
+
+        // Clear ALL overlays except GPS marker
+        clearAllPoiMarkers()
+        clearTrainMarkers(); clearSubwayMarkers(); clearBusMarkers()
+        clearStationMarkers(); clearBusStopMarkers()
+        clearAircraftMarkers()
+        clearFlightTrail()
+        clearWebcamMarkers()
+        clearMetarMarkers()
+        clearAllGeofenceOverlays()
+        binding.mapView.invalidate()
+
+        // Convert results → PlaceResult and add as labeled markers under "filter-map" layer
+        val places = results.map { it.toPlaceResult() }
+        for (place in places) {
+            val m = Marker(binding.mapView).apply {
+                position = GeoPoint(place.lat, place.lon)
+                icon = MarkerIconHelper.labeledDot(this@MainActivity, place.category, place.name)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                title = place.name
+                snippet = buildPlaceSnippet(place)
+                relatedObject = place
+                setOnMarkerClickListener { _, _ ->
+                    openPoiDetailFromPlace(place)
+                    true
+                }
+            }
+            poiMarkers.getOrPut("filter-map") { mutableListOf() }.add(m)
+            binding.mapView.overlays.add(m)
+        }
+
+        // Zoom to 15 centered on results centroid
+        if (places.isNotEmpty()) {
+            val avgLat = places.sumOf { it.lat } / places.size
+            val avgLon = places.sumOf { it.lon } / places.size
+            binding.mapView.controller.setZoom(15.0)
+            binding.mapView.controller.setCenter(GeoPoint(avgLat, avgLon))
+        }
+        binding.mapView.invalidate()
+
+        // Status line with tap-to-exit
+        statusLineManager.set(
+            StatusLineManager.Priority.FIND_FILTER,
+            "Showing ${results.size} $label — tap to clear"
+        ) { exitFilterAndMapMode() }
+    }
+
+    private fun exitFilterAndMapMode() {
+        if (!filterAndMapActive) return
+        DebugLogger.i("MainActivity", "exitFilterAndMapMode")
+
+        filterAndMapActive = false
+        filterAndMapResults = emptyList()
+        filterAndMapLabel = ""
+
+        // Clear status line
+        statusLineManager.clear(StatusLineManager.Priority.FIND_FILTER)
+
+        // Clear filter-map markers
+        clearPoiMarkers("filter-map")
+
+        // Restore normal POI display
+        loadCachedPoisForVisibleArea()
+
+        // Restore radar if it was on
+        if (savedRadarWasOn) {
+            addRadarOverlay()
+        }
+        savedRadarWasOn = false
+        savedRadarWasAnimating = false
+
+        // Fix label state to match current zoom
+        val zoom = binding.mapView.zoomLevelDouble
+        poiLabelsShowing = zoom >= 18.0
+        refreshPoiMarkerIcons()
+
+        // Other layers (transit, aircraft, webcams, METAR, geofences) will
+        // naturally restore on the next scroll/zoom event based on current prefs
     }
 
     // ── Legend Dialog ─────────────────────────────────────────────────────────
@@ -9066,6 +9244,11 @@ class MainActivity : AppCompatActivity() {
                 "active" to findFilterActive,
                 "label" to findFilterLabel,
                 "tags" to findFilterTags
+            ),
+            "filterAndMap" to mapOf(
+                "active" to filterAndMapActive,
+                "label" to filterAndMapLabel,
+                "resultCount" to filterAndMapResults.size
             ),
             "silentFill" to (silentFillJob?.isActive == true),
             "idlePopulate" to (idlePopulateJob?.isActive == true),
