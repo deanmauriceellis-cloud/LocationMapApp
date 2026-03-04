@@ -27,9 +27,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
-import androidx.core.content.ContextCompat
 import com.example.locationmapapp.R
-import com.example.locationmapapp.ui.MainViewModel
 import com.example.locationmapapp.util.DebugLogger
 import com.google.android.material.slider.Slider
 
@@ -53,18 +51,17 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module AppBarMenuM
 class AppBarMenuManager(
     private val context:           Context,
     private val toolbar:           Toolbar,
-    private val viewModel:         MainViewModel,
     private val menuEventListener: MenuEventListener
 ) {
 
     private val TAG = "AppBarMenuManager"
 
     private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
 
     var radarUpdateMinutes: Int
-        get() = prefs.getInt(PREF_RADAR_FREQ, DEFAULT_RADAR_FREQ_MIN)
-        set(v) { prefs.edit().putInt(PREF_RADAR_FREQ, v).apply() }
+        get() = prefs.getInt(MenuPrefs.PREF_RADAR_FREQ, MenuPrefs.DEFAULT_RADAR_FREQ_MIN)
+        set(v) { prefs.edit().putInt(MenuPrefs.PREF_RADAR_FREQ, v).apply() }
 
     // ─────────────────────────────────────────────────────────────────────────
     // PHASE 1 — called from onCreate (no menu items exist yet)
@@ -148,12 +145,12 @@ class AppBarMenuManager(
 
         // Dark mode toggle icon
         darkModeIcon?.let { icon ->
-            val isDark = prefs.getBoolean(PREF_DARK_MODE, false)
+            val isDark = prefs.getBoolean(MenuPrefs.PREF_DARK_MODE, false)
             icon.alpha = if (isDark) 1.0f else 0.4f
             icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
             icon.setOnClickListener {
-                val newState = !prefs.getBoolean(PREF_DARK_MODE, false)
-                prefs.edit().putBoolean(PREF_DARK_MODE, newState).apply()
+                val newState = !prefs.getBoolean(MenuPrefs.PREF_DARK_MODE, false)
+                prefs.edit().putBoolean(MenuPrefs.PREF_DARK_MODE, newState).apply()
                 icon.alpha = if (newState) 1.0f else 0.4f
                 DebugLogger.i(TAG, "Dark mode toggled → $newState")
                 menuEventListener.onDarkModeToggled(newState)
@@ -265,48 +262,48 @@ class AppBarMenuManager(
             DebugLogger.i(TAG, "Transit: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_mbta_stations ->
-                    toggleBinary(item, PREF_MBTA_STATIONS) { menuEventListener.onMbtaStationsToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_MBTA_STATIONS) { menuEventListener.onMbtaStationsToggled(it) }
 
                 R.id.menu_mbta_bus_stops ->
-                    toggleBinary(item, PREF_MBTA_BUS_STOPS) { menuEventListener.onMbtaBusStopsToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_MBTA_BUS_STOPS) { menuEventListener.onMbtaBusStopsToggled(it) }
 
                 R.id.menu_mbta_trains ->
-                    toggleBinary(item, PREF_MBTA_TRAINS) { menuEventListener.onMbtaTrainsToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_MBTA_TRAINS) { menuEventListener.onMbtaTrainsToggled(it) }
 
                 R.id.menu_mbta_trains_frequency ->
                     showSliderDialog("Commuter Rail Frequency (sec)", 30, 300,
-                        prefs.getInt(PREF_MBTA_TRAINS_FREQ, 60)) { v ->
-                        prefs.edit().putInt(PREF_MBTA_TRAINS_FREQ, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_MBTA_TRAINS_FREQ, 60)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_MBTA_TRAINS_FREQ, v).apply()
                         menuEventListener.onMbtaTrainsFrequencyChanged(v)
                     }
 
                 R.id.menu_mbta_subway ->
-                    toggleBinary(item, PREF_MBTA_SUBWAY) { menuEventListener.onMbtaSubwayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_MBTA_SUBWAY) { menuEventListener.onMbtaSubwayToggled(it) }
 
                 R.id.menu_mbta_subway_frequency ->
                     showSliderDialog("Subway Frequency (sec)", 30, 300,
-                        prefs.getInt(PREF_MBTA_SUBWAY_FREQ, 60)) { v ->
-                        prefs.edit().putInt(PREF_MBTA_SUBWAY_FREQ, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_MBTA_SUBWAY_FREQ, 60)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_MBTA_SUBWAY_FREQ, v).apply()
                         menuEventListener.onMbtaSubwayFrequencyChanged(v)
                     }
 
                 R.id.menu_mbta_buses ->
-                    toggleBinary(item, PREF_MBTA_BUSES) { menuEventListener.onMbtaBusesToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_MBTA_BUSES) { menuEventListener.onMbtaBusesToggled(it) }
 
                 R.id.menu_mbta_buses_frequency ->
                     showSliderDialog("Bus Frequency (sec)", 30, 300,
-                        prefs.getInt(PREF_MBTA_BUSES_FREQ, 60)) { v ->
-                        prefs.edit().putInt(PREF_MBTA_BUSES_FREQ, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_MBTA_BUSES_FREQ, 60)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_MBTA_BUSES_FREQ, v).apply()
                         menuEventListener.onMbtaBusesFrequencyChanged(v)
                     }
 
                 R.id.menu_national_alerts ->
-                    toggleBinary(item, PREF_NAT_ALERTS) { menuEventListener.onNationalAlertsToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_NAT_ALERTS) { menuEventListener.onNationalAlertsToggled(it) }
 
                 R.id.menu_national_alerts_frequency ->
                     showSliderDialog("Emergency Alert Frequency (min)", 1, 15,
-                        prefs.getInt(PREF_NAT_ALERTS_FREQ, 5)) { v ->
-                        prefs.edit().putInt(PREF_NAT_ALERTS_FREQ, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_NAT_ALERTS_FREQ, 5)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_NAT_ALERTS_FREQ, v).apply()
                         menuEventListener.onNationalAlertsFrequencyChanged(v)
                     }
 
@@ -318,12 +315,12 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_mbta_stations   to PREF_MBTA_STATIONS,
-            R.id.menu_mbta_bus_stops  to PREF_MBTA_BUS_STOPS,
-            R.id.menu_mbta_trains     to PREF_MBTA_TRAINS,
-            R.id.menu_mbta_subway     to PREF_MBTA_SUBWAY,
-            R.id.menu_mbta_buses      to PREF_MBTA_BUSES,
-            R.id.menu_national_alerts to PREF_NAT_ALERTS
+            R.id.menu_mbta_stations   to MenuPrefs.PREF_MBTA_STATIONS,
+            R.id.menu_mbta_bus_stops  to MenuPrefs.PREF_MBTA_BUS_STOPS,
+            R.id.menu_mbta_trains     to MenuPrefs.PREF_MBTA_TRAINS,
+            R.id.menu_mbta_subway     to MenuPrefs.PREF_MBTA_SUBWAY,
+            R.id.menu_mbta_buses      to MenuPrefs.PREF_MBTA_BUSES,
+            R.id.menu_national_alerts to MenuPrefs.PREF_NAT_ALERTS
         )
         popup.show()
     }
@@ -338,7 +335,7 @@ class AppBarMenuManager(
             DebugLogger.i(TAG, "CAMs: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_webcams ->
-                    toggleBinary(item, PREF_WEBCAMS_ON) { menuEventListener.onWebcamToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_WEBCAMS_ON) { menuEventListener.onWebcamToggled(it) }
 
                 R.id.menu_webcam_categories ->
                     showWebcamCategoryDialog()
@@ -350,7 +347,7 @@ class AppBarMenuManager(
             }
             true
         }
-        syncCheckStates(popup.menu, R.id.menu_webcams to PREF_WEBCAMS_ON)
+        syncCheckStates(popup.menu, R.id.menu_webcams to MenuPrefs.PREF_WEBCAMS_ON)
         popup.show()
     }
 
@@ -362,7 +359,7 @@ class AppBarMenuManager(
     )
 
     private fun showWebcamCategoryDialog() {
-        val saved = prefs.getStringSet(PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
+        val saved = prefs.getStringSet(MenuPrefs.PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
         val checked = BooleanArray(WEBCAM_CATEGORIES.size) { i -> saved.contains(WEBCAM_CATEGORIES[i]) }
         val labels = WEBCAM_CATEGORIES.map { cat ->
             cat.replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() }
@@ -382,14 +379,14 @@ class AppBarMenuManager(
                 for (i in checked.indices) checked[i] = newState
                 // Save and notify
                 val selected = if (newState) WEBCAM_CATEGORIES.toSet() else emptySet()
-                prefs.edit().putStringSet(PREF_WEBCAM_CATEGORIES, selected).apply()
+                prefs.edit().putStringSet(MenuPrefs.PREF_WEBCAM_CATEGORIES, selected).apply()
                 DebugLogger.i(TAG, "Webcam categories ${if (newState) "select all" else "deselect all"}")
                 menuEventListener.onWebcamCategoriesChanged(selected)
                 dialog.dismiss()
             }
             .setPositiveButton("OK") { _, _ ->
                 val selected = WEBCAM_CATEGORIES.filterIndexed { i, _ -> checked[i] }.toSet()
-                prefs.edit().putStringSet(PREF_WEBCAM_CATEGORIES, selected).apply()
+                prefs.edit().putStringSet(MenuPrefs.PREF_WEBCAM_CATEGORIES, selected).apply()
                 DebugLogger.i(TAG, "Webcam categories OK: $selected")
                 menuEventListener.onWebcamCategoriesChanged(selected)
             }
@@ -407,20 +404,20 @@ class AppBarMenuManager(
             DebugLogger.i(TAG, "Aircraft: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_aircraft_display ->
-                    toggleBinary(item, PREF_AIRCRAFT_DISPLAY) { menuEventListener.onAircraftDisplayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_AIRCRAFT_DISPLAY) { menuEventListener.onAircraftDisplayToggled(it) }
 
                 R.id.menu_aircraft_frequency ->
                     showSliderDialog("Aircraft Update Frequency (sec)", 30, 300,
-                        prefs.getInt(PREF_AIRCRAFT_FREQ, 60)) { v ->
-                        prefs.edit().putInt(PREF_AIRCRAFT_FREQ, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_AIRCRAFT_FREQ, 60)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_AIRCRAFT_FREQ, v).apply()
                         menuEventListener.onAircraftFrequencyChanged(v)
                     }
 
                 R.id.menu_auto_follow_aircraft -> {
-                    val newState = !prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
-                    prefs.edit().putBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, newState).apply()
+                    val newState = !prefs.getBoolean(MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, false)
+                    prefs.edit().putBoolean(MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, newState).apply()
                     item.isChecked = newState
-                    DebugLogger.i(TAG, "toggleBinary '$PREF_AUTO_FOLLOW_AIRCRAFT' → $newState")
+                    DebugLogger.i(TAG, "toggleBinary '${MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT}' → $newState")
                     menuEventListener.onAutoFollowAircraftToggled(newState)
                 }
 
@@ -432,11 +429,11 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_aircraft_display to PREF_AIRCRAFT_DISPLAY
+            R.id.menu_aircraft_display to MenuPrefs.PREF_AIRCRAFT_DISPLAY
         )
         // Auto-follow defaults to OFF, sync manually
         popup.menu.findItem(R.id.menu_auto_follow_aircraft)?.isChecked =
-            prefs.getBoolean(PREF_AUTO_FOLLOW_AIRCRAFT, false)
+            prefs.getBoolean(MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, false)
         popup.show()
     }
 
@@ -450,12 +447,12 @@ class AppBarMenuManager(
             DebugLogger.i(TAG, "Radar: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_radar_toggle ->
-                    toggleBinary(item, PREF_RADAR_ON) { menuEventListener.onRadarToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_RADAR_ON) { menuEventListener.onRadarToggled(it) }
 
                 R.id.menu_radar_visibility ->
                     showSliderDialog("Radar Visibility (0–100)", 0, 100,
-                        prefs.getInt(PREF_RADAR_VISIBILITY, 70)) { v ->
-                        prefs.edit().putInt(PREF_RADAR_VISIBILITY, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_RADAR_VISIBILITY, 70)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_RADAR_VISIBILITY, v).apply()
                         menuEventListener.onRadarVisibilityChanged(v)
                     }
 
@@ -467,22 +464,22 @@ class AppBarMenuManager(
                     }
 
                 R.id.menu_radar_animate ->
-                    toggleBinary(item, PREF_RADAR_ANIMATE) { menuEventListener.onRadarAnimateToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_RADAR_ANIMATE) { menuEventListener.onRadarAnimateToggled(it) }
 
                 R.id.menu_radar_anim_speed ->
                     showSliderDialog("Animation Speed (ms)", 300, 2000,
-                        prefs.getInt(PREF_RADAR_ANIM_SPEED, DEFAULT_RADAR_ANIM_SPEED)) { v ->
-                        prefs.edit().putInt(PREF_RADAR_ANIM_SPEED, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_RADAR_ANIM_SPEED, MenuPrefs.DEFAULT_RADAR_ANIM_SPEED)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_RADAR_ANIM_SPEED, v).apply()
                         menuEventListener.onRadarAnimSpeedChanged(v)
                     }
 
                 R.id.menu_metar_display ->
-                    toggleBinary(item, PREF_METAR_DISPLAY) { menuEventListener.onMetarDisplayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_METAR_DISPLAY) { menuEventListener.onMetarDisplayToggled(it) }
 
                 R.id.menu_metar_frequency ->
                     showSliderDialog("METAR Update Frequency (min)", 1, 10,
-                        prefs.getInt(PREF_METAR_FREQ, 5)) { v ->
-                        prefs.edit().putInt(PREF_METAR_FREQ, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_METAR_FREQ, 5)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_METAR_FREQ, v).apply()
                         menuEventListener.onMetarFrequencyChanged(v)
                     }
 
@@ -494,9 +491,9 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_radar_toggle to PREF_RADAR_ON,
-            R.id.menu_radar_animate to PREF_RADAR_ANIMATE,
-            R.id.menu_metar_display to PREF_METAR_DISPLAY
+            R.id.menu_radar_toggle to MenuPrefs.PREF_RADAR_ON,
+            R.id.menu_radar_animate to MenuPrefs.PREF_RADAR_ANIMATE,
+            R.id.menu_metar_display to MenuPrefs.PREF_METAR_DISPLAY
         )
         popup.show()
     }
@@ -607,16 +604,16 @@ class AppBarMenuManager(
             DebugLogger.i(TAG, "Utility: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_util_record_gps ->
-                    toggleBinary(item, PREF_RECORD_GPS) { menuEventListener.onGpsRecordingToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_RECORD_GPS) { menuEventListener.onGpsRecordingToggled(it) }
 
                 R.id.menu_util_build_story   -> menuEventListener.onBuildStoryRequested()
                 R.id.menu_util_analyze_today -> menuEventListener.onAnalyzeTodayRequested()
                 R.id.menu_util_anomalies     -> menuEventListener.onTravelAnomaliesRequested()
                 R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
                 R.id.menu_util_populate_pois -> {
-                    val running = prefs.getBoolean(PREF_POPULATE_POIS, false)
+                    val running = prefs.getBoolean(MenuPrefs.PREF_POPULATE_POIS, false)
                     val newState = !running
-                    prefs.edit().putBoolean(PREF_POPULATE_POIS, newState).apply()
+                    prefs.edit().putBoolean(MenuPrefs.PREF_POPULATE_POIS, newState).apply()
                     DebugLogger.i(TAG, "Populate POIs → $newState")
                     menuEventListener.onPopulatePoisToggled(newState)
                 }
@@ -626,10 +623,10 @@ class AppBarMenuManager(
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
 
                 R.id.menu_util_gps_mode ->
-                    toggleBinary(item, PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
 
                 R.id.menu_util_silent_fill_debug ->
-                    toggleBinary(item, PREF_SILENT_FILL_DEBUG) { menuEventListener.onSilentFillDebugToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_SILENT_FILL_DEBUG) { menuEventListener.onSilentFillDebugToggled(it) }
 
                 R.id.menu_util_legend -> menuEventListener.onLegendRequested()
 
@@ -641,12 +638,12 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_util_record_gps          to PREF_RECORD_GPS,
-            R.id.menu_util_gps_mode            to PREF_GPS_MODE,
-            R.id.menu_util_silent_fill_debug   to PREF_SILENT_FILL_DEBUG
+            R.id.menu_util_record_gps          to MenuPrefs.PREF_RECORD_GPS,
+            R.id.menu_util_gps_mode            to MenuPrefs.PREF_GPS_MODE,
+            R.id.menu_util_silent_fill_debug   to MenuPrefs.PREF_SILENT_FILL_DEBUG
         )
         // Update populate title to reflect running state
-        val popRunning = prefs.getBoolean(PREF_POPULATE_POIS, false)
+        val popRunning = prefs.getBoolean(MenuPrefs.PREF_POPULATE_POIS, false)
         popup.menu.findItem(R.id.menu_util_populate_pois)?.title =
             if (popRunning) "\u2316 Populate POIs (active)" else "Populate POIs"
         popup.show()
@@ -662,27 +659,27 @@ class AppBarMenuManager(
             DebugLogger.i(TAG, "Alerts: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_tfr_overlay ->
-                    toggleBinary(item, PREF_TFR_OVERLAY) { menuEventListener.onTfrOverlayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_TFR_OVERLAY) { menuEventListener.onTfrOverlayToggled(it) }
 
                 R.id.menu_camera_overlay ->
-                    toggleBinary(item, PREF_CAMERA_OVERLAY) { menuEventListener.onCameraOverlayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_CAMERA_OVERLAY) { menuEventListener.onCameraOverlayToggled(it) }
 
                 R.id.menu_school_overlay ->
-                    toggleBinary(item, PREF_SCHOOL_OVERLAY) { menuEventListener.onSchoolOverlayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_SCHOOL_OVERLAY) { menuEventListener.onSchoolOverlayToggled(it) }
 
                 R.id.menu_flood_overlay ->
-                    toggleBinary(item, PREF_FLOOD_OVERLAY) { menuEventListener.onFloodOverlayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_FLOOD_OVERLAY) { menuEventListener.onFloodOverlayToggled(it) }
 
                 R.id.menu_crossing_overlay ->
-                    toggleBinary(item, PREF_CROSSING_OVERLAY) { menuEventListener.onCrossingOverlayToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_CROSSING_OVERLAY) { menuEventListener.onCrossingOverlayToggled(it) }
 
                 R.id.menu_alert_sound ->
-                    toggleBinary(item, PREF_ALERT_SOUND) { menuEventListener.onAlertSoundToggled(it) }
+                    toggleBinary(item, MenuPrefs.PREF_ALERT_SOUND) { menuEventListener.onAlertSoundToggled(it) }
 
                 R.id.menu_alert_distance ->
                     showSliderDialog("Alert Distance (NM)", 1, 20,
-                        prefs.getInt(PREF_ALERT_DISTANCE, 5)) { v ->
-                        prefs.edit().putInt(PREF_ALERT_DISTANCE, v).apply()
+                        prefs.getInt(MenuPrefs.PREF_ALERT_DISTANCE, 5)) { v ->
+                        prefs.edit().putInt(MenuPrefs.PREF_ALERT_DISTANCE, v).apply()
                         menuEventListener.onAlertDistanceChanged(v)
                     }
 
@@ -697,12 +694,12 @@ class AppBarMenuManager(
             true
         }
         syncCheckStates(popup.menu,
-            R.id.menu_tfr_overlay to PREF_TFR_OVERLAY,
-            R.id.menu_camera_overlay to PREF_CAMERA_OVERLAY,
-            R.id.menu_school_overlay to PREF_SCHOOL_OVERLAY,
-            R.id.menu_flood_overlay to PREF_FLOOD_OVERLAY,
-            R.id.menu_crossing_overlay to PREF_CROSSING_OVERLAY,
-            R.id.menu_alert_sound to PREF_ALERT_SOUND
+            R.id.menu_tfr_overlay to MenuPrefs.PREF_TFR_OVERLAY,
+            R.id.menu_camera_overlay to MenuPrefs.PREF_CAMERA_OVERLAY,
+            R.id.menu_school_overlay to MenuPrefs.PREF_SCHOOL_OVERLAY,
+            R.id.menu_flood_overlay to MenuPrefs.PREF_FLOOD_OVERLAY,
+            R.id.menu_crossing_overlay to MenuPrefs.PREF_CROSSING_OVERLAY,
+            R.id.menu_alert_sound to MenuPrefs.PREF_ALERT_SOUND
         )
         popup.show()
     }
@@ -735,9 +732,9 @@ class AppBarMenuManager(
 
     /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
     private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
-        PREF_AIRCRAFT_DISPLAY, PREF_AUTO_FOLLOW_AIRCRAFT, PREF_POPULATE_POIS, PREF_MBTA_BUS_STOPS,
-        PREF_ALERT_SOUND, PREF_CAMERA_OVERLAY, PREF_SCHOOL_OVERLAY, PREF_FLOOD_OVERLAY, PREF_CROSSING_OVERLAY,
-        PREF_RADAR_ANIMATE, PREF_DARK_MODE -> false
+        MenuPrefs.PREF_AIRCRAFT_DISPLAY, MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, MenuPrefs.PREF_POPULATE_POIS, MenuPrefs.PREF_MBTA_BUS_STOPS,
+        MenuPrefs.PREF_ALERT_SOUND, MenuPrefs.PREF_CAMERA_OVERLAY, MenuPrefs.PREF_SCHOOL_OVERLAY, MenuPrefs.PREF_FLOOD_OVERLAY, MenuPrefs.PREF_CROSSING_OVERLAY,
+        MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE -> false
         else -> true
     }
 
@@ -812,68 +809,4 @@ class AppBarMenuManager(
             .show()
     }
 
-    // =========================================================================
-    // PREFERENCE KEY CONSTANTS
-    // =========================================================================
-
-    companion object {
-
-        const val PREFS_NAME = "app_bar_menu_prefs"
-
-        // ── Radar ─────────────────────────────────────────────────────────────
-        const val PREF_RADAR_ON          = "radar_on"
-        const val PREF_RADAR_VISIBILITY  = "radar_visibility"
-        const val PREF_RADAR_FREQ        = "radar_freq_min"
-        const val DEFAULT_RADAR_FREQ_MIN = 5
-
-        // ── Weather / METAR / Aircraft ──────────────────────────────────────
-        const val PREF_METAR_DISPLAY      = "metar_display_on"
-        const val PREF_METAR_FREQ         = "metar_freq_min"
-        const val PREF_AIRCRAFT_DISPLAY   = "aircraft_display_on"
-        const val PREF_AIRCRAFT_FREQ      = "aircraft_freq_sec"
-
-        // ── Transit ───────────────────────────────────────────────────────────
-        const val PREF_MBTA_STATIONS    = "mbta_stations_on"
-        const val PREF_MBTA_TRAINS      = "mbta_trains_on"
-        const val PREF_MBTA_TRAINS_FREQ = "mbta_trains_freq_sec"
-        const val PREF_MBTA_SUBWAY      = "mbta_subway_on"
-        const val PREF_MBTA_SUBWAY_FREQ = "mbta_subway_freq_sec"
-        const val PREF_MBTA_BUSES       = "mbta_buses_on"
-        const val PREF_MBTA_BUSES_FREQ  = "mbta_buses_freq_sec"
-        const val PREF_MBTA_BUS_STOPS   = "mbta_bus_stops_on"
-        const val PREF_NAT_ALERTS       = "national_alerts_on"
-        const val PREF_NAT_ALERTS_FREQ  = "national_alerts_freq_min"
-
-        // ── Cameras ───────────────────────────────────────────────────────────
-        const val PREF_WEBCAMS_ON          = "webcams_on"
-        const val PREF_WEBCAM_CATEGORIES   = "webcam_categories"
-
-        // ── POI ───────────────────────────────────────────────────────────────
-        // POI pref keys now live in PoiCategories.ALL (PoiCategory.prefKey)
-        // Old constants removed — use PoiCategories.find(id)?.prefKey
-
-        // ── Alerts / Geofence ────────────────────────────────────────────────
-        const val PREF_TFR_OVERLAY      = "tfr_overlay_on"
-        const val PREF_CAMERA_OVERLAY   = "camera_overlay_on"
-        const val PREF_SCHOOL_OVERLAY   = "school_overlay_on"
-        const val PREF_FLOOD_OVERLAY    = "flood_overlay_on"
-        const val PREF_CROSSING_OVERLAY = "crossing_overlay_on"
-        const val PREF_ALERT_SOUND      = "alert_sound_on"
-        const val PREF_ALERT_DISTANCE   = "alert_distance_nm"
-
-        // ── Dark Mode ────────────────────────────────────────────────────────
-        const val PREF_DARK_MODE = "dark_mode_enabled"
-
-        // ── Radar Animation ──────────────────────────────────────────────────
-        const val PREF_RADAR_ANIMATE    = "radar_animate_on"
-        const val PREF_RADAR_ANIM_SPEED = "radar_anim_speed_ms"
-        const val DEFAULT_RADAR_ANIM_SPEED = 800
-
-        // ── Utility ───────────────────────────────────────────────────────────
-        const val PREF_RECORD_GPS            = "record_gps_on"
-        const val PREF_GPS_MODE              = "gps_mode_auto"
-        const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
-        const val PREF_POPULATE_POIS         = "populate_pois_on"
-        const val PREF_SILENT_FILL_DEBUG     = "silent_fill_debug_on"
-    }
 }

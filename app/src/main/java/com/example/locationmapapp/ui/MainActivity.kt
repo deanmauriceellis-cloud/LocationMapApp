@@ -44,6 +44,7 @@ import com.example.locationmapapp.ui.menu.PoiCategories
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.locationmapapp.databinding.ActivityMainBinding
 import com.example.locationmapapp.ui.menu.AppBarMenuManager
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.ui.menu.MenuEventListener
 import com.example.locationmapapp.ui.radar.RadarRefreshScheduler
 import com.example.locationmapapp.util.DebugEndpoints
@@ -301,7 +302,6 @@ class MainActivity : AppCompatActivity() {
         appBarMenuManager = AppBarMenuManager(
             context           = this,
             toolbar           = binding.toolbar,
-            viewModel         = viewModel,
             menuEventListener = menuEventListenerImpl
         )
         val toolbarRefs = appBarMenuManager.setupSlimToolbar(
@@ -343,10 +343,10 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
 
         // Populate is never auto-restored — user must pick a location and start manually
-        prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
+        prefs.edit().putBoolean(MenuPrefs.PREF_POPULATE_POIS, false).apply()
 
         // Restore radar — add the tile overlay AND restart the refresh scheduler
-        val radarOn = prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, true)
+        val radarOn = prefs.getBoolean(MenuPrefs.PREF_RADAR_ON, true)
         DebugLogger.i("MainActivity", "onStart() radarOn=$radarOn interval=${appBarMenuManager.radarUpdateMinutes}min")
         if (radarOn) {
             if (radarTileOverlay == null) {
@@ -358,41 +358,41 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Restore MBTA layers from persisted toggle state
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_TRAINS, true) && trainRefreshJob?.isActive != true) {
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_TRAINS, true) && trainRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA trains")
             startTrainRefresh()
         }
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_SUBWAY, true) && subwayRefreshJob?.isActive != true) {
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_SUBWAY, true) && subwayRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA subway")
             startSubwayRefresh()
         }
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUSES, true) && busRefreshJob?.isActive != true) {
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUSES, true) && busRefreshJob?.isActive != true) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA buses")
             startBusRefresh()
         }
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_STATIONS, true) && stationMarkers.isEmpty()) {
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_STATIONS, true) && stationMarkers.isEmpty()) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA stations")
             transitViewModel.fetchMbtaStations()
         }
-        if (prefs.getBoolean(AppBarMenuManager.PREF_MBTA_BUS_STOPS, false) && allBusStops.isEmpty()) {
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUS_STOPS, false) && allBusStops.isEmpty()) {
             DebugLogger.i("MainActivity", "onStart() restoring MBTA bus stops")
             transitViewModel.fetchMbtaBusStops()
         }
 
         // Defer METAR restore until GPS fix so the map has a real bounding box
-        if (prefs.getBoolean(AppBarMenuManager.PREF_METAR_DISPLAY, true)) {
+        if (prefs.getBoolean(MenuPrefs.PREF_METAR_DISPLAY, true)) {
             pendingMetarRestore = true
             DebugLogger.i("MainActivity", "onStart() METAR restore deferred — waiting for GPS fix")
         }
 
         // Defer Aircraft restore
-        if (prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, false)) {
+        if (prefs.getBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, false)) {
             pendingAircraftRestore = true
             DebugLogger.i("MainActivity", "onStart() Aircraft restore deferred — waiting for GPS fix")
         }
 
         // Restore auto-follow aircraft if it was active
-        if (prefs.getBoolean(AppBarMenuManager.PREF_AUTO_FOLLOW_AIRCRAFT, false)) {
+        if (prefs.getBoolean(MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, false)) {
             pendingAutoFollowRestore = true
             DebugLogger.i("MainActivity", "onStart() Auto-follow restore deferred — waiting for GPS fix + aircraft data")
         }
@@ -404,17 +404,17 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onStart() POI restore deferred — waiting for GPS fix")
         }
         // Defer webcam restore until GPS fix
-        if (prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) {
+        if (prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) {
             pendingWebcamRestore = true
             DebugLogger.i("MainActivity", "onStart() Webcam restore deferred — waiting for GPS fix")
         }
 
         // Defer geofence overlay restore until GPS fix
-        val anyGeofence = prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)
-            || prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false)
-            || prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false)
-            || prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false)
-            || prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false)
+        val anyGeofence = prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, true)
+            || prefs.getBoolean(MenuPrefs.PREF_CAMERA_OVERLAY, false)
+            || prefs.getBoolean(MenuPrefs.PREF_SCHOOL_OVERLAY, false)
+            || prefs.getBoolean(MenuPrefs.PREF_FLOOD_OVERLAY, false)
+            || prefs.getBoolean(MenuPrefs.PREF_CROSSING_OVERLAY, false)
         if (anyGeofence) {
             pendingGeofenceRestore = true
             DebugLogger.i("MainActivity", "onStart() Geofence overlay restore deferred — waiting for GPS fix")
@@ -494,15 +494,15 @@ class MainActivity : AppCompatActivity() {
         // ── Layer toggles ──
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
         val toggleMap = mapOf<String, (Boolean) -> Unit>(
-            AppBarMenuManager.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
-            AppBarMenuManager.PREF_MBTA_BUS_STOPS  to { menuEventListenerImpl.onMbtaBusStopsToggled(it) },
-            AppBarMenuManager.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
-            AppBarMenuManager.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
-            AppBarMenuManager.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
-            AppBarMenuManager.PREF_RADAR_ON         to { menuEventListenerImpl.onRadarToggled(it) },
-            AppBarMenuManager.PREF_METAR_DISPLAY    to { menuEventListenerImpl.onMetarDisplayToggled(it) },
-            AppBarMenuManager.PREF_AIRCRAFT_DISPLAY to { menuEventListenerImpl.onAircraftDisplayToggled(it) },
-            AppBarMenuManager.PREF_WEBCAMS_ON       to { menuEventListenerImpl.onWebcamToggled(it) },
+            MenuPrefs.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
+            MenuPrefs.PREF_MBTA_BUS_STOPS  to { menuEventListenerImpl.onMbtaBusStopsToggled(it) },
+            MenuPrefs.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
+            MenuPrefs.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
+            MenuPrefs.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
+            MenuPrefs.PREF_RADAR_ON         to { menuEventListenerImpl.onRadarToggled(it) },
+            MenuPrefs.PREF_METAR_DISPLAY    to { menuEventListenerImpl.onMetarDisplayToggled(it) },
+            MenuPrefs.PREF_AIRCRAFT_DISPLAY to { menuEventListenerImpl.onAircraftDisplayToggled(it) },
+            MenuPrefs.PREF_WEBCAMS_ON       to { menuEventListenerImpl.onWebcamToggled(it) },
         )
 
         extras.getString("enable")?.split(",")?.map { it.trim() }?.forEach { key ->
@@ -553,8 +553,8 @@ class MainActivity : AppCompatActivity() {
 
     internal fun setupMap() {
         DebugLogger.i("MainActivity", "setupMap() — initial center=US_DEFAULT zoom=6 (will update on GPS fix)")
-        val darkModePrefs = getSharedPreferences(AppBarMenuManager.PREFS_NAME, MODE_PRIVATE)
-        val isDarkMode = darkModePrefs.getBoolean(AppBarMenuManager.PREF_DARK_MODE, false)
+        val darkModePrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+        val isDarkMode = darkModePrefs.getBoolean(MenuPrefs.PREF_DARK_MODE, false)
         binding.mapView.apply {
             setTileSource(if (isDarkMode) buildDarkTileSource() else TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
@@ -794,9 +794,9 @@ class MainActivity : AppCompatActivity() {
     /** FAB quick-toggle for aircraft layer — mirrors the menu toggle logic. */
     internal fun toggleAircraftFromFab() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-        val wasOn = prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, false)
+        val wasOn = prefs.getBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, false)
         val nowOn = !wasOn
-        prefs.edit().putBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, nowOn).apply()
+        prefs.edit().putBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, nowOn).apply()
         if (nowOn) {
             startAircraftRefresh()
             toast("Aircraft tracking ON")
@@ -808,7 +808,7 @@ class MainActivity : AppCompatActivity() {
             if (autoFollowAircraftJob?.isActive == true) {
                 autoFollowAircraftJob?.cancel()
                 autoFollowAircraftJob = null
-                prefs.edit().putBoolean(AppBarMenuManager.PREF_AUTO_FOLLOW_AIRCRAFT, false).apply()
+                prefs.edit().putBoolean(MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, false).apply()
                 stopFollowing()
                 DebugLogger.i("MainActivity", "Auto-follow cancelled — aircraft layer FAB off")
             }
@@ -1477,9 +1477,9 @@ class MainActivity : AppCompatActivity() {
 
     internal fun loadWebcamsForVisibleArea() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-        if (!prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) return
+        if (!prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) return
         val bb = binding.mapView.boundingBox
-        val cats = prefs.getStringSet(AppBarMenuManager.PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
+        val cats = prefs.getStringSet(MenuPrefs.PREF_WEBCAM_CATEGORIES, setOf("traffic")) ?: setOf("traffic")
         if (cats.isEmpty()) return
         // Windy API returns 0 results for very small bboxes — enforce minimum ~0.5° span
         val centerLat = (bb.latNorth + bb.latSouth) / 2.0
@@ -1492,7 +1492,7 @@ class MainActivity : AppCompatActivity() {
     /** Debounced: reload webcams 500ms after user stops scrolling/zooming. */
     internal fun scheduleWebcamReload() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-        if (!prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) return
+        if (!prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) return
         webcamReloadJob?.cancel()
         webcamReloadJob = lifecycleScope.launch {
             delay(500)
@@ -1607,7 +1607,7 @@ class MainActivity : AppCompatActivity() {
                     autoFollowAircraftJob?.cancel()
                     autoFollowAircraftJob = null
                     val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-                    prefs.edit().putBoolean(AppBarMenuManager.PREF_AUTO_FOLLOW_AIRCRAFT, false).apply()
+                    prefs.edit().putBoolean(MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, false).apply()
                     DebugLogger.i("MainActivity", "Auto-follow cancelled — aircraft layer turned off")
                 }
             }
@@ -1733,7 +1733,7 @@ class MainActivity : AppCompatActivity() {
         override fun onWebcamCategoriesChanged(categories: Set<String>) {
             DebugLogger.i("MainActivity", "onWebcamCategoriesChanged: $categories")
             val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
-            if (prefs.getBoolean(AppBarMenuManager.PREF_WEBCAMS_ON, true)) {
+            if (prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) {
                 if (categories.isEmpty()) {
                     weatherViewModel.clearWebcams()
                     clearWebcamMarkers()

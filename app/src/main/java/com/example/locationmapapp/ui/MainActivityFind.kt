@@ -37,7 +37,6 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.R
 import com.example.locationmapapp.data.model.GeocodeSuggestion
-import com.example.locationmapapp.ui.menu.AppBarMenuManager
 import com.example.locationmapapp.ui.menu.PoiCategories
 import com.example.locationmapapp.ui.menu.PoiCategory
 import com.example.locationmapapp.util.DebugLogger

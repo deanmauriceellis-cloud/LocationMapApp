@@ -17,7 +17,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.R
-import com.example.locationmapapp.ui.menu.AppBarMenuManager
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -64,7 +64,7 @@ internal fun MainActivity.startSilentFill(center: org.osmdroid.util.GeoPoint) {
     if (followedVehicleId != null || followedAircraftIcao != null) return
 
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
-    val showDebug = prefs.getBoolean(AppBarMenuManager.PREF_SILENT_FILL_DEBUG, true)
+    val showDebug = prefs.getBoolean(MenuPrefs.PREF_SILENT_FILL_DEBUG, true)
 
     silentFillJob = lifecycleScope.launch {
         DebugLogger.i("MainActivity", "Silent fill starting at ${center.latitude},${center.longitude}")
@@ -495,7 +495,7 @@ internal fun MainActivity.startPopulatePois() {
         toast("Stop following first")
         // Reset pref back to OFF
         val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
+        prefs.edit().putBoolean(MenuPrefs.PREF_POPULATE_POIS, false).apply()
         return
     }
     // Cancel idle populate and silent fill — manual scanner takes over
@@ -703,7 +703,7 @@ internal fun MainActivity.stopPopulatePois() {
     loadCachedPoisForVisibleArea()
     // Reset menu pref
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
-    prefs.edit().putBoolean(AppBarMenuManager.PREF_POPULATE_POIS, false).apply()
+    prefs.edit().putBoolean(MenuPrefs.PREF_POPULATE_POIS, false).apply()
     DebugLogger.i("MainActivity", "stopPopulatePois()")
 }
 

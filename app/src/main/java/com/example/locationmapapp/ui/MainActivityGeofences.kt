@@ -27,7 +27,7 @@ import android.widget.TextView
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.R
-import com.example.locationmapapp.ui.menu.AppBarMenuManager
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,7 +49,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivit
 
 internal fun MainActivity.loadTfrsForVisibleArea() {
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
-    if (!prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) return
+    if (!prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, true)) return
     val bb = binding.mapView.boundingBox
     geofenceViewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
 }
@@ -60,19 +60,19 @@ internal fun MainActivity.loadGeofenceZonesForVisibleArea() {
     val bb = binding.mapView.boundingBox
     val zoom = binding.mapView.zoomLevelDouble
 
-    if (prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)) {
+    if (prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, true)) {
         geofenceViewModel.loadTfrs(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
-    if (prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false) && zoom >= 10) {
+    if (prefs.getBoolean(MenuPrefs.PREF_CAMERA_OVERLAY, false) && zoom >= 10) {
         geofenceViewModel.loadCameras(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
-    if (prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false) && zoom >= 12) {
+    if (prefs.getBoolean(MenuPrefs.PREF_SCHOOL_OVERLAY, false) && zoom >= 12) {
         geofenceViewModel.loadSchools(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
-    if (prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false) && zoom >= 12) {
+    if (prefs.getBoolean(MenuPrefs.PREF_FLOOD_OVERLAY, false) && zoom >= 12) {
         geofenceViewModel.loadFloodZones(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
-    if (prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false) && zoom >= 12) {
+    if (prefs.getBoolean(MenuPrefs.PREF_CROSSING_OVERLAY, false) && zoom >= 12) {
         geofenceViewModel.loadCrossings(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
     // Load database zones (offline SQLite databases)
@@ -84,11 +84,11 @@ internal fun MainActivity.loadGeofenceZonesForVisibleArea() {
 /** Debounced: reload geofence zones 500ms after scrolling/zooming stops. */
 internal fun MainActivity.scheduleGeofenceReload() {
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
-    val anyEnabled = prefs.getBoolean(AppBarMenuManager.PREF_TFR_OVERLAY, true)
-        || prefs.getBoolean(AppBarMenuManager.PREF_CAMERA_OVERLAY, false)
-        || prefs.getBoolean(AppBarMenuManager.PREF_SCHOOL_OVERLAY, false)
-        || prefs.getBoolean(AppBarMenuManager.PREF_FLOOD_OVERLAY, false)
-        || prefs.getBoolean(AppBarMenuManager.PREF_CROSSING_OVERLAY, false)
+    val anyEnabled = prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, true)
+        || prefs.getBoolean(MenuPrefs.PREF_CAMERA_OVERLAY, false)
+        || prefs.getBoolean(MenuPrefs.PREF_SCHOOL_OVERLAY, false)
+        || prefs.getBoolean(MenuPrefs.PREF_FLOOD_OVERLAY, false)
+        || prefs.getBoolean(MenuPrefs.PREF_CROSSING_OVERLAY, false)
         || geofenceViewModel.hasInstalledDatabases()
     if (!anyEnabled) return
     geofenceReloadJob?.cancel()

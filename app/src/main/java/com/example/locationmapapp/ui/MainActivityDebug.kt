@@ -13,7 +13,7 @@ import com.example.locationmapapp.data.model.AircraftState
 import com.example.locationmapapp.data.model.MbtaStop
 import com.example.locationmapapp.data.model.MbtaVehicle
 import com.example.locationmapapp.data.model.Webcam
-import com.example.locationmapapp.ui.menu.AppBarMenuManager
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import android.content.Context
 import org.osmdroid.views.overlay.Marker
@@ -237,15 +237,15 @@ internal fun MainActivity.debugTogglePref(pref: String, value: Boolean) {
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
     prefs.edit().putBoolean(pref, value).apply()
     val toggleMap = mapOf<String, (Boolean) -> Unit>(
-        AppBarMenuManager.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
-        AppBarMenuManager.PREF_MBTA_BUS_STOPS  to { menuEventListenerImpl.onMbtaBusStopsToggled(it) },
-        AppBarMenuManager.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
-        AppBarMenuManager.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
-        AppBarMenuManager.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
-        AppBarMenuManager.PREF_RADAR_ON         to { menuEventListenerImpl.onRadarToggled(it) },
-        AppBarMenuManager.PREF_METAR_DISPLAY    to { menuEventListenerImpl.onMetarDisplayToggled(it) },
-        AppBarMenuManager.PREF_AIRCRAFT_DISPLAY to { menuEventListenerImpl.onAircraftDisplayToggled(it) },
-        AppBarMenuManager.PREF_WEBCAMS_ON       to { menuEventListenerImpl.onWebcamToggled(it) },
+        MenuPrefs.PREF_MBTA_STATIONS   to { menuEventListenerImpl.onMbtaStationsToggled(it) },
+        MenuPrefs.PREF_MBTA_BUS_STOPS  to { menuEventListenerImpl.onMbtaBusStopsToggled(it) },
+        MenuPrefs.PREF_MBTA_TRAINS     to { menuEventListenerImpl.onMbtaTrainsToggled(it) },
+        MenuPrefs.PREF_MBTA_SUBWAY     to { menuEventListenerImpl.onMbtaSubwayToggled(it) },
+        MenuPrefs.PREF_MBTA_BUSES      to { menuEventListenerImpl.onMbtaBusesToggled(it) },
+        MenuPrefs.PREF_RADAR_ON         to { menuEventListenerImpl.onRadarToggled(it) },
+        MenuPrefs.PREF_METAR_DISPLAY    to { menuEventListenerImpl.onMetarDisplayToggled(it) },
+        MenuPrefs.PREF_AIRCRAFT_DISPLAY to { menuEventListenerImpl.onAircraftDisplayToggled(it) },
+        MenuPrefs.PREF_WEBCAMS_ON       to { menuEventListenerImpl.onWebcamToggled(it) },
     )
     toggleMap[pref]?.invoke(value)
         ?: DebugLogger.w("DebugHttp", "debugTogglePref: unknown pref '$pref'")

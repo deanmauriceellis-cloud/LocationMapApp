@@ -11,7 +11,7 @@ package com.example.locationmapapp.ui
 
 import android.content.Context
 import android.graphics.Color
-import com.example.locationmapapp.ui.menu.AppBarMenuManager
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.XYTileSource
@@ -110,8 +110,8 @@ internal fun MainActivity.startRadarAnimation() {
     radarScheduler.stop()
 
     // Read speed from prefs
-    val prefs = getSharedPreferences(AppBarMenuManager.PREFS_NAME, Context.MODE_PRIVATE)
-    radarAnimSpeedMs = prefs.getInt(AppBarMenuManager.PREF_RADAR_ANIM_SPEED, AppBarMenuManager.DEFAULT_RADAR_ANIM_SPEED)
+    val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+    radarAnimSpeedMs = prefs.getInt(MenuPrefs.PREF_RADAR_ANIM_SPEED, MenuPrefs.DEFAULT_RADAR_ANIM_SPEED)
 
     // Generate 7 timestamps (35 min of history)
     val timestamps = generateRadarTimestamps(7)
@@ -198,9 +198,9 @@ internal fun MainActivity.stopRadarAnimation() {
     statusLineManager.clear(StatusLineManager.Priority.SILENT_FILL)
 
     // Restore static radar if it was enabled
-    val prefs = getSharedPreferences(AppBarMenuManager.PREFS_NAME, Context.MODE_PRIVATE)
-    prefs.edit().putBoolean(AppBarMenuManager.PREF_RADAR_ANIMATE, false).apply()
-    if (prefs.getBoolean(AppBarMenuManager.PREF_RADAR_ON, true)) {
+    val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+    prefs.edit().putBoolean(MenuPrefs.PREF_RADAR_ANIMATE, false).apply()
+    if (prefs.getBoolean(MenuPrefs.PREF_RADAR_ON, true)) {
         addRadarOverlay()
         radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { weatherViewModel.refreshRadar() }
     }

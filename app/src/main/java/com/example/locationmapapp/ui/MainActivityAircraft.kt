@@ -22,7 +22,7 @@ import org.osmdroid.util.GeoPoint
 import android.content.Context
 import android.graphics.Paint
 import android.view.View
-import com.example.locationmapapp.ui.menu.AppBarMenuManager
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import kotlinx.coroutines.Job
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
@@ -396,8 +396,8 @@ internal fun MainActivity.stopFollowedAircraftRefresh() {
 internal fun MainActivity.startAutoFollowAircraft() {
     val prefs = getSharedPreferences("app_bar_menu_prefs", Context.MODE_PRIVATE)
     // Ensure aircraft layer is on
-    if (!prefs.getBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true)) {
-        prefs.edit().putBoolean(AppBarMenuManager.PREF_AIRCRAFT_DISPLAY, true).apply()
+    if (!prefs.getBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, true)) {
+        prefs.edit().putBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, true).apply()
         startAircraftRefresh()
         DebugLogger.i("MainActivity", "Auto-follow: enabled aircraft layer")
     }
