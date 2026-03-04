@@ -332,6 +332,7 @@
 - Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
+- **Overpass intermittent 504s** (observed 2026-03-04): public `overpass-api.de` returns HTML error pages (`Dispatcher_Client::request_read_and_idx::timeout`) under load; proxy treats these as valid responses returning 0 POIs instead of retrying. Populate scanner compounds the problem by retrying ocean/empty-area tiles. Not a code bug — server-side capacity issue, but proxy error handling could be improved (detect HTML error, backoff, retry)
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |
@@ -410,6 +411,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
+- **Overpass resilience**: Proxy should detect HTML error responses from Overpass and retry with backoff instead of returning 0 POIs; populate scanner should skip ocean/water tiles
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)

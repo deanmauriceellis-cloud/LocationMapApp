@@ -17,6 +17,13 @@
 - v1.5.55: MODULE_ID, toolbar layout (7 icons)
 - v1.5.56: Distance-sorted search, Filter and Map button at top, adaptive zoom
 
+## Known Issue: Overpass Intermittent 504s (2026-03-04)
+- Public Overpass server (`overpass-api.de`) returning HTML error pages under load
+- Error: `Dispatcher_Client::request_read_and_idx::timeout`
+- Proxy passes these through as 0-result responses instead of detecting and retrying
+- Populate scanner compounds issue when scanning ocean/empty tiles (e.g., offshore Boca Raton)
+- **Fix needed**: detect HTML error in proxy Overpass worker, backoff and retry
+
 ## NOT YET TESTED — Resume Here
 
 ### v1.5.57 (needs proxy restart + app reinstall)
