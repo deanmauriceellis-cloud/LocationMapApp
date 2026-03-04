@@ -2,6 +2,16 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.58] — 2026-03-04
+
+### Added
+- **Overpass retry + endpoint rotation** — proxy retries up to 4 attempts across 3 endpoints (overpass-api.de, lz4, z) with 15s/30s/60s exponential backoff; detects HTML errors, 429s, 5xx, dispatcher errors
+- **App-side Overpass retry** — `PlacesRepository.executeOverpassWithRetry()` retries 3 times with 5s/10s delays on HTTP errors, HTML error bodies, and network exceptions
+- **Single tap on map stops everything** — tapping empty map area stops vehicle/aircraft following and all population tasks (populate, 10km probe, idle populate, silent fill)
+
+### Changed
+- **Label zoom threshold lowered to 16** — POI names, train/subway/bus details (route, speed, destination, status) now visible from zoom 16+ (was 18+)
+
 ## [Refactoring] — 2026-03-04
 
 ### Changed

@@ -569,7 +569,30 @@ class MainActivity : AppCompatActivity() {
         setupZoomSlider()
         val eventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                return false
+                var consumed = false
+                // Stop following any vehicle or aircraft
+                if (followedVehicleId != null || followedAircraftIcao != null) {
+                    stopFollowing()
+                    consumed = true
+                }
+                // Stop population tasks
+                if (populateJob != null) {
+                    stopPopulatePois()
+                    consumed = true
+                }
+                if (probe10kmJob != null) {
+                    stopProbe10km()
+                    consumed = true
+                }
+                if (idlePopulateJob != null) {
+                    stopIdlePopulate(clearState = true)
+                    consumed = true
+                }
+                if (silentFillJob != null) {
+                    stopSilentFill()
+                    consumed = true
+                }
+                return consumed
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
                 DebugLogger.i("MainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
@@ -691,16 +714,16 @@ class MainActivity : AppCompatActivity() {
                         binding.mapView.invalidate()
                     }
                 }
-                // Refresh POI marker icons when crossing the zoom-18 label threshold
+                // Refresh POI marker icons when crossing the zoom-16 label threshold
                 // In filter-and-map mode, always force labels
-                val nowLabeled = zoom >= 18.0 || filterAndMapActive
+                val nowLabeled = zoom >= 16.0 || filterAndMapActive
                 if (nowLabeled != poiLabelsShowing) {
                     poiLabelsShowing = nowLabeled
                     if (!filterAndMapActive) refreshPoiMarkerIcons()
                 }
                 // Refresh vehicle marker icons when crossing the zoom-18 label threshold
                 if (!filterAndMapActive) {
-                    val vehicleLabeled = zoom >= 18.0
+                    val vehicleLabeled = zoom >= 16.0
                     if (vehicleLabeled != vehicleLabelsShowing) {
                         vehicleLabelsShowing = vehicleLabeled
                         refreshVehicleMarkerIcons()
@@ -1260,7 +1283,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     internal fun addPoiMarker(layerId: String, place: com.example.locationmapapp.data.model.PlaceResult) {
-        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        val labeled = binding.mapView.zoomLevelDouble >= 16.0
         val m = Marker(binding.mapView).apply {
             position = GeoPoint(place.lat, place.lon)
             icon = if (labeled) {
@@ -1308,7 +1331,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Swap all POI marker icons between dot and labeled-dot when crossing zoom 18. */
     internal fun refreshPoiMarkerIcons() {
-        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        val labeled = binding.mapView.zoomLevelDouble >= 16.0
         DebugLogger.i("MainActivity", "refreshPoiMarkerIcons labeled=$labeled")
         poiMarkers.values.flatten().forEach { marker ->
             val place = marker.relatedObject as? com.example.locationmapapp.data.model.PlaceResult ?: return@forEach
@@ -1323,7 +1346,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Swap all vehicle marker icons between plain arrow and labeled when crossing zoom 18. */
     internal fun refreshVehicleMarkerIcons() {
-        val labeled = binding.mapView.zoomLevelDouble >= 18.0
+        val labeled = binding.mapView.zoomLevelDouble >= 16.0
         DebugLogger.i("MainActivity", "refreshVehicleMarkerIcons labeled=$labeled")
         fun refreshList(markers: List<Marker>, resId: Int, sizeDp: Int) {
             markers.forEach { marker ->

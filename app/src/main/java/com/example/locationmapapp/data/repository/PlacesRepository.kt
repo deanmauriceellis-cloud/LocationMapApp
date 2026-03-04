@@ -16,6 +16,7 @@ import com.example.locationmapapp.util.DebugLogger
 import com.google.gson.JsonParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
@@ -137,6 +138,75 @@ class PlacesRepository @Inject constructor(
         }
     }
 
+    // ── Overpass retry helpers ──────────────────────────────────────────────
+
+    /** Detect HTML error responses from Overpass (504 gateways, dispatcher errors). */
+    private fun isHtmlErrorResponse(response: okhttp3.Response, bodyStr: String): Boolean {
+        val ct = response.header("Content-Type")?.lowercase() ?: ""
+        if (ct.contains("text/html")) return true
+        val trimmed = bodyStr.trimStart().take(200).lowercase()
+        if (trimmed.startsWith("<html") || trimmed.startsWith("<!doctype")) return true
+        if (trimmed.contains("dispatcher_client")) return true
+        return false
+    }
+
+    /**
+     * Execute an Overpass request with retry on transient errors.
+     * Retries up to MAX_HTTP_RETRIES times with delays from RETRY_DELAYS_MS.
+     * Throws RuntimeException only after all attempts exhausted.
+     */
+    private suspend fun executeOverpassWithRetry(
+        request: Request, center: GeoPoint, tag: String
+    ): Pair<okhttp3.Response, String> {
+        var lastException: Exception? = null
+        for (attempt in 1..MAX_HTTP_RETRIES) {
+            try {
+                // Rebuild request each attempt — OkHttp can't re-execute consumed requests
+                val retryRequest = request.newBuilder().build()
+                val t0 = System.currentTimeMillis()
+                val response = client.newCall(retryRequest).execute()
+                val elapsed = System.currentTimeMillis() - t0
+                val bodyStr = response.body!!.string()
+
+                // Check for non-2xx or HTML error bodies
+                if (!response.isSuccessful || isHtmlErrorResponse(response, bodyStr)) {
+                    val reason = if (!response.isSuccessful) "HTTP ${response.code}" else "HTML error body"
+                    DebugLogger.w(TAG, "$tag attempt $attempt/$MAX_HTTP_RETRIES failed: $reason (${elapsed}ms)")
+                    lastException = RuntimeException("$reason: ${bodyStr.take(200)}")
+                    if (attempt < MAX_HTTP_RETRIES) {
+                        val delayMs = RETRY_DELAYS_MS.getOrElse(attempt - 1) { RETRY_DELAYS_MS.last() }
+                        DebugLogger.i(TAG, "$tag retrying in ${delayMs / 1000}s...")
+                        delay(delayMs)
+                        continue
+                    }
+                    // Last attempt — fall through to throw
+                    postRadiusFeedback(center, 0, error = true)
+                    throw lastException!!
+                }
+
+                // Success
+                if (attempt > 1) {
+                    DebugLogger.i(TAG, "$tag succeeded on attempt $attempt/$MAX_HTTP_RETRIES (${elapsed}ms)")
+                }
+                DebugLogger.i(TAG, "$tag response code=${response.code} in ${elapsed}ms contentType=${response.header("Content-Type")}")
+                return Pair(response, bodyStr)
+            } catch (e: java.io.IOException) {
+                lastException = e
+                DebugLogger.w(TAG, "$tag attempt $attempt/$MAX_HTTP_RETRIES network error: ${e.message}")
+                if (attempt < MAX_HTTP_RETRIES) {
+                    val delayMs = RETRY_DELAYS_MS.getOrElse(attempt - 1) { RETRY_DELAYS_MS.last() }
+                    DebugLogger.i(TAG, "$tag retrying in ${delayMs / 1000}s...")
+                    delay(delayMs)
+                } else {
+                    postRadiusFeedback(center, 0, error = true)
+                    throw RuntimeException("$tag failed after $MAX_HTTP_RETRIES attempts: ${e.message}", e)
+                }
+            }
+        }
+        // Should not reach here, but satisfy compiler
+        throw lastException ?: RuntimeException("$tag retry exhausted")
+    }
+
     // ── POI search ────────────────────────────────────────────────────────────
 
     suspend fun searchPois(center: GeoPoint, categories: List<String>): List<PlaceResult> =
@@ -150,18 +220,7 @@ class PlacesRepository @Inject constructor(
                 DebugLogger.d(TAG, "Overpass POST query (${query.length} chars, radius=${radiusM}m, attempt=$attempts)")
                 val body = FormBody.Builder().add("data", query).build()
                 val request = Request.Builder().url(OVERPASS_URL).post(body).header("X-Client-ID", clientId).build()
-                val t0 = System.currentTimeMillis()
-                val response = client.newCall(request).execute()
-                val elapsed = System.currentTimeMillis() - t0
-                DebugLogger.i(TAG, "Overpass response code=${response.code} in ${elapsed}ms contentType=${response.header("Content-Type")}")
-                if (!response.isSuccessful) {
-                    val errBody = response.body?.string()?.take(300) ?: "(empty)"
-                    DebugLogger.e(TAG, "Overpass HTTP ${response.code} body: $errBody")
-                    postRadiusFeedback(center, 0, error = true)
-                    throw RuntimeException("HTTP ${response.code}: $errBody")
-                }
-                val bodyStr = response.body!!.string()
-                DebugLogger.d(TAG, "Overpass response body length=${bodyStr.length} chars")
+                val (_, bodyStr) = executeOverpassWithRetry(request, center, "Search")
                 val (results, rawCount) = parseOverpassJson(bodyStr)
                 val capped = rawCount >= OVERPASS_RESULT_LIMIT
 
@@ -307,16 +366,11 @@ class PlacesRepository @Inject constructor(
                 DebugLogger.d(TAG, "Populate search at $key (radius=${radiusM}m, attempt=$attempts)")
                 val body = FormBody.Builder().add("data", query).build()
                 val request = Request.Builder().url(OVERPASS_URL).post(body).header("X-Client-ID", clientId).build()
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    postRadiusFeedback(center, 0, error = true)
-                    throw RuntimeException("HTTP ${response.code}")
-                }
+                val (response, bodyStr) = executeOverpassWithRetry(request, center, "Populate")
                 val cacheHeader = response.header("X-Cache") ?: "MISS"
                 lastCacheHit = cacheHeader.equals("HIT", ignoreCase = true)
                 totalNew += response.header("X-POI-New")?.toIntOrNull() ?: 0
                 totalKnown += response.header("X-POI-Known")?.toIntOrNull() ?: 0
-                val bodyStr = response.body!!.string()
                 val (results, rawCount) = parseOverpassJson(bodyStr)
                 val capped = rawCount >= OVERPASS_RESULT_LIMIT
 
@@ -349,6 +403,8 @@ class PlacesRepository @Inject constructor(
         const val MAX_RADIUS_M     = 15000
         const val MIN_USEFUL_POI_COUNT = 5
         const val OVERPASS_RESULT_LIMIT = 500
+        const val MAX_HTTP_RETRIES = 3
+        val RETRY_DELAYS_MS = longArrayOf(5_000L, 10_000L)
     }
 
     /** Fetch cached POIs within a bounding box from the proxy's poi-cache. */

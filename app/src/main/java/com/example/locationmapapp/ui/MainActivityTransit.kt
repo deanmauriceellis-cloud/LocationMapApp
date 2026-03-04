@@ -38,7 +38,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivit
 
 internal fun MainActivity.addTrainMarker(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
     val tint = vehicleRouteColor(vehicle)
-    val labeled = binding.mapView.zoomLevelDouble >= 18.0
+    val labeled = binding.mapView.zoomLevelDouble >= 16.0
     val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
     val m = Marker(binding.mapView).apply {
         position = vehicle.toGeoPoint()
@@ -130,7 +130,7 @@ internal fun MainActivity.stopTrainRefresh() {
 
 internal fun MainActivity.addSubwayMarker(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
     val tint = vehicleRouteColor(vehicle)
-    val labeled = binding.mapView.zoomLevelDouble >= 18.0
+    val labeled = binding.mapView.zoomLevelDouble >= 16.0
     val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
     val m = Marker(binding.mapView).apply {
         position = vehicle.toGeoPoint()
@@ -188,7 +188,7 @@ internal fun MainActivity.stopSubwayRefresh() {
 
 internal fun MainActivity.addBusMarker(vehicle: com.example.locationmapapp.data.model.MbtaVehicle) {
     val tint = vehicleRouteColor(vehicle)
-    val labeled = binding.mapView.zoomLevelDouble >= 18.0
+    val labeled = binding.mapView.zoomLevelDouble >= 16.0
     val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
     val m = Marker(binding.mapView).apply {
         position = vehicle.toGeoPoint()

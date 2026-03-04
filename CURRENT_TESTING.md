@@ -17,15 +17,18 @@
 - v1.5.55: MODULE_ID, toolbar layout (7 icons)
 - v1.5.56: Distance-sorted search, Filter and Map button at top, adaptive zoom
 - Refactoring: server.js decomposition (18 modules), 6 ViewModels, MenuPrefs.kt — build passes, pure structural
-
-## Known Issue: Overpass Intermittent 504s (2026-03-04)
-- Public Overpass server (`overpass-api.de`) returning HTML error pages under load
-- Error: `Dispatcher_Client::request_read_and_idx::timeout`
-- **Proxy fix needed** (`cache-proxy/lib/overpass.js`, overpassWorker function): detect HTML errors (`content-type: text/html` or `<html` in body), retry 2-3x with exponential backoff before returning error
-- **App fix needed** (PlacesRepository.kt:309): populate scanner should retry failed tiles 2-3 times before advancing to next point (currently skips permanently on failure)
-- ~13% failure rate observed during 10km Probe scan across Florida
+- v1.5.58: Overpass retry (proxy + app), zoom 16 labels, single-tap stop — build passes
 
 ## NOT YET TESTED — Resume Here
+
+### v1.5.58 (proxy restarted + app reinstalled)
+- [ ] Overpass retry — run 10km Probe scan, check proxy logs for `[Overpass retry]` messages
+- [ ] Overpass retry — verify error rate drops from ~13% to near zero
+- [ ] Zoom 16 labels — POI full names visible at zoom 16 (was 18)
+- [ ] Zoom 16 labels — train/subway/bus route, speed, destination visible at zoom 16 (was 18)
+- [ ] Single tap stop — tap empty map while following a vehicle, verify follow stops
+- [ ] Single tap stop — tap empty map while populate scan running, verify scan stops
+- [ ] Single tap stop — tap on a marker still opens detail (not consumed by tap handler)
 
 ### v1.5.57 (needs proxy restart + app reinstall)
 - [ ] Cuisine search — "pizza" returns pizza places (not just nearest Food & Drink)

@@ -2,6 +2,25 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04f (Overpass Retry + Zoom 16 Labels + Tap-to-Stop)
+
+### Context
+Overpass API returning intermittent HTML error pages (~13% failure rate during 10km Probe). Also UX improvements: lower zoom threshold for labels, single-tap to cancel follow/populate.
+
+### Changes
+- **Proxy retry** (`cache-proxy/lib/overpass.js`): 3 endpoint rotation (overpass-api.de, lz4, z), `detectOverpassError()` helper, 4 total attempts with 15s/30s/60s backoff
+- **App retry** (`PlacesRepository.kt`): `isHtmlErrorResponse()` + `executeOverpassWithRetry()` wrapper — 3 attempts, 5s/10s delays, coroutine-cancellable; used by both `searchPois()` and `searchPoisForPopulate()`
+- **Zoom 16 labels**: POI full names + train/subway/bus detail labels (route, speed, destination, status) now visible from zoom 16+ (was 18+) — changed in `addTrainMarker`, `addSubwayMarker`, `addBusMarker`, `addPoiMarker`, `refreshPoiMarkerIcons`, `refreshVehicleMarkerIcons`, and scroll handler threshold checks
+- **Single tap stop**: `singleTapConfirmedHelper` now stops following (vehicle/aircraft) + all population tasks (populate, 10km probe, idle populate, silent fill)
+
+### Files Modified (4)
+- `cache-proxy/lib/overpass.js` — retry loop with endpoint rotation + error detection
+- `app/.../data/repository/PlacesRepository.kt` — retry wrapper + HTML detection + constants
+- `app/.../ui/MainActivityTransit.kt` — zoom threshold 18→16 for train/subway/bus markers
+- `app/.../ui/MainActivity.kt` — zoom threshold 18→16 for POI labels + scroll handler + single tap handler
+
+---
+
 ## Session: 2026-03-04e (3-Phase Code Decomposition — server.js + ViewModels + MenuPrefs)
 
 ### Context

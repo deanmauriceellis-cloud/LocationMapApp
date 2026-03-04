@@ -14,6 +14,25 @@ module.exports = function(app, deps) {
   const OVERPASS_TTL = 365 * 24 * 60 * 60 * 1000;  // 365 days
   const OVERPASS_MIN_INTERVAL_MS = 10_000;  // 10s between upstream requests
 
+  const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
+    'https://z.overpass-api.de/api/interpreter',
+  ];
+  const MAX_RETRIES = 3;  // total attempts = MAX_RETRIES + 1
+  const RETRY_BACKOFFS_MS = [15_000, 30_000, 60_000];
+
+  function detectOverpassError(status, contentType, body) {
+    if (status === 429) return `rate-limited (429)`;
+    if (status >= 500) return `server error (${status})`;
+    const ct = (contentType || '').toLowerCase();
+    if (ct.includes('text/html')) return 'content-type is text/html';
+    const trimmed = (body || '').trimStart().substring(0, 200).toLowerCase();
+    if (trimmed.startsWith('<html') || trimmed.startsWith('<!doctype')) return 'body starts with HTML';
+    if (trimmed.includes('dispatcher_client')) return 'Overpass dispatcher error';
+    return null;
+  }
+
   // Upstream request queue — serializes cache misses, 10s apart
   const overpassQueue = [];
   let overpassWorkerRunning = false;
@@ -63,40 +82,80 @@ module.exports = function(app, deps) {
         }
       }
 
-      try {
-        const t0 = Date.now();
-        overpassLastUpstream = t0;
-        const upstream = await fetch('https://overpass-api.de/api/interpreter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `data=${encodeURIComponent(dataField)}`,
-        });
-        const elapsedMs = Date.now() - t0;
-        const body = await upstream.text();
-        const contentType = upstream.headers.get('content-type') || 'application/json';
+      let lastError = null;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const endpointIdx = attempt % OVERPASS_ENDPOINTS.length;
+        const endpoint = OVERPASS_ENDPOINTS[endpointIdx];
 
-        log('/overpass', false, elapsedMs);
-
-        let poiStats = { added: 0, updated: 0 };
-        if (upstream.ok && cacheKey) {
-          cacheSet(cacheKey, body, { 'content-type': contentType });
-
-          // Content hash delta detection — skip POI cache update if data unchanged
-          const newHash = computeElementHash(body);
-          const oldHash = contentHashes.get(cacheKey);
-          if (newHash && oldHash && newHash === oldHash) {
-            console.log(`[POI Cache] content unchanged (hash=${newHash.slice(0, 8)}) — skipping update`);
-            poiStats = { added: 0, updated: 0 };
-          } else {
-            poiStats = cacheIndividualPois(body);
-            if (newHash) contentHashes.set(cacheKey, newHash);
-          }
+        // Respect throttle on each attempt
+        if (attempt > 0) {
+          const backoff = RETRY_BACKOFFS_MS[attempt - 1] || 60_000;
+          console.log(`[Overpass retry] attempt ${attempt + 1}/${MAX_RETRIES + 1} using ${endpoint} after ${(backoff / 1000).toFixed(0)}s backoff`);
+          await new Promise(r => setTimeout(r, backoff));
         }
 
-        resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.added, poiKnown: poiStats.updated });
-      } catch (err) {
-        console.error('[Overpass upstream error]', err.message);
-        resolve({ hit: false, error: true, message: err.message });
+        // Re-check throttle before each attempt
+        const elapsedSinceLastUpstream = Date.now() - overpassLastUpstream;
+        if (elapsedSinceLastUpstream < OVERPASS_MIN_INTERVAL_MS) {
+          const wait = OVERPASS_MIN_INTERVAL_MS - elapsedSinceLastUpstream;
+          await new Promise(r => setTimeout(r, wait));
+        }
+
+        try {
+          const t0 = Date.now();
+          overpassLastUpstream = t0;
+          const upstream = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `data=${encodeURIComponent(dataField)}`,
+          });
+          const elapsedMs = Date.now() - t0;
+          const body = await upstream.text();
+          const contentType = upstream.headers.get('content-type') || 'application/json';
+
+          // Check for Overpass errors (504, HTML responses, dispatcher errors)
+          const errorReason = detectOverpassError(upstream.status, contentType, body);
+          if (errorReason) {
+            lastError = errorReason;
+            console.warn(`[Overpass retry] attempt ${attempt + 1} failed: ${errorReason} (endpoint=${endpoint}, ${elapsedMs}ms)`);
+            if (attempt < MAX_RETRIES) continue;
+            // Exhausted all retries
+            console.error(`[Overpass retry] all ${MAX_RETRIES + 1} attempts failed — last error: ${errorReason}`);
+            resolve({ hit: false, error: true, message: `Overpass failed after ${MAX_RETRIES + 1} attempts: ${errorReason}` });
+            break;
+          }
+
+          log('/overpass', false, elapsedMs);
+          if (attempt > 0) {
+            console.log(`[Overpass retry] succeeded on attempt ${attempt + 1} using ${endpoint}`);
+          }
+
+          let poiStats = { added: 0, updated: 0 };
+          if (upstream.ok && cacheKey) {
+            cacheSet(cacheKey, body, { 'content-type': contentType });
+
+            // Content hash delta detection — skip POI cache update if data unchanged
+            const newHash = computeElementHash(body);
+            const oldHash = contentHashes.get(cacheKey);
+            if (newHash && oldHash && newHash === oldHash) {
+              console.log(`[POI Cache] content unchanged (hash=${newHash.slice(0, 8)}) — skipping update`);
+              poiStats = { added: 0, updated: 0 };
+            } else {
+              poiStats = cacheIndividualPois(body);
+              if (newHash) contentHashes.set(cacheKey, newHash);
+            }
+          }
+
+          resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.added, poiKnown: poiStats.updated });
+          break;
+        } catch (err) {
+          lastError = err.message;
+          console.error(`[Overpass retry] attempt ${attempt + 1} network error: ${err.message} (endpoint=${endpoint})`);
+          if (attempt >= MAX_RETRIES) {
+            console.error(`[Overpass retry] all ${MAX_RETRIES + 1} attempts failed — last error: ${err.message}`);
+            resolve({ hit: false, error: true, message: `Overpass failed after ${MAX_RETRIES + 1} attempts: ${err.message}` });
+          }
+        }
       }
     }
 

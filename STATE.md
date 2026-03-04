@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 59 (3-Phase Code Decomposition)
+## Last Updated: 2026-03-04 Session 60 (Overpass Retry + Zoom 16 Labels + Tap-to-Stop)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -11,7 +11,7 @@
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
 - **17 POI categories, 153 subtypes** with submenu refinement (central config in `PoiCategories.kt`)
-  - 5dp colored dots; zoom ≥ 18: labeled icons with type + name
+  - 5dp colored dots; zoom ≥ 16: labeled icons with type + name
   - Layer-aware LiveData `Pair<String, List>`, viewport-only display via `/pois/bbox`
   - All layers default ON except aircraft (OFF)
 - **Weather dialog** (v1.5.34): current conditions, 48-hour hourly, 7-day outlook, expandable alerts
@@ -117,7 +117,7 @@
   - Any UI activity (grid dropdown, dialogs, toolbar buttons) also resets idle timer
   - State preservation: stopped idle scanner resumes from last ring/point (not from scratch)
   - State cleared on: long-press, GPS move >100m, goToLocation, manual populate start
-- **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta
+- **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta, **retry with 3-endpoint rotation + exponential backoff** (proxy + app-side)
 - **Bbox snapping**: METAR/webcams 0.01°, aircraft 0.1° for cache hit rate
 - **Silent fill** (v1.5.28): single Overpass search on startup/restore/long-press (3-4s delay)
 - **Geofence Alert System** (v1.5.35-36) — multi-zone spatial alerting with 5 zone types
@@ -208,6 +208,7 @@
 
 ## Map Interaction Model
 - **Tap POI marker**: opens POI detail dialog directly (info, comments, actions)
+- **Single tap on map** (empty area): stops all following (vehicle/aircraft) and all population tasks (populate, 10km probe, idle populate, silent fill)
 - **Long press (~2s)**: enter manual mode, center map (auto-zoom to 18 if <18), search POIs at location, fetch weather + alerts
 - **Scroll/pan**: displays cached POIs for visible area via proxy `/pois/bbox`
 - **Tap vehicle marker**: vehicle detail dialog (route, status, speed) with Follow / View Route / Arrivals buttons
@@ -381,7 +382,7 @@
 - Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
-- **Overpass intermittent 504s** (observed 2026-03-04): public `overpass-api.de` returns HTML error pages (`Dispatcher_Client::request_read_and_idx::timeout`) under load; proxy treats these as valid responses returning 0 POIs instead of retrying. Populate scanner compounds the problem by retrying ocean/empty-area tiles. Not a code bug — server-side capacity issue, but proxy error handling could be improved (detect HTML error, backoff, retry). Fix location: `cache-proxy/lib/overpass.js`
+- **Overpass intermittent 504s** (observed 2026-03-04): FIXED — proxy now retries with 3-endpoint rotation + exponential backoff; app PlacesRepository retries up to 3 times with 5s/10s delays
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |
@@ -465,7 +466,6 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
-- **Overpass resilience** (PRIORITY): Proxy should detect HTML error responses from Overpass (check `content-type: text/html` or `<html` in body) and retry 2-3x with exponential backoff (`cache-proxy/lib/overpass.js`, overpassWorker function). App populate scanner should retry failed tiles 2-3 times before advancing instead of skipping permanently (PlacesRepository.kt:309). ~13% failure rate observed during 10km Probe.
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)
