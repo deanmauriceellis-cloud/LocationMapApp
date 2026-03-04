@@ -2,6 +2,37 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04b (Commercialization Roadmap)
+
+### Context
+User requested a comprehensive "pathway to making this an application I can sell" — covering cloud deployment, legal structure, IP protection, user content liability, privacy compliance, content moderation, and Google Play requirements.
+
+### Changes Made
+
+#### 1. COMMERCIALIZATION.md (new document, ~700 lines)
+- Researched cloud hosting (Railway, DigitalOcean, Neon, Cloudflare R2), pricing at 100/1K/10K user scales
+- Legal structure: Wyoming LLC recommended ($100 formation, $60/yr)
+- Insurance: Tech E&O + Cyber Liability ($1,300–$3,000/yr) — non-optional given safety data
+- IP protection: copyright ($130), provisional patents ($60 each micro-entity), trademark ($350), trade secrets ($0), R8 obfuscation ($0)
+- User content liability: Section 230 protections, DMCA safe harbor ($6 agent registration), Take It Down Act (May 2026 deadline)
+- Privacy: CCPA/CPRA, 21+ state laws treating GPS as sensitive PI, COPPA age gate (13+), data retention schedule
+- Third-party APIs: **OpenSky requires commercial license (BLOCKING)**, OSM ODbL share-alike on POI database, MBTA license review needed
+- Content moderation: OpenAI Moderation API (free) + Perspective API (free), tiered auto-block/queue/approve system
+- Safety data disclaimers for TFR, geofences, weather, flood zones
+- Google Play: Data Safety section, prominent location disclosure, R8 release builds
+- Master checklist: 8 phases, ~50 action items
+- Year 1 estimated cost: $4,578–$10,955
+
+### Files Created (1)
+- `COMMERCIALIZATION.md` — full commercialization roadmap
+
+### Files Modified (3)
+- `STATE.md` — added Commercialization section + updated Next Steps
+- `SESSION-LOG.md` — added this session entry
+- `memory/MEMORY.md` — added commercialization reference
+
+---
+
 ## Session: 2026-03-04 (v1.5.56 — Search Distance Sort + Filter and Map UX)
 
 ### Context

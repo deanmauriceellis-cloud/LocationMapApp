@@ -402,7 +402,20 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - **Geofence Alert System** (v1.5.35–v1.5.39): Phases 1-4 done. See `PLAN-ARCHIVE.md`.
 - **Social Layer** Phases A-C (v1.5.45–v1.5.47): Auth + Comments + Chat done. Phase D (mod tools) not started. See `GOVERNANCE.md`.
 
+## Commercialization
+- **`COMMERCIALIZATION.md`** — full pathway to commercial launch (created 2026-03-04)
+  - Legal structure (Wyoming LLC), insurance (Tech E&O + Cyber), IP protection (copyright, patents, trademarks, trade secrets)
+  - Cloud deployment (Railway/DigitalOcean + Neon/Managed PG + Cloudflare R2)
+  - User content liability (Section 230, DMCA, Take It Down Act), content moderation (OpenAI + Perspective API)
+  - Privacy compliance (CCPA/CPRA, 21+ state laws, COPPA age gate), data retention
+  - Third-party API licensing — **OpenSky requires commercial license (BLOCKING)**
+  - OSM ODbL share-alike obligations, safety data disclaimers, Google Play requirements
+  - Master checklist: 8 phases, ~50 action items, estimated Year 1 cost $4,578–$10,955
+
 ## Next Steps
-- Social: Phase D (room management), governance checkpoints (COPPA, encryption, moderation)
+- **Commercialization blockers**: OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
+- Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)
+- Cloud migration: move proxy + PostgreSQL to cloud, replace hardcoded 10.0.0.4 with domain
 - Find dialog: pagination, recent searches, search history
-- Remote proxy deployment for non-local testing
+- Privacy: user data export endpoint, account deletion/anonymization, age gate
+- Google Play: R8 obfuscation, Data Safety section, prominent location disclosure
