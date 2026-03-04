@@ -8,10 +8,8 @@
  */
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module pois.js';
 
-const fs = require('fs');
-
 module.exports = function(app, deps) {
-  const { radiusHints, poiCache, getRadiusHint, adjustRadiusHint, POI_CACHE_FILE } = deps;
+  const { radiusHints, pgPool, getRadiusHint, adjustRadiusHint } = deps;
 
   // ── Radius hint endpoints ───────────────────────────────────────────────
 
@@ -40,50 +38,80 @@ module.exports = function(app, deps) {
     res.json({ count: radiusHints.size, hints });
   });
 
-  // ── POI cache endpoints ──────────────────────────────────────────────────────
+  // ── POI endpoints (PostgreSQL-backed) ─────────────────────────────────────
 
-  app.get('/pois/stats', (req, res) => {
-    let diskSize = 0;
+  app.get('/pois/stats', async (req, res) => {
+    if (!pgPool) return res.json({ count: 0 });
     try {
-      if (fs.existsSync(POI_CACHE_FILE)) {
-        diskSize = fs.statSync(POI_CACHE_FILE).size;
-      }
-    } catch (_) {}
-    res.json({
-      count: poiCache.size,
-      diskSizeMB: (diskSize / 1024 / 1024).toFixed(2),
-    });
-  });
-
-  app.get('/pois/export', (req, res) => {
-    const pois = [];
-    for (const [key, value] of poiCache) {
-      pois.push({ key, ...value });
+      const result = await pgPool.query('SELECT COUNT(*)::int AS count FROM pois');
+      res.json({ count: result.rows[0].count });
+    } catch (err) {
+      console.error('[POIs] stats error:', err.message);
+      res.status(500).json({ error: 'Database query failed' });
     }
-    res.json({ count: pois.length, pois });
   });
 
-  app.get('/pois/bbox', (req, res) => {
+  app.get('/pois/export', async (req, res) => {
+    if (!pgPool) return res.json({ count: 0, pois: [] });
+    try {
+      const limit = Math.min(parseInt(req.query.limit) || 1000, 10000);
+      const result = await pgPool.query(
+        'SELECT osm_type, osm_id, lat, lon, tags, first_seen, last_seen FROM pois ORDER BY last_seen DESC LIMIT $1',
+        [limit]
+      );
+      res.json({ count: result.rows.length, pois: result.rows });
+    } catch (err) {
+      console.error('[POIs] export error:', err.message);
+      res.status(500).json({ error: 'Database query failed' });
+    }
+  });
+
+  app.get('/pois/bbox', async (req, res) => {
     const { s, w, n, e } = req.query;
     if (!s || !w || !n || !e) return res.status(400).json({ error: 'Must specify s, w, n, e bounds' });
-    const south = parseFloat(s), west = parseFloat(w), north = parseFloat(n), east = parseFloat(e);
-    const elements = [];
-    for (const [, value] of poiCache) {
-      const el = value.element;
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
-      if (lat == null || lon == null) continue;
-      if (lat >= south && lat <= north && lon >= west && lon <= east) {
-        elements.push(el);
-      }
+    if (!pgPool) return res.json({ count: 0, elements: [] });
+    try {
+      const result = await pgPool.query(
+        'SELECT osm_type AS type, osm_id AS id, lat, lon, tags FROM pois WHERE lat BETWEEN $1 AND $2 AND lon BETWEEN $3 AND $4',
+        [parseFloat(s), parseFloat(n), parseFloat(w), parseFloat(e)]
+      );
+      const elements = result.rows.map(r => ({
+        type: r.type,
+        id: r.id,
+        lat: parseFloat(r.lat),
+        lon: parseFloat(r.lon),
+        tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags,
+      }));
+      res.json({ count: elements.length, elements });
+    } catch (err) {
+      console.error('[POIs] bbox error:', err.message);
+      res.status(500).json({ error: 'Database query failed' });
     }
-    res.json({ count: elements.length, elements });
   });
 
-  app.get('/poi/:type/:id', (req, res) => {
-    const key = `poi:${req.params.type}:${req.params.id}`;
-    const entry = poiCache.get(key);
-    if (!entry) return res.status(404).json({ error: 'POI not found', key });
-    res.json(entry);
+  app.get('/poi/:type/:id', async (req, res) => {
+    if (!pgPool) return res.status(404).json({ error: 'Database not configured' });
+    try {
+      const result = await pgPool.query(
+        'SELECT osm_type AS type, osm_id AS id, lat, lon, name, category, tags, first_seen, last_seen FROM pois WHERE osm_type = $1 AND osm_id = $2',
+        [req.params.type, parseInt(req.params.id)]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'POI not found' });
+      const row = result.rows[0];
+      res.json({
+        element: {
+          type: row.type,
+          id: row.id,
+          lat: parseFloat(row.lat),
+          lon: parseFloat(row.lon),
+          tags: typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags,
+        },
+        firstSeen: row.first_seen,
+        lastSeen: row.last_seen,
+      });
+    } catch (err) {
+      console.error('[POIs] single POI error:', err.message);
+      res.status(500).json({ error: 'Database query failed' });
+    }
   });
 };

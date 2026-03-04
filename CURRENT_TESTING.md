@@ -22,6 +22,18 @@
 
 ## NOT YET TESTED — Resume Here
 
+### v1.5.60 (proxy restarted — no app changes needed)
+- [ ] Overpass search → verify POIs buffered and imported to DB (check proxy logs for `[Import Buffer]` + `[DB Import]`)
+- [ ] Navigate to previously-scanned area → verify CELL hits still return POIs (from PostgreSQL now, check logs for `from DB`)
+- [ ] `/cache/stats` → verify `maxCacheEntries: 2000`, `importBufferPending`, no `pois` field
+- [ ] `/pois/bbox?s=42.3&w=-71.1&n=42.4&e=-71.0` → POIs returned from PostgreSQL
+- [ ] `/pois/stats` → count from PostgreSQL (should be ~268k)
+- [ ] `/poi/way/497190524` → single POI from PostgreSQL
+- [ ] `/db/import/status` → shows `pendingDelta` from buffer
+- [ ] Trigger manual import `POST /db/import` after some Overpass searches → verify buffer drains
+- [ ] `poi-cache.json` can be safely deleted (90MB, no longer used)
+- [ ] Lower `MAX_CACHE_ENTRIES=500` → restart → verify cache pruned to 500, heap drops further
+
 ### v1.5.59 (proxy restarted + app reinstalled)
 - [ ] Scan cell CELL hits — navigate to previously-scanned area, check proxy logs for `X-Cache: CELL`
 - [ ] Idle populate skip — start idle populate in well-scanned area, verify FRESH cells are skipped (no countdown, instant advance)

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 61 (Scan Cell Coverage + Queue Cancel)
+## Last Updated: 2026-03-04 Session 62 (Proxy Heap Reduction — 643MB → 208MB)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -119,8 +119,12 @@
   - State cleared on: long-press, GPS move >100m, goToLocation, manual populate start
 - **Overpass queue**: serialized upstream, 10s min gap, per-client fair queue, covering cache, content hash delta, **retry with 3-endpoint rotation + exponential backoff** (proxy + app-side)
   - **Queue cancel** (`POST /overpass/cancel`): flushes all queued requests for a client; called on stop follow, stop populate, GPS move
+- **Proxy heap reduction** (v1.5.60): eliminated poiCache Map (268k entries, ~90MB), LRU cap on main cache (7,214 → 2,000 entries)
+  - All POI endpoints (`/pois/*`, `/poi/:type/:id`) query PostgreSQL directly; `collectPoisInRadius()` uses PostgreSQL
+  - Import buffer: lightweight array drains every 15min; `MAX_CACHE_ENTRIES` env var (default 2000)
+  - Heap: 643MB → 208MB; `poi-cache.json` eliminated; `cache-data.json` 320MB → 57MB
 - **Scan cell coverage** (v1.5.59): ~1.1km grid cells track when areas were last scanned
-  - Decision flow: exact cache → covering cache → cache-only merge → **scan cell FRESH → serve from poiCache** → upstream Overpass
+  - Decision flow: exact cache → covering cache → cache-only merge → **scan cell FRESH → serve from PostgreSQL** → upstream Overpass
   - `X-Cache: CELL` + `X-Coverage: FRESH/STALE/EMPTY` headers on all `/overpass` responses
   - Configurable: `SCAN_FRESHNESS_MS` (default 24h), `MIN_COVERAGE_POIS` (default 10)
   - Persisted to `scan-cells.json`; debug endpoint `GET /scan-cells`
@@ -186,7 +190,7 @@
 | NWS Weather | `http://10.0.0.4:3000/weather?lat=&lon=` | GET /weather (composite) | 5min–24h per section |
 | METAR | `http://10.0.0.4:3000/metar?bbox=...` | GET /metar?bbox=s,w,n,e | 1 hour (per bbox) |
 | Radius Hints | `http://10.0.0.4:3000/radius-hint` | GET+POST /radius-hint | persistent |
-| POI Cache | `http://10.0.0.4:3000/pois/...` | GET /pois/stats, /pois/export, /pois/bbox, /poi/:type/:id | persistent |
+| POI Query | `http://10.0.0.4:3000/pois/...` | GET /pois/stats, /pois/export, /pois/bbox, /poi/:type/:id | live (PostgreSQL) |
 | Aircraft | `http://10.0.0.4:3000/aircraft?...` | GET /aircraft?bbox=s,w,n,e or ?icao24=hex | 15 seconds |
 | Webcams | `http://10.0.0.4:3000/webcams?...` | GET /webcams?s=&w=&n=&e=&categories= | 10 minutes |
 | DB Import | `http://10.0.0.4:3000/db/import` | POST /db/import (manual), GET /db/import/status | live |
@@ -291,7 +295,7 @@
 ### Cache Proxy (decomposed into 19 modules)
 - `cache-proxy/server.js` — Express bootstrap, middleware, module loader (164 lines)
 - `cache-proxy/lib/config.js` — environment vars, constants
-- `cache-proxy/lib/cache.js` — file-based cache engine
+- `cache-proxy/lib/cache.js` — file-based cache engine with LRU eviction + import buffer
 - `cache-proxy/lib/opensky.js` — OpenSky OAuth2 token management
 - `cache-proxy/lib/scan-cells.js` — scan cell coverage tracking (~1.1km grid, persistence, debug endpoint)
 - `cache-proxy/lib/overpass.js` — POST /overpass (queue, cache, scan cells, content hash, cancel)
@@ -304,15 +308,15 @@
 - `cache-proxy/lib/auth.js` — 5 /auth/* routes + rate limiting
 - `cache-proxy/lib/comments.js` — 4 /comments/* routes
 - `cache-proxy/lib/chat.js` — 3 /chat/* routes + Socket.IO
-- `cache-proxy/lib/pois.js`, `import.js`, `metar.js`, `webcams.js`, `mbta.js`, `geocode.js`, `geofences.js`, `admin.js`, `proxy-get.js`
+- `cache-proxy/lib/pois.js` — POI endpoints (PostgreSQL-backed: stats, export, bbox, single lookup)
+- `cache-proxy/lib/import.js`, `metar.js`, `webcams.js`, `mbta.js`, `geocode.js`, `geofences.js`, `admin.js`, `proxy-get.js`
 - `cache-proxy/geofence-databases/catalog.json` — geofence database catalog (4 databases)
 - `cache-proxy/geofence-databases/build-military.js` — military base polygon builder (ArcGIS NTAD)
 - `cache-proxy/geofence-databases/build-excam.js` — speed/red-light camera builder (WzSabre XZ/NDJSON)
 - `cache-proxy/geofence-databases/build-nces.js` — US public school builder (NCES ArcGIS)
 - `cache-proxy/geofence-databases/build-dji-nofly.js` — DJI no-fly zone builder (GitHub CSV)
-- `cache-proxy/cache-data.json` — persistent cache (gitignored)
+- `cache-proxy/cache-data.json` — persistent Overpass cache, LRU-capped at 2000 entries (gitignored)
 - `cache-proxy/radius-hints.json` — adaptive radius hints per grid cell (gitignored)
-- `cache-proxy/poi-cache.json` — individual POI cache, deduped by type+id (gitignored)
 - `cache-proxy/scan-cells.json` — scan cell coverage timestamps + POI counts (gitignored)
 - `cache-proxy/schema.sql` — PostgreSQL schema for permanent POI storage
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
@@ -323,16 +327,16 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound), **name trigram (GIN pg_trgm)** for fuzzy search
-  - 211,611 POIs as of 2026-03-04 (93,820 named); auto-imported, ~12.8k with cuisine tags
+  - 268,291 POIs as of 2026-03-04 (auto-imported, ~12.8k with cuisine tags)
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)
   - Indexes: icao24, callsign, first_seen, last_seen, last_lat+lon
   - 501+ sightings as of 2026-03-01, 195 unique aircraft (accumulates in real-time)
   - Real-time: proxy writes to DB on every aircraft API response (cache hits and misses)
-- **Automated POI import** (v1.5.49): delta upsert every 15min, inline in server.js
-  - Initial full import 30s after startup; subsequent runs only import POIs updated since last success
-  - Batches of 500, per-batch transactions, mutex against overlap, timestamp-only-on-success
+- **Automated POI import** (v1.5.49, updated v1.5.60): buffer-drain upsert every 15min
+  - Overpass responses buffered in lightweight import buffer; drained and deduped on each import cycle
+  - Batches of 500, per-batch transactions, mutex against overlap
   - `POST /db/import` (manual trigger), `GET /db/import/status` (read-only status)
   - Stats in `/cache/stats` → `dbImport` object
 - **DB query API** (`/db/*` prefix): 14 endpoints — 8 POI + 4 aircraft + 2 import

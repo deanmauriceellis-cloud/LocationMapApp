@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = function(app, deps) {
-  const { poiCache, log } = deps;
+  const { pgPool, log } = deps;
 
   // ── Config (env vars with defaults) ──────────────────────────────────────
   const SCAN_FRESHNESS_MS = parseInt(process.env.SCAN_FRESHNESS_MS) || 24 * 60 * 60 * 1000;  // 24h
@@ -116,11 +116,12 @@ module.exports = function(app, deps) {
   }
 
   /**
-   * Collect POIs from poiCache that fall within a radius of (lat, lon).
+   * Collect POIs from PostgreSQL that fall within a radius of (lat, lon).
    * Uses bbox filtering — same approach as /pois/bbox.
-   * Returns Overpass-compatible JSON string: { elements: [...] }
+   * Returns array of Overpass-compatible elements.
    */
-  function collectPoisInRadius(lat, lon, radius) {
+  async function collectPoisInRadius(lat, lon, radius) {
+    if (!pgPool) return [];
     const latF = parseFloat(lat);
     const lonF = parseFloat(lon);
     const latSpan = radius / 111320.0;
@@ -130,18 +131,22 @@ module.exports = function(app, deps) {
     const west = lonF - lonSpan;
     const east = lonF + lonSpan;
 
-    const elements = [];
-    for (const [, entry] of poiCache) {
-      const el = entry.element;
-      if (!el) continue;
-      const elLat = el.lat ?? el.center?.lat;
-      const elLon = el.lon ?? el.center?.lon;
-      if (elLat == null || elLon == null) continue;
-      if (elLat >= south && elLat <= north && elLon >= west && elLon <= east) {
-        elements.push(el);
-      }
+    try {
+      const result = await pgPool.query(
+        'SELECT osm_type AS type, osm_id AS id, lat, lon, tags FROM pois WHERE lat BETWEEN $1 AND $2 AND lon BETWEEN $3 AND $4',
+        [south, north, west, east]
+      );
+      return result.rows.map(r => ({
+        type: r.type,
+        id: r.id,
+        lat: parseFloat(r.lat),
+        lon: parseFloat(r.lon),
+        tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : r.tags,
+      }));
+    } catch (err) {
+      console.error('[Scan Cells] PostgreSQL collectPoisInRadius error:', err.message);
+      return [];
     }
-    return elements;
   }
 
   // ── Debug endpoint ───────────────────────────────────────────────────────

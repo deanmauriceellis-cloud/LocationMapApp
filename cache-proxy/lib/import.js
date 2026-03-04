@@ -10,7 +10,6 @@ const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module import.js';
 
 // ── Automated POI Database Import (delta every 15 minutes) ───────────────────
 
-let lastDbImportTime = 0;       // Unix ms — first run imports full cache
 let dbImportRunning = false;    // mutex against overlapping runs
 let dbImportStats = { lastUpserted: 0, lastSkipped: 0, lastElapsedMs: 0, totalRuns: 0, totalUpserted: 0 };
 const DB_IMPORT_INTERVAL_MS = 15 * 60 * 1000;
@@ -36,7 +35,7 @@ function extractPoiCoords(element) {
   return { lat: null, lon: null };
 }
 
-async function runPoiDbImport(pgPool, poiCache, manual = false) {
+async function runPoiDbImport(pgPool, drainImportBuffer, manual = false) {
   if (!pgPool) {
     if (manual) throw new Error('Database not configured (set DATABASE_URL)');
     return;
@@ -49,25 +48,26 @@ async function runPoiDbImport(pgPool, poiCache, manual = false) {
 
   dbImportRunning = true;
   const t0 = Date.now();
-  const isInitial = lastDbImportTime === 0;
-  const label = manual ? 'manual' : isInitial ? 'initial' : 'scheduled';
+  const label = manual ? 'manual' : 'scheduled';
 
   try {
-    // Build delta set: POIs updated since last successful import
-    const delta = [];
-    for (const [key, entry] of poiCache) {
-      if (entry.lastSeen >= lastDbImportTime) {
-        delta.push({ key, ...entry });
-      }
-    }
-
-    if (delta.length === 0) {
-      console.log(`[DB Import] No new/updated POIs since last import (${label})`);
+    // Drain buffered elements from Overpass responses
+    const rawElements = drainImportBuffer();
+    if (rawElements.length === 0) {
+      console.log(`[DB Import] No buffered elements to import (${label})`);
       dbImportRunning = false;
       return { upserted: 0, skipped: 0, elapsed: 0 };
     }
 
-    console.log(`[DB Import] Running ${label} import — ${delta.length} POIs to upsert...`);
+    // Dedupe by type:id (keep last occurrence)
+    const deduped = new Map();
+    for (const el of rawElements) {
+      if (!el.type || !el.id) continue;
+      deduped.set(`${el.type}:${el.id}`, el);
+    }
+    const elements = [...deduped.values()];
+
+    console.log(`[DB Import] Running ${label} import — ${elements.length} POIs to upsert (${rawElements.length} raw, ${rawElements.length - elements.length} dupes)...`);
 
     const UPSERT_SQL = `
       INSERT INTO pois (osm_type, osm_id, lat, lon, name, category, tags, first_seen, last_seen)
@@ -83,26 +83,24 @@ async function runPoiDbImport(pgPool, poiCache, manual = false) {
 
     let upserted = 0;
     let skipped = 0;
+    const now = new Date().toISOString();
 
     // Process in batches with individual transactions (short locks)
-    for (let i = 0; i < delta.length; i += DB_IMPORT_BATCH_SIZE) {
-      const batch = delta.slice(i, i + DB_IMPORT_BATCH_SIZE);
+    for (let i = 0; i < elements.length; i += DB_IMPORT_BATCH_SIZE) {
+      const batch = elements.slice(i, i + DB_IMPORT_BATCH_SIZE);
       const client = await pgPool.connect();
       try {
         await client.query('BEGIN');
-        for (const poi of batch) {
-          const el = poi.element;
-          if (!el || !el.type || !el.id) { skipped++; continue; }
+        for (const el of batch) {
           const { lat, lon } = extractPoiCoords(el);
           const tags = el.tags || {};
           const name = tags.name || null;
           const category = derivePoiCategory(tags);
-          const firstSeen = new Date(poi.firstSeen).toISOString();
-          const lastSeen = new Date(poi.lastSeen).toISOString();
           const result = await client.query(UPSERT_SQL, [
-            el.type, el.id, lat, lon, name, category, JSON.stringify(tags), firstSeen, lastSeen,
+            el.type, el.id, lat, lon, name, category, JSON.stringify(tags), now, now,
           ]);
           if (result.rowCount > 0) upserted++;
+          else skipped++;
         }
         await client.query('COMMIT');
       } catch (batchErr) {
@@ -119,7 +117,6 @@ async function runPoiDbImport(pgPool, poiCache, manual = false) {
     const countResult = await pgPool.query('SELECT count(*) AS total FROM pois');
     const totalInDb = parseInt(countResult.rows[0].total, 10);
 
-    lastDbImportTime = t0;
     dbImportStats = {
       lastUpserted: upserted,
       lastSkipped: skipped,
@@ -141,19 +138,19 @@ async function runPoiDbImport(pgPool, poiCache, manual = false) {
 }
 
 module.exports = function(app, deps) {
-  const { pgPool, requirePg, poiCache } = deps;
+  const { pgPool, requirePg, drainImportBuffer, importBuffer } = deps;
 
   // Schedule automatic imports (only if PostgreSQL is configured)
   if (pgPool) {
-    // Initial full import 30s after startup (cache is loaded from disk by then)
+    // Initial import 30s after startup (buffer may have elements by then)
     setTimeout(() => {
       console.log('[DB Import] Running initial import...');
-      runPoiDbImport(pgPool, poiCache).catch(err => console.error('[DB Import] Initial import error:', err.message));
+      runPoiDbImport(pgPool, drainImportBuffer).catch(err => console.error('[DB Import] Initial import error:', err.message));
     }, 30 * 1000);
 
     // Delta imports every 15 minutes
     setInterval(() => {
-      runPoiDbImport(pgPool, poiCache).catch(err => console.error('[DB Import] Scheduled import error:', err.message));
+      runPoiDbImport(pgPool, drainImportBuffer).catch(err => console.error('[DB Import] Scheduled import error:', err.message));
     }, DB_IMPORT_INTERVAL_MS);
   }
 
@@ -161,7 +158,7 @@ module.exports = function(app, deps) {
 
   app.post('/db/import', requirePg, async (req, res) => {
     try {
-      const result = await runPoiDbImport(pgPool, poiCache, true);
+      const result = await runPoiDbImport(pgPool, drainImportBuffer, true);
       res.json(result);
     } catch (err) {
       if (err.message === 'Import already in progress') {
@@ -172,16 +169,10 @@ module.exports = function(app, deps) {
   });
 
   app.get('/db/import/status', (req, res) => {
-    let pendingDelta = 0;
-    for (const [, entry] of poiCache) {
-      if (entry.lastSeen >= lastDbImportTime) pendingDelta++;
-    }
     res.json({
-      lastImportTime: lastDbImportTime > 0 ? new Date(lastDbImportTime).toISOString() : null,
       running: dbImportRunning,
       intervalMinutes: DB_IMPORT_INTERVAL_MS / 60000,
-      pendingDelta,
-      cacheSize: poiCache.size,
+      pendingDelta: importBuffer.length,
       enabled: !!pgPool,
       stats: dbImportStats,
     });
@@ -190,7 +181,6 @@ module.exports = function(app, deps) {
   // Expose internal state for admin module
   return {
     getImportState: () => ({
-      lastDbImportTime,
       dbImportRunning,
       dbImportStats,
       DB_IMPORT_INTERVAL_MS,

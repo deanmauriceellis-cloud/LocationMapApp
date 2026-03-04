@@ -15,6 +15,7 @@ const crypto = require('crypto');
 // ── In-memory cache with disk persistence ───────────────────────────────────
 
 const CACHE_FILE = path.join(__dirname, '..', 'cache-data.json');
+const MAX_CACHE_ENTRIES = parseInt(process.env.MAX_CACHE_ENTRIES) || 2000;
 const cache = new Map();   // key → { data, headers, timestamp }
 let stats = { hits: 0, misses: 0 };
 let savePending = false;
@@ -134,6 +135,12 @@ function loadCache() {
       cache.set(key, value);
     }
     console.log(`Loaded ${cache.size} cache entries from disk`);
+    if (cache.size > MAX_CACHE_ENTRIES) {
+      const before = cache.size;
+      evictOldest();
+      console.log(`[LRU] Pruned on load: ${before} → ${cache.size} entries (cap ${MAX_CACHE_ENTRIES})`);
+      saveCache();
+    }
   } catch (err) {
     console.error('Failed to load cache from disk:', err.message);
   }
@@ -166,77 +173,50 @@ function cacheGet(key, ttlMs) {
   return entry;
 }
 
+function evictOldest() {
+  if (cache.size <= MAX_CACHE_ENTRIES) return;
+  const sorted = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+  const toRemove = sorted.length - MAX_CACHE_ENTRIES;
+  for (let i = 0; i < toRemove; i++) {
+    cache.delete(sorted[i][0]);
+  }
+  console.log(`[LRU] Evicted ${toRemove} oldest entries (${cache.size} remain, cap ${MAX_CACHE_ENTRIES})`);
+}
+
 function cacheSet(key, data, headers) {
   cache.set(key, { data, headers, timestamp: Date.now() });
+  evictOldest();
   saveCache();
 }
 
-// ── Individual POI cache ─────────────────────────────────────────────────────
+// ── Import buffer (lightweight replacement for poiCache) ─────────────────────
+// Overpass elements are buffered here until the next DB import drains them.
 
-const POI_CACHE_FILE = path.join(__dirname, '..', 'poi-cache.json');
-const poiCache = new Map();   // "poi:TYPE:ID" → { element, firstSeen, lastSeen }
-let poiSavePending = false;
+const importBuffer = [];
 
-function loadPoiCache() {
-  try {
-    if (!fs.existsSync(POI_CACHE_FILE)) return;
-    const raw = fs.readFileSync(POI_CACHE_FILE, 'utf8');
-    const entries = JSON.parse(raw);
-    for (const [key, value] of entries) {
-      poiCache.set(key, value);
-    }
-    console.log(`Loaded ${poiCache.size} individual POIs from disk`);
-  } catch (err) {
-    console.error('Failed to load POI cache from disk:', err.message);
-  }
-}
-
-function savePoiCache() {
-  if (poiSavePending) return;
-  poiSavePending = true;
-  setTimeout(() => {
-    poiSavePending = false;
-    try {
-      const entries = [...poiCache.entries()];
-      fs.writeFileSync(POI_CACHE_FILE, JSON.stringify(entries));
-      console.log(`Saved ${entries.length} POIs to disk (${(fs.statSync(POI_CACHE_FILE).size / 1024 / 1024).toFixed(1)}MB)`);
-    } catch (err) {
-      console.error('Failed to save POI cache to disk:', err.message);
-    }
-  }, 2000);
-}
-
-function cacheIndividualPois(jsonBody) {
+function bufferOverpassElements(jsonBody) {
   try {
     const parsed = JSON.parse(jsonBody);
-    if (!parsed.elements || !Array.isArray(parsed.elements)) return { added: 0, updated: 0 };
+    if (!parsed.elements || !Array.isArray(parsed.elements)) return { buffered: 0 };
 
-    const now = Date.now();
-    let added = 0;
-    let updated = 0;
-
+    let buffered = 0;
     for (const element of parsed.elements) {
       if (!element.type || !element.id) continue;
-      const key = `poi:${element.type}:${element.id}`;
-      const existing = poiCache.get(key);
-
-      if (existing) {
-        existing.element = element;
-        existing.lastSeen = now;
-        updated++;
-      } else {
-        poiCache.set(key, { element, firstSeen: now, lastSeen: now });
-        added++;
-      }
+      importBuffer.push(element);
+      buffered++;
     }
 
-    console.log(`[POI Cache] +${added} new, ${updated} updated (${poiCache.size} total)`);
-    if (added > 0 || updated > 0) savePoiCache();
-    return { added, updated };
+    console.log(`[Import Buffer] +${buffered} elements (${importBuffer.length} pending)`);
+    return { buffered };
   } catch (err) {
-    console.error('[POI Cache] Failed to parse response:', err.message);
-    return { added: 0, updated: 0 };
+    console.error('[Import Buffer] Failed to parse response:', err.message);
+    return { buffered: 0 };
   }
+}
+
+function drainImportBuffer() {
+  const elements = importBuffer.splice(0, importBuffer.length);
+  return elements;
 }
 
 // ── Bbox snapping (improve cache hit rate for scroll-heavy layers) ───────────
@@ -290,21 +270,21 @@ function computeElementHash(jsonBody) {
 // Content hash store — maps cache key to last known element hash
 const contentHashes = new Map();
 
-// ── Load all caches from disk ────────────────────────────────────────────────
+// ── Load caches from disk ────────────────────────────────────────────────────
 
 loadCache();
 loadRadiusHints();
-loadPoiCache();
 
 module.exports = {
   cache,
   stats,
   radiusHints,
-  poiCache,
+  importBuffer,
   contentHashes,
   cacheGet,
   cacheSet,
-  cacheIndividualPois,
+  bufferOverpassElements,
+  drainImportBuffer,
   computeElementHash,
   snapBbox,
   log,
@@ -313,6 +293,6 @@ module.exports = {
   gridKey,
   saveCache,
   CACHE_FILE,
-  POI_CACHE_FILE,
+  MAX_CACHE_ENTRIES,
   RADIUS_HINTS_FILE,
 };

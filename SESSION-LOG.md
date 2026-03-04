@@ -2,6 +2,55 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04h (v1.5.60 — Proxy Heap Reduction)
+
+### Context
+Cache proxy consuming 643MB heap — dominated by two in-memory Maps: `poiCache` (268k entries, ~90MB) fully redundant with PostgreSQL, and `cache` (7,214 entries, ~320MB) mostly stale 365-day Overpass responses.
+
+### Changes Made
+
+#### Phase 1: Eliminate poiCache → PostgreSQL (saves ~90MB heap + 90MB disk)
+- **cache.js**: Removed `poiCache` Map, `loadPoiCache()`, `savePoiCache()`, `cacheIndividualPois()`. Added lightweight `importBuffer` array + `bufferOverpassElements()` + `drainImportBuffer()`
+- **overpass.js**: Wired `bufferOverpassElements` (replaces `cacheIndividualPois`), `await` on async `collectPoisInRadius`, updated stats fields (`buffered` replaces `added+updated`)
+- **scan-cells.js**: `collectPoisInRadius()` now queries PostgreSQL (`SELECT ... FROM pois WHERE lat BETWEEN ... AND lon BETWEEN ...`) instead of iterating poiCache
+- **pois.js**: All 4 endpoints rewritten as async PostgreSQL queries — `/pois/stats` (COUNT), `/pois/export` (with limit param), `/pois/bbox` (bbox SELECT), `/poi/:type/:id` (single lookup)
+- **import.js**: `runPoiDbImport()` calls `drainImportBuffer()` to get pending elements, dedupes by `type:id`, batch upserts. Removed `lastDbImportTime` delta tracking. Status endpoint shows `pendingDelta: importBuffer.length`
+- **admin.js**: Removed `poiCache` references; `/cache/stats` shows `importBufferPending`; `/cache/clear` clears buffer instead of poiCache
+
+#### Phase 2: LRU Cap on Main Cache (saves ~250MB+ heap)
+- **cache.js**: Added `MAX_CACHE_ENTRIES=2000` (env-configurable via `MAX_CACHE_ENTRIES`), `evictOldest()` sorts by timestamp and deletes oldest; called in `cacheSet()` and after `loadCache()`
+- **admin.js**: Shows `maxCacheEntries` in `/cache/stats`
+- **server.js**: Updated deps wiring — removed poiCache/cacheIndividualPois/POI_CACHE_FILE, added importBuffer/bufferOverpassElements/drainImportBuffer/MAX_CACHE_ENTRIES
+
+### Results
+| Metric | Before | After |
+|--------|--------|-------|
+| Heap | 643 MB | 208 MB |
+| Cache entries | 7,214 | 2,000 (LRU cap) |
+| cache-data.json | 320 MB | 57 MB |
+| poi-cache.json | 90 MB | eliminated |
+| poiCache Map | 268k entries | eliminated |
+| POI source | in-memory Map | PostgreSQL (268k rows) |
+
+### Verification (all passed)
+- `/cache/stats` → memoryMB: 208.2, entries: 2000, maxCacheEntries: 2000, importBufferPending: 0
+- `/pois/stats` → count: 268,291 (from PostgreSQL)
+- `/pois/bbox?s=42.3&w=-71.1&n=42.4&e=-71.0` → 5,819 POIs
+- `/poi/way/497190524` → Orient Heights Main Parking (from PostgreSQL)
+- `/db/import/status` → pendingDelta: 0, enabled: true
+- Server startup clean: all modules loaded, no errors
+
+### Files Modified (7)
+- `cache-proxy/lib/cache.js` — removed poiCache + added import buffer + LRU eviction
+- `cache-proxy/lib/overpass.js` — wired buffer, await async collectPoisInRadius
+- `cache-proxy/lib/scan-cells.js` — PostgreSQL collectPoisInRadius
+- `cache-proxy/lib/pois.js` — all 4 POI endpoints → async PostgreSQL queries
+- `cache-proxy/lib/import.js` — drain buffer + dedupe instead of poiCache delta
+- `cache-proxy/lib/admin.js` — importBuffer + MAX_CACHE_ENTRIES stats
+- `cache-proxy/server.js` — updated deps wiring
+
+---
+
 ## Session: 2026-03-04g (v1.5.59 — Scan Cell Coverage + Queue Cancel)
 
 ### Context

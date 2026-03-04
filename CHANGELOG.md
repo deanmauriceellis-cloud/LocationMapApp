@@ -2,6 +2,29 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.60] — 2026-03-04
+
+### Changed
+- **Proxy heap reduction** (643MB → 208MB) — eliminated `poiCache` in-memory Map (268k entries, ~90MB) and capped main Overpass cache with LRU eviction (7,214 → 2,000 entries)
+  - All POI endpoints (`/pois/stats`, `/pois/export`, `/pois/bbox`, `/poi/:type/:id`) now query PostgreSQL directly instead of in-memory Map
+  - `collectPoisInRadius()` (scan cell CELL hits) now queries PostgreSQL instead of iterating poiCache
+  - `poi-cache.json` (90MB disk file) eliminated — no longer generated or loaded
+  - `cache-data.json` shrunk from 320MB → 57MB via LRU eviction
+  - New import buffer: Overpass responses buffered in lightweight array, drained every 15min by DB import
+  - LRU cache cap: `MAX_CACHE_ENTRIES` env var (default 2000), oldest entries evicted on insert and on startup load
+  - `/cache/stats` shows `maxCacheEntries`, `importBufferPending` (replaces `pois` count)
+  - `/db/import/status` shows `pendingDelta` from buffer (replaces poiCache iteration)
+  - Zero app-side changes — all response formats preserved
+
+### Files Modified (7 proxy files)
+- `cache-proxy/lib/cache.js` — removed poiCache + added import buffer + LRU eviction
+- `cache-proxy/lib/overpass.js` — wired bufferOverpassElements, await async collectPoisInRadius
+- `cache-proxy/lib/scan-cells.js` — PostgreSQL collectPoisInRadius
+- `cache-proxy/lib/pois.js` — all 4 POI endpoints → async PostgreSQL queries
+- `cache-proxy/lib/import.js` — drainImportBuffer + dedupe instead of poiCache delta
+- `cache-proxy/lib/admin.js` — importBuffer + MAX_CACHE_ENTRIES stats, removed poiCache refs
+- `cache-proxy/server.js` — updated deps wiring
+
 ## [1.5.59] — 2026-03-04
 
 ### Added

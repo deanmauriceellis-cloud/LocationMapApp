@@ -59,11 +59,12 @@ const deps = {
   cache: cacheModule.cache,
   stats: cacheModule.stats,
   radiusHints: cacheModule.radiusHints,
-  poiCache: cacheModule.poiCache,
+  importBuffer: cacheModule.importBuffer,
   contentHashes: cacheModule.contentHashes,
   cacheGet: cacheModule.cacheGet,
   cacheSet: cacheModule.cacheSet,
-  cacheIndividualPois: cacheModule.cacheIndividualPois,
+  bufferOverpassElements: cacheModule.bufferOverpassElements,
+  drainImportBuffer: cacheModule.drainImportBuffer,
   computeElementHash: cacheModule.computeElementHash,
   snapBbox: cacheModule.snapBbox,
   log: cacheModule.log,
@@ -72,7 +73,7 @@ const deps = {
   gridKey: cacheModule.gridKey,
   saveCache: cacheModule.saveCache,
   CACHE_FILE: cacheModule.CACHE_FILE,
-  POI_CACHE_FILE: cacheModule.POI_CACHE_FILE,
+  MAX_CACHE_ENTRIES: cacheModule.MAX_CACHE_ENTRIES,
   RADIUS_HINTS_FILE: cacheModule.RADIUS_HINTS_FILE,
   // OpenSky
   getOpenskyToken: opensky.getOpenskyToken,
@@ -149,7 +150,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Zones:  GET /cameras, GET /schools, GET /flood-zones, GET /crossings');
   console.log('GeoDb:  GET /geofences/catalog, GET /geofences/database/:id/download');
   console.log('Radius: GET /radius-hint, POST /radius-hint, GET /radius-hints');
-  console.log('POIs:   GET /pois/stats, GET /pois/export, GET /pois/bbox, GET /poi/:type/:id');
+  console.log('POIs:   GET /pois/stats, GET /pois/export, GET /pois/bbox, GET /poi/:type/:id (PostgreSQL-backed)');
   console.log('DB:     GET /db/pois/search, /db/pois/nearby, /db/poi/:type/:id, /db/pois/stats, /db/pois/categories, /db/pois/coverage');
   console.log('Import: POST /db/import, GET /db/import/status');
   console.log(`        PostgreSQL: ${pgPool ? 'connected' : 'not configured (set DATABASE_URL)'}`);

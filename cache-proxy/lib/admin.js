@@ -11,8 +11,8 @@ const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin.js';
 const fs = require('fs');
 
 module.exports = function(app, deps) {
-  const { cache, stats, radiusHints, poiCache,
-          CACHE_FILE, RADIUS_HINTS_FILE, POI_CACHE_FILE,
+  const { cache, stats, radiusHints, importBuffer, MAX_CACHE_ENTRIES,
+          CACHE_FILE, RADIUS_HINTS_FILE,
           scanCells, SCAN_CELLS_FILE,
           openskyRateState, openskyConfigured,
           OPENSKY_EFFECTIVE_LIMIT, OPENSKY_MIN_INTERVAL_MS,
@@ -26,14 +26,13 @@ module.exports = function(app, deps) {
     const importState = getImportState();
     res.json({
       entries: cache.size,
+      maxCacheEntries: MAX_CACHE_ENTRIES,
       radiusHints: radiusHints.size,
-      pois: poiCache.size,
+      importBufferPending: importBuffer.length,
       scanCells: scanCells ? scanCells.size : 0,
       dbImport: {
-        lastImportTime: importState.lastDbImportTime > 0 ? new Date(importState.lastDbImportTime).toISOString() : null,
         running: importState.dbImportRunning,
         intervalMinutes: importState.DB_IMPORT_INTERVAL_MS / 60000,
-        pendingDelta: [...poiCache.values()].filter(e => e.lastSeen >= importState.lastDbImportTime).length,
         ...importState.dbImportStats,
       },
       overpassQueue: getOverpassQueueLength(),
@@ -60,19 +59,18 @@ module.exports = function(app, deps) {
   app.post('/cache/clear', (req, res) => {
     const count = cache.size;
     const hintCount = radiusHints.size;
-    const poiCount = poiCache.size;
+    const bufferCount = importBuffer.length;
     const scanCellCount = scanCells ? scanCells.size : 0;
     cache.clear();
     radiusHints.clear();
-    poiCache.clear();
+    importBuffer.length = 0;
     if (scanCells) scanCells.clear();
     stats.hits = 0;
     stats.misses = 0;
     try { fs.unlinkSync(CACHE_FILE); } catch (_) {}
     try { fs.unlinkSync(RADIUS_HINTS_FILE); } catch (_) {}
-    try { fs.unlinkSync(POI_CACHE_FILE); } catch (_) {}
     if (SCAN_CELLS_FILE) { try { fs.unlinkSync(SCAN_CELLS_FILE); } catch (_) {} }
-    console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints + ${poiCount} POIs + ${scanCellCount} scan cells, disk files removed)`);
-    res.json({ cleared: count, hintsCleared: hintCount, poisCleared: poiCount, scanCellsCleared: scanCellCount });
+    console.log(`[${new Date().toISOString()}] Cache cleared (${count} entries + ${hintCount} hints + ${bufferCount} buffered + ${scanCellCount} scan cells, disk files removed)`);
+    res.json({ cleared: count, hintsCleared: hintCount, bufferCleared: bufferCount, scanCellsCleared: scanCellCount });
   });
 };

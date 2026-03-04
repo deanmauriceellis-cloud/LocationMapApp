@@ -9,7 +9,7 @@
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module overpass.js';
 
 module.exports = function(app, deps) {
-  const { cacheGet, cacheSet, stats, log, poiCache, contentHashes, cacheIndividualPois, computeElementHash,
+  const { cacheGet, cacheSet, stats, log, contentHashes, bufferOverpassElements, computeElementHash,
           checkCoverage, markScanned, collectPoisInRadius } = deps;
 
   const OVERPASS_TTL = 365 * 24 * 60 * 60 * 1000;  // 365 days
@@ -131,18 +131,18 @@ module.exports = function(app, deps) {
             console.log(`[Overpass retry] succeeded on attempt ${attempt + 1} using ${endpoint}`);
           }
 
-          let poiStats = { added: 0, updated: 0 };
+          let poiStats = { buffered: 0 };
           if (upstream.ok && cacheKey) {
             cacheSet(cacheKey, body, { 'content-type': contentType });
 
-            // Content hash delta detection — skip POI cache update if data unchanged
+            // Content hash delta detection — skip buffer if data unchanged
             const newHash = computeElementHash(body);
             const oldHash = contentHashes.get(cacheKey);
             if (newHash && oldHash && newHash === oldHash) {
-              console.log(`[POI Cache] content unchanged (hash=${newHash.slice(0, 8)}) — skipping update`);
-              poiStats = { added: 0, updated: 0 };
+              console.log(`[Import Buffer] content unchanged (hash=${newHash.slice(0, 8)}) — skipping`);
+              poiStats = { buffered: 0 };
             } else {
-              poiStats = cacheIndividualPois(body);
+              poiStats = bufferOverpassElements(body);
               if (newHash) contentHashes.set(cacheKey, newHash);
             }
           }
@@ -154,12 +154,11 @@ module.exports = function(app, deps) {
               const rMark = parseInt(aroundMatch2[1]);
               const latMark = parseFloat(aroundMatch2[2]);
               const lonMark = parseFloat(aroundMatch2[3]);
-              const totalPois = poiStats.added + poiStats.updated;
-              markScanned(latMark, lonMark, rMark, totalPois);
+              markScanned(latMark, lonMark, rMark, poiStats.buffered);
             }
           }
 
-          resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.added, poiKnown: poiStats.updated });
+          resolve({ hit: false, status: upstream.status, data: body, contentType, poiNew: poiStats.buffered, poiKnown: 0 });
           break;
         } catch (err) {
           lastError = err.message;
@@ -349,10 +348,10 @@ module.exports = function(app, deps) {
         const lon = parseFloat(aroundMatch[3]);
         const coverage = checkCoverage(lat, lon);
         if (coverage.fresh) {
-          const elements = collectPoisInRadius(lat, lon, radius);
+          const elements = await collectPoisInRadius(lat, lon, radius);
           if (elements.length > 0) {
             stats.hits++;
-            log('/overpass (scan-cell)', true, 0, `FRESH — ${elements.length} POIs from poiCache`);
+            log('/overpass (scan-cell)', true, 0, `FRESH — ${elements.length} POIs from DB`);
             res.set('Content-Type', 'application/json');
             res.set('X-Cache', 'CELL');
             res.set('X-Coverage', 'FRESH');
