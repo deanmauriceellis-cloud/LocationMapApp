@@ -16,11 +16,12 @@
 - v1.5.53: Filter and Map mode (all tests passed)
 - v1.5.55: MODULE_ID, toolbar layout (7 icons)
 - v1.5.56: Distance-sorted search, Filter and Map button at top, adaptive zoom
+- Refactoring: server.js decomposition (18 modules), 6 ViewModels, MenuPrefs.kt — build passes, pure structural
 
 ## Known Issue: Overpass Intermittent 504s (2026-03-04)
 - Public Overpass server (`overpass-api.de`) returning HTML error pages under load
 - Error: `Dispatcher_Client::request_read_and_idx::timeout`
-- **Proxy fix needed** (server.js ~line 660-683): detect HTML errors (`content-type: text/html` or `<html` in body), retry 2-3x with exponential backoff before returning error
+- **Proxy fix needed** (`cache-proxy/lib/overpass.js`, overpassWorker function): detect HTML errors (`content-type: text/html` or `<html` in body), retry 2-3x with exponential backoff before returning error
 - **App fix needed** (PlacesRepository.kt:309): populate scanner should retry failed tiles 2-3 times before advancing to next point (currently skips permanently on failure)
 - ~13% failure rate observed during 10km Probe scan across Florida
 

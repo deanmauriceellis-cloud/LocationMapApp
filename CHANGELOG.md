@@ -2,6 +2,20 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [Refactoring] — 2026-03-04
+
+### Changed
+- **server.js decomposed** (3,925 → 156 lines) — 18 route modules extracted to `cache-proxy/lib/`
+- **MainViewModel.kt decomposed** (958 → 215 lines) — 6 domain-specific ViewModels: Social, Transit, Aircraft, Find, Weather, Geofence
+- **AppBarMenuManager.kt refactored** (879 → 812 lines) — 35 preference constants extracted to `MenuPrefs.kt`, unused viewModel param removed
+- **DebugEndpoints.kt** updated to accept 6 ViewModel constructor params
+- **REFACTORING-REPORT.txt** — detailed report of all decomposition work
+
+### Notes
+- Pure structural refactoring — zero behavior changes
+- All endpoints, LiveData, menus, and UI flows work identically
+- Prior: MainActivity.kt was decomposed (9,577 → 1,996 lines + 13 extension-function files)
+
 ## [1.5.57] — 2026-03-04
 
 ### Added

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 58 (POI Coverage Expansion + Cuisine Search)
+## Last Updated: 2026-03-04 Session 59 (3-Phase Code Decomposition)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -225,27 +225,76 @@
 - **Utility → Populate POIs**: systematic grid scanner spirals from map center
 
 ## Key Files
-- `app/src/main/java/.../ui/MainActivity.kt` — main map activity, all overlays
-- `app/src/main/java/.../ui/MainViewModel.kt` — LiveData, data fetching
+
+### MainActivity Decomposition (13 extension-function files)
+- `app/src/main/java/.../ui/MainActivity.kt` — main map activity, lifecycle, setup, observers (1,996 lines)
+- `app/src/main/java/.../ui/MainActivityFind.kt` — Find dialog, fuzzy search, Filter and Map (2,161 lines)
+- `app/src/main/java/.../ui/MainActivityGeofences.kt` — geofence overlays, zone loading, alerts (1,011 lines)
+- `app/src/main/java/.../ui/MainActivityTransit.kt` — MBTA vehicles, stations, bus stops (977 lines)
+- `app/src/main/java/.../ui/MainActivitySocial.kt` — auth, comments, chat UI (860 lines)
+- `app/src/main/java/.../ui/MainActivityPopulate.kt` — POI populate scanner, idle populate (782 lines)
+- `app/src/main/java/.../ui/MainActivityWeather.kt` — weather dialog, alerts dialog (607 lines)
+- `app/src/main/java/.../ui/MainActivityAircraft.kt` — aircraft overlays, follow mode, flight trail (534 lines)
+- `app/src/main/java/.../ui/MainActivityDebug.kt` — debug HTTP server accessor methods (332 lines)
+- `app/src/main/java/.../ui/MainActivityDialogs.kt` — POI detail, vehicle detail dialogs (269 lines)
+- `app/src/main/java/.../ui/MainActivityRadar.kt` — radar tile overlay, animation (211 lines)
+- `app/src/main/java/.../ui/MainActivityMetar.kt` — METAR markers, info display (208 lines)
+- `app/src/main/java/.../ui/MainActivityHelpers.kt` — small utility functions (39 lines)
+
+### ViewModel Decomposition (7 ViewModels)
+- `app/src/main/java/.../ui/MainViewModel.kt` — Location + POI viewport only (215 lines)
+- `app/src/main/java/.../ui/SocialViewModel.kt` — auth, comments, chat (200 lines)
+- `app/src/main/java/.../ui/TransitViewModel.kt` — MBTA trains, subway, buses, stations (165 lines)
+- `app/src/main/java/.../ui/GeofenceViewModel.kt` — TFR, cameras, schools, flood, crossings, databases (286 lines)
+- `app/src/main/java/.../ui/WeatherViewModel.kt` — weather, METAR, webcams, radar (108 lines)
+- `app/src/main/java/.../ui/FindViewModel.kt` — Find dialog DB queries, text search (86 lines)
+- `app/src/main/java/.../ui/AircraftViewModel.kt` — aircraft tracking, flight history (79 lines)
+
+### Menu & UI
+- `app/src/main/java/.../ui/menu/AppBarMenuManager.kt` — toolbar menus, grid dropdown (812 lines)
+- `app/src/main/java/.../ui/menu/MenuPrefs.kt` — preference key constants (74 lines)
+- `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 17 POI categories (153 subtypes)
+- `app/src/main/java/.../ui/menu/MenuEventListener.kt` — menu event interface
 - `app/src/main/java/.../ui/MarkerIconHelper.kt` — icon/dot rendering with cache
 - `app/src/main/java/.../ui/WeatherIconHelper.kt` — NWS icon code → drawable mapping
 - `app/src/main/java/.../ui/StatusLineManager.kt` — priority-based toolbar status line manager
-- `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 17 POI categories (138 subtypes)
-- `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search (injects `@ApplicationContext` for X-Client-ID)
+
+### Repositories
+- `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search
 - `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
 - `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
 - `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
 - `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries + text search
-- `app/src/main/java/.../util/FavoritesManager.kt` — SharedPreferences+JSON favorites CRUD
 - `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
 - `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
-- `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings fetch
-- `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog, download, SQLite loading, import/export, CSV parsing
-- `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
+- `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings
+- `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog/download/import/export
 - `app/src/main/java/.../data/repository/AuthRepository.kt` — JWT auth, token storage, auto-refresh
 - `app/src/main/java/.../data/repository/CommentRepository.kt` — POI comments CRUD
 - `app/src/main/java/.../data/repository/ChatRepository.kt` — Socket.IO chat + REST rooms/messages
-- `cache-proxy/server.js` — Express caching proxy + auth + comments + chat (Socket.IO)
+
+### Utilities
+- `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
+- `app/src/main/java/.../util/FavoritesManager.kt` — SharedPreferences+JSON favorites CRUD
+- `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
+- `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
+
+### Cache Proxy (decomposed into 18 modules)
+- `cache-proxy/server.js` — Express bootstrap, middleware, module loader (156 lines)
+- `cache-proxy/lib/config.js` — environment vars, constants
+- `cache-proxy/lib/cache.js` — file-based cache engine
+- `cache-proxy/lib/opensky.js` — OpenSky OAuth2 token management
+- `cache-proxy/lib/overpass.js` — POST /overpass (queue, cache, content hash)
+- `cache-proxy/lib/db-pois.js` — 8 /db/pois/* routes + /pois/website
+- `cache-proxy/lib/db-aircraft.js` — 4 /db/aircraft/* routes
+- `cache-proxy/lib/aircraft.js` — /aircraft endpoint
+- `cache-proxy/lib/weather.js` — /weather composite NWS
+- `cache-proxy/lib/tfr.js` — /tfrs FAA scraping
+- `cache-proxy/lib/zones.js` — /cameras, /schools, /flood-zones, /crossings
+- `cache-proxy/lib/auth.js` — 5 /auth/* routes + rate limiting
+- `cache-proxy/lib/comments.js` — 4 /comments/* routes
+- `cache-proxy/lib/chat.js` — 3 /chat/* routes + Socket.IO
+- `cache-proxy/lib/pois.js`, `import.js`, `metar.js`, `webcams.js`, `mbta.js`, `geocode.js`, `geofences.js`, `admin.js`, `proxy-get.js`
 - `cache-proxy/geofence-databases/catalog.json` — geofence database catalog (4 databases)
 - `cache-proxy/geofence-databases/build-military.js` — military base polygon builder (ArcGIS NTAD)
 - `cache-proxy/geofence-databases/build-excam.js` — speed/red-light camera builder (WzSabre XZ/NDJSON)
@@ -332,7 +381,7 @@
 - Windy Webcams API key hardcoded in server.js (free tier)
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
-- **Overpass intermittent 504s** (observed 2026-03-04): public `overpass-api.de` returns HTML error pages (`Dispatcher_Client::request_read_and_idx::timeout`) under load; proxy treats these as valid responses returning 0 POIs instead of retrying. Populate scanner compounds the problem by retrying ocean/empty-area tiles. Not a code bug — server-side capacity issue, but proxy error handling could be improved (detect HTML error, backoff, retry)
+- **Overpass intermittent 504s** (observed 2026-03-04): public `overpass-api.de` returns HTML error pages (`Dispatcher_Client::request_read_and_idx::timeout`) under load; proxy treats these as valid responses returning 0 POIs instead of retrying. Populate scanner compounds the problem by retrying ocean/empty-area tiles. Not a code bug — server-side capacity issue, but proxy error handling could be improved (detect HTML error, backoff, retry). Fix location: `cache-proxy/lib/overpass.js`
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |
@@ -403,6 +452,11 @@ overnight-runs/YYYY-MM-DD_HHMM/
 ## Completed Plans
 - **Geofence Alert System** (v1.5.35–v1.5.39): Phases 1-4 done. See `PLAN-ARCHIVE.md`.
 - **Social Layer** Phases A-C (v1.5.45–v1.5.47): Auth + Comments + Chat done. Phase D (mod tools) not started. See `GOVERNANCE.md`.
+- **Code Decomposition** (2026-03-04): 3-phase refactoring complete. See `REFACTORING-REPORT.txt`.
+  - Phase 1: server.js (3,925 → 156 lines + 18 modules in lib/)
+  - Phase 2: MainViewModel.kt (958 → 215 lines + 6 domain ViewModels)
+  - Phase 3: AppBarMenuManager.kt (879 → 812 lines + MenuPrefs.kt)
+  - Prior: MainActivity.kt (9,577 → 1,996 lines + 13 extension-function files)
 
 ## Commercialization
 - **`COMMERCIALIZATION.md`** v2.0 — lawyer-ready edition (1,897 lines, 27 sections, created 2026-03-04)
@@ -411,7 +465,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
-- **Overpass resilience** (PRIORITY): Proxy should detect HTML error responses from Overpass (check `content-type: text/html` or `<html` in body) and retry 2-3x with exponential backoff (server.js ~line 660-683). App populate scanner should retry failed tiles 2-3 times before advancing instead of skipping permanently (PlacesRepository.kt:309). ~13% failure rate observed during 10km Probe.
+- **Overpass resilience** (PRIORITY): Proxy should detect HTML error responses from Overpass (check `content-type: text/html` or `<html` in body) and retry 2-3x with exponential backoff (`cache-proxy/lib/overpass.js`, overpassWorker function). App populate scanner should retry failed tiles 2-3 times before advancing instead of skipping permanently (PlacesRepository.kt:309). ~13% failure rate observed during 10km Probe.
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)

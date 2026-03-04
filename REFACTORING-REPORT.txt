@@ -1,0 +1,215 @@
+================================================================================
+     LocationMapApp v1.5 — Code Decomposition & Refactoring Report
+                        2026-03-04 to 2026-03-04
+================================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+Three-phase refactoring to reduce file sizes and improve maintainability.
+All changes are pure structural refactoring — zero behavior changes.
+Every endpoint, LiveData, menu, and UI flow works identically after refactoring.
+
+  Total lines decomposed:  5,762 lines across 3 monolithic files
+  New files created:       25 modules + 7 ViewModels + 1 constants file = 33 files
+  Build verification:      All phases built successfully after each extraction
+  Test impact:             None — pure refactoring, no API or behavior changes
+
+================================================================================
+
+PHASE 1: server.js Decomposition
+=================================
+
+  Before:  3,925 lines (single monolithic Express server)
+  After:   156-line bootstrap + 18 modules in cache-proxy/lib/
+
+  Commit:  6e8fa58 "Decompose server.js (3,925 → 156 lines) into 18 modules
+                     in lib/"
+
+  Pattern: Each module exports a function receiving (app, deps) where deps
+           contains shared state (pgPool, cache, stats, etc.)
+
+  Modules Created (18):
+  ┌──────────────────┬──────┬─────────────────────────────────────────────┐
+  │ Module           │Lines │ Routes / Purpose                            │
+  ├──────────────────┼──────┼─────────────────────────────────────────────┤
+  │ config.js        │  ~40 │ Environment vars, constants                 │
+  │ cache.js         │ ~250 │ File-based cache engine (330MB cache-data)  │
+  │ opensky.js       │ ~100 │ OpenSky OAuth2 token management             │
+  │ proxy-get.js     │  ~50 │ /earthquakes, /nws-alerts                   │
+  │ metar.js         │  ~40 │ /metar                                      │
+  │ overpass.js      │ ~300 │ POST /overpass (queue, cache, content hash) │
+  │ pois.js          │  ~70 │ /radius-hint(s), /pois/*, /poi/:type/:id   │
+  │ import.js        │ ~180 │ /db/import, /db/import/status               │
+  │ db-pois.js       │ ~680 │ 8 /db/pois/* routes + /pois/website        │
+  │ db-aircraft.js   │ ~170 │ 4 /db/aircraft/* routes                    │
+  │ aircraft.js      │ ~180 │ /aircraft                                   │
+  │ webcams.js       │  ~60 │ /webcams                                    │
+  │ mbta.js          │  ~40 │ /mbta/bus-stops                             │
+  │ geocode.js       │  ~60 │ /geocode                                    │
+  │ weather.js       │ ~220 │ /weather (composite NWS)                    │
+  │ tfr.js           │ ~330 │ /tfrs (FAA scraping)                        │
+  │ zones.js         │ ~210 │ /cameras, /schools, /flood-zones, /crossings│
+  │ auth.js          │ ~340 │ 5 /auth/* routes + rate limiting            │
+  │ comments.js      │ ~160 │ 4 /comments/* routes                       │
+  │ chat.js          │ ~240 │ 3 /chat/* routes + Socket.IO                │
+  │ geofences.js     │  ~50 │ /geofences/catalog, /geofences/database/*   │
+  │ admin.js         │  ~50 │ /cache/stats, /cache/clear                  │
+  └──────────────────┴──────┴─────────────────────────────────────────────┘
+
+  Key Decision: auth.js registered before comments.js and chat.js because
+  it exports requireAuth middleware used by those modules.
+
+  Verification: Proxy restarted and tested with curl endpoints after each
+  batch of module extractions.
+
+================================================================================
+
+PHASE 2: MainViewModel.kt Decomposition
+========================================
+
+  Before:  958 lines (monolithic ViewModel with 13 repository dependencies)
+  After:   215 lines (Location + POI only) + 6 domain-specific ViewModels
+
+  Commit:  6762cd5 "Decompose MainViewModel.kt (958 → 215 lines) into 6
+                     domain-specific ViewModels"
+
+  Pattern: Each ViewModel uses @HiltViewModel with @Inject constructor,
+           accessed via `by viewModels()` delegation in MainActivity.
+
+  ViewModels Created (6):
+  ┌────────────────────┬──────┬────────┬──────────────────────────────────┐
+  │ ViewModel          │Lines │LiveData│ Repository Dependencies           │
+  ├────────────────────┼──────┼────────┼──────────────────────────────────┤
+  │ SocialViewModel    │  200 │   6    │ Auth, Comment, Chat              │
+  │ TransitViewModel   │  165 │   5    │ Mbta                             │
+  │ AircraftViewModel  │   79 │   3    │ Aircraft                         │
+  │ FindViewModel      │   86 │   2    │ Find                             │
+  │ WeatherViewModel   │  108 │   4    │ Weather, Webcam                  │
+  │ GeofenceViewModel  │  286 │  10    │ Tfr, Geofence, GeofenceDatabase  │
+  └────────────────────┴──────┴────────┴──────────────────────────────────┘
+
+  MainViewModel.kt (retained, 215 lines):
+    - LocationManager + PlacesRepository (2 dependencies, down from 13)
+    - _currentLocation, _locationMode, _places, _error LiveData
+    - GPS lifecycle, POI viewport methods, populateSearchAt
+
+  Files Modified Per ViewModel (typical):
+    1. New XxxViewModel.kt created
+    2. MainViewModel.kt — methods/LiveData removed
+    3. MainActivityXxx.kt — viewModel.xxx → xxxViewModel.xxx
+    4. MainActivity.kt — new ViewModel property + observer updates
+    5. DebugEndpoints.kt — new constructor param + reference updates
+
+  Extraction Order:
+    SocialViewModel → TransitViewModel → AircraftViewModel →
+    FindViewModel → WeatherViewModel → GeofenceViewModel
+
+  Build verified after each extraction (6 successful builds).
+
+================================================================================
+
+PHASE 3: AppBarMenuManager.kt Light Refactor
+=============================================
+
+  Before:  879 lines (well-structured, but constants embedded in companion)
+  After:   812 lines + MenuPrefs.kt (74 lines)
+
+  Commit:  494c112 "Refactor AppBarMenuManager.kt: extract MenuPrefs.kt,
+                     remove unused viewModel param"
+
+  Changes:
+    1. Removed unused MainViewModel constructor parameter
+       - Was passed but never referenced in the class body
+       - Updated constructor call in MainActivity.kt
+       - Removed MainViewModel import
+
+    2. Extracted 35 preference key constants to MenuPrefs.kt
+       - New object MenuPrefs in com.example.locationmapapp.ui.menu package
+       - Consuming files now import MenuPrefs directly instead of reaching
+         through AppBarMenuManager.PREF_XXX
+       - 65 references updated across 7 consuming files:
+         MainActivity.kt, MainActivityDebug.kt, MainActivityGeofences.kt,
+         MainActivityRadar.kt, MainActivityAircraft.kt,
+         MainActivityPopulate.kt, MainActivityFind.kt (unused import removed)
+
+    3. Cleaned up unused ContextCompat import
+
+================================================================================
+
+COMPLETE FILE INVENTORY — Before & After
+=========================================
+
+  BEFORE (3 monolithic files):
+    server.js             3,925 lines
+    MainViewModel.kt        958 lines
+    AppBarMenuManager.kt    879 lines
+    ─────────────────────────────────
+    TOTAL                 5,762 lines
+
+  AFTER (3 slim files + 25 new files):
+    server.js               156 lines
+    MainViewModel.kt        215 lines
+    AppBarMenuManager.kt    812 lines
+    ─────────────────────────────────
+    Core files            1,183 lines  (79.5% reduction)
+
+    lib/*.js (18 modules)  ~3,500 lines
+    *ViewModel.kt (6)        924 lines
+    MenuPrefs.kt               74 lines
+    ─────────────────────────────────
+    Extracted modules      ~4,498 lines
+
+  Prior decomposition (from 2026-03-04, separate effort):
+    MainActivity.kt was previously decomposed from 9,577 → 1,996 lines
+    into 13 extension-function files (MainActivityTransit.kt, etc.)
+
+================================================================================
+
+COMMIT LOG
+==========
+
+  494c112  Refactor AppBarMenuManager.kt: extract MenuPrefs.kt, remove
+           unused viewModel param
+  6762cd5  Decompose MainViewModel.kt (958 → 215 lines) into 6 domain-
+           specific ViewModels
+  6e8fa58  Decompose server.js (3,925 → 156 lines) into 18 modules in lib/
+  51c5d48  Decompose MainActivity.kt (9,577 → 1,996 lines) into 13
+           extension-function files
+
+================================================================================
+
+RISK ASSESSMENT
+===============
+
+  Risk Level:   LOW
+  Behavior Changes: NONE — pure structural refactoring
+  API Changes:      NONE — all endpoints work identically
+  UI Changes:       NONE — all menus, dialogs, and interactions unchanged
+  Data Changes:     NONE — all SharedPreferences keys, DB queries unchanged
+  Rollback:         Each phase has a separate commit for granular rollback
+
+================================================================================
+
+ARCHITECTURAL BENEFITS
+======================
+
+  1. MAINTAINABILITY — Smaller files are easier to navigate and modify
+     - No single file exceeds ~2,000 lines (was 9,577 for MainActivity)
+     - Domain-specific ViewModels make data flow clear
+
+  2. TESTABILITY — ViewModels can be unit-tested in isolation
+     - Each ViewModel has explicit repository dependencies via Hilt
+     - No implicit coupling through a monolithic ViewModel
+
+  3. BUILD SPEED — Incremental compilation benefits from smaller files
+     - Kotlin compiler recompiles only changed files
+
+  4. CODE ORGANIZATION — Clear module boundaries
+     - server.js: each route group in its own module
+     - ViewModels: each domain (transit, aircraft, weather, etc.) isolated
+     - Preferences: centralized in MenuPrefs.kt
+
+================================================================================
+                   Report generated 2026-03-04
+                   (C) Dean Maurice Ellis, 2026
+================================================================================

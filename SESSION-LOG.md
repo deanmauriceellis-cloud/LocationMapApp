@@ -2,6 +2,69 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04e (3-Phase Code Decomposition — server.js + ViewModels + MenuPrefs)
+
+### Context
+Monolithic files had grown to unsustainable sizes: `server.js` (3,925 lines), `MainViewModel.kt` (958 lines), `AppBarMenuManager.kt` (879 lines). Pure structural refactoring — zero behavior changes, all endpoints/menus/UI work identically after.
+
+### Phase 1: server.js → 156-line bootstrap + 18 modules in lib/
+- Created `cache-proxy/lib/` directory with 18 route/utility modules
+- Each module exports `function(app, deps)` receiving shared state
+- Key modules: overpass.js (300 lines), db-pois.js (680 lines), auth.js (340 lines), tfr.js (330 lines), chat.js (240 lines), weather.js (220 lines)
+- auth.js registered first (exports requireAuth used by comments.js + chat.js)
+- Proxy restarted and verified between batches
+
+### Phase 2: MainViewModel.kt → 215 lines + 6 domain ViewModels
+- **SocialViewModel** (200 lines): auth, comments, chat — AuthRepository, CommentRepository, ChatRepository
+- **TransitViewModel** (165 lines): MBTA trains, subway, buses, stations, bus stops — MbtaRepository
+- **AircraftViewModel** (79 lines): aircraft tracking, flight history — AircraftRepository
+- **FindViewModel** (86 lines): Find counts, nearby, search, POI website — FindRepository
+- **WeatherViewModel** (108 lines): weather, METAR, webcams, radar refresh — WeatherRepository, WebcamRepository
+- **GeofenceViewModel** (286 lines): TFR, cameras, schools, flood, crossings, databases, GeofenceEngine — TfrRepository, GeofenceRepository, GeofenceDatabaseRepository
+- MainViewModel retained: Location + POI viewport (215 lines, 2 dependencies)
+- Each extraction: update ViewModel refs in consumer files + MainActivity observers + DebugEndpoints constructor
+- 6 successful incremental builds
+
+### Phase 3: AppBarMenuManager.kt → 812 lines + MenuPrefs.kt (74 lines)
+- Removed unused MainViewModel constructor parameter
+- Extracted 35 preference key constants to MenuPrefs.kt object
+- Updated 65 references across 7 consuming files
+- Removed unused ContextCompat import, unused AppBarMenuManager import in MainActivityFind.kt
+
+### Files Created (26)
+- `cache-proxy/lib/*.js` — 18 route modules
+- `app/.../ui/SocialViewModel.kt` — auth, comments, chat
+- `app/.../ui/TransitViewModel.kt` — MBTA transit
+- `app/.../ui/AircraftViewModel.kt` — aircraft tracking
+- `app/.../ui/FindViewModel.kt` — Find dialog queries
+- `app/.../ui/WeatherViewModel.kt` — weather, METAR, webcams
+- `app/.../ui/GeofenceViewModel.kt` — geofence system
+- `app/.../ui/menu/MenuPrefs.kt` — preference key constants
+- `REFACTORING-REPORT.txt` — detailed refactoring report
+
+### Files Modified (15+)
+- `cache-proxy/server.js` — 3,925 → 156 lines (bootstrap only)
+- `app/.../ui/MainViewModel.kt` — 958 → 215 lines (Location + POI only)
+- `app/.../ui/menu/AppBarMenuManager.kt` — 879 → 812 lines (companion removed)
+- `app/.../ui/MainActivity.kt` — 7 ViewModel properties, updated observers + DebugEndpoints
+- `app/.../ui/MainActivityTransit.kt` — viewModel → transitViewModel
+- `app/.../ui/MainActivityAircraft.kt` — viewModel → aircraftViewModel
+- `app/.../ui/MainActivityFind.kt` — viewModel → findViewModel
+- `app/.../ui/MainActivityWeather.kt` — viewModel → weatherViewModel
+- `app/.../ui/MainActivityGeofences.kt` — viewModel → geofenceViewModel
+- `app/.../ui/MainActivityDebug.kt` — multiple ViewModel refs
+- `app/.../ui/MainActivityRadar.kt` — weatherViewModel + MenuPrefs
+- `app/.../ui/MainActivityPopulate.kt` — MenuPrefs
+- `app/.../ui/MainActivitySocial.kt` — socialViewModel
+- `app/.../util/DebugEndpoints.kt` — 6 ViewModel constructor params
+
+### Commits (3)
+- `6e8fa58` Decompose server.js (3,925 → 156 lines) into 18 modules in lib/
+- `6762cd5` Decompose MainViewModel.kt (958 → 215 lines) into 6 domain-specific ViewModels
+- `494c112` Refactor AppBarMenuManager.kt: extract MenuPrefs.kt, remove unused viewModel param
+
+---
+
 ## Session: 2026-03-04d (COMMERCIALIZATION.md v2.0 — Lawyer-Ready Enhancement)
 
 ### Context
