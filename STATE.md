@@ -411,7 +411,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
-- **Overpass resilience**: Proxy should detect HTML error responses from Overpass and retry with backoff instead of returning 0 POIs; populate scanner should skip ocean/water tiles
+- **Overpass resilience** (PRIORITY): Proxy should detect HTML error responses from Overpass (check `content-type: text/html` or `<html` in body) and retry 2-3x with exponential backoff (server.js ~line 660-683). App populate scanner should retry failed tiles 2-3 times before advancing instead of skipping permanently (PlacesRepository.kt:309). ~13% failure rate observed during 10km Probe.
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)
