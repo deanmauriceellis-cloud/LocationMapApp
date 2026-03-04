@@ -4342,6 +4342,27 @@ class MainActivity : AppCompatActivity() {
                     headerHint.text = "$countLabel$catPart$refineHint"
                     headerHint.setTextColor(if (response.categoryHint != null) Color.parseColor("#00BCD4") else Color.parseColor("#9E9E9E"))
                     headerHint.visibility = View.VISIBLE
+                    // "Filter and Map" button at top of search results
+                    searchResultsList.addView(TextView(this@MainActivity).apply {
+                        text = "Filter and Map"
+                        textSize = 14f
+                        setTextColor(Color.WHITE)
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        gravity = android.view.Gravity.CENTER
+                        setPadding(dp(16), dp(10), dp(16), dp(10))
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(Color.parseColor("#00897B"))
+                            cornerRadius = dp(6).toFloat()
+                        }
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) }
+                        setOnClickListener {
+                            dialog.dismiss()
+                            val filterLabel = response.categoryHint ?: "\"$query\""
+                            enterFilterAndMapMode(response.results, filterLabel)
+                        }
+                    })
                     // Get category label lookup for display
                     val catLabelMap = mutableMapOf<String, Pair<String, Int>>()
                     for (cat in com.example.locationmapapp.ui.menu.PoiCategories.ALL) {
@@ -4441,27 +4462,6 @@ class MainActivity : AppCompatActivity() {
                         setPadding(dp(4), dp(8), dp(4), dp(8))
                     })
 
-                    // "Filter and Map" button in search results
-                    searchResultsList.addView(TextView(this@MainActivity).apply {
-                        text = "Filter and Map"
-                        textSize = 14f
-                        setTextColor(Color.WHITE)
-                        setTypeface(null, android.graphics.Typeface.BOLD)
-                        gravity = android.view.Gravity.CENTER
-                        setPadding(dp(16), dp(10), dp(16), dp(10))
-                        background = android.graphics.drawable.GradientDrawable().apply {
-                            setColor(Color.parseColor("#00897B"))
-                            cornerRadius = dp(6).toFloat()
-                        }
-                        layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply { setMargins(dp(4), dp(8), dp(4), dp(8)) }
-                        setOnClickListener {
-                            dialog.dismiss()
-                            val filterLabel = response.categoryHint ?: "\"$query\""
-                            enterFilterAndMapMode(response.results, filterLabel)
-                        }
-                    })
                 }
             }
         })
@@ -5841,12 +5841,22 @@ class MainActivity : AppCompatActivity() {
             binding.mapView.overlays.add(m)
         }
 
-        // Zoom to 15 centered on results centroid
+        // Keep current position, start at zoom 18 and zoom out until results are visible
+        val center = binding.mapView.mapCenter
+        var zoom = 18.0
+        binding.mapView.controller.setZoom(zoom)
+        binding.mapView.invalidate()
+        // Check if any results are in the viewport; if not, step down zoom
         if (places.isNotEmpty()) {
-            val avgLat = places.sumOf { it.lat } / places.size
-            val avgLon = places.sumOf { it.lon } / places.size
-            binding.mapView.controller.setZoom(15.0)
-            binding.mapView.controller.setCenter(GeoPoint(avgLat, avgLon))
+            while (zoom >= 3.0) {
+                binding.mapView.controller.setZoom(zoom)
+                // Force layout so bounding box is accurate
+                binding.mapView.layoutParams = binding.mapView.layoutParams
+                val bb = binding.mapView.boundingBox
+                val visible = places.any { bb.contains(GeoPoint(it.lat, it.lon)) }
+                if (visible) break
+                zoom -= 1.0
+            }
         }
         binding.mapView.invalidate()
 

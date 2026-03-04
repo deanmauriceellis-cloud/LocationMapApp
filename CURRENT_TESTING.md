@@ -1,223 +1,49 @@
-# Social Layer Testing — In Progress
+# Social Layer Testing — Status
 
-## Session 46 (2026-03-03)
+## Completed (all passed)
+- DDL & proxy setup (8 tables, JWT_SECRET, all routes)
+- Proxy API: register, login, refresh, me, comments CRUD, votes, chat rooms, duplicate rejection
+- On-device UI: grid dropdown 3×4, register, profile, chat rooms, real-time messages, Socket.IO
+- POI marker click-through, comments with ratings, upvote, delete (soft), add comment dialog
+- Device-bonded auth (register-only, no logout), room create/navigate, message persistence
+- Security hardening: sanitization, rate limiting, login lockout, validation, debug endpoint protection
+- Client-side input limits, comment char counter
+- BlueStacks cross-platform: multi-user confirmed
+- v1.5.48 tunings: zoom 18, radar 35%, idle density guard
+- v1.5.49: automated POI import (full + delta)
+- v1.5.50: Find dialog ScrollView, unlimited distance, 16 new subtypes
+- v1.5.51-52: Smart fuzzy search (proxy API + on-device), header hints, distance expansion
+- v1.5.53: Filter and Map mode (all tests passed)
+- v1.5.55: MODULE_ID, toolbar layout (7 icons)
+- v1.5.56: Distance-sorted search, Filter and Map button at top, adaptive zoom
 
-### DDL & Proxy
-- [x] 8 social tables created via `create-social-tables.sh` (`sudo -u postgres`)
-- [x] Proxy restarted with `JWT_SECRET` env var — all social routes registered
-- [x] Proxy confirmed: Auth, Chat, Comments, Socket.IO all listed at startup
+## NOT YET TESTED — Resume Here
 
-### Proxy API Tests (curl)
-- [x] POST /auth/register — user created, tokens returned
-- [x] POST /auth/login — tokens returned, correct displayName
-- [x] GET /auth/me — profile returned
-- [x] POST /comments — comment created with rating
-- [x] GET /comments/:type/:id — comment with authorName + content
-- [x] POST /comments/:id/vote — upvote counted
-- [x] GET /chat/rooms — Global + Boston Area listed
-- [x] POST /chat/rooms — "Boston Area" created
-- [x] Duplicate register — rejected correctly
-- [x] POST /auth/refresh — new tokens returned
-- [x] GET /auth/debug/users — all users listed
+### v1.5.55 (needs user testing)
+- [ ] Home button — tap centers map on GPS at zoom 18
+- [ ] Home button no GPS — toast "No GPS fix yet"
+- [ ] About button — dialog with v1.5.55, copyright, DestructiveAIGurus.com, email
 
-### On-Device UI Tests (Session 46)
-- [x] Grid dropdown — 3×4 grid (12 buttons), Row 3: Social, Chat, Profile, Legend
-- [x] Social → Login dialog — email + password fields, Login button, Register link
-- [x] Register dialog — Display Name, Email, Password fields, Register button
-- [x] Register user "Dean" — success, dialog dismissed, tokens stored in auth_prefs
-- [x] Profile dialog — blue avatar "D", name "Dean", role "USER", UUID, red Logout button
-- [x] Chat Rooms dialog — "Boston Area" (1 member), "Global" (0 members), "+ New" button
-- [x] "1 member" grammar fix — confirmed working
-- [x] Global chat room — back arrow, title, close, empty messages, send bar
-- [x] Send bar visibility — `fitsSystemWindows` fix, input fully visible above nav bar
-- [x] Message history — "Hello from the Global chat" shown as blue bubble with "8m" timestamp
-- [x] Real-time message delivery — "Testing real-time delivery" appeared as "just now" bubble
-- [x] Socket.IO connect-before-join fix — messages now appear immediately
-
-### On-Device UI Tests (Session 47)
-- [x] **POI marker tap → detail dialog** — tapping POI marker now opens detail dialog directly (was info-window-only before)
-- [x] **POI Comments** — comments section visible in detail dialog with "Comments" header + "+ Add" button
-- [x] **Add comment with rating** — 4-star rating + text "Great college with beautiful campus" posted successfully
-- [x] **Comment display** — author "Dean" (cyan), "just now" timestamp, star rating, comment text
-- [x] **Upvote** — ▲ count incremented to 1 (green), ▼ stays 0
-- [x] **Delete comment** — soft delete shows "[deleted]" text, author/rating preserved
-- [x] **Delete button hidden on deleted comments** — fixed (was showing before)
-- [x] **Profile dialog** — no Logout button (device-bonded auth model)
-- [x] **Auth dialog** — Register-only (no login/logout toggle), "bonded to device" info text
-- [x] **Create room on device** — "North Shore Spotters" created with description, toast "Room created"
-- [x] **Room list updated** — 3 rooms: North Shore Spotters, Global, Boston Area
-- [x] **Send message in new room** — blue bubble "First message in North Shore Spotters!" with "just now"
-- [x] **Back arrow** — returns to room list from chat room
-- [x] **Room navigation** — switch between rooms, each shows correct message history
-- [x] **Message persistence** — Global room shows previous session messages (1h, 51m, 33m ago)
-- [x] **Message verified in DB** — proxy API confirms message stored with correct author/content
-
-### Bugs Fixed Session 46
-1. **Chat send bar obscured by nav bar** — added `fitsSystemWindows = true` to chat root layout
-2. **"1 members" grammar** — pluralization logic for member count
-3. **Socket.IO race condition** — `joinRoom` fired before socket connected; fixed with `suspendCancellableCoroutine` in `connect()` and sequential connect→join in ViewModel
-4. **Idle auto-populate too aggressive** — threshold 5min → 10min; any UI activity now resets timer
-
-### Changes Made Session 47
-1. **POI marker click-through** — added `setOnMarkerClickListener` + `openPoiDetailFromPlace()` to open detail dialog from map marker tap
-2. **PlaceResult.id format** — now stores `"type:id"` (e.g., "way:292110841") matching FindResult convention; both parsers updated
-3. **Device-bonded auth** — removed Login toggle, removed Logout button, register-only flow
-4. **Delete button on deleted comments** — hidden when `isDeleted` is true
-5. **Refresh token lifetime** — 30 days → 365 days (device-bonded accounts)
-6. **Chat toast** — "Log in first" → "Register first"
-
-### Security Hardening (Session 48 — v1.5.47)
-- Server-side: sanitizeText/sanitizeMultiline, rate limiting (express-rate-limit), login lockout, tightened validation
-- Client-side: InputFilter.LengthFilter on all social EditTexts, min-length/email validation, comment char counter
-- `/auth/debug/users` now requires auth + owner/support role
-
-### Completed — Security Hardening Verification
-
-#### Security Hardening Verification — ALL PASS (Session 49, 2026-03-03)
-- [x] **Sanitization**: `<script>alert(1)</script>Nice place!` → `alert(1)Nice place!`; HTML tags fully stripped
-- [x] **Rate limiting**: 429 after 9th request (1 login + 8 registers = 10 total = limit hit) — PASS
-- [x] **Login lockout**: 5 wrong passwords → 401 each, 6th → 429 locked, correct password also blocked — PASS
-- [x] **Validation**: empty name (rejected), 1-char name (rejected), HTML in name (sanitized to "Bad"), 2001-char comment (truncated to 1000), rating=6 (rejected), invalid osmType (rejected), 200-char password (rejected), bad email (rejected) — ALL PASS
-- [x] **Debug endpoint**: no auth → 401, regular user → 403 "Insufficient privileges" — PASS
-- [x] **Android input limits**: InputFilter.LengthFilter confirmed on all 7 social EditTexts (50/255/128/100/255/1000/1000)
-- [x] **Comment char counter**: "0 / 1000" visible, updates live to "32 / 1000" after typing — PASS
-- **Note**: proxy must be restarted to pick up server.js changes (Node caches at startup); app must be reinstalled for client-side changes
-
-### Completed — BlueStacks Cross-Platform (Session 49)
-- [x] **BlueStacks install** — APK installs and runs on BlueStacks Windows emulator
-  - Needed `adb uninstall` first (signature mismatch from prior debug key)
-  - BlueStacks reaches proxy at 10.0.0.4:3000 over local network
-  - Both devices (Android emulator + BlueStacks) traffic visible in proxy logs
-  - "Mr. Nobody" comment posted from BlueStacks confirmed in proxy logs
-- [x] **Multi-user confirmed** — two separate device registrations hitting proxy simultaneously
-
-### Completed — Startup/Behavior Tuning (Session 50)
-- [x] **Default zoom 14 → 18** — first GPS fix, goToLocation, long-press all zoom to 18
-- [x] **Radar alpha 70% → 35%** — default radar overlay now 50% more translucent
-- [x] **Idle auto-populate POI density guard** — queries `/db/pois/counts` 10km radius; skips if ≥100 POIs nearby
-- [x] **Build passes** — assembleDebug succeeds
-
-### Completed — Automated POI DB Import (Session 51)
-- [x] **Full import** — 178,395 POIs upserted in 217s on manual trigger
-- [x] **Delta import** — 1,996 new POIs in 9s (only recent arrivals)
-- [x] **GET /db/import/status** — returns lastImportTime, pendingDelta, running, stats
-- [x] **POST /db/import** — manual trigger returns `{ upserted, skipped, totalInDb, elapsed }`
-- [x] **GET /cache/stats** — `dbImport` object included with import stats
-- [x] **DB verified** — `SELECT count(*) FROM pois` = 180,059 after imports
-- [x] **pendingDelta** — drops to 0 after successful import
-- [x] **15-min timer** — setInterval registered at startup (guarded by pgPool)
-
-### Completed — Find Dialog Overhaul (Session 52 — v1.5.50)
-- [x] **ScrollView main grid** — all 18 cells visible, scrolls to bottom row (Entertainment, Offices)
-- [x] **ScrollView subtype grid** — Shopping (26 subtypes), Entertainment (18 subtypes) all scrollable
-- [x] **Cell height cap** — cells properly sized with 120dp max, no oversized cells
-- [x] **Count badges** — all categories show counts after back-navigation (Food 271, Parks 1.1k, Shopping 274, etc.)
-- [x] **New Shopping subtypes** — Pet Stores (6), Electronics (2), Bicycle Shops (3), Garden Centers (9) visible
-- [x] **New Entertainment subtypes** — Water Parks, Mini Golf (1), Escape Rooms (1) visible
-- [x] **Unlimited distance** — zoo search returned 5 results at 694–1413km (`scope_m: 0` global fallback)
-- [x] **`craft` category key** — added to server.js POI_CATEGORY_KEYS (breweries etc. will appear after next import)
-
-### Completed — Smart Fuzzy Search DDL (Session 53 — v1.5.51)
-- [x] **pg_trgm extension** — created via `sudo -u postgres`
-- [x] **GIN trigram index** — `idx_pois_name_trgm` on pois.name
-- [x] **Build passes** — assembleDebug succeeds
-
-### Completed — Smart Fuzzy Search (Session 54 — v1.5.52)
-
-#### Proxy API Tests — ALL PASS
-- [x] **Proxy restart** — proxy loaded with all social/search routes
-- [x] **Fuzzy typo search** — "starbcks" → 5 Starbucks results, similarity 0.583, sorted by distance (96m–644m)
-- [x] **Keyword category hint** — "historic" → `category_hint: "Tourism & History"`, monuments/memorials/attractions
-- [x] **Combined keyword+name** — "historic church" → Tourism & History + fuzzy "church" (Old North Church, First Church in Malden)
-- [x] **Keyword-only browse** — "gas" → `category_hint: "Fuel & Charging"`, ChargePoint/Shell/fuel stations by distance
-- [x] **Distance expansion** — "observatory" from remote lat/lon expanded to 200km scope; "antiques" expanded to 160km (100mi max)
-- [x] **Dunkin Donts typo** — fuzzy matched "Dunkin' Donuts" at 18–50km, score 0.667
-
-#### On-Device UI Tests — ALL PASS
-- [x] **Keyword search "gas"** — cyan "Showing Fuel & Charging" hint in header bar + ChargePoint/Shell results
-- [x] **Fuzzy search "Dunkin"** — matched Dunkin' locations, "donut, coffee_shop" detail, "Food & Drink" category
-- [x] **Fuzzy "starbcks" (with typo prefix)** — still found Starbucks (resilient to noise)
-- [x] **Keyword "historic"** — "Showing Tourism & History" + Birthplace of Telephone, Golden Teapot, Upper Plaza
-- [x] **Rich result rows** — 3-line layout: bold name, gray detail (cuisine/brand), colored category label
-- [x] **Header hint** — count + category + "refine to narrow" in title bar next to "Find"
-- [x] **Result count** — "200+ Fuel & Charging · refine to narrow" for broad queries, "6" for narrow "antiques"
-- [x] **Clear button** — ✕ clears search, restores category grid, clears header hint
-- [x] **Debounce** — 1s delay confirmed (results don't appear during typing)
-
-#### Bugs Fixed (Session 54)
-1. **Search results invisible** — `gridScroll` (weight=1f) consumed all space; `searchScroll` had no weight and was pushed offscreen. Fixed by toggling `gridScroll.visibility` and giving `searchScroll` matching weight.
-2. **`searchResultsList` stuck GONE** — inner LinearLayout had `visibility = View.GONE` that was never set back. Removed initial GONE since parent `searchScroll` handles visibility.
-
-#### Enhancements (Session 54)
-- **Header hint**: result count/category moved from buried footer to title bar ("Find  200+ Fuel & Charging · refine to narrow")
-- **Search limit**: 50 → 200 results (server already capped at 200)
-- **Distance expansion**: radii changed to [50km, 100km, 160,934m (100mi)], threshold ≥50 results (was ≥3)
-
-### In Progress — Filter and Map Mode (Session 55 — v1.5.53)
-
-#### On-Device Tests — Verified
-- [x] **Find → Parks → "Filter and Map" button visible** — teal button at bottom of results list
-- [x] **Tap button** — dialog closes, map shows only 50 parks with forced labels, status line "Showing 50 Parks — tap to clear"
-- [x] **All other layers cleared** — no transit, aircraft, webcams, METAR, geofences, radar visible
-- [x] **Zoom level** — set to 15, centered on results centroid
-- [x] **Debug endpoint** — `filterAndMap` block in `/state` with active=true, label="Parks", resultCount=50
-
-#### All Tests Passed (user-verified 2026-03-03)
-- [x] **Tap status line to exit** — mode exits, normal layers restore, POI labels revert to zoom-based
-- [x] **Scroll/zoom while in filter mode** — no other layers appear, markers stay labeled
-- [x] **Fuzzy search "Filter and Map" button** — button appears in search results too
-- [x] **Re-open Find while in filter mode** — auto-exit clears filter mode first
-- [x] **Filter and Map from subtype** — e.g. Food & Drink → Cafes → Filter and Map
-- [x] **Filter and Map with few results** — centroid + zoom still work with 1-2 results
-- [x] **Radar restore** — enable radar, enter filter mode (radar clears), exit → radar restores
-- [x] **POI detail from filtered marker** — tap a filtered marker → POI detail dialog opens
-
-### v1.5.55 — Module IDs + Home + About (Session 56)
-- [x] **Build passes** — assembleDebug succeeds
-- [x] **Toolbar layout** — 7 icons visible: Weather | Home | spacer | DarkMode | Alerts | Grid | About
-- [ ] **Home button** — tap centers map on GPS at zoom 18 (needs user test)
-- [ ] **Home button no GPS** — toast "No GPS fix yet" when no location available
-- [ ] **About button** — tap shows dialog with v1.5.55, copyright, DestructiveAIGurus.com, email
-- [ ] **MODULE_ID searchable** — `grep -r "MODULE_ID" --include="*.kt" | wc -l` = 33
-- **Note**: ANR at startup from Overpass 504 during silent fill is pre-existing, not related to v1.5.55 changes
-
-### NOT YET TESTED — Resume Here
-
-#### v1.5.48 Tunings
-- [x] **Zoom 18 on first GPS fix** — verified by user, street-level view on fresh app start
-- [x] **Zoom 18 on Go To** — verified by user, zooms to 18
-- [x] **Radar transparency** — verified by user, noticeably more transparent
-- [x] **Idle populate skip** — in a dense area, idle populate does NOT trigger after 10 min (user-verified 2026-03-03)
-
-#### v1.5.50 Find Dialog (remaining) — All Passed (user-verified 2026-03-03)
-- [x] **Food & Drink subtypes** — Breweries/Wineries/Distilleries visible (15 subtypes)
-- [x] **Civic & Gov subtypes** — Recycling/Embassies visible (9 subtypes)
-- [x] **Tourism & History subtypes** — Zoos/Aquariums/Theme Parks visible (15 subtypes)
-- [x] **Parks & Rec subtypes** — Beaches visible (15 subtypes)
-- [x] **Find results tap** — distance-sorted results load + tap opens POI detail
-
-#### Social Layer (from Session 47)
-- [x] **Multi-user chat** — BlueStacks as 2nd device confirmed traffic; verify gray bubbles visually
-- [ ] **Token refresh** — wait 15min or simulate expiry, verify auto-refresh works
-- [ ] **Error states** — duplicate registration, short password, empty fields, network down
-- [ ] **Dark mode** — verify social dialogs render correctly in dark mode
-- [ ] **Comment on POI with existing comments** — verify comments load and display correctly
-- [ ] **Downvote** — test downvote on a comment
+### Social Layer (from Session 47)
+- [ ] Token refresh — wait 15min or simulate expiry, verify auto-refresh
+- [ ] Error states — duplicate registration, short password, empty fields, network down
+- [ ] Dark mode — verify social dialogs render correctly
+- [ ] Comment on POI with existing comments — verify comments load and display
+- [ ] Downvote — test downvote on a comment
 
 ### Test Accounts
-| User | Email | Password | Created |
-|------|-------|----------|---------|
-| TestUser | test@example.com | TestPass123 | curl (proxy API test) |
-| Dean | dean@test.com | password123 | on-device registration |
-| SecurityTester | sectest@example.com | SecurePass123 | curl (session 49 security tests) |
-| RateUser1-8 | rate1-8@test.com | TestPass123 | curl (rate limit test, session 49) |
-| Mr. Nobody | (BlueStacks) | — | BlueStacks registration (session 49) |
+| User | Email | Created |
+|------|-------|---------|
+| TestUser | test@example.com | curl (proxy API test) |
+| Dean | dean@test.com | on-device registration |
+| SecurityTester | sectest@example.com | curl (security tests) |
+| Mr. Nobody | (BlueStacks) | BlueStacks registration |
 
-### Proxy Startup (for next session)
+### Proxy Startup
 ```bash
 cd cache-proxy && DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp \
   JWT_SECRET=$(openssl rand -hex 32) \
   OPENSKY_CLIENT_ID=deanmauriceellis-api-client \
   OPENSKY_CLIENT_SECRET=6m3uBQ5HXwSzJeLemRJK12G8Ux4L5veR node server.js
 ```
-Note: Random JWT_SECRET means test accounts' existing tokens won't work — users will need to re-register (device-bonded, no login flow).
+Note: Random JWT_SECRET means existing tokens won't work — users need to re-register.

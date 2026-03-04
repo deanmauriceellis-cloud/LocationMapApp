@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 56 (Module IDs + Home + About)
+## Last Updated: 2026-03-04 Session 57 (Search Distance Sort + Filter and Map UX)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -27,6 +27,7 @@
   - ~80 keyword→category mappings: "historic" → Tourism & History, "gas" → Fuel & Charging, etc.
   - Combined queries: "food italian" → Food & Drink category + fuzzy "italian" name match
   - Distance expansion: 50km → 100km → 100mi/160,934m (stops at ≥50 results)
+  - **Results sorted by distance** (v1.5.56): nearest first, regardless of fuzzy match score
   - Rich result rows: bold name, detail line (cuisine/brand), category label in category color
   - Header hint bar: count + category + "refine to narrow" in title bar next to "Find" (200 result limit)
 - **MBTA transit** — live vehicles (buses, CR, subway) with directional arrows + staleness detection
@@ -99,9 +100,9 @@
   - Unlimited distance on `/db/pois/find`: scope expands 50km → 200km → 1000km → global (no bbox)
   - Smart fuzzy search bar (v1.5.51): pg_trgm fuzzy + keyword hints, 1000ms debounce, rich 3-line result rows
   - Favorites cell (v1.5.44): gold star, first in grid, shows count badge, tap for sorted favorites list
-  - **Filter and Map** (v1.5.53): teal button in category/subtype/fuzzy results → exclusive map view
+  - **Filter and Map** (v1.5.53, improved v1.5.56): teal button at top of search results → exclusive map view
     - Clears all other layers (transit, aircraft, webcams, METAR, geofences, radar), stops background jobs
-    - Force-labels all result markers at any zoom; centroid-centered at zoom 15
+    - Force-labels all result markers at any zoom; keeps current position, adaptive zoom (18→out until results visible)
     - Status line "Showing N label — tap to clear" with FIND_FILTER priority; tap exits and restores layers
     - Scroll/zoom handlers guarded — no layer reloads while active
 - **POI Detail Dialog** (v1.5.27): info rows, website (3-tier waterfall), action buttons (Directions/Call/Reviews/Map/Share)
@@ -393,51 +394,15 @@ overnight-runs/YYYY-MM-DD_HHMM/
   logs/               — error snapshots + final log dump
 ```
 
-### Full Suite Results (2026-03-01, overnight 2:19AM + morning 7:50AM)
+### Full Suite Results (2026-03-01): 103 PASS, 0 FAIL
+- Overnight 5.5hrs + Morning 1hr — no leaks, no failures, memory 9-27MB steady
+- See `overnight-runs/` for detailed reports
 
-**Overnight (5.5 hrs): 67 PASS, 0 FAIL, 4 WARN**
-- Memory: 38MB baseline → 12-20MB steady, peak 62MB (GC spike), **no leak**
-- Cache: 184→265 entries, 28% session hit rate
-- OpenSky: 183 requests, 3,400 remaining
-- 27 screenshots, 69 CSV rows, 64 snapshots
-- Transit came online at 5:25 AM — detected automatically (buses 0→171, trains 0→9, subway 0→32)
-- Init timing: stations=257/7.3s, bus_stops=6904/5.4s, metar=1/5.2s, webcams=50/6.4s, pois=844/3.1s
-- Warnings: bus headsign/stopName 25% (early AM), aircraft altitude null (on ground), METAR 0 overnight
+## Completed Plans
+- **Geofence Alert System** (v1.5.35–v1.5.39): Phases 1-4 done. See `PLAN-ARCHIVE.md`.
+- **Social Layer** Phases A-C (v1.5.45–v1.5.47): Auth + Comments + Chat done. Phase D (mod tools) not started. See `GOVERNANCE.md`.
 
-**Morning (1 hr): 36 PASS, 0 FAIL, 2 WARN**
-- Vehicle quality: buses 240-270 (80% headsign, 100% tripId), CR 11-16 (100% all), subway 69-77 (100% all)
-- Follow endurance: 6/6 checks active over 60s
-- API reliability: 45/45 requests succeeded (100%)
-- Bus stops: Downtown=46, Cambridge=139, Seaport=78
-- Warnings: bus routeName 80% **(fixed v1.5.23)**, bus stop search 'Mass Ave' = 0 **(fixed v1.5.23 — fuzzy search)**
-
-**Monitor (14 snapshots, 30-min intervals, 2:22AM → 8:53AM)**
-- Transit ramp: 52 buses (2AM) → 100 (5:23) → 198 (6:23) → 273 (8:53)
-- Subway: 0 (3AM) → 9 (5:23) → 54 (6:23) → 75 (8:53)
-- POI markers: 3,136 → 4,828 (peak) — cache building during map moves
-- Memory: 9-27MB range, no trend upward
-- 0 test failures across entire run
-
-## Completed Plan: Geofence Alert System
-Roadmap completed across v1.5.35–v1.5.39. See `PLAN-ARCHIVE.md` for full details.
-- Phase 1: Core Engine + TFRs (v1.5.35)
-- Phase 2: Additional Zone Types (v1.5.36)
-- Phase 3A: Downloadable Database Infrastructure (v1.5.37)
-- Phase 3B: Additional Database Builders (v1.5.38)
-- Phase 4: Database Import & Export (v1.5.39)
-- Phase 5: Advanced Sources — deferred (sufficient coverage with current sources)
-
-## Active Plan: Social Layer
-See `SOCIAL-PLAN.md` for full plan. Current status:
-- **Phase A (Auth)**: DONE — register/login, JWT, profile, 3×4 grid
-- **Phase B (Comments)**: DONE — POI comments, ratings, votes
-- **Phase C (Chat)**: DONE — real-time Socket.IO chat, rooms
-- **Phase D (Room Management)**: NOT STARTED — mod tools, bans, room settings
-- **Governance checkpoints**: NOT STARTED — COPPA, encryption, moderation (see GOVERNANCE.md)
-- **DDL done** — 8 tables created, testing in progress (see CURRENT_TESTING.md)
-- **Auth model**: device-bonded (register once, no login/logout, 365d refresh tokens)
-
-## Other Next Steps
-- Monitor cache growth and hit rates over time
-- Evaluate proxy → remote deployment for non-local testing
-- Find dialog enhancements: pagination (load more), recent searches, search history
+## Next Steps
+- Social: Phase D (room management), governance checkpoints (COPPA, encryption, moderation)
+- Find dialog: pagination, recent searches, search history
+- Remote proxy deployment for non-local testing

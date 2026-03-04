@@ -1469,7 +1469,7 @@ app.get('/db/pois/search', requirePg, async (req, res) => {
 
       const dist = haversine(latP, lonP);
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      const order = scoreExpr ? `ORDER BY (${scoreExpr}) DESC, ${dist} ASC` : `ORDER BY ${dist} ASC`;
+      const order = `ORDER BY ${dist} ASC`;
 
       const sql = `SELECT osm_type, osm_id, name, category, lat, lon, tags, ${dist} AS distance_m${scoreExpr ? `, (${scoreExpr}) AS score` : ''} FROM pois ${where} ${order} LIMIT ${lim}`;
       const result = await pgPool.query(sql, params);
