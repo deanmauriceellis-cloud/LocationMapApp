@@ -219,7 +219,8 @@ class PlacesRepository @Inject constructor(
         val lat = center.latitude
         val lon = center.longitude
         val tags = if (categories.isEmpty()) {
-            listOf("amenity", "shop", "tourism", "historic", "leisure", "office")
+            listOf("amenity", "shop", "tourism", "historic", "leisure", "office",
+                   "craft", "aeroway", "healthcare")
         } else categories
 
         val sb = StringBuilder("[out:json][timeout:25];\n(\n")
@@ -265,6 +266,9 @@ class PlacesRepository @Inject constructor(
                     ?: tags["leisure"]?.asString
                     ?: tags["historic"]?.asString
                     ?: tags["office"]?.asString
+                    ?: tags["craft"]?.asString
+                    ?: tags["aeroway"]?.asString
+                    ?: tags["healthcare"]?.asString
                     ?: "place"
                 val osmType = obj["type"]?.asString ?: "node"
                 results.add(PlaceResult(
@@ -387,6 +391,9 @@ class PlacesRepository @Inject constructor(
                     ?: tags["leisure"]?.asString
                     ?: tags["historic"]?.asString
                     ?: tags["office"]?.asString
+                    ?: tags["craft"]?.asString
+                    ?: tags["aeroway"]?.asString
+                    ?: tags["healthcare"]?.asString
                     ?: "place"
                 val name = tags["name"]?.asString ?: category
                 val osmType = el["type"]?.asString ?: "node"

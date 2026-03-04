@@ -19,6 +19,18 @@
 
 ## NOT YET TESTED — Resume Here
 
+### v1.5.57 (needs proxy restart + app reinstall)
+- [ ] Cuisine search — "pizza" returns pizza places (not just nearest Food & Drink)
+- [ ] Cuisine search — "bbq" returns barbecue restaurants
+- [ ] Cuisine search — "sushi" returns sushi restaurants
+- [ ] New subtypes in Find grid — Boat Ramps visible in Parks & Rec
+- [ ] New subtypes — Tattoo Shops, Cannabis, Barber Shops in Shopping
+- [ ] New subtypes — Airports, Taxi Stands in Transit
+- [ ] New subtypes — Disc Golf in Entertainment
+- [ ] Filter and Map works with new subtypes
+- [ ] Trigger scan near airport to verify `aeroway=aerodrome` imports
+- [ ] Keyword search — "tattoo", "dispensary", "boat ramp", "disc golf" work
+
 ### v1.5.55 (needs user testing)
 - [ ] Home button — tap centers map on GPS at zoom 18
 - [ ] Home button no GPS — toast "No GPS fix yet"

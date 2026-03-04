@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 57 (Search Distance Sort + Filter and Map UX)
+## Last Updated: 2026-03-04 Session 58 (POI Coverage Expansion + Cuisine Search)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -10,7 +10,7 @@
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
-- **17 POI categories, 138 subtypes** with submenu refinement (central config in `PoiCategories.kt`)
+- **17 POI categories, 153 subtypes** with submenu refinement (central config in `PoiCategories.kt`)
   - 5dp colored dots; zoom ≥ 18: labeled icons with type + name
   - Layer-aware LiveData `Pair<String, List>`, viewport-only display via `/pois/bbox`
   - All layers default ON except aircraft (OFF)
@@ -24,8 +24,9 @@
 - **Favorites** (v1.5.44): star icon in POI detail dialog, SharedPreferences+JSON storage, dedicated Favorites cell in Find dialog
 - **Smart fuzzy search** (v1.5.51): pg_trgm similarity + keyword→category hints in Find dialog search bar
   - Typo-tolerant: "Starbcks" finds Starbucks, "Dunkin Donts" finds Dunkin' Donuts
-  - ~80 keyword→category mappings: "historic" → Tourism & History, "gas" → Fuel & Charging, etc.
-  - Combined queries: "food italian" → Food & Drink category + fuzzy "italian" name match
+  - ~110 keyword→category mappings: "historic" → Tourism & History, "gas" → Fuel & Charging, "tattoo" → Shopping, etc.
+  - **Cuisine-aware search** (v1.5.57): "pizza" matches name OR `cuisine=pizza` tag (~12.8k cuisine-tagged POIs)
+  - Combined queries: "food italian" → Food & Drink category + fuzzy "italian" name + cuisine match
   - Distance expansion: 50km → 100km → 100mi/160,934m (stops at ≥50 results)
   - **Results sorted by distance** (v1.5.56): nearest first, regardless of fuzzy match score
   - Rich result rows: bold name, detail line (cuisine/brand), category label in category color
@@ -262,7 +263,7 @@
 - Database: `locationmapapp`, user: `witchdoctor`
 - **`pois` table**: Composite PK `(osm_type, osm_id)`, JSONB tags (GIN index), promoted name/category columns
   - Indexes: category, name (partial), tags (GIN), lat+lon (compound), **name trigram (GIN pg_trgm)** for fuzzy search
-  - 180,059 POIs as of 2026-03-03 (auto-imported from 180k cache)
+  - 211,611 POIs as of 2026-03-04 (93,820 named); auto-imported, ~12.8k with cuisine tags
 - **`aircraft_sightings` table**: Serial PK, tracks each continuous observation as a separate row
   - Columns: icao24, callsign, origin_country, first/last seen, first/last lat/lon/altitude/heading, velocity, vertical_rate, squawk, on_ground
   - 5-minute gap between observations = new sighting row (enables flight history analysis)
@@ -275,7 +276,7 @@
   - `POST /db/import` (manual trigger), `GET /db/import/status` (read-only status)
   - Stats in `/cache/stats` → `dbImport` object
 - **DB query API** (`/db/*` prefix): 14 endpoints — 8 POI + 4 aircraft + 2 import
-  - `GET /db/pois/search` — smart fuzzy search (pg_trgm similarity + ILIKE), keyword→category hints, distance expansion, composite scoring
+  - `GET /db/pois/search` — smart fuzzy search (pg_trgm similarity + ILIKE), keyword→category hints, **cuisine-aware** (tags->>'cuisine'), distance expansion, composite scoring
   - `GET /db/pois/nearby` — Haversine distance sort with bbox pre-filter
   - `GET /db/poi/:type/:id` — single POI with timestamps
   - `GET /db/pois/stats` — totals, named count, top categories, bounds, time range

@@ -2,6 +2,23 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.57] — 2026-03-04
+
+### Added
+- **15 new POI subtypes** across 5 categories (138 → 153 total)
+  - Food & Drink: Wine Shops, Butcher Shops, Seafood Markets
+  - Transit: Airports, Taxi Stands
+  - Parks & Rec: Boat Ramps (1,324 in DB), Skateparks
+  - Shopping: Barber Shops, Massage, Tattoo Shops, Thrift Stores, Vape Shops, Cannabis
+  - Entertainment: Disc Golf
+- **Cuisine-aware fuzzy search** — "pizza", "sushi", "burger", "bbq", etc. now match `tags->>'cuisine'` in addition to name fuzzy match; unlocks ~12,800 cuisine-tagged POIs
+  - 30+ cuisine keywords with alias mapping (bbq → barbecue, burgers → burger, etc.)
+- **~30 new search keywords** — tattoo, barber, thrift, vape, cannabis, dispensary, massage, spa, boat ramp, skatepark, disc golf, airport, taxi, butcher, seafood, wine shop, bbq, burger, steak, ramen, noodle, taco, donut, bagel, chicken, wings, sandwich, japanese, korean, vietnamese, greek, french, mediterranean
+
+### Changed
+- **Overpass default search keys** expanded: `craft`, `aeroway`, `healthcare` added — future scans pick up airports, breweries (broad scans), urgent care
+- **POI category extraction** handles `craft`, `aeroway`, `healthcare` keys in both app and proxy import
+
 ## [1.5.56] — 2026-03-04
 
 ### Changed

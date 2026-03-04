@@ -424,7 +424,7 @@ let dbImportStats = { lastUpserted: 0, lastSkipped: 0, lastElapsedMs: 0, totalRu
 const DB_IMPORT_INTERVAL_MS = 15 * 60 * 1000;
 const DB_IMPORT_BATCH_SIZE = 500;
 
-const POI_CATEGORY_KEYS = ['amenity', 'shop', 'tourism', 'leisure', 'historic', 'office', 'craft'];
+const POI_CATEGORY_KEYS = ['amenity', 'shop', 'tourism', 'leisure', 'historic', 'office', 'craft', 'aeroway', 'healthcare'];
 
 function derivePoiCategory(tags) {
   if (!tags) return null;
@@ -1303,14 +1303,24 @@ const KEYWORD_CATEGORIES = {
   'bar': 'Food & Drink', 'pub': 'Food & Drink', 'pizza': 'Food & Drink',
   'bakery': 'Food & Drink', 'deli': 'Food & Drink', 'ice cream': 'Food & Drink',
   'brewery': 'Food & Drink', 'winery': 'Food & Drink', 'liquor': 'Food & Drink',
+  'wine shop': 'Food & Drink', 'butcher': 'Food & Drink', 'seafood': 'Food & Drink',
   'italian': 'Food & Drink', 'chinese': 'Food & Drink', 'mexican': 'Food & Drink',
   'sushi': 'Food & Drink', 'thai': 'Food & Drink', 'indian': 'Food & Drink',
+  'japanese': 'Food & Drink', 'korean': 'Food & Drink', 'vietnamese': 'Food & Drink',
+  'greek': 'Food & Drink', 'french': 'Food & Drink', 'mediterranean': 'Food & Drink',
+  'bbq': 'Food & Drink', 'burger': 'Food & Drink', 'burgers': 'Food & Drink',
+  'steak': 'Food & Drink', 'steakhouse': 'Food & Drink', 'ramen': 'Food & Drink',
+  'noodle': 'Food & Drink', 'noodles': 'Food & Drink', 'taco': 'Food & Drink',
+  'tacos': 'Food & Drink', 'donut': 'Food & Drink', 'donuts': 'Food & Drink',
+  'bagel': 'Food & Drink', 'chicken': 'Food & Drink', 'wings': 'Food & Drink',
+  'sub': 'Food & Drink', 'sandwich': 'Food & Drink', 'sandwiches': 'Food & Drink',
   // Fuel & Charging
   'gas': 'Fuel & Charging', 'fuel': 'Fuel & Charging', 'gas station': 'Fuel & Charging',
   'charging': 'Fuel & Charging', 'ev': 'Fuel & Charging', 'ev charging': 'Fuel & Charging',
   // Transit
   'transit': 'Transit', 'train': 'Transit', 'bus': 'Transit',
   'ferry': 'Transit', 'bike rental': 'Transit', 'station': 'Transit',
+  'airport': 'Transit', 'taxi': 'Transit',
   // Civic & Gov
   'civic': 'Civic & Gov', 'government': 'Civic & Gov', 'post office': 'Civic & Gov',
   'courthouse': 'Civic & Gov', 'town hall': 'Civic & Gov', 'embassy': 'Civic & Gov',
@@ -1318,13 +1328,17 @@ const KEYWORD_CATEGORIES = {
   'park': 'Parks & Rec', 'parks': 'Parks & Rec', 'playground': 'Parks & Rec',
   'garden': 'Parks & Rec', 'nature': 'Parks & Rec', 'pool': 'Parks & Rec',
   'dog park': 'Parks & Rec', 'beach': 'Parks & Rec', 'picnic': 'Parks & Rec',
-  'recreation': 'Parks & Rec',
+  'recreation': 'Parks & Rec', 'boat ramp': 'Parks & Rec', 'boat launch': 'Parks & Rec',
+  'skatepark': 'Parks & Rec', 'skateboard': 'Parks & Rec',
   // Shopping
   'shop': 'Shopping', 'shopping': 'Shopping', 'store': 'Shopping',
   'supermarket': 'Shopping', 'grocery': 'Shopping', 'mall': 'Shopping',
   'clothes': 'Shopping', 'clothing': 'Shopping', 'shoes': 'Shopping',
   'electronics': 'Shopping', 'hardware': 'Shopping', 'books': 'Shopping',
   'florist': 'Shopping', 'pet store': 'Shopping', 'furniture': 'Shopping',
+  'tattoo': 'Shopping', 'barber': 'Shopping', 'thrift': 'Shopping',
+  'second hand': 'Shopping', 'vape': 'Shopping', 'cannabis': 'Shopping',
+  'dispensary': 'Shopping', 'massage': 'Shopping', 'spa': 'Shopping',
   // Healthcare
   'health': 'Healthcare', 'healthcare': 'Healthcare', 'hospital': 'Healthcare',
   'pharmacy': 'Healthcare', 'clinic': 'Healthcare', 'doctor': 'Healthcare',
@@ -1360,7 +1374,8 @@ const KEYWORD_CATEGORIES = {
   'gym': 'Entertainment', 'fitness': 'Entertainment', 'cinema': 'Entertainment',
   'movie': 'Entertainment', 'movies': 'Entertainment', 'theatre': 'Entertainment',
   'theater': 'Entertainment', 'nightclub': 'Entertainment', 'bowling': 'Entertainment',
-  'golf': 'Entertainment', 'marina': 'Entertainment', 'sports': 'Entertainment',
+  'golf': 'Entertainment', 'disc golf': 'Entertainment', 'frisbee golf': 'Entertainment',
+  'marina': 'Entertainment', 'sports': 'Entertainment',
   'entertainment': 'Entertainment', 'arcade': 'Entertainment',
   // Offices & Services
   'office': 'Offices & Services', 'lawyer': 'Offices & Services',
@@ -1368,12 +1383,12 @@ const KEYWORD_CATEGORIES = {
 };
 
 const CATEGORY_LABEL_TAGS = {
-  'Food & Drink':       ['amenity=restaurant','amenity=fast_food','amenity=cafe','amenity=bar','amenity=pub','amenity=ice_cream','shop=bakery','shop=alcohol','shop=deli','shop=pastry','shop=confectionery','amenity=marketplace','craft=brewery','craft=winery','craft=distillery'],
+  'Food & Drink':       ['amenity=restaurant','amenity=fast_food','amenity=cafe','amenity=bar','amenity=pub','amenity=ice_cream','shop=bakery','shop=alcohol','shop=deli','shop=pastry','shop=confectionery','amenity=marketplace','craft=brewery','craft=winery','craft=distillery','shop=wine','shop=butcher','shop=seafood'],
   'Fuel & Charging':    ['amenity=fuel','amenity=charging_station'],
-  'Transit':            ['public_transport=station','railway=station','amenity=bus_station','amenity=bicycle_rental','amenity=ferry_terminal'],
+  'Transit':            ['public_transport=station','railway=station','amenity=bus_station','amenity=bicycle_rental','amenity=ferry_terminal','aeroway=aerodrome','amenity=taxi'],
   'Civic & Gov':        ['amenity=townhall','amenity=courthouse','amenity=post_office','office=government','amenity=community_centre','amenity=social_facility','amenity=post_box','amenity=recycling','office=diplomatic'],
-  'Parks & Rec':        ['leisure=park','leisure=nature_reserve','leisure=playground','leisure=pitch','leisure=swimming_pool','leisure=garden','tourism=picnic_site','amenity=drinking_water','amenity=toilets','amenity=shelter','amenity=fountain','leisure=dog_park','leisure=track','leisure=recreation_ground','leisure=beach_resort'],
-  'Shopping':           ['shop=supermarket','shop=convenience','shop=mall','shop=department_store','shop=clothes','shop=hairdresser','shop=beauty','shop=gift','shop=laundry','shop=variety_store','shop=mobile_phone','shop=dry_cleaning','shop=books','shop=furniture','shop=jewelry','shop=optician','shop=florist','shop=chemist','shop=storage_rental','shop=shoes','shop=tobacco','shop=hardware','shop=pet','shop=electronics','shop=bicycle','shop=garden_centre'],
+  'Parks & Rec':        ['leisure=park','leisure=nature_reserve','leisure=playground','leisure=pitch','leisure=swimming_pool','leisure=garden','tourism=picnic_site','amenity=drinking_water','amenity=toilets','amenity=shelter','amenity=fountain','leisure=dog_park','leisure=track','leisure=recreation_ground','leisure=beach_resort','leisure=slipway','leisure=skatepark'],
+  'Shopping':           ['shop=supermarket','shop=convenience','shop=mall','shop=department_store','shop=clothes','shop=hairdresser','shop=beauty','shop=massage','shop=gift','shop=laundry','shop=variety_store','shop=mobile_phone','shop=dry_cleaning','shop=books','shop=furniture','shop=jewelry','shop=optician','shop=florist','shop=chemist','shop=storage_rental','shop=shoes','shop=tobacco','shop=hardware','shop=pet','shop=electronics','shop=bicycle','shop=garden_centre','shop=tattoo','shop=barber','shop=second_hand','shop=e-cigarette','shop=cannabis'],
   'Healthcare':         ['amenity=hospital','amenity=pharmacy','amenity=clinic','amenity=dentist','amenity=doctors','amenity=veterinary','amenity=nursing_home'],
   'Education':          ['amenity=school','amenity=library','amenity=college','amenity=university','amenity=childcare','amenity=kindergarten'],
   'Lodging':            ['tourism=hotel','tourism=motel','tourism=hostel','tourism=camp_site','tourism=guest_house','tourism=caravan_site'],
@@ -1383,9 +1398,22 @@ const CATEGORY_LABEL_TAGS = {
   'Tourism & History':  ['tourism=museum','tourism=attraction','tourism=viewpoint','historic=memorial','historic=monument','tourism=artwork','tourism=gallery','tourism=information','historic=cemetery','historic=building','historic=ruins','historic=maritime','tourism=zoo','tourism=aquarium','tourism=theme_park'],
   'Emergency Svc':      ['amenity=police','amenity=fire_station'],
   'Auto Services':      ['shop=car_repair','amenity=car_wash','amenity=car_rental','shop=tyres','shop=car','shop=car_parts'],
-  'Entertainment':      ['leisure=fitness_centre','leisure=sports_centre','leisure=golf_course','leisure=marina','leisure=stadium','amenity=theatre','amenity=cinema','amenity=nightclub','amenity=events_venue','amenity=arts_centre','amenity=studio','leisure=dance','leisure=amusement_arcade','leisure=ice_rink','leisure=bowling_alley','leisure=water_park','leisure=miniature_golf','leisure=escape_game'],
+  'Entertainment':      ['leisure=fitness_centre','leisure=sports_centre','leisure=golf_course','leisure=disc_golf_course','leisure=marina','leisure=stadium','amenity=theatre','amenity=cinema','amenity=nightclub','amenity=events_venue','amenity=arts_centre','amenity=studio','leisure=dance','leisure=amusement_arcade','leisure=ice_rink','leisure=bowling_alley','leisure=water_park','leisure=miniature_golf','leisure=escape_game'],
   'Offices & Services': ['office=company','office=estate_agent','office=lawyer','office=insurance','office=tax_advisor'],
 };
+
+// Cuisine keywords — when user searches these, also match tags->>'cuisine'
+// Cuisine keywords — when user searches these, also match tags->>'cuisine'
+// Keys with alternate spellings map to the OSM cuisine value
+const CUISINE_KEYWORDS = new Set([
+  'pizza', 'sushi', 'mexican', 'chinese', 'indian', 'thai', 'japanese', 'korean',
+  'vietnamese', 'greek', 'french', 'mediterranean', 'italian', 'bbq', 'barbecue',
+  'burger', 'burgers', 'steak', 'steakhouse', 'ramen', 'noodle', 'noodles',
+  'taco', 'tacos', 'donut', 'donuts', 'bagel', 'chicken', 'wings', 'seafood',
+  'sandwich', 'sandwiches', 'sub', 'vegan', 'vegetarian'
+]);
+// Map alternate spellings to what OSM actually uses
+const CUISINE_ALIASES = { 'bbq': 'barbecue', 'burgers': 'burger', 'noodles': 'noodle', 'tacos': 'taco', 'donuts': 'donut', 'sandwiches': 'sandwich', 'steakhouse': 'steak', 'wings': 'chicken' };
 
 function parseSearchKeywords(query) {
   const lower = query.toLowerCase().trim();
@@ -1396,10 +1424,15 @@ function parseSearchKeywords(query) {
     if (KEYWORD_CATEGORIES[prefix]) {
       const label = KEYWORD_CATEGORIES[prefix];
       const remaining = words.slice(len).join(' ').trim();
-      return { keyword: prefix, categoryLabel: label, categoryTags: CATEGORY_LABEL_TAGS[label], remainingQuery: remaining };
+      const rawCuisine = CUISINE_KEYWORDS.has(prefix) ? prefix : (CUISINE_KEYWORDS.has(remaining) ? remaining : null);
+      const cuisineHint = rawCuisine ? (CUISINE_ALIASES[rawCuisine] || rawCuisine) : null;
+      return { keyword: prefix, categoryLabel: label, categoryTags: CATEGORY_LABEL_TAGS[label], remainingQuery: remaining, cuisineHint };
     }
   }
-  return { keyword: null, categoryLabel: null, categoryTags: null, remainingQuery: lower };
+  // Check if the bare query itself is a cuisine keyword
+  const rawCuisine = CUISINE_KEYWORDS.has(lower) ? lower : null;
+  const cuisineHint = rawCuisine ? (CUISINE_ALIASES[rawCuisine] || rawCuisine) : null;
+  return { keyword: null, categoryLabel: null, categoryTags: null, remainingQuery: lower, cuisineHint };
 }
 
 // GET /db/pois/search — smart fuzzy search with keyword category hints
@@ -1410,7 +1443,7 @@ app.get('/db/pois/search', requirePg, async (req, res) => {
 
     const fLat = parseFloat(lat), fLon = parseFloat(lon);
     const lim = Math.min(parseInt(limit) || 50, 200);
-    const { keyword, categoryLabel, categoryTags, remainingQuery } = parseSearchKeywords(q);
+    const { keyword, categoryLabel, categoryTags, remainingQuery, cuisineHint } = parseSearchKeywords(q);
     const hasNameQuery = remainingQuery.length >= 2;
 
     // Distance expansion radii — expand until ≥50 results, max 100 miles (160,934m)
@@ -1449,13 +1482,27 @@ app.get('/db/pois/search', requirePg, async (req, res) => {
         pi++;
       }
 
-      // Name matching: fuzzy + substring
+      // Name matching: fuzzy + substring + cuisine tag
       let scoreExpr;
       if (hasNameQuery) {
         conditions.push(`name IS NOT NULL`);
-        conditions.push(`(name ILIKE $${pi} OR similarity(name, $${pi + 1}) > 0.2)`);
-        params.push(`%${remainingQuery}%`, remainingQuery);
-        scoreExpr = `CASE WHEN name ILIKE $${pi} THEN 1.0 ELSE 0.0 END + similarity(name, $${pi + 1})`;
+        if (cuisineHint) {
+          // Also match cuisine tag (e.g. "italian" matches name OR cuisine)
+          conditions.push(`(name ILIKE $${pi} OR similarity(name, $${pi + 1}) > 0.2 OR tags->>'cuisine' ILIKE $${pi + 2})`);
+          params.push(`%${remainingQuery}%`, remainingQuery, `%${cuisineHint}%`);
+          scoreExpr = `CASE WHEN name ILIKE $${pi} THEN 1.0 WHEN tags->>'cuisine' ILIKE $${pi + 2} THEN 0.8 ELSE 0.0 END + COALESCE(similarity(name, $${pi + 1}), 0)`;
+          pi += 3;
+        } else {
+          conditions.push(`(name ILIKE $${pi} OR similarity(name, $${pi + 1}) > 0.2)`);
+          params.push(`%${remainingQuery}%`, remainingQuery);
+          scoreExpr = `CASE WHEN name ILIKE $${pi} THEN 1.0 ELSE 0.0 END + similarity(name, $${pi + 1})`;
+          pi += 2;
+        }
+      } else if (cuisineHint && categoryTags) {
+        // Cuisine keyword only (e.g. just "pizza") — match name OR cuisine tag
+        conditions.push(`(name ILIKE $${pi} OR tags->>'cuisine' ILIKE $${pi + 1})`);
+        params.push(`%${cuisineHint}%`, `%${cuisineHint}%`);
+        scoreExpr = `CASE WHEN tags->>'cuisine' ILIKE $${pi + 1} THEN 1.0 WHEN name ILIKE $${pi} THEN 0.8 ELSE 0.0 END`;
         pi += 2;
       } else if (!categoryTags) {
         // No keyword, no name query — need at least a name substring

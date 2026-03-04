@@ -2,6 +2,51 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04c (v1.5.57 — POI Coverage Expansion + Cuisine Search)
+
+### Context
+Analyzed 211K POIs — found 1,324 boat ramps, 165 massage shops, 132 tattoo shops, 131 cannabis dispensaries, and 12,800+ cuisine-tagged restaurants not reachable through Find grid or search. Also missing airports, barber shops, skateparks from Overpass scans.
+
+### Changes Made
+
+#### 1. 15 New Subtypes in PoiCategories.kt (138 → 153)
+- Food & Drink: +Wine Shops, +Butcher Shops, +Seafood Markets
+- Transit: +Airports (`aeroway=aerodrome`), +Taxi Stands
+- Parks & Rec: +Boat Ramps (`leisure=slipway`), +Skateparks
+- Shopping: +Barber Shops, +Massage, +Tattoo Shops, +Thrift Stores, +Vape Shops, +Cannabis
+- Entertainment: +Disc Golf
+
+#### 2. Cuisine-Aware Fuzzy Search (server.js)
+- Added CUISINE_KEYWORDS set (30+ entries) + CUISINE_ALIASES for OSM spelling variants
+- Search query now adds `OR tags->>'cuisine' ILIKE '%keyword%'` when cuisine keyword detected
+- "pizza" finds 1,483 pizza places, "burger" finds 1,693, "mexican" finds 1,103, etc.
+
+#### 3. ~30 New Search Keywords (server.js)
+- Shopping: tattoo, barber, thrift, second hand, vape, cannabis, dispensary, massage, spa
+- Food: butcher, seafood, wine shop, bbq, burger, steak, ramen, noodle, taco, donut, bagel, chicken, wings, sandwich, japanese, korean, vietnamese, greek, french, mediterranean
+- Transit: airport, taxi
+- Parks: boat ramp, boat launch, skatepark, skateboard
+- Entertainment: disc golf, frisbee golf
+
+#### 4. Expanded Overpass Search (PlacesRepository.kt)
+- Default keys: added `craft`, `aeroway`, `healthcare`
+- Category extraction: handles new keys in both parseOverpassJson instances
+- POI_CATEGORY_KEYS in server.js: added `aeroway`, `healthcare`
+
+### Files Modified (3)
+- `app/.../ui/menu/PoiCategories.kt` — 15 new subtypes, new tags
+- `cache-proxy/server.js` — cuisine search, 30+ keywords, CATEGORY_LABEL_TAGS, POI_CATEGORY_KEYS
+- `app/.../data/repository/PlacesRepository.kt` — 3 new Overpass keys, category extraction
+
+### Testing Needed
+- [ ] Proxy restart + verify cuisine search ("pizza", "bbq", "sushi" near Boston)
+- [ ] App reinstall + verify new subtypes appear in Find grid
+- [ ] Verify "Boat Ramps" shows 1,324 results
+- [ ] Verify "Filter and Map" works with new subtypes
+- [ ] Trigger a scan to verify airports/barbers/skateparks get imported
+
+---
+
 ## Session: 2026-03-04b (Commercialization Roadmap)
 
 ### Context
