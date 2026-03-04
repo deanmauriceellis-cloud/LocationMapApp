@@ -14,6 +14,9 @@ import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration
 import androidx.preference.PreferenceManager
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module LocationMapApp.kt"
+
 @HiltAndroidApp
 class LocationMapApp : Application() {
     override fun onCreate() {

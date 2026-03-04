@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-03 Session 55 (Filter and Map Mode)
+## Last Updated: 2026-03-03 Session 56 (Module IDs + Home + About)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -37,8 +37,8 @@
 - **Aircraft tracking** (OpenSky) — rotated airplane icons, callsign, altitude-colored, SPI emergency
   - 18 state vector fields, configurable refresh (30s–5min), zoom ≥ 10 guard
   - Dedicated **Air** menu (toggle, frequency, auto-follow)
-- **Slim toolbar + status line + grid dropdown** (v1.5.40): replaced 2×5 icon grid with compact 3-icon bar
-  - **Toolbar** (40dp): Weather icon (left) | spacer | Dark Mode toggle | Alerts icon + Grid menu button (right)
+- **Slim toolbar + status line + grid dropdown** (v1.5.40): replaced 2×5 icon grid with compact toolbar bar
+  - **Toolbar** (40dp): Weather | Home | spacer | Dark Mode | Alerts | Grid | About (v1.5.55)
   - **Status line** (24dp): priority-based info bar — GPS coords+weather when idle, follow/scan/alert info when active
     - `StatusLineManager.kt`: 8 priority levels (GPS_IDLE → GEOFENCE_ALERT), set/clear/updateIdle API
     - All banner functions migrated from dynamic TextView creation to StatusLineManager
@@ -46,6 +46,8 @@
   - **Grid dropdown**: PopupWindow with 8 labeled buttons (icon+text) in 2×4 grid
     - Row 1: Transit, Webcams, Aircraft, Radar | Row 2: POI, Utility, Find, Go To
   - `setupSlimToolbar()` + `showGridDropdown()` in AppBarMenuManager; `fitsSystemWindows` on AppBarLayout
+  - **Home icon** (v1.5.55): house icon centers map on GPS at zoom 18 with 800ms animation
+  - **About icon** (v1.5.55): info circle shows version/copyright/contact dialog (DestructiveAIGurus.com)
   - Weather icon dynamically updates to show current conditions; red border when alerts active
   - Alerts icon dynamically colored by severity: gray (none), blue (INFO), yellow (WARNING), red (CRITICAL), pulsing red (EMERGENCY)
   - Debug `/state` includes `statusLine` field with text + priority name
@@ -158,6 +160,8 @@
   - **Duplicate handling**: detects existing database ID, shows overwrite confirmation dialog
   - **Local-only databases**: catalog merges locally-imported databases not in remote catalog; works offline
   - **Database Manager UI**: "IMPORT .DB" / "IMPORT CSV" buttons at top; "EXPORT" button on installed cards
+- **MODULE_ID** (v1.5.55): searchable copyright+module constant in every source file (131 files)
+  - Kotlin: `private const val MODULE_ID` after imports; JS: `const MODULE_ID`; Shell: `MODULE_ID=`; SQL: `-- MODULE_ID:`; XML: `Module:` in copyright comment
 - **Startup**: loads cached bbox only (no per-category Overpass queries); 504/429 don't shrink radius hints
 - **Debug HTTP server** (v1.5.18): port 8085, 24 endpoints, `adb forward` + `curl`
   - `DebugHttpServer.kt` (singleton) + `DebugEndpoints.kt`; lifecycle-aware, double-start guard

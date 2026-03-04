@@ -9,6 +9,9 @@
 
 package com.example.locationmapapp.core
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module AppException.kt"
+
 /**
  * Sealed hierarchy for all domain-level exceptions in LocationMapApp.
  *

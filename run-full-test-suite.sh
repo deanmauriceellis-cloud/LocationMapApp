@@ -5,6 +5,7 @@
 # This source code is proprietary and confidential.
 # Unauthorized copying, modification, or distribution is
 # strictly prohibited.
+MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module run-full-test-suite.sh"
 #
 # run-full-test-suite.sh — Master test runner
 #

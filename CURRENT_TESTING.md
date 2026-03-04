@@ -162,15 +162,24 @@
 - [x] **Zoom level** — set to 15, centered on results centroid
 - [x] **Debug endpoint** — `filterAndMap` block in `/state` with active=true, label="Parks", resultCount=50
 
-#### Still Needs Testing
-- [ ] **Tap status line to exit** — verify mode exits, normal layers restore, POI labels revert to zoom-based
-- [ ] **Scroll/zoom while in filter mode** — verify no other layers appear, markers stay labeled
-- [ ] **Fuzzy search "Filter and Map" button** — verify button appears in search results too
-- [ ] **Re-open Find while in filter mode** — verify auto-exit clears filter mode first
-- [ ] **Filter and Map from subtype** — e.g. Food & Drink → Cafes → Filter and Map
-- [ ] **Filter and Map with few results** — verify centroid + zoom still work with 1-2 results
-- [ ] **Radar restore** — enable radar, enter filter mode (radar clears), exit → radar restores
-- [ ] **POI detail from filtered marker** — tap a filtered marker → verify POI detail dialog opens
+#### All Tests Passed (user-verified 2026-03-03)
+- [x] **Tap status line to exit** — mode exits, normal layers restore, POI labels revert to zoom-based
+- [x] **Scroll/zoom while in filter mode** — no other layers appear, markers stay labeled
+- [x] **Fuzzy search "Filter and Map" button** — button appears in search results too
+- [x] **Re-open Find while in filter mode** — auto-exit clears filter mode first
+- [x] **Filter and Map from subtype** — e.g. Food & Drink → Cafes → Filter and Map
+- [x] **Filter and Map with few results** — centroid + zoom still work with 1-2 results
+- [x] **Radar restore** — enable radar, enter filter mode (radar clears), exit → radar restores
+- [x] **POI detail from filtered marker** — tap a filtered marker → POI detail dialog opens
+
+### v1.5.55 — Module IDs + Home + About (Session 56)
+- [x] **Build passes** — assembleDebug succeeds
+- [x] **Toolbar layout** — 7 icons visible: Weather | Home | spacer | DarkMode | Alerts | Grid | About
+- [ ] **Home button** — tap centers map on GPS at zoom 18 (needs user test)
+- [ ] **Home button no GPS** — toast "No GPS fix yet" when no location available
+- [ ] **About button** — tap shows dialog with v1.5.55, copyright, DestructiveAIGurus.com, email
+- [ ] **MODULE_ID searchable** — `grep -r "MODULE_ID" --include="*.kt" | wc -l` = 33
+- **Note**: ANR at startup from Overpass 504 during silent fill is pre-existing, not related to v1.5.55 changes
 
 ### NOT YET TESTED — Resume Here
 
@@ -178,14 +187,14 @@
 - [x] **Zoom 18 on first GPS fix** — verified by user, street-level view on fresh app start
 - [x] **Zoom 18 on Go To** — verified by user, zooms to 18
 - [x] **Radar transparency** — verified by user, noticeably more transparent
-- [ ] **Idle populate skip** — in a dense area (DC), verify idle populate does NOT trigger after 10 min
+- [x] **Idle populate skip** — in a dense area, idle populate does NOT trigger after 10 min (user-verified 2026-03-03)
 
-#### v1.5.50 Find Dialog (remaining)
-- [ ] **Food & Drink subtypes** — verify Breweries/Wineries/Distilleries visible (15 subtypes)
-- [ ] **Civic & Gov subtypes** — verify Recycling/Embassies visible (9 subtypes)
-- [ ] **Tourism & History subtypes** — verify Zoos/Aquariums/Theme Parks visible (15 subtypes)
-- [ ] **Parks & Rec subtypes** — verify Beaches visible (15 subtypes)
-- [ ] **Find results tap** — tap a subtype, verify distance-sorted results load + tap opens POI detail
+#### v1.5.50 Find Dialog (remaining) — All Passed (user-verified 2026-03-03)
+- [x] **Food & Drink subtypes** — Breweries/Wineries/Distilleries visible (15 subtypes)
+- [x] **Civic & Gov subtypes** — Recycling/Embassies visible (9 subtypes)
+- [x] **Tourism & History subtypes** — Zoos/Aquariums/Theme Parks visible (15 subtypes)
+- [x] **Parks & Rec subtypes** — Beaches visible (15 subtypes)
+- [x] **Find results tap** — distance-sorted results load + tap opens POI detail
 
 #### Social Layer (from Session 47)
 - [x] **Multi-user chat** — BlueStacks as 2nd device confirmed traffic; verify gray bubbles visually

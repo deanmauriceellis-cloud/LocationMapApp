@@ -5,6 +5,7 @@
 # This source code is proprietary and confidential.
 # Unauthorized copying, modification, or distribution is
 # strictly prohibited.
+MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module create-social-tables.sh"
 # LocationMapApp v1.5.45 — Social Layer DDL
 # Creates the 8 tables needed for auth, comments, and chat
 # Must run as: sudo -u postgres bash create-social-tables.sh

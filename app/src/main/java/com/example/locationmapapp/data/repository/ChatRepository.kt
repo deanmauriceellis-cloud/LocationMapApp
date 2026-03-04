@@ -28,6 +28,9 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module ChatRepository.kt"
+
 @Singleton
 class ChatRepository @Inject constructor(
     private val authRepository: AuthRepository

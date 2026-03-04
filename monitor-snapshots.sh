@@ -5,6 +5,7 @@
 # This source code is proprietary and confidential.
 # Unauthorized copying, modification, or distribution is
 # strictly prohibited.
+MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module monitor-snapshots.sh"
 #
 # monitor-snapshots.sh — 30-minute snapshot monitor
 # Runs alongside overnight test, captures screenshots + log analysis for morning review.

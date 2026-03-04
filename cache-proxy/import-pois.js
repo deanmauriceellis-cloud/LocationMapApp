@@ -7,6 +7,7 @@
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
+const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module import-pois.js';
 
 // Import POIs from cache proxy into PostgreSQL
 // Usage: DATABASE_URL=postgres://user:pass@localhost/locationmapapp node import-pois.js

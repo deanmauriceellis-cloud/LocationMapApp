@@ -20,6 +20,9 @@ import org.locationtech.jts.geom.Polygon
 import org.locationtech.jts.index.strtree.STRtree
 import java.util.Calendar
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module GeofenceEngine.kt"
+
 /**
  * GeofenceEngine — spatial geofence checking using JTS R-tree.
  *

@@ -15,6 +15,9 @@ import java.net.Socket
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module TcpLogStreamer.kt"
+
 /**
  * TcpLogStreamer — streams DebugLogger output to a PC running:
  *   nc -lk 9999

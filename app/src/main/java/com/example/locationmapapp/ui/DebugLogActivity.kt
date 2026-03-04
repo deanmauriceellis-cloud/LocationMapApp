@@ -15,6 +15,9 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.example.locationmapapp.util.DebugLogger
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugLogActivity.kt"
+
 class DebugLogActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {

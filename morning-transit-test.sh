@@ -5,6 +5,7 @@
 # This source code is proprietary and confidential.
 # Unauthorized copying, modification, or distribution is
 # strictly prohibited.
+MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module morning-transit-test.sh"
 #
 # morning-transit-test.sh — Deep transit test for when MBTA service is active
 #

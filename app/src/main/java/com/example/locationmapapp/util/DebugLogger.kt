@@ -14,6 +14,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugLogger.kt"
+
 /**
  * DebugLogger — in-memory ring buffer + logcat bridge.
  * Captures up to MAX_ENTRIES log lines with sequence numbers and timestamps.

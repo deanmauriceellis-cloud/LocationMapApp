@@ -23,6 +23,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.cos
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module GeofenceRepository.kt"
+
 @Singleton
 class GeofenceRepository @Inject constructor() {
 

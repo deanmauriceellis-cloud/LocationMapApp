@@ -18,6 +18,9 @@ import androidx.core.graphics.drawable.DrawableCompat
 import com.example.locationmapapp.R
 import com.example.locationmapapp.util.DebugLogger
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MarkerIconHelper.kt"
+
 /**
  * MarkerIconHelper
  *

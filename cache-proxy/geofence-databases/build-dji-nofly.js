@@ -7,6 +7,7 @@
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
+const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module build-dji-nofly.js';
 
 /**
  * build-dji-nofly.js — Download DJI no-fly zone database and build SQLite database.

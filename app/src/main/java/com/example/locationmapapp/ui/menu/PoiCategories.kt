@@ -11,6 +11,9 @@ package com.example.locationmapapp.ui.menu
 
 import android.graphics.Color
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module PoiCategories.kt"
+
 /**
  * Central config for all 17 POI categories.
  * Menu items, toggles, restore, Overpass queries, and marker colors are all driven from this list.

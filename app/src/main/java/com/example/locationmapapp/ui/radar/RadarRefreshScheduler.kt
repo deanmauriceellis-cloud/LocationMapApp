@@ -13,6 +13,9 @@ import android.os.Handler
 import android.os.Looper
 import com.example.locationmapapp.util.DebugLogger
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module RadarRefreshScheduler.kt"
+
 /**
  * RadarRefreshScheduler
  *

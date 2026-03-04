@@ -21,6 +21,9 @@ import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugEndpoints.kt"
+
 /** Response from an endpoint handler. */
 data class EndpointResult(
     val status: Int = 200,

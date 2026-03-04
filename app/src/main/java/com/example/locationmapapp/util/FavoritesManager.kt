@@ -14,6 +14,9 @@ import com.example.locationmapapp.data.model.FavoriteEntry
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module FavoritesManager.kt"
+
 class FavoritesManager(context: Context) {
 
     private val prefs = context.getSharedPreferences("favorites_prefs", Context.MODE_PRIVATE)

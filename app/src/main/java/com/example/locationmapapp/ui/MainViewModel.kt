@@ -43,6 +43,9 @@ import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import javax.inject.Inject
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainViewModel.kt"
+
 /** Rich GPS update — carries speed/bearing/accuracy alongside the map point. */
 data class LocationUpdate(
     val point: GeoPoint,

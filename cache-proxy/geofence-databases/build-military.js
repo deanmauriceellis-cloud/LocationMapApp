@@ -7,6 +7,7 @@
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
+const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module build-military.js';
 
 /**
  * build-military.js — Download MIRTA/NTAD military base boundaries and build SQLite database.

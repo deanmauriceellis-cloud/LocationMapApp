@@ -9,6 +9,9 @@
 
 package com.example.locationmapapp.ui.menu
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MenuEventListener.kt"
+
 /**
  * MenuEventListener  — v1.5
  *
@@ -223,6 +226,16 @@ interface MenuEventListener {
 
     /** Open the user profile dialog. */
     fun onProfileRequested()
+
+    // =========================================================================
+    // TOOLBAR ACTIONS
+    // =========================================================================
+
+    /** Center map on current GPS location. */
+    fun onHomeRequested()
+
+    /** Show the About dialog with version and copyright info. */
+    fun onAboutRequested()
 
     // =========================================================================
     // SAFETY NET

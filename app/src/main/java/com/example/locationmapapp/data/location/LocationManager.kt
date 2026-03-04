@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module LocationManager.kt"
+
 /**
  * LocationManager — wraps the GMS FusedLocationProviderClient and exposes
  * a cold Kotlin Flow of [Location] updates.

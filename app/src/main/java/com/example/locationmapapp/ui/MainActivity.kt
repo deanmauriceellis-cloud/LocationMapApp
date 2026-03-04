@@ -60,6 +60,9 @@ import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.TilesOverlay
 import androidx.preference.PreferenceManager
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivity.kt"
+
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
@@ -314,13 +317,15 @@ class MainActivity : AppCompatActivity() {
             alertsIcon   = binding.root.findViewById(R.id.toolbarAlertsIcon),
             gridButton   = binding.root.findViewById(R.id.toolbarGridButton),
             statusLine   = binding.root.findViewById(R.id.toolbarStatusLine),
-            darkModeIcon = binding.root.findViewById(R.id.toolbarDarkModeIcon)
+            darkModeIcon = binding.root.findViewById(R.id.toolbarDarkModeIcon),
+            homeIcon     = binding.root.findViewById(R.id.toolbarHomeIcon),
+            aboutIcon    = binding.root.findViewById(R.id.toolbarAboutIcon)
         )
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
         statusLineManager = StatusLineManager(toolbarRefs.statusLine)
         favoritesManager = com.example.locationmapapp.util.FavoritesManager(this)
-        DebugLogger.i("MainActivity", "Slim toolbar wired — Weather, Alerts, Grid + StatusLine")
+        DebugLogger.i("MainActivity", "Slim toolbar wired — Weather, Home, Alerts, Grid, About + StatusLine")
 
         setupMap()
         buildFabSpeedDial()
@@ -8371,6 +8376,22 @@ class MainActivity : AppCompatActivity() {
             if (viewModel.isLoggedIn()) showProfileDialog() else showAuthDialog()
         }
 
+        // ── Toolbar actions ───────────────────────────────────────────────────
+
+        override fun onHomeRequested() {
+            resetIdleTimer()
+            DebugLogger.i("MainActivity", "onHomeRequested — centering on GPS")
+            viewModel.currentLocation.value?.point?.let { gps ->
+                binding.mapView.controller.animateTo(gps, 18.0, 800L)
+            } ?: toast("No GPS fix yet")
+        }
+
+        override fun onAboutRequested() {
+            resetIdleTimer()
+            DebugLogger.i("MainActivity", "onAboutRequested")
+            showAboutDialog()
+        }
+
         // ── Safety net ────────────────────────────────────────────────────────
 
         override fun onStubAction(featureId: String) {
@@ -8388,6 +8409,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    private fun showAboutDialog() {
+        val message = """
+            |LocationMapApp v1.5.55
+            |Copyright (c) 2026 Dean Maurice Ellis
+            |All rights reserved.
+            |
+            |Website: DestructiveAIGurus.com
+            |Email: Questions@DestructiveAIGurus.com
+            |
+            |This application is proprietary software.
+            |Unauthorized copying, modification, or
+            |distribution is strictly prohibited.
+        """.trimMargin()
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("About LocationMapApp")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .show()
+    }
 
     // =========================================================================
     // AUTH / SOCIAL DIALOGS

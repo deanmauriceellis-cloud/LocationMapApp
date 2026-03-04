@@ -6,6 +6,7 @@
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
+const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module server.js';
 
 const express = require('express');
 const crypto = require('crypto');

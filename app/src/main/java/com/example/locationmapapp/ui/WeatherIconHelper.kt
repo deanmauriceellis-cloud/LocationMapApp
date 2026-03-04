@@ -11,6 +11,9 @@ package com.example.locationmapapp.ui
 
 import com.example.locationmapapp.R
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WeatherIconHelper.kt"
+
 /**
  * WeatherIconHelper — maps NWS icon codes to vector drawable resources.
  *

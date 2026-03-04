@@ -24,6 +24,9 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MbtaRepository.kt"
+
 /**
  * MbtaRepository — fetches live vehicle positions from MBTA API v3.
  *

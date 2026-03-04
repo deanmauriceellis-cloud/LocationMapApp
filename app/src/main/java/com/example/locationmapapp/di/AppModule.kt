@@ -29,6 +29,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module AppModule.kt"
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {

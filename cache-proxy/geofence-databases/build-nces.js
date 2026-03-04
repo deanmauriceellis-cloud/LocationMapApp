@@ -7,6 +7,7 @@
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
+const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module build-nces.js';
 
 /**
  * build-nces.js — Download NCES public school locations and build SQLite database.

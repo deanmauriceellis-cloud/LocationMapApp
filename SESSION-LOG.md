@@ -2,6 +2,46 @@
 
 > Sessions prior to v1.5.35 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-03g (v1.5.55 — Module IDs + Home + About)
+
+### Context
+Three changes: (1) Add searchable MODULE_ID string to every source file for IP tracking, (2) Home toolbar icon to center on GPS, (3) About button with version/copyright/contact info.
+
+### Changes Made
+
+#### 1. MODULE_ID Constants (131 files)
+- **33 Kotlin files**: `@Suppress("unused") private const val MODULE_ID = "..."` after imports, before first class/object
+- **6 JavaScript files**: `const MODULE_ID = '...'` after copyright header (one per file, deduplicated after fixing multi-`*/` sed issue)
+- **6 Shell files**: `MODULE_ID="..."` after copyright block
+- **1 SQL file**: `-- MODULE_ID: ...` comment after copyright header
+- **85 XML files**: `Module: <filename>` line inside existing copyright comment (+ 2 new icon XMLs = 87 total with Module: lines)
+
+#### 2. Home Icon (toolbar)
+- `ic_home.xml`: 24dp white house vector (Material Design home path)
+- `toolbar_two_row.xml`: `toolbarHomeIcon` ImageView after Weather, before spacer
+- `MenuEventListener.kt`: added `onHomeRequested()`
+- `AppBarMenuManager.kt`: `setupSlimToolbar()` gains optional `homeIcon` param, wires click + white tint
+- `MainActivity.kt`: passes `homeIcon`, implements `onHomeRequested()` — `animateTo(gps, 18.0, 800L)`
+
+#### 3. About Icon (toolbar)
+- `ic_about.xml`: 24dp white info circle vector (Material Design info path)
+- `toolbar_two_row.xml`: `toolbarAboutIcon` ImageView after Grid button (far right)
+- `MenuEventListener.kt`: added `onAboutRequested()`
+- `AppBarMenuManager.kt`: `setupSlimToolbar()` gains optional `aboutIcon` param, wires click + white tint
+- `MainActivity.kt`: passes `aboutIcon`, implements `onAboutRequested()` → `showAboutDialog()` with AlertDialog
+
+#### 4. Bug Fix
+- **Duplicate MODULE_ID in JS files**: sed matched every `*/` in files (copyright + JSDoc), not just the copyright header. Fixed by deduplicating to keep only the first occurrence per file.
+
+### Build
+- `assembleDebug` passes (28s, one pre-existing deprecation warning)
+
+### On-Device Test
+- App launched on BlueStacks, toolbar shows all 7 icons correctly
+- ANR on startup (pre-existing: Overpass 504 timeout during silent fill) — app recovers after "Wait"
+
+---
+
 ## Session: 2026-03-03f (v1.5.53 — Filter and Map Mode)
 
 ### Context

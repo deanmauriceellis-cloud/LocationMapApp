@@ -33,6 +33,9 @@ import com.example.locationmapapp.ui.MainViewModel
 import com.example.locationmapapp.util.DebugLogger
 import com.google.android.material.slider.Slider
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module AppBarMenuManager.kt"
+
 /**
  * AppBarMenuManager  — v1.5
  *
@@ -100,7 +103,7 @@ class AppBarMenuManager(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // SLIM TOOLBAR — Weather + Alerts + Grid button
+    // SLIM TOOLBAR — Weather + Home + spacer + DarkMode + Alerts + Grid + About
     // ─────────────────────────────────────────────────────────────────────────
 
     data class SlimToolbarRefs(
@@ -111,15 +114,18 @@ class AppBarMenuManager(
     )
 
     /**
-     * Wire the three slim toolbar icons with click listeners.
-     * Weather → onWeatherRequested, Alerts → onAlertsRequested, Grid → showGridDropdown.
+     * Wire slim toolbar icons with click listeners.
+     * Weather → onWeatherRequested, Home → onHomeRequested, Alerts → onAlertsRequested,
+     * Grid → showGridDropdown, About → onAboutRequested.
      */
     fun setupSlimToolbar(
         weatherIcon: ImageView,
         alertsIcon: ImageView,
         gridButton: ImageView,
         statusLine: TextView,
-        darkModeIcon: ImageView? = null
+        darkModeIcon: ImageView? = null,
+        homeIcon: ImageView? = null,
+        aboutIcon: ImageView? = null
     ): SlimToolbarRefs {
         weatherIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
         alertsIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
@@ -127,6 +133,18 @@ class AppBarMenuManager(
         weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
         alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         gridButton.setOnClickListener { showGridDropdown(it) }
+
+        // Home icon — center on GPS
+        homeIcon?.let { icon ->
+            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            icon.setOnClickListener { menuEventListener.onHomeRequested() }
+        }
+
+        // About icon — show app info
+        aboutIcon?.let { icon ->
+            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            icon.setOnClickListener { menuEventListener.onAboutRequested() }
+        }
 
         // Dark mode toggle icon
         darkModeIcon?.let { icon ->
@@ -142,7 +160,7 @@ class AppBarMenuManager(
             }
         }
 
-        DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, DarkMode, Alerts, Grid)")
+        DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, Home, DarkMode, Alerts, Grid, About)")
         return SlimToolbarRefs(weatherIcon, alertsIcon, gridButton, statusLine)
     }
 

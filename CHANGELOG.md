@@ -2,6 +2,26 @@
 
 > Releases prior to v1.5.30 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.55] — 2026-03-03
+
+### Added
+- **MODULE_ID constants** — searchable `(C) Dean Maurice Ellis, 2026 - Module <filename>` in every source file (131 files: 33 Kotlin, 6 JS, 6 shell, 1 SQL, 85 XML)
+- **Home toolbar icon** — house icon (left of spacer) centers map on current GPS location at zoom 18 with 800ms animation; shows toast "No GPS fix yet" if unavailable
+- **About toolbar icon** — info circle icon (far right) shows AlertDialog with version (v1.5.55), copyright, website (DestructiveAIGurus.com), email (Questions@DestructiveAIGurus.com), proprietary notice
+- **`ic_home.xml`** — 24dp white house vector drawable (Material Design home)
+- **`ic_about.xml`** — 24dp white info circle vector drawable (Material Design info)
+- **`onHomeRequested()`** and **`onAboutRequested()`** in `MenuEventListener.kt`
+
+### Changed
+- **Toolbar layout** — now 7 icons: Weather | Home | spacer | DarkMode | Alerts | Grid | About
+- **`setupSlimToolbar()`** — added optional `homeIcon` and `aboutIcon` parameters
+- **`toolbar_two_row.xml`** — added `toolbarHomeIcon` and `toolbarAboutIcon` ImageViews
+
+## [1.5.54] — 2026-03-03
+
+### Added
+- **Copyright headers** on 131 source files + `IP.md` intellectual property register
+
 ## [1.5.53] — 2026-03-03
 
 ### Added

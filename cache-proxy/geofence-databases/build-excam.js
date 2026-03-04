@@ -7,6 +7,7 @@
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
+const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module build-excam.js';
 
 /**
  * build-excam.js — Download WzSabre speed/red-light camera data and build SQLite database.

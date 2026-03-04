@@ -17,6 +17,9 @@ import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugHttpServer.kt"
+
 /**
  * DebugHttpServer — embedded HTTP server for programmatic control via
  *   adb forward tcp:8085 tcp:8085 && curl localhost:8085/state

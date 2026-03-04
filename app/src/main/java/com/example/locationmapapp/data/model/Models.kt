@@ -11,6 +11,9 @@ package com.example.locationmapapp.data.model
 
 import org.osmdroid.util.GeoPoint
 
+@Suppress("unused")
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module Models.kt"
+
 data class PlaceResult(
     val id: String,
     val name: String,
