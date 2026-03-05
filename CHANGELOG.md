@@ -2,6 +2,37 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.62] — 2026-03-04
+
+### Added
+- **Web app Phase 2** — Find dialog, fuzzy search, and POI detail panel
+  - **Find panel**: slide-in 360px panel with search bar, 4-column category grid with count badges (10km radius), subtype drill-down, results list
+  - **Fuzzy search**: 1s debounced search via `/db/pois/search`, min 2 chars, AbortController cancellation
+  - **Category browse**: tap category → subtype grid (or direct results if no subtypes), "Browse All" option
+  - **Results list**: distance (ft/mi) + category color dot + bold name + detail line (cuisine/brand) + category label
+  - **Filter and Map**: button at top of results, shows only matching POIs with forced labels, teal status bar "click to clear"
+  - **POI detail panel**: category color bar, info rows (distance, type, cuisine, address, phone, hours), async website resolution
+  - **Action buttons**: Directions (Google Maps), Call (tel: link), Map (fly to zoom 18), Share (Web Share API)
+  - **POI marker click**: tap any marker on map → opens detail panel with haversine distance
+  - **Toolbar Find button**: magnifying glass icon with teal active highlight
+  - **Category utilities**: `resolveCategory()` handles both ID and tag-string formats, count aggregation from tag→category
+
+### Files Created (5)
+- `web/src/lib/distance.ts` — `haversineM()` + `formatDistance()` (ft/mi)
+- `web/src/hooks/useFind.ts` — search, findByCategory, loadCounts, fetchWebsite, fetchPoiDetail
+- `web/src/components/Find/FindPanel.tsx` — search + category grid + subtype grid + results + Filter and Map
+- `web/src/components/Find/ResultsList.tsx` — shared result rows with distance + color dot + category
+- `web/src/components/Find/PoiDetailPanel.tsx` — detail panel with info rows + website + action buttons
+
+### Files Modified (7)
+- `web/src/lib/types.ts` — added FindResult, WebsiteInfo, PoiDetailResponse interfaces; id types widened to `string | number`
+- `web/src/config/categories.ts` — added `resolveCategory()`, `getCategoryByTag()`, `getCategoryTags()`, `getSubtypeTags()`
+- `web/src/components/Layout/Toolbar.tsx` — Find button with active highlight
+- `web/src/components/Layout/StatusBar.tsx` — filter mode: teal bar with count + label + click to clear
+- `web/src/components/Map/PoiMarkerLayer.tsx` — click handlers + filter mode (forced labels, filtered markers only)
+- `web/src/components/Map/MapView.tsx` — passes through filterResults + onPoiClick props
+- `web/src/App.tsx` — full orchestration: findOpen, selectedResult, filterResults state; Find/Detail mutual exclusion
+
 ## [1.5.61] — 2026-03-04
 
 ### Added

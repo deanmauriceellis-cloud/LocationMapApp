@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 62 (Proxy Heap Reduction — 643MB → 208MB)
+## Last Updated: 2026-03-04 Session 63 (Web App Phase 2 — Find + Search + POI Detail)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -293,22 +293,27 @@
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 
-### Web App (Phase 1 — Map + POI markers + dark mode)
+### Web App (Phases 1-2 — Map + Find + Search + POI Detail)
 - `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite
 - `web/vite.config.ts` — dev proxy `/api` → `localhost:3000`, `@/` path alias
 - `web/src/main.tsx` — React root entry point
-- `web/src/App.tsx` — top-level layout: Toolbar + Map + StatusBar
+- `web/src/App.tsx` — top-level orchestration: Find/Detail panels, filter mode, marker click → detail
 - `web/src/config/api.ts` — typed `apiFetch<T>()` wrapper, `VITE_API_URL` env var
-- `web/src/config/categories.ts` — all 17 POI categories (colors, tag matches, 153 subtypes), `classifyPoi()`
-- `web/src/lib/types.ts` — POI, BboxParams, Category, Subtype TypeScript types
+- `web/src/config/categories.ts` — 17 POI categories, `classifyPoi()`, `resolveCategory()`, `getCategoryByTag/Tags/SubtypeTags()`
+- `web/src/lib/types.ts` — POI, FindResult, WebsiteInfo, PoiDetailResponse + shared interfaces
+- `web/src/lib/distance.ts` — `haversineM()` + `formatDistance()` (ft/mi formatting)
 - `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback
 - `web/src/hooks/usePois.ts` — debounced (300ms) `/pois/bbox` fetch + `/pois/stats` total count
 - `web/src/hooks/useDarkMode.ts` — localStorage-persisted dark mode toggle
-- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + light/dark TileLayer + bounds watcher
-- `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, labels at zoom >= 16
+- `web/src/hooks/useFind.ts` — search (1s debounce), findByCategory, loadCounts, fetchWebsite, fetchPoiDetail
+- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + light/dark TileLayer + bounds watcher + filter/click passthrough
+- `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, click handlers, filter mode (forced labels)
 - `web/src/components/Map/MapControls.tsx` — zoom +/- buttons + geolocation button
-- `web/src/components/Layout/Toolbar.tsx` — top bar with app name + dark mode toggle
-- `web/src/components/Layout/StatusBar.tsx` — bottom bar: coordinates + POI count + total
+- `web/src/components/Layout/Toolbar.tsx` — top bar: app name + Find button (magnifying glass, active highlight) + dark mode
+- `web/src/components/Layout/StatusBar.tsx` — bottom bar: coords + counts, or teal filter bar ("Showing N results — click to clear")
+- `web/src/components/Find/FindPanel.tsx` — slide-in panel: search bar, 4-col category grid with count badges, subtype grid, results, Filter and Map
+- `web/src/components/Find/ResultsList.tsx` — shared result rows: distance + color dot + name + detail + category label
+- `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share)
 
 ### Cache Proxy (decomposed into 19 modules)
 - `cache-proxy/server.js` — Express bootstrap, middleware, CORS, module loader (167 lines)
@@ -498,8 +503,8 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
-- **Web app Phase 2**: Find dialog + fuzzy search + POI detail panel (see `WEB-APP-PLAN.md`)
-- **Web app Phase 3-8**: Weather, aircraft/transit, auth/chat, favorites/SEO, PWA, monetization
+- **Web app Phase 3**: Weather overlay — current conditions panel, METAR markers, radar tiles (see `WEB-APP-PLAN.md`)
+- **Web app Phase 4-8**: Aircraft/transit, auth/chat, favorites/SEO, PWA, monetization
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)

@@ -352,3 +352,36 @@ export function getCategoryById(id: string): Category | undefined {
 }
 
 export const UNCATEGORIZED_COLOR = '#9E9E9E'
+
+/** Resolve a category from either an ID ("FOOD_DRINK") or a tag string ("amenity=restaurant") */
+export function resolveCategory(cat: string): Category | null {
+  return categoryMap.get(cat) || getCategoryByTag(cat)
+}
+
+/** Look up category by a "key=value" tag string, e.g. "amenity=restaurant" */
+export function getCategoryByTag(tag: string): Category | null {
+  const [key, value] = tag.split('=', 2)
+  if (!key || !value) return null
+  for (const cat of CATEGORIES) {
+    for (const tm of cat.tagMatches) {
+      if (tm.key === key && tm.values.includes(value)) return cat
+    }
+  }
+  return null
+}
+
+/** Get all "key=value" tag strings for a category */
+export function getCategoryTags(categoryId: string): string[] {
+  const cat = categoryMap.get(categoryId)
+  if (!cat) return []
+  const tags: string[] = []
+  for (const tm of cat.tagMatches) {
+    for (const v of tm.values) tags.push(`${tm.key}=${v}`)
+  }
+  return tags
+}
+
+/** Get "key=value" tag strings for a specific subtype */
+export function getSubtypeTags(subtype: { tags: Record<string, string> }): string[] {
+  return Object.entries(subtype.tags).map(([k, v]) => `${k}=${v}`)
+}

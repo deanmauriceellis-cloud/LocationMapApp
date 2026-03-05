@@ -2,6 +2,42 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04j (v1.5.62 — Web App Phase 2: Find + Search + POI Detail)
+
+### Context
+Phase 2 of web app: add Find dialog, fuzzy search, and POI detail panel. All proxy API endpoints already working with CORS.
+
+### Changes Made
+
+#### New Files (5)
+- `web/src/lib/distance.ts` — haversine distance calculation + imperial formatting (ft/mi)
+- `web/src/hooks/useFind.ts` — API hook: search (1s debounce, AbortController), findByCategory, loadCounts, fetchWebsite, fetchPoiDetail; aggregates tag-string counts into category-level counts
+- `web/src/components/Find/FindPanel.tsx` — slide-in panel (360px, 85vw mobile): search bar, 4-col category grid with count badges, subtype drill-down, results list, "Filter and Map" button, back navigation state machine
+- `web/src/components/Find/ResultsList.tsx` — shared result row component: formatted distance + category color dot + bold name + detail line + category label
+- `web/src/components/Find/PoiDetailPanel.tsx` — POI detail: category color bar header, info rows (distance/type/cuisine/address/phone/hours), async website resolution ("Find Website" button), action buttons (Directions/Call/Map/Share)
+
+#### Modified Files (7)
+- `web/src/lib/types.ts` — added FindResult, WebsiteInfo, PoiDetailResponse; widened id types to `string | number`
+- `web/src/config/categories.ts` — added `resolveCategory()`, `getCategoryByTag()`, `getCategoryTags()`, `getSubtypeTags()`
+- `web/src/components/Layout/Toolbar.tsx` — added Find (magnifying glass) button with teal active highlight
+- `web/src/components/Layout/StatusBar.tsx` — filter mode: teal bar "Showing N results for X — click to clear"
+- `web/src/components/Map/PoiMarkerLayer.tsx` — click handlers on markers, filter mode (forced labels, filtered markers only)
+- `web/src/components/Map/MapView.tsx` — forwards filterResults + onPoiClick to PoiMarkerLayer
+- `web/src/App.tsx` — full orchestration: Find/Detail mutual exclusion, filter mode, marker click → detail, fitBounds on Filter and Map
+
+### Bug Fixes During Implementation
+- Proxy returns `elements` not `results`, `category_hint` not `hint` — fixed response field mapping in useFind
+- Proxy returns tag-string categories (`"amenity=cafe"`) not category IDs (`"FOOD_DRINK"`) — added `resolveCategory()` + count aggregation
+- Proxy returns string IDs — widened TypeScript types to `string | number`
+
+### Verification
+- `npm run build` — clean, 0 TypeScript errors, 385KB / 117KB gzip
+- Search "restaurant" returns results with distances and categories
+- Category grid shows counts, subtypes drill down works
+- POI marker click opens detail panel
+
+---
+
 ## Session: 2026-03-04i (v1.5.61 — Web App Phase 1)
 
 ### Context

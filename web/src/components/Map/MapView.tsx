@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import { PoiMarkerLayer } from './PoiMarkerLayer'
 import { MapControls } from './MapControls'
-import type { POI, BboxParams } from '@/lib/types'
+import type { POI, BboxParams, FindResult } from '@/lib/types'
 
 const LIGHT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -17,6 +17,8 @@ interface Props {
   onBoundsChange: (bbox: BboxParams) => void
   onLocate: () => void
   mapRef: React.MutableRefObject<LeafletMap | null>
+  filterResults?: FindResult[] | null
+  onPoiClick?: (poi: POI) => void
 }
 
 function BoundsWatcher({ onBoundsChange }: { onBoundsChange: (bbox: BboxParams) => void }) {
@@ -43,7 +45,7 @@ function MapRefSetter({ mapRef }: { mapRef: React.MutableRefObject<LeafletMap | 
   return null
 }
 
-export function MapView({ center, dark, pois, onBoundsChange, onLocate, mapRef }: Props) {
+export function MapView({ center, dark, pois, onBoundsChange, onLocate, mapRef, filterResults, onPoiClick }: Props) {
   return (
     <MapContainer
       center={center}
@@ -59,7 +61,7 @@ export function MapView({ center, dark, pois, onBoundsChange, onLocate, mapRef }
         maxZoom={19}
       />
       <BoundsWatcher onBoundsChange={onBoundsChange} />
-      <PoiMarkerLayer pois={pois} />
+      <PoiMarkerLayer pois={pois} filterResults={filterResults} onPoiClick={onPoiClick} />
       <MapControls onLocate={onLocate} />
     </MapContainer>
   )
