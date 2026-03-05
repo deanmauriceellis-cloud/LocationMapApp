@@ -17,3 +17,5 @@ poi-cache.json
 scan-cells.json
 overnight-runs/
 cache-proxy/geofence-databases/*.db
+web/node_modules/
+web/dist/

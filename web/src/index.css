@@ -1,0 +1,44 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.leaflet-container {
+  font-family: inherit;
+}
+
+.poi-label {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  padding: 1px 6px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  border-radius: 3px !important;
+}
+
+.poi-label::before {
+  display: none !important;
+}
+
+.dark .poi-label {
+  background: rgba(30, 30, 30, 0.9) !important;
+  color: #e5e7eb !important;
+}
+
+.dark .leaflet-control-attribution {
+  background: rgba(17, 24, 39, 0.8) !important;
+  color: #9ca3af !important;
+}
+
+.dark .leaflet-control-attribution a {
+  color: #60a5fa !important;
+}

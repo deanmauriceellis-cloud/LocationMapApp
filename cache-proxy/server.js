@@ -13,7 +13,9 @@ const { Pool } = require('pg');
 const http = require('http');
 const { Server: SocketServer } = require('socket.io');
 
+const cors = require('cors');
 const app = express();
+app.use(cors({ origin: true, credentials: true }));
 const server = http.createServer(app);
 const io = new SocketServer(server, { cors: { origin: '*' } });
 const PORT = 3000;

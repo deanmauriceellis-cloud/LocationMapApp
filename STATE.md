@@ -4,9 +4,10 @@
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
-- **Cache proxy** (Node.js/Express on port 3000) — transparent caching layer between app and external APIs
+- **Web app** (React 19, TypeScript, Vite, Leaflet/react-leaflet, Tailwind CSS) — cross-platform frontend at `web/`
+- **Cache proxy** (Node.js/Express on port 3000) — transparent caching layer, CORS-enabled for web app
 - **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs and aircraft sightings
-- **Split**: App → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
+- **Split**: App/Web → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
@@ -292,8 +293,25 @@
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 
+### Web App (Phase 1 — Map + POI markers + dark mode)
+- `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite
+- `web/vite.config.ts` — dev proxy `/api` → `localhost:3000`, `@/` path alias
+- `web/src/main.tsx` — React root entry point
+- `web/src/App.tsx` — top-level layout: Toolbar + Map + StatusBar
+- `web/src/config/api.ts` — typed `apiFetch<T>()` wrapper, `VITE_API_URL` env var
+- `web/src/config/categories.ts` — all 17 POI categories (colors, tag matches, 153 subtypes), `classifyPoi()`
+- `web/src/lib/types.ts` — POI, BboxParams, Category, Subtype TypeScript types
+- `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback
+- `web/src/hooks/usePois.ts` — debounced (300ms) `/pois/bbox` fetch + `/pois/stats` total count
+- `web/src/hooks/useDarkMode.ts` — localStorage-persisted dark mode toggle
+- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + light/dark TileLayer + bounds watcher
+- `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, labels at zoom >= 16
+- `web/src/components/Map/MapControls.tsx` — zoom +/- buttons + geolocation button
+- `web/src/components/Layout/Toolbar.tsx` — top bar with app name + dark mode toggle
+- `web/src/components/Layout/StatusBar.tsx` — bottom bar: coordinates + POI count + total
+
 ### Cache Proxy (decomposed into 19 modules)
-- `cache-proxy/server.js` — Express bootstrap, middleware, module loader (164 lines)
+- `cache-proxy/server.js` — Express bootstrap, middleware, CORS, module loader (167 lines)
 - `cache-proxy/lib/config.js` — environment vars, constants
 - `cache-proxy/lib/cache.js` — file-based cache engine with LRU eviction + import buffer
 - `cache-proxy/lib/opensky.js` — OpenSky OAuth2 token management
@@ -480,6 +498,8 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
+- **Web app Phase 2**: Find dialog + fuzzy search + POI detail panel (see `WEB-APP-PLAN.md`)
+- **Web app Phase 3-8**: Weather, aircraft/transit, auth/chat, favorites/SEO, PWA, monetization
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)

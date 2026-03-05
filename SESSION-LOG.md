@@ -2,6 +2,55 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-04i (v1.5.61 — Web App Phase 1)
+
+### Context
+Build a cross-platform web frontend to consume the existing proxy API (54+ endpoints). Zero backend rewrite — just a new React frontend at `web/` alongside `app/` and `cache-proxy/`.
+
+### Changes Made
+
+#### Proxy: CORS Middleware (2 lines + 1 dep)
+- Added `cors ^2.8.5` to `cache-proxy/package.json`
+- Added `const cors = require('cors'); app.use(cors({ origin: true, credentials: true }))` to `server.js`
+- Verified: `Access-Control-Allow-Origin` header present on all responses
+
+#### Web App: Foundation + Map + POI Markers + Dark Mode
+- **20 files** created in `web/` directory
+- **Tech stack**: React 19, TypeScript (strict), Vite 6, react-leaflet 5, Tailwind CSS 3, PostCSS
+- **Map**: react-leaflet MapContainer with OpenStreetMap light tiles + CartoDB Dark Matter dark tiles
+- **POI markers**: colored CircleMarkers using `classifyPoi()` — all 17 categories with exact Android hex colors
+- **Labels**: zoom >= 16 shows `tags.name` as permanent Leaflet Tooltips (same threshold as Android)
+- **Dark mode**: toggle in toolbar, persisted to localStorage, switches tile layer + UI theme
+- **Geolocation**: browser Geolocation API, falls back to Boston (42.36, -71.06)
+- **Data loading**: debounced 300ms `/pois/bbox` fetch on viewport change, `/pois/stats` for total count
+- **Layout**: 12px toolbar (app name + dark mode) + full-height map + 8px status bar (coords + counts)
+- **Controls**: zoom +/- buttons + locate button (bottom-right, z-index 1000)
+- **Build**: TypeScript clean (0 errors), Vite production build passes (368KB JS / 112KB gzipped)
+
+### Files Created (20)
+```
+web/package.json, tsconfig.json, vite.config.ts, tailwind.config.ts, postcss.config.js
+web/index.html, .env.development, public/favicon.svg, public/manifest.json
+web/src/main.tsx, App.tsx, index.css, vite-env.d.ts
+web/src/config/api.ts, categories.ts
+web/src/lib/types.ts
+web/src/hooks/useGeolocation.ts, usePois.ts, useDarkMode.ts
+web/src/components/Map/MapView.tsx, PoiMarkerLayer.tsx, MapControls.tsx
+web/src/components/Layout/Toolbar.tsx, StatusBar.tsx
+```
+
+### Files Modified (2)
+- `cache-proxy/server.js` — CORS middleware
+- `cache-proxy/package.json` — cors dependency
+
+### Verification
+- `npx tsc --noEmit` — 0 errors
+- `npx vite build` — clean, no warnings
+- `npm run dev` → http://localhost:5173 — Vite dev server starts in 346ms
+- `curl -I -H "Origin: http://localhost:5173" http://10.0.0.4:3000/pois/stats` — CORS headers present
+
+---
+
 ## Session: 2026-03-04h (v1.5.60 — Proxy Heap Reduction)
 
 ### Context

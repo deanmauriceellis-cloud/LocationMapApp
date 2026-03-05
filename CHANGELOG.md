@@ -2,6 +2,38 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.61] — 2026-03-04
+
+### Added
+- **Web application** (Phase 1) — React 19 + TypeScript + Vite + Leaflet frontend consuming existing proxy API
+  - Interactive map with OpenStreetMap (light) and CartoDB Dark Matter (dark) tile layers
+  - POI markers from `/pois/bbox` with all 17 category colors matching Android app
+  - Zoom >= 16 shows POI name labels (same threshold as Android)
+  - Dark mode toggle persisted to localStorage
+  - Browser geolocation with Boston fallback
+  - Debounced (300ms) viewport-based POI loading
+  - Status bar: coordinates + viewport POI count + total DB count
+  - Toolbar: app name + dark mode toggle
+  - Zoom/locate controls
+  - Full POI category classification system (`classifyPoi()`) ported from `PoiCategories.kt`
+  - TypeScript strict mode, zero compilation errors
+  - Vite production build: 368KB JS (112KB gzipped)
+- **CORS middleware** on cache proxy — `cors({ origin: true, credentials: true })` enables web app cross-origin requests
+  - New dependency: `cors ^2.8.5`
+
+### Files Created (20 web app files)
+- `web/package.json`, `web/tsconfig.json`, `web/vite.config.ts`, `web/tailwind.config.ts`, `web/postcss.config.js`
+- `web/index.html`, `web/.env.development`, `web/public/favicon.svg`, `web/public/manifest.json`
+- `web/src/main.tsx`, `web/src/App.tsx`, `web/src/index.css`, `web/src/vite-env.d.ts`
+- `web/src/config/api.ts`, `web/src/config/categories.ts`, `web/src/lib/types.ts`
+- `web/src/hooks/useGeolocation.ts`, `web/src/hooks/usePois.ts`, `web/src/hooks/useDarkMode.ts`
+- `web/src/components/Map/MapView.tsx`, `web/src/components/Map/PoiMarkerLayer.tsx`, `web/src/components/Map/MapControls.tsx`
+- `web/src/components/Layout/Toolbar.tsx`, `web/src/components/Layout/StatusBar.tsx`
+
+### Files Modified (2 proxy files)
+- `cache-proxy/server.js` — added `cors` require + middleware
+- `cache-proxy/package.json` — added `cors ^2.8.5` dependency
+
 ## [1.5.60] — 2026-03-04
 
 ### Changed
