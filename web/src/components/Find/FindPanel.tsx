@@ -22,6 +22,9 @@ interface Props {
   onSelectResult: (result: FindResult) => void
   onFilterAndMap: (results: FindResult[], label: string) => void
   onClose: () => void
+  favoriteCount?: number
+  favoriteResults?: FindResult[] | null
+  onShowFavorites?: () => void
 }
 
 export function FindPanel({
@@ -31,6 +34,7 @@ export function FindPanel({
   onSearch, onClearSearch, onLoadCounts,
   onFindByCategory, onSelectResult, onFilterAndMap,
   onClose,
+  favoriteCount, favoriteResults, onShowFavorites,
 }: Props) {
   const [view, setView] = useState<View>('categories')
   const [query, setQuery] = useState('')
@@ -59,6 +63,15 @@ export function FindPanel({
       setBrowseResults([])
     }
   }, [searchResults, searchLoading])
+
+  // Switch to results view when favorites are loaded externally
+  useEffect(() => {
+    if (favoriteResults && favoriteResults.length > 0) {
+      setBrowseResults(favoriteResults)
+      setBrowseLabel('Favorites')
+      setView('results')
+    }
+  }, [favoriteResults])
 
   const handleQueryChange = (val: string) => {
     setQuery(val)
@@ -190,6 +203,19 @@ export function FindPanel({
               {countsTotal > 0 ? `${countsTotal.toLocaleString()} places within 10 km` : 'Loading...'}
             </div>
             <div className="grid grid-cols-4 gap-2">
+              {onShowFavorites && (
+                <button
+                  onClick={onShowFavorites}
+                  className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold bg-amber-500">
+                    {(favoriteCount || 0) > 99 ? '99+' : favoriteCount || '-'}
+                  </span>
+                  <span className="text-[10px] text-center text-gray-700 dark:text-gray-300 leading-tight">
+                    Favorites
+                  </span>
+                </button>
+              )}
               {CATEGORIES.map((cat) => {
                 const count = categoryCounts[cat.id] || 0
                 return (

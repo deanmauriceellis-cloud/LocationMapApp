@@ -23,12 +23,16 @@ import { useTransit } from '@/hooks/useTransit'
 import { useAuth } from '@/hooks/useAuth'
 import { useComments } from '@/hooks/useComments'
 import { useChat } from '@/hooks/useChat'
+import { useFavorites } from '@/hooks/useFavorites'
+import { useUrlState, parseUrlState } from '@/hooks/useUrlState'
 import { classifyPoi } from '@/config/categories'
 import { haversineM } from '@/lib/distance'
-import type { BboxParams, POI, FindResult, AircraftState, MbtaVehicle, MbtaStop } from '@/lib/types'
+import type { BboxParams, POI, FindResult, FavoriteEntry, AircraftState, MbtaVehicle, MbtaStop } from '@/lib/types'
 
 // Which detail panel is showing (mutual exclusion)
 type DetailView = 'none' | 'poi' | 'aircraft' | 'vehicle' | 'arrivals'
+
+const urlInit = parseUrlState()
 
 export default function App() {
   const geo = useGeolocation()
@@ -41,9 +45,15 @@ export default function App() {
   const auth = useAuth()
   const comments = useComments()
   const chat = useChat()
+  const favs = useFavorites()
+  const urlState = useUrlState()
   const mapRef = useRef<LeafletMap | null>(null)
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(
+    urlInit.lat != null && urlInit.lon != null ? [urlInit.lat, urlInit.lon] : null
+  )
+  const [initialZoom] = useState(urlInit.z)
   const lastBbox = useRef<BboxParams | null>(null)
+  const [favoriteResults, setFavoriteResults] = useState<FindResult[] | null>(null)
 
   const [findOpen, setFindOpen] = useState(false)
   const [weatherOpen, setWeatherOpen] = useState(false)
@@ -74,10 +84,12 @@ export default function App() {
     const lat = (bbox.s + bbox.n) / 2
     const lon = (bbox.w + bbox.e) / 2
     setMapCenter([lat, lon])
+    const zoom = mapRef.current?.getZoom() ?? 14
+    urlState.updateMapPosition(lat, lon, zoom)
     if (metarsVisibleRef.current) wx.fetchMetars(bbox)
     if (acVisibleRef.current) ac.fetchAircraft(bbox)
     if (busesVisibleRef.current) fetchBusStopsRef.current(bbox)
-  }, [fetchPois, wx.fetchMetars, ac.fetchAircraft])
+  }, [fetchPois, wx.fetchMetars, ac.fetchAircraft, urlState.updateMapPosition])
 
   // Auto-refresh aircraft when visible
   useEffect(() => {
@@ -134,6 +146,35 @@ export default function App() {
     }
   }, [auth.isLoggedIn, authDialogOpen])
 
+  // On mount: if URL has poi param, fetch and open detail
+  useEffect(() => {
+    if (urlInit.poiType && urlInit.poiId) {
+      find.fetchPoiDetail(urlInit.poiType, urlInit.poiId).then(poi => {
+        if (poi) {
+          const dist = mapCenter
+            ? haversineM(mapCenter[0], mapCenter[1], poi.lat, poi.lon)
+            : 0
+          const result: FindResult = {
+            type: poi.type,
+            id: poi.id,
+            lat: poi.lat,
+            lon: poi.lon,
+            name: poi.name,
+            category: poi.category,
+            distance_m: dist,
+            tags: poi.tags || {},
+          }
+          setSelectedResult(result)
+          setDetailView('poi')
+          comments.loadComments(poi.type, poi.id)
+          if (mapRef.current) {
+            mapRef.current.setView([poi.lat, poi.lon], mapRef.current.getZoom() < 16 ? 18 : undefined)
+          }
+        }
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleLocate = useCallback(() => {
     geo.locate().then(({ lat, lon }) => {
       mapRef.current?.setView([lat, lon], 14)
@@ -152,21 +193,54 @@ export default function App() {
     geo.setHome(c[0], c[1])
   }, [mapCenter, geo.lat, geo.lon, geo.setHome])
 
+  const handleToggleFavorite = useCallback(() => {
+    if (!selectedResult) return
+    const entry: FavoriteEntry = {
+      osm_type: selectedResult.type,
+      osm_id: selectedResult.id,
+      name: selectedResult.name,
+      lat: selectedResult.lat,
+      lon: selectedResult.lon,
+      category: selectedResult.category,
+      addedAt: Date.now(),
+    }
+    favs.toggleFavorite(entry)
+  }, [selectedResult, favs.toggleFavorite])
+
+  const handleShowFavorites = useCallback(() => {
+    if (favs.favorites.length === 0) return
+    const c = mapCenter || [geo.lat, geo.lon]
+    const results: FindResult[] = favs.favorites.map(f => ({
+      type: f.osm_type,
+      id: f.osm_id,
+      lat: f.lat,
+      lon: f.lon,
+      name: f.name,
+      category: f.category,
+      distance_m: haversineM(c[0], c[1], f.lat, f.lon),
+      tags: {},
+    }))
+    results.sort((a, b) => a.distance_m - b.distance_m)
+    setFavoriteResults(results)
+  }, [favs.favorites, mapCenter, geo.lat, geo.lon])
+
   const handleToggleFind = useCallback(() => {
     setFindOpen(prev => {
       if (!prev) {
         setDetailView('none')
         setSelectedResult(null)
+        setFavoriteResults(null)
         ac.clearSelection()
         tr.clearSelection()
         comments.clearComments()
+        urlState.clearPoiParam()
         setWeatherOpen(false)
         setChatOpen(false)
         wx.stopAutoRefresh()
       }
       return !prev
     })
-  }, [wx.stopAutoRefresh, ac.clearSelection, tr.clearSelection, comments.clearComments])
+  }, [wx.stopAutoRefresh, ac.clearSelection, tr.clearSelection, comments.clearComments, urlState.clearPoiParam])
 
   const handleToggleWeather = useCallback(() => {
     setWeatherOpen(prev => {
@@ -239,13 +313,15 @@ export default function App() {
     setSelectedResult(result)
     setDetailView('poi')
     setFindOpen(false)
+    setFavoriteResults(null)
     ac.clearSelection()
     tr.clearSelection()
     comments.loadComments(result.type, result.id)
+    urlState.setPoiParam(result.type, result.id)
     if (mapRef.current) {
       mapRef.current.setView([result.lat, result.lon], 18)
     }
-  }, [ac.clearSelection, tr.clearSelection, comments.loadComments])
+  }, [ac.clearSelection, tr.clearSelection, comments.loadComments, urlState.setPoiParam])
 
   const handleFilterAndMap = useCallback((results: FindResult[], label: string) => {
     setFilterResults(results)
@@ -288,7 +364,8 @@ export default function App() {
     ac.clearSelection()
     tr.clearSelection()
     comments.loadComments(osmType, osmId)
-  }, [center, ac.clearSelection, tr.clearSelection, comments.loadComments])
+    urlState.setPoiParam(osmType, osmId)
+  }, [center, ac.clearSelection, tr.clearSelection, comments.loadComments, urlState.setPoiParam])
 
   const handleAircraftClick = useCallback((aircraft: AircraftState) => {
     ac.selectAircraft(aircraft)
@@ -296,7 +373,8 @@ export default function App() {
     setSelectedResult(null)
     tr.clearSelection()
     setFindOpen(false)
-  }, [ac.selectAircraft, tr.clearSelection])
+    urlState.clearPoiParam()
+  }, [ac.selectAircraft, tr.clearSelection, urlState.clearPoiParam])
 
   const handleVehicleClick = useCallback((v: MbtaVehicle) => {
     tr.selectVehicle(v)
@@ -304,7 +382,8 @@ export default function App() {
     setSelectedResult(null)
     ac.clearSelection()
     setFindOpen(false)
-  }, [tr.selectVehicle, ac.clearSelection])
+    urlState.clearPoiParam()
+  }, [tr.selectVehicle, ac.clearSelection, urlState.clearPoiParam])
 
   const handleStopClick = useCallback((s: MbtaStop) => {
     tr.selectStop(s)
@@ -313,7 +392,8 @@ export default function App() {
     setSelectedResult(null)
     ac.clearSelection()
     setFindOpen(false)
-  }, [tr.selectStop, ac.clearSelection])
+    urlState.clearPoiParam()
+  }, [tr.selectStop, ac.clearSelection, urlState.clearPoiParam])
 
   const handleCloseDetail = useCallback(() => {
     setDetailView('none')
@@ -321,7 +401,8 @@ export default function App() {
     ac.clearSelection()
     tr.clearSelection()
     comments.clearComments()
-  }, [ac.clearSelection, tr.clearSelection, comments.clearComments])
+    urlState.clearPoiParam()
+  }, [ac.clearSelection, tr.clearSelection, comments.clearComments, urlState.clearPoiParam])
 
   const handleFlyTo = useCallback((lat: number, lon: number) => {
     if (mapRef.current) {
@@ -399,6 +480,7 @@ export default function App() {
           onStopClick={handleStopClick}
           onLongPress={handleLongPress}
           hasHome={geo.hasHome}
+          zoom={initialZoom}
         />
       </div>
 
@@ -419,6 +501,9 @@ export default function App() {
         onSelectResult={handleSelectResult}
         onFilterAndMap={handleFilterAndMap}
         onClose={handleToggleFind}
+        favoriteCount={favs.count}
+        favoriteResults={favoriteResults}
+        onShowFavorites={handleShowFavorites}
       />
 
       {/* Weather panel */}
@@ -461,6 +546,8 @@ export default function App() {
           onVoteComment={comments.voteOnComment}
           onDeleteComment={comments.deleteComment}
           onLoginRequired={handleLoginRequired}
+          isFavorite={favs.isFavorite(selectedResult.type, selectedResult.id)}
+          onToggleFavorite={handleToggleFavorite}
         />
       )}
 

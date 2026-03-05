@@ -38,6 +38,16 @@ export interface PoiStats {
   byCategory?: Record<string, number>
 }
 
+export interface FavoriteEntry {
+  osm_type: string
+  osm_id: number | string
+  name: string
+  lat: number
+  lon: number
+  category: string
+  addedAt: number
+}
+
 export interface FindResult {
   type: string
   id: number | string

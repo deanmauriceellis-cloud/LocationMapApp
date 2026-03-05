@@ -49,6 +49,7 @@ interface Props {
   onStopClick?: (s: MbtaStop) => void
   onLongPress?: (lat: number, lon: number) => void
   hasHome?: boolean
+  zoom?: number
 }
 
 function BoundsWatcher({ onBoundsChange }: { onBoundsChange: (bbox: BboxParams) => void }) {
@@ -112,12 +113,12 @@ export function MapView({
   metars, metarsVisible, radarOn, radarAnimating,
   aircraft, aircraftVisible, flightPath, onAircraftClick,
   trains, subway, buses, stations, busStops, trainsVisible, subwayVisible, busesVisible, selectedVehicleId, onVehicleClick, onStopClick,
-  onLongPress, hasHome,
+  onLongPress, hasHome, zoom,
 }: Props) {
   return (
     <MapContainer
       center={center}
-      zoom={14}
+      zoom={zoom ?? 14}
       className="h-full w-full"
       zoomControl={false}
     >

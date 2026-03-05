@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-05 Session 67 (Web App — Long-Press + Home Location)
+## Last Updated: 2026-03-05 Session 68 (Web App Phase 6 — Favorites + URL Routing)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -22,7 +22,7 @@
 - **NWS NEXRAD radar** tiles (Iowa State Mesonet) + animated radar (7-frame 35-min loop), default 35% opacity
 - **Dark mode** (v1.5.44): toolbar moon icon toggles between MAPNIK and CartoDB Dark Matter tiles, persisted
 - **Share POI** (v1.5.44): 5th action button in POI detail dialog, shares name/address/phone/hours + Google Maps link
-- **Favorites** (v1.5.44): star icon in POI detail dialog, SharedPreferences+JSON storage, dedicated Favorites cell in Find dialog
+- **Favorites** (v1.5.44, web v1.5.68): star icon in POI detail dialog, SharedPreferences+JSON storage (Android) / localStorage (web), dedicated Favorites cell in Find dialog/panel
 - **Smart fuzzy search** (v1.5.51): pg_trgm similarity + keyword→category hints in Find dialog search bar
   - Typo-tolerant: "Starbcks" finds Starbucks, "Dunkin Donts" finds Dunkin' Donuts
   - ~110 keyword→category mappings: "historic" → Tourism & History, "gas" → Fuel & Charging, "tattoo" → Shopping, etc.
@@ -293,17 +293,17 @@
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 
-### Web App (Phases 1-5 — Map + Find + Weather + Aircraft + Transit + Social)
+### Web App (Phases 1-6 — Map + Find + Weather + Aircraft + Transit + Social + Favorites/URL)
 - `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite, socket.io-client
 - `web/vite.config.ts` — dev server binds `0.0.0.0:5173` (LAN-accessible), proxy `/api` → `localhost:3000`, `@/` path alias
 - `web/src/main.tsx` — React root entry point
-- `web/src/App.tsx` — top-level orchestration: Find/Detail/Weather/Aircraft/Transit/Chat panels, layer toggles, auth state, detail panel mutual exclusion, vehicle/aircraft follow
+- `web/src/App.tsx` — top-level orchestration: Find/Detail/Weather/Aircraft/Transit/Chat panels, layer toggles, auth state, detail panel mutual exclusion, vehicle/aircraft follow, favorites, URL routing
 - `web/src/config/api.ts` — typed `apiFetch<T>()` + `authFetch<T>()` wrappers, token storage helpers, singleton refresh, `VITE_API_URL` env var
 - `web/src/config/categories.ts` — 17 POI categories, `classifyPoi()`, `resolveCategory()`, `getCategoryByTag/Tags/SubtypeTags()`
 - `web/src/config/weatherIcons.ts` — NWS icon code → inline SVG mapping (~25 codes, day/night variants)
 - `web/src/config/aircraft.ts` — altitude color mapping, unit converters, `aircraftIconHtml()` DivIcon factory, emergency squawk detection
 - `web/src/config/transit.ts` — MBTA route colors, `getRouteColor()`, `routeTypeLabel()`, `vehicleStatusLabel()`
-- `web/src/lib/types.ts` — POI, FindResult, WeatherData, MetarStation, AircraftState, AircraftHistory, MbtaVehicle, MbtaStop, MbtaPrediction, AuthUser, AuthResponse, PoiComment, CommentsResponse, ChatRoom, ChatMessage
+- `web/src/lib/types.ts` — POI, FavoriteEntry, FindResult, WeatherData, MetarStation, AircraftState, AircraftHistory, MbtaVehicle, MbtaStop, MbtaPrediction, AuthUser, AuthResponse, PoiComment, CommentsResponse, ChatRoom, ChatMessage
 - `web/src/lib/distance.ts` — `haversineM()` + `formatDistance()` (ft/mi formatting)
 - `web/src/lib/timeFormat.ts` — `relativeTime()` ("just now" / "5m ago" / "2h ago" / "3d ago" / date)
 - `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback, persistent home location (localStorage), Promise-based locate
@@ -316,6 +316,8 @@
 - `web/src/hooks/useAuth.ts` — auth state, register, login, logout, token validation on mount via `/auth/me`
 - `web/src/hooks/useComments.ts` — POI comment CRUD with unauthenticated fallback for viewing
 - `web/src/hooks/useChat.ts` — Socket.IO chat rooms, real-time messaging, typing indicator
+- `web/src/hooks/useFavorites.ts` — localStorage-backed favorites CRUD (toggle, isFavorite, count)
+- `web/src/hooks/useUrlState.ts` — URL search params (lat/lon/z/poi): parse on load, debounced replaceState, POI deep linking
 - `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + all marker layers + radar + flight trail + long-press handler
 - `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, server-side cluster rendering (translucent), filter mode
 - `web/src/components/Map/RadarLayer.tsx` — RainViewer radar tiles + 7-frame animation via Leaflet API
@@ -331,9 +333,9 @@
 - `web/src/components/Aircraft/AircraftDetailPanel.tsx` — aircraft info panel: altitude/speed/heading/squawk, follow button, sighting history
 - `web/src/components/Transit/VehicleDetailPanel.tsx` — vehicle info panel: route-colored header, status, next 5 stops with arrival times, follow button
 - `web/src/components/Transit/ArrivalBoardPanel.tsx` — station arrival/departure board: dark-themed, route-colored prediction rows, DEP/ARR labels, service ended message
-- `web/src/components/Find/FindPanel.tsx` — slide-in panel: search bar, 4-col category grid with count badges, subtype grid, results, Filter and Map
+- `web/src/components/Find/FindPanel.tsx` — slide-in panel: search bar, favorites cell, 4-col category grid with count badges, subtype grid, results, Filter and Map
 - `web/src/components/Find/ResultsList.tsx` — shared result rows: distance + color dot + name + detail + category label
-- `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share), comments section
+- `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share), comments section, star favorite toggle
 - `web/src/components/Social/AuthDialog.tsx` — register/login modal with client-side validation, two modes (toggle)
 - `web/src/components/Social/ProfileDropdown.tsx` — profile info dropdown with sign-in/sign-out, home location set/clear, click-outside-to-close
 - `web/src/components/Social/CommentsSection.tsx` — comment list, add form, star rating, voting, delete
@@ -517,6 +519,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
 - **Geofence Alert System** (v1.5.35–v1.5.39): Phases 1-4 done. See `PLAN-ARCHIVE.md`.
 - **Social Layer** Phases A-C (v1.5.45–v1.5.47): Auth + Comments + Chat done. Phase D (mod tools) not started. See `GOVERNANCE.md`.
 - **Web App Social** Phase 5 (v1.5.66): Auth + Comments + Chat ported to web app. See `WEB-APP-PLAN.md`.
+- **Web App Favorites + URL** Phase 6 (v1.5.68): localStorage favorites + shareable URL routing. See `WEB-APP-PLAN.md`.
 - **Code Decomposition** (2026-03-04): 3-phase refactoring complete. See `REFACTORING-REPORT.txt`.
   - Phase 1: server.js (3,925 → 156 lines + 18 modules in lib/)
   - Phase 2: MainViewModel.kt (958 → 215 lines + 6 domain ViewModels)
@@ -531,7 +534,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
 
 ## Next Steps
 - **Web app Phase 5 testing**: Auth register/login, comments CRUD, chat room messaging, token refresh, dark mode
-- **Web app Phase 6-8**: Favorites/SEO, PWA, monetization
+- **Web app Phase 7-8**: PWA, monetization
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)

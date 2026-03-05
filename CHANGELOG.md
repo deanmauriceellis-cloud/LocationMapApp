@@ -2,6 +2,30 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.68] — 2026-03-05
+
+### Added
+- **Web app Phase 6** — Favorites + URL Routing (client-only, no proxy changes)
+  - **Favorites**: star button in POI detail header (filled amber when favorited, outline when not), localStorage persistence (`lma_favorites` key), toggle on/off
+  - **Favorites cell**: gold amber circle in Find panel category grid (first position), shows count badge, tap to browse favorites sorted by distance
+  - **URL routing**: shareable URLs with `?lat=&lon=&z=&poi=` search params, map position debounced (500ms) `replaceState`, POI deep linking
+  - **POI deep links**: opening `?poi=way/123` auto-fetches POI from DB and opens detail panel
+  - **Share URL**: POI detail Share button clipboard fallback now copies full URL (with poi param) instead of text
+
+### New Files (2)
+- `web/src/hooks/useFavorites.ts` — localStorage-backed favorites with toggle, isFavorite, count
+- `web/src/hooks/useUrlState.ts` — `parseUrlState()` reads URL on load, `useUrlState()` provides debounced position updates + POI param management
+
+### Files Modified (5)
+- `web/src/lib/types.ts` — added `FavoriteEntry` interface (osm_type, osm_id, name, lat, lon, category, addedAt)
+- `web/src/components/Find/PoiDetailPanel.tsx` — star button in header (isFavorite/onToggleFavorite props), share copies URL
+- `web/src/components/Find/FindPanel.tsx` — favorites cell in category grid (favoriteCount/favoriteResults/onShowFavorites props), external results view
+- `web/src/components/Map/MapView.tsx` — optional `zoom` prop passed to MapContainer
+- `web/src/App.tsx` — useFavorites + useUrlState hooks, URL-based initial center/zoom, POI deep linking on mount, favorites wiring, URL updates on pan/zoom/POI open/close
+
+### Build
+- Production: 506KB / 149KB gzip (144 modules)
+
 ## [1.5.67] — 2026-03-05
 
 ### Added

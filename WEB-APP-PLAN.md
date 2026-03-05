@@ -59,11 +59,13 @@ Cross-platform web frontend (React 19 + TypeScript + Vite + Leaflet) consuming t
 - Panel mutual exclusion: Chat/Find/Weather share left panel slot
 - 9 new files + 5 modified, 499KB / 147KB gzip
 
-## Phase 6: Favorites + Offline + SEO
-- Favorites: star in POI detail, localStorage persistence, dedicated view
-- Recent searches / search history
-- URL routing: shareable links for map position + selected POI
-- SEO: meta tags, Open Graph, structured data
+## Phase 6: Favorites + URL Routing — DONE (v1.5.68)
+- Favorites: star in POI detail header (amber filled/outline), localStorage persistence (`lma_favorites`), toggle on/off
+- Favorites cell in Find panel category grid (first position, gold amber, count badge), tap to browse sorted by distance
+- URL routing: `?lat=&lon=&z=&poi=` search params, debounced replaceState on map move
+- POI deep linking: `?poi=way/123` auto-fetches and opens detail panel on load
+- Share button copies full URL (with poi param) to clipboard
+- 2 new files + 5 modified, 506KB / 149KB gzip
 
 ## Phase 7: PWA + Mobile
 - Service worker for offline map tile caching

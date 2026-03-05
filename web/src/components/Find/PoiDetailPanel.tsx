@@ -19,9 +19,11 @@ interface Props {
   onVoteComment?: (commentId: number, vote: 1 | -1) => void
   onDeleteComment?: (commentId: number, osmType: string, osmId: string | number) => void
   onLoginRequired?: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
 }
 
-export function PoiDetailPanel({ result, onClose, onFlyTo, onFetchWebsite, comments, commentTotal, commentsLoading, userId, userRole, isLoggedIn, onPostComment, onVoteComment, onDeleteComment, onLoginRequired }: Props) {
+export function PoiDetailPanel({ result, onClose, onFlyTo, onFetchWebsite, comments, commentTotal, commentsLoading, userId, userRole, isLoggedIn, onPostComment, onVoteComment, onDeleteComment, onLoginRequired, isFavorite, onToggleFavorite }: Props) {
   const [website, setWebsite] = useState<WebsiteInfo | null>(null)
   const [websiteLoading, setWebsiteLoading] = useState(false)
   const [websiteLoaded, setWebsiteLoaded] = useState(false)
@@ -65,7 +67,7 @@ export function PoiDetailPanel({ result, onClose, onFlyTo, onFetchWebsite, comme
     if (navigator.share) {
       try { await navigator.share({ title: result.name, text, url: window.location.href }) } catch {}
     } else {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText(window.location.href)
     }
   }
 
@@ -87,6 +89,17 @@ export function PoiDetailPanel({ result, onClose, onFlyTo, onFetchWebsite, comme
             {cat?.label || 'Other'}
           </div>
         </div>
+        {onToggleFavorite && (
+          <button
+            onClick={onToggleFavorite}
+            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill={isFavorite ? '#f59e0b' : 'none'} stroke={isFavorite ? '#f59e0b' : 'currentColor'} strokeWidth="2">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </button>
+        )}
         <button
           onClick={onClose}
           className="w-8 h-8 shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
