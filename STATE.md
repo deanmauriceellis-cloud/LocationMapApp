@@ -295,7 +295,7 @@
 
 ### Web App (Phases 1-4 — Map + Find + Weather + Aircraft + Transit)
 - `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite
-- `web/vite.config.ts` — dev proxy `/api` → `localhost:3000`, `@/` path alias
+- `web/vite.config.ts` — dev server binds `0.0.0.0:5173` (LAN-accessible), proxy `/api` → `localhost:3000`, `@/` path alias
 - `web/src/main.tsx` — React root entry point
 - `web/src/App.tsx` — top-level orchestration: Find/Detail/Weather/Aircraft/Transit panels, layer toggles, detail panel mutual exclusion, vehicle/aircraft follow
 - `web/src/config/api.ts` — typed `apiFetch<T>()` wrapper, `VITE_API_URL` env var
@@ -436,6 +436,7 @@
 - 10.0.0.4 proxy IP hardcoded (works on local network only)
 - OpenSky state vector: category field (index 17) not always present — guarded with size check
 - **Overpass intermittent 504s** (observed 2026-03-04): FIXED — proxy now retries with 3-endpoint rotation + exponential backoff; app PlacesRepository retries up to 3 times with 5s/10s delays
+- **Web app POI limitation**: only shows POIs already in PostgreSQL (from prior Android app scans); navigating to unscanned areas shows nothing — needs Overpass trigger mechanism
 
 ## Debug HTTP Server (v1.5.18)
 | Endpoint | Description |

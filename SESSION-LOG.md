@@ -2,6 +2,22 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-05c (Web App External Access)
+
+### Context
+Testing web app from an external system — POIs were failing. Diagnosed that the cache proxy wasn't running. Also enabled Vite dev server to listen on all interfaces for LAN access.
+
+### Changes Made
+- `web/vite.config.ts` — added `host: '0.0.0.0'` to Vite server config (allows access from other machines on the network)
+- `.gitignore` — added `web/tsconfig.tsbuildinfo` (build artifact)
+
+### Notes
+- Web app requires the cache proxy to be running (`node server.js` on port 3000) — all POI/weather/aircraft/transit data comes from the proxy
+- Web app currently only shows POIs that exist in PostgreSQL (previously scanned areas); no Overpass trigger mechanism yet
+- Future: consider adding auto-fetch for unseen areas (Phase 5+ scope)
+
+---
+
 ## Session: 2026-03-05b (v1.5.65 — Web App Phase 4: Aircraft + Transit)
 
 ### Context

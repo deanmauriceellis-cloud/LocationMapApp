@@ -19,3 +19,4 @@ overnight-runs/
 cache-proxy/geofence-databases/*.db
 web/node_modules/
 web/dist/
+web/tsconfig.tsbuildinfo
