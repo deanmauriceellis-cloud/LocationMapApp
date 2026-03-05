@@ -7,9 +7,12 @@ interface Props {
   filterLabel?: string | null
   filterCount?: number
   onClearFilter?: () => void
+  alertEvent?: string | null
+  alertCount?: number
+  onAlertClick?: () => void
 }
 
-export function StatusBar({ lat, lon, poiCount, totalCount, loading, filterLabel, filterCount, onClearFilter }: Props) {
+export function StatusBar({ lat, lon, poiCount, totalCount, loading, filterLabel, filterCount, onClearFilter, alertEvent, alertCount, onAlertClick }: Props) {
   if (filterLabel) {
     return (
       <button
@@ -18,6 +21,22 @@ export function StatusBar({ lat, lon, poiCount, totalCount, loading, filterLabel
       >
         <span>Showing {filterCount || 0} results for {filterLabel}</span>
         <span className="opacity-75">— click to clear</span>
+      </button>
+    )
+  }
+
+  if (alertEvent && (alertCount ?? 0) > 0) {
+    return (
+      <button
+        onClick={onAlertClick}
+        className="absolute bottom-0 left-0 right-0 z-[1000] h-8 bg-red-600/90 dark:bg-red-800/90 backdrop-blur-sm border-t border-red-500 dark:border-red-700 flex items-center justify-center px-3 text-xs text-white gap-2 hover:bg-red-700/90 dark:hover:bg-red-900/90 transition-colors cursor-pointer"
+      >
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span>{alertEvent}{(alertCount ?? 0) > 1 ? ` (+${(alertCount ?? 0) - 1} more)` : ''}</span>
       </button>
     )
   }

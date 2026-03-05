@@ -2,6 +2,45 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-03-05 (v1.5.63 — Web App Phase 3: Weather Overlay)
+
+### Context
+Phase 3 of web app: add weather visualization — weather panel with current/hourly/daily forecasts, METAR aviation markers, radar overlay with animation, and alert notifications. All proxy endpoints already exist.
+
+### Changes Made
+
+#### New Files (5)
+- `web/src/hooks/useWeather.ts` — weather/METAR fetch with AbortController, radar/metar toggles, 5-min auto-refresh timer
+- `web/src/config/weatherIcons.ts` — NWS icon code → inline SVG React elements (~25 codes, day/night variants using basic SVG shapes)
+- `web/src/components/Weather/WeatherPanel.tsx` — 360px slide-in panel: header (city/state/station), expandable alert banners (red/orange by severity), Current/Hourly/Daily tab bar, layer controls (Radar/Animate/METAR toggles)
+- `web/src/components/Map/RadarLayer.tsx` — RainViewer API radar tiles, static (latest frame at 35% opacity) + animated (7-frame loop at 800ms via Leaflet `L.tileLayer` + `setOpacity()`)
+- `web/src/components/Map/MetarMarkerLayer.tsx` — flight-category colored CircleMarkers (VFR=#2E7D32, MVFR=#1565C0, IFR=#C62828, LIFR=#AD1457), monospace labels at zoom >= 10
+
+#### Modified Files (6)
+- `web/src/lib/types.ts` — added WeatherLocation, WeatherCurrent, WeatherHourly, WeatherDaily, WeatherAlert, WeatherData, MetarStation types
+- `web/src/App.tsx` — weatherOpen state, mutual exclusion with Find, METAR bounds-based fetch, alert click handler, stable callback refs via individual function deps
+- `web/src/components/Layout/Toolbar.tsx` — weather button (dynamic SVG icon from weatherIcons + red dot alert indicator)
+- `web/src/components/Layout/StatusBar.tsx` — red alert banner (event name + count, click opens weather panel)
+- `web/src/components/Map/MapView.tsx` — RadarLayer + MetarMarkerLayer integration with new props
+- `web/src/index.css` — `.metar-label` styles (monospace, dark mode variant)
+
+### Bug Fixes During Implementation
+- Iowa State Mesonet animated tile URLs return 404 (format `nexrad-n0q-{timestamp}` doesn't work for national mosaic) — switched to RainViewer API which provides a JSON frame manifest
+- react-leaflet `<TileLayer>` doesn't reactively update `opacity` prop — switched to direct Leaflet API (`L.tileLayer` + `setOpacity()`) for radar animation
+- `handleBoundsChange` infinite re-render loop: `wx` (entire hook return object) as dependency recreated callback every render → `BoundsWatcher` useEffect re-fired → POIs never settled. Fixed by using stable individual function refs (`wx.fetchMetars`) + ref for `metarsVisible`
+
+### Verification
+- `npm run build` — clean, 0 TypeScript errors, 404KB / 121KB gzip
+- Weather panel opens with current conditions, hourly, daily tabs
+- Radar toggle shows RainViewer tiles at 35% opacity
+- Animate toggle cycles 7 frames smoothly
+- METAR markers show colored circles at airports
+- Alert banner in status bar when NWS alerts active
+- Find ↔ Weather mutual exclusion works
+- POIs display normally (no infinite re-render)
+
+---
+
 ## Session: 2026-03-04j (v1.5.62 — Web App Phase 2: Find + Search + POI Detail)
 
 ### Context

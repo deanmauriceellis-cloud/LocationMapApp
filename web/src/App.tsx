@@ -5,10 +5,12 @@ import { Toolbar } from '@/components/Layout/Toolbar'
 import { StatusBar } from '@/components/Layout/StatusBar'
 import { FindPanel } from '@/components/Find/FindPanel'
 import { PoiDetailPanel } from '@/components/Find/PoiDetailPanel'
+import { WeatherPanel } from '@/components/Weather/WeatherPanel'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { usePois } from '@/hooks/usePois'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { useFind } from '@/hooks/useFind'
+import { useWeather } from '@/hooks/useWeather'
 import { classifyPoi } from '@/config/categories'
 import { haversineM } from '@/lib/distance'
 import type { BboxParams, POI, FindResult } from '@/lib/types'
@@ -18,22 +20,30 @@ export default function App() {
   const { pois, loading, totalCount, fetchPois } = usePois()
   const { dark, toggle: toggleDark } = useDarkMode()
   const find = useFind()
+  const wx = useWeather()
   const mapRef = useRef<LeafletMap | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
+  const lastBbox = useRef<BboxParams | null>(null)
 
   const [findOpen, setFindOpen] = useState(false)
+  const [weatherOpen, setWeatherOpen] = useState(false)
   const [selectedResult, setSelectedResult] = useState<FindResult | null>(null)
   const [filterResults, setFilterResults] = useState<FindResult[] | null>(null)
   const [filterLabel, setFilterLabel] = useState<string | null>(null)
 
   const center: [number, number] = mapCenter || [geo.lat, geo.lon]
 
+  const metarsVisibleRef = useRef(wx.metarsVisible)
+  metarsVisibleRef.current = wx.metarsVisible
+
   const handleBoundsChange = useCallback((bbox: BboxParams) => {
     fetchPois(bbox)
+    lastBbox.current = bbox
     const lat = (bbox.s + bbox.n) / 2
     const lon = (bbox.w + bbox.e) / 2
     setMapCenter([lat, lon])
-  }, [fetchPois])
+    if (metarsVisibleRef.current) wx.fetchMetars(bbox)
+  }, [fetchPois, wx.fetchMetars])
 
   const handleLocate = useCallback(() => {
     geo.locate()
@@ -44,10 +54,47 @@ export default function App() {
 
   const handleToggleFind = useCallback(() => {
     setFindOpen(prev => {
-      if (!prev) setSelectedResult(null) // close detail when opening find
+      if (!prev) {
+        setSelectedResult(null)
+        setWeatherOpen(false) // mutual exclusion
+        wx.stopAutoRefresh()
+      }
       return !prev
     })
-  }, [])
+  }, [wx.stopAutoRefresh])
+
+  const handleToggleWeather = useCallback(() => {
+    setWeatherOpen(prev => {
+      if (!prev) {
+        setFindOpen(false) // mutual exclusion
+        // Fetch weather for current center
+        const c = mapCenter || [geo.lat, geo.lon]
+        wx.fetchWeather(c[0], c[1])
+        wx.startAutoRefresh(c[0], c[1])
+      } else {
+        wx.stopAutoRefresh()
+      }
+      return !prev
+    })
+  }, [mapCenter, geo.lat, geo.lon, wx.fetchWeather, wx.startAutoRefresh, wx.stopAutoRefresh])
+
+  const handleAlertClick = useCallback(() => {
+    if (!weatherOpen) {
+      setFindOpen(false)
+      setWeatherOpen(true)
+      const c = mapCenter || [geo.lat, geo.lon]
+      wx.fetchWeather(c[0], c[1])
+      wx.startAutoRefresh(c[0], c[1])
+    }
+  }, [weatherOpen, mapCenter, geo.lat, geo.lon, wx.fetchWeather, wx.startAutoRefresh])
+
+  const handleToggleMetars = useCallback(() => {
+    wx.toggleMetars()
+    // If enabling metars and we have a bbox, fetch immediately
+    if (!metarsVisibleRef.current && lastBbox.current) {
+      wx.fetchMetars(lastBbox.current)
+    }
+  }, [wx.toggleMetars, wx.fetchMetars])
 
   const handleSearch = useCallback((query: string) => {
     find.search(query, center[0], center[1])
@@ -123,6 +170,11 @@ export default function App() {
         onToggleDark={toggleDark}
         findOpen={findOpen}
         onToggleFind={handleToggleFind}
+        weatherOpen={weatherOpen}
+        onToggleWeather={handleToggleWeather}
+        alertCount={wx.weather?.alerts?.length}
+        weatherIconCode={wx.weather?.current?.iconCode}
+        weatherIsDaytime={wx.weather?.current?.isDaytime}
       />
       <div className="absolute inset-0 top-12 bottom-8">
         <MapView
@@ -134,6 +186,10 @@ export default function App() {
           mapRef={mapRef}
           filterResults={filterResults}
           onPoiClick={handlePoiClick}
+          metars={wx.metars}
+          metarsVisible={wx.metarsVisible}
+          radarOn={wx.radarOn}
+          radarAnimating={wx.radarAnimating}
         />
       </div>
 
@@ -156,6 +212,20 @@ export default function App() {
         onClose={handleToggleFind}
       />
 
+      {/* Weather panel */}
+      <WeatherPanel
+        open={weatherOpen}
+        weather={wx.weather}
+        loading={wx.weatherLoading}
+        radarOn={wx.radarOn}
+        radarAnimating={wx.radarAnimating}
+        metarsVisible={wx.metarsVisible}
+        onToggleRadar={wx.toggleRadar}
+        onToggleRadarAnimate={wx.toggleRadarAnimate}
+        onToggleMetars={handleToggleMetars}
+        onClose={handleToggleWeather}
+      />
+
       {/* POI detail panel */}
       {selectedResult && (
         <PoiDetailPanel
@@ -175,6 +245,9 @@ export default function App() {
         filterLabel={filterLabel}
         filterCount={filterResults?.length}
         onClearFilter={handleClearFilter}
+        alertEvent={wx.weather?.alerts?.[0]?.event}
+        alertCount={wx.weather?.alerts?.length}
+        onAlertClick={handleAlertClick}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-04 Session 63 (Web App Phase 2 — Find + Search + POI Detail)
+## Last Updated: 2026-03-05 Session 64 (Web App Phase 3 — Weather Overlay)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -217,7 +217,7 @@
 | MBTA Stations | direct (api-v3.mbta.com/stops) | not proxied | — |
 | MBTA Predictions | direct (api-v3.mbta.com/predictions) | not proxied | — |
 | MBTA Schedules | direct (api-v3.mbta.com/schedules) | not proxied | — |
-| Radar tiles | direct (mesonet.agron.iastate.edu) | not proxied | — |
+| Radar tiles | direct (tilecache.rainviewer.com) | not proxied | — |
 
 ## Map Interaction Model
 - **Tap POI marker**: opens POI detail dialog directly (info, comments, actions)
@@ -293,24 +293,29 @@
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 
-### Web App (Phases 1-2 — Map + Find + Search + POI Detail)
+### Web App (Phases 1-3 — Map + Find + Search + POI Detail + Weather)
 - `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite
 - `web/vite.config.ts` — dev proxy `/api` → `localhost:3000`, `@/` path alias
 - `web/src/main.tsx` — React root entry point
-- `web/src/App.tsx` — top-level orchestration: Find/Detail panels, filter mode, marker click → detail
+- `web/src/App.tsx` — top-level orchestration: Find/Detail/Weather panels, filter mode, marker click → detail
 - `web/src/config/api.ts` — typed `apiFetch<T>()` wrapper, `VITE_API_URL` env var
 - `web/src/config/categories.ts` — 17 POI categories, `classifyPoi()`, `resolveCategory()`, `getCategoryByTag/Tags/SubtypeTags()`
-- `web/src/lib/types.ts` — POI, FindResult, WebsiteInfo, PoiDetailResponse + shared interfaces
+- `web/src/config/weatherIcons.ts` — NWS icon code → inline SVG mapping (~25 codes, day/night variants)
+- `web/src/lib/types.ts` — POI, FindResult, WebsiteInfo, PoiDetailResponse, WeatherData, MetarStation + shared interfaces
 - `web/src/lib/distance.ts` — `haversineM()` + `formatDistance()` (ft/mi formatting)
 - `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback
 - `web/src/hooks/usePois.ts` — debounced (300ms) `/pois/bbox` fetch + `/pois/stats` total count
 - `web/src/hooks/useDarkMode.ts` — localStorage-persisted dark mode toggle
 - `web/src/hooks/useFind.ts` — search (1s debounce), findByCategory, loadCounts, fetchWebsite, fetchPoiDetail
-- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + light/dark TileLayer + bounds watcher + filter/click passthrough
+- `web/src/hooks/useWeather.ts` — weather/METAR fetch, radar/metar toggles, 5-min auto-refresh
+- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + light/dark TileLayer + bounds watcher + radar/METAR/filter/click passthrough
 - `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, click handlers, filter mode (forced labels)
+- `web/src/components/Map/RadarLayer.tsx` — RainViewer radar tiles + 7-frame animation via Leaflet API
+- `web/src/components/Map/MetarMarkerLayer.tsx` — flight-category colored CircleMarkers + monospace labels
 - `web/src/components/Map/MapControls.tsx` — zoom +/- buttons + geolocation button
-- `web/src/components/Layout/Toolbar.tsx` — top bar: app name + Find button (magnifying glass, active highlight) + dark mode
-- `web/src/components/Layout/StatusBar.tsx` — bottom bar: coords + counts, or teal filter bar ("Showing N results — click to clear")
+- `web/src/components/Layout/Toolbar.tsx` — top bar: app name + Find + Weather (dynamic icon + alert dot) + dark mode
+- `web/src/components/Layout/StatusBar.tsx` — bottom bar: coords + counts, teal filter bar, or red alert banner
+- `web/src/components/Weather/WeatherPanel.tsx` — slide-in panel: Current/Hourly/Daily tabs, alert banners, layer controls (Radar/Animate/METAR)
 - `web/src/components/Find/FindPanel.tsx` — slide-in panel: search bar, 4-col category grid with count badges, subtype grid, results, Filter and Map
 - `web/src/components/Find/ResultsList.tsx` — shared result rows: distance + color dot + name + detail + category label
 - `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share)
@@ -503,8 +508,8 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
-- **Web app Phase 3**: Weather overlay — current conditions panel, METAR markers, radar tiles (see `WEB-APP-PLAN.md`)
-- **Web app Phase 4-8**: Aircraft/transit, auth/chat, favorites/SEO, PWA, monetization
+- **Web app Phase 4**: Aircraft + Transit — live markers, detail panels, layer toggles (see `WEB-APP-PLAN.md`)
+- **Web app Phase 5-8**: Auth/chat, favorites/SEO, PWA, monetization
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating
 - Social: Phase D (room management), content moderation system (reporting, flagging, moderation queue)

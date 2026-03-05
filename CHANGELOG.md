@@ -2,6 +2,45 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.63] — 2026-03-05
+
+### Added
+- **Web app Phase 3** — Weather overlay, METAR markers, radar, alert notifications
+  - **Weather panel**: slide-in 360px panel with Current/Hourly/Daily tabs, expandable alert banners
+  - **Current tab**: large temp + SVG weather icon, description, 2×3 detail grid (humidity, wind, visibility, barometer, dewpoint, windchill/heat index)
+  - **Hourly tab**: scrollable 48-hour forecast — time, icon, temp, precip%, wind
+  - **Daily tab**: 7-day forecast cards — name, icon, temp, precip%, wind, short forecast
+  - **Alert banners**: red/orange expandable sections with severity-aware colors, headline, area, instruction, description
+  - **Weather icons**: 15 SVG icon variants (sun, moon, clouds, rain, thunderstorm, snow, fog, wind) with day/night variants
+  - **METAR markers**: flight-category colored circles (VFR green, MVFR blue, IFR red, LIFR magenta), monospace labels at zoom >= 10
+  - **Radar overlay**: RainViewer API tiles at 35% opacity, direct from CDN (no proxy needed)
+  - **Animated radar**: 7-frame loop at 800ms/frame using RainViewer historical frames, smooth opacity cycling via Leaflet API
+  - **Layer controls**: Radar/Animate/METAR toggle buttons at bottom of weather panel
+  - **Toolbar weather button**: dynamic SVG icon showing current conditions, red dot when alerts active
+  - **Status bar alert banner**: red bar with alert event name + count, click opens weather panel
+  - **Mutual exclusion**: Weather and Find panels share position, opening one closes the other
+  - **Auto-refresh**: weather data refreshes every 5 minutes while panel is open
+  - **METAR bounds fetch**: fetches METARs on map move when layer enabled
+
+### Files Created (5)
+- `web/src/hooks/useWeather.ts` — weather/METAR fetch, radar/metar toggles, 5-min auto-refresh
+- `web/src/config/weatherIcons.ts` — NWS icon code → SVG mapping (~25 codes, day/night)
+- `web/src/components/Weather/WeatherPanel.tsx` — slide-in panel: tabs, alerts, layer controls
+- `web/src/components/Map/RadarLayer.tsx` — RainViewer radar tiles + 7-frame animation via Leaflet API
+- `web/src/components/Map/MetarMarkerLayer.tsx` — flight-category colored CircleMarkers + monospace labels
+
+### Files Modified (6)
+- `web/src/lib/types.ts` — WeatherData, WeatherCurrent/Hourly/Daily, WeatherAlert, WeatherLocation, MetarStation
+- `web/src/App.tsx` — weather state, mutual exclusion, METAR bounds fetch, alert click, stable callback refs
+- `web/src/components/Layout/Toolbar.tsx` — weather button with dynamic icon + alert dot indicator
+- `web/src/components/Layout/StatusBar.tsx` — red alert banner with event name + click handler
+- `web/src/components/Map/MapView.tsx` — RadarLayer + MetarMarkerLayer integration
+- `web/src/index.css` — `.metar-label` styles (monospace, dark mode)
+
+### Bug Fixes
+- Fixed `handleBoundsChange` infinite re-render loop caused by `wx` object dependency — use stable individual function refs
+- Switched from Iowa State Mesonet animated tiles (404 errors) to RainViewer API (provides frame manifest)
+
 ## [1.5.62] — 2026-03-04
 
 ### Added

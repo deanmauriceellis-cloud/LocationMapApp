@@ -17,14 +17,17 @@ Cross-platform web frontend (React 19 + TypeScript + Vite + Leaflet) consuming t
 - Marker click → detail panel with haversine distance
 - 5 new files + 7 modified, 385KB / 117KB gzip
 
-## Phase 3: Weather Overlay
-- Weather panel (slide-in, same position as Find): current conditions, 48-hour forecast, 7-day outlook
-- Consumes `/weather?lat=&lon=` composite endpoint
-- Weather icon in toolbar (dynamic conditions icon, red border on alerts)
-- METAR markers on map (colored by flight category)
-- NWS NEXRAD radar tile overlay (Iowa State Mesonet)
-- Animated radar option (7-frame loop)
-- Alert banner in status bar
+## Phase 3: Weather Overlay — DONE (v1.5.63)
+- Weather panel (slide-in, same position as Find): current conditions, 48-hour hourly, 7-day daily, expandable alert banners
+- Consumes `/weather?lat=&lon=` composite endpoint, auto-refresh every 5min
+- 15 SVG weather icon variants (day/night) for NWS icon codes
+- Weather toolbar button: dynamic conditions icon + red dot on alerts
+- METAR markers: flight-category colored (VFR/MVFR/IFR/LIFR), monospace labels at zoom >= 10
+- Radar overlay: RainViewer API tiles at 35% opacity (replaced Iowa State Mesonet)
+- Animated radar: 7-frame loop at 800ms via Leaflet API + RainViewer historical frames
+- Layer controls: Radar/Animate/METAR toggles at bottom of weather panel
+- Alert banner in status bar (red, click opens weather panel)
+- 5 new files + 6 modified, 404KB / 121KB gzip
 
 ## Phase 4: Aircraft + Transit
 - Aircraft markers from `/aircraft` (rotated icons, altitude-colored, callsign labels)
