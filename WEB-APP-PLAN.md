@@ -47,12 +47,17 @@ Cross-platform web frontend (React 19 + TypeScript + Vite + Leaflet) consuming t
 - Proxy endpoints: `/mbta/vehicles`, `/mbta/stations`, `/mbta/predictions`, `/mbta/trip-predictions`, `/mbta/bus-stops/bbox`
 - 12 new files + 6 modified + 2 proxy files modified
 
-## Phase 5: Auth + Social
-- Device-bonded registration (same as Android: register once, JWT tokens)
-- POI comments: star ratings, votes, in POI detail panel
-- Real-time chat: Socket.IO, room list, global room
-- Profile panel: display name, avatar initial, role badge
-- Requires auth token storage (localStorage + refresh logic)
+## Phase 5: Auth + Social — DONE (v1.5.66)
+- Auth system: register/login modal, JWT tokens in localStorage, auto-refresh with 2-min buffer, singleton de-duplication, 401 retry
+- `authFetch<T>()` wrapper: Bearer header injection, proactive refresh, auto-retry
+- Profile dropdown: avatar initial (teal), display name, role badge, sign-out
+- POI comments: star ratings (1-5, interactive), upvote/downvote with color feedback, delete for owner/staff, relative time
+- CommentsSection embedded below POI detail action buttons, auto-loads on POI open
+- Real-time chat: Socket.IO with JWT auth, room list, create room, typing indicator
+- Chat panel: room list → chat room views, own messages teal/right, others gray/left
+- Toolbar: Chat (speech bubble) + Profile (user icon/initial) buttons
+- Panel mutual exclusion: Chat/Find/Weather share left panel slot
+- 9 new files + 5 modified, 499KB / 147KB gzip
 
 ## Phase 6: Favorites + Offline + SEO
 - Favorites: star in POI detail, localStorage persistence, dedicated view

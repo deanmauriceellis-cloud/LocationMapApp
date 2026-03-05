@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-05 Session 65 (Web App Phase 4 — Aircraft + Transit)
+## Last Updated: 2026-03-05 Session 66 (Web App Phase 5 — Auth + Social)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -293,18 +293,19 @@
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 
-### Web App (Phases 1-4 — Map + Find + Weather + Aircraft + Transit)
-- `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite
+### Web App (Phases 1-5 — Map + Find + Weather + Aircraft + Transit + Social)
+- `web/package.json` — React 19, react-leaflet, Leaflet, Tailwind CSS, Vite, socket.io-client
 - `web/vite.config.ts` — dev server binds `0.0.0.0:5173` (LAN-accessible), proxy `/api` → `localhost:3000`, `@/` path alias
 - `web/src/main.tsx` — React root entry point
-- `web/src/App.tsx` — top-level orchestration: Find/Detail/Weather/Aircraft/Transit panels, layer toggles, detail panel mutual exclusion, vehicle/aircraft follow
-- `web/src/config/api.ts` — typed `apiFetch<T>()` wrapper, `VITE_API_URL` env var
+- `web/src/App.tsx` — top-level orchestration: Find/Detail/Weather/Aircraft/Transit/Chat panels, layer toggles, auth state, detail panel mutual exclusion, vehicle/aircraft follow
+- `web/src/config/api.ts` — typed `apiFetch<T>()` + `authFetch<T>()` wrappers, token storage helpers, singleton refresh, `VITE_API_URL` env var
 - `web/src/config/categories.ts` — 17 POI categories, `classifyPoi()`, `resolveCategory()`, `getCategoryByTag/Tags/SubtypeTags()`
 - `web/src/config/weatherIcons.ts` — NWS icon code → inline SVG mapping (~25 codes, day/night variants)
 - `web/src/config/aircraft.ts` — altitude color mapping, unit converters, `aircraftIconHtml()` DivIcon factory, emergency squawk detection
 - `web/src/config/transit.ts` — MBTA route colors, `getRouteColor()`, `routeTypeLabel()`, `vehicleStatusLabel()`
-- `web/src/lib/types.ts` — POI, FindResult, WeatherData, MetarStation, AircraftState, AircraftHistory, MbtaVehicle, MbtaStop, MbtaPrediction + shared interfaces
+- `web/src/lib/types.ts` — POI, FindResult, WeatherData, MetarStation, AircraftState, AircraftHistory, MbtaVehicle, MbtaStop, MbtaPrediction, AuthUser, AuthResponse, PoiComment, CommentsResponse, ChatRoom, ChatMessage
 - `web/src/lib/distance.ts` — `haversineM()` + `formatDistance()` (ft/mi formatting)
+- `web/src/lib/timeFormat.ts` — `relativeTime()` ("just now" / "5m ago" / "2h ago" / "3d ago" / date)
 - `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback
 - `web/src/hooks/usePois.ts` — debounced (300ms) `/pois/bbox` fetch + `/pois/stats` total count + server-side cluster support
 - `web/src/hooks/useDarkMode.ts` — localStorage-persisted dark mode toggle
@@ -312,6 +313,9 @@
 - `web/src/hooks/useWeather.ts` — weather/METAR fetch, radar/metar toggles, 5-min auto-refresh
 - `web/src/hooks/useAircraft.ts` — aircraft state, 15s auto-refresh, OpenSky state vector parsing, select/follow/history
 - `web/src/hooks/useTransit.ts` — trains/subway/buses/stations/busStops, per-type refresh timers, vehicle follow, trip predictions
+- `web/src/hooks/useAuth.ts` — auth state, register, login, logout, token validation on mount via `/auth/me`
+- `web/src/hooks/useComments.ts` — POI comment CRUD with unauthenticated fallback for viewing
+- `web/src/hooks/useChat.ts` — Socket.IO chat rooms, real-time messaging, typing indicator
 - `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + all marker layers + radar + flight trail
 - `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, server-side cluster rendering (translucent), filter mode
 - `web/src/components/Map/RadarLayer.tsx` — RainViewer radar tiles + 7-frame animation via Leaflet API
@@ -320,7 +324,7 @@
 - `web/src/components/Map/FlightTrailLayer.tsx` — altitude-colored polyline segments from flight path history
 - `web/src/components/Map/TransitMarkerLayer.tsx` — route-colored CircleMarkers for vehicles, station dots, bus stop dots, selected vehicle highlighting
 - `web/src/components/Map/MapControls.tsx` — zoom +/- buttons + geolocation button
-- `web/src/components/Layout/Toolbar.tsx` — top bar: app name + Find + Weather + Layers (with count badge) + dark mode
+- `web/src/components/Layout/Toolbar.tsx` — top bar: app name + Find + Weather + Layers (with count badge) + Chat + Profile + dark mode
 - `web/src/components/Layout/LayersDropdown.tsx` — dropdown toggle switches for Aircraft/Trains/Subway/Buses with count badges
 - `web/src/components/Layout/StatusBar.tsx` — bottom bar: coords + POI/aircraft/transit counts, teal filter bar, red alert banner
 - `web/src/components/Weather/WeatherPanel.tsx` — slide-in panel: Current/Hourly/Daily tabs, alert banners, layer controls
@@ -329,7 +333,12 @@
 - `web/src/components/Transit/ArrivalBoardPanel.tsx` — station arrival/departure board: dark-themed, route-colored prediction rows, DEP/ARR labels, service ended message
 - `web/src/components/Find/FindPanel.tsx` — slide-in panel: search bar, 4-col category grid with count badges, subtype grid, results, Filter and Map
 - `web/src/components/Find/ResultsList.tsx` — shared result rows: distance + color dot + name + detail + category label
-- `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share)
+- `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share), comments section
+- `web/src/components/Social/AuthDialog.tsx` — register/login modal with client-side validation, two modes (toggle)
+- `web/src/components/Social/ProfileDropdown.tsx` — profile info dropdown with sign-in/sign-out, click-outside-to-close
+- `web/src/components/Social/CommentsSection.tsx` — comment list, add form, star rating, voting, delete
+- `web/src/components/Social/StarRating.tsx` — reusable star rating display + interactive selector
+- `web/src/components/Social/ChatPanel.tsx` — room list + chat room with real-time messaging, typing indicator
 
 ### Cache Proxy (decomposed into 19 modules)
 - `cache-proxy/server.js` — Express bootstrap, middleware, CORS, module loader (167 lines)
@@ -507,6 +516,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
 ## Completed Plans
 - **Geofence Alert System** (v1.5.35–v1.5.39): Phases 1-4 done. See `PLAN-ARCHIVE.md`.
 - **Social Layer** Phases A-C (v1.5.45–v1.5.47): Auth + Comments + Chat done. Phase D (mod tools) not started. See `GOVERNANCE.md`.
+- **Web App Social** Phase 5 (v1.5.66): Auth + Comments + Chat ported to web app. See `WEB-APP-PLAN.md`.
 - **Code Decomposition** (2026-03-04): 3-phase refactoring complete. See `REFACTORING-REPORT.txt`.
   - Phase 1: server.js (3,925 → 156 lines + 18 modules in lib/)
   - Phase 2: MainViewModel.kt (958 → 215 lines + 6 domain ViewModels)
@@ -520,7 +530,7 @@ overnight-runs/YYYY-MM-DD_HHMM/
   - **Part C** (§18–27): Content moderation, legal documents, Play Store requirements, account management, APK protection, cloud deployment, cost summary ($4,803–$11,480 Year 1), risk matrix (14 risks scored by probability×impact), 17 prioritized attorney questions, master checklist (10 phases, ~70 action items)
 
 ## Next Steps
-- **Web app Phase 5**: Auth + Social — device-bonded registration, comments, chat (see `WEB-APP-PLAN.md`)
+- **Web app Phase 5 testing**: Auth register/login, comments CRUD, chat room messaging, token refresh, dark mode
 - **Web app Phase 6-8**: Favorites/SEO, PWA, monetization
 - **Commercialization blockers**: Find attorney (see §5), OpenSky commercial license, LLC formation, insurance, attorney review of ToS/Privacy Policy
 - **Monetization**: AdMob integration, Google Play Billing for subscriptions, freemium tier gating

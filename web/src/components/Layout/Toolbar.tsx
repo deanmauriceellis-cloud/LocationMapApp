@@ -13,9 +13,14 @@ interface Props {
   alertCount?: number
   weatherIconCode?: string
   weatherIsDaytime?: boolean
+  chatOpen?: boolean
+  onToggleChat?: () => void
+  profileOpen?: boolean
+  onToggleProfile?: () => void
+  userInitial?: string | null
 }
 
-export function Toolbar({ dark, onToggleDark, findOpen, onToggleFind, weatherOpen, onToggleWeather, layersOpen, onToggleLayers, activeLayerCount, alertCount, weatherIconCode, weatherIsDaytime }: Props) {
+export function Toolbar({ dark, onToggleDark, findOpen, onToggleFind, weatherOpen, onToggleWeather, layersOpen, onToggleLayers, activeLayerCount, alertCount, weatherIconCode, weatherIsDaytime, chatOpen, onToggleChat, profileOpen, onToggleProfile, userInitial }: Props) {
   return (
     <div className="absolute top-0 left-0 right-0 z-[1000] h-12 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center px-3 gap-1">
       <span className="font-semibold text-sm text-gray-800 dark:text-gray-100 mr-auto">
@@ -63,6 +68,29 @@ export function Toolbar({ dark, onToggleDark, findOpen, onToggleFind, weatherOpe
               </span>
             )}
           </div>
+        </ToolbarButton>
+      )}
+
+      {onToggleChat && (
+        <ToolbarButton title="Chat" onClick={onToggleChat} active={chatOpen}>
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+          </svg>
+        </ToolbarButton>
+      )}
+
+      {onToggleProfile && (
+        <ToolbarButton title="Profile" onClick={onToggleProfile} active={profileOpen}>
+          {userInitial ? (
+            <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold">
+              {userInitial}
+            </div>
+          ) : (
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          )}
         </ToolbarButton>
       )}
 

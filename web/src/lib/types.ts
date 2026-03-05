@@ -238,6 +238,65 @@ export interface MbtaPrediction {
   routeColor: string | null
 }
 
+// Social types — auth, comments, chat
+export interface AuthUser {
+  id: number
+  displayName: string
+  role: string
+  createdAt: string
+}
+
+export interface AuthResponse {
+  user: AuthUser
+  accessToken: string
+  refreshToken: string
+  expiresAt: string
+}
+
+export interface PoiComment {
+  id: number
+  osmType: string
+  osmId: string
+  userId: number
+  parentId: number | null
+  content: string
+  rating: number | null
+  upvotes: number
+  downvotes: number
+  isDeleted: boolean
+  createdAt: string
+  authorName: string
+  viewerVote: number
+}
+
+export interface CommentsResponse {
+  comments: PoiComment[]
+  total: number
+}
+
+export interface ChatRoom {
+  id: number
+  roomType: string
+  name: string
+  description: string | null
+  memberCount: number
+  lastMessageAt: string | null
+  createdAt: string
+  isMember?: boolean
+  memberRole?: string | null
+}
+
+export interface ChatMessage {
+  id: number
+  roomId: number
+  userId: number
+  content: string
+  replyToId: number | null
+  isDeleted?: boolean
+  sentAt: string
+  authorName: string
+}
+
 // METAR types — passthrough from aviationweather.gov API
 export interface MetarStation {
   icaoId: string

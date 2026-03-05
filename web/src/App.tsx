@@ -10,6 +10,9 @@ import { WeatherPanel } from '@/components/Weather/WeatherPanel'
 import { AircraftDetailPanel } from '@/components/Aircraft/AircraftDetailPanel'
 import { VehicleDetailPanel } from '@/components/Transit/VehicleDetailPanel'
 import { ArrivalBoardPanel } from '@/components/Transit/ArrivalBoardPanel'
+import { AuthDialog } from '@/components/Social/AuthDialog'
+import { ProfileDropdown } from '@/components/Social/ProfileDropdown'
+import { ChatPanel } from '@/components/Social/ChatPanel'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { usePois } from '@/hooks/usePois'
 import { useDarkMode } from '@/hooks/useDarkMode'
@@ -17,6 +20,9 @@ import { useFind } from '@/hooks/useFind'
 import { useWeather } from '@/hooks/useWeather'
 import { useAircraft } from '@/hooks/useAircraft'
 import { useTransit } from '@/hooks/useTransit'
+import { useAuth } from '@/hooks/useAuth'
+import { useComments } from '@/hooks/useComments'
+import { useChat } from '@/hooks/useChat'
 import { classifyPoi } from '@/config/categories'
 import { haversineM } from '@/lib/distance'
 import type { BboxParams, POI, FindResult, AircraftState, MbtaVehicle, MbtaStop } from '@/lib/types'
@@ -32,6 +38,9 @@ export default function App() {
   const wx = useWeather()
   const ac = useAircraft()
   const tr = useTransit()
+  const auth = useAuth()
+  const comments = useComments()
+  const chat = useChat()
   const mapRef = useRef<LeafletMap | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
   const lastBbox = useRef<BboxParams | null>(null)
@@ -39,6 +48,9 @@ export default function App() {
   const [findOpen, setFindOpen] = useState(false)
   const [weatherOpen, setWeatherOpen] = useState(false)
   const [layersOpen, setLayersOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [detailView, setDetailView] = useState<DetailView>('none')
   const [selectedResult, setSelectedResult] = useState<FindResult | null>(null)
   const [filterResults, setFilterResults] = useState<FindResult[] | null>(null)
@@ -104,6 +116,24 @@ export default function App() {
     }
   }, [tr.followingVehicleId, tr.selectedVehicle])
 
+  // Connect/disconnect chat socket when chat panel opens/closes
+  useEffect(() => {
+    if (chatOpen && auth.isLoggedIn) {
+      chat.connect()
+      chat.loadRooms()
+    } else {
+      chat.disconnect()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatOpen, auth.isLoggedIn])
+
+  // Close auth dialog when user logs in successfully
+  useEffect(() => {
+    if (auth.isLoggedIn && authDialogOpen) {
+      setAuthDialogOpen(false)
+    }
+  }, [auth.isLoggedIn, authDialogOpen])
+
   const handleLocate = useCallback(() => {
     geo.locate()
     if (mapRef.current && geo.lat && geo.lon) {
@@ -118,17 +148,20 @@ export default function App() {
         setSelectedResult(null)
         ac.clearSelection()
         tr.clearSelection()
+        comments.clearComments()
         setWeatherOpen(false)
+        setChatOpen(false)
         wx.stopAutoRefresh()
       }
       return !prev
     })
-  }, [wx.stopAutoRefresh, ac.clearSelection, tr.clearSelection])
+  }, [wx.stopAutoRefresh, ac.clearSelection, tr.clearSelection, comments.clearComments])
 
   const handleToggleWeather = useCallback(() => {
     setWeatherOpen(prev => {
       if (!prev) {
         setFindOpen(false)
+        setChatOpen(false)
         const c = mapCenter || [geo.lat, geo.lon]
         wx.fetchWeather(c[0], c[1])
         wx.startAutoRefresh(c[0], c[1])
@@ -141,6 +174,25 @@ export default function App() {
 
   const handleToggleLayers = useCallback(() => {
     setLayersOpen(prev => !prev)
+  }, [])
+
+  const handleToggleChat = useCallback(() => {
+    setChatOpen(prev => {
+      if (!prev) {
+        setFindOpen(false)
+        setWeatherOpen(false)
+        wx.stopAutoRefresh()
+      }
+      return !prev
+    })
+  }, [wx.stopAutoRefresh])
+
+  const handleToggleProfile = useCallback(() => {
+    setProfileOpen(prev => !prev)
+  }, [])
+
+  const handleLoginRequired = useCallback(() => {
+    setAuthDialogOpen(true)
   }, [])
 
   const handleAlertClick = useCallback(() => {
@@ -178,10 +230,11 @@ export default function App() {
     setFindOpen(false)
     ac.clearSelection()
     tr.clearSelection()
+    comments.loadComments(result.type, result.id)
     if (mapRef.current) {
       mapRef.current.setView([result.lat, result.lon], 18)
     }
-  }, [ac.clearSelection, tr.clearSelection])
+  }, [ac.clearSelection, tr.clearSelection, comments.loadComments])
 
   const handleFilterAndMap = useCallback((results: FindResult[], label: string) => {
     setFilterResults(results)
@@ -206,9 +259,11 @@ export default function App() {
   const handlePoiClick = useCallback((poi: POI) => {
     const cat = classifyPoi(poi.tags || {})
     const dist = haversineM(center[0], center[1], poi.lat, poi.lon)
+    const osmType = poi.osm_type || poi.type
+    const osmId = poi.osm_id || poi.id
     const result: FindResult = {
-      type: poi.osm_type || poi.type,
-      id: poi.osm_id || poi.id,
+      type: osmType,
+      id: osmId,
       lat: poi.lat,
       lon: poi.lon,
       name: poi.tags?.name || '',
@@ -221,7 +276,8 @@ export default function App() {
     setFindOpen(false)
     ac.clearSelection()
     tr.clearSelection()
-  }, [center, ac.clearSelection, tr.clearSelection])
+    comments.loadComments(osmType, osmId)
+  }, [center, ac.clearSelection, tr.clearSelection, comments.loadComments])
 
   const handleAircraftClick = useCallback((aircraft: AircraftState) => {
     ac.selectAircraft(aircraft)
@@ -253,7 +309,8 @@ export default function App() {
     setSelectedResult(null)
     ac.clearSelection()
     tr.clearSelection()
-  }, [ac.clearSelection, tr.clearSelection])
+    comments.clearComments()
+  }, [ac.clearSelection, tr.clearSelection, comments.clearComments])
 
   const handleFlyTo = useCallback((lat: number, lon: number) => {
     if (mapRef.current) {
@@ -290,6 +347,11 @@ export default function App() {
         alertCount={wx.weather?.alerts?.length}
         weatherIconCode={wx.weather?.current?.iconCode}
         weatherIsDaytime={wx.weather?.current?.isDaytime}
+        chatOpen={chatOpen}
+        onToggleChat={handleToggleChat}
+        profileOpen={profileOpen}
+        onToggleProfile={handleToggleProfile}
+        userInitial={auth.user?.displayName?.charAt(0)?.toUpperCase() || null}
       />
 
       <LayersDropdown open={layersOpen} layers={layers} onClose={() => setLayersOpen(false)} />
@@ -360,6 +422,15 @@ export default function App() {
         onClose={handleToggleWeather}
       />
 
+      {/* Chat panel */}
+      <ChatPanel
+        open={chatOpen}
+        user={auth.user}
+        chat={chat}
+        onLoginRequired={handleLoginRequired}
+        onClose={handleToggleChat}
+      />
+
       {/* Detail panels — mutually exclusive */}
       {detailView === 'poi' && selectedResult && (
         <PoiDetailPanel
@@ -367,6 +438,16 @@ export default function App() {
           onClose={handleCloseDetail}
           onFlyTo={handleFlyTo}
           onFetchWebsite={find.fetchWebsite}
+          comments={comments.comments}
+          commentTotal={comments.total}
+          commentsLoading={comments.loading}
+          userId={auth.user?.id ?? null}
+          userRole={auth.user?.role ?? null}
+          isLoggedIn={auth.isLoggedIn}
+          onPostComment={comments.postComment}
+          onVoteComment={comments.voteOnComment}
+          onDeleteComment={comments.deleteComment}
+          onLoginRequired={handleLoginRequired}
         />
       )}
 
@@ -418,6 +499,26 @@ export default function App() {
         trainCount={tr.trainsVisible ? tr.trains.length : undefined}
         subwayCount={tr.subwayVisible ? tr.subway.length : undefined}
         busCount={tr.busesVisible ? tr.buses.length : undefined}
+      />
+
+      {/* Auth dialog (modal overlay) */}
+      <AuthDialog
+        open={authDialogOpen}
+        onClose={() => setAuthDialogOpen(false)}
+        onRegister={auth.register}
+        onLogin={auth.login}
+        loading={auth.loading}
+        error={auth.error}
+        onClearError={auth.clearError}
+      />
+
+      {/* Profile dropdown */}
+      <ProfileDropdown
+        open={profileOpen}
+        user={auth.user}
+        onClose={() => setProfileOpen(false)}
+        onLogout={auth.logout}
+        onSignIn={handleLoginRequired}
       />
     </div>
   )

@@ -2,6 +2,41 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.66] — 2026-03-05
+
+### Added
+- **Web app Phase 5** — Auth + Social layer (register, login, comments, chat)
+  - **Auth system**: register/login modal, JWT token storage in localStorage, auto-refresh with 2-min buffer, singleton refresh de-duplication, auto-retry on 401
+  - **Profile dropdown**: avatar initial (teal circle), display name, role badge, sign out button; click-outside-to-close
+  - **POI comments**: star ratings (1-5, interactive selector), upvote/downvote with color feedback (teal=up, red=down), delete for owner/staff, relative time ("5m ago")
+  - **CommentsSection**: embedded below POI detail action buttons, "Sign in to comment" prompt when not authed, add comment form with char counter (1000 limit)
+  - **Real-time chat**: Socket.IO connection with JWT auth, room list with member counts + last activity, create room inline form
+  - **Chat messages**: own messages right-aligned (teal), others left-aligned (gray) with author name, typing indicator, Enter to send
+  - **Chat panel**: slide-in panel (same position as Find/Weather), room list → chat room views, "Sign in to chat" when not authenticated
+  - **Toolbar buttons**: Chat (speech bubble icon) + Profile (user circle icon, shows initial letter when logged in)
+  - **Panel mutual exclusion**: Chat/Find/Weather share left panel slot — opening one closes others
+  - **Auth token lifecycle**: `authFetch<T>()` wrapper with Bearer header injection, proactive refresh, 401 retry
+  - **Comments load on POI open**: comments fetched automatically when POI detail panel opens (from search result or marker click)
+  - **Dark mode**: all new panels render correctly in dark mode
+
+### New Files (9)
+- `web/src/hooks/useAuth.ts` — auth state, register, login, logout, token validation on mount
+- `web/src/hooks/useComments.ts` — POI comment CRUD with unauthenticated fallback
+- `web/src/hooks/useChat.ts` — Socket.IO chat rooms + real-time messaging
+- `web/src/lib/timeFormat.ts` — relative time formatter ("just now" / "5m ago" / "2h ago" / "3d ago")
+- `web/src/components/Social/AuthDialog.tsx` — register/login modal with client-side validation
+- `web/src/components/Social/ProfileDropdown.tsx` — profile info dropdown with sign-in/sign-out
+- `web/src/components/Social/CommentsSection.tsx` — comment list, add form, star rating, voting, delete
+- `web/src/components/Social/StarRating.tsx` — reusable star rating (display + interactive)
+- `web/src/components/Social/ChatPanel.tsx` — room list + chat room with real-time messaging
+
+### Files Modified (5)
+- `web/src/lib/types.ts` — 6 social types: AuthUser, AuthResponse, PoiComment, CommentsResponse, ChatRoom, ChatMessage
+- `web/src/config/api.ts` — `authFetch<T>()`, token storage helpers (localStorage), singleton refresh, auto-retry on 401
+- `web/src/components/Layout/Toolbar.tsx` — Chat button (speech bubble) + Profile button (user circle/initial)
+- `web/src/components/Find/PoiDetailPanel.tsx` — CommentsSection embedded below action buttons
+- `web/src/App.tsx` — 3 hooks (useAuth, useComments, useChat), authDialog/profile/chat state, panel mutual exclusion, comment loading on POI open
+
 ## [1.5.65] — 2026-03-05
 
 ### Added
