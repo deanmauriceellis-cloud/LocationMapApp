@@ -2,6 +2,17 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.67] — 2026-03-05
+
+### Added
+- **Web app**: Long-press on map (700ms) — fly to pressed location, auto-zoom to 18 if below, context menu suppressed
+- **Web app**: Home location — Profile dropdown "Set Current Location as Home" saves map center to localStorage, persists across page reloads; "Reset to Browser GPS" clears override; teal dot indicator on locate button when home is set
+- **Web app**: Toolbar button hover tooltips (native title attributes on all 6 buttons)
+
+### Changed
+- **Web app**: `useGeolocation` hook now returns Promise from `locate()`, supports persistent home location via localStorage, skips browser GPS on mount when home is set
+- **Web app**: `handleLocate` uses Promise-based locate to fix race condition (map now flies to actual GPS coords, not stale state)
+
 ## [1.5.66] — 2026-03-05
 
 ### Added

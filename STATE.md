@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-05 Session 66 (Web App Phase 5 — Auth + Social)
+## Last Updated: 2026-03-05 Session 67 (Web App — Long-Press + Home Location)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -306,7 +306,7 @@
 - `web/src/lib/types.ts` — POI, FindResult, WeatherData, MetarStation, AircraftState, AircraftHistory, MbtaVehicle, MbtaStop, MbtaPrediction, AuthUser, AuthResponse, PoiComment, CommentsResponse, ChatRoom, ChatMessage
 - `web/src/lib/distance.ts` — `haversineM()` + `formatDistance()` (ft/mi formatting)
 - `web/src/lib/timeFormat.ts` — `relativeTime()` ("just now" / "5m ago" / "2h ago" / "3d ago" / date)
-- `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback
+- `web/src/hooks/useGeolocation.ts` — browser Geolocation API with Boston fallback, persistent home location (localStorage), Promise-based locate
 - `web/src/hooks/usePois.ts` — debounced (300ms) `/pois/bbox` fetch + `/pois/stats` total count + server-side cluster support
 - `web/src/hooks/useDarkMode.ts` — localStorage-persisted dark mode toggle
 - `web/src/hooks/useFind.ts` — search (1s debounce), findByCategory, loadCounts, fetchWebsite, fetchPoiDetail
@@ -316,14 +316,14 @@
 - `web/src/hooks/useAuth.ts` — auth state, register, login, logout, token validation on mount via `/auth/me`
 - `web/src/hooks/useComments.ts` — POI comment CRUD with unauthenticated fallback for viewing
 - `web/src/hooks/useChat.ts` — Socket.IO chat rooms, real-time messaging, typing indicator
-- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + all marker layers + radar + flight trail
+- `web/src/components/Map/MapView.tsx` — react-leaflet MapContainer + all marker layers + radar + flight trail + long-press handler
 - `web/src/components/Map/PoiMarkerLayer.tsx` — category-colored CircleMarkers, server-side cluster rendering (translucent), filter mode
 - `web/src/components/Map/RadarLayer.tsx` — RainViewer radar tiles + 7-frame animation via Leaflet API
 - `web/src/components/Map/MetarMarkerLayer.tsx` — flight-category colored CircleMarkers + monospace labels
 - `web/src/components/Map/AircraftMarkerLayer.tsx` — DivIcon markers with rotated airplane SVG, altitude-colored
 - `web/src/components/Map/FlightTrailLayer.tsx` — altitude-colored polyline segments from flight path history
 - `web/src/components/Map/TransitMarkerLayer.tsx` — route-colored CircleMarkers for vehicles, station dots, bus stop dots, selected vehicle highlighting
-- `web/src/components/Map/MapControls.tsx` — zoom +/- buttons + geolocation button
+- `web/src/components/Map/MapControls.tsx` — zoom +/- buttons + geolocation button + home location indicator
 - `web/src/components/Layout/Toolbar.tsx` — top bar: app name + Find + Weather + Layers (with count badge) + Chat + Profile + dark mode
 - `web/src/components/Layout/LayersDropdown.tsx` — dropdown toggle switches for Aircraft/Trains/Subway/Buses with count badges
 - `web/src/components/Layout/StatusBar.tsx` — bottom bar: coords + POI/aircraft/transit counts, teal filter bar, red alert banner
@@ -335,7 +335,7 @@
 - `web/src/components/Find/ResultsList.tsx` — shared result rows: distance + color dot + name + detail + category label
 - `web/src/components/Find/PoiDetailPanel.tsx` — detail panel: color bar, info rows, website resolution, action buttons (Directions/Call/Map/Share), comments section
 - `web/src/components/Social/AuthDialog.tsx` — register/login modal with client-side validation, two modes (toggle)
-- `web/src/components/Social/ProfileDropdown.tsx` — profile info dropdown with sign-in/sign-out, click-outside-to-close
+- `web/src/components/Social/ProfileDropdown.tsx` — profile info dropdown with sign-in/sign-out, home location set/clear, click-outside-to-close
 - `web/src/components/Social/CommentsSection.tsx` — comment list, add form, star rating, voting, delete
 - `web/src/components/Social/StarRating.tsx` — reusable star rating display + interactive selector
 - `web/src/components/Social/ChatPanel.tsx` — room list + chat room with real-time messaging, typing indicator

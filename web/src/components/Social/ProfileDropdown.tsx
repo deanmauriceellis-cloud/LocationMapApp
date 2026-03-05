@@ -7,9 +7,12 @@ interface Props {
   onClose: () => void
   onLogout: () => void
   onSignIn: () => void
+  hasHome?: boolean
+  onSetHome?: () => void
+  onClearHome?: () => void
 }
 
-export function ProfileDropdown({ open, user, onClose, onLogout, onSignIn }: Props) {
+export function ProfileDropdown({ open, user, onClose, onLogout, onSignIn, hasHome, onSetHome, onClearHome }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -55,6 +58,30 @@ export function ProfileDropdown({ open, user, onClose, onLogout, onSignIn }: Pro
           >
             Sign In
           </button>
+        </div>
+      )}
+
+      {/* Home location */}
+      {onSetHome && (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-2">
+          <button
+            onClick={() => { onSetHome(); onClose() }}
+            className="w-full py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Set Current Location as Home
+          </button>
+          {hasHome && onClearHome && (
+            <button
+              onClick={() => { onClearHome(); onClose() }}
+              className="w-full py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              Reset to Browser GPS
+            </button>
+          )}
         </div>
       )}
     </div>

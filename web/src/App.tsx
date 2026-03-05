@@ -135,11 +135,22 @@ export default function App() {
   }, [auth.isLoggedIn, authDialogOpen])
 
   const handleLocate = useCallback(() => {
-    geo.locate()
-    if (mapRef.current && geo.lat && geo.lon) {
-      mapRef.current.setView([geo.lat, geo.lon], 14)
+    geo.locate().then(({ lat, lon }) => {
+      mapRef.current?.setView([lat, lon], 14)
+    }).catch(() => {})
+  }, [geo.locate])
+
+  const handleLongPress = useCallback((lat: number, lon: number) => {
+    if (mapRef.current) {
+      const zoom = mapRef.current.getZoom()
+      mapRef.current.setView([lat, lon], zoom < 18 ? 18 : zoom)
     }
-  }, [geo])
+  }, [])
+
+  const handleSetHome = useCallback(() => {
+    const c = mapCenter || [geo.lat, geo.lon]
+    geo.setHome(c[0], c[1])
+  }, [mapCenter, geo.lat, geo.lon, geo.setHome])
 
   const handleToggleFind = useCallback(() => {
     setFindOpen(prev => {
@@ -386,6 +397,8 @@ export default function App() {
           selectedVehicleId={tr.selectedVehicle?.id}
           onVehicleClick={handleVehicleClick}
           onStopClick={handleStopClick}
+          onLongPress={handleLongPress}
+          hasHome={geo.hasHome}
         />
       </div>
 
@@ -519,6 +532,9 @@ export default function App() {
         onClose={() => setProfileOpen(false)}
         onLogout={auth.logout}
         onSignIn={handleLoginRequired}
+        hasHome={geo.hasHome}
+        onSetHome={handleSetHome}
+        onClearHome={geo.clearHome}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import { PoiMarkerLayer } from './PoiMarkerLayer'
@@ -47,6 +47,8 @@ interface Props {
   selectedVehicleId?: string | null
   onVehicleClick?: (v: MbtaVehicle) => void
   onStopClick?: (s: MbtaStop) => void
+  onLongPress?: (lat: number, lon: number) => void
+  hasHome?: boolean
 }
 
 function BoundsWatcher({ onBoundsChange }: { onBoundsChange: (bbox: BboxParams) => void }) {
@@ -67,6 +69,38 @@ function BoundsWatcher({ onBoundsChange }: { onBoundsChange: (bbox: BboxParams) 
   return null
 }
 
+function LongPressHandler({ onLongPress }: { onLongPress: (lat: number, lon: number) => void }) {
+  const map = useMap()
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const cancel = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+  }, [])
+
+  useMapEvents({
+    mousedown: (e) => {
+      cancel()
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null
+        onLongPress(e.latlng.lat, e.latlng.lng)
+      }, 700)
+    },
+    mouseup: cancel,
+    dragstart: cancel,
+    zoomstart: cancel,
+  })
+
+  // Prevent native context menu on map (mobile long-press)
+  useEffect(() => {
+    const container = map.getContainer()
+    const prevent = (e: Event) => e.preventDefault()
+    container.addEventListener('contextmenu', prevent)
+    return () => container.removeEventListener('contextmenu', prevent)
+  }, [map])
+
+  return null
+}
+
 function MapRefSetter({ mapRef }: { mapRef: React.MutableRefObject<LeafletMap | null> }) {
   const map = useMap()
   useEffect(() => { mapRef.current = map }, [map, mapRef])
@@ -78,6 +112,7 @@ export function MapView({
   metars, metarsVisible, radarOn, radarAnimating,
   aircraft, aircraftVisible, flightPath, onAircraftClick,
   trains, subway, buses, stations, busStops, trainsVisible, subwayVisible, busesVisible, selectedVehicleId, onVehicleClick, onStopClick,
+  onLongPress, hasHome,
 }: Props) {
   return (
     <MapContainer
@@ -87,6 +122,7 @@ export function MapView({
       zoomControl={false}
     >
       <MapRefSetter mapRef={mapRef} />
+      {onLongPress && <LongPressHandler onLongPress={onLongPress} />}
       <TileLayer
         key={dark ? 'dark' : 'light'}
         url={dark ? DARK_TILES : LIGHT_TILES}
@@ -105,7 +141,7 @@ export function MapView({
         selectedVehicleId={selectedVehicleId}
         onVehicleClick={onVehicleClick} onStopClick={onStopClick}
       />
-      <MapControls onLocate={onLocate} />
+      <MapControls onLocate={onLocate} hasHome={hasHome} />
     </MapContainer>
   )
 }
