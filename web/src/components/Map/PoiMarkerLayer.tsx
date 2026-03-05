@@ -69,6 +69,30 @@ export function PoiMarkerLayer({ pois, filterResults, onPoiClick }: Props) {
     )
   }
 
+  const lightweight = pois.length > 1000
+
+  if (lightweight) {
+    // Too many POIs — render simple dots, no interaction, no labels
+    return (
+      <>
+        {classified.map(({ poi, category }) => (
+          <CircleMarker
+            key={`${poi.osm_type || poi.type}-${poi.osm_id || poi.id}`}
+            center={[poi.lat, poi.lon]}
+            radius={3}
+            pathOptions={{
+              color: category?.color || UNCATEGORIZED_COLOR,
+              fillColor: category?.color || UNCATEGORIZED_COLOR,
+              fillOpacity: 0.7,
+              weight: 0,
+            }}
+            interactive={false}
+          />
+        ))}
+      </>
+    )
+  }
+
   return (
     <>
       {classified.map(({ poi, category }) => {

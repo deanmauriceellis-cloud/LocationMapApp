@@ -138,6 +138,103 @@ export interface WeatherData {
   fetchedAt: string
 }
 
+// Aircraft types — OpenSky state vectors + DB sightings
+export interface AircraftState {
+  icao24: string
+  callsign: string
+  originCountry: string
+  timePosition: number | null
+  lastContact: number
+  lon: number
+  lat: number
+  baroAlt: number | null
+  onGround: boolean
+  velocity: number | null
+  track: number | null
+  vertRate: number | null
+  sensors: number[] | null
+  geoAlt: number | null
+  squawk: string | null
+  spi: boolean
+  posSource: number
+  category: number
+}
+
+export interface FlightPathPoint {
+  firstLat: number
+  firstLon: number
+  lastLat: number
+  lastLon: number
+  firstSeen: string
+  lastSeen: string
+  altitude: number | null
+  heading: number | null
+}
+
+export interface AircraftSighting {
+  id: number
+  icao24: string
+  callsign: string | null
+  originCountry: string | null
+  firstSeen: string
+  lastSeen: string
+  firstLat: number
+  firstLon: number
+  lastLat: number
+  lastLon: number
+  firstAltitude: number | null
+  lastAltitude: number | null
+  squawk: string | null
+  onGround: boolean
+}
+
+export interface AircraftHistory {
+  icao24: string
+  callsigns: string[]
+  originCountry: string | null
+  totalSightings: number
+  firstSeen: string
+  lastSeen: string
+  sightings: AircraftSighting[]
+  path: FlightPathPoint[]
+}
+
+// MBTA transit types
+export interface MbtaVehicle {
+  id: string
+  label: string
+  routeId: string
+  routeName: string
+  headsign: string
+  stopName: string
+  lat: number
+  lon: number
+  bearing: number | null
+  speed: number | null
+  status: string
+  routeType: number
+  updatedAt: string
+}
+
+export interface MbtaStop {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  routeIds: string[]
+}
+
+export interface MbtaPrediction {
+  id: string
+  routeId: string
+  routeName: string
+  headsign: string
+  arrivalTime: string | null
+  departureTime: string | null
+  status: string | null
+  routeColor: string | null
+}
+
 // METAR types — passthrough from aviationweather.gov API
 export interface MetarStation {
   icaoId: string

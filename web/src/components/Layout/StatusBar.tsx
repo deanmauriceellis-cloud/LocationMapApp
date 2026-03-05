@@ -10,9 +10,13 @@ interface Props {
   alertEvent?: string | null
   alertCount?: number
   onAlertClick?: () => void
+  aircraftCount?: number
+  trainCount?: number
+  subwayCount?: number
+  busCount?: number
 }
 
-export function StatusBar({ lat, lon, poiCount, totalCount, loading, filterLabel, filterCount, onClearFilter, alertEvent, alertCount, onAlertClick }: Props) {
+export function StatusBar({ lat, lon, poiCount, totalCount, loading, filterLabel, filterCount, onClearFilter, alertEvent, alertCount, onAlertClick, aircraftCount, trainCount, subwayCount, busCount }: Props) {
   if (filterLabel) {
     return (
       <button
@@ -44,9 +48,15 @@ export function StatusBar({ lat, lon, poiCount, totalCount, loading, filterLabel
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[1000] h-8 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 flex items-center px-3 text-xs text-gray-600 dark:text-gray-400 gap-4">
       <span>{lat.toFixed(4)}, {lon.toFixed(4)}</span>
-      <span className="ml-auto">
-        {loading ? 'Loading...' : `${poiCount} POIs`}
-        {totalCount > 0 && ` / ${totalCount.toLocaleString()} total`}
+      <span className="ml-auto flex gap-3">
+        <span>
+          {loading ? 'Loading...' : `${poiCount} POIs`}
+          {totalCount > 0 && ` / ${totalCount.toLocaleString()} total`}
+        </span>
+        {(aircraftCount ?? 0) > 0 && <span>{aircraftCount} aircraft</span>}
+        {(trainCount ?? 0) > 0 && <span>{trainCount} trains</span>}
+        {(subwayCount ?? 0) > 0 && <span>{subwayCount} subway</span>}
+        {(busCount ?? 0) > 0 && <span>{busCount} buses</span>}
       </span>
     </div>
   )

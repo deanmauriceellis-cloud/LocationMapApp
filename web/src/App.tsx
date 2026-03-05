@@ -1,19 +1,28 @@
-import { useRef, useCallback, useState } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
 import type { Map as LeafletMap } from 'leaflet'
 import { MapView } from '@/components/Map/MapView'
 import { Toolbar } from '@/components/Layout/Toolbar'
 import { StatusBar } from '@/components/Layout/StatusBar'
+import { LayersDropdown } from '@/components/Layout/LayersDropdown'
 import { FindPanel } from '@/components/Find/FindPanel'
 import { PoiDetailPanel } from '@/components/Find/PoiDetailPanel'
 import { WeatherPanel } from '@/components/Weather/WeatherPanel'
+import { AircraftDetailPanel } from '@/components/Aircraft/AircraftDetailPanel'
+import { VehicleDetailPanel } from '@/components/Transit/VehicleDetailPanel'
+import { ArrivalBoardPanel } from '@/components/Transit/ArrivalBoardPanel'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { usePois } from '@/hooks/usePois'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { useFind } from '@/hooks/useFind'
 import { useWeather } from '@/hooks/useWeather'
+import { useAircraft } from '@/hooks/useAircraft'
+import { useTransit } from '@/hooks/useTransit'
 import { classifyPoi } from '@/config/categories'
 import { haversineM } from '@/lib/distance'
-import type { BboxParams, POI, FindResult } from '@/lib/types'
+import type { BboxParams, POI, FindResult, AircraftState, MbtaVehicle, MbtaStop } from '@/lib/types'
+
+// Which detail panel is showing (mutual exclusion)
+type DetailView = 'none' | 'poi' | 'aircraft' | 'vehicle' | 'arrivals'
 
 export default function App() {
   const geo = useGeolocation()
@@ -21,20 +30,27 @@ export default function App() {
   const { dark, toggle: toggleDark } = useDarkMode()
   const find = useFind()
   const wx = useWeather()
+  const ac = useAircraft()
+  const tr = useTransit()
   const mapRef = useRef<LeafletMap | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
   const lastBbox = useRef<BboxParams | null>(null)
 
   const [findOpen, setFindOpen] = useState(false)
   const [weatherOpen, setWeatherOpen] = useState(false)
+  const [layersOpen, setLayersOpen] = useState(false)
+  const [detailView, setDetailView] = useState<DetailView>('none')
   const [selectedResult, setSelectedResult] = useState<FindResult | null>(null)
   const [filterResults, setFilterResults] = useState<FindResult[] | null>(null)
   const [filterLabel, setFilterLabel] = useState<string | null>(null)
+  const [arrivalStopName, setArrivalStopName] = useState('')
 
   const center: [number, number] = mapCenter || [geo.lat, geo.lon]
 
   const metarsVisibleRef = useRef(wx.metarsVisible)
   metarsVisibleRef.current = wx.metarsVisible
+  const acVisibleRef = useRef(ac.visible)
+  acVisibleRef.current = ac.visible
 
   const handleBoundsChange = useCallback((bbox: BboxParams) => {
     fetchPois(bbox)
@@ -43,7 +59,30 @@ export default function App() {
     const lon = (bbox.w + bbox.e) / 2
     setMapCenter([lat, lon])
     if (metarsVisibleRef.current) wx.fetchMetars(bbox)
-  }, [fetchPois, wx.fetchMetars])
+    if (acVisibleRef.current) ac.fetchAircraft(bbox)
+  }, [fetchPois, wx.fetchMetars, ac.fetchAircraft])
+
+  // Auto-refresh aircraft when visible
+  useEffect(() => {
+    if (ac.visible && lastBbox.current) {
+      ac.fetchAircraft(lastBbox.current)
+      ac.startAutoRefresh(lastBbox.current)
+    } else {
+      ac.stopAutoRefresh()
+    }
+    return () => ac.stopAutoRefresh()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ac.visible])
+
+  // Follow selected aircraft: fly to its position on each data refresh
+  useEffect(() => {
+    if (ac.following && ac.selectedAircraft && mapRef.current) {
+      const sel = ac.aircraft.find(a => a.icao24 === ac.selectedAircraft!.icao24)
+      if (sel) {
+        mapRef.current.setView([sel.lat, sel.lon])
+      }
+    }
+  }, [ac.following, ac.selectedAircraft, ac.aircraft])
 
   const handleLocate = useCallback(() => {
     geo.locate()
@@ -55,19 +94,21 @@ export default function App() {
   const handleToggleFind = useCallback(() => {
     setFindOpen(prev => {
       if (!prev) {
+        setDetailView('none')
         setSelectedResult(null)
-        setWeatherOpen(false) // mutual exclusion
+        ac.clearSelection()
+        tr.clearSelection()
+        setWeatherOpen(false)
         wx.stopAutoRefresh()
       }
       return !prev
     })
-  }, [wx.stopAutoRefresh])
+  }, [wx.stopAutoRefresh, ac.clearSelection, tr.clearSelection])
 
   const handleToggleWeather = useCallback(() => {
     setWeatherOpen(prev => {
       if (!prev) {
-        setFindOpen(false) // mutual exclusion
-        // Fetch weather for current center
+        setFindOpen(false)
         const c = mapCenter || [geo.lat, geo.lon]
         wx.fetchWeather(c[0], c[1])
         wx.startAutoRefresh(c[0], c[1])
@@ -77,6 +118,10 @@ export default function App() {
       return !prev
     })
   }, [mapCenter, geo.lat, geo.lon, wx.fetchWeather, wx.startAutoRefresh, wx.stopAutoRefresh])
+
+  const handleToggleLayers = useCallback(() => {
+    setLayersOpen(prev => !prev)
+  }, [])
 
   const handleAlertClick = useCallback(() => {
     if (!weatherOpen) {
@@ -90,7 +135,6 @@ export default function App() {
 
   const handleToggleMetars = useCallback(() => {
     wx.toggleMetars()
-    // If enabling metars and we have a bbox, fetch immediately
     if (!metarsVisibleRef.current && lastBbox.current) {
       wx.fetchMetars(lastBbox.current)
     }
@@ -110,18 +154,21 @@ export default function App() {
 
   const handleSelectResult = useCallback((result: FindResult) => {
     setSelectedResult(result)
+    setDetailView('poi')
     setFindOpen(false)
+    ac.clearSelection()
+    tr.clearSelection()
     if (mapRef.current) {
       mapRef.current.setView([result.lat, result.lon], 18)
     }
-  }, [])
+  }, [ac.clearSelection, tr.clearSelection])
 
   const handleFilterAndMap = useCallback((results: FindResult[], label: string) => {
     setFilterResults(results)
     setFilterLabel(label)
     setFindOpen(false)
     setSelectedResult(null)
-    // Zoom to fit all results
+    setDetailView('none')
     if (mapRef.current && results.length > 0) {
       const L = (window as any).L
       if (L) {
@@ -150,18 +197,70 @@ export default function App() {
       tags: poi.tags || {},
     }
     setSelectedResult(result)
+    setDetailView('poi')
     setFindOpen(false)
-  }, [center])
+    ac.clearSelection()
+    tr.clearSelection()
+  }, [center, ac.clearSelection, tr.clearSelection])
+
+  const handleAircraftClick = useCallback((aircraft: AircraftState) => {
+    ac.selectAircraft(aircraft)
+    setDetailView('aircraft')
+    setSelectedResult(null)
+    tr.clearSelection()
+    setFindOpen(false)
+  }, [ac.selectAircraft, tr.clearSelection])
+
+  const handleVehicleClick = useCallback((v: MbtaVehicle) => {
+    tr.selectVehicle(v)
+    setDetailView('vehicle')
+    setSelectedResult(null)
+    ac.clearSelection()
+    setFindOpen(false)
+  }, [tr.selectVehicle, ac.clearSelection])
+
+  const handleStopClick = useCallback((s: MbtaStop) => {
+    tr.selectStop(s)
+    setArrivalStopName(s.name)
+    setDetailView('arrivals')
+    setSelectedResult(null)
+    ac.clearSelection()
+    setFindOpen(false)
+  }, [tr.selectStop, ac.clearSelection])
+
+  const handleVehicleArrivals = useCallback((_stopName: string) => {
+    // Find the stop by name and show arrivals
+    // For now, show arrival board with the vehicle's stop name
+    setArrivalStopName(_stopName)
+    setDetailView('arrivals')
+  }, [])
 
   const handleCloseDetail = useCallback(() => {
+    setDetailView('none')
     setSelectedResult(null)
-  }, [])
+    ac.clearSelection()
+    tr.clearSelection()
+  }, [ac.clearSelection, tr.clearSelection])
 
   const handleFlyTo = useCallback((lat: number, lon: number) => {
     if (mapRef.current) {
       mapRef.current.setView([lat, lon], 18)
     }
   }, [])
+
+  // Layer counts
+  const activeLayerCount =
+    (ac.visible ? 1 : 0) +
+    (tr.trainsVisible ? 1 : 0) +
+    (tr.subwayVisible ? 1 : 0) +
+    (tr.busesVisible ? 1 : 0)
+
+  const layers = [
+    { label: 'Aircraft', active: ac.visible, count: ac.aircraft.length, onToggle: ac.toggleVisible },
+    { label: 'Trains', active: tr.trainsVisible, count: tr.trains.length, onToggle: tr.toggleTrains },
+    { label: 'Subway', active: tr.subwayVisible, count: tr.subway.length, onToggle: tr.toggleSubway },
+    { label: 'Buses', active: tr.busesVisible, count: tr.buses.length, onToggle: tr.toggleBuses },
+  ]
 
   return (
     <div className={`h-screen w-screen relative ${dark ? 'dark' : ''}`}>
@@ -172,10 +271,16 @@ export default function App() {
         onToggleFind={handleToggleFind}
         weatherOpen={weatherOpen}
         onToggleWeather={handleToggleWeather}
+        layersOpen={layersOpen}
+        onToggleLayers={handleToggleLayers}
+        activeLayerCount={activeLayerCount}
         alertCount={wx.weather?.alerts?.length}
         weatherIconCode={wx.weather?.current?.iconCode}
         weatherIsDaytime={wx.weather?.current?.isDaytime}
       />
+
+      <LayersDropdown open={layersOpen} layers={layers} onClose={() => setLayersOpen(false)} />
+
       <div className="absolute inset-0 top-12 bottom-8">
         <MapView
           center={center}
@@ -190,6 +295,19 @@ export default function App() {
           metarsVisible={wx.metarsVisible}
           radarOn={wx.radarOn}
           radarAnimating={wx.radarAnimating}
+          aircraft={ac.aircraft}
+          aircraftVisible={ac.visible}
+          flightPath={ac.history?.path}
+          onAircraftClick={handleAircraftClick}
+          trains={tr.trains}
+          subway={tr.subway}
+          buses={tr.buses}
+          stations={tr.stations}
+          trainsVisible={tr.trainsVisible}
+          subwayVisible={tr.subwayVisible}
+          busesVisible={tr.busesVisible}
+          onVehicleClick={handleVehicleClick}
+          onStopClick={handleStopClick}
         />
       </div>
 
@@ -226,13 +344,43 @@ export default function App() {
         onClose={handleToggleWeather}
       />
 
-      {/* POI detail panel */}
-      {selectedResult && (
+      {/* Detail panels — mutually exclusive */}
+      {detailView === 'poi' && selectedResult && (
         <PoiDetailPanel
           result={selectedResult}
           onClose={handleCloseDetail}
           onFlyTo={handleFlyTo}
           onFetchWebsite={find.fetchWebsite}
+        />
+      )}
+
+      {detailView === 'aircraft' && ac.selectedAircraft && (
+        <AircraftDetailPanel
+          aircraft={ac.selectedAircraft}
+          history={ac.history}
+          historyLoading={ac.historyLoading}
+          following={ac.following}
+          onToggleFollow={ac.toggleFollow}
+          onFlyTo={handleFlyTo}
+          onClose={handleCloseDetail}
+        />
+      )}
+
+      {detailView === 'vehicle' && tr.selectedVehicle && (
+        <VehicleDetailPanel
+          vehicle={tr.selectedVehicle}
+          onArrivals={handleVehicleArrivals}
+          onFlyTo={handleFlyTo}
+          onClose={handleCloseDetail}
+        />
+      )}
+
+      {detailView === 'arrivals' && (tr.selectedStop || arrivalStopName) && (
+        <ArrivalBoardPanel
+          stopName={tr.selectedStop?.name || arrivalStopName}
+          predictions={tr.predictions}
+          loading={tr.predictionsLoading}
+          onClose={handleCloseDetail}
         />
       )}
 
@@ -248,6 +396,10 @@ export default function App() {
         alertEvent={wx.weather?.alerts?.[0]?.event}
         alertCount={wx.weather?.alerts?.length}
         onAlertClick={handleAlertClick}
+        aircraftCount={ac.visible ? ac.aircraft.length : undefined}
+        trainCount={tr.trainsVisible ? tr.trains.length : undefined}
+        subwayCount={tr.subwayVisible ? tr.subway.length : undefined}
+        busCount={tr.busesVisible ? tr.buses.length : undefined}
       />
     </div>
   )

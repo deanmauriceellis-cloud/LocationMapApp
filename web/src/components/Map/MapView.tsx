@@ -4,8 +4,11 @@ import type { Map as LeafletMap } from 'leaflet'
 import { PoiMarkerLayer } from './PoiMarkerLayer'
 import { RadarLayer } from './RadarLayer'
 import { MetarMarkerLayer } from './MetarMarkerLayer'
+import { AircraftMarkerLayer } from './AircraftMarkerLayer'
+import { FlightTrailLayer } from './FlightTrailLayer'
+import { TransitMarkerLayer } from './TransitMarkerLayer'
 import { MapControls } from './MapControls'
-import type { POI, BboxParams, FindResult, MetarStation } from '@/lib/types'
+import type { POI, BboxParams, FindResult, MetarStation, AircraftState, FlightPathPoint, MbtaVehicle, MbtaStop } from '@/lib/types'
 
 const LIGHT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -25,6 +28,21 @@ interface Props {
   metarsVisible?: boolean
   radarOn?: boolean
   radarAnimating?: boolean
+  // Aircraft
+  aircraft?: AircraftState[]
+  aircraftVisible?: boolean
+  flightPath?: FlightPathPoint[]
+  onAircraftClick?: (ac: AircraftState) => void
+  // Transit
+  trains?: MbtaVehicle[]
+  subway?: MbtaVehicle[]
+  buses?: MbtaVehicle[]
+  stations?: MbtaStop[]
+  trainsVisible?: boolean
+  subwayVisible?: boolean
+  busesVisible?: boolean
+  onVehicleClick?: (v: MbtaVehicle) => void
+  onStopClick?: (s: MbtaStop) => void
 }
 
 function BoundsWatcher({ onBoundsChange }: { onBoundsChange: (bbox: BboxParams) => void }) {
@@ -51,7 +69,12 @@ function MapRefSetter({ mapRef }: { mapRef: React.MutableRefObject<LeafletMap | 
   return null
 }
 
-export function MapView({ center, dark, pois, onBoundsChange, onLocate, mapRef, filterResults, onPoiClick, metars, metarsVisible, radarOn, radarAnimating }: Props) {
+export function MapView({
+  center, dark, pois, onBoundsChange, onLocate, mapRef, filterResults, onPoiClick,
+  metars, metarsVisible, radarOn, radarAnimating,
+  aircraft, aircraftVisible, flightPath, onAircraftClick,
+  trains, subway, buses, stations, trainsVisible, subwayVisible, busesVisible, onVehicleClick, onStopClick,
+}: Props) {
   return (
     <MapContainer
       center={center}
@@ -70,6 +93,13 @@ export function MapView({ center, dark, pois, onBoundsChange, onLocate, mapRef, 
       <RadarLayer visible={radarOn || false} animating={radarAnimating || false} />
       <PoiMarkerLayer pois={pois} filterResults={filterResults} onPoiClick={onPoiClick} />
       <MetarMarkerLayer metars={metars || []} visible={metarsVisible || false} />
+      <AircraftMarkerLayer aircraft={aircraft || []} visible={aircraftVisible || false} onAircraftClick={onAircraftClick} />
+      <FlightTrailLayer path={flightPath || []} visible={aircraftVisible || false} />
+      <TransitMarkerLayer
+        trains={trains || []} subway={subway || []} buses={buses || []} stations={stations || []}
+        trainsVisible={trainsVisible || false} subwayVisible={subwayVisible || false} busesVisible={busesVisible || false}
+        onVehicleClick={onVehicleClick} onStopClick={onStopClick}
+      />
       <MapControls onLocate={onLocate} />
     </MapContainer>
   )

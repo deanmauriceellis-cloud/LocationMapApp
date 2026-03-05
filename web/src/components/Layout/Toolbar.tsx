@@ -7,12 +7,15 @@ interface Props {
   onToggleFind?: () => void
   weatherOpen?: boolean
   onToggleWeather?: () => void
+  layersOpen?: boolean
+  onToggleLayers?: () => void
+  activeLayerCount?: number
   alertCount?: number
   weatherIconCode?: string
   weatherIsDaytime?: boolean
 }
 
-export function Toolbar({ dark, onToggleDark, findOpen, onToggleFind, weatherOpen, onToggleWeather, alertCount, weatherIconCode, weatherIsDaytime }: Props) {
+export function Toolbar({ dark, onToggleDark, findOpen, onToggleFind, weatherOpen, onToggleWeather, layersOpen, onToggleLayers, activeLayerCount, alertCount, weatherIconCode, weatherIsDaytime }: Props) {
   return (
     <div className="absolute top-0 left-0 right-0 z-[1000] h-12 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center px-3 gap-1">
       <span className="font-semibold text-sm text-gray-800 dark:text-gray-100 mr-auto">
@@ -41,6 +44,23 @@ export function Toolbar({ dark, onToggleDark, findOpen, onToggleFind, weatherOpe
               )}
             {(alertCount ?? 0) > 0 && (
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
+            )}
+          </div>
+        </ToolbarButton>
+      )}
+
+      {onToggleLayers && (
+        <ToolbarButton title="Layers" onClick={onToggleLayers} active={layersOpen}>
+          <div className="relative">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+            {(activeLayerCount ?? 0) > 0 && (
+              <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] bg-teal-600 rounded-full text-[9px] text-white font-bold flex items-center justify-center px-0.5">
+                {activeLayerCount}
+              </span>
             )}
           </div>
         </ToolbarButton>
