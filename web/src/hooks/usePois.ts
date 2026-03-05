@@ -2,8 +2,22 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiFetch } from '@/config/api'
 import type { POI, BboxParams } from '@/lib/types'
 
+export interface PoiCluster {
+  lat: number
+  lon: number
+  count: number
+  tag: string
+}
+
+interface BboxResponse {
+  count: number
+  elements: POI[]
+  clusters: PoiCluster[] | null
+}
+
 export function usePois() {
   const [pois, setPois] = useState<POI[]>([])
+  const [clusters, setClusters] = useState<PoiCluster[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -23,12 +37,13 @@ export function usePois() {
           n: bbox.n.toFixed(6),
           e: bbox.e.toFixed(6),
         })
-        const data = await apiFetch<{ elements: POI[] }>(
+        const data = await apiFetch<BboxResponse>(
           `/pois/bbox?${params}`,
           { signal: controller.signal }
         )
         if (!controller.signal.aborted) {
           setPois(data.elements || [])
+          setClusters(data.clusters || null)
         }
       } catch (e: unknown) {
         if (e instanceof DOMException && e.name === 'AbortError') return
@@ -45,5 +60,5 @@ export function usePois() {
       .catch(() => {})
   }, [])
 
-  return { pois, loading, totalCount, fetchPois }
+  return { pois, clusters, loading, totalCount, fetchPois }
 }

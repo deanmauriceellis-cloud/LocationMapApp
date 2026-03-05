@@ -1,15 +1,26 @@
 // (C) Dean Maurice Ellis, 2026 - Module VehicleDetailPanel.tsx
 import { getRouteColor, routeTypeLabel, vehicleStatusLabel } from '@/config/transit'
-import type { MbtaVehicle } from '@/lib/types'
+import type { MbtaVehicle, MbtaPrediction } from '@/lib/types'
 
 interface Props {
   vehicle: MbtaVehicle
-  onArrivals: (stopName: string) => void
+  predictions: MbtaPrediction[]
+  following: boolean
+  onToggleFollow: () => void
   onFlyTo: (lat: number, lon: number) => void
   onClose: () => void
 }
 
-export function VehicleDetailPanel({ vehicle: v, onArrivals, onFlyTo, onClose }: Props) {
+function formatArrival(time: string | null): string {
+  if (!time) return '—'
+  const dt = new Date(time)
+  const diff = Math.round((dt.getTime() - Date.now()) / 60_000)
+  if (diff <= 0) return 'Now'
+  if (diff < 60) return `${diff} min`
+  return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+export function VehicleDetailPanel({ vehicle: v, predictions, following, onToggleFollow, onFlyTo, onClose }: Props) {
   const color = getRouteColor(v.routeId, v.routeType)
   const statusText = `${vehicleStatusLabel(v.status)} ${v.stopName}`
   const typeText = routeTypeLabel(v.routeType)
@@ -50,22 +61,48 @@ export function VehicleDetailPanel({ vehicle: v, onArrivals, onFlyTo, onClose }:
           )}
         </div>
 
+        {/* Next stops along the route */}
+        {predictions.length > 0 && (
+          <div className="px-4 pb-3">
+            <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+              Next Stops
+            </div>
+            <div className="space-y-1.5">
+              {predictions.slice(0, 5).map((p, i) => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold text-white"
+                    style={{ backgroundColor: p.routeColor || color }}
+                  >
+                    {i + 1}
+                  </div>
+                  <span className="flex-1 text-gray-700 dark:text-gray-300 truncate">
+                    {p.stopName || p.headsign || p.routeId}
+                  </span>
+                  <span className="text-xs font-mono text-teal-600 dark:text-teal-400 shrink-0">
+                    {formatArrival(p.arrivalTime || p.departureTime)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="p-4 pt-0 grid grid-cols-2 gap-2">
-          {v.stopName && (
-            <button
-              onClick={() => onArrivals(v.stopName)}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              Arrivals
-            </button>
-          )}
+          <button
+            onClick={onToggleFollow}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+              following
+                ? 'bg-teal-600 text-white hover:bg-teal-700'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            {following ? 'Following' : 'Follow'}
+          </button>
           <button
             onClick={() => onFlyTo(v.lat, v.lon)}
             className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"

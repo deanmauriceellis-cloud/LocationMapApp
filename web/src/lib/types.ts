@@ -207,6 +207,7 @@ export interface MbtaVehicle {
   routeName: string
   headsign: string
   stopName: string
+  tripId: string
   lat: number
   lon: number
   bearing: number | null
@@ -228,7 +229,9 @@ export interface MbtaPrediction {
   id: string
   routeId: string
   routeName: string
-  headsign: string
+  headsign?: string
+  stopName?: string
+  stopSequence?: number
   arrivalTime: string | null
   departureTime: string | null
   status: string | null

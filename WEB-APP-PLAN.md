@@ -29,13 +29,23 @@ Cross-platform web frontend (React 19 + TypeScript + Vite + Leaflet) consuming t
 - Alert banner in status bar (red, click opens weather panel)
 - 5 new files + 6 modified, 404KB / 121KB gzip
 
-## Phase 4: Aircraft + Transit
-- Aircraft markers from `/aircraft` (rotated icons, altitude-colored, callsign labels)
-- Aircraft detail panel (click marker → info + follow button)
-- Flight path trail (altitude-colored polyline)
-- MBTA transit: live vehicle markers (buses, trains, subway)
-- Station/stop tap → arrival board
-- Layer toggles in toolbar or settings panel
+## Phase 4: Aircraft + Transit — DONE (v1.5.65)
+- Aircraft markers from `/aircraft` (DivIcon with rotated airplane SVG, altitude-colored, callsign labels)
+- Aircraft detail panel (altitude/speed/heading/squawk, follow button, sighting history)
+- Flight path trail (altitude-colored polyline segments from DB history)
+- MBTA transit: live vehicle markers (trains/subway/buses) as route-colored CircleMarkers
+- Station dots at zoom >= 12 (rail), bus stop dots at zoom >= 15 (max 200 per viewport, bbox-filtered)
+- Click station → arrival/departure board with DEP/ARR labels, service-ended message when no predictions
+- Click vehicle → detail panel with next 5 stops along route (trip-based predictions)
+- Vehicle follow mode: map centers on vehicle position each refresh cycle
+- Selected vehicle highlighting: teal border ring + permanent detail label
+- Layers dropdown: 4 toggle switches (Aircraft/Trains/Subway/Buses) with count badges
+- Server-side POI clustering: >1000 POIs → SQL grid aggregation (~77 clusters vs 28k markers)
+- Detail panel mutual exclusion: POI/Aircraft/Vehicle/ArrivalBoard (only one shows at a time)
+- Auto-refresh: aircraft 15s, trains/subway 15s, buses 30s, predictions 30s
+- Status bar: per-layer counts (aircraft/trains/subway/buses) alongside POI count
+- Proxy endpoints: `/mbta/vehicles`, `/mbta/stations`, `/mbta/predictions`, `/mbta/trip-predictions`, `/mbta/bus-stops/bbox`
+- 12 new files + 6 modified + 2 proxy files modified
 
 ## Phase 5: Auth + Social
 - Device-bonded registration (same as Android: register once, JWT tokens)

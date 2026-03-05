@@ -2,6 +2,66 @@
 
 > Releases prior to v1.5.51 archived in `CHANGELOG-ARCHIVE.md`.
 
+## [1.5.65] — 2026-03-05
+
+### Added
+- **Web app Phase 4** — Aircraft tracking + MBTA transit layers with real-time data
+  - **Aircraft markers**: DivIcon with rotated airplane SVG, altitude-colored (ground=gray, <5kft=green, 5-20kft=blue, >20kft=purple), callsign labels
+  - **Aircraft detail panel**: altitude/speed/heading/squawk info, follow button (centers map on aircraft each 15s refresh), sighting history from DB
+  - **Flight trail**: altitude-colored polyline segments from flight path history
+  - **Transit vehicle markers**: route-colored CircleMarkers for trains, subway, and buses with labels at zoom >= 16
+  - **Station markers**: rail station dots at zoom >= 12, bus stop dots at zoom >= 15 (max 200 per viewport, bbox-filtered with sampling)
+  - **Arrival/departure board**: click station → dark-themed panel with route-colored prediction rows, DEP/ARR labels, "service ended" message when no predictions
+  - **Vehicle detail panel**: route-colored header, status, next 5 stops along route with arrival times (trip-based predictions)
+  - **Vehicle follow mode**: click Follow → map centers on vehicle position each refresh cycle, selected vehicle gets teal border ring + permanent detail label
+  - **Layers dropdown**: toolbar button with 4 toggle switches (Aircraft/Trains/Subway/Buses) and count badges
+  - **Server-side POI clustering**: >1000 POIs triggers SQL grid aggregation (~77 translucent cluster circles vs 28k individual markers)
+  - **Detail panel mutual exclusion**: POI/Aircraft/Vehicle/ArrivalBoard — only one shows at a time
+  - **Auto-refresh**: aircraft 15s, trains/subway 15s, buses 30s, predictions 30s
+  - **Status bar**: per-layer counts (aircraft/trains/subway/buses) alongside POI count
+
+### Proxy Endpoints Added (5)
+- `GET /mbta/vehicles?route_type=X` — flat vehicle list with tripId, 15s cache
+- `GET /mbta/stations?route_type=X` — flat station list, 1h cache
+- `GET /mbta/predictions?stop=X&stop_name=X` — station predictions (resolves all platforms by name), 30s cache
+- `GET /mbta/trip-predictions?trip=X` — next 5 stops for a vehicle's trip, 30s cache
+- `GET /mbta/bus-stops/bbox?s=&w=&n=&e=` — bus stops in viewport, max 200 with sampling
+
+### Proxy Changes
+- `cache-proxy/lib/pois.js` — `/pois/bbox` now returns server-side clusters when >1000 POIs (SQL grid aggregation with MODE() dominant category)
+- `cache-proxy/lib/mbta.js` — JSON:API flattening helpers, 5 new endpoints, prediction null-time filtering + time-based sorting
+
+### Files Created (12)
+- `web/src/config/aircraft.ts` — altitude colors, unit converters, SVG icon factory
+- `web/src/config/transit.ts` — MBTA route colors, status/type labels
+- `web/src/hooks/useAircraft.ts` — aircraft state, auto-refresh, history, follow
+- `web/src/hooks/useTransit.ts` — trains/subway/buses/stations/busStops, follow, trip predictions
+- `web/src/components/Map/AircraftMarkerLayer.tsx` — rotated airplane DivIcons
+- `web/src/components/Map/FlightTrailLayer.tsx` — altitude-colored polylines
+- `web/src/components/Map/TransitMarkerLayer.tsx` — route-colored CircleMarkers + station/bus stop dots
+- `web/src/components/Aircraft/AircraftDetailPanel.tsx` — aircraft info + follow
+- `web/src/components/Transit/VehicleDetailPanel.tsx` — vehicle info + next stops
+- `web/src/components/Transit/ArrivalBoardPanel.tsx` — station departures & arrivals board
+- `web/src/components/Layout/LayersDropdown.tsx` — layer toggle dropdown
+
+### Files Modified (8)
+- `web/src/lib/types.ts` — AircraftState, AircraftHistory, MbtaVehicle (with tripId), MbtaStop, MbtaPrediction (with stopName/stopSequence)
+- `web/src/hooks/usePois.ts` — server-side cluster support (PoiCluster type)
+- `web/src/App.tsx` — aircraft/transit hooks, layers dropdown, detail mutual exclusion, follow effects, bus stops fetch
+- `web/src/components/Map/MapView.tsx` — aircraft/transit/cluster layer integration
+- `web/src/components/Map/PoiMarkerLayer.tsx` — cluster rendering mode (translucent circles with count labels)
+- `web/src/components/Layout/Toolbar.tsx` — Layers button with active count badge
+- `web/src/components/Layout/StatusBar.tsx` — per-layer vehicle counts
+- `web/src/index.css` — aircraft-label, transit-label, cluster-label CSS (dark mode variants)
+
+### Bug Fixes
+- DivIcon transit markers not rendering → replaced with CircleMarker approach (same as POIs/METARs)
+- MBTA stations returning 0 results (location_type=1 filter incorrect) → removed filter
+- Page unresponsive with 28k POIs → server-side SQL grid clustering
+- Bus stop predictions failing (stop_name resolver only checked rail stations cache) → added fetchPredictionsById for bus stops
+- Selected vehicle permanent label not showing → force remount via key change on selection
+- Prediction null-time entries sorting first → filtered out + sorted by earliest available time
+
 ## [1.5.63] — 2026-03-05
 
 ### Added

@@ -26,7 +26,7 @@ type DetailView = 'none' | 'poi' | 'aircraft' | 'vehicle' | 'arrivals'
 
 export default function App() {
   const geo = useGeolocation()
-  const { pois, loading, totalCount, fetchPois } = usePois()
+  const { pois, clusters, loading, totalCount, fetchPois } = usePois()
   const { dark, toggle: toggleDark } = useDarkMode()
   const find = useFind()
   const wx = useWeather()
@@ -51,6 +51,10 @@ export default function App() {
   metarsVisibleRef.current = wx.metarsVisible
   const acVisibleRef = useRef(ac.visible)
   acVisibleRef.current = ac.visible
+  const busesVisibleRef = useRef(tr.busesVisible)
+  busesVisibleRef.current = tr.busesVisible
+  const fetchBusStopsRef = useRef(tr.fetchBusStops)
+  fetchBusStopsRef.current = tr.fetchBusStops
 
   const handleBoundsChange = useCallback((bbox: BboxParams) => {
     fetchPois(bbox)
@@ -60,6 +64,7 @@ export default function App() {
     setMapCenter([lat, lon])
     if (metarsVisibleRef.current) wx.fetchMetars(bbox)
     if (acVisibleRef.current) ac.fetchAircraft(bbox)
+    if (busesVisibleRef.current) fetchBusStopsRef.current(bbox)
   }, [fetchPois, wx.fetchMetars, ac.fetchAircraft])
 
   // Auto-refresh aircraft when visible
@@ -74,6 +79,14 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ac.visible])
 
+  // Fetch bus stops when bus layer is toggled on
+  useEffect(() => {
+    if (tr.busesVisible && lastBbox.current) {
+      fetchBusStopsRef.current(lastBbox.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tr.busesVisible])
+
   // Follow selected aircraft: fly to its position on each data refresh
   useEffect(() => {
     if (ac.following && ac.selectedAircraft && mapRef.current) {
@@ -83,6 +96,13 @@ export default function App() {
       }
     }
   }, [ac.following, ac.selectedAircraft, ac.aircraft])
+
+  // Follow selected vehicle: fly to its position on each data refresh
+  useEffect(() => {
+    if (tr.followingVehicleId && tr.selectedVehicle && mapRef.current) {
+      mapRef.current.setView([tr.selectedVehicle.lat, tr.selectedVehicle.lon])
+    }
+  }, [tr.followingVehicleId, tr.selectedVehicle])
 
   const handleLocate = useCallback(() => {
     geo.locate()
@@ -228,13 +248,6 @@ export default function App() {
     setFindOpen(false)
   }, [tr.selectStop, ac.clearSelection])
 
-  const handleVehicleArrivals = useCallback((_stopName: string) => {
-    // Find the stop by name and show arrivals
-    // For now, show arrival board with the vehicle's stop name
-    setArrivalStopName(_stopName)
-    setDetailView('arrivals')
-  }, [])
-
   const handleCloseDetail = useCallback(() => {
     setDetailView('none')
     setSelectedResult(null)
@@ -286,6 +299,7 @@ export default function App() {
           center={center}
           dark={dark}
           pois={pois}
+          clusters={clusters}
           onBoundsChange={handleBoundsChange}
           onLocate={handleLocate}
           mapRef={mapRef}
@@ -303,9 +317,11 @@ export default function App() {
           subway={tr.subway}
           buses={tr.buses}
           stations={tr.stations}
+          busStops={tr.busStops}
           trainsVisible={tr.trainsVisible}
           subwayVisible={tr.subwayVisible}
           busesVisible={tr.busesVisible}
+          selectedVehicleId={tr.selectedVehicle?.id}
           onVehicleClick={handleVehicleClick}
           onStopClick={handleStopClick}
         />
@@ -369,7 +385,9 @@ export default function App() {
       {detailView === 'vehicle' && tr.selectedVehicle && (
         <VehicleDetailPanel
           vehicle={tr.selectedVehicle}
-          onArrivals={handleVehicleArrivals}
+          predictions={tr.predictions}
+          following={tr.followingVehicleId === tr.selectedVehicle.id}
+          onToggleFollow={tr.toggleFollow}
           onFlyTo={handleFlyTo}
           onClose={handleCloseDetail}
         />
@@ -387,7 +405,7 @@ export default function App() {
       <StatusBar
         lat={center[0]}
         lon={center[1]}
-        poiCount={pois.length}
+        poiCount={clusters ? clusters.reduce((s, c) => s + c.count, 0) : pois.length}
         totalCount={totalCount}
         loading={loading}
         filterLabel={filterLabel}

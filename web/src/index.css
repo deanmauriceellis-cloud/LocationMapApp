@@ -34,6 +34,27 @@ html, body, #root {
   color: #e5e7eb !important;
 }
 
+/* Cluster count labels */
+.cluster-label {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: rgba(0, 0, 0, 0.45) !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.dark .cluster-label {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.cluster-label::before {
+  display: none !important;
+}
+
 .dark .leaflet-control-attribution {
   background: rgba(17, 24, 39, 0.8) !important;
   color: #9ca3af !important;

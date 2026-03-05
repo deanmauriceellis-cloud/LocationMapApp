@@ -2,16 +2,33 @@ import { useMemo } from 'react'
 import { CircleMarker, Tooltip, useMap } from 'react-leaflet'
 import { classifyPoi, resolveCategory, UNCATEGORIZED_COLOR } from '@/config/categories'
 import type { POI, FindResult } from '@/lib/types'
+import type { PoiCluster } from '@/hooks/usePois'
 
 const LABEL_ZOOM = 16
 
+/** Map dominant tag string to a color */
+function clusterColor(tag: string): string {
+  const cat = resolveCategory(tag)
+  return cat?.color || UNCATEGORIZED_COLOR
+}
+
+/** Cluster circle radius based on count */
+function clusterRadius(count: number): number {
+  if (count <= 5) return 10
+  if (count <= 20) return 14
+  if (count <= 50) return 18
+  if (count <= 100) return 22
+  return 26
+}
+
 interface Props {
   pois: POI[]
+  clusters?: PoiCluster[] | null
   filterResults?: FindResult[] | null
   onPoiClick?: (poi: POI) => void
 }
 
-export function PoiMarkerLayer({ pois, filterResults, onPoiClick }: Props) {
+export function PoiMarkerLayer({ pois, clusters, filterResults, onPoiClick }: Props) {
   const map = useMap()
   const zoom = map.getZoom()
   const showLabels = zoom >= LABEL_ZOOM
@@ -38,7 +55,6 @@ export function PoiMarkerLayer({ pois, filterResults, onPoiClick }: Props) {
   }, [filterResults, isFilterMode])
 
   if (isFilterMode) {
-    // Render only filtered results with forced labels
     return (
       <>
         {filterResults!.map((r) => {
@@ -52,7 +68,6 @@ export function PoiMarkerLayer({ pois, filterResults, onPoiClick }: Props) {
               pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 1 }}
               eventHandlers={onPoiClick ? {
                 click: () => {
-                  // Construct a POI-like object from FindResult
                   onPoiClick({ osm_type: r.type, osm_id: r.id, lat: r.lat, lon: r.lon, tags: r.tags, type: r.type, id: r.id })
                 }
               } : undefined}
@@ -69,30 +84,38 @@ export function PoiMarkerLayer({ pois, filterResults, onPoiClick }: Props) {
     )
   }
 
-  const lightweight = pois.length > 1000
-
-  if (lightweight) {
-    // Too many POIs — render simple dots, no interaction, no labels
+  // Server-side clusters — lightweight rendering, max ~400 circles
+  if (clusters && clusters.length > 0) {
     return (
       <>
-        {classified.map(({ poi, category }) => (
-          <CircleMarker
-            key={`${poi.osm_type || poi.type}-${poi.osm_id || poi.id}`}
-            center={[poi.lat, poi.lon]}
-            radius={3}
-            pathOptions={{
-              color: category?.color || UNCATEGORIZED_COLOR,
-              fillColor: category?.color || UNCATEGORIZED_COLOR,
-              fillOpacity: 0.7,
-              weight: 0,
-            }}
-            interactive={false}
-          />
-        ))}
+        {clusters.map((c, i) => {
+          const r = clusterRadius(c.count)
+          const color = clusterColor(c.tag)
+          return (
+            <CircleMarker
+              key={i}
+              center={[c.lat, c.lon]}
+              radius={r}
+              pathOptions={{
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.2,
+                weight: 1,
+                opacity: 0.4,
+              }}
+              interactive={false}
+            >
+              <Tooltip permanent direction="center" className="cluster-label">
+                {c.count}
+              </Tooltip>
+            </CircleMarker>
+          )
+        })}
       </>
     )
   }
 
+  // Normal mode — individual interactive markers
   return (
     <>
       {classified.map(({ poi, category }) => {

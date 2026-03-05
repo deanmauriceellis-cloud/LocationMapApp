@@ -8,13 +8,30 @@ interface Props {
   onClose: () => void
 }
 
-function formatArrival(time: string | null): string {
+function formatTime(time: string | null): string {
   if (!time) return '—'
   const dt = new Date(time)
   const diff = Math.round((dt.getTime() - Date.now()) / 60_000)
   if (diff <= 0) return 'Now'
   if (diff < 60) return `${diff} min`
   return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+/** Determine if this prediction is a departure (no arrival) or arrival */
+function timeLabel(p: { arrivalTime: string | null; departureTime: string | null }): { text: string; tag: 'arr' | 'dep' } {
+  if (p.arrivalTime && p.departureTime) {
+    // Both present — show arrival (typical mid-route stop)
+    return { text: formatTime(p.arrivalTime), tag: 'arr' }
+  }
+  if (p.departureTime && !p.arrivalTime) {
+    // Departure only — origin/hub station
+    return { text: formatTime(p.departureTime), tag: 'dep' }
+  }
+  if (p.arrivalTime && !p.departureTime) {
+    // Arrival only — terminus
+    return { text: formatTime(p.arrivalTime), tag: 'arr' }
+  }
+  return { text: '—', tag: 'arr' }
 }
 
 export function ArrivalBoardPanel({ stopName, predictions, loading, onClose }: Props) {
@@ -27,7 +44,7 @@ export function ArrivalBoardPanel({ stopName, predictions, loading, onClose }: P
             {stopName}
           </h2>
           <div className="text-xs text-gray-400 mt-0.5">
-            Arrivals {loading && '(updating...)'}
+            Departures &amp; Arrivals {loading && '(updating...)'}
           </div>
         </div>
         <button
@@ -43,7 +60,12 @@ export function ArrivalBoardPanel({ stopName, predictions, loading, onClose }: P
       {/* Predictions list */}
       <div className="flex-1 overflow-y-auto">
         {predictions.length === 0 && !loading && (
-          <div className="p-4 text-sm text-gray-500">No upcoming arrivals</div>
+          <div className="p-4">
+            <div className="text-sm text-gray-400">No upcoming departures or arrivals</div>
+            <div className="text-xs text-gray-500 mt-2">
+              Service may have ended for the night. Check back during operating hours.
+            </div>
+          </div>
         )}
         {predictions.map(p => (
           <div
@@ -65,9 +87,29 @@ export function ArrivalBoardPanel({ stopName, predictions, loading, onClose }: P
                 <div className="text-[10px] text-gray-500 mt-0.5">{p.status}</div>
               )}
             </div>
-            {/* Arrival time */}
-            <div className="text-sm font-mono text-amber-400 shrink-0">
-              {formatArrival(p.arrivalTime || p.departureTime)}
+            {/* Time + arr/dep labels */}
+            <div className="text-right shrink-0">
+              {p.arrivalTime && p.departureTime ? (
+                <>
+                  <div className="text-sm font-mono text-amber-400">
+                    {formatTime(p.arrivalTime)}
+                    <span className="text-[9px] text-gray-500 ml-1">ARR</span>
+                  </div>
+                  <div className="text-sm font-mono text-sky-400">
+                    {formatTime(p.departureTime)}
+                    <span className="text-[9px] text-sky-500 ml-1">DEP</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-mono text-amber-400">
+                    {timeLabel(p).text}
+                  </div>
+                  <div className={`text-[9px] font-medium ${timeLabel(p).tag === 'dep' ? 'text-sky-400' : 'text-gray-500'}`}>
+                    {timeLabel(p).tag === 'dep' ? 'DEP' : 'ARR'}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ))}

@@ -9,6 +9,7 @@ import { FlightTrailLayer } from './FlightTrailLayer'
 import { TransitMarkerLayer } from './TransitMarkerLayer'
 import { MapControls } from './MapControls'
 import type { POI, BboxParams, FindResult, MetarStation, AircraftState, FlightPathPoint, MbtaVehicle, MbtaStop } from '@/lib/types'
+import type { PoiCluster } from '@/hooks/usePois'
 
 const LIGHT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -19,6 +20,7 @@ interface Props {
   center: [number, number]
   dark: boolean
   pois: POI[]
+  clusters?: PoiCluster[] | null
   onBoundsChange: (bbox: BboxParams) => void
   onLocate: () => void
   mapRef: React.MutableRefObject<LeafletMap | null>
@@ -38,9 +40,11 @@ interface Props {
   subway?: MbtaVehicle[]
   buses?: MbtaVehicle[]
   stations?: MbtaStop[]
+  busStops?: MbtaStop[]
   trainsVisible?: boolean
   subwayVisible?: boolean
   busesVisible?: boolean
+  selectedVehicleId?: string | null
   onVehicleClick?: (v: MbtaVehicle) => void
   onStopClick?: (s: MbtaStop) => void
 }
@@ -70,10 +74,10 @@ function MapRefSetter({ mapRef }: { mapRef: React.MutableRefObject<LeafletMap | 
 }
 
 export function MapView({
-  center, dark, pois, onBoundsChange, onLocate, mapRef, filterResults, onPoiClick,
+  center, dark, pois, clusters, onBoundsChange, onLocate, mapRef, filterResults, onPoiClick,
   metars, metarsVisible, radarOn, radarAnimating,
   aircraft, aircraftVisible, flightPath, onAircraftClick,
-  trains, subway, buses, stations, trainsVisible, subwayVisible, busesVisible, onVehicleClick, onStopClick,
+  trains, subway, buses, stations, busStops, trainsVisible, subwayVisible, busesVisible, selectedVehicleId, onVehicleClick, onStopClick,
 }: Props) {
   return (
     <MapContainer
@@ -91,13 +95,14 @@ export function MapView({
       />
       <BoundsWatcher onBoundsChange={onBoundsChange} />
       <RadarLayer visible={radarOn || false} animating={radarAnimating || false} />
-      <PoiMarkerLayer pois={pois} filterResults={filterResults} onPoiClick={onPoiClick} />
+      <PoiMarkerLayer pois={pois} clusters={clusters} filterResults={filterResults} onPoiClick={onPoiClick} />
       <MetarMarkerLayer metars={metars || []} visible={metarsVisible || false} />
       <AircraftMarkerLayer aircraft={aircraft || []} visible={aircraftVisible || false} onAircraftClick={onAircraftClick} />
       <FlightTrailLayer path={flightPath || []} visible={aircraftVisible || false} />
       <TransitMarkerLayer
-        trains={trains || []} subway={subway || []} buses={buses || []} stations={stations || []}
+        trains={trains || []} subway={subway || []} buses={buses || []} stations={stations || []} busStops={busStops || []}
         trainsVisible={trainsVisible || false} subwayVisible={subwayVisible || false} busesVisible={busesVisible || false}
+        selectedVehicleId={selectedVehicleId}
         onVehicleClick={onVehicleClick} onStopClick={onStopClick}
       />
       <MapControls onLocate={onLocate} />
