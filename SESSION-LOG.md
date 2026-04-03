@@ -2,6 +2,99 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-03a — WickedSalemWitchCityTour Master Plan
+
+### Context
+Planning session for a new app built on the LocationMapApp platform. The user wants to create a GPS-guided tourist app for Salem, MA that leverages all existing LocationMapApp features (maps, transit, weather, geofencing, POIs, social) plus adds tour-specific features (TTS narration, walking tours, historical content from the Salem Witch Trials project).
+
+### Decisions Made
+
+1. **Architecture**: Multi-module monorepo — `:core` (shared library), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour)
+2. **App name**: WickedSalemWitchCityTour, package `com.example.wickedsalemwitchcitytour`
+3. **Price**: $9.99 one-time purchase, no ads, no IAP
+4. **Map SDK**: Stay with osmdroid (free, offline tile caching)
+5. **Narration**: Android TTS first, upgrade later
+6. **Walking directions**: OSRM (free, no API key)
+7. **Danvers sites**: Included in tours, flagged as requiring transportation
+8. **Content source**: ~/Development/Salem project JSON (2,174 NPCs, 3,891 facts, 4,950 primary sources, 424 buildings)
+9. **Session protocol**: Established start/end protocol with WickedSalemWitchCityTour_MASTER_PLAN.md as primary plan document
+
+### Research Performed
+- Full LocationMapApp architecture analysis (52 Kotlin files, 12 repositories, all dependencies mapped)
+- Full Salem project content inventory (29,800 data files, 1.1M lines of JSON, scholarly sources cataloged)
+- Salem tourist destination research (25+ attractions, Heritage Trail route, MBTA access, seasonal events, GPS coordinates)
+
+### Files Created
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Comprehensive 10-phase plan with tour definitions, POI catalog, content pipeline, database schema
+
+### Files Modified
+- `STATE.md` — Added current direction section, planned multi-module architecture
+- `SESSION-LOG.md` — This session entry
+
+### Next Steps
+- Begin Phase 1: Core Module Extraction (create `:core` module, move shared code)
+
+---
+
+## Session: 2026-03-20a — Performance Optimization + Proxy Quick-Drain
+
+### Context
+Session startup: recycled servers, fixed missing POIs (DATABASE_URL not set), configured emulator for testing, then addressed ANR/performance issues and POI import latency.
+
+### Issues Fixed
+
+#### 1. POIs not appearing — DATABASE_URL missing
+- Cache proxy started without `DATABASE_URL`, so `/db/*` endpoints returned 503
+- POIs are PostgreSQL-backed; without the env var, bbox queries return empty
+- Fix: always start proxy with `DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp`
+- Helper script: `bin/restart-proxy.sh` already includes this
+
+#### 2. Emulator configuration (Pixel_8a_API_34)
+- AVD config at `~/.android/avd/Pixel_8a_API_34.avd/config.ini` updated:
+  - `hw.initialOrientation=landscape` — app renders landscape
+  - `showDeviceFrame=no` — removes phone bezel, fixes touch coordinate mapping
+  - `skin.name=1080x2400` / `skin.path=1080x2400` — no pixel_8a skin
+  - `hw.ramSize=8192` — prevents OOM with all layers active
+- Immersive mode via system setting: `adb shell settings put global policy_control "immersive.full=com.example.locationmapapp"`
+- Resize emulator by dragging corner — do NOT use `wmctrl` (crashes emulator or breaks touch coords)
+
+#### 3. ANR / Performance — marker rendering on main thread
+- **POI cluster rendering** (`renderPoiClusters`): moved icon generation to `Dispatchers.Default`, marker creation stays on main thread
+- **POI marker rendering** (`replaceAllPoiMarkers`): same pattern — icons generated off-thread
+- **Station markers** (`addStationMarkersBatched`): new batched method with off-thread icon generation (257 stations at once)
+- **Webcam markers** (`addWebcamMarkersBatched`): new batched method with shared icon instance
+- **TransitViewModel**: all 5 fetch methods now use `withContext(Dispatchers.IO)` to prevent DNS timeout blocking main thread
+- **Staggered MBTA startup**: `onStart()` MBTA restores wrapped in coroutine with 2s initial delay + 500ms gaps between layers
+- Result: frame skips reduced from 239 to ~35 per burst (emulator-only residual)
+
+#### 4. POI import latency — quick-drain
+- Problem: Overpass search finds POIs → buffered for import → but import only runs every 15 minutes → bbox returns 0
+- Fix: added quick-drain in `server.js` — wraps `bufferOverpassElements` to trigger `runPoiDbImport` 2 seconds after new elements are buffered
+- POIs now appear on map within ~4 seconds of a long-press search instead of waiting up to 15 minutes
+- `lib/import.js` now exports `runImport()` for the quick-drain hook
+
+#### 5. "Emulator is not responding" dialog
+- This is **Ubuntu GNOME's** `check-alive-timeout` detecting the emulator process is sluggish — not an Android ANR
+- No app-level ANR in logcat — the emulator hardware (Quadro K1100M / Haswell) is the bottleneck
+- GNOME timeout set to 20s (`gsettings set org.gnome.mutter check-alive-timeout 20000`)
+- Will not occur on real devices
+
+### Files Modified
+
+#### Android App
+- `MainActivity.kt` — batched marker rendering (POI clusters, POI markers, webcams), staggered MBTA startup
+- `MainActivityTransit.kt` — added `addStationMarkersBatched()` with off-thread icon generation
+- `TransitViewModel.kt` — all fetch methods use `withContext(Dispatchers.IO)`
+
+#### Cache Proxy
+- `server.js` — quick-drain wrapper on `bufferOverpassElements` triggers import 2s after new elements arrive
+- `lib/import.js` — exports `runImport()` function for quick-drain hook
+
+#### AVD Config
+- `~/.android/avd/Pixel_8a_API_34.avd/config.ini` — landscape, no frame, 8GB RAM, generic skin
+
+---
+
 ## Session: 2026-03-05f (v1.5.68 — Web App Phase 6: Favorites + URL Routing)
 
 ### Context

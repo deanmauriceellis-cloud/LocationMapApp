@@ -1,13 +1,21 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-03-05 Session 68 (Web App Phase 6 — Favorites + URL Routing)
+## Last Updated: 2026-04-03 Session 69 (WickedSalemWitchCityTour Planning)
+
+## Current Direction
+- **Multi-module platform refactor** underway — extracting `:core` shared library from `:app`
+- **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app, $9.99 paid
+- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 phases, supersedes all other plans)
+- Phase 1 (Core Module Extraction) is next to begin
+- Content sourced from `~/Development/Salem` project (2,174 NPCs, 3,891 facts, 4,950 primary sources)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
 - **Web app** (React 19, TypeScript, Vite, Leaflet/react-leaflet, Tailwind CSS) — cross-platform frontend at `web/`
-- **Cache proxy** (Node.js/Express on port 3000) — transparent caching layer, CORS-enabled for web app
+- **Cache proxy** (Node.js/Express on port 4300) — transparent caching layer, CORS-enabled for web app
 - **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs and aircraft sightings
 - **Split**: App/Web → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
+- **Planned**: Multi-module monorepo — `:core` (shared library), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour)
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
@@ -405,6 +413,7 @@
 - **Social tables** (v1.5.45): `users`, `auth_lookup`, `refresh_tokens`, `poi_comments`, `comment_votes`, `chat_rooms`, `room_memberships`, `messages`
   - All granted to `witchdoctor` user; DDL runs as `sudo -u postgres`
 - Import: automated every 15min when `DATABASE_URL` set (manual: `node import-pois.js` or `POST /db/import`)
+  - **Quick-drain** (v1.5.69): buffered Overpass results auto-imported to PostgreSQL within 2 seconds, so POIs appear on map immediately after long-press search
 - Proxy startup: `DATABASE_URL=... JWT_SECRET=... OPENSKY_CLIENT_ID=... OPENSKY_CLIENT_SECRET=... node server.js`
   - Without DATABASE_URL: proxy starts normally, `/db/*` and social endpoints return 503, auto-import disabled
   - Without JWT_SECRET: random secret generated (tokens don't survive restarts)
@@ -435,6 +444,50 @@
   - Path: `/home/witchdoctor/AndroidStudio/android-studio/jbr`
   - Build command: `JAVA_HOME=/home/witchdoctor/AndroidStudio/android-studio/jbr ./gradlew assembleDebug`
   - System Java 17 is NOT sufficient — Gradle daemon requires Java 21 (`gradle/gradle-daemon-jvm.properties`)
+
+## Development Environment — Server & Emulator Setup
+
+### Ports
+| Port | Service | Notes |
+|------|---------|-------|
+| 4300 | Cache proxy (Node.js/Express) | Main backend API |
+| 4301 | TCP log streamer | Android app sends debug logs here |
+| 4302 | Vite web dev server | React web app |
+| 4303 | Debug HTTP server | On-device, access via `adb forward tcp:4303 tcp:4303` |
+| 5432 | PostgreSQL | Database: `locationmapapp` |
+
+### Server Startup (all three required for full functionality)
+```bash
+# 1. Cache proxy — use bin/restart-proxy.sh or:
+cd cache-proxy && DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp \
+  JWT_SECRET=$(openssl rand -hex 32) \
+  OPENSKY_CLIENT_ID=deanmauriceellis-api-client \
+  OPENSKY_CLIENT_SECRET=6m3uBQ5HXwSzJeLemRJK12G8Ux4L5veR node server.js
+
+# 2. Web dev server
+cd web && npx vite --host 0.0.0.0 --port 4302
+
+# 3. PostgreSQL must be running on port 5432
+#    Without DATABASE_URL: /db/* POI endpoints return 503, POIs won't appear on map
+```
+
+### Emulator Setup (Pixel_8a_API_34)
+AVD config at `~/.android/avd/Pixel_8a_API_34.avd/config.ini` — critical settings:
+```ini
+hw.initialOrientation=landscape
+showDeviceFrame=no
+skin.name=1080x2400
+skin.path=1080x2400
+```
+- **Must use API 34** (not 36) — API 36 has immersive mode restrictions
+- **showDeviceFrame=no** — removes phone bezel; required for correct touch coordinate mapping
+- **skin.name/path=1080x2400** — do NOT use `pixel_8a` skin (causes bezel to reappear)
+- AVD RAM: 8192 MB (`hw.ramSize=8192`) — prevents ANR on startup with all layers active
+- Start: `emulator -avd Pixel_8a_API_34 -no-boot-anim -no-snapshot`
+- After boot, apply immersive mode: `adb shell settings put global policy_control "immersive.full=com.example.locationmapapp"`
+- Resize the emulator window by **dragging the corner** — do NOT use `wmctrl -b add,fullscreen` (crashes emulator) or `wmctrl -e` to force size (breaks touch coordinates)
+- Install app: `./gradlew installDebug`
+- Desktop screen resolution: 1280x720
 
 ## POI Marker Memory Management
 - Viewport-only display: `replaceAllPoiMarkers()` on bbox refresh, ~100-400 markers (was 22k)
