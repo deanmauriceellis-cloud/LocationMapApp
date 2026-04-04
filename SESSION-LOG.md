@@ -2,6 +2,87 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-03f — Phase 5 Complete + Tour Data + Business Model + Full Audit
+
+### Context
+Session 74. Major session — completed Phase 5 POI gaps, created 3 circular walking tour definitions with 60 stops and TTS narrations, ran end-to-end architecture audit, captured tiered business model and monetization strategy, updated master plan with audit recommendations and future phases.
+
+### Work Performed
+
+**1. Tour Data (SalemTours.kt — NEW)**
+Created 3 circular walking tours as loop routes that start/end where the user is:
+- **Salem Essentials** (14 stops, ~90 min, 2.2 km, easy) — compact downtown must-sees
+- **Salem Explorer** (20 stops, ~2 hr 15 min, 3.3 km, moderate) — extended with dining/shopping areas
+- **Grand Salem Tour** (26 stops, ~3.5 hr, 5.2 km, challenging) — Derby St → Proctor's Ledge → back
+- Every stop has: transition narration (TTS-optimized), walking time, distance from prev
+- All tours minimize backtracking, different directional routes for variety
+
+**2. Phase 5 POI Gaps Completed (8 new POIs, 29→37 total)**
+- Witch Trials: Judge Hathorne's Home, Sheriff Corwin's Home
+- Maritime: Derby Wharf Light Station, Narbonne House
+- Literary: Castle Dismal (Hawthorne boyhood), 14 Mall St (Scarlet Letter house)
+- Landmarks: McIntire Historic District
+- Visitor Services: South Harbor Garage
+- Salem Wax Museum verified closed — removed from plan
+
+**3. Content Pipeline Integration**
+- Wired SalemTours into ContentPipeline (replaced emptyList() with tour data)
+- Added SQL generation for tours + tour_stops tables in writeSql()
+- Enhanced ContentValidator with tour-specific checks (sequential stops, count matching, distance validation)
+- Pipeline output: 37 POIs + 23 businesses + 3 tours + 60 stops, 0 errors, 0 warnings
+
+**4. Full Architecture Audit**
+Three-agent parallel audit covering app-salem, content pipeline, and core/architecture:
+- **Critical**: Missing DB indexes (all entities), fallbackToDestructiveMigration, cleartext traffic, minifyEnabled false, LIKE '%query%' search
+- **Major**: No @Delete/@Update in DAOs, no FK constraints, no @Transaction, no app-side sync
+- **Architecture**: Solid 9/10. Core is production-ready for tours. Server/API aligned. Schema match perfect.
+- **Data quality**: Excellent. Historical accuracy verified. Coordinates verified. Tour routes geographically sound.
+
+**5. Business Model & Monetization (NEW in Master Plan)**
+Captured tiered pricing strategy:
+- Free ($0): limited tours, Google Ads, no transit/weather
+- Explorer ($4.99): moderate tours, North Shore POIs
+- Premium ($9.99): full content, transit, all tours
+- Salem Village LLM ($49.99/mo): AI conversations with historical figures
+Revenue: ads, geofenced merchant advertising, loyalty program, business partnerships
+
+**6. Master Plan Major Update (1,122→1,315 lines)**
+New sections added:
+- Business Model & Monetization (pricing tiers, revenue streams, feature gating)
+- Technical Foundation — Audit Recommendations (7 priorities: indexes, FKs, JSON packages, FTS5, API keys, Socket.IO→OkHttp, network security)
+- Future Phases: Phase 11 (Merchant Network), Phase 12 (Salem LLM), Phase 13 (Additional Revenue)
+
+### Files Created (2)
+- `salem-content/src/main/kotlin/.../data/SalemTours.kt` — 3 tour definitions + 60 stops
+- `/home/witchdoctor/.claude/plans/glowing-gliding-starlight.md` — Phase 5 implementation plan
+
+### Files Modified (5)
+- `salem-content/src/main/kotlin/.../data/SalemPois.kt` — 8 new POIs (29→37)
+- `salem-content/src/main/kotlin/.../pipeline/ContentPipeline.kt` — Tours wired in, SQL generation for tours/stops
+- `salem-content/src/main/kotlin/.../pipeline/ContentValidator.kt` — Tour-specific validation
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Business model, audit recs, future phases, Phase 5 checkboxes
+- `STATE.md` — Updated to Session 74
+
+### Key Decisions
+1. **JSON content packages** as source of truth, Room DB as cache. Startup checks for updates.
+2. **Core must remain backward compatible** — Salem features in :app-salem only, never in :core
+3. **FTS5 replaces LIKE search** — no table scans
+4. **OkHttp WebSocket replaces Socket.IO** — already in dependency tree, eliminates outdated dep
+5. **Tiered feature gating at app level** — core is tier-agnostic
+6. **North Shore merchant expansion** — 500+ businesses needed for Explorer tier
+7. **Geofenced merchant advertising** — proximity-triggered cards for paying businesses
+
+### Open Items
+- [ ] Phase 6 code: TourEngine, TourModels, tour UI (data is ready, engine is not)
+- [ ] DB hardening: indexes, FK constraints, explicit migrations, CRUD ops (Tier 1 audit items)
+- [ ] JSON content package system implementation
+- [ ] FTS5 search implementation
+- [ ] App-side /salem/sync call implementation
+- [ ] API key security (BuildConfig/secrets-gradle-plugin)
+- [ ] Network security config (disable cleartext, enable minify)
+
+---
+
 ## Session: 2026-04-03e — Phase 5: POI Catalog + Provenance + Staleness + API
 
 ### Context

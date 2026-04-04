@@ -1,15 +1,19 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-03 Session 73 (Phase 5: POI Catalog + Provenance + Staleness + API)
+## Last Updated: 2026-04-03 Session 74 (Phase 5 Complete + Tour Data + Business Model + Audit)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
-- **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app, $9.99 paid
-- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 phases, supersedes all other plans)
-- Phases 1-5 complete — Phase 6 (Tour Engine) is next
-- **Offline-first architecture**: bundled Room DB (841 records) + API sync when online
-- Content pipeline: 49 figures, 500 facts, 40 events, 200 sources, 29 POIs, 23 businesses
+- **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app
+- **Tiered pricing**: Free (ads, limited) / $4.99 Explorer (North Shore POIs) / $9.99 Premium (full tours, transit) / $49.99-mo (Salem LLM)
+- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 core phases + 3 future phases, supersedes all other plans)
+- **Phases 1-5 complete** — Phase 6 (Tour Engine code) is next
+- **Tour data complete**: 3 circular walking tours (Essentials 14 stops, Explorer 20 stops, Grand 26 stops), 60 total stops with TTS transition narrations
+- **Offline-first architecture**: bundled Room DB + JSON content packages (source of truth) + API sync when online
+- Content pipeline: 49 figures, 500 facts, 40 events, 200 sources, 37 POIs, 23 businesses, 3 tours, 60 stops
 - **Data provenance & staleness** on all entities (local Room + remote PostgreSQL)
+- **Revenue streams**: Google Ads (free tier), merchant geofenced ads, loyalty program, business partnerships, LLM subscription
+- **Technical foundation audit complete**: DB indexes, FK constraints, FTS5 search, JSON packages, API key security, Socket.IO→OkHttp all planned
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34

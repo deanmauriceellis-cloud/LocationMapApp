@@ -7,6 +7,7 @@ package com.example.salemcontent.pipeline
 
 import com.example.salemcontent.data.SalemBusinesses
 import com.example.salemcontent.data.SalemPois
+import com.example.salemcontent.data.SalemTours
 import com.example.salemcontent.mapper.CoordinateMapper
 import com.example.salemcontent.model.*
 import com.example.salemcontent.narration.NarrationGenerator
@@ -67,17 +68,24 @@ class ContentPipeline(private val salemRoot: File) {
         println("  Primary sources: ${outputSources.size}")
 
         // Phase 5: Load curated Salem POIs and businesses
-        println("\n[4/6] Loading curated POIs and businesses...")
+        println("\n[4/7] Loading curated POIs and businesses...")
         val tourPois = SalemPois.all()
         println("  Tour POIs: ${tourPois.size}")
         val businesses = SalemBusinesses.all()
         println("  Businesses: ${businesses.size}")
 
-        println("\n[5/6] Generating narration scripts...")
+        println("\n[5/7] Loading tour definitions...")
+        val tours = SalemTours.allTours()
+        println("  Tours: ${tours.size}")
+        val tourStops = SalemTours.allStops()
+        println("  Tour stops: ${tourStops.size}")
+
+        println("\n[6/7] Generating narration scripts...")
         // Narration is embedded in figure/source transforms above
         // POI narrations are included in the curated data
+        // Tour transition narrations are included in the tour stop data
 
-        println("\n[6/6] Assembling output...")
+        println("\n[7/7] Assembling output...")
         val output = PipelineOutput(
             tourPois = tourPois,
             businesses = businesses,
@@ -85,8 +93,8 @@ class ContentPipeline(private val salemRoot: File) {
             facts = outputFacts,
             timelineEvents = timelineEvents,
             primarySources = outputSources,
-            tours = emptyList(),         // Phase 6: tour engine
-            tourStops = emptyList(),     // Phase 6: tour engine
+            tours = tours,
+            tourStops = tourStops,
             events = emptyList()         // Phase 9: Haunted Happenings
         )
 
@@ -264,6 +272,20 @@ class ContentPipeline(private val salemRoot: File) {
             w.write("\n-- Salem Businesses (${output.businesses.size})\n")
             for (b in output.businesses) {
                 w.write("""INSERT OR REPLACE INTO salem_businesses (id, name, lat, lng, address, business_type, cuisine_type, price_range, hours, phone, website, description, historical_note, tags, rating, image_asset, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(b.id)}, ${esc(b.name)}, ${b.lat}, ${b.lng}, ${esc(b.address)}, ${esc(b.businessType)}, ${esc(b.cuisineType)}, ${esc(b.priceRange)}, ${esc(b.hours)}, ${esc(b.phone)}, ${esc(b.website)}, ${esc(b.description)}, ${esc(b.historicalNote)}, ${esc(b.tags)}, ${b.rating ?: "NULL"}, ${esc(b.imageAsset)}, ${esc(b.provenance.dataSource)}, ${b.provenance.confidence}, ${esc(b.provenance.verifiedDate)}, ${b.provenance.createdAt}, ${b.provenance.updatedAt}, ${b.provenance.staleAfter});""")
+                w.newLine()
+            }
+
+            // Tours
+            w.write("\n-- Tours (${output.tours.size})\n")
+            for (t in output.tours) {
+                w.write("""INSERT OR REPLACE INTO tours (id, name, theme, description, estimated_minutes, distance_km, stop_count, difficulty, seasonal, icon_asset, sort_order, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(t.id)}, ${esc(t.name)}, ${esc(t.theme)}, ${esc(t.description)}, ${t.estimatedMinutes}, ${t.distanceKm}, ${t.stopCount}, ${esc(t.difficulty)}, ${if (t.seasonal) 1 else 0}, ${esc(t.iconAsset)}, ${t.sortOrder}, ${esc(t.provenance.dataSource)}, ${t.provenance.confidence}, ${esc(t.provenance.verifiedDate)}, ${t.provenance.createdAt}, ${t.provenance.updatedAt}, ${t.provenance.staleAfter});""")
+                w.newLine()
+            }
+
+            // Tour Stops
+            w.write("\n-- Tour Stops (${output.tourStops.size})\n")
+            for (s in output.tourStops) {
+                w.write("""INSERT OR REPLACE INTO tour_stops (tour_id, poi_id, stop_order, transition_narration, walking_minutes_from_prev, distance_m_from_prev, data_source, confidence, created_at, updated_at, stale_after) VALUES (${esc(s.tourId)}, ${esc(s.poiId)}, ${s.stopOrder}, ${esc(s.transitionNarration)}, ${s.walkingMinutesFromPrev ?: "NULL"}, ${s.distanceMFromPrev ?: "NULL"}, ${esc(s.provenance.dataSource)}, ${s.provenance.confidence}, ${s.provenance.createdAt}, ${s.provenance.updatedAt}, ${s.provenance.staleAfter});""")
                 w.newLine()
             }
         }

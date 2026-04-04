@@ -147,6 +147,38 @@ object SalemPois {
             provenance = curated
         ),
         OutputTourPoi(
+            id = "judge_hathorne_home",
+            name = "Judge Hathorne's Home Site",
+            lat = 42.5165, lng = -70.8913,
+            address = "118 Washington St, Salem, MA 01970",
+            category = "witch_trials",
+            subcategories = """["historic_site","magistrate"]""",
+            shortNarration = "Near this location on Washington Street stood the home of Judge John Hathorne, the most relentless interrogator during the 1692 witch trials. His leading questions and presumption of guilt helped seal the fate of many accused.",
+            longNarration = "Judge John Hathorne lived near this spot on Washington Street. He was the chief examiner during the Salem witch trials, presiding over the preliminary hearings that determined whether the accused would face trial. Hathorne was notorious for his aggressive interrogation style. He assumed guilt before asking a single question, demanding that the accused explain why they were afflicting their accusers rather than allowing them to defend themselves. His most famous exchange was with Rebecca Nurse, the elderly grandmother whom he badgered relentlessly despite her protests of innocence. Unlike fellow magistrate Samuel Sewall, Hathorne never expressed regret for his role. He continued to serve in public office until his death in 1717. His great-great-grandson, the author Nathaniel Hawthorne, added a W to the family name, widely believed to be an attempt to distance himself from this ancestor's dark legacy.",
+            description = "Site of Judge John Hathorne's home. The most aggressive witch trial interrogator, ancestor of Nathaniel Hawthorne. No structure remains.",
+            historicalPeriod = "1692",
+            admissionInfo = "Free (exterior site marker)",
+            geofenceRadiusM = 25,
+            priority = 3,
+            provenance = curated
+        ),
+        OutputTourPoi(
+            id = "sheriff_corwin_home",
+            name = "Sheriff Corwin's Home Site",
+            lat = 42.5155, lng = -70.8920,
+            address = "148 Washington St, Salem, MA 01970",
+            category = "witch_trials",
+            subcategories = """["historic_site","sheriff"]""",
+            shortNarration = "Near this spot on Washington Street lived High Sheriff George Corwin, the man who carried out the arrests and executions during the Salem witch trials. He personally seized the property of the accused.",
+            longNarration = "High Sheriff George Corwin lived near this location on Washington Street. As the officer responsible for executing the warrants and sentences of the Court of Oyer and Terminer, Corwin played a central role in the physical enforcement of the witch trials. He arrested the accused, transported them to jail, and oversaw their executions at Proctor's Ledge. Corwin was also responsible for the pressing death of Giles Corey, who refused to enter a plea and was subjected to heavy stones placed on his chest over two days until he died. Corwin also seized the property and livestock of the condemned, enriching himself in the process. After the trials ended, he was so reviled that when he died in 1696 at age thirty, the family of one of his victims attached his body for debt. His remains were reportedly hidden in the basement of this house to protect them from further retribution.",
+            description = "Site of High Sheriff George Corwin's home. He carried out arrests, executions, and the pressing death of Giles Corey. No structure remains.",
+            historicalPeriod = "1692",
+            admissionInfo = "Free (exterior site marker)",
+            geofenceRadiusM = 25,
+            priority = 3,
+            provenance = curated
+        ),
+        OutputTourPoi(
             id = "rebecca_nurse_homestead",
             name = "Rebecca Nurse Homestead",
             lat = 42.5630, lng = -70.9380,
@@ -220,6 +252,40 @@ object SalemPois {
             hours = "Open dawn to dusk",
             geofenceRadiusM = 60,
             priority = 2,
+            provenance = nps
+        ),
+        OutputTourPoi(
+            id = "derby_wharf_light",
+            name = "Derby Wharf Light Station",
+            lat = 42.5163, lng = -70.8787,
+            address = "End of Derby Wharf, Salem, MA 01970",
+            category = "maritime",
+            subcategories = """["nps","lighthouse","waterfront"]""",
+            shortNarration = "The Derby Wharf Light Station stands at the far end of the half-mile wharf. This small square lighthouse has guided vessels into Salem Harbor since 1871.",
+            longNarration = "The Derby Wharf Light Station sits at the outermost point of Derby Wharf, marking the entrance to Salem Harbor. The current structure, a small square brick tower, was built in 1871 to replace an earlier wooden lighthouse. It guided merchant ships, fishing boats, and later pleasure craft safely into port. The light was automated in 1977 and is now maintained by the Coast Guard as an active aid to navigation. Walking the full length of the wharf to reach this lighthouse offers panoramic views of Salem Harbor, Marblehead Neck, and the open Atlantic. On a clear day you can see all the way to Baker's Island. The walk out and back is one of Salem's most peaceful experiences.",
+            description = "1871 lighthouse at the tip of Derby Wharf. Active aid to navigation. Panoramic harbor views from the half-mile walk along the wharf.",
+            historicalPeriod = "1871",
+            admissionInfo = "Free",
+            hours = "Dawn to dusk",
+            geofenceRadiusM = 30,
+            priority = 3,
+            provenance = nps
+        ),
+        OutputTourPoi(
+            id = "narbonne_house",
+            name = "Narbonne House",
+            lat = 42.5197, lng = -70.8855,
+            address = "71 Essex St, Salem, MA 01970",
+            category = "maritime",
+            subcategories = """["nps","historic_house","colonial"]""",
+            shortNarration = "The Narbonne House dates to around 1675, making it one of the oldest houses in Salem. It sits within the Salem Maritime National Historical Park and illustrates how ordinary families lived in colonial Salem.",
+            longNarration = "The Narbonne House, built around 1675, is one of the oldest surviving houses in Salem and a rare example of a modest colonial dwelling. Unlike the grand merchant homes that dominate Salem's historic landscape, this house tells the story of working-class life in colonial New England. Multiple generations of families lived here over more than three centuries, each leaving architectural layers that archaeologists and historians have carefully documented. The house sits within the Salem Maritime National Historical Park and provides a fascinating contrast to the nearby Custom House and grand wharf buildings. Its survival is remarkable. While wealthy merchants built and rebuilt in fashionable styles, this humble First Period house endured virtually unchanged.",
+            description = "One of Salem's oldest houses (c. 1675). Rare example of modest colonial dwelling within Salem Maritime NHP. Architectural layers from 300+ years.",
+            historicalPeriod = "c. 1675",
+            admissionInfo = "Free (exterior only; interior by ranger tour)",
+            hours = "Seasonal — check with NPS",
+            geofenceRadiusM = 25,
+            priority = 3,
             provenance = nps
         )
     )
@@ -367,6 +433,38 @@ object SalemPois {
             geofenceRadiusM = 40,
             priority = 3,
             provenance = curated
+        ),
+        OutputTourPoi(
+            id = "castle_dismal",
+            name = "Castle Dismal (Manning House)",
+            lat = 42.5205, lng = -70.8862,
+            address = "10½ Herbert St (now 21 Union St), Salem, MA 01970",
+            category = "literary",
+            subcategories = """["hawthorne","historic_house","childhood"]""",
+            shortNarration = "This was the Manning family home where young Nathaniel Hawthorne spent much of his boyhood. He called it Castle Dismal, reflecting the gloomy, reclusive years he spent reading and dreaming in its upper rooms.",
+            longNarration = "After the death of Nathaniel Hawthorne's father, a sea captain who died of yellow fever in Suriname when Nathaniel was just four years old, the family moved in with the Manning relatives at this house on Herbert Street. Young Hawthorne lived here through much of his childhood and into his twenties, spending long solitary years reading voraciously and beginning to write. He nicknamed the house Castle Dismal, a name that captures the brooding, isolated quality of those formative years. It was in this house that Hawthorne developed the introspective, shadow-haunted sensibility that would define his literary voice. The building has been altered over the centuries but still stands, a quiet landmark in Hawthorne's personal geography of Salem.",
+            description = "Hawthorne's boyhood home, nicknamed Castle Dismal. Where the future author spent reclusive years reading and developing his literary voice.",
+            historicalPeriod = "Early 1800s",
+            admissionInfo = "Free (exterior only, private residence)",
+            geofenceRadiusM = 20,
+            priority = 4,
+            provenance = curated
+        ),
+        OutputTourPoi(
+            id = "scarlet_letter_house",
+            name = "14 Mall Street (Scarlet Letter House)",
+            lat = 42.5213, lng = -70.8896,
+            address = "14 Mall St, Salem, MA 01970",
+            category = "literary",
+            subcategories = """["hawthorne","historic_house","writing"]""",
+            shortNarration = "At 14 Mall Street, Nathaniel Hawthorne wrote The Scarlet Letter in the autumn and winter of 1849. He had just been fired from his position at the Custom House, and the loss drove him to produce his masterpiece.",
+            longNarration = "It was at this modest house on Mall Street that Nathaniel Hawthorne wrote The Scarlet Letter, the novel that would make him one of the most important American authors. In June 1849, Hawthorne was abruptly removed from his position as surveyor at the Custom House, a political casualty of the change in presidential administration. Financially desperate and deeply bitter, he channeled his anger and his intimate knowledge of Salem's Puritan history into a sustained burst of creative energy. Working through the autumn and winter of 1849, he produced the novel in a matter of months. His wife Sophia later recalled that he would read chapters aloud to her, and that the final scene left him with a headache so intense he went to bed. The Scarlet Letter was published in March 1850 and was an immediate sensation.",
+            description = "Where Hawthorne wrote The Scarlet Letter (1849-1850) after being fired from the Custom House. The novel was written in a burst of creative fury.",
+            historicalPeriod = "1849-1850",
+            admissionInfo = "Free (exterior only, private residence)",
+            geofenceRadiusM = 20,
+            priority = 3,
+            provenance = curated
         )
     )
 
@@ -467,6 +565,22 @@ object SalemPois {
             geofenceRadiusM = 60,
             priority = 3,
             provenance = curated
+        ),
+        OutputTourPoi(
+            id = "mcintire_historic_district",
+            name = "McIntire Historic District",
+            lat = 42.5178, lng = -70.8955,
+            address = "Chestnut St & Federal St, Salem, MA 01970",
+            category = "landmark",
+            subcategories = """["architecture","federal_style","national_register"]""",
+            shortNarration = "The McIntire Historic District is named for architect Samuel McIntire, who designed many of the grand mansions in this neighborhood. It is one of the finest collections of Federal-era architecture in the United States.",
+            longNarration = "The McIntire Historic District encompasses several blocks of Salem's most architecturally significant streets, including Chestnut, Federal, and Essex Streets. Named for Samuel McIntire, a self-taught woodcarver and architect who became one of the most important builders of the Federal period, the district contains dozens of grand mansions built between roughly 1780 and 1830, when Salem was one of the wealthiest cities in America. McIntire's signature style combined elegant Federal proportions with exquisite carved ornament. His Hamilton Hall, built in 1805 as a social hall for Salem's elite, is a masterpiece of the style. The district is listed on the National Register of Historic Places and is considered one of the finest intact collections of Federal architecture in the country.",
+            description = "One of America's finest Federal-era architecture districts. Named for architect Samuel McIntire. Grand mansions from Salem's maritime golden age.",
+            historicalPeriod = "1780-1830",
+            admissionInfo = "Free (public streets, private homes)",
+            geofenceRadiusM = 80,
+            priority = 3,
+            provenance = curated
         )
     )
 
@@ -531,6 +645,20 @@ object SalemPois {
             subcategories = """["parking","ev_charging"]""",
             shortNarration = "Museum Place Garage is the most central parking garage in Salem, adjacent to the Peabody Essex Museum and NPS Visitor Center.",
             description = "Central parking garage near PEM and NPS Visitor Center. $1.25/hr. EV charging available. Best option for downtown Salem.",
+            hours = "Open 24 hours",
+            geofenceRadiusM = 30,
+            priority = 4,
+            provenance = curated
+        ),
+        OutputTourPoi(
+            id = "south_harbor_garage",
+            name = "South Harbor Garage",
+            lat = 42.5168, lng = -70.8860,
+            address = "10 Congress St, Salem, MA 01970",
+            category = "visitor_services",
+            subcategories = """["parking","ev_charging"]""",
+            shortNarration = "South Harbor Garage is an alternative parking option near the waterfront, convenient for Derby Street, Pickering Wharf, and the House of the Seven Gables.",
+            description = "Waterfront parking garage near Pickering Wharf and Derby Street. EV charging available. Good for waterfront attractions.",
             hours = "Open 24 hours",
             geofenceRadiusM = 30,
             priority = 4,

@@ -2,7 +2,7 @@
 
 **App Name:** WickedSalemWitchCityTour
 **Package:** `com.example.wickedsalemwitchcitytour`
-**Price:** $9.99 (one-time, Google Play)
+**Price:** Tiered (Free / $4.99 / $9.99 / $49.99-mo subscription)
 **Platform:** Android (API 26+, Kotlin, osmdroid)
 **Base:** LocationMapApp v1.5 multi-module platform
 **Knowledge Base:** ~/Development/Salem (Salem Witch Trials 1692 simulation project)
@@ -28,6 +28,9 @@
 15. [Salem POI Master List](#salem-poi-master-list)
 16. [Data Sources Reference](#data-sources-reference)
 17. [Verification Checkpoints](#verification-checkpoints)
+18. [Business Model & Monetization](#business-model--monetization)
+19. [Technical Foundation — Audit Recommendations](#technical-foundation--audit-recommendations)
+20. [Future Phases (Post-Launch)](#future-phases-post-launch)
 
 ---
 
@@ -436,29 +439,29 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [x] Charter Street Cemetery / Old Burying Point (51 Charter St)
 - [x] Salem Jail site (Federal & St. Peter's) — marked location
 - [x] Court House site (70 Washington St) — marked location
-- [ ] Judge Hathorne's home site (118 Washington St) — marked location
-- [ ] Sheriff Corwin's home site (148 Washington St)
+- [x] Judge Hathorne's home site (118 Washington St) — marked location
+- [x] Sheriff Corwin's home site (148 Washington St) — marked location
 - [x] Rebecca Nurse Homestead (149 Pine St, Danvers) — flag: requires transport
 
 **Maritime & National Historic (3/5 curated):**
 - [x] Salem Maritime National Historical Park (160 Derby St) — FREE
 - [x] Custom House (within SMNHP) — Hawthorne worked here
 - [x] Derby Wharf — 1/2 mile, Friendship of Salem replica
-- [ ] Derby Wharf Light Station
-- [ ] Narbonne House, Derby House, Scale House (within SMNHP)
+- [x] Derby Wharf Light Station — lighthouse at end of wharf, 1871
+- [x] Narbonne House (71 Essex St, within SMNHP) — c. 1675, oldest surviving house
 
 **Museums & Cultural (5/6 curated):**
 - [x] Peabody Essex Museum (161 Essex St) — exhibits, hours, admission
 - [x] House of the Seven Gables (115 Derby St) — campus with multiple buildings
 - [x] Pioneer Village / Salem 1630 (98 West Ave) — living history
 - [x] Witch Dungeon Museum
-- [ ] Salem Wax Museum (if operational — verify status)
+- [x] ~~Salem Wax Museum~~ — permanently closed, removed from catalog
 - [x] New England Pirate Museum
 
 **Literary (3/5 curated):**
 - [x] Hawthorne's Birthplace (on Seven Gables campus)
-- [ ] "Castle Dismal" (10 1/2 Herbert St) — Manning family home
-- [ ] 14 Mall Street — where he wrote The Scarlet Letter
+- [x] "Castle Dismal" (10½ Herbert St) — Manning family / Hawthorne boyhood home
+- [x] 14 Mall Street — where he wrote The Scarlet Letter
 - [x] Hawthorne statue
 - [x] Hawthorne Hotel (18 Washington Square West)
 
@@ -467,7 +470,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [x] Winter Island Park (50 Winter Island Rd) — Fort Pickering, lighthouse
 - [x] Salem Willows Park — beaches, carousel
 - [x] Roger Conant Statue (Brown St & Washington Sq)
-- [ ] McIntire Historic District — Federal-style mansions
+- [x] McIntire Historic District — Federal-style mansions, Samuel McIntire
 - [x] Chestnut Street — grand residential boulevard
 - [x] Ropes Mansion — Hocus Pocus filming location
 
@@ -476,7 +479,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [x] Salem MBTA Station (252 Bridge St)
 - [x] Salem Ferry Terminal (10 Blaney St) — seasonal
 - [x] Museum Place Garage (1 New Liberty St) — $1.25/hr, EV charging
-- [ ] South Harbor Garage (10 Congress St) — $0.75-$1.50/hr, EV charging
+- [x] South Harbor Garage (10 Congress St) — waterfront parking, EV charging
 
 ### Step 5.2: Witch & occult shops (5 curated)
 - [x] Catalog witch/occult/metaphysical shops on Essex Street and surrounds
@@ -516,7 +519,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [x] All backward compatible — no changes to existing LocationMapApp endpoints
 
 ### Step 5.7: Verify
-- [x] Pipeline generates 29 POIs + 23 businesses with provenance (0 errors, 0 warnings)
+- [x] Pipeline generates 37 POIs + 23 businesses + 3 tours (60 stops) with provenance (0 errors, 0 warnings)
 - [x] `salem_content.db` created (1.7MB, 841 records, Room identity hash matched)
 - [x] `./gradlew :app-salem:assembleDebug` builds successfully
 - [ ] Emulator verification (this session)
@@ -789,7 +792,7 @@ GPS update → GeofenceEngine.checkPosition()
 
 ## Phase 10 — Polish, Branding & Play Store
 
-**Goal:** Final polish, app icon, store listing, $9.99 paid app release.
+**Goal:** Final polish, app icon, store listing, tiered pricing release (see Business Model section).
 
 ### Step 10.1: App icon & branding
 - [ ] Design app icon (Salem themed — consider: witch silhouette, historic building outline, crescent moon, vintage map element)
@@ -819,7 +822,7 @@ GPS update → GeofenceEngine.checkPosition()
 
 ### Step 10.5: Google Play Store
 - [ ] Set up Google Play Developer account (if not already)
-- [ ] Configure paid app: $9.99
+- [ ] Configure tiered pricing via Google Play billing (Free + IAP / subscriptions)
 - [ ] Store listing:
   - Title: "Wicked Salem Witch City Tour"
   - Short description: "GPS-guided walking tours of Salem, MA with historical narration"
@@ -1117,6 +1120,196 @@ Spooky history + Halloween events + haunted tour starting points + October-only 
 
 ---
 
+## Business Model & Monetization
+
+### Tiered Pricing
+
+| Tier | Price | Features |
+|------|-------|----------|
+| **Free** | $0 | Limited tour ability (1 tour preview), Google Ads throughout, NO transit, NO weather, basic POI map |
+| **Explorer** | $4.99 (one-time) | Moderate tour ability (2-3 tours), all North Shore POIs, reduced ads, local business directory |
+| **Premium** | $9.99 (one-time) | Full Salem POIs, ALL tours, transit info, detailed historical + POI content, all walking directions, no ads |
+| **Salem Village LLM** | $49.99/month | All Premium features + conversational AI with Salem Village NPCs via Salem LLM. Talk to historical figures. |
+
+### Revenue Streams
+
+1. **Google Ads (Free tier)** — Standard AdMob banner/interstitial ads. Primary conversion funnel to paid tiers.
+2. **Salem business advertising** — Local businesses pay for featured placement. Geofenced proximity ads push content to users near the business.
+3. **Loyalty/discount program** — Visit X highlighted partner shops → app generates discount code (vendor-specific %). Drives foot traffic for merchants, engagement for users.
+4. **Merchant partnerships** — Paid POI placements, featured listings, sponsored tour stops, "Recommended by Wicked Salem" badges.
+5. **Subscription revenue (LLM tier)** — Monthly recurring for AI-powered conversations with Salem Village historical figures.
+
+### Feature Gating Architecture
+
+```
+Free tier:       core map + limited POIs + 1 tour preview + ads
+Explorer tier:   unlock via Google Play IAP → expands POI database + 2-3 tours
+Premium tier:    unlock via Google Play IAP → full content + transit + weather + all tours
+LLM tier:        Google Play subscription → all Premium + /salem/chat endpoint
+```
+
+Implementation: `FeatureGate.kt` in `:app-salem` checks tier via Google Play Billing Library. Core engine (`core`) is tier-agnostic — gating is app-level only.
+
+### Advertising & Marketing Platform
+
+- **Geofenced business ads**: When user is within X meters of a paying merchant, show contextual card (not intrusive popup). Respect user preferences.
+- **Sponsored tour stops**: Merchants can sponsor a stop on a tour route. "This stop brought to you by [Business]."
+- **Loyalty program**: `LoyaltyTracker` tracks check-ins at partner locations. After X visits, generate redeemable discount code. Codes tied to merchant ID + user ID.
+- **Analytics dashboard** (future): Merchant portal showing foot traffic, ad impressions, redemption rates.
+- **Business content section needed**: Full review of business plan profitability, merchant acquisition strategy, pricing for ad placements.
+
+### North Shore Merchant Expansion
+
+Coverage must extend beyond downtown Salem to include:
+- Marblehead, Beverly, Danvers, Peabody, Swampscott
+- All restaurants, bars, cafes, shops, lodging, attractions in the region
+- Overpass/OSM as base → manual curation for quality
+- Business categories: dining, shopping, entertainment, services, lodging, attractions
+- Each merchant record needs: hours, phone, website, description, GPS, tags, historical notes (where applicable)
+- Target: 500+ North Shore businesses in Explorer tier, 200+ Salem-specific in Premium tier
+
+---
+
+## Technical Foundation — Audit Recommendations
+
+### Priority 1: Database Hardening (Do Before Phase 6 Code)
+
+**1a. Add @Index to all Room entities**
+All findNearby(), findByCategory(), and FK-based queries currently do full table scans. Add indexes:
+- `TourPoi`: lat, lng, category, data_source, priority
+- `SalemBusiness`: lat, lng, business_type, data_source
+- `HistoricalFigure`: primary_poi_id, role, data_source
+- `HistoricalFact`: poi_id, figure_id, category, data_source
+- `TimelineEvent`: crisis_phase, poi_id, date, data_source
+- `PrimarySource`: figure_id, poi_id, source_type, data_source
+- `EventsCalendar`: venue_poi_id, seasonal_month, start_date, data_source
+- `TourStop`: tour_id, poi_id (explicit indexes beyond composite PK)
+
+**1b. Add @ForeignKey constraints**
+All FK relationships are implicit. Declare with CASCADE DELETE:
+- `TourStop.tour_id` → `Tour.id`
+- `TourStop.poi_id` → `TourPoi.id`
+- `HistoricalFact.poi_id` → `TourPoi.id`
+- `HistoricalFact.figure_id` → `HistoricalFigure.id`
+- `HistoricalFigure.primary_poi_id` → `TourPoi.id`
+- `EventsCalendar.venue_poi_id` → `TourPoi.id`
+
+**1c. Replace fallbackToDestructiveMigration**
+Use explicit `Migration(2, 3)` classes. Set `exportSchema = true` for migration validation.
+
+**1d. Add @Delete/@Update to all DAOs**
+Currently only INSERT and SELECT exist. Add full CRUD.
+
+**1e. Add @Transaction on batch operations**
+Multi-entity inserts must be atomic.
+
+### Priority 2: JSON Content Packages
+
+**Design:** All POI/content data must be deliverable as versioned JSON bundles:
+- Content packages are the **source of truth**, Room DB is the **cache**
+- App checks for newer packages on startup (network available → hit `/salem/content/version`)
+- On Android version upgrade, content refresh is part of the upgrade process
+- Stale local data overwritten by fresh packages
+- Same pattern as LocationMapApp — portable, versionable, independently updatable
+
+**Implementation:**
+- Versioned JSON bundles in `assets/content/v{N}/` for offline baseline
+- Server endpoint `/salem/content/check?version=N` returns update availability
+- Server endpoint `/salem/content/download?since=N` returns delta JSON
+- `ContentSyncManager.kt` in `:app-salem` handles download → parse → Room insert/update
+- Package format: `{ version: N, pois: [...], businesses: [...], tours: [...], ... }`
+
+### Priority 3: FTS5 Search (Replace LIKE '%query%')
+
+All 6 DAOs with search methods use `LIKE '%' || :query || '%'` which:
+- Prevents index usage (leading wildcard)
+- Does full table scan on every keystroke
+- Is unreliable for JSON tag matching
+
+**Fix:** Implement SQLite FTS5 virtual tables:
+- `tour_pois_fts` → name, description, short_narration
+- `salem_businesses_fts` → name, description, tags
+- `historical_figures_fts` → name, short_bio
+- `historical_facts_fts` → title, description
+- `primary_sources_fts` → title, excerpt
+- Trigram tokenizer for fuzzy matching (same approach as LocationMapApp's pg_trgm)
+
+### Priority 4: API Key Security
+
+Currently hardcoded in source:
+- MBTA API key in MbtaRepository.kt
+- Windy Webcams API key in server.js
+
+**Fix:**
+- Move to `local.properties` (gitignored) → injected via BuildConfig at build time
+- Server-side keys → environment variables (already partially done for DATABASE_URL)
+- Add `secrets-gradle-plugin` for Android key management
+- Never commit keys to version control
+
+### Priority 5: Socket.IO Replacement Evaluation
+
+Current: Socket.IO v2.1.0 (2021, outdated, security concerns)
+
+**Options:**
+- **OkHttp WebSocket** — Already in dependency tree (OkHttp 4.12.0). Native WebSocket support, no additional dependency. Simpler API. **Recommended.**
+- **Ktor WebSocket** — Kotlin-native, coroutine-based. Heavier dependency.
+- **Socket.IO v4.x** — Upgrade in place. More features than needed.
+
+**Recommendation:** Migrate to OkHttp WebSocket. Eliminates Socket.IO dependency entirely. OkHttp is already in `:core`.
+
+### Priority 6: Core API Backward Compatibility
+
+**Principle:** Core engine (`:core`) must serve LocationMapApp, WickedSalem, and future apps. Salem-specific features NEVER go in `:core`.
+
+**Rules:**
+- All core API changes must be **additive** (new methods/classes, not breaking changes)
+- Test core changes against both `:app` and `:app-salem` builds
+- Salem-specific: `:app-salem` only (tour engine, narration, Salem content DB)
+- Shared infrastructure: `:core` (geofencing, location, repositories, networking)
+- Feature gating: `:app-salem` level, not `:core` level
+
+### Priority 7: Network Security
+
+- Remove `android:usesCleartextTraffic="true"` from AndroidManifest.xml
+- Add `network_security_config.xml` allowing cleartext only for local dev (10.0.0.x)
+- Enable `minifyEnabled true` + `shrinkResources true` for release builds
+- Add `POST_NOTIFICATIONS` permission for Android 13+ proximity alerts
+- Add ProGuard/R8 rules for Room, Gson, Retrofit, OkHttp
+
+---
+
+## Future Phases (Post-Launch)
+
+### Phase 11 — Merchant Network & Advertising Platform
+- [ ] Build merchant admin portal (web-based)
+- [ ] Merchant self-service POI creation/editing
+- [ ] Geofenced ad delivery system (proximity-triggered cards)
+- [ ] Loyalty program engine (check-ins, discount code generation)
+- [ ] Analytics dashboard (impressions, foot traffic, redemptions)
+- [ ] North Shore merchant data expansion (500+ businesses)
+- [ ] Sponsored tour stop system
+- [ ] Business-to-app payment integration (Stripe)
+
+### Phase 12 — Salem Village LLM Integration
+- [ ] `/salem/chat` API endpoint — conversational interface to Salem LLM
+- [ ] Character selection (50 historical figures available)
+- [ ] Context-aware conversations (figure knows their history, location, relationships)
+- [ ] Token metering for $49.99/mo subscription
+- [ ] Conversation persistence (chat history)
+- [ ] Voice input/output integration with TTS system
+- [ ] Safety guardrails (historical accuracy, no harmful content)
+- [ ] Rate limiting and abuse prevention
+
+### Phase 13 — Additional Revenue Features
+- [ ] In-app merchandise (Salem-branded items, print-on-demand)
+- [ ] Tour booking integration (partner ghost tours, museum tickets)
+- [ ] Photo/selfie spots with AR historical overlays
+- [ ] Social sharing ("I completed the Witch Trial Trail!")
+- [ ] Seasonal content packs (October Haunted Happenings premium content)
+
+---
+
 *Document created: 2026-04-03*
+*Last updated: 2026-04-03 (Session 73: Business model, technical foundation, audit recommendations)*
 *Project: LocationMapApp v1.5 → WickedSalemWitchCityTour*
 *Author: Dean Maurice Ellis*
