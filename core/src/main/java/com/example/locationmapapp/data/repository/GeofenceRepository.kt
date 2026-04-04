@@ -36,7 +36,7 @@ class GeofenceRepository @Inject constructor() {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val BASE = "http://10.0.0.4:3000"
+    private val BASE = "http://10.0.0.4:4300"
 
     // ── Speed / Red-Light Cameras ────────────────────────────────────────────
 

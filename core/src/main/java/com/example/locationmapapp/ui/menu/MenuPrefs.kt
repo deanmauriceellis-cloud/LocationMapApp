@@ -65,6 +65,11 @@ object MenuPrefs {
     const val PREF_RADAR_ANIM_SPEED = "radar_anim_speed_ms"
     const val DEFAULT_RADAR_ANIM_SPEED = 800
 
+    // ── Home Location ──────────────────────────────────────────────────────
+    const val PREF_HOME_LAT  = "home_lat"
+    const val PREF_HOME_LON  = "home_lon"
+    const val PREF_HOME_SET  = "home_set"
+
     // ── Utility ───────────────────────────────────────────────────────────
     const val PREF_RECORD_GPS            = "record_gps_on"
     const val PREF_GPS_MODE              = "gps_mode_auto"

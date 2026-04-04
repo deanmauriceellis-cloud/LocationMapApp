@@ -237,6 +237,23 @@ data class MbtaTripScheduleEntry(
     val platformCode: String?
 )
 
+// ── POI Clustering ──────────────────────────────────────────────────────────
+
+data class PoiCluster(
+    val lat: Double,
+    val lon: Double,
+    val count: Int,
+    val tag: String
+) {
+    fun toGeoPoint() = GeoPoint(lat, lon)
+}
+
+data class PoiBboxResponse(
+    val count: Int,
+    val elements: List<PlaceResult>,
+    val clusters: List<PoiCluster>?
+)
+
 // ── Populate POIs scanner ────────────────────────────────────────────────────
 
 data class PopulateSearchResult(

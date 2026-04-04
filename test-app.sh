@@ -17,7 +17,7 @@ MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module test-app.sh"
 set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
-BASE="http://localhost:8085"
+BASE="http://localhost:4303"
 PACKAGE="com.example.locationmapapp"
 BOSTON_LAT=42.3601
 BOSTON_LON=-71.0589
@@ -76,7 +76,7 @@ jqf() {
 
 # Wait for debug server to be ready (up to 30s)
 wait_for_server() {
-    echo "Waiting for debug server on port 8085..."
+    echo "Waiting for debug server on port 4303..."
     for i in $(seq 1 30); do
         if curl -s --max-time 2 "$BASE/" >/dev/null 2>&1; then
             echo "Debug server is ready."
@@ -108,7 +108,7 @@ suite_header "Setup"
 
 if [[ "$SKIP_SETUP" == "false" ]]; then
     echo "Setting up adb forward..."
-    adb forward tcp:8085 tcp:8085 2>/dev/null || true
+    adb forward tcp:4303 tcp:4303 2>/dev/null || true
 
     # Check if app is running
     if ! adb shell pidof "$PACKAGE" >/dev/null 2>&1; then

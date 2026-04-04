@@ -20,7 +20,9 @@ import com.example.locationmapapp.data.model.MbtaVehicle
 import com.example.locationmapapp.data.repository.MbtaRepository
 import com.example.locationmapapp.util.DebugLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @Suppress("unused")
@@ -51,7 +53,7 @@ class TransitViewModel @Inject constructor(
     fun fetchMbtaTrains() {
         DebugLogger.i(TAG, "fetchMbtaTrains() — fetching commuter rail vehicles")
         viewModelScope.launch {
-            runCatching { mbtaRepository.fetchCommuterRailVehicles() }
+            runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchCommuterRailVehicles() } }
                 .onSuccess {
                     DebugLogger.i(TAG, "MBTA trains success — ${it.size} vehicles")
                     _mbtaTrains.value = it
@@ -70,7 +72,7 @@ class TransitViewModel @Inject constructor(
     fun fetchMbtaSubway() {
         DebugLogger.i(TAG, "fetchMbtaSubway() — fetching subway vehicles")
         viewModelScope.launch {
-            runCatching { mbtaRepository.fetchSubwayVehicles() }
+            runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchSubwayVehicles() } }
                 .onSuccess {
                     DebugLogger.i(TAG, "MBTA subway success — ${it.size} vehicles")
                     _mbtaSubway.value = it
@@ -89,7 +91,7 @@ class TransitViewModel @Inject constructor(
     fun fetchMbtaBuses() {
         DebugLogger.i(TAG, "fetchMbtaBuses() — fetching bus vehicles")
         viewModelScope.launch {
-            runCatching { mbtaRepository.fetchBusVehicles() }
+            runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchBusVehicles() } }
                 .onSuccess {
                     DebugLogger.i(TAG, "MBTA buses success — ${it.size} vehicles")
                     _mbtaBuses.value = it
@@ -108,7 +110,7 @@ class TransitViewModel @Inject constructor(
     fun fetchMbtaStations() {
         DebugLogger.i(TAG, "fetchMbtaStations() — fetching subway + CR stations")
         viewModelScope.launch {
-            runCatching { mbtaRepository.fetchStations() }
+            runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchStations() } }
                 .onSuccess {
                     DebugLogger.i(TAG, "MBTA stations success — ${it.size} stations")
                     _mbtaStations.value = it
@@ -127,7 +129,7 @@ class TransitViewModel @Inject constructor(
     fun fetchMbtaBusStops() {
         DebugLogger.i(TAG, "fetchMbtaBusStops() — fetching all bus stops")
         viewModelScope.launch {
-            runCatching { mbtaRepository.fetchBusStops() }
+            runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchBusStops() } }
                 .onSuccess {
                     DebugLogger.i(TAG, "MBTA bus stops success — ${it.size} stops")
                     _mbtaBusStops.value = it

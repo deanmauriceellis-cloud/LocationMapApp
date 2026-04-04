@@ -67,17 +67,17 @@ echo ""
 log "Checking prerequisites..."
 
 if [[ "$SKIP_SETUP" == "false" ]]; then
-    adb forward tcp:8085 tcp:8085 2>/dev/null || true
+    adb forward tcp:4303 tcp:4303 2>/dev/null || true
 fi
 
-if ! curl -s --max-time 3 "http://localhost:8085/" >/dev/null 2>&1; then
-    log "ERROR: Debug server not reachable on port 8085"
-    log "Make sure: app running + adb forward tcp:8085 tcp:8085"
+if ! curl -s --max-time 3 "http://localhost:4303/" >/dev/null 2>&1; then
+    log "ERROR: Debug server not reachable on port 4303"
+    log "Make sure: app running + adb forward tcp:4303 tcp:4303"
     exit 1
 fi
 log "Debug server: OK"
 
-if ! curl -s --max-time 3 "http://10.0.0.4:3000/cache/stats" >/dev/null 2>&1; then
+if ! curl -s --max-time 3 "http://10.0.0.4:4300/cache/stats" >/dev/null 2>&1; then
     log "WARNING: Cache proxy not reachable — some tests limited"
 else
     log "Cache proxy: OK"

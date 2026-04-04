@@ -71,19 +71,19 @@ Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (
 **Goal:** Extract shared code from `:app` into `:core` library module. No user-facing changes.
 
 ### Step 1.1: Create core module structure
-- [ ] Create `core/build.gradle.kts` (Android library plugin)
+- [x] Create `core/build.gradle` (Android library plugin)
   - Dependencies: OkHttp 4.12.0, Gson 2.10.1, Coroutines 1.7.3, Hilt 2.51, JTS 1.19.0, Socket.IO 2.1.0, Room 2.6.1, GMS Location 21.1.0
-- [ ] Create `core/src/main/AndroidManifest.xml` (minimal library manifest)
-- [ ] Update `settings.gradle`: add `include ':core'`
-- [ ] Update `app/build.gradle`: add `implementation project(':core')`
+- [x] Create `core/src/main/AndroidManifest.xml` (minimal library manifest)
+- [x] Update `settings.gradle`: add `include ':core'`
+- [x] Update `app/build.gradle`: add `implementation project(':core')`
 
 ### Step 1.2: Move data models
-- [ ] Move `app/.../data/model/Models.kt` → `core/.../model/Models.kt`
+- [x] Move `app/.../data/model/Models.kt` → `core/.../data/model/Models.kt`
   - All 50+ data classes (PlaceResult, MbtaVehicle, AircraftState, WeatherAlert, GeofenceAlert, AuthUser, ChatMessage, etc.)
-- [ ] Move `app/.../core/AppException.kt` → `core/.../core/AppException.kt`
+- [x] Move `app/.../core/AppException.kt` → `core/.../core/AppException.kt`
 
 ### Step 1.3: Move repositories
-- [ ] Move all 12 repository files from `app/.../data/repository/` → `core/.../repository/`:
+- [x] Move all 12 repository files from `app/.../data/repository/` → `core/.../data/repository/`:
   - PlacesRepository.kt (537 lines — POI search, Overpass, OSM)
   - MbtaRepository.kt (561 lines — MBTA API v3, vehicles, stops)
   - AircraftRepository.kt (160 lines — OpenSky)
@@ -98,27 +98,27 @@ Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (
   - CommentRepository.kt (144 lines — POI comments)
 
 ### Step 1.4: Move location & geofencing
-- [ ] Move `app/.../data/location/LocationManager.kt` → `core/.../location/LocationManager.kt`
-- [ ] Move `app/.../util/GeofenceEngine.kt` → `core/.../geofence/GeofenceEngine.kt`
+- [x] Move `app/.../data/location/LocationManager.kt` → `core/.../data/location/LocationManager.kt`
+- [x] Move `app/.../util/GeofenceEngine.kt` → `core/.../util/GeofenceEngine.kt`
   - JTS STRtree spatial indexing, point-in-polygon, proximity alerts
 
 ### Step 1.5: Move utilities & DI
-- [ ] Move `app/.../util/DebugLogger.kt` → `core/.../util/DebugLogger.kt`
-- [ ] Move `app/.../util/FavoritesManager.kt` → `core/.../util/FavoritesManager.kt`
-- [ ] Move `app/.../di/AppModule.kt` → `core/.../di/CoreModule.kt` (rename)
-- [ ] Move `app/.../ui/menu/MenuPrefs.kt` → `core/.../menu/MenuPrefs.kt`
-- [ ] Move `app/.../ui/menu/MenuEventListener.kt` → `core/.../menu/MenuEventListener.kt`
-- [ ] Move `app/.../ui/menu/PoiLayerId.kt` → `core/.../menu/PoiLayerId.kt`
+- [x] Move `app/.../util/DebugLogger.kt` → `core/.../util/DebugLogger.kt`
+- [x] Move `app/.../util/FavoritesManager.kt` → `core/.../util/FavoritesManager.kt`
+- [x] Move `app/.../di/AppModule.kt` → `core/.../di/CoreModule.kt` (rename)
+- [x] Move `app/.../ui/menu/MenuPrefs.kt` → `core/.../ui/menu/MenuPrefs.kt`
+- [x] Move `app/.../ui/menu/MenuEventListener.kt` → `core/.../ui/menu/MenuEventListener.kt`
+- N/A `PoiLayerId` — not a standalone file (defined within PoiCategories.kt)
 
 ### Step 1.6: Update imports in `:app`
-- [ ] Update all import statements in remaining `:app` files
-- [ ] Verify no circular dependencies
+- [x] Update all import statements in remaining `:app` files
+- [x] Verify no circular dependencies
 
 ### Step 1.7: Verify
-- [ ] `./gradlew :core:assembleDebug` builds successfully
-- [ ] `./gradlew :app:assembleDebug` builds successfully
+- [x] `./gradlew :core:assembleDebug` builds successfully
+- [x] `./gradlew :app:assembleDebug` builds successfully
 - [ ] Run on Pixel_8a_API_34 emulator — all features work identically
-- [ ] Git commit: "Extract :core shared library module"
+- [ ] Git commit: "Phase 1: Extract :core shared library module"
 
 **What stays in `:app` (NOT moved):**
 - All `MainActivity*.kt` files (UI-specific)

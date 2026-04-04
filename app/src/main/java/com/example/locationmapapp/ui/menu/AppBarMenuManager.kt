@@ -107,7 +107,9 @@ class AppBarMenuManager(
         val weatherIcon: ImageView,
         val alertsIcon: ImageView,
         val gridButton: ImageView,
-        val statusLine: TextView
+        val statusLine: TextView,
+        val alertsBadge: TextView? = null,
+        val layersBadge: TextView? = null
     )
 
     /**
@@ -122,7 +124,9 @@ class AppBarMenuManager(
         statusLine: TextView,
         darkModeIcon: ImageView? = null,
         homeIcon: ImageView? = null,
-        aboutIcon: ImageView? = null
+        aboutIcon: ImageView? = null,
+        alertsBadge: TextView? = null,
+        layersBadge: TextView? = null
     ): SlimToolbarRefs {
         weatherIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
         alertsIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
@@ -131,10 +135,29 @@ class AppBarMenuManager(
         alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         gridButton.setOnClickListener { showGridDropdown(it) }
 
-        // Home icon — center on GPS
+        // Home icon — tap: go home, long-press: set/clear home
         homeIcon?.let { icon ->
-            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            val homeSet = prefs.getBoolean(MenuPrefs.PREF_HOME_SET, false)
+            icon.imageTintList = ColorStateList.valueOf(
+                if (homeSet) Color.parseColor("#4DB6AC") else Color.WHITE
+            )
             icon.setOnClickListener { menuEventListener.onHomeRequested() }
+            icon.setOnLongClickListener {
+                val isSet = prefs.getBoolean(MenuPrefs.PREF_HOME_SET, false)
+                if (isSet) {
+                    prefs.edit()
+                        .remove(MenuPrefs.PREF_HOME_LAT)
+                        .remove(MenuPrefs.PREF_HOME_LON)
+                        .putBoolean(MenuPrefs.PREF_HOME_SET, false)
+                        .apply()
+                    icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+                    DebugLogger.i(TAG, "Home location cleared")
+                    menuEventListener.onHomeLongPressed(false)
+                } else {
+                    menuEventListener.onHomeLongPressed(true)
+                }
+                true
+            }
         }
 
         // About icon — show app info
@@ -158,7 +181,44 @@ class AppBarMenuManager(
         }
 
         DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, Home, DarkMode, Alerts, Grid, About)")
-        return SlimToolbarRefs(weatherIcon, alertsIcon, gridButton, statusLine)
+        return SlimToolbarRefs(weatherIcon, alertsIcon, gridButton, statusLine, alertsBadge, layersBadge)
+    }
+
+    /** Update the weather alert badge count on the alerts icon. */
+    fun updateAlertBadge(badge: TextView?, count: Int) {
+        badge ?: return
+        if (count > 0) {
+            badge.text = count.toString()
+            badge.visibility = View.VISIBLE
+        } else {
+            badge.visibility = View.GONE
+        }
+    }
+
+    /** Update the active layer count badge on the grid/menu icon. */
+    fun updateLayerBadge(badge: TextView?, count: Int) {
+        badge ?: return
+        if (count > 0) {
+            badge.text = count.toString()
+            badge.visibility = View.VISIBLE
+        } else {
+            badge.visibility = View.GONE
+        }
+    }
+
+    /** Count how many data layers are currently enabled. */
+    fun computeActiveLayerCount(): Int {
+        var count = 0
+        if (prefs.getBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, true)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_TRAINS, false)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_SUBWAY, false)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUSES, false)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_RADAR_ON, false)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_METAR_DISPLAY, false)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, false)) count++
+        if (prefs.getBoolean(MenuPrefs.PREF_CAMERA_OVERLAY, false)) count++
+        return count
     }
 
     /**
@@ -180,10 +240,10 @@ class AppBarMenuManager(
         data class GridBtn(val iconRes: Int, val label: String, val onClick: (View) -> Unit)
 
         val row1Btns = listOf(
-            GridBtn(R.drawable.ic_transit_rail, "Transit") { v -> popup.dismiss(); showTransitMenu(v) },
-            GridBtn(R.drawable.ic_camera,       "Webcams") { v -> popup.dismiss(); showCamsMenu(v) },
-            GridBtn(R.drawable.ic_aircraft,     "Aircraft") { v -> popup.dismiss(); showAircraftMenu(v) },
-            GridBtn(R.drawable.ic_radar,        "Radar") { v -> popup.dismiss(); showRadarMenu(v) }
+            GridBtn(R.drawable.ic_transit_rail, "Transit") { popup.dismiss(); showTransitMenu(anchor) },
+            GridBtn(R.drawable.ic_camera,       "Webcams") { popup.dismiss(); showCamsMenu(anchor) },
+            GridBtn(R.drawable.ic_aircraft,     "Aircraft") { popup.dismiss(); showAircraftMenu(anchor) },
+            GridBtn(R.drawable.ic_radar,        "Radar") { popup.dismiss(); showRadarMenu(anchor) }
         )
         val row2Btns = listOf(
             GridBtn(R.drawable.ic_poi,           "POI") { popup.dismiss(); showPoiMenu(anchor) },

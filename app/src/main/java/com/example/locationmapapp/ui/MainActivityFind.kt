@@ -1162,13 +1162,13 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
     addInfoRow("Type", typeLine)
 
     // Address
-    if (result.address != null) addInfoRow("Address", result.address)
+    result.address?.let { addr -> addInfoRow("Address", addr) }
 
     // Phone (tappable)
-    if (result.phone != null) {
-        addInfoRow("Phone", result.phone, tappable = true) {
+    result.phone?.let { phone ->
+        addInfoRow("Phone", phone, tappable = true) {
             try {
-                startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${result.phone}")).apply {
+                startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
                 })
             } catch (_: Exception) {}
@@ -1176,7 +1176,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
     }
 
     // Hours
-    if (result.openingHours != null) addInfoRow("Hours", result.openingHours)
+    result.openingHours?.let { hours -> addInfoRow("Hours", hours) }
 
     // ── Website button area ──
     val websiteArea = android.widget.FrameLayout(this).apply {
@@ -1214,8 +1214,9 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
             result.type, result.id, result.name, result.lat, result.lon
         )
         websiteArea.removeAllViews()
-        if (websiteInfo?.url != null) {
-            resolvedUrl = websiteInfo.url
+        val siteUrl = websiteInfo?.url
+        if (siteUrl != null) {
+            resolvedUrl = siteUrl
             websiteArea.addView(TextView(this@showPoiDetailDialog).apply {
                 text = "\uD83C\uDF10  Load Website"
                 textSize = 18f
@@ -1226,7 +1227,7 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
                 layoutParams = android.widget.FrameLayout.LayoutParams(
                     dp(260), dp(56)
                 ).apply { gravity = android.view.Gravity.CENTER }
-                setOnClickListener { showFullScreenWebView(websiteInfo.url, result.name ?: "Website") }
+                setOnClickListener { showFullScreenWebView(siteUrl, result.name ?: "Website") }
             })
         } else {
             websiteArea.addView(TextView(this@showPoiDetailDialog).apply {
@@ -1464,9 +1465,10 @@ internal fun MainActivity.showPoiDetailDialog(result: com.example.locationmapapp
             card.addView(authorLine)
 
             // Rating stars
-            if (comment.rating != null && comment.rating > 0) {
+            val r = comment.rating
+            if (r != null && r > 0) {
                 card.addView(TextView(this).apply {
-                    text = "\u2605".repeat(comment.rating) + "\u2606".repeat(5 - comment.rating)
+                    text = "\u2605".repeat(r) + "\u2606".repeat(5 - r)
                     textSize = 12f
                     setTextColor(Color.parseColor("#FFB300"))
                     setPadding(0, dp(2), 0, 0)

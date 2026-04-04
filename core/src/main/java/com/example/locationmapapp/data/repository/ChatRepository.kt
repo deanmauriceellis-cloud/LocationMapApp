@@ -36,7 +36,7 @@ class ChatRepository @Inject constructor(
     private val authRepository: AuthRepository
 ) {
     private val TAG = "ChatRepo"
-    private val BASE = "http://10.0.0.4:3000"
+    private val BASE = "http://10.0.0.4:4300"
     private val JSON_TYPE = "application/json".toMediaType()
 
     private val client = OkHttpClient.Builder()

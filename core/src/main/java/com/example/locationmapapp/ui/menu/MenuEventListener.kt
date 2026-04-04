@@ -231,8 +231,11 @@ interface MenuEventListener {
     // TOOLBAR ACTIONS
     // =========================================================================
 
-    /** Center map on current GPS location. */
+    /** Center map on current GPS location or saved home. */
     fun onHomeRequested()
+
+    /** Long-press on home icon: set (true) or clear (false) home location. */
+    fun onHomeLongPressed(setting: Boolean)
 
     /** Show the About dialog with version and copyright info. */
     fun onAboutRequested()

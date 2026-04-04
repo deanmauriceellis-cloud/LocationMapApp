@@ -1,12 +1,12 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-03 Session 69 (WickedSalemWitchCityTour Planning)
+## Last Updated: 2026-04-03 Session 70 (Phase 1: Core Module Extraction)
 
 ## Current Direction
-- **Multi-module platform refactor** underway — extracting `:core` shared library from `:app`
+- **Multi-module platform refactor** — `:core` shared library extracted from `:app` (Phase 1 complete, builds pass)
 - **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app, $9.99 paid
 - Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 phases, supersedes all other plans)
-- Phase 1 (Core Module Extraction) is next to begin
+- Phase 1 (Core Module Extraction) complete — Phase 2 (Salem App Shell) is next
 - Content sourced from `~/Development/Salem` project (2,174 NPCs, 3,891 facts, 4,950 primary sources)
 
 ## Architecture
@@ -15,7 +15,7 @@
 - **Cache proxy** (Node.js/Express on port 4300) — transparent caching layer, CORS-enabled for web app
 - **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs and aircraft sightings
 - **Split**: App/Web → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
-- **Planned**: Multi-module monorepo — `:core` (shared library), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour)
+- **Multi-module monorepo**: `:core` (shared library, extracted), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour, Phase 2)
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider
@@ -272,32 +272,38 @@
 - `app/src/main/java/.../ui/FindViewModel.kt` — Find dialog DB queries, text search (86 lines)
 - `app/src/main/java/.../ui/AircraftViewModel.kt` — aircraft tracking, flight history (79 lines)
 
-### Menu & UI
+### Menu & UI (app-specific)
 - `app/src/main/java/.../ui/menu/AppBarMenuManager.kt` — toolbar menus, grid dropdown (812 lines)
-- `app/src/main/java/.../ui/menu/MenuPrefs.kt` — preference key constants (74 lines)
 - `app/src/main/java/.../ui/menu/PoiCategories.kt` — central config for all 17 POI categories (153 subtypes)
-- `app/src/main/java/.../ui/menu/MenuEventListener.kt` — menu event interface
+- (MenuPrefs.kt and MenuEventListener.kt moved to `:core`)
 - `app/src/main/java/.../ui/MarkerIconHelper.kt` — icon/dot rendering with cache
 - `app/src/main/java/.../ui/WeatherIconHelper.kt` — NWS icon code → drawable mapping
 - `app/src/main/java/.../ui/StatusLineManager.kt` — priority-based toolbar status line manager
 
-### Repositories
-- `app/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search
-- `app/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
-- `app/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
-- `app/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
-- `app/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries + text search
-- `app/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
-- `app/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
-- `app/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings
-- `app/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog/download/import/export
-- `app/src/main/java/.../data/repository/AuthRepository.kt` — JWT auth, token storage, auto-refresh
-- `app/src/main/java/.../data/repository/CommentRepository.kt` — POI comments CRUD
-- `app/src/main/java/.../data/repository/ChatRepository.kt` — Socket.IO chat + REST rooms/messages
+### Core Module (`:core` — shared library)
+- `core/src/main/java/.../data/model/Models.kt` — 50+ data classes (PlaceResult, MbtaVehicle, AircraftState, etc.)
+- `core/src/main/java/.../core/AppException.kt` — sealed exception hierarchy
+- `core/src/main/java/.../data/repository/PlacesRepository.kt` — Overpass POI search
+- `core/src/main/java/.../data/repository/WeatherRepository.kt` — NWS + METAR
+- `core/src/main/java/.../data/repository/AircraftRepository.kt` — OpenSky aircraft
+- `core/src/main/java/.../data/repository/MbtaRepository.kt` — MBTA vehicles
+- `core/src/main/java/.../data/repository/FindRepository.kt` — Find dialog DB queries + text search
+- `core/src/main/java/.../data/repository/WebcamRepository.kt` — Windy webcams
+- `core/src/main/java/.../data/repository/TfrRepository.kt` — FAA TFR fetch via proxy
+- `core/src/main/java/.../data/repository/GeofenceRepository.kt` — speed cameras, schools, flood zones, crossings
+- `core/src/main/java/.../data/repository/GeofenceDatabaseRepository.kt` — downloadable geofence DB catalog/download/import/export
+- `core/src/main/java/.../data/repository/AuthRepository.kt` — JWT auth, token storage, auto-refresh
+- `core/src/main/java/.../data/repository/CommentRepository.kt` — POI comments CRUD
+- `core/src/main/java/.../data/repository/ChatRepository.kt` — Socket.IO chat + REST rooms/messages
+- `core/src/main/java/.../data/location/LocationManager.kt` — GPS location management
+- `core/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
+- `core/src/main/java/.../util/FavoritesManager.kt` — SharedPreferences+JSON favorites CRUD
+- `core/src/main/java/.../util/DebugLogger.kt` — tagged debug logging
+- `core/src/main/java/.../di/CoreModule.kt` — Hilt DI module (repositories + location + geofence)
+- `core/src/main/java/.../ui/menu/MenuPrefs.kt` — preference key constants
+- `core/src/main/java/.../ui/menu/MenuEventListener.kt` — menu event interface
 
-### Utilities
-- `app/src/main/java/.../util/GeofenceEngine.kt` — JTS R-tree spatial index + multi-zone geofence alerting
-- `app/src/main/java/.../util/FavoritesManager.kt` — SharedPreferences+JSON favorites CRUD
+### App-specific Utilities (remain in `:app`)
 - `app/src/main/java/.../util/DebugHttpServer.kt` — embedded HTTP server (port 8085)
 - `app/src/main/java/.../util/DebugEndpoints.kt` — debug endpoint handlers (takes 6 ViewModel params)
 

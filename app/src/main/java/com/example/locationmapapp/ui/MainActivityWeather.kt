@@ -193,7 +193,8 @@ internal fun MainActivity.buildWeatherDialogContent(
         setPadding(0, 0, 0, dp(8))
     }
     val headerIcon = ImageView(this).apply {
-        val iconRes = if (data.current != null) WeatherIconHelper.drawableForCode(data.current.iconCode, data.current.isDaytime) else R.drawable.ic_wx_default
+        val cur = data.current
+        val iconRes = if (cur != null) WeatherIconHelper.drawableForCode(cur.iconCode, cur.isDaytime) else R.drawable.ic_wx_default
         setImageResource(iconRes)
         layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { setMargins(0, 0, dp(8), 0) }
     }

@@ -289,6 +289,40 @@ internal fun MainActivity.addStationMarker(stop: com.example.locationmapapp.data
     binding.mapView.overlays.add(m)
 }
 
+/** Add station markers with icon generation off main thread. */
+internal fun MainActivity.addStationMarkersBatched(stations: List<com.example.locationmapapp.data.model.MbtaStop>) {
+    if (stations.isEmpty()) return
+    lifecycleScope.launch {
+        val iconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            stations.map { stop ->
+                val tint = if (stop.routeIds.size > 1) {
+                    android.graphics.Color.parseColor("#37474F")
+                } else {
+                    routeColor(stop.routeIds.firstOrNull() ?: "")
+                }
+                Pair(stop, MarkerIconHelper.stationIcon(this@addStationMarkersBatched, tint))
+            }
+        }
+        for ((stop, icon) in iconData) {
+            val m = org.osmdroid.views.overlay.Marker(binding.mapView).apply {
+                position = stop.toGeoPoint()
+                this.icon = icon
+                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+                title = stop.name
+                snippet = stop.routeIds.joinToString(", ") { routeAbbrev(it) }
+                relatedObject = stop
+                setOnMarkerClickListener { _, _ ->
+                    showArrivalBoardDialog(stop)
+                    true
+                }
+            }
+            stationMarkers.add(m)
+            binding.mapView.overlays.add(m)
+        }
+        binding.mapView.invalidate()
+    }
+}
+
 internal fun MainActivity.clearStationMarkers() {
     stationMarkers.forEach { binding.mapView.overlays.remove(it) }
     stationMarkers.clear()
@@ -405,8 +439,8 @@ internal fun MainActivity.showArrivalBoardDialog(stop: com.example.locationmapap
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
         addView(TextView(this@showArrivalBoardDialog).apply {
-            text = "Arrives"; textSize = 12f; setTextColor(Color.parseColor("#999999"))
-            layoutParams = LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT)
+            text = "Time"; textSize = 12f; setTextColor(Color.parseColor("#999999"))
+            layoutParams = LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT)
             gravity = android.view.Gravity.END
         })
     }
@@ -509,15 +543,39 @@ internal fun MainActivity.showArrivalBoardDialog(stop: com.example.locationmapap
                         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     })
 
-                    // Arrival time
-                    row.addView(TextView(this@showArrivalBoardDialog).apply {
-                        text = formatArrivalTime(pred.arrivalTime ?: pred.departureTime)
-                        textSize = 14f
-                        setTextColor(Color.parseColor("#4FC3F7"))
-                        layoutParams = LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT)
+                    // Arrival / Departure times
+                    val timeCol = LinearLayout(this@showArrivalBoardDialog).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT)
                         gravity = android.view.Gravity.END
-                        setTypeface(null, android.graphics.Typeface.BOLD)
-                    })
+                    }
+                    if (pred.arrivalTime != null) {
+                        timeCol.addView(TextView(this@showArrivalBoardDialog).apply {
+                            text = "${formatArrivalTime(pred.arrivalTime)}  ARR"
+                            textSize = 13f
+                            setTextColor(Color.parseColor("#FFC107"))
+                            gravity = android.view.Gravity.END
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                        })
+                    }
+                    if (pred.departureTime != null) {
+                        timeCol.addView(TextView(this@showArrivalBoardDialog).apply {
+                            text = "${formatArrivalTime(pred.departureTime)}  DEP"
+                            textSize = 13f
+                            setTextColor(Color.parseColor("#4FC3F7"))
+                            gravity = android.view.Gravity.END
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                        })
+                    }
+                    if (pred.arrivalTime == null && pred.departureTime == null) {
+                        timeCol.addView(TextView(this@showArrivalBoardDialog).apply {
+                            text = "—"
+                            textSize = 13f
+                            setTextColor(Color.parseColor("#999999"))
+                            gravity = android.view.Gravity.END
+                        })
+                    }
+                    row.addView(timeCol)
 
                     // Tap row → trip schedule
                     if (pred.tripId != null) {
@@ -843,12 +901,11 @@ internal fun MainActivity.showVehicleDetailDialog(vehicle: com.example.locationm
     }
 
     addInfoRow("Route", vehicle.routeName)
-    if (vehicle.headsign != null) {
-        addInfoRow("Destination", vehicle.headsign)
-    }
+    vehicle.headsign?.let { addInfoRow("Destination", it) }
     addInfoRow("Vehicle", vehicle.label)
+    val sn = vehicle.stopName
     val statusText = when {
-        vehicle.stopName != null -> "${vehicle.currentStatus.display} ${vehicle.stopName}"
+        sn != null -> "${vehicle.currentStatus.display} $sn"
         else -> vehicle.currentStatus.display
     }
     addInfoRow("Status", statusText)

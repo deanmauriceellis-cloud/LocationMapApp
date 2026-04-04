@@ -34,6 +34,18 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivit
 // AIRCRAFT
 // =========================================================================
 
+/** Check if squawk code indicates an emergency. */
+internal fun isEmergencySquawk(squawk: String?): Boolean =
+    squawk == "7500" || squawk == "7600" || squawk == "7700"
+
+/** Human-readable label for emergency squawk codes. */
+internal fun squawkLabel(squawk: String): String = when (squawk) {
+    "7500" -> "HIJACK"
+    "7600" -> "RADIO FAILURE"
+    "7700" -> "EMERGENCY"
+    else -> ""
+}
+
 /** Altitude → color for aircraft markers and flight trail segments. */
 internal fun MainActivity.altitudeColor(altitudeMeters: Double?, onGround: Boolean = false): Int {
     val altFt = altitudeMeters?.let { it * 3.28084 }
@@ -88,7 +100,10 @@ internal fun MainActivity.buildAircraftSnippet(s: com.example.locationmapapp.dat
         lines += "Vertical: ${"%.0f".format(fpm)} ft/min ($dir)"
     }
     // Squawk
-    s.squawk?.let { lines += "Squawk: $it" }
+    s.squawk?.let {
+        val label = squawkLabel(it)
+        lines += if (label.isNotEmpty()) "⚠ SQUAWK: $it ($label)" else "Squawk: $it"
+    }
     // On ground
     if (s.onGround) lines += "Status: On ground"
     // Origin
@@ -474,7 +489,7 @@ internal fun MainActivity.pickAndFollowRandomAircraft() {
 internal fun MainActivity.filterHighAltitude(
     aircraft: List<com.example.locationmapapp.data.model.AircraftState>
 ): List<com.example.locationmapapp.data.model.AircraftState> {
-    return aircraft.filter { it.baroAltitude != null && it.baroAltitude * 3.28084 >= 10000 }
+    return aircraft.filter { val alt = it.baroAltitude; alt != null && alt * 3.28084 >= 10000 }
 }
 
 internal fun MainActivity.selectAndFollow(candidates: List<com.example.locationmapapp.data.model.AircraftState>) {
@@ -484,9 +499,9 @@ internal fun MainActivity.selectAndFollow(candidates: List<com.example.locationm
     val pool = if (others.isNotEmpty()) others else candidates
 
     // Filter by preferred E/W direction
-    val ewFiltered = pool.filter { it.track != null && if (autoFollowPreferWest) it.track >= 180.0 && it.track <= 360.0 else it.track >= 0.0 && it.track < 180.0 }
+    val ewFiltered = pool.filter { val t = it.track; t != null && if (autoFollowPreferWest) t >= 180.0 && t <= 360.0 else t >= 0.0 && t < 180.0 }
     // Further filter by preferred N/S direction (secondary preference — relaxed if too few)
-    val nsFiltered = ewFiltered.filter { it.track != null && if (autoFollowPreferSouth) it.track >= 90.0 && it.track <= 270.0 else it.track < 90.0 || it.track > 270.0 }
+    val nsFiltered = ewFiltered.filter { val t = it.track; t != null && if (autoFollowPreferSouth) t >= 90.0 && t <= 270.0 else t < 90.0 || t > 270.0 }
 
     val dirLabel = "${if (autoFollowPreferWest) "W" else "E"}${if (autoFollowPreferSouth) "S" else "N"}"
     val pick = if (nsFiltered.isNotEmpty()) {
@@ -533,6 +548,7 @@ internal fun MainActivity.showAircraftFollowBanner(state: com.example.locationma
     } ?: ""
     val headingStr = state.track?.let { "%.0f\u00B0".format(it) } ?: ""
     val spiFlag = if (state.spi) " \u26A0SPI" else ""
+    val squawkFlag = if (isEmergencySquawk(state.squawk)) " \u26A0${squawkLabel(state.squawk!!)}" else ""
 
     val dirLabel = if (autoFollowAircraftJob?.isActive == true) {
         val ew = if (autoFollowPreferWest) "W" else "E"
@@ -540,7 +556,7 @@ internal fun MainActivity.showAircraftFollowBanner(state: com.example.locationma
         " [$ew$ns]"
     } else ""
     val prefix = if (autoFollowAircraftJob?.isActive == true) "Auto$dirLabel" else "Following"
-    val text = "$prefix \u2708 $label$spiFlag | $altFt • $speedKt • $headingStr • $vertDesc"
+    val text = "$prefix \u2708 $label$spiFlag$squawkFlag | $altFt • $speedKt • $headingStr • $vertDesc"
     statusLineManager.set(StatusLineManager.Priority.AIRCRAFT_FOLLOW, text) { stopFollowing() }
 }
 

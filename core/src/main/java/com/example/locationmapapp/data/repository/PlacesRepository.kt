@@ -54,7 +54,7 @@ class PlacesRepository @Inject constructor(
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val PROXY_BASE    = "http://10.0.0.4:3000"
+    private val PROXY_BASE    = "http://10.0.0.4:4300"
     private val OVERPASS_URL  = "$PROXY_BASE/overpass"
 
     /** Session-level in-memory cache of radius hints keyed by "lat3:lon3" */
@@ -426,19 +426,52 @@ class PlacesRepository @Inject constructor(
         val RETRY_DELAYS_MS = longArrayOf(5_000L, 10_000L)
     }
 
-    /** Fetch cached POIs within a bounding box from the proxy's poi-cache. */
-    suspend fun fetchCachedPoisInBbox(south: Double, west: Double, north: Double, east: Double): List<PlaceResult> = withContext(Dispatchers.IO) {
+    /** Fetch cached POIs within a bounding box from the proxy's poi-cache.
+     *  Returns a PoiBboxResponse with either elements (individual POIs) or clusters. */
+    suspend fun fetchCachedPoisInBbox(south: Double, west: Double, north: Double, east: Double): com.example.locationmapapp.data.model.PoiBboxResponse = withContext(Dispatchers.IO) {
         val url = "$PROXY_BASE/pois/bbox?s=$south&w=$west&n=$north&e=$east"
         DebugLogger.d(TAG, "Fetching cached POIs for bbox=$south,$west,$north,$east")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()
         val elapsed = System.currentTimeMillis() - t0
         DebugLogger.i(TAG, "POI bbox response code=${response.code} in ${elapsed}ms")
-        if (!response.isSuccessful) return@withContext emptyList()
+        if (!response.isSuccessful) return@withContext com.example.locationmapapp.data.model.PoiBboxResponse(0, emptyList(), null)
         val bodyStr = response.body?.string().orEmpty()
-        if (bodyStr.isBlank()) return@withContext emptyList()
-        // Response format: { count, elements: [...] } — same element format as Overpass
-        parseOverpassJson(bodyStr).first
+        if (bodyStr.isBlank()) return@withContext com.example.locationmapapp.data.model.PoiBboxResponse(0, emptyList(), null)
+        // Parse clusters if present
+        try {
+            val root = JsonParser.parseString(bodyStr).asJsonObject
+            val count = root["count"]?.asInt ?: 0
+            val clustersEl = root["clusters"]
+            val clustersArray = if (clustersEl != null && clustersEl.isJsonArray) clustersEl.asJsonArray else null
+            if (clustersArray != null && clustersArray.size() > 0) {
+                val clusters = clustersArray.map { el ->
+                    val obj = el.asJsonObject
+                    com.example.locationmapapp.data.model.PoiCluster(
+                        lat = obj["lat"].asDouble,
+                        lon = obj["lon"].asDouble,
+                        count = obj["count"].asInt,
+                        tag = obj["tag"]?.asString ?: "place"
+                    )
+                }
+                DebugLogger.i(TAG, "POI bbox returned ${clusters.size} clusters (count=$count)")
+                return@withContext com.example.locationmapapp.data.model.PoiBboxResponse(count, emptyList(), clusters)
+            }
+            // No clusters — parse individual elements from "elements" array
+            val elementsEl = root["elements"]
+            val elementsArray = if (elementsEl != null && elementsEl.isJsonArray) elementsEl.asJsonArray else null
+            if (elementsArray != null) {
+                val (elements, _) = parseOverpassJson(bodyStr)
+                DebugLogger.i(TAG, "POI bbox returned ${elements.size} elements (count=$count)")
+                com.example.locationmapapp.data.model.PoiBboxResponse(count, elements, null)
+            } else {
+                DebugLogger.i(TAG, "POI bbox returned count=$count with no clusters or elements")
+                com.example.locationmapapp.data.model.PoiBboxResponse(count, emptyList(), null)
+            }
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "POI bbox parse error: ${e.message}", e)
+            com.example.locationmapapp.data.model.PoiBboxResponse(0, emptyList(), null)
+        }
     }
 
     private fun parsePoiExportJson(json: String): List<PlaceResult> {

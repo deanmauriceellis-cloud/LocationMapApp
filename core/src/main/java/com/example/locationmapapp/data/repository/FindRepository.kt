@@ -56,7 +56,7 @@ class FindRepository @Inject constructor() {
             }
         }
 
-        val url = "http://10.0.0.4:3000/db/pois/counts?lat=$lat&lon=$lon&radius=$radiusM"
+        val url = "http://10.0.0.4:4300/db/pois/counts?lat=$lat&lon=$lon&radius=$radiusM"
         DebugLogger.d(TAG, "Fetching counts lat=$lat lon=$lon radius=${radiusM}m")
         try {
             val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -103,7 +103,7 @@ class FindRepository @Inject constructor() {
         offset: Int = 0
     ): FindResponse? = withContext(Dispatchers.IO) {
         val catParam = URLEncoder.encode(categories.joinToString(","), "UTF-8")
-        val url = "http://10.0.0.4:3000/db/pois/find?lat=$lat&lon=$lon&categories=$catParam&limit=$limit&offset=$offset"
+        val url = "http://10.0.0.4:4300/db/pois/find?lat=$lat&lon=$lon&categories=$catParam&limit=$limit&offset=$offset"
         DebugLogger.d(TAG, "findNearby lat=$lat lon=$lon cats=${categories.size} limit=$limit")
         try {
             val t0 = System.currentTimeMillis()
@@ -165,7 +165,7 @@ class FindRepository @Inject constructor() {
         limit: Int = 50
     ): SearchResponse? = withContext(Dispatchers.IO) {
         val q = URLEncoder.encode(query, "UTF-8")
-        val url = "http://10.0.0.4:3000/db/pois/search?q=$q&lat=$lat&lon=$lon&limit=$limit"
+        val url = "http://10.0.0.4:4300/db/pois/search?q=$q&lat=$lat&lon=$lon&limit=$limit"
         DebugLogger.d(TAG, "searchByName q=$query lat=$lat lon=$lon")
         try {
             val t0 = System.currentTimeMillis()
@@ -231,7 +231,7 @@ class FindRepository @Inject constructor() {
         val params = StringBuilder("osm_type=${URLEncoder.encode(osmType, "UTF-8")}&osm_id=$osmId")
         if (name != null) params.append("&name=${URLEncoder.encode(name, "UTF-8")}")
         params.append("&lat=$lat&lon=$lon")
-        val url = "http://10.0.0.4:3000/pois/website?$params"
+        val url = "http://10.0.0.4:4300/pois/website?$params"
         DebugLogger.d(TAG, "fetchWebsite osm=$osmType/$osmId")
         try {
             val response = client.newCall(Request.Builder().url(url).build()).execute()

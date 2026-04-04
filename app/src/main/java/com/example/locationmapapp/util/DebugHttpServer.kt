@@ -22,7 +22,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugHttpSe
 
 /**
  * DebugHttpServer — embedded HTTP server for programmatic control via
- *   adb forward tcp:8085 tcp:8085 && curl localhost:8085/state
+ *   adb forward tcp:4303 tcp:4303 && curl localhost:4303/state
  *
  * Minimal HTTP/1.0 parser. All responses are Connection: close.
  * Runs accept loop on Dispatchers.IO. Call start() from MainActivity.onCreate(),
@@ -30,7 +30,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugHttpSe
  */
 object DebugHttpServer {
 
-    private const val PORT = 8085
+    private const val PORT = 4303
     private const val TAG  = "DebugHttp"
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())

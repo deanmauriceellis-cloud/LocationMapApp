@@ -35,7 +35,12 @@ export function parseUrlState(): UrlParams {
 export function useUrlState() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const hasWritten = useRef(false)
+
   const updateMapPosition = useCallback((lat: number, lon: number, zoom: number) => {
+    // Don't write URL until we've moved away from (0,0) default — prevents poisoning on cold start
+    if (!hasWritten.current && Math.abs(lat) < 1 && Math.abs(lon) < 1) return
+    hasWritten.current = true
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const params = new URLSearchParams(window.location.search)

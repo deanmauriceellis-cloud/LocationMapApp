@@ -857,7 +857,8 @@ internal fun MainActivity.showGeofenceAlertBanner(alert: com.example.locationmap
         com.example.locationmapapp.data.model.ZoneType.NO_FLY_ZONE -> Color.parseColor("#DD7B1FA2")
         com.example.locationmapapp.data.model.ZoneType.CUSTOM -> Color.parseColor("#DD616161")
     }
-    val distText = if (alert.distanceNm != null && alert.distanceNm > 0) " %.1fNM".format(alert.distanceNm) else ""
+    val dist = alert.distanceNm
+    val distText = if (dist != null && dist > 0) " %.1fNM".format(dist) else ""
     val text = "\u26A0 $alertLabel ${alert.zoneName}$distText — ${alert.description.take(60)}"
 
     statusLineManager.set(StatusLineManager.Priority.GEOFENCE_ALERT, text, bgColor) {

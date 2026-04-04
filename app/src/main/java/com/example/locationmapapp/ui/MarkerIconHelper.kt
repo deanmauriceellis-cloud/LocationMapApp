@@ -225,6 +225,81 @@ object MarkerIconHelper {
     }
 
     /**
+     * Cluster circle icon: filled circle with count text centered, sized by count threshold.
+     * Matches web app's cluster visualization.
+     */
+    fun clusterIcon(context: Context, count: Int, color: Int): BitmapDrawable {
+        val density = context.resources.displayMetrics.density
+        val radiusDp = when {
+            count <= 5   -> 16
+            count <= 20  -> 20
+            count <= 50  -> 24
+            count <= 100 -> 28
+            else         -> 32
+        }
+        val sizePx = (radiusDp * 2 * density).toInt()
+        val key = "cluster|$count|$color|$sizePx"
+        cache[key]?.let { return it }
+
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val cx = sizePx / 2f
+        val cy = sizePx / 2f
+        val radius = cx - density  // 1dp inset for border
+
+        // Fill circle — 30% opacity
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            this.color = color
+            alpha = 77  // ~30%
+        }
+        canvas.drawCircle(cx, cy, radius, fillPaint)
+
+        // Border — 60% opacity
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            this.color = color
+            alpha = 153  // ~60%
+            strokeWidth = density
+        }
+        canvas.drawCircle(cx, cy, radius, borderPaint)
+
+        // Count text
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = Color.WHITE
+            textSize = (radiusDp * 0.7f) * density
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(2f * density, 0f, 0f, Color.argb(128, 0, 0, 0))
+        }
+        val textY = cy - (textPaint.descent() + textPaint.ascent()) / 2f
+        canvas.drawText(count.toString(), cx, textY, textPaint)
+
+        val result = BitmapDrawable(context.resources, bitmap)
+        cache[key] = result
+        return result
+    }
+
+    /** Resolve a cluster tag string (e.g. "amenity=restaurant") to a category color. */
+    fun clusterTagColor(tag: String): Int {
+        // Try direct match on value after "="
+        val value = tag.substringAfter("=", tag)
+        CATEGORY_MAP[value.lowercase()]?.let { return it.second }
+        // Fallback: match the key
+        val key = tag.substringBefore("=", tag)
+        return when (key.lowercase()) {
+            "amenity"    -> Color.parseColor("#BF360C")  // Food & Drink orange
+            "shop"       -> Color.parseColor("#F57F17")  // Shopping yellow
+            "tourism"    -> Color.parseColor("#FF6F00")   // Tourism amber
+            "leisure"    -> Color.parseColor("#2E7D32")   // Parks green
+            "historic"   -> Color.parseColor("#FF6F00")   // History amber
+            "office"     -> Color.parseColor("#455A64")   // Offices gray
+            "healthcare" -> Color.parseColor("#D32F2F")   // Healthcare red
+            else         -> DEFAULT.second
+        }
+    }
+
+    /**
      * Labeled POI marker for high zoom levels (≥18): category type above the dot, name below.
      * Layout (top to bottom): category label → dot → name label
      */

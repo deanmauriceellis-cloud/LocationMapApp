@@ -30,11 +30,11 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module AppModule.kt"
+private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module CoreModule.kt"
 
 @Module
 @InstallIn(SingletonComponent::class)
-object AppModule {
+object CoreModule {
 
     @Provides @Singleton
     fun provideLocationManager(@ApplicationContext context: Context): LocationManager =

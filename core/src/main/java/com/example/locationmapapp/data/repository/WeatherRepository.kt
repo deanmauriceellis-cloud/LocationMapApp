@@ -44,7 +44,7 @@ class WeatherRepository @Inject constructor() {
     // ── NWS Weather Alerts (all active US alerts) ─────────────────────────────
 
     suspend fun fetchAlerts(): List<WeatherAlert> = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:3000/nws-alerts"
+        val url = "http://10.0.0.4:4300/nws-alerts"
         DebugLogger.d(TAG, "Fetching NWS alerts")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -88,7 +88,7 @@ class WeatherRepository @Inject constructor() {
     // ── NWS Composite Weather (via proxy /weather) ────────────────────────────
 
     suspend fun fetchWeather(lat: Double, lon: Double): WeatherData = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:3000/weather?lat=$lat&lon=$lon"
+        val url = "http://10.0.0.4:4300/weather?lat=$lat&lon=$lon"
         DebugLogger.d(TAG, "Fetching weather for $lat,$lon")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -202,7 +202,7 @@ class WeatherRepository @Inject constructor() {
 
     suspend fun fetchMetars(south: Double, west: Double, north: Double, east: Double): List<MetarStation> = withContext(Dispatchers.IO) {
         val bbox = "$south,$west,$north,$east"
-        val url = "http://10.0.0.4:3000/metar?bbox=$bbox"
+        val url = "http://10.0.0.4:4300/metar?bbox=$bbox"
         DebugLogger.d(TAG, "Fetching METARs")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()

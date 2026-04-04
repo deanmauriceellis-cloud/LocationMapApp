@@ -9,7 +9,7 @@ MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module overnight-test.sh"
 #
 # overnight-test.sh — Unattended 6-hour test harness for LocationMapApp
 #
-# Exercises every feature via debug HTTP server (port 8085) and cache proxy (port 3000),
+# Exercises every feature via debug HTTP server (port 4303) and cache proxy (port 4300),
 # collects time-series diagnostics, captures errors, and generates a morning report.
 #
 # Usage:
@@ -27,8 +27,8 @@ set -uo pipefail
 # CONFIGURATION
 # ════════════════════════════════════════════════════════════════════════════════
 
-APP_BASE="http://localhost:8085"
-PROXY_BASE="http://10.0.0.4:3000"
+APP_BASE="http://localhost:4303"
+PROXY_BASE="http://10.0.0.4:4300"
 PACKAGE="com.example.locationmapapp"
 DURATION_MIN=360           # default 6 hours
 SKIP_SETUP=false
@@ -383,7 +383,7 @@ phase1_setup_baseline() {
         if ! command -v adb &>/dev/null; then
             echo "ERROR: adb not found in PATH"; exit 1
         fi
-        adb forward tcp:8085 tcp:8085 2>/dev/null || true
+        adb forward tcp:4303 tcp:4303 2>/dev/null || true
 
         # Check app is running
         if ! adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
@@ -403,7 +403,7 @@ phase1_setup_baseline() {
     done
 
     # Wait for debug server
-    event INFO "Waiting for debug server on port 8085..."
+    event INFO "Waiting for debug server on port 4303..."
     local ready=false
     for i in $(seq 1 30); do
         if curl -s --max-time 2 "${APP_BASE}/" >/dev/null 2>&1; then

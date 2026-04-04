@@ -2,6 +2,69 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-03b — Phase 1: Core Module Extraction
+
+### Context
+Continuation of WickedSalemWitchCityTour work. Previous session (crashed due to OS reboot) completed all Phase 1 code changes but never committed. This session recovered and verified the work, then performed proper session end.
+
+### Changes Made
+
+#### Phase 1: Core Module Extraction (Steps 1.1–1.7)
+- Created `core/` Android library module (`core/build.gradle`, `core/src/main/AndroidManifest.xml`)
+- Updated `settings.gradle` to include `:core`, `app/build.gradle` to depend on `:core`
+- Moved 22 files from `:app` to `:core`:
+  - **Models**: `Models.kt`, `AppException.kt`
+  - **12 Repositories**: Places, Mbta, Aircraft, Weather, Webcam, Tfr, Find, Geofence, GeofenceDatabase, Auth, Chat, Comment
+  - **Location**: `LocationManager.kt`
+  - **Geofencing**: `GeofenceEngine.kt`
+  - **Utilities**: `DebugLogger.kt`, `FavoritesManager.kt`
+  - **DI**: `AppModule.kt` → `CoreModule.kt` (renamed)
+  - **Menu**: `MenuPrefs.kt`, `MenuEventListener.kt`
+- Updated all import statements in remaining `:app` files
+- `PoiLayerId.kt` not a standalone file (N/A — defined within PoiCategories.kt)
+
+#### Build Verification
+- `./gradlew :core:assembleDebug` — BUILD SUCCESSFUL (26 tasks)
+- `./gradlew :app:assembleDebug` — BUILD SUCCESSFUL (62 tasks)
+- Emulator testing deferred to next session
+
+#### Other Changes (from crashed session)
+- `CURRENT_TESTING.md` — updated test status
+- `toolbar_two_row.xml` — layout updates
+- `MarkerIconHelper.kt` — additions
+- `AppBarMenuManager.kt` — import updates
+- Cache proxy & web app — minor config/port adjustments
+- Shell scripts — updated for current environment
+
+### Files Created (1 new module)
+- `core/build.gradle` — Android library module config
+- `core/src/main/AndroidManifest.xml` — minimal library manifest
+- `core/src/main/java/.../` — 22 Kotlin files moved from `:app`
+- `app/src/main/res/drawable/badge_red.xml`, `badge_teal.xml` — badge drawables
+- `bin/` — helper scripts
+
+### Files Modified (17)
+- `settings.gradle`, `app/build.gradle` — multi-module setup
+- `MainActivity.kt`, `MainActivityAircraft.kt`, `MainActivityFind.kt`, `MainActivityGeofences.kt`, `MainActivityMetar.kt`, `MainActivityTransit.kt`, `MainActivityWeather.kt` — import updates
+- `MainViewModel.kt`, `TransitViewModel.kt` — import updates
+- `AppBarMenuManager.kt`, `MarkerIconHelper.kt` — import updates + additions
+- `DebugHttpServer.kt`, `TcpLogStreamer.kt` — minor updates
+- `toolbar_two_row.xml` — layout changes
+- Cache proxy + web + shell scripts — config adjustments
+
+### Files Deleted (from `:app`, moved to `:core`)
+- 22 files: Models.kt, AppException.kt, LocationManager.kt, 12 repositories, GeofenceEngine.kt, DebugLogger.kt, FavoritesManager.kt, AppModule.kt, MenuPrefs.kt, MenuEventListener.kt
+
+### Decisions Made
+- `PoiLayerId` is not a standalone file — master plan step marked N/A
+- Phase 1 complete pending emulator verification in next session
+
+### Next Steps
+- Emulator test to verify all features still work identically (Step 1.7 final checkbox)
+- Begin Phase 2: Salem App Shell (`:app-salem` module)
+
+---
+
 ## Session: 2026-04-03a — WickedSalemWitchCityTour Master Plan
 
 ### Context

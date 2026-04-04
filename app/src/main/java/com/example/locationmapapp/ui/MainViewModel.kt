@@ -62,6 +62,9 @@ class MainViewModel @Inject constructor(
     private val _places = MutableLiveData<Pair<String, List<PlaceResult>>>()
     val places: LiveData<Pair<String, List<PlaceResult>>> = _places
 
+    private val _poiClusters = MutableLiveData<List<com.example.locationmapapp.data.model.PoiCluster>?>()
+    val poiClusters: LiveData<List<com.example.locationmapapp.data.model.PoiCluster>?> = _poiClusters
+
 
     private val _error = MutableLiveData<String>()
     val error: LiveData<String> = _error
@@ -193,7 +196,18 @@ class MainViewModel @Inject constructor(
         DebugLogger.i(TAG, "loadCachedPoisForBbox() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { placesRepository.fetchCachedPoisInBbox(south, west, north, east) }
-                .onSuccess { DebugLogger.i(TAG, "Cached POIs in bbox — ${it.size}"); _places.value = "bbox" to it }
+                .onSuccess { response ->
+                    val cls = response.clusters
+                    if (!cls.isNullOrEmpty()) {
+                        DebugLogger.i(TAG, "Cached POIs in bbox — ${cls.size} clusters")
+                        _poiClusters.value = response.clusters
+                        // Don't emit empty places — it would clear the clusters we just set
+                    } else {
+                        DebugLogger.i(TAG, "Cached POIs in bbox — ${response.elements.size} elements")
+                        _poiClusters.value = null
+                        _places.value = "bbox" to response.elements
+                    }
+                }
                 .onFailure { e -> DebugLogger.e(TAG, "Cached POIs bbox FAILED: ${e.message}", e as? Exception) }
         }
     }

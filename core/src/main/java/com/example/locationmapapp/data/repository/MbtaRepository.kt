@@ -485,7 +485,7 @@ class MbtaRepository @Inject constructor() {
      * Uses page[limit]=10000 to get all in one request (~500KB).
      */
     suspend fun fetchBusStops(): List<MbtaStop> = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:3000/mbta/bus-stops"
+        val url = "http://10.0.0.4:4300/mbta/bus-stops"
         val json = executeGet(url, "bus stops")
         parseBusStops(json)
     }

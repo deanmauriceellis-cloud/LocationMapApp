@@ -36,7 +36,7 @@ class TfrRepository @Inject constructor() {
 
     suspend fun fetchTfrs(south: Double, west: Double, north: Double, east: Double): List<TfrZone> = withContext(Dispatchers.IO) {
         val bbox = "$south,$west,$north,$east"
-        val url = "http://10.0.0.4:3000/tfrs?bbox=$bbox"
+        val url = "http://10.0.0.4:4300/tfrs?bbox=$bbox"
         DebugLogger.d(TAG, "Fetching TFRs for bbox=$bbox")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()

@@ -13,8 +13,8 @@ MODULE_ID="(C) Dean Maurice Ellis, 2026 - Module monitor-snapshots.sh"
 
 set -uo pipefail
 
-APP="http://localhost:8085"
-PROXY="http://10.0.0.4:3000"
+APP="http://localhost:4303"
+PROXY="http://10.0.0.4:4300"
 MONITOR_DIR="overnight-runs/monitor-$(date +%Y-%m-%d)"
 DURATION_HOURS=${1:-7}
 INTERVAL_SEC=1800  # 30 minutes

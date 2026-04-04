@@ -22,6 +22,9 @@ import org.osmdroid.views.overlay.Marker
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivityMetar.kt"
 
+/** METAR label zoom threshold — matches web app (labels at zoom ≥ 10, dots below). */
+private const val METAR_LABEL_ZOOM = 10.0
+
 internal fun MainActivity.addMetarMarker(station: com.example.locationmapapp.data.model.MetarStation) {
     val fltCatColor = when (station.flightCategory?.uppercase()) {
         "VFR"  -> Color.parseColor("#2E7D32")
@@ -30,12 +33,15 @@ internal fun MainActivity.addMetarMarker(station: com.example.locationmapapp.dat
         "LIFR" -> Color.parseColor("#AD1457")
         else   -> Color.parseColor("#546E7A")
     }
+    val showLabels = binding.mapView.zoomLevelDouble >= METAR_LABEL_ZOOM
     val m = Marker(binding.mapView).apply {
         position = GeoPoint(station.lat, station.lon)
-        icon     = buildMetarStationIcon(station, fltCatColor)
+        icon     = if (showLabels) buildMetarStationIcon(station, fltCatColor)
+                   else MarkerIconHelper.dot(this@addMetarMarker, fltCatColor)
         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
         title    = "${station.stationId} — ${station.name ?: station.flightCategory ?: "?"}"
         snippet  = buildMetarSnippet(station)
+        relatedObject = station
     }
     metarMarkers.add(m); binding.mapView.overlays.add(m); binding.mapView.invalidate()
 }
@@ -43,10 +49,11 @@ internal fun MainActivity.addMetarMarker(station: com.example.locationmapapp.dat
 internal fun MainActivity.buildMetarStationIcon(s: com.example.locationmapapp.data.model.MetarStation, color: Int): android.graphics.drawable.Drawable {
     val density = resources.displayMetrics.density
     val tempF = s.tempC?.let { "%.0f°".format(it * 9.0 / 5.0 + 32) } ?: "?"
-    val wind = if (s.windSpeedKt != null && s.windSpeedKt > 0) {
+    val spd = s.windSpeedKt
+    val wind = if (spd != null && spd > 0) {
         val dir = s.windDirDeg?.let { windDirToArrow(it) } ?: ""
-        val gust = if (s.windGustKt != null) "G${s.windGustKt}" else ""
-        "$dir${s.windSpeedKt}$gust"
+        val gust = s.windGustKt?.let { "G$it" } ?: ""
+        "$dir${spd}$gust"
     } else "Calm"
     val wx = s.wxString ?: s.skyCover ?: ""
 
@@ -114,10 +121,11 @@ internal fun MainActivity.buildMetarSnippet(s: com.example.locationmapapp.data.m
     }
 
     // Wind
-    val wind = if (s.windSpeedKt != null && s.windSpeedKt > 0) {
+    val spd2 = s.windSpeedKt
+    val wind = if (spd2 != null && spd2 > 0) {
         val dirName = s.windDirDeg?.let { degreesToCompass(it) } ?: "Variable"
-        val gust = if (s.windGustKt != null) ", gusting to ${s.windGustKt} kt" else ""
-        "Wind: $dirName at ${s.windSpeedKt} kt$gust"
+        val gust = s.windGustKt?.let { ", gusting to $it kt" } ?: ""
+        "Wind: $dirName at ${spd2} kt$gust"
     } else "Wind: Calm"
     lines += wind
 
@@ -204,5 +212,23 @@ internal fun MainActivity.decodeWx(wx: String): String {
 fun MainActivity.clearMetarMarkers() {
     metarMarkers.forEach { binding.mapView.overlays.remove(it) }
     metarMarkers.clear(); binding.mapView.invalidate()
+}
+
+/** Rebuild METAR marker icons when crossing the zoom-10 label threshold. */
+internal fun MainActivity.refreshMetarMarkerIcons() {
+    val showLabels = binding.mapView.zoomLevelDouble >= METAR_LABEL_ZOOM
+    for (marker in metarMarkers) {
+        val station = marker.relatedObject as? com.example.locationmapapp.data.model.MetarStation ?: continue
+        val fltCatColor = when (station.flightCategory?.uppercase()) {
+            "VFR"  -> Color.parseColor("#2E7D32")
+            "MVFR" -> Color.parseColor("#1565C0")
+            "IFR"  -> Color.parseColor("#C62828")
+            "LIFR" -> Color.parseColor("#AD1457")
+            else   -> Color.parseColor("#546E7A")
+        }
+        marker.icon = if (showLabels) buildMetarStationIcon(station, fltCatColor)
+                      else MarkerIconHelper.dot(this, fltCatColor)
+    }
+    binding.mapView.invalidate()
 }
 

@@ -18,7 +18,7 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 const server = http.createServer(app);
 const io = new SocketServer(server, { cors: { origin: '*' } });
-const PORT = 3000;
+const PORT = 4300;
 
 // ── Parse request bodies ─────────────────────────────────────────────────────
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -112,6 +112,24 @@ require('./lib/db-aircraft')(app, deps);
 
 // Aircraft (needs opensky + cache)
 require('./lib/aircraft')(app, deps);
+
+// Quick-drain: import buffered POIs 2s after Overpass results arrive
+// so POIs appear on map immediately instead of waiting 15 minutes
+if (importModule.runImport) {
+  let quickImportTimer = null;
+  const origBuffer = deps.bufferOverpassElements;
+  deps.bufferOverpassElements = function(jsonBody) {
+    const result = origBuffer(jsonBody);
+    if (result.buffered > 0) {
+      clearTimeout(quickImportTimer);
+      quickImportTimer = setTimeout(() => {
+        console.log('[DB Import] Quick drain — importing buffered elements...');
+        importModule.runImport().catch(err => console.error('[DB Import] Quick drain error:', err.message));
+      }, 2000);
+    }
+    return result;
+  };
+}
 
 // Scan cells (coverage tracking — must load before overpass)
 const scanCellsModule = require('./lib/scan-cells')(app, deps);

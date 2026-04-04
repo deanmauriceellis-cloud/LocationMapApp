@@ -16,7 +16,7 @@ export function useComments() {
     } catch {
       // If not authed, try unauthenticated fetch
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://10.0.0.4:3000'}/comments/${osmType}/${osmId}`)
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://10.0.0.4:4300'}/comments/${osmType}/${osmId}`)
         if (res.ok) {
           const data = await res.json()
           setComments(data.comments)

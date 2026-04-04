@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity() {
 
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
+    internal val clusterMarkers    = mutableListOf<Marker>()
     internal val trainMarkers      = mutableListOf<Marker>()
     internal val subwayMarkers     = mutableListOf<Marker>()
     internal val busMarkers        = mutableListOf<Marker>()
@@ -146,6 +147,9 @@ class MainActivity : AppCompatActivity() {
     internal val flightTrailPoints = mutableListOf<com.example.locationmapapp.data.model.FlightPathPoint>()
     internal val flightTrailOverlays = mutableListOf<Polyline>()
 
+    // Emergency squawk dedup — one alert per icao24 per session
+    internal val emSquawkAlerted = mutableSetOf<String>()
+
     // Webcam tracking
     internal val webcamMarkers = mutableListOf<Marker>()
     internal var webcamReloadJob: Job? = null
@@ -163,6 +167,11 @@ class MainActivity : AppCompatActivity() {
     internal var idlePopulateJob: Job? = null
     internal var lastSignificantMoveTime: Long = System.currentTimeMillis()
 
+    /** Refresh the layer count badge on the grid toolbar icon. */
+    internal fun refreshLayerBadge() {
+        appBarMenuManager.updateLayerBadge(layersBadgeView, appBarMenuManager.computeActiveLayerCount())
+    }
+
     /** Reset idle timer on any UI activity — grid, dialogs, etc. */
     internal fun resetIdleTimer() {
         lastSignificantMoveTime = System.currentTimeMillis()
@@ -177,6 +186,8 @@ class MainActivity : AppCompatActivity() {
     internal var weatherMenuItem: android.view.MenuItem? = null
     internal var weatherIconView: ImageView? = null
     internal var alertsIconView: ImageView? = null
+    internal var alertsBadgeView: android.widget.TextView? = null
+    internal var layersBadgeView: android.widget.TextView? = null
     internal var lastWeatherFetchTime: Long = 0L
     internal var weatherAutoFetchJob: Job? = null
     internal val WEATHER_FETCH_INTERVAL_MS = 30 * 60 * 1000L  // 30 min
@@ -196,6 +207,8 @@ class MainActivity : AppCompatActivity() {
     internal var poiLabelsShowing = false
     internal var vehicleLabelsShowing = false
     internal var transitMarkersVisible = true
+    internal var stationsVisible = false  // stations only at zoom ≥ 12
+    internal var metarLabelsShowing = false  // METAR labels only at zoom ≥ 10
 
     // Deferred restore — wait for first real GPS fix so the map has a valid bounding box
     internal var pendingPoiRestore = false
@@ -313,10 +326,16 @@ class MainActivity : AppCompatActivity() {
             statusLine   = binding.root.findViewById(R.id.toolbarStatusLine),
             darkModeIcon = binding.root.findViewById(R.id.toolbarDarkModeIcon),
             homeIcon     = binding.root.findViewById(R.id.toolbarHomeIcon),
-            aboutIcon    = binding.root.findViewById(R.id.toolbarAboutIcon)
+            aboutIcon    = binding.root.findViewById(R.id.toolbarAboutIcon),
+            alertsBadge  = binding.root.findViewById(R.id.alertsBadge),
+            layersBadge  = binding.root.findViewById(R.id.layersBadge)
         )
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
+        alertsBadgeView = toolbarRefs.alertsBadge
+        layersBadgeView = toolbarRefs.layersBadge
+        // Set initial layer badge count
+        appBarMenuManager.updateLayerBadge(layersBadgeView, appBarMenuManager.computeActiveLayerCount())
         statusLineManager = StatusLineManager(toolbarRefs.statusLine)
         favoritesManager = com.example.locationmapapp.util.FavoritesManager(this)
         DebugLogger.i("MainActivity", "Slim toolbar wired — Weather, Home, Alerts, Grid, About + StatusLine")
@@ -359,26 +378,31 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "Radar scheduler restarted from onStart()")
         }
 
-        // Restore MBTA layers from persisted toggle state
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_TRAINS, true) && trainRefreshJob?.isActive != true) {
-            DebugLogger.i("MainActivity", "onStart() restoring MBTA trains")
-            startTrainRefresh()
-        }
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_SUBWAY, true) && subwayRefreshJob?.isActive != true) {
-            DebugLogger.i("MainActivity", "onStart() restoring MBTA subway")
-            startSubwayRefresh()
-        }
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUSES, true) && busRefreshJob?.isActive != true) {
-            DebugLogger.i("MainActivity", "onStart() restoring MBTA buses")
-            startBusRefresh()
-        }
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_STATIONS, true) && stationMarkers.isEmpty()) {
-            DebugLogger.i("MainActivity", "onStart() restoring MBTA stations")
-            transitViewModel.fetchMbtaStations()
-        }
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUS_STOPS, false) && allBusStops.isEmpty()) {
-            DebugLogger.i("MainActivity", "onStart() restoring MBTA bus stops")
-            transitViewModel.fetchMbtaBusStops()
+        // Restore MBTA layers — stagger startup to avoid ANR
+        lifecycleScope.launch {
+            delay(2000) // let map render first
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_TRAINS, true) && trainRefreshJob?.isActive != true) {
+                DebugLogger.i("MainActivity", "onStart() restoring MBTA trains")
+                startTrainRefresh()
+            }
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_SUBWAY, true) && subwayRefreshJob?.isActive != true) {
+                DebugLogger.i("MainActivity", "onStart() restoring MBTA subway")
+                startSubwayRefresh()
+            }
+            delay(500)
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUSES, true) && busRefreshJob?.isActive != true) {
+                DebugLogger.i("MainActivity", "onStart() restoring MBTA buses")
+                startBusRefresh()
+            }
+            delay(500)
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_STATIONS, true) && stationMarkers.isEmpty()) {
+                DebugLogger.i("MainActivity", "onStart() restoring MBTA stations")
+                transitViewModel.fetchMbtaStations()
+            }
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUS_STOPS, false) && allBusStops.isEmpty()) {
+                DebugLogger.i("MainActivity", "onStart() restoring MBTA bus stops")
+                transitViewModel.fetchMbtaBusStops()
+            }
         }
 
         // Defer METAR restore until GPS fix so the map has a real bounding box
@@ -711,7 +735,9 @@ class MainActivity : AppCompatActivity() {
                         transitViewModel.mbtaTrains.value?.let { it.forEach { v -> addTrainMarker(v) } }
                         transitViewModel.mbtaSubway.value?.let { it.forEach { v -> addSubwayMarker(v) } }
                         transitViewModel.mbtaBuses.value?.let { it.forEach { v -> addBusMarker(v) } }
-                        transitViewModel.mbtaStations.value?.let { it.forEach { s -> addStationMarker(s) } }
+                        if (zoom >= 12.0) {
+                            transitViewModel.mbtaStations.value?.let { addStationMarkersBatched(it) }
+                        }
                         refreshBusStopMarkersForViewport()
                         binding.mapView.invalidate()
                     }
@@ -729,6 +755,27 @@ class MainActivity : AppCompatActivity() {
                     if (vehicleLabeled != vehicleLabelsShowing) {
                         vehicleLabelsShowing = vehicleLabeled
                         refreshVehicleMarkerIcons()
+                    }
+                }
+                // Toggle METAR labels at zoom 10 threshold
+                if (!filterAndMapActive) {
+                    val nowMetarLabels = zoom >= 10.0
+                    if (nowMetarLabels != metarLabelsShowing) {
+                        metarLabelsShowing = nowMetarLabels
+                        refreshMetarMarkerIcons()
+                    }
+                }
+                // Show/hide station markers at zoom 12 threshold
+                if (transitMarkersVisible && !filterAndMapActive) {
+                    val nowStations = zoom >= 12.0
+                    if (nowStations != stationsVisible) {
+                        stationsVisible = nowStations
+                        if (nowStations) {
+                            transitViewModel.mbtaStations.value?.let { addStationMarkersBatched(it) }
+                        } else {
+                            clearStationMarkers()
+                        }
+                        binding.mapView.invalidate()
                     }
                 }
                 return false
@@ -1014,6 +1061,14 @@ class MainActivity : AppCompatActivity() {
                 scheduleSilentFill(point, 2000)
             }
         }
+        viewModel.poiClusters.observe(this) { clusters ->
+            if (clusters != null) {
+                DebugLogger.i("MainActivity", "poiClusters → ${clusters.size} clusters")
+                renderPoiClusters(clusters)
+            } else {
+                clearClusterMarkers()
+            }
+        }
         viewModel.places.observe(this) { (layerId, places) ->
             DebugLogger.i("MainActivity", "places → ${places.size} results layerId=$layerId")
             if (layerId == "bbox") {
@@ -1022,6 +1077,8 @@ class MainActivity : AppCompatActivity() {
                     replaceAllPoiMarkers(emptyList())
                     return@observe
                 }
+                // Clear cluster markers when showing individual POIs
+                clearClusterMarkers()
                 // Viewport bbox fetch — replace ALL POI markers with only visible results
                 replaceAllPoiMarkers(places)
             } else {
@@ -1029,7 +1086,7 @@ class MainActivity : AppCompatActivity() {
                 // Trigger a bbox refresh so the newly cached POIs appear on screen.
                 cachePoiJob?.cancel()
                 cachePoiJob = lifecycleScope.launch {
-                    delay(1000)
+                    delay(2000)
                     loadCachedPoisForVisibleArea()
                 }
             }
@@ -1041,6 +1098,7 @@ class MainActivity : AppCompatActivity() {
         }
         weatherViewModel.weatherAlerts.observe(this) { alerts ->
             DebugLogger.i("MainActivity", "weatherAlerts → ${alerts.size} alerts")
+            appBarMenuManager.updateAlertBadge(alertsBadgeView, alerts.size)
             if (alerts.isNotEmpty()) toast("${alerts.size} weather alert(s) active")
         }
         weatherViewModel.weatherData.observe(this) { data ->
@@ -1056,8 +1114,7 @@ class MainActivity : AppCompatActivity() {
         weatherViewModel.webcams.observe(this) { webcams ->
             DebugLogger.i("MainActivity", "webcams → ${webcams.size} on map")
             clearWebcamMarkers()
-            webcams.forEach { addWebcamMarker(it) }
-            bringStationMarkersToFront()
+            addWebcamMarkersBatched(webcams)
         }
         viewModel.error.observe(this) { msg ->
             DebugLogger.e("MainActivity", "VM error: $msg")
@@ -1073,6 +1130,14 @@ class MainActivity : AppCompatActivity() {
                 if (followed != null) aircraft + followed else aircraft
             } else aircraft
             merged.forEach { addAircraftMarker(it) }
+            // Emergency squawk detection — alert once per icao24 per session
+            merged.filter { isEmergencySquawk(it.squawk) && emSquawkAlerted.add(it.icao24) }
+                .forEach { s ->
+                    val callsign = s.callsign?.ifBlank { null } ?: s.icao24
+                    val altFt = s.baroAltitude?.let { "%.0f ft".format(it * 3.28084) } ?: "—"
+                    toast("⚠ ${squawkLabel(s.squawk!!)} — $callsign squawk ${s.squawk} at $altFt")
+                    DebugLogger.i("MainActivity", "EMERGENCY SQUAWK ${s.squawk} (${squawkLabel(s.squawk!!)}) — $callsign icao=${s.icao24} alt=$altFt")
+                }
             updateFollowedAircraft(merged)
         }
         aircraftViewModel.followedAircraft.observe(this) { state ->
@@ -1205,7 +1270,9 @@ class MainActivity : AppCompatActivity() {
         transitViewModel.mbtaStations.observe(this) { stations ->
             DebugLogger.i("MainActivity", "MBTA stations update — ${stations.size} stations")
             clearStationMarkers()
-            if (transitMarkersVisible) stations.forEach { addStationMarker(it) }
+            if (transitMarkersVisible && binding.mapView.zoomLevelDouble >= 12.0) {
+                addStationMarkersBatched(stations)
+            }
         }
         transitViewModel.mbtaBusStops.observe(this) { stops ->
             DebugLogger.i("MainActivity", "MBTA bus stops update — ${stops.size} total stops loaded")
@@ -1310,7 +1377,6 @@ class MainActivity : AppCompatActivity() {
         }
         poiMarkers.getOrPut(layerId) { mutableListOf() }.add(m)
         binding.mapView.overlays.add(m)
-        binding.mapView.invalidate()
     }
 
     /** Convert a PlaceResult to FindResult and open the POI detail dialog. */
@@ -1435,13 +1501,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Ask the proxy for cached POIs within the visible map bounding box.
-     *  Skips loading at zoom ≤ 8 — viewport too large, too many markers. */
+     *  Server returns clusters at wide zoom levels, individual POIs when zoomed in. */
     internal fun loadCachedPoisForVisibleArea() {
-        if (binding.mapView.zoomLevelDouble < 10.0) {
-            // Safety floor — very wide bbox would fetch too many POIs and risk OOM
-            replaceAllPoiMarkers(emptyList())
-            return
-        }
         val bb = binding.mapView.boundingBox
         viewModel.loadCachedPoisForBbox(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
@@ -1465,10 +1526,82 @@ class MainActivity : AppCompatActivity() {
     /** Replace all POI markers with only the given viewport results. */
     internal fun replaceAllPoiMarkers(places: List<com.example.locationmapapp.data.model.PlaceResult>) {
         clearAllPoiMarkers()
-        places.forEach { addPoiMarker("bbox", it) }
-        // Re-add station markers so they stay on top and receive taps first
-        bringStationMarkersToFront()
-        binding.mapView.invalidate()
+        if (places.isEmpty()) {
+            binding.mapView.invalidate()
+            return
+        }
+        // Pre-generate icons on background thread to avoid ANR
+        lifecycleScope.launch {
+            val labeled = binding.mapView.zoomLevelDouble >= 16.0
+            val iconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                places.map { place ->
+                    val icon = if (labeled) {
+                        MarkerIconHelper.labeledDot(this@MainActivity, place.category, place.name)
+                    } else {
+                        MarkerIconHelper.dot(this@MainActivity, place.category)
+                    }
+                    Pair(place, icon)
+                }
+            }
+            // Now on main thread — fast marker creation
+            for ((place, icon) in iconData) {
+                val m = Marker(binding.mapView).apply {
+                    position = GeoPoint(place.lat, place.lon)
+                    this.icon = icon
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    title = place.name
+                    snippet = buildPlaceSnippet(place)
+                    relatedObject = place
+                    setOnMarkerClickListener { _, _ ->
+                        openPoiDetailFromPlace(place)
+                        true
+                    }
+                }
+                poiMarkers.getOrPut("bbox") { mutableListOf() }.add(m)
+                binding.mapView.overlays.add(m)
+            }
+            bringStationMarkersToFront()
+            binding.mapView.invalidate()
+        }
+    }
+
+    /** Clear cluster markers from the map. */
+    internal fun clearClusterMarkers() {
+        clusterMarkers.forEach { binding.mapView.overlays.remove(it) }
+        clusterMarkers.clear()
+    }
+
+    /** Render server-side POI clusters as sized, colored circle markers. */
+    internal fun renderPoiClusters(clusters: List<com.example.locationmapapp.data.model.PoiCluster>) {
+        clearClusterMarkers()
+        clearAllPoiMarkers()
+        // Pre-generate icons on background thread to avoid ANR, then add markers on main thread
+        lifecycleScope.launch {
+            val iconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                clusters.map { cluster ->
+                    val color = MarkerIconHelper.clusterTagColor(cluster.tag)
+                    Triple(cluster, color, MarkerIconHelper.clusterIcon(this@MainActivity, cluster.count, color))
+                }
+            }
+            // Now on main thread — fast marker creation + overlay add
+            for ((cluster, _, icon) in iconData) {
+                val m = org.osmdroid.views.overlay.Marker(binding.mapView).apply {
+                    position = cluster.toGeoPoint()
+                    this.icon = icon
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    title = "${cluster.count} POIs"
+                    snippet = cluster.tag
+                    setOnMarkerClickListener { _, _ ->
+                        binding.mapView.controller.animateTo(cluster.toGeoPoint(), binding.mapView.zoomLevelDouble + 2.0, 500L)
+                        true
+                    }
+                }
+                clusterMarkers.add(m)
+                binding.mapView.overlays.add(m)
+            }
+            bringStationMarkersToFront()
+            binding.mapView.invalidate()
+        }
     }
 
     /** Move station markers to the end of the overlay list so they draw on top and get taps first. */
@@ -1498,6 +1631,34 @@ class MainActivity : AppCompatActivity() {
         }
         webcamMarkers.add(m)
         binding.mapView.overlays.add(m)
+    }
+
+    /** Add webcam markers with icon generation off main thread. */
+    internal fun addWebcamMarkersBatched(webcams: List<com.example.locationmapapp.data.model.Webcam>) {
+        if (webcams.isEmpty()) return
+        lifecycleScope.launch {
+            val icon = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                MarkerIconHelper.forCategory(this@MainActivity, "camera", 20)
+            }
+            for (webcam in webcams) {
+                val m = Marker(binding.mapView).apply {
+                    position = webcam.toGeoPoint()
+                    this.icon = icon
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    title = webcam.title
+                    snippet = webcam.categories.joinToString(", ") { it.replaceFirstChar { c -> c.uppercase() } }
+                    relatedObject = webcam
+                    setOnMarkerClickListener { _, _ ->
+                        showWebcamPreviewDialog(webcam)
+                        true
+                    }
+                }
+                webcamMarkers.add(m)
+                binding.mapView.overlays.add(m)
+            }
+            bringStationMarkersToFront()
+            binding.mapView.invalidate()
+        }
     }
 
     internal fun clearWebcamMarkers() {
@@ -1556,6 +1717,7 @@ class MainActivity : AppCompatActivity() {
             toggleRadar()
             if (enabled) radarScheduler.start(appBarMenuManager.radarUpdateMinutes) { weatherViewModel.refreshRadar() }
             else         radarScheduler.stop()
+            refreshLayerBadge()
         }
 
         override fun onRadarVisibilityChanged(percent: Int) {
@@ -1613,6 +1775,7 @@ class MainActivity : AppCompatActivity() {
             DebugLogger.i("MainActivity", "onMetarDisplayToggled: $enabled")
             if (enabled) { loadMetarsForVisibleArea(); toast("Loading METARs…") }
             else          clearMetarMarkers()
+            refreshLayerBadge()
         }
 
         override fun onMetarFrequencyChanged(minutes: Int) {
@@ -1642,6 +1805,7 @@ class MainActivity : AppCompatActivity() {
                     DebugLogger.i("MainActivity", "Auto-follow cancelled — aircraft layer turned off")
                 }
             }
+            refreshLayerBadge()
         }
 
         override fun onAircraftFrequencyChanged(seconds: Int) {
@@ -1687,6 +1851,7 @@ class MainActivity : AppCompatActivity() {
                 transitViewModel.clearMbtaTrains()
                 if (followedVehicleId != null) stopFollowing()
             }
+            refreshLayerBadge()
         }
 
         override fun onMbtaTrainsFrequencyChanged(seconds: Int) {
@@ -1707,6 +1872,7 @@ class MainActivity : AppCompatActivity() {
                 transitViewModel.clearMbtaSubway()
                 if (followedVehicleId != null) stopFollowing()
             }
+            refreshLayerBadge()
         }
 
         override fun onMbtaSubwayFrequencyChanged(seconds: Int) {
@@ -1726,6 +1892,7 @@ class MainActivity : AppCompatActivity() {
                 transitViewModel.clearMbtaBuses()
                 if (followedVehicleId != null) stopFollowing()
             }
+            refreshLayerBadge()
         }
 
         override fun onMbtaBusesFrequencyChanged(seconds: Int) {
@@ -1759,6 +1926,7 @@ class MainActivity : AppCompatActivity() {
                 weatherViewModel.clearWebcams()
                 clearWebcamMarkers()
             }
+            refreshLayerBadge()
         }
 
         override fun onWebcamCategoriesChanged(categories: Set<String>) {
@@ -1884,6 +2052,7 @@ class MainActivity : AppCompatActivity() {
                 geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.TFR)
                 clearTfrOverlays()
             }
+            refreshLayerBadge()
         }
 
         override fun onCameraOverlayToggled(enabled: Boolean) {
@@ -1896,6 +2065,7 @@ class MainActivity : AppCompatActivity() {
                 geofenceViewModel.clearZoneType(com.example.locationmapapp.data.model.ZoneType.SPEED_CAMERA)
                 clearCameraOverlays()
             }
+            refreshLayerBadge()
         }
 
         override fun onSchoolOverlayToggled(enabled: Boolean) {
@@ -2000,10 +2170,40 @@ class MainActivity : AppCompatActivity() {
 
         override fun onHomeRequested() {
             resetIdleTimer()
-            DebugLogger.i("MainActivity", "onHomeRequested — centering on GPS")
-            viewModel.currentLocation.value?.point?.let { gps ->
-                binding.mapView.controller.animateTo(gps, 18.0, 800L)
-            } ?: toast("No GPS fix yet")
+            val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+            if (prefs.getBoolean(MenuPrefs.PREF_HOME_SET, false)) {
+                val lat = prefs.getFloat(MenuPrefs.PREF_HOME_LAT, 0f).toDouble()
+                val lon = prefs.getFloat(MenuPrefs.PREF_HOME_LON, 0f).toDouble()
+                DebugLogger.i("MainActivity", "onHomeRequested — centering on saved home ($lat,$lon)")
+                binding.mapView.controller.animateTo(org.osmdroid.util.GeoPoint(lat, lon), 18.0, 800L)
+            } else {
+                DebugLogger.i("MainActivity", "onHomeRequested — centering on GPS (no home set)")
+                viewModel.currentLocation.value?.point?.let { gps ->
+                    binding.mapView.controller.animateTo(gps, 18.0, 800L)
+                } ?: toast("No GPS fix yet — long-press Home to set")
+            }
+        }
+
+        override fun onHomeLongPressed(setting: Boolean) {
+            resetIdleTimer()
+            if (setting) {
+                val center = binding.mapView.mapCenter
+                val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+                prefs.edit()
+                    .putFloat(MenuPrefs.PREF_HOME_LAT, center.latitude.toFloat())
+                    .putFloat(MenuPrefs.PREF_HOME_LON, center.longitude.toFloat())
+                    .putBoolean(MenuPrefs.PREF_HOME_SET, true)
+                    .apply()
+                // Tint home icon teal
+                binding.root.findViewById<android.widget.ImageView>(R.id.toolbarHomeIcon)
+                    ?.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#4DB6AC"))
+                DebugLogger.i("MainActivity", "Home set to ${center.latitude},${center.longitude}")
+                toast("Home location saved")
+            } else {
+                // Already cleared in AppBarMenuManager
+                DebugLogger.i("MainActivity", "Home location cleared")
+                toast("Home location cleared")
+            }
         }
 
         override fun onAboutRequested() {

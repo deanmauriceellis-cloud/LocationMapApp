@@ -37,7 +37,7 @@ class WebcamRepository @Inject constructor() {
         south: Double, west: Double, north: Double, east: Double,
         categories: String = "traffic"
     ): List<Webcam> = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:3000/webcams?s=$south&w=$west&n=$north&e=$east&categories=$categories"
+        val url = "http://10.0.0.4:4300/webcams?s=$south&w=$west&n=$north&e=$east&categories=$categories"
         DebugLogger.d(TAG, "Fetching webcams categories=$categories bbox=$south,$west,$north,$east")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()

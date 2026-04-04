@@ -28,8 +28,8 @@ set -uo pipefail
 # CONFIG
 # ═══════════════════════════════════════════════════════════════════════════════
 
-APP="http://localhost:8085"
-PROXY="http://10.0.0.4:3000"
+APP="http://localhost:4303"
+PROXY="http://10.0.0.4:4300"
 DURATION_MIN=60
 WAIT_FOR_SERVICE=false
 
@@ -801,7 +801,7 @@ echo ""
 
 # Verify connectivity
 if ! curl -s --max-time 3 "${APP}/" >/dev/null 2>&1; then
-    echo "ERROR: Debug server not reachable on port 8085"
+    echo "ERROR: Debug server not reachable on port 4303"
     exit 1
 fi
 event PASS "Debug server reachable"

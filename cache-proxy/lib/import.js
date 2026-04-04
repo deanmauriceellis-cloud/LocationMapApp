@@ -178,12 +178,13 @@ module.exports = function(app, deps) {
     });
   });
 
-  // Expose internal state for admin module
+  // Expose internal state + import function for quick-drain
   return {
     getImportState: () => ({
       dbImportRunning,
       dbImportStats,
       DB_IMPORT_INTERVAL_MS,
     }),
+    runImport: () => runPoiDbImport(pgPool, drainImportBuffer),
   };
 };

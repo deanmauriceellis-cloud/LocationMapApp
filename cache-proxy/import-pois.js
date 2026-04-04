@@ -14,7 +14,7 @@ const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module import-pois.js';
 
 const { Client } = require('pg');
 
-const EXPORT_URL = 'http://localhost:3000/pois/export';
+const EXPORT_URL = 'http://localhost:4300/pois/export';
 
 // Category tag keys in priority order
 const CATEGORY_KEYS = ['amenity', 'shop', 'tourism', 'leisure', 'historic', 'office'];

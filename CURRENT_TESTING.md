@@ -20,6 +20,17 @@
 - v1.5.58: Overpass retry (proxy + app), zoom 16 labels, single-tap stop — build passes
 - v1.5.59: Scan cell coverage + queue cancel — build passes, partial live testing (cells marking correctly, persistence working)
 
+## Performance Optimization (2026-03-20)
+- [x] Moved POI cluster icon generation off main thread (`renderPoiClusters`)
+- [x] Moved POI marker icon generation off main thread (`replaceAllPoiMarkers`)
+- [x] Batched station marker creation off main thread (`addStationMarkersBatched` — 257 stations)
+- [x] Batched webcam marker creation off main thread (`addWebcamMarkersBatched` — 50 webcams)
+- [x] TransitViewModel: all fetch methods use `Dispatchers.IO` (prevents DNS timeout on main thread)
+- [x] Staggered MBTA restore in `onStart()` — 2s delay + 500ms gaps
+- [x] Proxy quick-drain: Overpass results auto-imported to PostgreSQL within 2s
+- [x] Frame skips reduced from 239 to ~35 per burst
+- [ ] Remaining "Emulator not responding" dialog is Ubuntu GNOME `check-alive-timeout` (not app ANR)
+
 ## NOT YET TESTED — Resume Here
 
 ### v1.5.60 (proxy restarted — no app changes needed)
@@ -88,9 +99,26 @@
 
 ### Proxy Startup
 ```bash
+# Use the helper script (recommended):
+bin/restart-proxy.sh
+
+# Or manually:
 cd cache-proxy && DATABASE_URL=postgres://witchdoctor:fuckers123@localhost/locationmapapp \
   JWT_SECRET=$(openssl rand -hex 32) \
   OPENSKY_CLIENT_ID=deanmauriceellis-api-client \
   OPENSKY_CLIENT_SECRET=6m3uBQ5HXwSzJeLemRJK12G8Ux4L5veR node server.js
 ```
 Note: Random JWT_SECRET means existing tokens won't work — users need to re-register.
+**IMPORTANT:** Without `DATABASE_URL`, POIs will NOT appear on the map (`/db/*` endpoints return 503).
+
+### Emulator Setup
+- Use **Pixel_8a_API_34** AVD (API 34, not 36)
+- AVD config (`~/.android/avd/Pixel_8a_API_34.avd/config.ini`) must have:
+  - `hw.initialOrientation=landscape`
+  - `showDeviceFrame=no`
+  - `skin.name=1080x2400` / `skin.path=1080x2400` (not `pixel_8a`)
+- Start: `emulator -avd Pixel_8a_API_34 -no-boot-anim -no-snapshot`
+- After boot: `adb shell settings put global policy_control "immersive.full=com.example.locationmapapp"`
+- Resize by dragging corner — do NOT use `wmctrl` fullscreen (crashes emulator)
+- Install: `./gradlew installDebug`
+- See STATE.md "Development Environment" section for full details.
