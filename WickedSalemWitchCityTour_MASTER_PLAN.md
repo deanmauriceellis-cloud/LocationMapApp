@@ -507,6 +507,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [ ] Salem-enhanced POIs OVERLAY on top of generic Overpass POIs
   - If a Salem business matches an Overpass POI → merge (Salem data takes priority)
   - If no match → Salem business appears as its own marker with richer detail
+- **Tier gate:** Overpass POI auto-populate is $19.99+ tier only. Free/$4.99/$9.99 use curated Salem content only.
 
 ### Step 5.6: Data provenance & staleness infrastructure
 - [x] Added provenance fields to all 9 Room entities (data_source, confidence, verified_date, created_at, updated_at, stale_after)
@@ -522,7 +523,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [x] Pipeline generates 37 POIs + 23 businesses + 3 tours (60 stops) with provenance (0 errors, 0 warnings)
 - [x] `salem_content.db` created (1.7MB, 841 records, Room identity hash matched)
 - [x] `./gradlew :app-salem:assembleDebug` builds successfully
-- [ ] Emulator verification (this session)
+- [x] Emulator verification — confirmed working
 - [ ] Git commit: "Phase 5: Salem POI catalog + provenance + staleness + API"
 
 ---
@@ -532,73 +533,88 @@ recurrence_pattern, seasonal_month (10 for October events)
 **Goal:** Implement the guided walking tour system.
 
 ### Step 6.1: Tour data model
-- [ ] Create `TourModels.kt`:
+- [x] Create `TourModels.kt` (`tour/TourModels.kt`):
   - `TourTheme` enum: WITCH_TRIALS, MARITIME, LITERARY, ARCHITECTURE, PARKS, FOOD_DRINK, COMPLETE, OCTOBER_SPECIAL, HERITAGE_TRAIL, CUSTOM
-  - `TourProgress` data class: tourId, currentStopIndex, completedStops, startTime, totalDistanceWalked
-  - `ActiveTour` data class: tour, stops (ordered), progress, isActive
+  - `TourProgress` data class: tourId, currentStopIndex, completedStops, skippedStops, startTime, totalDistanceWalked, elapsedMs
+  - `ActiveTour` data class: tour, stops (ordered), pois, progress — with currentStop/currentPoi/nextStop/nextPoi/remainingStops helpers
+  - `TourState` sealed class: Idle, Loading, Active, Paused, Completed, Error
+  - `TourSummary` data class: completion stats for end-of-tour dialog
 
 ### Step 6.2: Tour engine
-- [ ] Create `TourEngine.kt`:
-  - `startTour(tourId)` — load tour + stops, begin GPS tracking
-  - `advanceToNextStop()` — mark current complete, update progress
+- [x] Create `TourEngine.kt` (`tour/TourEngine.kt`):
+  - `startTour(tourId)` — load tour + stops + POIs from SalemContentRepository, begin GPS tracking
+  - `advanceToNextStop()` — mark current complete, update progress, auto-end if last
   - `skipStop()` — skip without completing
   - `reorderStops(newOrder)` — user rearranges
-  - `addStop(poiId)` — insert POI from another theme
-  - `removeStop(poiId)` — remove from active tour
-  - `pauseTour()` / `resumeTour()` — persist progress
-  - `endTour()` — summary stats
-  - Emits `Flow<TourState>` for UI observation
+  - `addStop(poiId)` — insert POI from another theme (after current position)
+  - `removeStop(poiId)` — remove from active tour (cannot remove current)
+  - `pauseTour()` / `resumeTour()` — persist elapsed time across pauses
+  - `endTour()` — summary stats, clear persisted progress
+  - Emits `StateFlow<TourState>` for UI observation
+  - `restoreIfSaved()` — restore from SharedPreferences on app startup
+  - `onLocationUpdate(GeoPoint)` — feed GPS for distance calculations
+  - Geofence-aware: `isAtCurrentStop()`, `distanceToStop()`, `isWithinGeofence()`
+  - Haversine distance calculation between stops
+  - `TourViewModel.kt` bridges TourEngine to SalemMainActivity UI
 
 ### Step 6.3: Tour selection UI
-- [ ] Create tour selection screen (RecyclerView or Compose list):
-  - Tour card: icon, name, description, stop count, estimated time, distance
-  - Category filter chips
-  - "Build Your Own" option
-- [ ] Tour detail screen:
-  - Route preview on map with numbered markers
-  - Stop list with descriptions and distances
-  - "Start Tour" button
-  - Estimated time, total distance
+- [x] Tour selection dialog (full-screen, Salem-branded):
+  - Tour card: name, description, stop count, estimated time, distance, difficulty chips
+  - "Start Tour" gold button per card
+  - Auto-redirect to active tour dialog if a tour is already running
+- [ ] Category filter chips (deferred — can be added when more tours exist)
+- [x] "Build Your Own" and "I Have X Minutes" buttons at bottom of tour list
 
 ### Step 6.4: Active tour HUD
-- [ ] Map overlay showing:
-  - Route polyline (connecting all stops)
+- [x] Map overlay showing:
+  - Route polyline (gold, connecting all stops in order)
   - Numbered stop markers (completed = green, current = blue, upcoming = gray)
-  - Current stop name + distance to next
-  - Progress bar (stops completed / total)
-  - Tour controls: Next, Skip, Pause, End
-- [ ] Bottom sheet with current stop details
+  - Bottom HUD bar: current stop name + distance + Next/Skip/Info buttons
+  - Tour status on StatusLineManager (TOUR priority level 4)
+- [x] Active tour dialog with stop list, progress bar, and action buttons (Next/Skip/Pause/Resume/End)
+- [x] Tour stop detail dialog (tap numbered marker): full POI info + "Show on Map" button
+- [x] Tour completion dialog: stats summary (stops, time, distance, completion %)
 
 ### Step 6.5: Tour progress persistence
-- [ ] Save to SharedPreferences:
-  - Active tour ID, current stop index, completed stops list
-  - Restore on app relaunch
-  - "Resume Tour?" prompt on next open
+- [x] Save to SharedPreferences (tour_engine_prefs):
+  - Active tour ID, current stop index, completed/skipped stops, distance, elapsed time, custom stop order
+  - Restore on app relaunch via TourEngine.restoreIfSaved() (restores as Paused state)
+  - TourViewModel calls restoreIfSaved() in init{}
 
 ### Step 6.6: Custom tour builder
-- [ ] "Build Your Own" flow:
-  - Browse all POIs by category
-  - Add/remove stops
-  - Auto-optimize route (nearest-neighbor TSP)
-  - Show estimated time and distance
-  - Save as personal tour
+- [x] "Build Your Own" flow (`SalemMainActivityTour.kt::showCustomTourBuilder()`):
+  - Browse all POIs grouped by category with checkbox selection
+  - Select All / Clear / Start Tour buttons
+  - Live summary: stop count, route distance (km), estimated time
+  - Auto-optimize route via nearest-neighbor TSP (`TourEngine.optimizeRoute()`)
+  - Starts as custom tour with auto-generated TourStop transitions
+  - Priority stars (\u2605) shown for must-see POIs
 
 ### Step 6.7: Time-filtered tours
-- [ ] "I have X minutes" filter:
+- [x] "I Have X Minutes" dialog (`SalemMainActivityTour.kt::showTimeBudgetDialog()`):
   - 30 min → top 4-5 must-see sites
-  - 60 min → essential witch trials + 1-2 maritime
+  - 60 min → essential witch trials + maritime
   - 90 min → full themed tour
-  - 3+ hours → complete Salem
-- [ ] Algorithm: select highest-priority POIs that fit within time budget, optimize route
+  - 2 hours → extended exploration
+  - 3+ hours → complete Salem experience
+- [x] Algorithm (`TourEngine.buildTimeBudgetTour()`):
+  - Filters out requires_transportation POIs for <2hr budgets
+  - Selects highest-priority POIs that fit within time budget (~9 min/stop avg)
+  - Route-optimized from user's current GPS via `optimizeRouteFromStart()`
+  - Live preview: stop count + distance shown per time option
+  - Tap to instantly start the generated tour
 
 ### Step 6.8: Verify
-- [ ] Can select and start any pre-defined tour
-- [ ] Route displays correctly on map
-- [ ] Progress tracks through stops
-- [ ] Can skip, reorder, add stops
-- [ ] Progress persists across app restarts
-- [ ] Custom tour builder generates valid routes
-- [ ] Git commit: "Tour engine — guided walking tours with customization"
+- [x] `./gradlew :app-salem:assembleDebug` builds clean (0 errors)
+- [x] `./gradlew :app:assembleDebug` builds clean (core MenuEventListener backward compat)
+- [ ] Emulator: can select and start any pre-defined tour
+- [ ] Emulator: route displays correctly on map (polyline + numbered markers)
+- [ ] Emulator: progress tracks through stops (advance/skip)
+- [ ] Emulator: can add stops from active tour dialog
+- [ ] Emulator: progress persists across app restarts (resume prompt)
+- [ ] Emulator: custom tour builder generates valid routes
+- [ ] Emulator: time-budget tour selects appropriate stops
+- [ ] Git commit: "Phase 6: Tour engine — guided walking tours with customization"
 
 ---
 
@@ -607,71 +623,78 @@ recurrence_pattern, seasonal_month (10 for October events)
 **Goal:** Automatic GPS-triggered narration as the tourist walks through Salem.
 
 ### Step 7.1: Tour geofence manager
-- [ ] Create `TourGeofenceManager.kt`:
-  - On tour start: create geofence zones for all tour stops (50m radius circles)
-  - Convert tour POIs to `TfrZone` format for core `GeofenceEngine`
-  - Load into `GeofenceEngine.loadZones()`
-  - On each GPS update: `GeofenceEngine.checkPosition()` → detect proximity/entry
-  - On POI entry: emit event → trigger narration + UI update
+- [x] Create `TourGeofenceManager.kt` (`tour/TourGeofenceManager.kt`):
+  - Lightweight haversine-based proximity engine (not polygon-based — tour stops are circles)
+  - On tour start: `loadStops()` registers all tour stop geofences
+  - On each GPS update: `checkPosition()` → APPROACH/ENTRY/EXIT detection
+  - APPROACH zone: 2× geofence radius (~100m), ENTRY zone: geofence radius (~50m)
+  - 60-second cooldown per stop per event type (prevents spam)
+  - Emits `SharedFlow<TourGeofenceEvent>` for UI observation
+  - Wired into TourEngine.onLocationUpdate() automatically
 
 ### Step 7.2: Android TTS integration
-- [ ] Create `NarrationManager.kt`:
+- [x] Create `NarrationManager.kt` (`tour/NarrationManager.kt`):
   - Initialize `TextToSpeech` engine with `Locale.US`
-  - Speech rate: 0.9x (slightly slower for historical content)
+  - Speech rate: 0.9x default (slightly slower for historical content)
   - Methods:
-    - `speakShortNarration(poiId)` — approach summary (15-30 sec)
-    - `speakLongNarration(poiId)` — full story (60-120 sec)
-    - `speakQuote(text)` — primary source quote
-    - `speakTransition(fromPoiId, toPoiId)` — walking transition
+    - `speakShortNarration(poi)` — approach summary (15-30 sec)
+    - `speakLongNarration(poi)` — full story (60-120 sec)
+    - `speakQuote(text, sourceName)` — primary source quote
+    - `speakTransition(transitionText)` — walking transition between stops
+    - `speakHint(text, poiName)` — ambient mode hint
     - `pause()`, `resume()`, `stop()`, `skip()`
-  - Queue management: queue segments, play in order
-  - Emit `Flow<NarrationState>` (IDLE, SPEAKING, PAUSED, segment info)
+  - Queue management: ArrayDeque of NarrationSegment, auto-advance on completion
+  - UtteranceProgressListener → auto-play next segment
+  - Emits `StateFlow<NarrationState>` (Idle, Speaking, Paused)
+  - `cycleSpeed()` — cycles through 0.75x / 0.9x / 1.0x / 1.25x
+  - Respects phone ringer mode (RINGER_MODE_NORMAL only)
 
 ### Step 7.3: Narration trigger flow
+- [x] Wired in TourEngine.onLocationUpdate():
 ```
-GPS update → GeofenceEngine.checkPosition()
-  → PROXIMITY alert (approaching, ~50m out)
-    → Vibrate briefly
-    → Show notification: "Approaching: Witch Trials Memorial"
+GPS update → TourGeofenceManager.checkPosition()
+  → APPROACH alert (~100m out)
+    → Toast: "Approaching: [POI name]"
     → If auto-narration ON: speakShortNarration()
-  → ENTRY alert (arrived, within ~20m)
-    → Show rich POI card
+  → ENTRY alert (within ~50m)
+    → Toast: "Arrived: [POI name]"
+    → Center map on POI (zoom 18, 800ms animation)
     → If auto-narration ON: speakLongNarration()
-    → "Hear More" button → speakQuote() with primary sources
   → EXIT alert (leaving)
     → If on active tour: speakTransition() to next stop
 ```
 
 ### Step 7.4: Narration controls
-- [ ] On-screen controls:
-  - Play/Pause button
-  - Skip to next segment
-  - Stop narration
-  - Speed control (0.75x, 1.0x, 1.25x)
-  - Volume control
-- [ ] Notification controls (MediaStyle notification):
-  - Play/Pause, Skip, Stop
-  - Current POI name as notification title
-  - Narration text snippet as notification body
-- [ ] Respect phone ringer mode (silent = no narration, vibrate only)
+- [x] On-screen narration bar (`SalemMainActivityTour.kt`):
+  - Appears above tour HUD when narration is active
+  - Shows POI name + segment type (Short Narration, Long Narration, etc.)
+  - Play/Pause toggle button
+  - Skip to next segment button
+  - Stop narration button
+  - Speed cycle button (0.75x → 0.9x → 1.0x → 1.25x, shows toast)
+  - Bar auto-hides when narration finishes (NarrationState.Idle)
+- [x] Respects phone ringer mode (silent/vibrate = no speech)
+- [ ] MediaStyle notification controls (deferred to Phase 10 polish)
 
 ### Step 7.5: Ambient mode (no active tour)
-- [ ] Even without an active tour, enable "Ambient Narration":
-  - Monitor GPS passively
-  - When user walks near ANY Salem POI (100m): subtle notification
-  - "Did you know? You're near the Witch House — the only building still standing with direct ties to the 1692 trials."
-  - User can tap to hear full narration
-  - Toggle on/off in settings
+- [x] Ambient narration in TourEngine:
+  - `ambientModeEnabled` toggle (default off)
+  - When no tour active + ambient on: monitors GPS passively
+  - Checks proximity to ALL Salem POIs (100m radius)
+  - On approach: speaks short narration hint via `speakHint()`
+  - Dedup: each POI triggers only once per session (`ambientHintedPois` set)
+  - `resetAmbientHints()` clears history
+  - POI cache loaded at ViewModel init via `loadAmbientPois()`
 
 ### Step 7.6: Verify
-- [ ] Simulate GPS walk along Witch Trial Trail
-- [ ] Geofence triggers fire at correct distances
-- [ ] Short narration plays on approach
-- [ ] Long narration plays on arrival
-- [ ] Controls (pause, resume, skip) work
-- [ ] Notification shows with media controls
-- [ ] Ambient mode triggers for non-tour POIs
-- [ ] Git commit: "GPS geofence triggers and TTS narration system"
+- [x] `./gradlew :app-salem:assembleDebug` builds clean
+- [x] `./gradlew :app:assembleDebug` builds clean
+- [ ] Emulator: simulate GPS walk — geofence triggers fire at correct distances
+- [ ] Emulator: short narration plays on approach
+- [ ] Emulator: long narration plays on arrival
+- [ ] Emulator: narration controls (pause, resume, skip, speed) work
+- [ ] Emulator: ambient mode triggers for non-tour POIs
+- [ ] Git commit: "Phase 7: GPS geofence triggers and TTS narration system"
 
 ---
 
@@ -680,46 +703,50 @@ GPS update → GeofenceEngine.checkPosition()
 **Goal:** Turn-by-turn walking directions from user's location to any POI.
 
 ### Step 8.1: OSRM routing integration
-- [ ] Create `WalkingDirections.kt`:
-  - Call OSRM public API: `router.project-osrm.org/route/v1/walking/{coords}`
-  - Parse GeoJSON response → list of route segments
-  - Extract: total distance, estimated time, step-by-step instructions
-  - Cache responses (same route = same result within an hour)
+- [x] Create `WalkingDirections.kt` (`tour/WalkingDirections.kt`):
+  - Uses OSMBonusPack's `OSRMRoadManager` with `MEAN_BY_FOOT`
+  - `getRoute(from, to)` — single A→B walking route
+  - `getMultiStopRoute(waypoints)` — multi-stop connected route (tour preview)
+  - Returns `WalkingRoute`: polyline, distance (km), duration (min), turn-by-turn instructions
+  - Cache: routes cached by start+end hash for 1 hour
+  - `WalkingInstruction`: text, distance, duration, location, maneuver type
+  - User agent: `WickedSalemWitchCityTour/1.0`
 
 ### Step 8.2: Route display on map
-- [ ] Draw walking route as polyline on osmdroid map
-  - Color: tour theme color or branded gold
-  - Width: 6px with border
-  - Dashed for future segments, solid for current
-- [ ] Turn markers at key intersections
-- [ ] Distance remaining overlay
+- [x] Walking route drawn on osmdroid map (`SalemMainActivityDirections.kt`):
+  - Bordered polyline: 10px dark gold border + 6px gold main line
+  - Round caps and joins for smooth rendering
+  - Turn markers at key intersections (dots at turn points, skip "continue" instructions)
+  - Directions info bar: distance (km), time (min), turn count, Turns button, close button
 
 ### Step 8.3: "Get me there" feature
-- [ ] Any POI detail card: "Walk Here" button
-  - Calculate route from current GPS to selected POI
-  - Show route on map + estimated walking time
-  - Optional: TTS turn-by-turn ("Turn left on Essex Street in 100 feet")
+- [x] "Walk Here" button in tour stop detail dialog:
+  - Calculates route from current GPS to selected POI
+  - Shows route on map + info bar with estimated walking time
+  - `walkTo(GeoPoint)` helper callable from any POI card
+- [x] "Narrate" button in tour stop detail dialog:
+  - Speaks long narration on demand for any stop
 
 ### Step 8.4: Tour route display
-- [ ] When on active tour: show route from current location → next stop
-- [ ] Preview: show entire tour route as connected polyline
-- [ ] Completed segments shown in faded color
+- [x] `getDirectionsToCurrentStop()` — route from GPS to active tour stop
+- [x] `getFullTourRoute()` — multi-stop route preview for entire tour
+- [x] `clearDirections()` — dismiss route overlay
 
 ### Step 8.5: Route optimization for custom tours
-- [ ] Nearest-neighbor heuristic:
-  1. Start from current GPS location
-  2. Find nearest unvisited stop
-  3. Go there, repeat until all visited
-- [ ] Display total distance and estimated walking time
-- [ ] Allow manual reordering (drag-and-drop stop list)
+- [x] Already implemented in Phase 6.6:
+  - `TourEngine.optimizeRoute()` — nearest-neighbor TSP from first POI
+  - `TourEngine.optimizeRouteFromStart()` — nearest-neighbor from user GPS
+  - Distance + estimated time displayed in custom tour builder
+  - Reorder via `TourEngine.reorderStops()` (programmatic — drag-and-drop deferred to Phase 10)
 
 ### Step 8.6: Verify
-- [ ] Walking directions display correctly on map
-- [ ] Estimated times are reasonable (~5 km/h walking)
-- [ ] "Walk Here" works from any POI card
-- [ ] Tour route preview shows all stops connected
-- [ ] Route optimization produces reasonable order
-- [ ] Git commit: "Walking directions — OSRM integration"
+- [x] `./gradlew :app-salem:assembleDebug` builds clean
+- [x] `./gradlew :app:assembleDebug` builds clean
+- [ ] Emulator: walking directions display correctly on map
+- [ ] Emulator: estimated times are reasonable (~5 km/h walking)
+- [ ] Emulator: "Walk Here" works from tour stop detail
+- [ ] Emulator: turn-by-turn dialog shows correct instructions
+- [ ] Git commit: "Phase 8: Walking directions — OSRM integration"
 
 ---
 
@@ -728,65 +755,76 @@ GPS update → GeofenceEngine.checkPosition()
 **Goal:** Comprehensive coverage of Salem's events, shows, exhibits, and seasonal offerings.
 
 ### Step 9.1: Events calendar database
-- [ ] Populate `events_calendar` table with:
+- [x] Populated `events_calendar` via `SalemEvents.kt` in `:salem-content` — 20 curated events:
 
-**Haunted Happenings (October):**
-- [ ] Grand Parade (early October)
-- [ ] Artisan marketplace (every weekend)
-- [ ] Haunted houses: all major commercial haunted attractions
-- [ ] Ghost tours: all operators with schedules and prices
-- [ ] Psychic fairs, seances, special events
-- [ ] Costume contests, pumpkin decorating
-- [ ] Extended museum hours during October
+**Haunted Happenings (October) — 7 events:**
+- [x] Grand Parade (first Thursday October)
+- [x] Artisan Marketplace (weekends October, Salem Common)
+- [x] Costume Contest (Oct 31, Salem Common)
+- [x] Pumpkin Decorating (Riley Plaza)
+- [x] Thirteen Ghosts haunted house
+- [x] Salem Witch Museum extended hours
+- [x] Psychic Fair (daily October)
 
-**Year-round events:**
-- [ ] Salem Film Fest (March)
-- [ ] Salem's So Sweet (February)
-- [ ] Salem Arts Festival (June)
-- [ ] Heritage Days (August)
+**Year-round events — 5 events:**
+- [x] Salem's So Sweet (February chocolate festival)
+- [x] Salem Film Fest (March documentaries)
+- [x] Salem Arts Festival (June, free)
+- [x] Heritage Days (August, Derby Wharf)
+- [x] Salem Ferry season (May-October, Boston Harbor Cruises)
 
-**Museum exhibits:**
-- [ ] Peabody Essex Museum — current and upcoming exhibits
-- [ ] Salem Witch Museum — permanent + special exhibits
-- [ ] House of Seven Gables — programs, tours, events
-- [ ] Pioneer Village — seasonal programming
+**Museum exhibits — 5 events:**
+- [x] Peabody Essex Museum — permanent collection
+- [x] House of Seven Gables — guided tours
+- [x] Salem Witch Museum — witch trials presentation
+- [x] Pioneer Village — seasonal living history
+- [x] Witch Dungeon Museum — live reenactment
 
-**Event venues:**
-- [ ] Witch House — event schedule
-- [ ] Old Town Hall
-- [ ] Hawthorne Hotel events
-- [ ] Hamilton Hall
-- [ ] Peabody Essex Museum event space
+**Ghost tours & shows — 3 events:**
+- [x] Bewitched After Dark walking tour (nightly)
+- [x] Candlelight Ghost Tour (nightly Apr-Nov)
+- [x] Cry Innocent — interactive witch trial (daily May-Oct)
+
+- [x] Content pipeline updated: `SalemEvents.all()` → `ContentPipeline` → SQL output
+- [x] All events linked to venue POIs where applicable
 
 ### Step 9.2: Events UI
-- [ ] Events tab/section:
-  - "What's Happening Today" — filtered by current date
-  - "This Week" — upcoming events
-  - "This Month" — monthly calendar view
-  - Category filter: haunted, museum, food, music, family, outdoor
-- [ ] Event detail card:
-  - Name, venue (linked to POI), description
-  - Date/time, admission, "Walk Here" button
-  - Share button
+- [x] Events dialog (`SalemMainActivityEvents.kt`):
+  - "On This Date in 1692" section — cross-references timeline_events by month-day
+  - "Happening Today" — active events filtered by current date
+  - "Upcoming" — future events sorted by start date
+  - Monthly events section
+  - Category filter chips (horizontal scroll, color-coded by event type)
+  - 12 event types mapped to display names + colors
+- [x] Event card:
+  - Name, type badge (color-coded), date range
+  - Description (3-line preview), hours, admission
+  - "Show venue on map" link (centers map on POI)
+- [x] Events by type — filtered sub-dialog
+- [x] EventsViewModel: today/upcoming/month/all events + "on this day" + type filter + October/season detection
+- [x] Grid dropdown: Events button (row 4, calendar icon)
+- [x] `onEventsRequested()` added to MenuEventListener (+ no-op in `:app`)
 
 ### Step 9.3: Seasonal awareness
-- [ ] October mode:
-  - Special October tour theme unlocked
-  - Haunted Happenings banner/callout
-  - Extended hours reflected in POI data
-  - Halloween-themed map overlays (optional)
-- [ ] "On this date in 1692..." feature:
-  - Cross-reference current date with timeline events
-  - Show what was happening in Salem on this date 334 years ago
-  - Daily historical notification (optional)
+- [x] October mode: `EventsViewModel.isOctober` flag, pumpkin emoji banner in events dialog
+- [x] Tourist season detection: `isTouristSeason` (April-October)
+- [x] "On this date in 1692" feature:
+  - `TimelineEventDao.findByMonthDay()` — substr(date, 6, 5) match
+  - Red-bordered section at top of events dialog
+  - Links to related POI on map
+- [ ] Halloween-themed map overlays (deferred to Phase 10)
+- [ ] Daily historical notification (deferred to Phase 10)
 
 ### Step 9.4: Verify
-- [ ] Events display with correct dates and venues
-- [ ] "Today" filter shows only current events
-- [ ] Tapping venue navigates to POI on map
-- [ ] October content appears in October, hidden otherwise
-- [ ] "On this date" feature shows accurate historical correlation
-- [ ] Git commit: "Events calendar — Haunted Happenings, exhibits, seasonal content"
+- [x] `./gradlew :salem-content:build` builds clean
+- [x] `./gradlew :app-salem:assembleDebug` builds clean
+- [x] `./gradlew :app:assembleDebug` builds clean
+- [ ] Emulator: events display with correct dates and venues
+- [ ] Emulator: category filter chips work
+- [ ] Emulator: tapping venue navigates to POI on map
+- [ ] Emulator: "On this date in 1692" shows for matching dates
+- [ ] Re-run content pipeline to regenerate salem_content.db with events
+- [ ] Git commit: "Phase 9: Events calendar — Haunted Happenings, exhibits, seasonal content"
 
 ---
 

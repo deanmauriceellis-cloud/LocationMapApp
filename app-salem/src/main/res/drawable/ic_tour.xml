@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WickedSalemWitchCityTour v1.0
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: ic_tour.xml — Walking tour / route icon (footsteps + path)
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Walking figure path -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13.5,5.5C14.33,5.5 15,4.83 15,4C15,3.17 14.33,2.5 13.5,2.5C12.67,2.5 12,3.17 12,4C12,4.83 12.67,5.5 13.5,5.5ZM9.8,8.9L7,23H9.1L10.9,15L13,17V23H15V15.5L12.9,13.5L13.5,10.5C14.8,12 16.8,13 19,13V11C17.1,11 15.5,10 14.7,8.6L13.7,7C13.3,6.4 12.7,6 12,6C11.7,6 11.5,6.1 11.2,6.1L6,8.3V13H8V9.6L9.8,8.9Z" />
+    <!-- Route dots -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M3,18C3.55,18 4,17.55 4,17C4,16.45 3.55,16 3,16C2.45,16 2,16.45 2,17C2,17.55 2.45,18 3,18Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,20C5.55,20 6,19.55 6,19C6,18.45 5.55,18 5,18C4.45,18 4,18.45 4,19C4,19.55 4.45,20 5,20Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M3,22C3.55,22 4,21.55 4,21C4,20.45 3.55,20 3,20C2.45,20 2,20.45 2,21C2,21.55 2.45,22 3,22Z" />
+</vector>

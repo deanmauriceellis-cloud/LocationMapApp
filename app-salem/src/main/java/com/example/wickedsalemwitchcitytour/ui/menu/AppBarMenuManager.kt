@@ -235,6 +235,7 @@ class AppBarMenuManager(
         val row1 = panel.findViewById<LinearLayout>(R.id.gridRow1)
         val row2 = panel.findViewById<LinearLayout>(R.id.gridRow2)
         val row3 = panel.findViewById<LinearLayout>(R.id.gridRow3)
+        val row4 = panel.findViewById<LinearLayout>(R.id.gridRow4)
 
         val popup = PopupWindow(panel, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
         popup.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -304,12 +305,18 @@ class AppBarMenuManager(
             GridBtn(R.drawable.ic_legend,  "Legend")  { popup.dismiss(); menuEventListener.onLegendRequested() }
         )
 
+        val row4Btns = listOf(
+            GridBtn(R.drawable.ic_tour,   "Tours")  { popup.dismiss(); menuEventListener.onTourRequested() },
+            GridBtn(R.drawable.ic_events, "Events") { popup.dismiss(); menuEventListener.onEventsRequested() }
+        )
+
         addGridButtons(row1, row1Btns)
         addGridButtons(row2, row2Btns)
         addGridButtons(row3, row3Btns)
+        addGridButtons(row4, row4Btns)
 
         popup.showAsDropDown(anchor)
-        DebugLogger.i(TAG, "showGridDropdown() — 12 buttons shown")
+        DebugLogger.i(TAG, "showGridDropdown() — 14 buttons shown")
     }
 
     /** Density-independent pixel helper. */

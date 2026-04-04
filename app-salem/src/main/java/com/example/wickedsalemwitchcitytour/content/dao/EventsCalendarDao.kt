@@ -33,6 +33,9 @@ interface EventsCalendarDao {
     @Query("SELECT * FROM events_calendar ORDER BY start_date ASC")
     suspend fun findAll(): List<EventsCalendar>
 
+    @Query("SELECT * FROM events_calendar WHERE event_type = :type ORDER BY start_date ASC")
+    suspend fun findByType(type: String): List<EventsCalendar>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(events: List<EventsCalendar>)
 

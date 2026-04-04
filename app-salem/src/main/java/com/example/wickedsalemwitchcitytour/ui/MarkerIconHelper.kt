@@ -763,5 +763,54 @@ object MarkerIconHelper {
         return get(context, R.drawable.ic_bus_stop, 20, tintColor)
     }
 
+    /**
+     * Create a numbered circle marker for tour stops.
+     * @param number Stop number (1-based)
+     * @param color Fill color (green=completed, blue=current, gray=upcoming)
+     */
+    fun createNumberedCircle(context: Context, number: Int, color: Int): BitmapDrawable {
+        val key = "tour_circle_${number}_${color}"
+        cache[key]?.let { return it }
+
+        val density = context.resources.displayMetrics.density
+        val sizePx = (28 * density).toInt()
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val cx = sizePx / 2f
+        val cy = sizePx / 2f
+        val radius = sizePx / 2f - 2 * density
+
+        // Circle fill
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy, radius, fillPaint)
+
+        // White border
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2 * density
+        }
+        canvas.drawCircle(cx, cy, radius, borderPaint)
+
+        // Number text
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = Color.WHITE
+            textSize = 12 * density
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val textBounds = Rect()
+        val text = number.toString()
+        textPaint.getTextBounds(text, 0, text.length, textBounds)
+        canvas.drawText(text, cx, cy + textBounds.height() / 2f, textPaint)
+
+        val drawable = BitmapDrawable(context.resources, bitmap)
+        cache[key] = drawable
+        return drawable
+    }
+
     fun clearCache() = cache.clear()
 }

@@ -101,6 +101,10 @@ class SalemContentRepository @Inject constructor(
     suspend fun getTimelineByPhase(phase: String): List<TimelineEvent> =
         timelineEventDao.findByPhase(phase)
 
+    /** Find timeline events that occurred on this month-day in 1692. */
+    suspend fun getTimelineByMonthDay(monthDay: String): List<TimelineEvent> =
+        timelineEventDao.findByMonthDay(monthDay)
+
     // ── Primary Sources ──────────────────────────────────────────────────
 
     suspend fun getSourcesByFigure(figureId: String): List<PrimarySource> =
@@ -119,6 +123,12 @@ class SalemContentRepository @Inject constructor(
 
     suspend fun getActiveEvents(today: String): List<EventsCalendar> =
         eventsCalendarDao.findActive(today)
+
+    suspend fun getEventsByType(type: String): List<EventsCalendar> =
+        eventsCalendarDao.findByType(type)
+
+    suspend fun getAllEvents(): List<EventsCalendar> =
+        eventsCalendarDao.findAll()
 
     // ── Provenance & Staleness ─────────────────────────────────────────
 

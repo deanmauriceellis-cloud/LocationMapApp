@@ -228,6 +228,16 @@ interface MenuEventListener {
     fun onProfileRequested()
 
     // =========================================================================
+    // TOURS
+    // =========================================================================
+
+    /** Open the tour selection / active tour UI. */
+    fun onTourRequested()
+
+    /** Open the events calendar (Haunted Happenings, exhibits, seasonal). */
+    fun onEventsRequested()
+
+    // =========================================================================
     // TOOLBAR ACTIONS
     // =========================================================================
 

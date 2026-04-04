@@ -75,6 +75,8 @@ class SalemMainActivity : AppCompatActivity() {
     internal val findViewModel: FindViewModel by viewModels()
     internal val weatherViewModel: WeatherViewModel by viewModels()
     internal val geofenceViewModel: GeofenceViewModel by viewModels()
+    internal val tourViewModel: TourViewModel by viewModels()
+    internal val eventsViewModel: EventsViewModel by viewModels()
 
     internal lateinit var appBarMenuManager: AppBarMenuManager
     internal val radarScheduler = RadarRefreshScheduler()
@@ -1002,6 +1004,9 @@ class SalemMainActivity : AppCompatActivity() {
             updateGpsMarker(point)
             lastGpsPoint = point
 
+            // ── 3a. Feed location to tour engine ──
+            updateTourLocation(point)
+
             // ── 3b. Significant move — reset idle timer and cancel idle populate ──
             lastSignificantMoveTime = System.currentTimeMillis()
             if (idlePopulateJob?.isActive == true) {
@@ -1312,6 +1317,12 @@ class SalemMainActivity : AppCompatActivity() {
                 showGeofenceAlertBanner(critical.first())
             }
         }
+        // ── Tour state + geofence + narration + directions observers ──
+        observeTourState()
+        observeGeofenceEvents()
+        observeNarrationState()
+        observeWalkingRoute()
+
         DebugLogger.i("SalemMainActivity", "observeViewModel() complete — all observers attached")
     }
 
@@ -2210,6 +2221,20 @@ class SalemMainActivity : AppCompatActivity() {
             resetIdleTimer()
             DebugLogger.i("SalemMainActivity", "onAboutRequested")
             showAboutDialog()
+        }
+
+        // ── Tours ─────────────────────────────────────────────────────────────
+
+        override fun onTourRequested() {
+            resetIdleTimer()
+            DebugLogger.i("SalemMainActivity", "onTourRequested")
+            showTourSelectionDialog()
+        }
+
+        override fun onEventsRequested() {
+            resetIdleTimer()
+            DebugLogger.i("SalemMainActivity", "onEventsRequested")
+            showEventsDialog()
         }
 
         // ── Safety net ────────────────────────────────────────────────────────

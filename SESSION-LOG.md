@@ -2,6 +2,82 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-04 — Session 75: Phases 6-9 Complete (Tour Engine, Geofence, Narration, Directions, Events)
+
+### Context
+Continuing from Phase 5 completion. Built Phases 6-9 in a single session — all four phases code-complete, all three modules build clean.
+
+### Phase 6 — Tour Engine (Steps 6.1-6.8)
+
+#### Files Created (5)
+- `app-salem/.../tour/TourModels.kt` — TourTheme enum, TourProgress, ActiveTour, TourState sealed class, TourSummary
+- `app-salem/.../tour/TourEngine.kt` — Full tour lifecycle: start/advance/skip/reorder/add/remove/pause/resume/end, SharedPreferences persistence, custom tour builder, time-budget tours, nearest-neighbor TSP route optimization, haversine distance
+- `app-salem/.../ui/TourViewModel.kt` — Bridges TourEngine to UI, exposes tour list/state/actions
+- `app-salem/.../ui/SalemMainActivityTour.kt` — Tour selection dialog, active tour dialog, stop detail dialog, route polyline + numbered markers, tour HUD bar, completion dialog, custom tour builder, time-budget dialog
+- `app-salem/res/drawable/ic_tour.xml` — Walking tour icon
+
+#### Files Modified (7)
+- `core/.../ui/menu/MenuEventListener.kt` — Added onTourRequested()
+- `app/.../ui/MainActivity.kt` — No-op onTourRequested() override
+- `app-salem/.../ui/SalemMainActivity.kt` — TourViewModel, observeTourState(), GPS location feed
+- `app-salem/.../ui/menu/AppBarMenuManager.kt` — Tours button in grid row 4
+- `app-salem/.../ui/StatusLineManager.kt` — TOUR priority level (4)
+- `app-salem/.../ui/MarkerIconHelper.kt` — createNumberedCircle() for stop markers
+- `app-salem/res/layout/grid_dropdown_panel.xml` — Row 4
+
+### Phase 7 — GPS Geofence Triggers & Narration (Steps 7.1-7.6)
+
+#### Files Created (2)
+- `app-salem/.../tour/TourGeofenceManager.kt` — Lightweight haversine proximity engine: APPROACH/ENTRY/EXIT events, 60s cooldown, SharedFlow
+- `app-salem/.../tour/NarrationManager.kt` — Android TTS wrapper: queue management, speed control (0.75-1.25x), ringer mode check, segment types (short/long/quote/transition/hint)
+
+#### Files Modified (4)
+- `tour/TourEngine.kt` — Integrated geofence+narration managers, ambient mode, auto-triggers on GPS
+- `ui/TourViewModel.kt` — Exposed geofence events, narration controls, ambient mode toggle
+- `ui/SalemMainActivityTour.kt` — Geofence event observer, narration controls bar
+- `ui/SalemMainActivity.kt` — Wired geofence+narration observers
+
+### Phase 8 — Walking Directions (Steps 8.1-8.6)
+
+#### Files Created (2)
+- `app-salem/.../tour/WalkingDirections.kt` — OSRM routing via OSMBonusPack OSRMRoadManager, route caching, multi-stop support
+- `app-salem/.../ui/SalemMainActivityDirections.kt` — Route display (bordered gold polyline), directions info bar, turn-by-turn dialog, walkTo() helper
+
+#### Files Modified (4)
+- `tour/TourEngine.kt` — Exposed lastLocation
+- `ui/TourViewModel.kt` — Walking directions state, getDirectionsTo/getFullTourRoute/clearDirections
+- `ui/SalemMainActivityTour.kt` — "Walk Here" + "Narrate" buttons in stop detail
+- `ui/SalemMainActivity.kt` — Wired observeWalkingRoute()
+
+### Phase 9 — Haunted Happenings & Events (Steps 9.1-9.4)
+
+#### Files Created (4)
+- `salem-content/.../data/SalemEvents.kt` — 20 curated events (Haunted Happenings, festivals, museums, ghost tours)
+- `app-salem/.../ui/EventsViewModel.kt` — Events state, today/upcoming/monthly, "on this day in 1692", October detection
+- `app-salem/.../ui/SalemMainActivityEvents.kt` — Events dialog, event cards, category chips, "on this date" section
+- `app-salem/res/drawable/ic_events.xml` — Calendar icon
+
+#### Files Modified (6)
+- `content/dao/TimelineEventDao.kt` — findByMonthDay()
+- `content/dao/EventsCalendarDao.kt` — findByType()
+- `content/SalemContentRepository.kt` — getEventsByType(), getAllEvents(), getTimelineByMonthDay()
+- `salem-content/pipeline/ContentPipeline.kt` — Wired SalemEvents + SQL writer for events_calendar
+- `core/MenuEventListener.kt` — onEventsRequested()
+- `app-salem/menu/AppBarMenuManager.kt` — Events button in grid row 4
+
+### Decisions Made
+- Tour geofence uses lightweight haversine distance (not polygon-based GeofenceEngine) — tour stops are simple circles
+- Overpass POI auto-populate gated to $19.99+ tier (not free/$4.99/$9.99)
+- MediaStyle notification for narration deferred to Phase 10
+- Halloween map overlays and daily historical notification deferred to Phase 10
+
+### Open Items
+- Emulator verification for all four phases
+- Re-run content pipeline to regenerate salem_content.db with 20 calendar events
+- Phase 10 (Polish, Branding & Play Store) is next
+
+---
+
 ## Session: 2026-04-03f — Phase 5 Complete + Tour Data + Business Model + Full Audit
 
 ### Context

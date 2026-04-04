@@ -32,10 +32,11 @@ class StatusLineManager(private val statusView: TextView) {
         SILENT_FILL(1),
         IDLE_POPULATE(2),
         FIND_FILTER(3),
-        POPULATE(4),
-        AIRCRAFT_FOLLOW(5),
-        VEHICLE_FOLLOW(6),
-        GEOFENCE_ALERT(7)
+        TOUR(4),
+        POPULATE(5),
+        AIRCRAFT_FOLLOW(6),
+        VEHICLE_FOLLOW(7),
+        GEOFENCE_ALERT(8)
     }
 
     data class StatusEntry(

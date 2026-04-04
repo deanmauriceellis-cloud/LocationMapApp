@@ -38,4 +38,11 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal" />
 
+    <!-- Row 4: Tours -->
+    <LinearLayout
+        android:id="@+id/gridRow4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+
 </LinearLayout>

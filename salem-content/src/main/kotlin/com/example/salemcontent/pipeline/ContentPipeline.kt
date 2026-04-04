@@ -6,6 +6,7 @@
 package com.example.salemcontent.pipeline
 
 import com.example.salemcontent.data.SalemBusinesses
+import com.example.salemcontent.data.SalemEvents
 import com.example.salemcontent.data.SalemPois
 import com.example.salemcontent.data.SalemTours
 import com.example.salemcontent.mapper.CoordinateMapper
@@ -74,18 +75,22 @@ class ContentPipeline(private val salemRoot: File) {
         val businesses = SalemBusinesses.all()
         println("  Businesses: ${businesses.size}")
 
-        println("\n[5/7] Loading tour definitions...")
+        println("\n[5/8] Loading tour definitions...")
         val tours = SalemTours.allTours()
         println("  Tours: ${tours.size}")
         val tourStops = SalemTours.allStops()
         println("  Tour stops: ${tourStops.size}")
 
-        println("\n[6/7] Generating narration scripts...")
+        println("\n[6/8] Loading events calendar...")
+        val calendarEvents = SalemEvents.all()
+        println("  Calendar events: ${calendarEvents.size}")
+
+        println("\n[7/8] Generating narration scripts...")
         // Narration is embedded in figure/source transforms above
         // POI narrations are included in the curated data
         // Tour transition narrations are included in the tour stop data
 
-        println("\n[7/7] Assembling output...")
+        println("\n[8/8] Assembling output...")
         val output = PipelineOutput(
             tourPois = tourPois,
             businesses = businesses,
@@ -95,7 +100,7 @@ class ContentPipeline(private val salemRoot: File) {
             primarySources = outputSources,
             tours = tours,
             tourStops = tourStops,
-            events = emptyList()         // Phase 9: Haunted Happenings
+            events = calendarEvents
         )
 
         // Validate
@@ -286,6 +291,13 @@ class ContentPipeline(private val salemRoot: File) {
             w.write("\n-- Tour Stops (${output.tourStops.size})\n")
             for (s in output.tourStops) {
                 w.write("""INSERT OR REPLACE INTO tour_stops (tour_id, poi_id, stop_order, transition_narration, walking_minutes_from_prev, distance_m_from_prev, data_source, confidence, created_at, updated_at, stale_after) VALUES (${esc(s.tourId)}, ${esc(s.poiId)}, ${s.stopOrder}, ${esc(s.transitionNarration)}, ${s.walkingMinutesFromPrev ?: "NULL"}, ${s.distanceMFromPrev ?: "NULL"}, ${esc(s.provenance.dataSource)}, ${s.provenance.confidence}, ${s.provenance.createdAt}, ${s.provenance.updatedAt}, ${s.provenance.staleAfter});""")
+                w.newLine()
+            }
+
+            // Events Calendar
+            w.write("\n-- Events Calendar (${output.events.size})\n")
+            for (e in output.events) {
+                w.write("""INSERT OR REPLACE INTO events_calendar (id, name, venue_poi_id, event_type, description, start_date, end_date, hours, admission, website, recurring, recurrence_pattern, seasonal_month, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(e.id)}, ${esc(e.name)}, ${esc(e.venuePoiId)}, ${esc(e.eventType)}, ${esc(e.description)}, ${esc(e.startDate)}, ${esc(e.endDate)}, ${esc(e.hours)}, ${esc(e.admission)}, ${esc(e.website)}, ${if (e.recurring) 1 else 0}, ${esc(e.recurrencePattern)}, ${e.seasonalMonth ?: "NULL"}, ${esc(e.provenance.dataSource)}, ${e.provenance.confidence}, ${esc(e.provenance.verifiedDate)}, ${e.provenance.createdAt}, ${e.provenance.updatedAt}, ${e.provenance.staleAfter});""")
                 w.newLine()
             }
         }

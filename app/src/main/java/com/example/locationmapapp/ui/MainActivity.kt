@@ -2212,6 +2212,16 @@ class MainActivity : AppCompatActivity() {
             showAboutDialog()
         }
 
+        // ── Tours (Salem-only; no-op in generic app) ─────────────────────────
+
+        override fun onTourRequested() {
+            DebugLogger.i("MenuStub", "onTourRequested — tours not available in generic LocationMapApp")
+        }
+
+        override fun onEventsRequested() {
+            DebugLogger.i("MenuStub", "onEventsRequested — events not available in generic LocationMapApp")
+        }
+
         // ── Safety net ────────────────────────────────────────────────────────
 
         override fun onStubAction(featureId: String) {

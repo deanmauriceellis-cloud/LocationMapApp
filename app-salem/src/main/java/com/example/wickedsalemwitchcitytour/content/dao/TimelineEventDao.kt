@@ -30,6 +30,10 @@ interface TimelineEventDao {
     @Query("SELECT * FROM timeline_events WHERE crisis_phase = :phase ORDER BY date ASC")
     suspend fun findByPhase(phase: String): List<TimelineEvent>
 
+    /** Find events that occurred on a specific month-day (MM-dd format match). */
+    @Query("SELECT * FROM timeline_events WHERE substr(date, 6, 5) = :monthDay ORDER BY date ASC")
+    suspend fun findByMonthDay(monthDay: String): List<TimelineEvent>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(events: List<TimelineEvent>)
 
