@@ -15,4 +15,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "LocationMapApp_v1.5"
 include ':app'
+include ':app-salem'
 include ':core'
+include ':salem-content'

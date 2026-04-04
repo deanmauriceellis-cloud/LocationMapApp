@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: menu_aircraft.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!-- menu/menu_aircraft.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Binary: Aircraft tracking (OpenSky) -->
+    <item
+        android:id="@+id/menu_aircraft_display"
+        android:title="Aircraft Tracking"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider stub: Aircraft update frequency 30-300 sec -->
+    <item
+        android:id="@+id/menu_aircraft_frequency"
+        android:title="Aircraft Update Frequency…"
+        app:showAsAction="never" />
+
+    <!-- Auto-follow random high-altitude aircraft for passive POI cache building -->
+    <item
+        android:id="@+id/menu_auto_follow_aircraft"
+        android:title="Auto-Follow Aircraft (POI Builder)"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+</menu>

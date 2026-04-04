@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: menu_radar.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!-- menu/menu_radar.xml — Radar + METAR weather overlays -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_radar_toggle"
+        android:title="Radar View"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Slider 0-100: radar tile alpha -->
+    <item
+        android:id="@+id/menu_radar_visibility"
+        android:title="Radar Visibility…"
+        app:showAsAction="never" />
+
+    <!-- Slider 5-15 min: auto-refresh interval -->
+    <item
+        android:id="@+id/menu_radar_frequency"
+        android:title="Radar Update Frequency…"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_radar_animate"
+        android:title="Animate Radar"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_radar_anim_speed"
+        android:title="Animation Speed…"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_metar_display"
+        android:title="METAR Information Display"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_metar_frequency"
+        android:title="METAR Update Frequency…"
+        app:showAsAction="never" />
+
+</menu>

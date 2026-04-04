@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: menu_main_toolbar.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!--
+    menu_main_toolbar.xml — top-level icon toolbar
+
+    showAsAction="always":
+      Forces the item onto the toolbar (never into overflow ⋮).
+      Icons only — long-press shows android:title as tooltip.
+
+    WARNING: do NOT use showAsAction="never" — that buries items in the overflow
+    menu and is why the menu bar was invisible in earlier builds.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_top_weather"
+        android:title="Weather"
+        android:tooltipText="Weather"
+        android:icon="@drawable/ic_wx_default"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_transit"
+        android:title="Transit"
+        android:tooltipText="Transit"
+        android:icon="@drawable/ic_transit_rail"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_cams"
+        android:title="CAMs"
+        android:tooltipText="Webcams"
+        android:icon="@drawable/ic_camera"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_aircraft"
+        android:title="Air"
+        android:tooltipText="Aircraft"
+        android:icon="@drawable/ic_aircraft"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_radar"
+        android:title="Radar"
+        android:tooltipText="Radar"
+        android:icon="@drawable/ic_radar"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_poi"
+        android:title="POI"
+        android:tooltipText="POI Categories"
+        android:icon="@drawable/ic_poi"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_utility"
+        android:title="Utility"
+        android:tooltipText="Utility"
+        android:icon="@drawable/ic_debug"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_find"
+        android:title="Find"
+        android:tooltipText="Find POI"
+        android:icon="@drawable/ic_search"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_top_goto"
+        android:title="Go to Location"
+        android:tooltipText="Go to Location"
+        android:icon="@drawable/ic_goto_location"
+        app:showAsAction="always" />
+
+</menu>

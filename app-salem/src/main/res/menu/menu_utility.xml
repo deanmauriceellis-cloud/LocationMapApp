@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: menu_utility.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!-- menu/menu_utility.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Binary: record GPS breadcrumb trail -->
+    <item
+        android:id="@+id/menu_util_record_gps"
+        android:title="Record GPS Travel Coordinates"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Button: launch story-builder website with stored coordinates -->
+    <item
+        android:id="@+id/menu_util_build_story"
+        android:title="Build Travel Story…"
+        app:showAsAction="never" />
+
+    <!-- Button: launch analysis website for today's travels -->
+    <item
+        android:id="@+id/menu_util_analyze_today"
+        android:title="Analyze Today's Travels…"
+        app:showAsAction="never" />
+
+    <!-- Button: detect anomalies in recorded movements -->
+    <item
+        android:id="@+id/menu_util_anomalies"
+        android:title="Show Travel Anomalies…"
+        app:showAsAction="never" />
+
+    <!-- Button: email GPX file of recorded coordinates -->
+    <item
+        android:id="@+id/menu_util_email_gpx"
+        android:title="Email GPS Coordinates (GPX)…"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_util_divider" style="@style/Widget.AppCompat.ActionBar.TabBar"/>
+
+    <!-- Populate POIs: systematic grid scanner (not checkable — title changes to show state) -->
+    <item
+        android:id="@+id/menu_util_populate_pois"
+        android:title="Populate POIs"
+        app:showAsAction="never" />
+
+    <!-- 10km Probe: single wide search at map center to discover POIs in low-density areas -->
+    <item
+        android:id="@+id/menu_util_probe_10km"
+        android:title="10km Probe Populate"
+        app:showAsAction="never" />
+
+    <!-- Fill Probe: use existing radius hints to fill gaps (stub for now) -->
+    <item
+        android:id="@+id/menu_util_fill_probe"
+        android:title="Fill Probe Populate"
+        app:showAsAction="never" />
+
+    <!-- Debug log viewer (existing feature surfaced here) -->
+    <item
+        android:id="@+id/menu_util_debug_log"
+        android:title="Debug Log Viewer"
+        app:showAsAction="never" />
+
+    <!-- GPS mode toggle (existing feature) -->
+    <item
+        android:id="@+id/menu_util_gps_mode"
+        android:title="GPS / Manual Location Mode"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Silent POI fill debug banner (checkable — shows banner when background fill is running) -->
+    <item
+        android:id="@+id/menu_util_silent_fill_debug"
+        android:title="Silent Fill Debug Banner"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <!-- Map legend dialog -->
+    <item
+        android:id="@+id/menu_util_legend"
+        android:title="Map Legend"
+        app:showAsAction="never" />
+
+</menu>

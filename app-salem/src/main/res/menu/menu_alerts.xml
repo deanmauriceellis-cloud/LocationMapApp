@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: menu_alerts.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!-- menu/menu_alerts.xml — Geofence alerts + zone overlays -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_tfr_overlay"
+        android:title="TFR Overlay"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_camera_overlay"
+        android:title="Speed Camera Alerts"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_school_overlay"
+        android:title="School Zone Alerts"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_flood_overlay"
+        android:title="Flood Zone Overlay"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_crossing_overlay"
+        android:title="Railroad Crossing Alerts"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_alert_sound"
+        android:title="Alert Sound"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_alert_distance"
+        android:title="Alert Distance…"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manage_databases"
+        android:title="Zone Databases…"
+        app:showAsAction="never" />
+
+</menu>

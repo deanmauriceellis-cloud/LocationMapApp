@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WickedSalemWitchCityTour v1.0
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<resources>
+    <!-- Night mode override — Salem dark theme is already dark, minimal changes -->
+    <style name="Theme.WickedSalem" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
+        <item name="colorOnPrimary">@color/salemTextPrimary</item>
+        <item name="colorSecondary">@color/colorAccent</item>
+        <item name="colorOnSecondary">@color/black</item>
+    </style>
+</resources>

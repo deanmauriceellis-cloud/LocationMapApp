@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WickedSalemWitchCityTour v1.0
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Placeholder launcher foreground — gold "W" for Wicked.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Gold "W" letter centered in adaptive icon safe zone -->
+    <path
+        android:fillColor="#C9A84C"
+        android:pathData="M32,36 L40,72 L48,50 L54,50 L62,72 L70,36 L76,36 L64,80 L58,80 L51,58 L44,80 L38,80 L26,36 Z" />
+</vector>

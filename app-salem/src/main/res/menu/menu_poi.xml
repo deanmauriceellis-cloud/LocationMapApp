@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: menu_poi.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!-- menu/menu_poi.xml — 16 POI categories -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item android:id="@+id/menu_poi_all_on"
+        android:title="All POIs On"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_food_drink"
+        android:title="Food &amp; Drink \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_fuel_charging"
+        android:title="Fuel &amp; Charging \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_transit"
+        android:title="Transit"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_civic"
+        android:title="Civic &amp; Gov \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_parks_rec"
+        android:title="Parks &amp; Rec \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_shopping"
+        android:title="Shopping \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_healthcare"
+        android:title="Healthcare \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_education"
+        android:title="Education \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_lodging"
+        android:title="Lodging"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_parking"
+        android:title="Parking"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_finance"
+        android:title="Finance \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_worship"
+        android:title="Places of Worship"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_tourism_history"
+        android:title="Tourism &amp; History \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_emergency"
+        android:title="Emergency Svc \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_auto_services"
+        android:title="Auto Services"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item android:id="@+id/menu_poi_entertainment"
+        android:title="Entertainment \u25B8"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+</menu>

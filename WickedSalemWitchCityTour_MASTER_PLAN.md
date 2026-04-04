@@ -117,8 +117,8 @@ Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (
 ### Step 1.7: Verify
 - [x] `./gradlew :core:assembleDebug` builds successfully
 - [x] `./gradlew :app:assembleDebug` builds successfully
-- [ ] Run on Pixel_8a_API_34 emulator — all features work identically
-- [ ] Git commit: "Phase 1: Extract :core shared library module"
+- [x] Run on Pixel_8a_API_34 emulator — all features work identically
+- [x] Git commit: "Phase 1: Extract :core shared library module"
 
 **What stays in `:app` (NOT moved):**
 - All `MainActivity*.kt` files (UI-specific)
@@ -137,49 +137,38 @@ Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (
 **Goal:** Create a buildable Salem app that shows a map centered on Salem with all core features working.
 
 ### Step 2.1: Create app-salem module
-- [ ] Create `app-salem/build.gradle.kts`
+- [x] Create `app-salem/build.gradle` (`.gradle` not `.kts`)
   - `com.android.application` plugin
   - `implementation(project(":core"))`
   - Dependencies: osmdroid 6.1.18, osm-bonus-pack 6.9.0, Material Design, AndroidX
   - `applicationId = "com.example.wickedsalemwitchcitytour"`
   - `versionName = "1.0.0"`
-- [ ] Update `settings.gradle`: add `include ':app-salem'`
-- [ ] Create `app-salem/src/main/AndroidManifest.xml`
+- [x] Update `settings.gradle`: add `include ':app-salem'`
+- [x] Create `app-salem/src/main/AndroidManifest.xml`
   - Permissions: INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FOREGROUND_SERVICE
-  - TTS permission if needed
 
 ### Step 2.2: Copy & adapt UI from `:app`
-- [ ] Copy `MainActivity.kt` → `SalemMainActivity.kt` (adapt, don't just clone)
+- [x] Copy `MainActivity.kt` → `SalemMainActivity.kt` (adapted, map centered on Salem)
   - Center map on Salem: lat=42.521, lng=-70.887, zoom=15
-  - Set home location to Salem center
-- [ ] Copy essential extension files:
-  - `MainActivityFind.kt` → `SalemMainActivityFind.kt`
-  - `MainActivityWeather.kt` → `SalemMainActivityWeather.kt`
-  - `MainActivityTransit.kt` → `SalemMainActivityTransit.kt`
-  - `MainActivityGeofences.kt` → `SalemMainActivityGeofences.kt`
-  - `MainActivitySocial.kt` → `SalemMainActivitySocial.kt`
-  - `MainActivityDialogs.kt` → `SalemMainActivityDialogs.kt`
-  - `MainActivityHelpers.kt` → `SalemMainActivityHelpers.kt`
-- [ ] Copy ViewModels (adapt as needed)
-- [ ] Copy `MarkerIconHelper.kt`, `StatusLineManager.kt`, `WeatherIconHelper.kt`
-- [ ] Copy menu system (`AppBarMenuManager.kt` + adapt for Salem)
+- [x] Copy all extension files (Find, Weather, Transit, Geofences, Social, Dialogs, Helpers, Aircraft, Debug, Metar, Populate, Radar — 12 total)
+- [x] Copy ViewModels (7 files)
+- [x] Copy `MarkerIconHelper.kt`, `StatusLineManager.kt`, `WeatherIconHelper.kt`
+- [x] Copy menu system (`AppBarMenuManager.kt`, `PoiCategories.kt`)
+- [x] Copy `WickedSalemApp.kt` application class, `DebugLogActivity.kt`, debug utils
+- [x] Package: `com.example.wickedsalemwitchcitytour`, 31 Kotlin files total
 
 ### Step 2.3: Salem branding
-- [ ] Create `res/values/colors.xml` — Salem palette:
-  - Primary: deep purple (#2D1B4E) or midnight blue
-  - Accent: antique gold (#C9A84C)
-  - Background: dark charcoal
-  - Text: warm off-white
-- [ ] Create `res/values/strings.xml` — app name "Wicked Salem"
-- [ ] Create `res/values/themes.xml` — Salem dark theme
-- [ ] Create app icon (placeholder initially)
-- [ ] Create splash screen layout
+- [x] Create `res/values/colors.xml` — deep purple (#2D1B4E), antique gold (#C9A84C), dark charcoal
+- [x] Create `res/values/strings.xml` — app name "Wicked Salem"
+- [x] Create `res/values/themes.xml` — `Theme.WickedSalem` (day + night)
+- [x] Create app icon (placeholder: gold "W" on purple background)
+- [ ] Create splash screen layout (deferred)
 
 ### Step 2.4: Verify
-- [ ] `./gradlew :app-salem:assembleDebug` builds
+- [x] `./gradlew :app-salem:assembleDebug` builds (9.6MB APK)
 - [ ] Install on emulator — map shows Salem
 - [ ] Core features work: weather, transit, POI search, geofences
-- [ ] Git commit: "Add :app-salem module — WickedSalemWitchCityTour shell"
+- [ ] Git commit: "Phase 2-4: Salem app shell, content database, content pipeline"
 
 ---
 
@@ -188,8 +177,8 @@ Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (
 **Goal:** Design and implement the Room database that holds all Salem-specific content.
 
 ### Step 3.1: Room database schema
-- [ ] Create `SalemContentDatabase.kt` — Room database class
-- [ ] Create entity classes (in `app-salem/.../content/model/`):
+- [x] Create `SalemContentDatabase.kt` — Room database class
+- [x] Create entity classes (in `app-salem/.../content/model/`):
 
 ```
 tour_pois          — Tour-worthy points of interest with narration
@@ -276,29 +265,30 @@ recurrence_pattern, seasonal_month (10 for October events)
 ```
 
 ### Step 3.3: DAO interfaces
-- [ ] `TourPoiDao` — findByCategory, findNearby(lat, lng, radiusM), findById, search(query)
-- [ ] `SalemBusinessDao` — findByType, findNearby, search, findByTags
-- [ ] `HistoricalFigureDao` — findAll, findById, findByPoi
-- [ ] `HistoricalFactDao` — findByPoi, findByFigure, findByCategory, findByDate
-- [ ] `TimelineEventDao` — findAll (ordered by date), findByPoi, findByPhase
-- [ ] `PrimarySourceDao` — findByFigure, findByPoi, findByType
-- [ ] `TourDao` — findAll, findById, findBySeason
-- [ ] `TourStopDao` — findByTour (ordered), findByPoi
-- [ ] `EventsCalendarDao` — findUpcoming, findByMonth, findByVenue, findActive
+- [x] `TourPoiDao` — findByCategory, findNearby(lat, lng, radiusM), findById, search(query)
+- [x] `SalemBusinessDao` — findByType, findNearby, search, findByTag
+- [x] `HistoricalFigureDao` — findAll, findById, findByPoi, findByRole, search
+- [x] `HistoricalFactDao` — findByPoi, findByFigure, findByCategory, findByDate, search
+- [x] `TimelineEventDao` — findAll (ordered by date), findByPoi, findByPhase, findAnchorEvents
+- [x] `PrimarySourceDao` — findByFigure, findByPoi, findByType, search
+- [x] `TourDao` — findAll, findById, findBySeason
+- [x] `TourStopDao` — findByTour (ordered), findByPoi, findTourPoisByTour (JOIN)
+- [x] `EventsCalendarDao` — findUpcoming, findByMonth, findByVenue, findActive
 
 ### Step 3.4: Repository layer
-- [ ] Create `SalemContentRepository.kt` — unified access to all Salem content
+- [x] Create `SalemContentRepository.kt` — unified access to all Salem content
   - Tour management (list tours, get stops, track progress)
   - POI queries (by category, proximity, search)
   - Business directory queries
   - Historical content queries (figures, facts, sources, timeline)
   - Event calendar queries
-- [ ] Hilt injection via `SalemModule.kt`
+  - Bulk insert methods for content pipeline
+- [x] Hilt injection via `SalemModule.kt`
 
 ### Step 3.5: Verify
-- [ ] Database creates on first launch
-- [ ] All DAOs compile and can be injected
-- [ ] Git commit: "Salem content database schema and DAOs"
+- [x] All DAOs compile and can be injected
+- [x] `./gradlew :app-salem:assembleDebug` builds clean (0 warnings)
+- [ ] Git commit: "Phase 2-4: Salem app shell, content database, content pipeline"
 
 ---
 
@@ -307,30 +297,30 @@ recurrence_pattern, seasonal_month (10 for October events)
 **Goal:** Build tooling to transform ~/Development/Salem JSON into the Salem content database.
 
 ### Step 4.1: Create salem-content module
-- [ ] Create `salem-content/build.gradle.kts` (JVM-only, no Android)
+- [x] Create `salem-content/build.gradle.kts` (JVM-only, no Android)
   - Dependencies: Gson, kotlinx-coroutines (for file I/O)
 - [ ] Update `settings.gradle`: add `include ':salem-content'`
 
 ### Step 4.2: JSON readers
-- [ ] `BuildingReader.kt` — parse `data/json/buildings/_all_buildings.json`
+- [x] `BuildingReader.kt` — parse `data/json/buildings/_all_buildings.json`
   - Extract: id, name, type, zone, rooms, atmosphere, descriptions
-- [ ] `NpcReader.kt` — parse `data/json/npcs/_all_npcs.json`
+- [x] `NpcReader.kt` — parse `data/json/npcs/_all_npcs.json`
   - Extract: id, name, born/died, role, faction, narrative, personality, relationships, role_in_crisis, key quotes
   - Filter: Tier 1 (28) + Tier 2 (20) only
-- [ ] `FactReader.kt` — parse `data/json/facts/_all_facts.json`
+- [x] `FactReader.kt` — parse `data/json/facts/_all_facts.json`
   - Extract: id, title, description, date, category, npcs_involved, location, source
   - Filter: public/semi_private confidentiality, tourist-relevant categories
   - Target: ~500 facts
-- [ ] `EventReader.kt` — parse `data/json/events/_all_events.json`
+- [x] `EventReader.kt` — parse `data/json/events/_all_events.json`
   - Extract: all 40 anchor events + select minor events
-- [ ] `PrimarySourceReader.kt` — parse `data/json/primary_sources/_all_primary_sources.json`
+- [x] `PrimarySourceReader.kt` — parse `data/json/primary_sources/_all_primary_sources.json`
   - Extract: key examination transcripts, petitions, letters, diary entries
   - Target: ~200 most impactful excerpts
-- [ ] `CoordinateReader.kt` — parse `client/src/data/buildingCoordinates.ts`
+- [x] `CoordinateReader.kt` — parse `client/src/data/buildingCoordinates.ts`
   - Extract: building id, name, x, y grid coordinates, zone
 
 ### Step 4.3: Coordinate mapping
-- [ ] `CoordinateMapper.kt` — grid (2000x2000) → GPS lat/lng
+- [x] `CoordinateMapper.kt` — grid (2000x2000) → GPS lat/lng
   - Anchor points for triangulation:
     - Meetinghouse (grid 1000,1200) → GPS ~42.5630, -70.9510 (Danvers)
     - Nurse Homestead (grid 1100,1260) → GPS 42.5630, -70.9380 (Danvers)
@@ -339,7 +329,7 @@ recurrence_pattern, seasonal_month (10 for October events)
   - Modern SALEM tourist sites have direct GPS (manually curated, not grid-derived)
 
 ### Step 4.4: Narration script generator
-- [ ] `NarrationGenerator.kt`
+- [x] `NarrationGenerator.kt`
   - Convert historical descriptions to TTS-optimized text:
     - Shorter sentences (max ~20 words)
     - Pronunciation hints for 1692 names (Parris, Hathorne, Corey, Easty)
@@ -352,13 +342,13 @@ recurrence_pattern, seasonal_month (10 for October events)
   - Embed key primary source quotes inline
 
 ### Step 4.5: Content assembly & output
-- [ ] `ContentPipeline.kt` — orchestrate the full pipeline:
+- [x] `ContentPipeline.kt` — orchestrate the full pipeline:
   1. Read all JSON sources
   2. Filter to tourist-relevant content
   3. Map coordinates
   4. Generate narration scripts
   5. Output as SQL insert statements or pre-built Room DB
-- [ ] `ContentValidator.kt` — verify:
+- [x] `ContentValidator.kt` — verify:
   - All tour POIs have valid GPS coordinates
   - All narration scripts are under TTS length limits
   - All figure-POI links reference valid entities
@@ -366,7 +356,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 - [ ] Generate `salem_content.db` → copy to `app-salem/src/main/assets/`
 
 ### Step 4.6: Verify
-- [ ] Pipeline runs end-to-end without errors
+- [x] Pipeline runs end-to-end without errors
 - [ ] Output database loads in the Salem app
 - [ ] Content is queryable and displays correctly
 - [ ] Git commit: "Salem content pipeline — import from Salem project"

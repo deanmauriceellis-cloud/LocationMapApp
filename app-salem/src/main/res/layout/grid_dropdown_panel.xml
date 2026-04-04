@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: grid_dropdown_panel.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<!-- Grid dropdown panel — PopupWindow content for 8 labeled buttons in 2×4 grid -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#E8212121"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <!-- Row 1: Transit, Webcams, Aircraft, Radar -->
+    <LinearLayout
+        android:id="@+id/gridRow1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+
+    <!-- Row 2: POI, Utility, Find, Go To -->
+    <LinearLayout
+        android:id="@+id/gridRow2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+
+    <!-- Row 3: Social, Chat, Profile, Legend -->
+    <LinearLayout
+        android:id="@+id/gridRow3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+
+</LinearLayout>

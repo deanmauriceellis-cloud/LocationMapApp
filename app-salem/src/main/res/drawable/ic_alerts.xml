@@ -1,0 +1,20 @@
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: ic_alerts.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+  <!-- Warning triangle -->
+  <path android:fillColor="#9E9E9E"
+        android:pathData="M1,21 L12,2 L23,21 Z"/>
+  <path android:fillColor="#1A1A1A"
+        android:pathData="M11,15 L13,15 L13,17 L11,17 Z"/>
+  <path android:fillColor="#1A1A1A"
+        android:pathData="M11,9 L13,9 L13,14 L11,14 Z"/>
+</vector>

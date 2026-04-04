@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WickedSalemWitchCityTour v1.0
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<resources>
+    <!-- Salem palette — dark, atmospheric, historic -->
+    <color name="colorPrimary">#2D1B4E</color>         <!-- Deep purple -->
+    <color name="colorPrimaryDark">#1A0F2E</color>     <!-- Darker purple -->
+    <color name="colorAccent">#C9A84C</color>           <!-- Antique gold -->
+
+    <!-- Surface colors -->
+    <color name="salemBackground">#1E1E2A</color>       <!-- Dark charcoal with purple tint -->
+    <color name="salemSurface">#2A2A3C</color>          <!-- Slightly lighter surface -->
+    <color name="salemTextPrimary">#F5F0E8</color>      <!-- Warm off-white -->
+    <color name="salemTextSecondary">#B8AFA0</color>    <!-- Muted warm gray -->
+
+    <!-- Legacy Material template names — referenced by wizard-generated themes -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

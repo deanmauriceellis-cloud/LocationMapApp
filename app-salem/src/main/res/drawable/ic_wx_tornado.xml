@@ -1,0 +1,23 @@
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: ic_wx_tornado.xml
+
+  This source code is proprietary and confidential.
+  Unauthorized copying, modification, or distribution is
+  strictly prohibited.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+  <!-- Tornado funnel shape - wide at top, narrow at bottom -->
+  <path
+      android:fillColor="#546E7A"
+      android:pathData="M3,3h18l-2,4H6zM6,7l1.5,4h9L18,7zM7.5,11l1.5,4h6l1.5,-4zM9,15l1,3h4l1,-3zM10,18l0.8,3h2.4l0.8,-3z"/>
+  <!-- Debris/wind lines -->
+  <path
+      android:strokeColor="#546E7A"
+      android:strokeWidth="0.8"
+      android:strokeLineCap="round"
+      android:pathData="M1,4.5L4,3.5M20,3.5L23,4.5"/>
+</vector>

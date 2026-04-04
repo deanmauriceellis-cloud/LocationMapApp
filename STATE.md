@@ -1,13 +1,13 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-03 Session 70 (Phase 1: Core Module Extraction)
+## Last Updated: 2026-04-03 Session 71 (Phases 2-4: Salem App Shell + Content DB + Pipeline)
 
 ## Current Direction
-- **Multi-module platform refactor** — `:core` shared library extracted from `:app` (Phase 1 complete, builds pass)
+- **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
 - **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app, $9.99 paid
 - Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 phases, supersedes all other plans)
-- Phase 1 (Core Module Extraction) complete — Phase 2 (Salem App Shell) is next
-- Content sourced from `~/Development/Salem` project (2,174 NPCs, 3,891 facts, 4,950 primary sources)
+- Phases 1-4 complete — Phase 5 (Enhanced Salem POI Catalog) is next
+- Content pipeline running: 49 figures, 500 facts, 40 events, 200 primary sources from `~/Development/Salem`
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
@@ -15,7 +15,7 @@
 - **Cache proxy** (Node.js/Express on port 4300) — transparent caching layer, CORS-enabled for web app
 - **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs and aircraft sightings
 - **Split**: App/Web → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
-- **Multi-module monorepo**: `:core` (shared library, extracted), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour, Phase 2)
+- **Multi-module monorepo**: `:core` (shared library), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour), `:salem-content` (JVM content pipeline)
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider

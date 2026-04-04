@@ -2,6 +2,75 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-03c — Phases 2-4: Salem App Shell, Content Database, Content Pipeline
+
+### Context
+Session 71. Phase 1 emulator test confirmed working. Executed Phases 2, 3, and 4 of the WickedSalemWitchCityTour master plan.
+
+### Changes Made
+
+**Phase 2 — Salem App Shell (`:app-salem`)**
+- Created `app-salem/build.gradle` — Android application module, applicationId `com.example.wickedsalemwitchcitytour`
+- Updated `settings.gradle` with `:app-salem`
+- Created `AndroidManifest.xml` — `WickedSalemApp`, `SalemMainActivity`
+- Copied and adapted 31 Kotlin source files from `:app`:
+  - `WickedSalemApp.kt` (Application class)
+  - `SalemMainActivity.kt` + 12 extension files (map centered on Salem 42.521, -70.887, zoom 15)
+  - 7 ViewModels, 3 helpers, menu system, radar scheduler, debug tools
+  - Package: `com.example.wickedsalemwitchcitytour` (core imports preserved as `com.example.locationmapapp.*`)
+- Added missing core imports (MenuPrefs, MenuEventListener, PoiLayerId, DebugLogger) for cross-package access
+- Salem branding: deep purple (#2D1B4E), antique gold (#C9A84C), Theme.WickedSalem, placeholder "W" icon
+- Copied all resources (67 drawables, 4 layouts, 8 menus)
+
+**Phase 3 — Salem Content Database**
+- Created 9 Room entity classes under `app-salem/.../content/model/`:
+  TourPoi, SalemBusiness, HistoricalFigure, HistoricalFact, TimelineEvent, PrimarySource, Tour, TourStop, EventsCalendar
+- Created 9 DAO interfaces under `content/dao/` with proximity queries, search, joins
+- Created `SalemContentDatabase.kt` (Room, version 1, 9 entities)
+- Created `SalemModule.kt` (Hilt DI — database singleton + 9 DAO providers)
+- Created `SalemContentRepository.kt` — unified repository with bulk insert methods
+
+**Phase 4 — Content Pipeline (`:salem-content`)**
+- Created JVM-only module `salem-content/` with Gson + application plugin
+- Created 13 Gson model classes matching ~/Development/Salem JSON schemas
+- Created 6 readers: Building (424), NPC (Tier 1+2: 49), Fact (3,672 filtered), Event (40), PrimarySource (top 200), Coordinate (29)
+- Created `CoordinateMapper.kt` — grid→GPS (7.9m/unit at lat 42.56°)
+- Created `NarrationGenerator.kt` — TTS-optimized short/long narration from historical data
+- Created `ContentPipeline.kt` — orchestrator with SQL output
+- Created `ContentValidator.kt` — data integrity validation
+- Pipeline runs successfully: 1.5MB SQL, 789 INSERT statements
+
+### Files Modified
+- `settings.gradle` — added `:app-salem`, `:salem-content`
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — checked off Phase 1.7, Phase 2, Phase 3, Phase 4
+- `STATE.md` — updated current direction and architecture
+
+### Files Created
+- `app-salem/` — 31 Kotlin source files, manifest, build.gradle, all resources (100+ files total)
+- `app-salem/.../content/` — 21 Kotlin files (9 entities, 9 DAOs, database, DI module, repository)
+- `salem-content/` — 12 Kotlin files (models, readers, mapper, narration, pipeline, validator, main)
+- `salem-content/salem_content.sql` — 1.5MB generated SQL
+
+### Build Status
+- `:app` — builds clean
+- `:app-salem` — builds clean (9.6MB APK)
+- `:salem-content` — compiles and runs successfully
+
+### Decisions Made
+- Used `.gradle` (Groovy) not `.gradle.kts` for app-salem to match existing convention
+- Kept same package structure convention with explicit core imports rather than shared packages
+- Pipeline outputs SQL rather than pre-built .db — Room DB generation deferred to Phase 5 when POI GPS data is curated
+- Capped facts at 500 (from 3,672 available) — can increase later
+- Tour POIs, businesses, tours, events calendar left empty — Phase 5/6/9 will curate with real GPS coordinates
+
+### Open Items
+- Phase 2: Splash screen layout not yet created
+- Phase 2: Emulator testing of app-salem not yet done
+- Phase 4: Pre-built `salem_content.db` for assets deferred to Phase 5
+- Next: Phase 5 — Enhanced Salem POI Catalog (curated GPS locations for tour stops, businesses)
+
+---
+
 ## Session: 2026-04-03b — Phase 1: Core Module Extraction
 
 ### Context
