@@ -1,21 +1,25 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-03 Session 71 (Phases 2-4: Salem App Shell + Content DB + Pipeline)
+## Last Updated: 2026-04-03 Session 73 (Phase 5: POI Catalog + Provenance + Staleness + API)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
 - **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app, $9.99 paid
 - Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 phases, supersedes all other plans)
-- Phases 1-4 complete — Phase 5 (Enhanced Salem POI Catalog) is next
-- Content pipeline running: 49 figures, 500 facts, 40 events, 200 primary sources from `~/Development/Salem`
+- Phases 1-5 complete — Phase 6 (Tour Engine) is next
+- **Offline-first architecture**: bundled Room DB (841 records) + API sync when online
+- Content pipeline: 49 figures, 500 facts, 40 events, 200 sources, 29 POIs, 23 businesses
+- **Data provenance & staleness** on all entities (local Room + remote PostgreSQL)
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34
 - **Web app** (React 19, TypeScript, Vite, Leaflet/react-leaflet, Tailwind CSS) — cross-platform frontend at `web/`
 - **Cache proxy** (Node.js/Express on port 4300) — transparent caching layer, CORS-enabled for web app
-- **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs and aircraft sightings
+- **PostgreSQL** (`locationmapapp` DB) — permanent storage for POIs, aircraft sightings, and Salem content (9 new `salem_*` tables)
 - **Split**: App/Web → Cache Proxy → External APIs (Overpass, NWS, Aviation Weather, MBTA, OpenSky, Windy Webcams)
 - **Multi-module monorepo**: `:core` (shared library), `:app` (generic LocationMapApp), `:app-salem` (WickedSalemWitchCityTour), `:salem-content` (JVM content pipeline)
+- **Dual database**: Local Room SQLite (offline-first, bundled asset) + remote PostgreSQL (API sync via `/salem/*` endpoints)
+- **Provenance on all data**: data_source, confidence, verified_date, created_at, updated_at, stale_after
 
 ## What's Working
 - Map display (osmdroid), GPS tracking with manual override (long-press), custom zoom slider

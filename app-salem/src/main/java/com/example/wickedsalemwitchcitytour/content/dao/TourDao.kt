@@ -29,4 +29,12 @@ interface TourDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(tours: List<Tour>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM tours WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<Tour>
+
+    @Query("UPDATE tours SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
 }

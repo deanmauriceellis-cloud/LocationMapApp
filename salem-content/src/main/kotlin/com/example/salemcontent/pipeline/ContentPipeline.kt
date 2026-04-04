@@ -5,6 +5,8 @@
 
 package com.example.salemcontent.pipeline
 
+import com.example.salemcontent.data.SalemBusinesses
+import com.example.salemcontent.data.SalemPois
 import com.example.salemcontent.mapper.CoordinateMapper
 import com.example.salemcontent.model.*
 import com.example.salemcontent.narration.NarrationGenerator
@@ -64,17 +66,21 @@ class ContentPipeline(private val salemRoot: File) {
         val outputSources = sources.map { transformPrimarySource(it, npcs) }
         println("  Primary sources: ${outputSources.size}")
 
-        // Note: Tour POIs, businesses, tours, tour stops, and events calendar
-        // will be populated in Phase 5 (manually curated GPS-accurate data).
-        // The pipeline generates placeholder structures for now.
+        // Phase 5: Load curated Salem POIs and businesses
+        println("\n[4/6] Loading curated POIs and businesses...")
+        val tourPois = SalemPois.all()
+        println("  Tour POIs: ${tourPois.size}")
+        val businesses = SalemBusinesses.all()
+        println("  Businesses: ${businesses.size}")
 
-        println("\n[4/5] Generating narration scripts...")
+        println("\n[5/6] Generating narration scripts...")
         // Narration is embedded in figure/source transforms above
+        // POI narrations are included in the curated data
 
-        println("\n[5/5] Assembling output...")
+        println("\n[6/6] Assembling output...")
         val output = PipelineOutput(
-            tourPois = emptyList(),      // Phase 5: manually curated
-            businesses = emptyList(),    // Phase 5: manually curated
+            tourPois = tourPois,
+            businesses = businesses,
             figures = figures,
             facts = outputFacts,
             timelineEvents = timelineEvents,
@@ -222,33 +228,44 @@ class ContentPipeline(private val salemRoot: File) {
             // Historical figures
             w.write("-- Historical Figures (${output.figures.size})\n")
             for (f in output.figures) {
-                w.write("""INSERT OR REPLACE INTO historical_figures (id, name, first_name, surname, born, died, age_in_1692, role, faction, short_bio, full_bio, narration_script, appearance_description, role_in_crisis, historical_outcome, key_quotes, family_connections, primary_poi_id) VALUES (${esc(f.id)}, ${esc(f.name)}, ${esc(f.firstName)}, ${esc(f.surname)}, ${esc(f.born)}, ${esc(f.died)}, ${f.ageIn1692 ?: "NULL"}, ${esc(f.role)}, ${esc(f.faction)}, ${esc(f.shortBio)}, ${esc(f.fullBio)}, ${esc(f.narrationScript)}, ${esc(f.appearanceDescription)}, ${esc(f.roleInCrisis)}, ${esc(f.historicalOutcome)}, ${esc(f.keyQuotes)}, ${esc(f.familyConnections)}, ${esc(f.primaryPoiId)});""")
+                w.write("""INSERT OR REPLACE INTO historical_figures (id, name, first_name, surname, born, died, age_in_1692, role, faction, short_bio, full_bio, narration_script, appearance_description, role_in_crisis, historical_outcome, key_quotes, family_connections, primary_poi_id, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(f.id)}, ${esc(f.name)}, ${esc(f.firstName)}, ${esc(f.surname)}, ${esc(f.born)}, ${esc(f.died)}, ${f.ageIn1692 ?: "NULL"}, ${esc(f.role)}, ${esc(f.faction)}, ${esc(f.shortBio)}, ${esc(f.fullBio)}, ${esc(f.narrationScript)}, ${esc(f.appearanceDescription)}, ${esc(f.roleInCrisis)}, ${esc(f.historicalOutcome)}, ${esc(f.keyQuotes)}, ${esc(f.familyConnections)}, ${esc(f.primaryPoiId)}, ${esc(f.provenance.dataSource)}, ${f.provenance.confidence}, ${esc(f.provenance.verifiedDate)}, ${f.provenance.createdAt}, ${f.provenance.updatedAt}, ${f.provenance.staleAfter});""")
                 w.newLine()
             }
 
             // Timeline events
             w.write("\n-- Timeline Events (${output.timelineEvents.size})\n")
             for (e in output.timelineEvents) {
-                w.write("""INSERT OR REPLACE INTO timeline_events (id, name, date, crisis_phase, description, poi_id, figures_involved, narration_script, is_anchor) VALUES (${esc(e.id)}, ${esc(e.name)}, ${esc(e.date)}, ${esc(e.crisisPhase)}, ${esc(e.description)}, ${esc(e.poiId)}, ${esc(e.figuresInvolved)}, ${esc(e.narrationScript)}, ${if (e.isAnchor) 1 else 0});""")
+                w.write("""INSERT OR REPLACE INTO timeline_events (id, name, date, crisis_phase, description, poi_id, figures_involved, narration_script, is_anchor, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(e.id)}, ${esc(e.name)}, ${esc(e.date)}, ${esc(e.crisisPhase)}, ${esc(e.description)}, ${esc(e.poiId)}, ${esc(e.figuresInvolved)}, ${esc(e.narrationScript)}, ${if (e.isAnchor) 1 else 0}, ${esc(e.provenance.dataSource)}, ${e.provenance.confidence}, ${esc(e.provenance.verifiedDate)}, ${e.provenance.createdAt}, ${e.provenance.updatedAt}, ${e.provenance.staleAfter});""")
                 w.newLine()
             }
 
             // Facts
             w.write("\n-- Historical Facts (${output.facts.size})\n")
             for (f in output.facts) {
-                w.write("""INSERT OR REPLACE INTO historical_facts (id, title, description, date, date_precision, category, subcategory, poi_id, figure_id, source_citation, narration_script, confidentiality, tags) VALUES (${esc(f.id)}, ${esc(f.title)}, ${esc(f.description)}, ${esc(f.date)}, ${esc(f.datePrecision)}, ${esc(f.category)}, ${esc(f.subcategory)}, ${esc(f.poiId)}, ${esc(f.figureId)}, ${esc(f.sourceCitation)}, ${esc(f.narrationScript)}, ${esc(f.confidentiality)}, ${esc(f.tags)});""")
+                w.write("""INSERT OR REPLACE INTO historical_facts (id, title, description, date, date_precision, category, subcategory, poi_id, figure_id, source_citation, narration_script, confidentiality, tags, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(f.id)}, ${esc(f.title)}, ${esc(f.description)}, ${esc(f.date)}, ${esc(f.datePrecision)}, ${esc(f.category)}, ${esc(f.subcategory)}, ${esc(f.poiId)}, ${esc(f.figureId)}, ${esc(f.sourceCitation)}, ${esc(f.narrationScript)}, ${esc(f.confidentiality)}, ${esc(f.tags)}, ${esc(f.provenance.dataSource)}, ${f.provenance.confidence}, ${esc(f.provenance.verifiedDate)}, ${f.provenance.createdAt}, ${f.provenance.updatedAt}, ${f.provenance.staleAfter});""")
                 w.newLine()
             }
 
             // Primary sources
             w.write("\n-- Primary Sources (${output.primarySources.size})\n")
             for (s in output.primarySources) {
-                w.write("""INSERT OR REPLACE INTO primary_sources (id, title, source_type, author, date, full_text, excerpt, figure_id, poi_id, narration_script, citation) VALUES (${esc(s.id)}, ${esc(s.title)}, ${esc(s.sourceType)}, ${esc(s.author)}, ${esc(s.date)}, ${esc(s.fullText)}, ${esc(s.excerpt)}, ${esc(s.figureId)}, ${esc(s.poiId)}, ${esc(s.narrationScript)}, ${esc(s.citation)});""")
+                w.write("""INSERT OR REPLACE INTO primary_sources (id, title, source_type, author, date, full_text, excerpt, figure_id, poi_id, narration_script, citation, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(s.id)}, ${esc(s.title)}, ${esc(s.sourceType)}, ${esc(s.author)}, ${esc(s.date)}, ${esc(s.fullText)}, ${esc(s.excerpt)}, ${esc(s.figureId)}, ${esc(s.poiId)}, ${esc(s.narrationScript)}, ${esc(s.citation)}, ${esc(s.provenance.dataSource)}, ${s.provenance.confidence}, ${esc(s.provenance.verifiedDate)}, ${s.provenance.createdAt}, ${s.provenance.updatedAt}, ${s.provenance.staleAfter});""")
                 w.newLine()
             }
 
-            w.write("\n-- Tour POIs, businesses, tours, tour stops, events calendar\n")
-            w.write("-- will be populated in Phase 5/6/9 with curated GPS data.\n")
+            // Tour POIs
+            w.write("\n-- Tour POIs (${output.tourPois.size})\n")
+            for (p in output.tourPois) {
+                w.write("""INSERT OR REPLACE INTO tour_pois (id, name, lat, lng, address, category, subcategories, short_narration, long_narration, description, historical_period, admission_info, hours, phone, website, image_asset, geofence_radius_m, requires_transportation, wheelchair_accessible, seasonal, priority, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(p.id)}, ${esc(p.name)}, ${p.lat}, ${p.lng}, ${esc(p.address)}, ${esc(p.category)}, ${esc(p.subcategories)}, ${esc(p.shortNarration)}, ${esc(p.longNarration)}, ${esc(p.description)}, ${esc(p.historicalPeriod)}, ${esc(p.admissionInfo)}, ${esc(p.hours)}, ${esc(p.phone)}, ${esc(p.website)}, ${esc(p.imageAsset)}, ${p.geofenceRadiusM}, ${if (p.requiresTransportation) 1 else 0}, ${if (p.wheelchairAccessible) 1 else 0}, ${if (p.seasonal) 1 else 0}, ${p.priority}, ${esc(p.provenance.dataSource)}, ${p.provenance.confidence}, ${esc(p.provenance.verifiedDate)}, ${p.provenance.createdAt}, ${p.provenance.updatedAt}, ${p.provenance.staleAfter});""")
+                w.newLine()
+            }
+
+            // Businesses
+            w.write("\n-- Salem Businesses (${output.businesses.size})\n")
+            for (b in output.businesses) {
+                w.write("""INSERT OR REPLACE INTO salem_businesses (id, name, lat, lng, address, business_type, cuisine_type, price_range, hours, phone, website, description, historical_note, tags, rating, image_asset, data_source, confidence, verified_date, created_at, updated_at, stale_after) VALUES (${esc(b.id)}, ${esc(b.name)}, ${b.lat}, ${b.lng}, ${esc(b.address)}, ${esc(b.businessType)}, ${esc(b.cuisineType)}, ${esc(b.priceRange)}, ${esc(b.hours)}, ${esc(b.phone)}, ${esc(b.website)}, ${esc(b.description)}, ${esc(b.historicalNote)}, ${esc(b.tags)}, ${b.rating ?: "NULL"}, ${esc(b.imageAsset)}, ${esc(b.provenance.dataSource)}, ${b.provenance.confidence}, ${esc(b.provenance.verifiedDate)}, ${b.provenance.createdAt}, ${b.provenance.updatedAt}, ${b.provenance.staleAfter});""")
+                w.newLine()
+            }
         }
         println("SQL written: ${outFile.length() / 1024} KB")
     }

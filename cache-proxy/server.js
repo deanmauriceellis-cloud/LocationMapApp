@@ -158,6 +158,9 @@ deps.sanitizeMultiline = authModule.sanitizeMultiline;
 require('./lib/comments')(app, deps);
 const chatModule = require('./lib/chat')(app, deps);
 
+// Salem content (backward compatible — all routes under /salem/*)
+require('./lib/salem')(app, deps);
+
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);
 
@@ -182,5 +185,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Social: GET/POST /comments/:osm_type/:osm_id, POST /comments/:id/vote, DELETE /comments/:id');
   console.log(`        JWT: ${process.env.JWT_SECRET ? 'secret configured' : 'WARNING — using random secret'}`);
   console.log('Scan:   GET /scan-cells');
+  console.log('Salem:  GET /salem/pois, /salem/businesses, /salem/figures, /salem/timeline, /salem/sources, /salem/tours, /salem/events, /salem/sync, /salem/stats');
   console.log('Admin:  GET /cache/stats, POST /cache/clear');
 });

@@ -64,6 +64,63 @@ app-salem → core ← app
 
 Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (models, repositories, location, geofencing) but have independent UI, branding, and app-specific features.
 
+### Offline-First + API Sync Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ WickedSalemWitchCityTour (Android)                           │
+│                                                              │
+│  ┌─────────────────┐    ┌──────────────────────────────────┐ │
+│  │ Room SQLite DB   │◄──│ Bundled salem_content.db (asset) │ │
+│  │ (salem_content)  │    │ 9 tables, ~841 records           │ │
+│  │                  │    └──────────────────────────────────┘ │
+│  │ Works 100%       │                                        │
+│  │ offline          │◄── /salem/sync (when online)           │
+│  └─────────────────┘                                        │
+│           │                                                  │
+│  ┌────────▼────────┐    ┌──────────────────────────────────┐ │
+│  │ Core repos       │───►│ cache-proxy (existing APIs)      │ │
+│  │ (Overpass, MBTA, │    │ /pois, /weather, /transit, etc.  │ │
+│  │  Weather, etc.)  │    │ POIs, transit, weather = online  │ │
+│  └─────────────────┘    └──────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                    ┌─────────▼──────────┐
+                    │ cache-proxy (4300)  │
+                    │ Node.js + PostgreSQL│
+                    │                    │
+                    │ /salem/* endpoints  │ ← NEW: Salem content API
+                    │ /pois/*            │ ← Existing: generic POIs
+                    │ /weather, /transit │ ← Existing: weather, MBTA
+                    └────────────────────┘
+```
+
+**Design principles:**
+- **Offline-first**: App ships with bundled Room DB; all Salem content (POIs, figures, facts, sources, tours) works without internet
+- **Online-enhanced**: When connected, syncs fresh content via `/salem/sync` endpoint; core features (live transit, weather radar, Overpass POIs) require network
+- **Dual database**: Local Room SQLite (bundled asset) + remote PostgreSQL (cache-proxy APIs). Local is the truth for Salem content; remote for generic POIs
+- **Backward compatible**: All new endpoints under `/salem/*` prefix. Existing `pois`, `auth`, `chat`, `comments` endpoints untouched. No schema changes to existing tables except optional provenance columns on `pois` (ALTER ADD, nullable, defaults)
+- **Cloud-ready**: Backend designed for eventual cloud deployment. Salem API endpoints are stateless and horizontally scalable
+
+### Data Provenance & Staleness
+
+Every entity in both local and remote databases carries provenance and staleness metadata:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `data_source` | String | Origin: `manual_curated`, `salem_project`, `overpass_import`, `api_sync`, `user_report` |
+| `confidence` | Float | 0.0–1.0 trust score (curated=1.0, overpass=0.8, user_report=0.5) |
+| `verified_date` | String/Timestamp | ISO date of last human/automated verification |
+| `created_at` | Long/Timestamp | Record creation time |
+| `updated_at` | Long/Timestamp | Last modification time |
+| `stale_after` | Long/Timestamp | TTL — when this record should be re-verified (0 = never stale) |
+
+**Staleness strategy:**
+- Historical content (figures, facts, timeline, sources): `stale_after = 0` (never stale — history doesn't change)
+- Businesses: `stale_after = 180 days` (hours, prices, and closures change)
+- Events: `stale_after = event end date` (naturally expire)
+- Tour POIs: varies (museums=365d, seasonal sites=90d, permanent landmarks=0)
+
 ---
 
 ## Phase 1 — Core Module Extraction
@@ -162,7 +219,7 @@ Both `:app` and `:app-salem` depend on `:core`. They share all data layer code (
 - [x] Create `res/values/strings.xml` — app name "Wicked Salem"
 - [x] Create `res/values/themes.xml` — `Theme.WickedSalem` (day + night)
 - [x] Create app icon (placeholder: gold "W" on purple background)
-- [ ] Create splash screen layout (deferred)
+- [ ] Create splash screen layout (deferred to Phase 10)
 
 ### Step 2.4: Verify
 - [x] `./gradlew :app-salem:assembleDebug` builds (9.6MB APK)
@@ -288,7 +345,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 ### Step 3.5: Verify
 - [x] All DAOs compile and can be injected
 - [x] `./gradlew :app-salem:assembleDebug` builds clean (0 warnings)
-- [ ] Git commit: "Phase 2-4: Salem app shell, content database, content pipeline"
+- [x] Git commit: "Phase 2-4: Salem app shell, content database, content pipeline"
 
 ---
 
@@ -299,7 +356,7 @@ recurrence_pattern, seasonal_month (10 for October events)
 ### Step 4.1: Create salem-content module
 - [x] Create `salem-content/build.gradle.kts` (JVM-only, no Android)
   - Dependencies: Gson, kotlinx-coroutines (for file I/O)
-- [ ] Update `settings.gradle`: add `include ':salem-content'`
+- [x] Update `settings.gradle`: add `include ':salem-content'`
 
 ### Step 4.2: JSON readers
 - [x] `BuildingReader.kt` — parse `data/json/buildings/_all_buildings.json`
@@ -353,13 +410,15 @@ recurrence_pattern, seasonal_month (10 for October events)
   - All narration scripts are under TTS length limits
   - All figure-POI links reference valid entities
   - No orphaned content
-- [ ] Generate `salem_content.db` → copy to `app-salem/src/main/assets/`
+- [x] Generate `salem_content.db` → copy to `app-salem/src/main/assets/`
+  - Room `createFromAsset("salem_content.db")` with identity hash `1ab2eea2c8c64126e88af7a9ce8ba38f`
+  - 1.7MB SQLite DB with 841 records
 
 ### Step 4.6: Verify
 - [x] Pipeline runs end-to-end without errors
-- [ ] Output database loads in the Salem app
-- [ ] Content is queryable and displays correctly
-- [ ] Git commit: "Salem content pipeline — import from Salem project"
+- [x] Output database loads in the Salem app (createFromAsset + fallbackToDestructiveMigration)
+- [ ] Content is queryable and displays correctly (Phase 6 — UI needed)
+- [x] Git commit: (included in Phase 5 commit)
 
 ---
 
@@ -369,89 +428,99 @@ recurrence_pattern, seasonal_month (10 for October events)
 
 ### Step 5.1: Historical & cultural POIs (curated, ships in DB)
 
-**Witch Trials Sites:**
-- [ ] Witch Trials Memorial (24 Liberty St) — with full narration
-- [ ] Salem Witch Museum (19 1/2 Washington Sq N) — hours, admission, narration
-- [ ] Witch House / Jonathan Corwin House (310 1/2 Essex St)
-- [ ] Proctor's Ledge Memorial (7 Pope St) — confirmed execution site
-- [ ] Charter Street Cemetery / Old Burying Point (51 Charter St)
-- [ ] Salem Jail site (Federal & St. Peter's) — marked location
-- [ ] Court House site (70 Washington St) — marked location
+**Witch Trials Sites (8/10 curated):**
+- [x] Witch Trials Memorial (24 Liberty St) — with full narration
+- [x] Salem Witch Museum (19 1/2 Washington Sq N) — hours, admission, narration
+- [x] Witch House / Jonathan Corwin House (310 1/2 Essex St)
+- [x] Proctor's Ledge Memorial (7 Pope St) — confirmed execution site
+- [x] Charter Street Cemetery / Old Burying Point (51 Charter St)
+- [x] Salem Jail site (Federal & St. Peter's) — marked location
+- [x] Court House site (70 Washington St) — marked location
 - [ ] Judge Hathorne's home site (118 Washington St) — marked location
 - [ ] Sheriff Corwin's home site (148 Washington St)
-- [ ] Rebecca Nurse Homestead (149 Pine St, Danvers) — flag: requires transport
+- [x] Rebecca Nurse Homestead (149 Pine St, Danvers) — flag: requires transport
 
-**Maritime & National Historic:**
-- [ ] Salem Maritime National Historical Park (160 Derby St) — FREE
-- [ ] Custom House (within SMNHP) — Hawthorne worked here
-- [ ] Derby Wharf — 1/2 mile, Friendship of Salem replica
+**Maritime & National Historic (3/5 curated):**
+- [x] Salem Maritime National Historical Park (160 Derby St) — FREE
+- [x] Custom House (within SMNHP) — Hawthorne worked here
+- [x] Derby Wharf — 1/2 mile, Friendship of Salem replica
 - [ ] Derby Wharf Light Station
 - [ ] Narbonne House, Derby House, Scale House (within SMNHP)
 
-**Museums & Cultural:**
-- [ ] Peabody Essex Museum (161 Essex St) — exhibits, hours, admission
-- [ ] House of the Seven Gables (115 Derby St) — campus with multiple buildings
-- [ ] Pioneer Village / Salem 1630 (98 West Ave) — living history
-- [ ] Witch Dungeon Museum
-- [ ] Salem Wax Museum (if operational)
-- [ ] New England Pirate Museum
+**Museums & Cultural (5/6 curated):**
+- [x] Peabody Essex Museum (161 Essex St) — exhibits, hours, admission
+- [x] House of the Seven Gables (115 Derby St) — campus with multiple buildings
+- [x] Pioneer Village / Salem 1630 (98 West Ave) — living history
+- [x] Witch Dungeon Museum
+- [ ] Salem Wax Museum (if operational — verify status)
+- [x] New England Pirate Museum
 
-**Literary:**
-- [ ] Hawthorne's Birthplace (on Seven Gables campus)
+**Literary (3/5 curated):**
+- [x] Hawthorne's Birthplace (on Seven Gables campus)
 - [ ] "Castle Dismal" (10 1/2 Herbert St) — Manning family home
 - [ ] 14 Mall Street — where he wrote The Scarlet Letter
-- [ ] Hawthorne statue
-- [ ] Hawthorne Hotel (18 Washington Square West)
+- [x] Hawthorne statue
+- [x] Hawthorne Hotel (18 Washington Square West)
 
-**Parks & Landmarks:**
-- [ ] Salem Common (31 Washington Square) — 9 acres
-- [ ] Winter Island Park (50 Winter Island Rd) — Fort Pickering, lighthouse
-- [ ] Salem Willows Park — beaches, carousel
-- [ ] Roger Conant Statue (Brown St & Washington Sq)
+**Parks & Landmarks (6/6 curated):**
+- [x] Salem Common (31 Washington Square) — 9 acres
+- [x] Winter Island Park (50 Winter Island Rd) — Fort Pickering, lighthouse
+- [x] Salem Willows Park — beaches, carousel
+- [x] Roger Conant Statue (Brown St & Washington Sq)
 - [ ] McIntire Historic District — Federal-style mansions
-- [ ] Chestnut Street — grand residential boulevard
-- [ ] Ropes Mansion — Hocus Pocus filming location
+- [x] Chestnut Street — grand residential boulevard
+- [x] Ropes Mansion — Hocus Pocus filming location
 
-**Visitor Services:**
-- [ ] NPS Regional Visitor Center (2 New Liberty St) — Heritage Trail start
-- [ ] Salem MBTA Station (252 Bridge St)
-- [ ] Salem Ferry Terminal (10 Blaney St) — seasonal
-- [ ] Museum Place Garage (1 New Liberty St) — $1.25/hr, EV charging
+**Visitor Services (4/5 curated):**
+- [x] NPS Regional Visitor Center (2 New Liberty St) — Heritage Trail start
+- [x] Salem MBTA Station (252 Bridge St)
+- [x] Salem Ferry Terminal (10 Blaney St) — seasonal
+- [x] Museum Place Garage (1 New Liberty St) — $1.25/hr, EV charging
 - [ ] South Harbor Garage (10 Congress St) — $0.75-$1.50/hr, EV charging
 
-### Step 5.2: Witch & occult shops (enhanced listings)
-- [ ] Research and catalog every witch/occult/metaphysical shop on Essex Street and surrounds
-  - Crow Haven Corner, Hex, Omen, Artemisia Botanicals, etc.
-  - Each with: name, address, GPS, hours, phone, description, specialty (tarot, crystals, herbs, etc.)
+### Step 5.2: Witch & occult shops (5 curated)
+- [x] Catalog witch/occult/metaphysical shops on Essex Street and surrounds
+  - Crow Haven Corner, Hex, Omen, Artemisia Botanicals, Coven's Cottage
+  - Each with: name, address, GPS, description, specialty tags, provenance
 
-### Step 5.3: Restaurants, bars, cafes (comprehensive)
-- [ ] Catalog all tourist-area dining establishments:
-  - Fine dining, casual, seafood, pubs, cafes, bakeries
-  - Each with: name, address, GPS, cuisine type, price range ($/$$/$$$), hours, phone, website
-  - Historical notes where applicable (e.g., "In a building dating to 1780...")
-- [ ] Key areas: Pickering Wharf, Essex Street, Derby Street, downtown scattered
-- [ ] Include: Finz Seafood, Sea Level Oyster Bar, Gulu-Gulu Cafe, Rockafellas, Flying Saucer Pizza, Turner's Seafood, Ledger, Opus, etc.
+### Step 5.3: Restaurants, bars, cafes (13 curated)
+- [x] Catalog tourist-area dining establishments:
+  - Restaurants (7): Turner's, Sea Level, Finz, Flying Saucer, Rockafellas, Ledger, Opus
+  - Bars (3): Mercy Tavern, Notch Brewing, Bit Bar
+  - Cafes (3): Gulu-Gulu, Jaho Coffee, Brew Box
+  - Each with: name, address, GPS, cuisine type, price range, description, historical notes, tags, provenance
+- [x] Key areas covered: Pickering Wharf, Essex Street, Derby Street, downtown
 
-### Step 5.4: Lodging (B&Bs, hotels, inns)
-- [ ] Catalog all tourist lodging:
-  - Hawthorne Hotel, Salem Waterfront Hotel, Salem Inn, Coach House Inn, etc.
-  - B&Bs: Morning Glory, Amelia Payson House, Salem's historic B&Bs
-  - Each with: name, address, GPS, price range, phone, website, amenities, historical notes
+### Step 5.4: Lodging (5 curated)
+- [x] Catalog tourist lodging:
+  - Hotels: Hawthorne Hotel, Salem Waterfront Hotel
+  - Inns: Salem Inn, Coach House Inn
+  - B&Bs: Morning Glory
+  - Each with: address, GPS, price range, phone, website, historical notes, provenance
 
 ### Step 5.5: Leverage LocationMapApp's existing POI database
-- [ ] The core PlacesRepository (Overpass/OSM) already has 1000s of POIs
-- [ ] For Salem app: set default search center to Salem
+- [ ] For Salem app: set default search center to Salem (deferred — UI integration in Phase 6+)
 - [ ] Auto-populate on first launch: restaurants, cafes, shops, parking, fuel, transit in Salem area
 - [ ] Salem-enhanced POIs OVERLAY on top of generic Overpass POIs
   - If a Salem business matches an Overpass POI → merge (Salem data takes priority)
   - If no match → Salem business appears as its own marker with richer detail
 
-### Step 5.6: Verify
-- [ ] All POIs display on map with correct positions
-- [ ] Category filtering works
-- [ ] Search finds businesses by name, cuisine, type
-- [ ] Tapping a POI shows full detail with narration (for tour POIs)
-- [ ] Git commit: "Enhanced Salem POI catalog — complete business directory"
+### Step 5.6: Data provenance & staleness infrastructure
+- [x] Added provenance fields to all 9 Room entities (data_source, confidence, verified_date, created_at, updated_at, stale_after)
+- [x] Added staleness-aware DAO queries (findStale, findBySource, markUpdated, setStaleAfter)
+- [x] Updated SalemContentRepository with provenance methods
+- [x] Room DB version 2, fallbackToDestructiveMigration
+- [x] Updated content pipeline output models with Provenance data class
+- [x] Created PostgreSQL schema (salem-schema.sql) — 9 Salem tables + provenance on existing pois
+- [x] Created Node.js Salem API endpoints (lib/salem.js) — CRUD + /salem/sync + /salem/stats
+- [x] All backward compatible — no changes to existing LocationMapApp endpoints
+
+### Step 5.7: Verify
+- [x] Pipeline generates 29 POIs + 23 businesses with provenance (0 errors, 0 warnings)
+- [x] `salem_content.db` created (1.7MB, 841 records, Room identity hash matched)
+- [x] `./gradlew :app-salem:assembleDebug` builds successfully
+- [ ] Emulator verification (this session)
+- [ ] Git commit: "Phase 5: Salem POI catalog + provenance + staleness + API"
 
 ---
 

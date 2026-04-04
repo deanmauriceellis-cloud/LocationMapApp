@@ -44,4 +44,18 @@ interface SalemBusinessDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(businesses: List<SalemBusiness>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM salem_businesses WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<SalemBusiness>
+
+    @Query("SELECT * FROM salem_businesses WHERE data_source = :source ORDER BY name ASC")
+    suspend fun findBySource(source: String): List<SalemBusiness>
+
+    @Query("UPDATE salem_businesses SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
+
+    @Query("UPDATE salem_businesses SET stale_after = :staleAfter WHERE id = :id")
+    suspend fun setStaleAfter(id: String, staleAfter: Long)
 }

@@ -35,4 +35,15 @@ interface HistoricalFigureDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(figures: List<HistoricalFigure>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM historical_figures WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<HistoricalFigure>
+
+    @Query("SELECT * FROM historical_figures WHERE data_source = :source ORDER BY surname ASC")
+    suspend fun findBySource(source: String): List<HistoricalFigure>
+
+    @Query("UPDATE historical_figures SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
 }

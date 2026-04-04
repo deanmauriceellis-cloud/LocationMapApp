@@ -120,6 +120,36 @@ class SalemContentRepository @Inject constructor(
     suspend fun getActiveEvents(today: String): List<EventsCalendar> =
         eventsCalendarDao.findActive(today)
 
+    // ── Provenance & Staleness ─────────────────────────────────────────
+
+    /** Find all stale tour POIs (stale_after > 0 and expired). */
+    suspend fun getStaleTourPois(): List<TourPoi> =
+        tourPoiDao.findStale(System.currentTimeMillis())
+
+    /** Find all stale businesses. */
+    suspend fun getStaleBusinesses(): List<SalemBusiness> =
+        salemBusinessDao.findStale(System.currentTimeMillis())
+
+    /** Find all stale events. */
+    suspend fun getStaleEvents(): List<EventsCalendar> =
+        eventsCalendarDao.findStale(System.currentTimeMillis())
+
+    /** Find tour POIs by data source. */
+    suspend fun getTourPoisBySource(source: String): List<TourPoi> =
+        tourPoiDao.findBySource(source)
+
+    /** Find businesses by data source. */
+    suspend fun getBusinessesBySource(source: String): List<SalemBusiness> =
+        salemBusinessDao.findBySource(source)
+
+    /** Touch the updated_at timestamp for a tour POI. */
+    suspend fun markTourPoiUpdated(id: String) =
+        tourPoiDao.markUpdated(id, System.currentTimeMillis())
+
+    /** Touch the updated_at timestamp for a business. */
+    suspend fun markBusinessUpdated(id: String) =
+        salemBusinessDao.markUpdated(id, System.currentTimeMillis())
+
     // ── Bulk Insert (for content pipeline) ───────────────────────────────
 
     suspend fun insertTourPois(pois: List<TourPoi>) = tourPoiDao.insertAll(pois)

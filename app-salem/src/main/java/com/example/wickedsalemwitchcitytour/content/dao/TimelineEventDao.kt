@@ -32,4 +32,15 @@ interface TimelineEventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(events: List<TimelineEvent>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM timeline_events WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<TimelineEvent>
+
+    @Query("SELECT * FROM timeline_events WHERE data_source = :source ORDER BY date ASC")
+    suspend fun findBySource(source: String): List<TimelineEvent>
+
+    @Query("UPDATE timeline_events SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
 }

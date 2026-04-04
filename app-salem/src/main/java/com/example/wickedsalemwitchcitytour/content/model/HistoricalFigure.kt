@@ -44,5 +44,17 @@ data class HistoricalFigure(
     /** JSON object of family relationships */
     @ColumnInfo(name = "family_connections") val familyConnections: String? = null,
     /** FK to tour_pois.id — the primary POI associated with this figure */
-    @ColumnInfo(name = "primary_poi_id") val primaryPoiId: String? = null
+    @ColumnInfo(name = "primary_poi_id") val primaryPoiId: String? = null,
+
+    // --- Provenance & Staleness ---
+    /** manual_curated|salem_project|overpass_import|api_sync|user_report */
+    @ColumnInfo(name = "data_source") val dataSource: String = "salem_project",
+    /** 0.0–1.0 trust score */
+    val confidence: Float = 1.0f,
+    /** ISO date of last human/automated verification */
+    @ColumnInfo(name = "verified_date") val verifiedDate: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: Long = 0L,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0L,
+    /** Epoch millis when this record becomes stale (0 = never) */
+    @ColumnInfo(name = "stale_after") val staleAfter: Long = 0L
 )

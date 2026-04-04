@@ -2,6 +2,108 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-03e — Phase 5: POI Catalog + Provenance + Staleness + API
+
+### Context
+Session 73. Major architecture session — established offline-first + API sync dual-database architecture, added data provenance and staleness hooks across all entities (local Room + remote PostgreSQL), curated Phase 5 POI catalog, completed Phase 4 loose ends (DB asset loading), and created Salem content API endpoints.
+
+### Key Architectural Decisions
+1. **Offline-first**: App ships with bundled Room DB (salem_content.db asset, 1.7MB, 841 records). Works 100% without internet.
+2. **Online-enhanced**: When connected, syncs via `/salem/sync` endpoint. Core features (transit, weather, Overpass POIs) require network.
+3. **Provenance on everything**: Every entity carries data_source, confidence (0-1), verified_date, created_at, updated_at, stale_after. Built as hooks to evolve later.
+4. **Staleness TTL**: Historical content = never stale. Businesses = 180 days. Events = expire at end date.
+5. **Backward compatible**: All new endpoints under `/salem/*`. Existing pois table gets optional provenance columns (ALTER ADD, nullable). No breaking changes to LocationMapApp.
+6. **Cloud-ready**: Salem API endpoints are stateless, horizontally scalable for future cloud deployment.
+
+### Changes Made
+
+**Room Entities (9 files)** — Added 6 provenance/staleness fields to all entities:
+- TourPoi, SalemBusiness, HistoricalFigure, HistoricalFact, TimelineEvent, PrimarySource, Tour, TourStop, EventsCalendar
+- Room DB version 1 → 2, fallbackToDestructiveMigration (no production users yet)
+
+**DAOs (9 files)** — Added staleness-aware queries:
+- findStale(now), findBySource(source), markUpdated(id, now), setStaleAfter(id, staleAfter)
+
+**SalemContentRepository** — Added provenance methods:
+- getStaleTourPois(), getStaleBusinesses(), getStaleEvents()
+- getTourPoisBySource(), getBusinessesBySource()
+- markTourPoiUpdated(), markBusinessUpdated()
+
+**SalemModule (DI)** — Added createFromAsset("salem_content.db") + fallbackToDestructiveMigration()
+
+**Content Pipeline** — Provenance throughout:
+- New `Provenance` data class in PipelineOutput.kt
+- All 9 Output* classes carry provenance
+- SQL generation includes all provenance columns
+- Pipeline now loads curated POIs (SalemPois.kt) and businesses (SalemBusinesses.kt)
+
+**Phase 5 POI Curation** — 29 tour POIs + 23 businesses:
+- Witch Trials: 8 sites (Memorial, Museum, Witch House, Proctor's Ledge, Cemetery, Jail, Court, Rebecca Nurse)
+- Maritime: 3 sites (Salem Maritime NHP, Custom House, Derby Wharf)
+- Museums: 5 sites (PEM, Seven Gables, Pioneer Village, Witch Dungeon, Pirate Museum)
+- Literary: 3 sites (Hawthorne Birthplace, statue, hotel)
+- Parks: 6 sites (Common, Winter Island, Willows, Conant statue, Ropes Mansion, Chestnut St)
+- Visitor: 4 sites (NPS Center, MBTA Station, Ferry Terminal, Museum Place Garage)
+- Occult shops: 5 (Crow Haven Corner, HEX, OMEN, Artemisia, Coven's Cottage)
+- Restaurants: 7 (Turner's, Sea Level, Finz, Flying Saucer, Rockafellas, Ledger, Opus)
+- Bars: 3 (Mercy Tavern, Notch Brewing, Bit Bar)
+- Cafes: 3 (Gulu-Gulu, Jaho, Brew Box)
+- Lodging: 5 (Hawthorne Hotel, Waterfront, Salem Inn, Coach House, Morning Glory)
+
+**PostgreSQL Schema** — `cache-proxy/salem-schema.sql`:
+- 9 Salem content tables mirroring Room entities (all with provenance)
+- Provenance columns added to existing `pois` table (backward compatible ALTER ADD)
+- `salem_sync_state` table for tracking sync status
+
+**Node.js API** — `cache-proxy/lib/salem.js`:
+- GET /salem/pois, /salem/pois/:id (filterable by category, source, stale, nearby, search)
+- GET /salem/businesses (filterable by type, source, stale, search)
+- GET /salem/figures, /salem/figures/:id (includes related facts/sources)
+- GET /salem/timeline, /salem/sources, /salem/tours, /salem/tours/:id, /salem/events
+- GET /salem/sync?since= (incremental sync for mobile app)
+- GET /salem/stats (counts + stale record counts)
+
+**Database Asset** — `app-salem/src/main/assets/salem_content.db`:
+- 1.7MB SQLite, Room identity hash 1ab2eea2c8c64126e88af7a9ce8ba38f
+- 841 records: 29 POIs, 23 businesses, 49 figures, 500 facts, 40 events, 200 sources
+
+### Emulator Verification
+- Salem_Tour_API34 on port 5570
+- APK installs and launches successfully
+- Map renders Salem downtown with correct tiles
+- Purple toolbar branding (#2D1B4E) renders correctly
+- "Filling POIs..." status line shows Room DB loading
+- MBTA transit loaded (20 trains, 266 buses, 257 stations)
+- No crashes, no Room errors, no FATAL exceptions
+- ANR was system resource contention (multiple emulators running), not app bug
+
+### Files Created (5)
+- `cache-proxy/salem-schema.sql` — PostgreSQL Salem content schema
+- `cache-proxy/lib/salem.js` — Node.js Salem content API
+- `salem-content/src/main/kotlin/.../data/SalemPois.kt` — Curated tour POIs
+- `salem-content/src/main/kotlin/.../data/SalemBusinesses.kt` — Curated businesses
+- `salem-content/create_db.sql` — Room-compatible SQLite schema for asset DB
+
+### Files Modified (23)
+- 9 Room entity files (provenance fields)
+- 8 DAO files (staleness queries) + TourStopDao unchanged
+- `SalemContentRepository.kt` (provenance methods)
+- `SalemContentDatabase.kt` (version 2)
+- `SalemModule.kt` (createFromAsset + fallbackToDestructiveMigration)
+- `PipelineOutput.kt` (Provenance class + fields on all outputs)
+- `ContentPipeline.kt` (provenance SQL generation + curated data loading)
+- `cache-proxy/server.js` (Salem module registration + startup log)
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` (architecture docs + Phase 5 checkboxes)
+- `STATE.md`, `SESSION-LOG.md`
+
+### Open Items
+- Phase 5 remaining POIs: ~7 uncurated (Hathorne home, Corwin home, Derby Wharf Light, Narbonne/Derby/Scale Houses, Castle Dismal, Mall St, McIntire District, South Harbor Garage)
+- Step 5.5 (Overpass overlay merge) deferred to Phase 6+ UI integration
+- Phase 6 (Tour Engine) is next
+- Emulator performance tuning (avoid running multiple AVDs)
+
+---
+
 ## Session: 2026-04-03d — POI Data Provenance Strategy Note
 
 ### Context

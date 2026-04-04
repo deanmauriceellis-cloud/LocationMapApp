@@ -35,4 +35,15 @@ interface EventsCalendarDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(events: List<EventsCalendar>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM events_calendar WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<EventsCalendar>
+
+    @Query("SELECT * FROM events_calendar WHERE data_source = :source ORDER BY name ASC")
+    suspend fun findBySource(source: String): List<EventsCalendar>
+
+    @Query("UPDATE events_calendar SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
 }

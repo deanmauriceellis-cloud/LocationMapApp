@@ -26,7 +26,7 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         TourStop::class,
         EventsCalendar::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SalemContentDatabase : RoomDatabase() {

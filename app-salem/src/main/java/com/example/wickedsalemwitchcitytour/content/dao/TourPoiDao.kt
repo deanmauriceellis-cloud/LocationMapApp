@@ -44,4 +44,18 @@ interface TourPoiDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(pois: List<TourPoi>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM tour_pois WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<TourPoi>
+
+    @Query("SELECT * FROM tour_pois WHERE data_source = :source ORDER BY name ASC")
+    suspend fun findBySource(source: String): List<TourPoi>
+
+    @Query("UPDATE tour_pois SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
+
+    @Query("UPDATE tour_pois SET stale_after = :staleAfter WHERE id = :id")
+    suspend fun setStaleAfter(id: String, staleAfter: Long)
 }

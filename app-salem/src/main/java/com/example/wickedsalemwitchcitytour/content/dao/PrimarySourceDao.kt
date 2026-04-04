@@ -32,4 +32,15 @@ interface PrimarySourceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(sources: List<PrimarySource>)
+
+    // --- Provenance & Staleness ---
+
+    @Query("SELECT * FROM primary_sources WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
+    suspend fun findStale(now: Long): List<PrimarySource>
+
+    @Query("SELECT * FROM primary_sources WHERE data_source = :source ORDER BY date ASC")
+    suspend fun findBySource(source: String): List<PrimarySource>
+
+    @Query("UPDATE primary_sources SET updated_at = :now WHERE id = :id")
+    suspend fun markUpdated(id: String, now: Long)
 }

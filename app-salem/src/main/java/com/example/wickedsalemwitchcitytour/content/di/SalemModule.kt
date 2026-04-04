@@ -30,7 +30,10 @@ object SalemModule {
             context,
             SalemContentDatabase::class.java,
             "salem_content.db"
-        ).build()
+        )
+            .createFromAsset("salem_content.db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides fun provideTourPoiDao(db: SalemContentDatabase): TourPoiDao = db.tourPoiDao()
     @Provides fun provideSalemBusinessDao(db: SalemContentDatabase): SalemBusinessDao = db.salemBusinessDao()

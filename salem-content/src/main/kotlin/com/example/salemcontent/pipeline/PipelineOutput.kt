@@ -21,6 +21,16 @@ data class PipelineOutput(
     val events: List<OutputEvent>
 )
 
+/** Provenance metadata shared by all output types. */
+data class Provenance(
+    val dataSource: String = "manual_curated",
+    val confidence: Float = 1.0f,
+    val verifiedDate: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val staleAfter: Long = 0L
+)
+
 data class OutputTourPoi(
     val id: String, val name: String, val lat: Double, val lng: Double,
     val address: String, val category: String, val subcategories: String? = null,
@@ -31,7 +41,8 @@ data class OutputTourPoi(
     val imageAsset: String? = null, val geofenceRadiusM: Int = 50,
     val requiresTransportation: Boolean = false,
     val wheelchairAccessible: Boolean = true,
-    val seasonal: Boolean = false, val priority: Int = 3
+    val seasonal: Boolean = false, val priority: Int = 3,
+    val provenance: Provenance = Provenance(dataSource = "manual_curated")
 )
 
 data class OutputBusiness(
@@ -41,7 +52,8 @@ data class OutputBusiness(
     val hours: String? = null, val phone: String? = null,
     val website: String? = null, val description: String? = null,
     val historicalNote: String? = null, val tags: String? = null,
-    val rating: Float? = null, val imageAsset: String? = null
+    val rating: Float? = null, val imageAsset: String? = null,
+    val provenance: Provenance = Provenance(dataSource = "manual_curated")
 )
 
 data class OutputFigure(
@@ -52,7 +64,8 @@ data class OutputFigure(
     val narrationScript: String? = null, val appearanceDescription: String? = null,
     val roleInCrisis: String? = null, val historicalOutcome: String? = null,
     val keyQuotes: String? = null, val familyConnections: String? = null,
-    val primaryPoiId: String? = null
+    val primaryPoiId: String? = null,
+    val provenance: Provenance = Provenance(dataSource = "salem_project")
 )
 
 data class OutputFact(
@@ -61,14 +74,16 @@ data class OutputFact(
     val category: String? = null, val subcategory: String? = null,
     val poiId: String? = null, val figureId: String? = null,
     val sourceCitation: String? = null, val narrationScript: String? = null,
-    val confidentiality: String = "public", val tags: String? = null
+    val confidentiality: String = "public", val tags: String? = null,
+    val provenance: Provenance = Provenance(dataSource = "salem_project")
 )
 
 data class OutputTimelineEvent(
     val id: String, val name: String, val date: String,
     val crisisPhase: String? = null, val description: String,
     val poiId: String? = null, val figuresInvolved: String? = null,
-    val narrationScript: String? = null, val isAnchor: Boolean = false
+    val narrationScript: String? = null, val isAnchor: Boolean = false,
+    val provenance: Provenance = Provenance(dataSource = "salem_project")
 )
 
 data class OutputPrimarySource(
@@ -76,7 +91,8 @@ data class OutputPrimarySource(
     val author: String? = null, val date: String? = null,
     val fullText: String? = null, val excerpt: String? = null,
     val figureId: String? = null, val poiId: String? = null,
-    val narrationScript: String? = null, val citation: String? = null
+    val narrationScript: String? = null, val citation: String? = null,
+    val provenance: Provenance = Provenance(dataSource = "salem_project")
 )
 
 data class OutputTour(
@@ -84,14 +100,16 @@ data class OutputTour(
     val description: String, val estimatedMinutes: Int,
     val distanceKm: Float, val stopCount: Int,
     val difficulty: String = "moderate", val seasonal: Boolean = false,
-    val iconAsset: String? = null, val sortOrder: Int = 0
+    val iconAsset: String? = null, val sortOrder: Int = 0,
+    val provenance: Provenance = Provenance(dataSource = "manual_curated")
 )
 
 data class OutputTourStop(
     val tourId: String, val poiId: String, val stopOrder: Int,
     val transitionNarration: String? = null,
     val walkingMinutesFromPrev: Int? = null,
-    val distanceMFromPrev: Int? = null
+    val distanceMFromPrev: Int? = null,
+    val provenance: Provenance = Provenance(dataSource = "manual_curated")
 )
 
 data class OutputEvent(
@@ -100,5 +118,6 @@ data class OutputEvent(
     val startDate: String? = null, val endDate: String? = null,
     val hours: String? = null, val admission: String? = null,
     val website: String? = null, val recurring: Boolean = false,
-    val recurrencePattern: String? = null, val seasonalMonth: Int? = null
+    val recurrencePattern: String? = null, val seasonalMonth: Int? = null,
+    val provenance: Provenance = Provenance(dataSource = "manual_curated")
 )
