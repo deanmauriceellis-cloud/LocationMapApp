@@ -1,22 +1,28 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-04 Session 75 (Phases 6-9 Complete — Tour Engine, Geofence, Narration, Directions, Events)
+## Last Updated: 2026-04-04 Session 76 (Full Re-Evaluation & Master Plan Overhaul)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
 - **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app
-- **Tiered pricing**: Free (ads, limited) / $4.99 Explorer (North Shore POIs) / $9.99 Premium (full tours, transit) / $19.99+ Overpass auto-populate / $49.99-mo (Salem LLM)
-- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (10 core phases + 3 future phases, supersedes all other plans)
-- **Phases 1-9 complete** — Phase 10 (Polish, Branding & Play Store) is next
+- **Tiered pricing**: Free (ads, limited) / $4.99 Explorer / $9.99 Premium / $49.99-mo (Salem LLM)
+- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (16 phases + 4 future phases, supersedes all other plans)
+- **Phases 1-9 complete** (core development done)
+- **Phase 10 next**: Production readiness — Firebase, offline tiles, photos, emulator verification, DB hardening
+- **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**
+- **Phases 12-14**: Social media, fieldwork, community engagement — **NO CODE, can start NOW**
+- **Critical timing**: 2026 is Salem's 400th anniversary (Salem 400+) — once-in-a-generation marketing window
 - **Tour engine complete**: 3 pre-defined tours + custom tour builder + time-budget tours + route optimization
 - **GPS geofence triggers**: approach/entry/exit detection with auto-narration via Android TTS
 - **Walking directions**: OSRM integration via OSMBonusPack, turn-by-turn, "Walk Here" from any POI
-- **Events calendar**: 20 curated Salem events (Haunted Happenings, festivals, museums, ghost tours) + "On this date in 1692"
-- **Offline-first architecture**: bundled Room DB + JSON content packages (source of truth) + API sync when online
+- **Events calendar**: 20 curated Salem events + "On this date in 1692"
+- **Offline-first architecture**: bundled Room DB + offline map tiles (zoom 12-15, ~60MB) + API sync when online
 - Content pipeline: 49 figures, 500 facts, 40 timeline events, 200 sources, 37 POIs, 23 businesses, 3 tours, 60 stops, 20 calendar events
 - **Data provenance & staleness** on all entities (local Room + remote PostgreSQL)
-- **Revenue streams**: Google Ads (free tier), merchant geofenced ads, loyalty program, business partnerships, LLM subscription
-- **Technical foundation audit complete**: DB indexes, FK constraints, FTS5 search, JSON packages, API key security, Socket.IO→OkHttp all planned
+- **Revenue streams**: Google Ads (free tier), merchant partnerships, loyalty program, LLM subscription
+- **New in Session 76**: Firebase Crashlytics/Analytics, POI photos (Wikimedia/NPS/field), social media strategy, community engagement plan, competitive landscape analysis, iOS/PWA roadmap, gamification/virality features
+- **Direct competitors identified**: Action Tour Guide ($9.99, multi-language), Salem On Your Own (25+ years)
+- **Key partners identified**: Destination Salem (Bridie O'Connell), Salem Chamber ($360/yr), NPS VECE Division, Salem 400+
 
 ## Architecture
 - **Android app** (Kotlin, Hilt DI, OkHttp, osmdroid) targeting API 34

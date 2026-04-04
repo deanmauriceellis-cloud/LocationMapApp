@@ -11,6 +11,7 @@
 
 ## Table of Contents
 
+### Core Development (Phases 1-9 — COMPLETE)
 1. [Vision](#1-vision)
 2. [Architecture Overview](#2-architecture-overview)
 3. [Phase 1 — Core Module Extraction](#phase-1--core-module-extraction)
@@ -22,15 +23,41 @@
 9. [Phase 7 — GPS Geofence Triggers & Narration](#phase-7--gps-geofence-triggers--narration)
 10. [Phase 8 — Walking Directions](#phase-8--walking-directions)
 11. [Phase 9 — Haunted Happenings & Events](#phase-9--haunted-happenings--events-integration)
-12. [Phase 10 — Polish, Branding & Play Store](#phase-10--polish-branding--play-store)
-13. [Content Organization Strategy](#content-organization-strategy)
-14. [Tour Definitions](#tour-definitions)
-15. [Salem POI Master List](#salem-poi-master-list)
-16. [Data Sources Reference](#data-sources-reference)
-17. [Verification Checkpoints](#verification-checkpoints)
-18. [Business Model & Monetization](#business-model--monetization)
-19. [Technical Foundation — Audit Recommendations](#technical-foundation--audit-recommendations)
-20. [Future Phases (Post-Launch)](#future-phases-post-launch)
+
+### Launch Readiness (Phases 10-11 — CODE)
+12. [Phase 10 — Production Readiness & Offline Infrastructure](#phase-10--production-readiness--offline-infrastructure)
+13. [Phase 11 — Branding, ASO & Play Store Launch](#phase-11--branding-aso--play-store-launch)
+
+### Marketing & Business Development (Phases 12-14 — NO CODE)
+14. [Phase 12 — Social Media & Digital Presence](#phase-12--social-media--digital-presence)
+15. [Phase 13 — Fieldwork & Content Photography](#phase-13--fieldwork--content-photography)
+16. [Phase 14 — Community Engagement & Salem Partnerships](#phase-14--community-engagement--salem-partnerships)
+
+### Growth Features (Phases 15-16 — CODE)
+17. [Phase 15 — In-App Virality & Gamification](#phase-15--in-app-virality--gamification)
+18. [Phase 16 — iOS & Web Expansion (PWA)](#phase-16--ios--web-expansion-pwa)
+
+### Future Phases (Post-Launch)
+19. [Phase 17 — Merchant Network & Advertising Platform](#phase-17--merchant-network--advertising-platform)
+20. [Phase 18 — Custom Narration & Audio Upgrade](#phase-18--custom-narration--audio-upgrade)
+21. [Phase 19 — Salem Village LLM Integration](#phase-19--salem-village-llm-integration)
+22. [Phase 20 — Additional Revenue Features](#phase-20--additional-revenue-features)
+
+### Reference Sections
+23. [Competitive Landscape](#competitive-landscape)
+24. [Content Organization Strategy](#content-organization-strategy)
+25. [Tour Definitions](#tour-definitions)
+26. [Salem POI Master List](#salem-poi-master-list)
+27. [Data Sources Reference](#data-sources-reference)
+28. [Verification Checkpoints](#verification-checkpoints)
+29. [Business Model & Monetization](#business-model--monetization)
+30. [Technical Foundation — Audit Recommendations](#technical-foundation--audit-recommendations)
+31. [Social Media Content Calendar](#social-media-content-calendar)
+32. [Community Engagement Contacts](#community-engagement-contacts)
+33. [Fieldwork Planning Guide](#fieldwork-planning-guide)
+
+### Critical Timeline
+> **Salem 400+ quadricentennial is 2026 — the city's 400th anniversary.** Every organization in Salem is mobilized. This is a once-in-a-generation marketing window. App MUST be in Play Store by **September 1, 2026** to capture October (1M+ visitors). Missing October 2026 means waiting until October 2027.
 
 ---
 
@@ -828,51 +855,227 @@ GPS update → TourGeofenceManager.checkPosition()
 
 ---
 
-## Phase 10 — Polish, Branding & Play Store
+## Phase 10 — Production Readiness & Offline Infrastructure
 
-**Goal:** Final polish, app icon, store listing, tiered pricing release (see Business Model section).
+**Goal:** Make the app production-grade: crash reporting, analytics, offline map tiles, photo assets, emulator verification of Phases 6-9, performance optimization, accessibility, and security hardening. This is the engineering foundation for a paid product.
 
-### Step 10.1: App icon & branding
-- [ ] Design app icon (Salem themed — consider: witch silhouette, historic building outline, crescent moon, vintage map element)
-- [ ] Splash screen with Salem imagery
-- [ ] Consistent typography and color scheme throughout
-- [ ] About screen with credits, historical source citations
+**Target:** Complete by July 2026.
 
-### Step 10.2: Offline mode
-- [ ] Pre-cache osmdroid map tiles for Salem area (zoom 12-18)
-  - ~42.50 to 42.54 lat, -70.91 to -70.87 lng
-- [ ] All content in local Room DB (already offline)
-- [ ] Walking directions: cache recent routes, fallback to straight-line distance
-- [ ] Indicate online/offline status in status bar
+### Step 10.1: Emulator verification backlog (Phases 6-9)
+- [ ] Re-run content pipeline to regenerate `salem_content.db` with 20 calendar events
+- [ ] Install on Salem_Tour_API34 emulator (port 5570)
+- [ ] Phase 6 verification:
+  - [ ] Select and start any pre-defined tour
+  - [ ] Route displays correctly (polyline + numbered markers)
+  - [ ] Progress tracks through stops (advance/skip)
+  - [ ] Add stops from active tour dialog
+  - [ ] Progress persists across app restarts (resume prompt)
+  - [ ] Custom tour builder generates valid routes
+  - [ ] Time-budget tour selects appropriate stops
+- [ ] Phase 7 verification:
+  - [ ] Simulate GPS walk — geofence triggers fire at correct distances
+  - [ ] Short narration plays on approach, long on arrival
+  - [ ] Narration controls (pause, resume, skip, speed) work
+  - [ ] Ambient mode triggers for non-tour POIs
+- [ ] Phase 8 verification:
+  - [ ] Walking directions display correctly on map
+  - [ ] "Walk Here" works from tour stop detail
+  - [ ] Turn-by-turn dialog shows correct instructions
+- [ ] Phase 9 verification:
+  - [ ] Events display with correct dates and venues
+  - [ ] Category filter chips work
+  - [ ] Tapping venue navigates to POI on map
+  - [ ] "On this date in 1692" shows for matching dates
 
-### Step 10.3: Performance optimization
-- [ ] Lazy-load narration scripts (don't load all at startup)
-- [ ] Marker clustering for dense POI areas (Essex Street)
-- [ ] Background GPS: use foreground service with notification
-- [ ] Battery optimization: reduce GPS frequency when user is stationary
+### Step 10.2: Firebase Crashlytics & Analytics
+- [ ] Create Firebase project for WickedSalemWitchCityTour
+- [ ] Add `google-services.json` to `app-salem/`
+- [ ] Add Firebase BoM 34.11.0 to `app-salem/build.gradle`:
+  - `com.google.firebase:firebase-crashlytics`
+  - `com.google.firebase:firebase-analytics`
+- [ ] Add Crashlytics Gradle plugin to root `build.gradle`
+- [ ] Initialize in `WickedSalemApp.kt` (auto-init via ContentProvider)
+- [ ] Custom keys for crash context:
+  - `current_tour_id`, `tour_phase`, `user_tier`, `current_poi_id`, `location_accuracy_m`
+- [ ] Non-fatal exception logging on: OSRM failures, content DB errors, API timeouts
+- [ ] Custom log breadcrumbs for narration state, geofence events
+- [ ] Analytics events to track:
+  - `tour_started` (tour_id, tour_name, user_tier)
+  - `tour_completed` (tour_id, duration_minutes, stops_visited)
+  - `tour_abandoned` (tour_id, stop_index, reason)
+  - `poi_viewed` (poi_id, poi_name, tour_id)
+  - `narration_played` / `narration_skipped` (poi_id, duration)
+  - `walking_directions_requested` (from_poi, to_poi, distance)
+  - `events_calendar_opened`
+- [ ] User properties: `user_tier`, `device_language`, `app_version`
+- [ ] GDPR consent flow: disable analytics collection until user consents
+  - Show consent dialog on first launch (not blocking — default to disabled)
+  - `Firebase.analytics.setAnalyticsCollectionEnabled(userConsented)`
+- [ ] Force test crash button in debug menu → verify in Firebase Console
+- [ ] Google Play Data Safety section documentation prepared
 
-### Step 10.4: Accessibility
-- [ ] Content descriptions on all map markers
-- [ ] TalkBack compatibility
-- [ ] High-contrast mode
-- [ ] Wheelchair accessibility flags on POIs
-- [ ] Large text support
+### Step 10.3: Offline map tiles (Salem area)
+- [ ] Use MOBAC (Mobile Atlas Creator) to generate Salem, MA tiles:
+  - Bounding box: lat 42.50-42.54, lng -70.91 to -70.87
+  - Zoom levels 12-15 bundled in APK (~60 MB SQLite archive)
+  - Tile source: OpenStreetMap Mapnik (ODbL license)
+- [ ] Export as `.sqlite` format for osmdroid
+- [ ] Place archive in `app-salem/src/main/assets/osmdroid/tiles/`
+- [ ] Configure `MapTileProviderArray` for offline-first:
+  - Priority 1: Asset-bundled SQLite tiles (zoom 12-15)
+  - Priority 2: Filesystem cache (previously downloaded tiles)
+  - Priority 3: Online downloader (fallback for zoom 16-18)
+- [ ] Add `CacheManager` UI for optional runtime download of zoom 16-18:
+  - "Download High-Detail Maps" button in settings
+  - `CacheManager.downloadAreaAsync()` with progress callback
+  - Estimated additional storage: ~300 MB for zoom 16-18
+- [ ] CartoDB Dark Matter tiles for dark mode: bundle same zoom range
+- [ ] Attribution: "© OpenStreetMap contributors" prominently on map (not hidden)
+- [ ] Online/offline status indicator in status bar
+- [ ] Walking directions: cache recent OSRM routes, fallback to straight-line with haversine distance
 
-### Step 10.5: Google Play Store
-- [ ] Set up Google Play Developer account (if not already)
-- [ ] Configure tiered pricing via Google Play billing (Free + IAP / subscriptions)
-- [ ] Store listing:
-  - Title: "Wicked Salem Witch City Tour"
-  - Short description: "GPS-guided walking tours of Salem, MA with historical narration"
-  - Full description: features, tour themes, historical accuracy claims, content sources
-  - Screenshots (5-8): map view, tour selection, narration, POI detail, walking directions
-  - Feature graphic
-  - Category: Travel & Local
-  - Content rating: Everyone
-- [ ] Privacy policy (required for paid apps)
-- [ ] Generate signed APK/AAB
+### Step 10.4: Photo sourcing & integration (digital phase — no field trip needed)
+- [ ] Download CC0/CC-BY photos from Wikimedia Commons for Tier 1 POIs (14 sites):
+  - Witch Trials Memorial, Salem Witch Museum, Witch House (31 files on Commons), House of Seven Gables (51 files), Salem Maritime NHS, Custom House, Derby Wharf, Derby Wharf Light, Peabody Essex Museum, Roger Conant Statue, Charter Street Cemetery, Rebecca Nurse Homestead, Ropes Mansion, Salem Common
+- [ ] Download public domain photos from NPS Media Library (npgallery.nps.gov):
+  - Custom House (14 HABS photos), Derby Wharf, Narbonne House, NPS Visitor Center
+- [ ] Download HABS photos from Library of Congress (loc.gov):
+  - Custom House & Public Stores (14 photos + 16 measured drawings)
+  - House of the Seven Gables, Hamilton Hall
+- [ ] Convert all to WebP at 1920x1280 (full) + 480x320 (thumbnail)
+- [ ] Name convention: `{poi_id}_hero.webp`, `{poi_id}_hero_thumb.webp`
+- [ ] Place in `app-salem/src/main/assets/photos/`
+- [ ] Add `PoiPhoto` Room entity:
+  - Fields: id, poi_id (FK), asset_path, photo_type (hero/detail/context/approach), caption, attribution_text, license, source_url, photographer, sort_order, width_px, height_px
+- [ ] Add `PoiPhotoDao` with `findByPoi()`, `findHeroByPoi()`
+- [ ] Add Coil 2.7.0 dependency for image loading:
+  - `implementation("io.coil-kt:coil:2.7.0")`
+- [ ] Integrate hero photo into POI detail dialog
+- [ ] Add "Image Credits" section in POI detail (small text below photo)
+- [ ] Add "Photo Credits" screen accessible from About dialog
+- [ ] Update content pipeline to populate `poi_photos` table
+- [ ] Populate `imageAsset` field in `SalemPois.kt` (currently null for all POIs)
+- [ ] **License tracking**: CC-BY-SA images used unmodified only, CC-NC images excluded entirely
+- [ ] Target: 1 hero photo per POI for v1.0 (~7.4 MB total WebP)
 
-### Step 10.6: Verify (full regression)
+### Step 10.5: Performance optimization
+- [ ] Lazy-load narration scripts (don't preload all at startup)
+- [ ] Marker clustering for dense POI areas (Essex Street) using osmdroid-geopackage or custom clustering
+- [ ] Background GPS: foreground service with persistent notification for active tours
+- [ ] Battery optimization: reduce GPS frequency when user is stationary (>30 sec same position)
+- [ ] `minifyEnabled true` + `shrinkResources true` for release builds
+- [ ] ProGuard/R8 rules for Room, Gson, OkHttp, osmdroid, Firebase, Coil
+
+### Step 10.6: Accessibility
+- [ ] Content descriptions on all map markers (POI name + category)
+- [ ] TalkBack compatibility testing for all dialogs
+- [ ] High-contrast mode option in settings
+- [ ] Wheelchair accessibility flags on POIs (field-verified in Phase 13)
+- [ ] Large text support (sp units throughout, no hardcoded dp for text)
+
+### Step 10.7: Network security hardening
+- [ ] Remove `android:usesCleartextTraffic="true"` from AndroidManifest.xml
+- [ ] Add `network_security_config.xml` allowing cleartext only for local dev (10.0.0.x)
+- [ ] Move MBTA API key to `local.properties` → BuildConfig injection
+- [ ] Move Windy API key to environment variable on server
+- [ ] Add `secrets-gradle-plugin` for Android key management
+- [ ] Add `POST_NOTIFICATIONS` permission for Android 13+ proximity alerts
+
+### Step 10.8: Database hardening (from audit recommendations)
+- [ ] Add `@Index` to all Room entities (lat/lng, category, FK columns, data_source)
+- [ ] Add `@ForeignKey` constraints with CASCADE DELETE
+- [ ] Replace `fallbackToDestructiveMigration` with explicit `Migration(2, 3)` classes
+- [ ] Set `exportSchema = true` for migration validation
+- [ ] Add `@Delete`/`@Update` to all DAOs (currently INSERT + SELECT only)
+- [ ] Add `@Transaction` on batch insert operations
+
+### Step 10.9: Verify
+- [ ] `./gradlew :app-salem:assembleDebug` builds clean
+- [ ] `./gradlew :app-salem:assembleRelease` builds clean (with ProGuard)
+- [ ] Offline mode works (airplane mode after initial load): map tiles display, content queries work, tours function
+- [ ] Firebase Crashlytics dashboard shows test crash
+- [ ] Firebase Analytics shows custom events in real-time view
+- [ ] All Phase 6-9 emulator checks pass
+- [ ] Git commit: "Phase 10: Production readiness — Firebase, offline tiles, photos, hardening"
+
+---
+
+## Phase 11 — Branding, ASO & Play Store Launch
+
+**Goal:** Final branding polish, App Store Optimization, and Google Play Store publication. This is the launch gate.
+
+**Target:** Complete by August 2026. App live on Play Store by September 1, 2026.
+
+### Step 11.1: App icon & splash screen
+- [ ] Design app icon (Salem themed: witch silhouette, crescent moon, vintage map element)
+  - Generate adaptive icon set (foreground + background layers)
+  - Replace placeholder gold "W" on purple
+- [ ] Splash screen with Salem imagery (use Android 12+ SplashScreen API)
+- [ ] Consistent typography and color scheme verification throughout all screens
+- [ ] About screen: credits, historical source citations, photo credits link, version, contact
+
+### Step 11.2: App Store Optimization (ASO)
+- [ ] **Title** (30 chars): `Wicked Salem Witch City Tour`
+- [ ] **Short description** (80 chars): `GPS-guided walking tours of Salem's 1692 Witch Trials with audio narration`
+- [ ] **Full description** (4,000 chars): keyword-rich, feature-complete (see Social Media section for full text)
+  - Primary keywords: Salem walking tour, Salem witch trials tour, Salem MA tour guide, GPS walking tour
+  - Secondary: haunted Salem, Salem ghost tour, self-guided tour Salem, Salem history
+  - Long-tail: Salem witch trials walking tour app, things to do in Salem MA
+- [ ] **8 screenshots** (1080x1920 minimum):
+  1. Hero: map with POI markers + "Your GPS Guide to Salem's History"
+  2. Tour selection: all 8 tours with themes/durations
+  3. Narration: POI detail with narration controls + witch trial text
+  4. Walking directions: turn-by-turn route between POIs
+  5. Historical figure: biography card (Bridget Bishop or Giles Corey)
+  6. Primary source: court record excerpt with dramatic typography
+  7. Geofence trigger: "Approaching: Witch Trials Memorial" notification
+  8. Events: Haunted Happenings schedule view
+- [ ] **30-second promo video** (screen recording + Salem footage):
+  - 0-5s: Salem establishing shot + logo
+  - 5-12s: Tour selection, user taps "Witch Trial Trail"
+  - 12-20s: Walking POV with geofence trigger + narration
+  - 20-25s: Historical facts, court records, POI map montage
+  - 25-30s: "Download Free on Google Play" + feature highlights
+- [ ] Seasonal screenshot rotation plan: swap screenshots 1+8 for October content
+- [ ] **Localization** (store listing only for v1.0, app content later):
+  - English (primary), Spanish, French, German
+
+### Step 11.3: Google Play listing & policies
+- [ ] Google Play Developer account ($25 one-time fee)
+- [ ] Configure tiered pricing via Google Play Billing Library:
+  - Free tier (default)
+  - Explorer $4.99 (one-time IAP)
+  - Premium $9.99 (one-time IAP)
+  - Salem Village LLM $49.99/mo (subscription — implement when Phase 19 ready)
+- [ ] `FeatureGate.kt` in `:app-salem` — check tier via Play Billing, gate features accordingly
+- [ ] Category: Travel & Local
+- [ ] Content rating: Everyone
+- [ ] **Privacy policy** (required for paid + analytics apps):
+  - Host on landing page website
+  - Disclose: Firebase Crashlytics, Firebase Analytics, GPS location usage
+  - GDPR compliance section for EU visitors
+  - Link accessible from About screen in-app
+- [ ] **Data Safety section**: complete Google Play questionnaire accurately
+  - Data collected: crash logs, usage analytics, approximate location
+  - Data shared with: Google (Firebase infrastructure)
+  - Security: encryption in transit
+
+### Step 11.4: In-app review prompt
+- [ ] Implement Android in-app review API (`com.google.android.play.core.review`)
+- [ ] Trigger AFTER user completes their first tour (experienced core value)
+- [ ] Never prompt on first launch
+- [ ] Rate limit: once per 30 days
+- [ ] Target: 50+ reviews with 4.5+ average within first 3 months
+
+### Step 11.5: Generate signed AAB & launch
+- [ ] Generate signing key (store securely outside repo)
+- [ ] Build signed AAB: `./gradlew :app-salem:bundleRelease`
+- [ ] Upload to Google Play Console
+- [ ] Set up staged rollout (10% → 50% → 100%)
+- [ ] Monitor Firebase Crashlytics for launch-day crashes
+- [ ] Git commit: "v1.0.0 — WickedSalemWitchCityTour Play Store launch"
+
+### Step 11.6: Full regression verification
 - [ ] Complete tour walkthrough (simulated GPS): Witch Trial Trail start-to-finish
 - [ ] All narration triggers correctly
 - [ ] Walking directions display and update
@@ -881,8 +1084,482 @@ GPS update → TourGeofenceManager.checkPosition()
 - [ ] MBTA transit works (Salem Station trains)
 - [ ] Weather displays for Salem
 - [ ] Offline mode works (airplane mode after initial load)
-- [ ] App installs from signed APK
-- [ ] Git commit: "v1.0.0 — WickedSalemWitchCityTour release candidate"
+- [ ] Photos display for all POIs with digital assets
+- [ ] Firebase analytics events fire correctly
+- [ ] App installs from signed AAB on clean device
+
+---
+
+## Phase 12 — Social Media & Digital Presence
+
+**Goal:** Build audience and brand presence BEFORE app launch. Start organic content marketing, establish social accounts, build email list, create landing page. **This phase requires NO CODE and can start immediately (April 2026).**
+
+**Target:** Start NOW. Landing page live by July. 1,000 email subscribers by September launch.
+
+### Step 12.1: Register social media accounts (THIS WEEK)
+- [ ] Instagram: @WickedSalemApp (or @WickedSalemTour)
+- [ ] TikTok: @WickedSalemApp
+- [ ] Facebook Page: "Wicked Salem Witch City Tour"
+- [ ] Twitter/X: @WickedSalemApp
+- [ ] YouTube: "Wicked Salem Witch City Tour"
+- [ ] Consistent branding across all: Salem-themed profile photo, purple/gold color scheme, consistent bio
+
+### Step 12.2: Domain & landing page
+- [ ] Register domain (priority order): wickedsalemtour.com, wickedsalem.app, wickedsalemguide.com
+- [ ] Also register: wickedsalem.travel (signals category)
+- [ ] Build single-page landing site (can use the existing React web app infrastructure or a simple static page):
+  - Hero: app screenshots + "Your GPS Guide to Salem's History"
+  - Feature highlights: 500 facts, 8 tours, GPS narration, offline mode
+  - "Coming September 2026 to Google Play" → email signup
+  - Tour preview section (all 8 tours with descriptions)
+  - Historical content teaser (drives SEO)
+  - Download links (add when live)
+  - Blog section (for SEO content)
+  - "For Businesses" page (merchant partnership info)
+- [ ] SSL certificate (Let's Encrypt free)
+- [ ] Google Analytics on website
+- [ ] Google Search Console setup
+
+### Step 12.3: Email list building
+- [ ] Email service: Mailchimp free tier (up to 500 contacts) or ConvertKit
+- [ ] Lead magnet: "10 Salem Witch Trial Facts Most People Don't Know" (PDF)
+- [ ] Signup form on landing page (popup + inline)
+- [ ] Welcome email → weekly "Fact of the Week" from 500 facts database
+- [ ] Launch announcement sequence when app goes live
+- [ ] Seasonal content emails (October Haunted Happenings guide)
+
+### Step 12.4: "This Day in 1692" content series (START IMMEDIATELY)
+- [ ] Create 30+ pre-designed quote graphics using the 500 facts + 80 timeline events
+- [ ] Parchment/sepia aesthetic, consistent branded template
+- [ ] Post daily on Instagram + TikTok + Twitter
+- [ ] Schedule with Buffer, Later, or Hootsuite (free tier)
+- [ ] Cross-reference timeline_events by date for accuracy
+
+### Step 12.5: Content calendar execution
+
+**Instagram (target: 5x/week feed, daily Stories, 3-4 Reels/week):**
+- Content pillars (rotate weekly):
+  1. "This Day in 1692" — daily historical fact
+  2. "Then vs. Now" — historical illustration vs modern photo
+  3. "Primary Source Spotlight" — court record excerpts
+  4. "Meet the Accused" — mini-biography cards for 49 figures
+  5. "App in Action" — screenshots, features, development updates
+  6. "Salem Today" — current photos, UGC reposts
+- Hashtag tiers: #SalemMA #SalemWitchTrials #WickedSalem #1692 #WitchCity + branded #WickedSalemApp
+- Stories: polls, quizzes, behind-the-scenes, countdown stickers
+
+**TikTok (target: 5-7 videos/week, daily in October):**
+- "Did You Know?" historical facts (30-60 sec)
+- Dramatic court record readings from 200 primary sources
+- Walking tour POV previews with app on-screen
+- "Salem Myth Busters" quick-hit format
+- "POI Reveal" — stand at location, reveal hidden history
+- October blitz: daily Haunted Happenings coverage
+- Key hashtags: #WitchTok (20.7B views) #SalemWitchTrials #DarkHistory #HistoryTok
+
+**Facebook (target: 3-4x/week):**
+- Longer-form historical stories
+- Event creation for launch day, Haunted Happenings
+- Engage Salem community groups
+- Share blog content from landing page
+
+**YouTube (target: 2 videos/month pre-launch, 4/month at launch):**
+- Full tour preview walkthroughs (10-20 min)
+- Historical deep dives: "The Real Story of Giles Corey" etc.
+- App demo/tutorial (3-5 min)
+- "Planning Your Salem Trip" guides (high SEO value)
+- October vlogs from on-the-ground in Salem
+
+### Step 12.6: Press kit
+- [ ] App description (150-word and 500-word versions)
+- [ ] Fact sheet: 500 facts, 49 figures, 200 sources, 37 POIs, 8 tours
+- [ ] High-res screenshots (all 8 from Play Store listing)
+- [ ] App icon (512x512, 1024x1024)
+- [ ] Feature graphic (1024x500)
+- [ ] 30-second demo video (MP4, downloadable)
+- [ ] Founder story: "Solo developer builds most comprehensive Salem walking tour app"
+- [ ] 5 key differentiators vs. competitors
+- [ ] Contact info + social handles
+- [ ] Brand guidelines: logo usage, color palette (#2D1B4E purple, #C9A84C gold)
+- [ ] Host as downloadable ZIP on website
+
+### Step 12.7: SEO blog content (ongoing)
+- [ ] "10 Salem Witch Trial Facts Most People Get Wrong"
+- [ ] "The Complete Salem Witch Trials Timeline: January to October 1692"
+- [ ] "Who Were the 20 People Executed in the Salem Witch Trials?" (series: 1 post per person)
+- [ ] "Salem Walking Tour: The Witch Trial Trail Step by Step"
+- [ ] "How to Plan a Day Trip to Salem from Boston (2026 Guide)"
+- [ ] "Salem Haunted Happenings 2026: Complete Guide"
+- [ ] "The Real Execution Site: How Proctor's Ledge Was Discovered"
+- [ ] "Best Restaurants in Salem MA (2026)"
+- [ ] "Taking the Ferry from Boston to Salem"
+- [ ] E-E-A-T signals: cite scholarly sources, link to NPS/PEM, real contact info
+
+---
+
+## Phase 13 — Fieldwork & Content Photography
+
+**Goal:** On-the-ground Salem field trip to photograph all POIs, verify GPS coordinates, check business listings, and assess wheelchair accessibility. **This phase requires NO CODE — it's physical fieldwork.**
+
+**Target:** Late September 2026 (ideal timing: good light, foliage starting, all seasonal sites open, before peak October crowds).
+
+### Step 13.1: Pre-trip digital download session (do before field trip)
+- [ ] Download Wikimedia Commons CC0/CC-BY photos (Tier 1 POIs, Step 10.4)
+- [ ] Download NPS + LOC public domain photos
+- [ ] Identify gaps: which POIs still need field photography
+
+### Step 13.2: Salem field trip — Day 1 (Downtown core, ~20 POIs)
+
+**Equipment:**
+- Phone with GPS enabled (Pixel 8a or equivalent), charged + backup battery
+- Compact tripod (for blue hour shots)
+- Clip-on polarizing filter (reduces glare on glass/stone)
+
+**Shot list per POI (5 shots each):**
+1. Hero shot: full exterior, best angle, good light, minimal clutter
+2. Detail shot: plaque, signage, inscription, architectural detail
+3. Context shot: street-level view showing POI in neighborhood
+4. Approach shot: what user sees walking toward it (for geofence trigger moment)
+5. Atmospheric shot: moody/unique angle for variety
+
+**Day 1 itinerary:**
+- [ ] 7:00 AM (golden hour): Derby Wharf, Custom House, Salem Maritime NHS (east-facing, morning light)
+- [ ] 8:30 AM: House of Seven Gables, Hawthorne's Birthplace, Pickering Wharf
+- [ ] 10:00 AM: Narbonne House, Derby Wharf Light Station
+- [ ] 11:00 AM (flat light — good for): Charter Street Cemetery, Witch Trials Memorial, Salem Jail site
+- [ ] 12:30 PM: Court House site, Judge Hathorne's home site, Sheriff Corwin's home site
+- [ ] 2:00 PM: Peabody Essex Museum, NPS Visitor Center, Lappin Park
+- [ ] 3:30 PM (afternoon light): Essex Street witch shops (Crow Haven Corner, Hex, Omen, Artemisia, Coven's Cottage)
+- [ ] 4:30 PM: Witch House (west-facing), Hawthorne Statue, Old Town Hall
+- [ ] 5:30 PM: Roger Conant Statue, Salem Common
+- [ ] Blue hour (6:00 PM): Hawthorne Hotel, Salem Witch Museum (illuminated exteriors)
+
+### Step 13.3: Salem field trip — Day 2 (Outer sites + fill-ins)
+- [ ] 8:00 AM: Winter Island Park, Fort Pickering Light
+- [ ] 9:30 AM: Salem Willows Park
+- [ ] 10:30 AM: Salem MBTA Station, Salem Ferry Terminal
+- [ ] 11:30 AM: Proctor's Ledge Memorial (7 Pope St — confirmed execution site)
+- [ ] 12:30 PM: Pioneer Village (98 West Ave — seasonal, verify open)
+- [ ] 2:00 PM: Chestnut Street, McIntire Historic District walking loop
+- [ ] 3:00 PM: 14 Mall Street, "Castle Dismal" (10.5 Herbert St) — photograph from public way only
+- [ ] 4:00 PM: Witch Dungeon Museum, New England Pirate Museum (exteriors)
+- [ ] 5:00 PM: Return to any POIs that need better light
+- [ ] Optional: Rebecca Nurse Homestead (149 Pine St, Danvers — 30-min drive)
+
+### Step 13.4: Field verification tasks (during photography trip)
+- [ ] Verify GPS coordinates for all 37 POIs (stand at each, record phone GPS, compare to database)
+- [ ] Check wheelchair accessibility at each POI (note: curb cuts, ramps, terrain, door width)
+- [ ] Verify business listings: hours posted, seasonal closures, any businesses permanently closed
+- [ ] Walk the Heritage Trail red line — verify it matches Tour 5 stop order
+- [ ] Note any new POIs not in database (new shops, restaurants, memorials)
+- [ ] Photograph restaurant menus/hours boards for 13 curated dining listings
+- [ ] Test MBTA commuter rail from Boston → Salem (verify station info accuracy)
+
+### Step 13.5: Post-trip photo processing
+- [ ] Extract EXIF GPS coordinates: `exiftool -csv -GPSLatitude -GPSLongitude *.jpg > coords.csv`
+- [ ] Verify EXIF GPS matches POI database coordinates (within geofence radius)
+- [ ] Convert to WebP: `cwebp -metadata exif -q 82 input.jpg -o output.webp`
+- [ ] Generate thumbnails: resize to 480x320 with `cwebp -resize 480 320`
+- [ ] Select best hero + 2-4 detail photos per POI
+- [ ] Name: `{poi_id}_{type}.webp` (hero, detail1, detail2, context, approach)
+- [ ] Update `poi_photos` table in content pipeline
+- [ ] Rebuild `salem_content.db` with photo metadata
+- [ ] Replace/supplement digital-only photos from Step 10.4 with field photos
+
+### Step 13.6: Legal notes
+- Photographing building exteriors from public sidewalks is legal in Massachusetts
+- Private residences (Castle Dismal, 14 Mall St): photograph from public way only, do NOT enter property
+- NPS sites: photography permitted outdoors; ask at visitor center about interior policies
+- Private businesses (witch shops): ask permission for interiors; storefronts from sidewalk are legal
+- Cemeteries: photography permitted, be respectful, no flash on headstones
+
+---
+
+## Phase 14 — Community Engagement & Salem Partnerships
+
+**Goal:** Establish the app as part of Salem's tourism ecosystem through Chamber membership, Destination Salem partnership, NPS collaboration, Salem 400+ involvement, and local media outreach. **This phase requires NO CODE — it's business development and relationship building.**
+
+**Target:** Start immediately (April 2026). Chamber membership by May. Destination Salem contact by June. Salem 400+ involvement ongoing through 2026.
+
+### Step 14.1: Salem Chamber of Commerce membership (FIRST PRIORITY)
+- [ ] Apply: salem-chamber.org/member/newmemberapp or call 978-744-0004
+- [ ] Tier: Regular Member ($360/year) — unlocks:
+  - Business Directory listing (print + online)
+  - Website listing with hyperlink
+  - Weekly e-newsletter exposure (~2,000 readers)
+  - Consumer and B2B referrals (hundreds monthly)
+  - Networking events: Coffee Connections, After Hours
+  - Government representation
+  - **Access to Haunted Happenings Grand Parade sponsorship**
+- [ ] Attend first Coffee Connections networking event
+- [ ] Inquire about Banner Sponsorship for Haunted Happenings 2026
+
+### Step 14.2: Destination Salem outreach
+- [ ] Contact: **Bridie O'Connell**, Advertising & Tourism Manager
+  - Email: boconnell@salem.org | Phone: 978-498-4147
+- [ ] Request media kit and advertising rate card
+- [ ] Explore: salem.org online listing, digital advertising
+- [ ] 2027 Visitor Guide advertising (2026 edition already produced)
+- [ ] Position app as **complementary** to Destination Salem's logistics app (theirs = parking/events, ours = guided tours/history)
+- [ ] Offer co-promotion: link to salem.org from app, they recommend app on website
+
+### Step 14.3: NPS Salem Maritime partnership
+- [ ] Contact: VECE Division (Visitor Experience & Community Engagement), 978-740-1650
+- [ ] Address: 160 Derby Street, Salem, MA 01970
+- [ ] Pitch: app includes NPS-accurate historical content about Salem Maritime; drives visitors to NPS sites
+- [ ] Ask: recommendation at visitor center, featured app rack card
+- [ ] Offer: proper NPS attribution in all maritime content, link to NPS ranger programs
+- [ ] Explore: Eastern National cooperating association (operates NPS bookstores) — feature or sell app
+
+### Step 14.4: Salem 400+ quadricentennial (2026 — BIGGEST OPPORTUNITY)
+- [ ] Contact: salem400@salem.com, salem400.org
+- [ ] Volunteer: salemvolunteers.org
+- [ ] Follow: @400salem on Facebook and Instagram
+- [ ] Submit proposal for **Old Town Hall programming** (city issued call for proposals)
+- [ ] Position app as a Salem 400+ resource
+- [ ] Add Salem 400+ content to app (founding history, Roger Conant, 1626 settlement)
+- [ ] Attend Salem 400+ events: Food at 400+ (June 11-22), Heritage Days Parade, Sister City events
+- [ ] Sponsor or volunteer at a Salem 400+ activity for visibility
+
+### Step 14.5: Hotel concierge programs
+- [ ] **Hawthorne Hotel** (hawthornehotel.com) — Salem's landmark historic hotel
+  - Provide QR code display stand for front desk
+  - Offer "Hotel Partner" program: guests get bonus content or small discount
+- [ ] **Salem Waterfront Hotel** (Pickering Wharf) — tourist convenience location
+- [ ] **Hotel Salem** — boutique downtown hotel
+- [ ] Print QR code cards (100 per hotel) with app download link + partner code
+- [ ] Follow up monthly to refresh cards and build relationship
+
+### Step 14.6: Salem Cultural Council grant
+- [ ] Contact: SalemCulturalCouncil@salem.com, Julie Barry (Senior Planner — Arts & Culture)
+- [ ] Address: 98 Washington Street, City Hall Annex, 2nd Floor
+- [ ] Grant cycle: opens September 2026, deadline October 2026, awards January 2027
+- [ ] Frame app as cultural/historical education project: "GPS-guided access to Salem's 1692 history"
+- [ ] Meets 1st Monday of each month, 7:30 PM — attend to introduce project
+- [ ] Grant funds could offset content development, narration recording, or marketing costs
+
+### Step 14.7: Local government engagement
+- [ ] **Mayor Dominick Pangallo** — office at City Hall, 978-745-9595, 93 Washington St
+- [ ] Attend City Council meetings regularly (posted at salemma.gov/AgendaCenter)
+  - Introduce project during public comment period
+  - Express support for tourism initiatives
+- [ ] Explore appointment to a city board (Salem has ~40 boards, 200+ volunteers):
+  - Salem Cultural Council, Historical Commission, or tourism-adjacent board
+  - Mayor's Office publishes weekly vacancy listings
+- [ ] Support Salem Main Streets initiatives (260+ downtown businesses)
+
+### Step 14.8: Media & PR outreach
+- [ ] **The Salem News** (salemnews.com) — pitch: "Local tech innovation in Salem tourism for Salem 400+"
+- [ ] **Northshore Magazine** (nshoremag.com) — pitch: lifestyle angle, "new way to experience Salem"
+- [ ] **Salem The Podcast** — hosts Jeffrey Lilley (Salem Uncovered Tours) + Sarah Black (Bewitched Historical Tours)
+  - Pitch guest appearance to discuss app + Salem history
+  - These are tour guides themselves — ideal audience
+- [ ] **Streets of Salem Blog** (streetsofsalem.com) — Donna A. Seger, history professor
+  - Potential content consultant / historical accuracy advisor
+  - Her book "Salem's Centuries" coming 2026 from Temple University Press
+- [ ] **The Thing About Salem** podcast — hosts Josh Hutchinson + Sarah Jack (witch trial descendants)
+- [ ] Send press kit to all media contacts when app launches
+
+### Step 14.9: Influencer partnerships
+- [ ] Target 10-15 micro-influencers (1K-50K followers) across: travel, history, spooky/paranormal, local Salem
+- [ ] Offer: free lifetime Premium access ($9.99 value) + unique referral code
+- [ ] Ask: 1 Instagram Reel or TikTok video using app on location in Salem + 1 Story set
+- [ ] Track referral code downloads to measure ROI
+- [ ] Priority targets: @destsalem (64K), local Salem lifestyle accounts, NE travel bloggers
+- [ ] 25-30 partnerships active by October peak season
+
+### Step 14.10: Cross-promotion partnerships
+- [ ] **Salem Ferry** (Boston Harbor City Cruises): QR codes on vessel/terminal, co-marketing
+  - Season: mid-May through Halloween
+  - Every passenger is a tourist arriving in Salem
+- [ ] **Salem Trolley**: complement — trolley gives overview, app gives deep dive
+  - Operates June-September, 7 days/week, $18 (free for Salem residents)
+- [ ] **Salem Food Tours** (salemfoodtours.com): cross-promotion for dining content
+- [ ] **Ghost tour operators**: include their schedules/booking links in app (referral revenue)
+  - Salem Historical Tours, Witch City Walking Tours, Spellbound Tours
+  - They are competitors AND partners — app is self-paced 24/7, they are scheduled group tours
+- [ ] **TripAdvisor / Viator**: list app as a tour experience (105 Salem tours already listed)
+- [ ] **MBTA**: station advertising at Salem station
+- [ ] **SBDC at Salem State University**: free business assistance (marketing, financial planning)
+  - Contact: 121 Loring Avenue, Suite 310, Salem, MA 01970, 978-542-6343
+
+### Step 14.11: Offer app free to Salem residents
+- [ ] "Salem Resident" promo code — free Premium tier for locals
+- [ ] Builds goodwill and word-of-mouth (Salem Trolley already does free-for-residents)
+- [ ] Locals become ambassadors who recommend app to visiting friends/family
+
+---
+
+## Phase 15 — In-App Virality & Gamification
+
+**Goal:** Build sharing mechanics and gamification that turn every user into a marketing channel. Each completed tour, visited POI, and shared fact is organic advertising.
+
+**Target:** v1.1 update, October 2026 (in time for peak season).
+
+### Step 15.1: Tour completion shareable cards
+- [ ] On tour completion, generate branded graphic card:
+  - "I walked the Witch Trial Trail — 12 stops, 2.5 km, 90 minutes of Salem history"
+  - Tour route map thumbnail, date, app branding, user display name
+  - Purple/gold Salem aesthetic
+- [ ] One-tap share to Instagram Stories, TikTok, Facebook, Twitter
+- [ ] Pre-populate hashtags: #WickedSalemApp #WitchTrialTrail #SalemMA
+- [ ] `Bitmap` generation in `SalemMainActivityTour.kt` using Canvas
+- [ ] Share via Android `Intent.ACTION_SEND` with `FileProvider` URI
+
+### Step 15.2: POI progress tracker & badges
+- [ ] "I've visited X of 37 Salem POIs" with visual progress bar on home screen
+- [ ] Badge system (stored in SharedPreferences, synced to analytics):
+
+| Badge | Requirement | Rarity |
+|-------|-------------|--------|
+| First Steps | Complete any tour | Common |
+| Witch Trial Witness | Complete Witch Trial Trail | Common |
+| Maritime Explorer | Complete Maritime Heritage | Common |
+| Literary Pilgrim | Complete Hawthorne's Salem | Common |
+| Architecture Buff | Complete Architecture Walk | Common |
+| Heritage Walker | Complete Heritage Trail | Common |
+| Foodie | Complete Food & Drink Trail | Uncommon |
+| Salem Master | Complete ALL tours | Rare |
+| History Scholar | Read 100 historical facts | Uncommon |
+| Primary Source Researcher | Read 50 court records | Uncommon |
+| Salem Explorer Bronze | Visit 10 POIs | Common |
+| Salem Explorer Silver | Visit 20 POIs | Uncommon |
+| Salem Explorer Gold | Visit all 37 POIs | Rare |
+| October Veteran | Use app during Haunted Happenings | Seasonal |
+| Early Adopter | Download in first month | Limited |
+| Social Butterfly | Share 5 facts to social media | Uncommon |
+
+- [ ] Milestone shareable cards at 10, 20, 30, 37 POIs
+- [ ] Badge display in user profile screen
+
+### Step 15.3: "Share This Fact" button
+- [ ] Every historical fact (500), figure bio (49), and primary source (200) gets a share button
+- [ ] Generates branded graphic card with the content + app attribution
+- [ ] "Shared from Wicked Salem Witch City Tour — Download the app"
+- [ ] Share via Android share intent
+- [ ] Track share count per item in analytics
+
+### Step 15.4: QR code referral system
+- [ ] Each user gets unique referral code (generated at registration or first launch)
+- [ ] QR code display in app with "Share with a friend" prompt
+- [ ] Referrer gets: unlock one premium tour free
+- [ ] Referee gets: same benefit
+- [ ] Track referral conversions in Firebase Analytics
+- [ ] Cap: 10 referrals per user
+- [ ] Print physical QR code stickers to leave at partner businesses
+
+### Step 15.5: Push notification system
+- [ ] Request permission AFTER user completes first tour (not first launch)
+- [ ] Notification types:
+  - Daily Historical Fact (9:00 AM, opt-in): pull from 500 facts by date
+  - Tour Reminder (24hrs after last session): "Ready to explore?"
+  - Geofence Welcome (entering Salem city limits): "Welcome to Salem!"
+  - Event Alert (1 day before Haunted Happenings event)
+  - Achievement (on badge unlock)
+  - Seasonal (new content available)
+- [ ] Use Firebase Cloud Messaging (FCM) for delivery
+- [ ] Respect user notification preferences (settings screen with toggles per type)
+
+### Step 15.6: Photo spot prompts
+- [ ] At designated POIs, show prompt: "Take a photo at the Witch Trials Memorial"
+- [ ] Provide optimal photo angle/framing suggestion
+- [ ] Optional overlay: "Wicked Salem" watermark/frame
+- [ ] One-tap share with location tag
+- [ ] Priority POIs: Witch Trials Memorial, Roger Conant Statue, Derby Wharf, Seven Gables, Charter Street Cemetery, Proctor's Ledge
+
+---
+
+## Phase 16 — iOS & Web Expansion (PWA)
+
+**Goal:** Capture iOS users (55-60% of US tourists) by enhancing the existing React web app with Salem tour functionality and deploying as a PWA. Fastest path to iOS with zero App Store friction. Validates demand before investing in native iOS.
+
+**Target:** v1.0 PWA by November 2026 (post-Android launch, captures late-season and planning-for-next-year traffic).
+
+### Step 16.1: Add Salem tour route to React web app
+- [ ] Create `/salem` route in existing web app (`web/src/`)
+- [ ] Tour selection page: list all 8 tours with descriptions, stop counts, durations
+- [ ] Tour detail page: map with route polyline + numbered stop markers (Leaflet)
+- [ ] Tour progress state: active tour, current stop, completed/skipped stops
+- [ ] POI detail cards with photos, narration text, historical content
+
+### Step 16.2: Port TourEngine to TypeScript
+- [ ] Translate `TourEngine.kt` logic to TypeScript:
+  - Tour lifecycle: start, advance, skip, pause, resume, end
+  - Progress tracking: completed stops, elapsed time, distance walked
+  - Route optimization: nearest-neighbor TSP (haversine math)
+  - Time-budget tour builder
+- [ ] Port `TourGeofenceManager` to TypeScript:
+  - Haversine-based proximity checks
+  - APPROACH/ENTRY/EXIT event detection
+  - Cooldown tracking
+- [ ] Store tour state in localStorage or IndexedDB
+
+### Step 16.3: Web Speech API narration
+- [ ] Implement narration using `window.speechSynthesis` (SpeechSynthesis API)
+- [ ] Queue management: replicate NarrationManager segment queue
+- [ ] Speed control: `SpeechSynthesisUtterance.rate` (0.75-1.25x)
+- [ ] Event listeners: `onstart`, `onend`, `onerror`, `onpause`, `onresume`
+- [ ] Note: iOS Safari requires user gesture for first speech; subsequent calls work without gesture
+- [ ] Wake Lock API (`navigator.wakeLock`) to prevent screen dimming during tours
+
+### Step 16.4: Offline support via Service Worker
+- [ ] Precache Salem map tiles (Leaflet): zoom 14-19 for 1 sq mile core (~2-5 MB)
+- [ ] Cache tour/POI data in IndexedDB (841 records, tiny)
+- [ ] Service worker with cache-first strategy for tile URLs
+- [ ] "Download Salem Map" button for manual precache trigger
+- [ ] Cache API for static assets (JS, CSS, images)
+
+### Step 16.5: PWA manifest & installation
+- [ ] Create `manifest.json`: name, icons, theme color (#2D1B4E), background color
+- [ ] "Add to Home Screen" prompt for iOS Safari (iOS 16.4+ supports PWA install)
+- [ ] Splash screen configuration
+- [ ] Standalone display mode
+
+### Step 16.6: Payment integration (bypass Apple 30% cut)
+- [ ] Stripe Checkout for tier upgrades ($4.99/$9.99)
+  - Stripe fee: 2.9% + $0.30 per transaction (vs Apple's 30%)
+  - On $9.99 sale: Stripe takes $0.59, Apple would take $3.00
+- [ ] Payment link or embedded Stripe checkout
+- [ ] Store purchase status in user account (synced to backend)
+
+### Step 16.7: PWA limitations to document for users
+- **Background GPS**: NOT supported on iOS Safari — user must keep screen on during tour
+- **Push notifications**: Only for home-screen-installed PWAs on iOS 16.4+
+- **Audio**: Web Speech API works but less reliable than native TTS
+- **GPS accuracy**: Comparable to native when browser tab is active
+
+### Step 16.8: Future native iOS consideration
+- If PWA validates iOS demand, evaluate KMP (Kotlin Multiplatform) for native iOS:
+  - Shareable: TourEngine, TourGeofenceManager, TourModels, content models (pure Kotlin)
+  - Platform-specific: UI (SwiftUI), maps (MapKit), TTS (AVSpeechSynthesizer), GPS (CLLocationManager)
+  - Database: SQLDelight replaces Room (cross-platform SQLite)
+  - Estimated effort: 6-10 weeks for native iOS app
+  - Unlocks: background GPS, App Store presence, premium native feel
+
+---
+
+## Competitive Landscape
+
+### Direct Competitors
+
+| Competitor | Platform | Price | Strengths | Weakness vs. Wicked Salem |
+|-----------|----------|-------|-----------|--------------------------|
+| **Action Tour Guide (Salem GPS Tour)** | iOS + Android | ~$9.99 | Established, offline audio, multi-language (EN/FR/DE/ES) | Audio-only, no live transit, no events, limited historical depth |
+| **Salem On Your Own** | Web/app | Varies | 25+ years of Salem storytelling, family-run | Less historical depth, no primary sources, no geofencing |
+| **VoiceMap** | iOS + Android | Per-tour | Professional narration, global platform | Generic platform, not Salem-specialized, no custom tours |
+| **GPSmyCity** | iOS + Android | $3.99-7.99/tour | Huge library, offline | Shallow content, no geofence triggers |
+| **Viator Self-Guided Tours** | Viator platform | $5-15/tour | Major booking platform | Platform fee, no native features |
+| **Destination Salem App** | iOS + Android | Free | Official tourism org, parking/events | NOT a guided tour — complementary, not competitive |
+
+### Our Competitive Advantages
+1. **Unmatched content depth:** 500 facts, 49 figures, 200 primary sources (court records, petitions, letters)
+2. **8 themed tours** + custom tour builder + time-budget tours (competitors offer 1-2 fixed tours)
+3. **GPS geofence narration** that triggers automatically (not "press play at stop 3")
+4. **Live MBTA transit** (trains from Boston, local buses) — no competitor offers this
+5. **Events calendar** with Haunted Happenings integration
+6. **Offline-first architecture** — works without internet after initial download
+7. **Scholarly sources** — UVA Salem Witchcraft Papers, actual court records, not Wikipedia summaries
+8. **Data provenance** — every fact tracked to source with confidence scores
 
 ---
 
@@ -1146,6 +1823,20 @@ Spooky history + Halloween events + haunted tour starting points + October-only 
 - "Walk Here" from any POI card
 - Estimated times reasonable for walking speed
 
+### After Phase 10 (Production Readiness):
+- Firebase Crashlytics shows test crash in dashboard
+- Firebase Analytics shows custom events in real-time
+- Offline map tiles display (airplane mode): zoom 12-15 for Salem area
+- Photos display for all POIs with digital assets (Wikimedia/NPS/LOC)
+- GDPR consent dialog appears on first launch
+- ProGuard/R8 release build succeeds
+
+### After Phase 11 (Play Store Launch):
+- App installs from signed AAB on clean device
+- Google Play listing looks polished (screenshots, description, video)
+- In-app review prompt appears after first tour completion
+- Privacy policy accessible from About screen
+
 ### End-to-End Acceptance Test:
 - Simulate walking Witch Trial Trail: Salem Station → 12 stops → finish
 - Narration triggers at every stop
@@ -1153,8 +1844,11 @@ Spooky history + Halloween events + haunted tour starting points + October-only 
 - Can browse restaurants mid-tour
 - MBTA transit shows Salem trains
 - Weather works for Salem
-- Offline mode functional (airplane mode after load)
+- Offline mode functional (airplane mode after load): map + content + tours all work
 - Events calendar shows current events
+- Photos display for every POI
+- Firebase analytics events fire for: tour_started, poi_viewed, narration_played, tour_completed
+- App size under 80 MB (including offline tiles + photos)
 
 ---
 
@@ -1318,36 +2012,168 @@ Current: Socket.IO v2.1.0 (2021, outdated, security concerns)
 
 ## Future Phases (Post-Launch)
 
-### Phase 11 — Merchant Network & Advertising Platform
+### Phase 17 — Merchant Network & Advertising Platform
 - [ ] Build merchant admin portal (web-based)
 - [ ] Merchant self-service POI creation/editing
-- [ ] Geofenced ad delivery system (proximity-triggered cards)
-- [ ] Loyalty program engine (check-ins, discount code generation)
+- [ ] Geofenced ad delivery system (proximity-triggered cards, not intrusive popups)
+- [ ] Loyalty program engine (check-ins, discount code generation, tied to merchant ID + user ID)
 - [ ] Analytics dashboard (impressions, foot traffic, redemptions)
-- [ ] North Shore merchant data expansion (500+ businesses)
-- [ ] Sponsored tour stop system
+- [ ] North Shore merchant data expansion (500+ businesses: Marblehead, Beverly, Danvers, Peabody, Swampscott)
+- [ ] Sponsored tour stop system ("This stop brought to you by [Business]")
 - [ ] Business-to-app payment integration (Stripe)
+- [ ] **Pre-launch merchant pilot (can start at Phase 14):** approach 10-15 Salem businesses, offer "Featured Partner" listing for $99/year — gold badge, mention in tour narrations. No portal needed — just a spreadsheet and manual content updates. Revenue: $1,000-1,500/year from day one.
 
-### Phase 12 — Salem Village LLM Integration
+### Phase 18 — Custom Narration & Audio Upgrade
+- [ ] Transition from Android TTS to pre-recorded human narration
+- [ ] Options evaluation:
+  - Professional voice actors (highest quality, highest cost, ~$200-500/hour)
+  - Google Cloud TTS Neural2 voices (high quality, ~$10-50 for all narration scripts)
+  - ElevenLabs AI voice synthesis (natural-sounding, $5-22/month for needed volume)
+  - Local Salem actors/historians (authentic, supports community, moderate cost)
+- [ ] Pre-generate all narration as MP3 files:
+  - Short narrations (37 POIs × 15-30 sec) = ~20 minutes total
+  - Long narrations (37 POIs × 60-120 sec) = ~60 minutes total
+  - Transition narrations (~60 segments × 10-15 sec) = ~12 minutes total
+  - Historical figure bios (49 × 30-60 sec) = ~30 minutes total
+  - Primary source readings (selected 50 × 30-60 sec) = ~35 minutes total
+  - **Total: ~2.5 hours of audio content**
+- [ ] Bundle MP3s in app assets or stream on demand
+- [ ] Replace `NarrationManager.kt` TTS calls with `MediaPlayer` audio playback
+- [ ] Add `MediaStyle` notification controls for narration (deferred from Phase 7)
+- [ ] Consider multi-language narration: English (primary), Spanish, French
+- [ ] Estimated cost range: $50-500 depending on approach
+
+### Phase 19 — Salem Village LLM Integration
 - [ ] `/salem/chat` API endpoint — conversational interface to Salem LLM
 - [ ] Character selection (50 historical figures available)
 - [ ] Context-aware conversations (figure knows their history, location, relationships)
 - [ ] Token metering for $49.99/mo subscription
 - [ ] Conversation persistence (chat history)
-- [ ] Voice input/output integration with TTS system
+- [ ] Voice input/output integration with narration system
 - [ ] Safety guardrails (historical accuracy, no harmful content)
 - [ ] Rate limiting and abuse prevention
 
-### Phase 13 — Additional Revenue Features
+### Phase 20 — Additional Revenue Features
 - [ ] In-app merchandise (Salem-branded items, print-on-demand)
-- [ ] Tour booking integration (partner ghost tours, museum tickets)
-- [ ] Photo/selfie spots with AR historical overlays
-- [ ] Social sharing ("I completed the Witch Trial Trail!")
+- [ ] Tour booking integration (partner ghost tours, museum tickets — referral revenue from Phase 14 partnerships)
+- [ ] AR historical overlays at photo spots (Phase 15.6 foundation)
 - [ ] Seasonal content packs (October Haunted Happenings premium content)
+- [ ] Multi-language app content (Spanish, French, German, Japanese, Chinese)
+  - Action Tour Guide already offers EN/FR/DE/ES — must match or exceed
+- [ ] "What's Near Me" passive browse screen: scrollable list of POIs sorted by distance, with photos and one-line descriptions
+- [ ] Emergency/practical info: Salem Police non-emergency, Salem Hospital, pharmacies, public restrooms, water fountains, free wifi spots
+- [ ] Drag-and-drop stop reordering in custom tour builder (deferred from Phase 6)
+- [ ] Halloween-themed map overlays (deferred from Phase 9)
+- [ ] Daily historical notification (deferred from Phase 9)
+
+---
+
+## Social Media Content Calendar
+
+### Seasonal Framework
+
+| Period | Focus | Posting Cadence |
+|--------|-------|-----------------|
+| **Apr-Jun (pre-launch)** | Build audience, tease app | IG 3x/week, TikTok 3x/week, FB 2x/week |
+| **Jul-Aug (hype)** | App previews, beta recruitment, countdown | IG 5x/week, TikTok 5x/week, FB 3x/week |
+| **Sep (launch)** | App live, feature spotlights, download push | IG daily, TikTok daily, FB 4x/week, YT 4 videos |
+| **Oct (peak)** | Haunted Happenings blitz, user content, max ads | ALL platforms daily, multiple posts/day |
+| **Nov-Mar (off-season)** | Historical deep dives, trip planning content | IG 3x/week, TikTok 3x/week, FB 2x/week |
+
+### Content Pillar Rotation (Instagram)
+
+| Day | Pillar | Content |
+|-----|--------|---------|
+| Monday | "This Day in 1692" | Historical fact tied to calendar from 500 facts + 80 timeline events |
+| Tuesday | "Meet the Accused" | Mini-biography card for one of 49 historical figures |
+| Wednesday | "Primary Source Spotlight" | Court record excerpt — handwritten-style on dark background |
+| Thursday | "App in Action" | Screenshots, features, development updates |
+| Friday | "Salem Today" | Current photos, restaurant spotlights, seasonal content |
+| Saturday | Reel | "Did You Know?" video, walking tour preview, myth buster |
+| Sunday | Stories | Polls, quizzes, behind-the-scenes, user Q&A |
+
+### Paid Advertising Budget
+
+| Period | Monthly Budget | Allocation |
+|--------|---------------|------------|
+| Apr-Aug (pre-launch) | $0-100 | Social post boosting only |
+| September (launch) | $300-500 | 50% Google Ads, 30% IG/FB, 20% TikTok |
+| October (peak) | $500 | 40% Google Ads, 30% IG/FB, 30% TikTok |
+| Nov-Mar (off-season) | $100-150 | Retargeting only |
+
+**Expected ROI at $500/month peak:** ~225 installs. At 30% paid conversion ($9.99), revenue = ~$670/month. Profitable from month one.
+
+---
+
+## Community Engagement Contacts
+
+| Organization | Contact | Phone/Email | Action |
+|-------------|---------|-------------|--------|
+| **Destination Salem** | Bridie O'Connell | boconnell@salem.org, 978-498-4147 | Advertising, listing, partnership |
+| **Salem Chamber of Commerce** | General | info@salem-chamber.org, 978-744-0004 | Membership ($360/yr), Haunted Happenings |
+| **Salem City Hall** | City Recorder | 978-745-9595, 93 Washington St | Council meetings, board appointments |
+| **Salem Cultural Council** | Julie Barry | SalemCulturalCouncil@salem.com | Grant application (Sep 2026 cycle) |
+| **Salem 400+** | General | salem400@salem.com | Volunteering, programming proposals |
+| **NPS Salem Maritime** | VECE Division | 978-740-1650, 160 Derby St | Visitor center recommendation |
+| **Salem Witch Museum** | Education Dept | education@salemwitchmuseum.com | Content accuracy, cross-promotion |
+| **SBDC at Salem State** | General | 978-542-6343, 121 Loring Ave | Free business assistance |
+| **Enterprise Center** | Laura DeToma Swanson | 978-542-7039 | Business development |
+| **Salem Food Tours** | General | salemfoodtours.com | Cross-promotion, Food at 400+ |
+| **Salem Main Streets** | General | salemmainstreets.org | Downtown business network |
+| **The Salem News** | Editorial | salemnews.com/contact_us | Press coverage |
+| **Northshore Magazine** | Editorial | nshoremag.com | Feature article |
+| **Salem The Podcast** | Jeffrey Lilley + Sarah Black | Apple Podcasts, Spotify | Guest appearance |
+| **Streets of Salem Blog** | Donna A. Seger | streetsofsalem.com | Content consulting |
+| **North of Boston CVB** | General | northofboston.org | I-95 visitor center feature |
+| **MOTT** | Grants | mass.gov/orgs/office-of-travel-and-tourism | DDC Grant (FY27 cycle, May 2027) |
+
+---
+
+## Fieldwork Planning Guide
+
+### Equipment Checklist
+- [ ] Phone with GPS enabled (Pixel 8a or equivalent) + backup battery
+- [ ] Compact phone tripod (for blue hour/evening shots)
+- [ ] Clip-on polarizing filter (reduces glare on glass, water, stone)
+- [ ] Notepad for field verification notes (hours, accessibility, closures)
+- [ ] Printed POI checklist with GPS coordinates for verification
+- [ ] Comfortable walking shoes (2 full days, ~10 miles total)
+
+### Photo Processing Pipeline
+1. Transfer photos to development machine
+2. Extract EXIF GPS: `exiftool -csv -GPSLatitude -GPSLongitude *.jpg > coords.csv`
+3. Verify GPS matches POI database (within geofence radius)
+4. Select best shots per POI (1 hero + 2-4 detail)
+5. Convert to WebP: `cwebp -metadata exif -q 82 input.jpg -o {poi_id}_{type}.webp`
+6. Generate thumbnails: `cwebp -resize 480 320 -q 75 input.jpg -o {poi_id}_{type}_thumb.webp`
+7. Copy to `app-salem/src/main/assets/photos/`
+8. Update content pipeline `poi_photos` table
+9. Rebuild `salem_content.db`
+
+### Image Specifications
+
+| Spec | Full-Size | Thumbnail |
+|------|-----------|-----------|
+| Format | WebP (lossy) | WebP (lossy) |
+| Dimensions | 1920 x 1280 (3:2) | 480 x 320 |
+| Quality | 82 | 75 |
+| Avg file size | 150-250 KB | 15-30 KB |
+| Color space | sRGB | sRGB |
+
+### Storage Budget
+
+| Scenario | Photos | Total Size |
+|----------|--------|------------|
+| 1 hero/POI (MVP) | 37 + 37 thumbs | ~7.4 MB |
+| 3 photos/POI + thumbs | 111 + 37 thumbs | ~23 MB |
+| 5 photos/POI + thumbs | 185 + 37 thumbs | ~38 MB |
+| Offline map tiles (zoom 12-15) | N/A | ~60 MB |
+| **Total app assets (MVP)** | | **~70 MB** |
 
 ---
 
 *Document created: 2026-04-03*
-*Last updated: 2026-04-03 (Session 73: Business model, technical foundation, audit recommendations)*
+*Last updated: 2026-04-04 (Session 76: Full re-evaluation — added Phases 10-16 expanded, social media, community engagement, fieldwork, competitive landscape, iOS/PWA strategy)*
 *Project: LocationMapApp v1.5 → WickedSalemWitchCityTour*
 *Author: Dean Maurice Ellis*
+*Archived: Pre-Session 76 Phase 10 & Future Phases → MASTER_PLAN_ARCHIVE_Phase10_FuturePhases.md*

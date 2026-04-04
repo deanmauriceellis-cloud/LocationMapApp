@@ -2,6 +2,56 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-04 — Session 76: Full Re-Evaluation & Master Plan Overhaul
+
+### Context
+Post Phases 6-9 completion. User requested a total honest re-evaluation of the app from business, marketing, competitive, and feature perspectives. Goal: make the app profitable.
+
+### Work Performed
+- **Comprehensive app evaluation**: identified critical gaps (no photos, no tests, no crash reporting, no iOS, TTS quality, pricing complexity, no web presence, no social media)
+- **6 parallel research agents** deployed covering:
+  1. Offline map tile caching (osmdroid CacheManager, MOBAC, SQLite archives)
+  2. Firebase Crashlytics + Analytics (setup, events, GDPR, alternatives)
+  3. Salem tourism partnerships (Destination Salem, NPS, Chamber, Salem 400+, local government)
+  4. Social media & marketing strategy (Instagram, TikTok, ASO, paid ads, influencer strategy)
+  5. Photo sourcing (Wikimedia Commons per-POI audit, NPS/LOC public domain, field photography guide)
+  6. iOS/cross-platform (PWA recommended first, then KMP for native iOS)
+- **Master plan restructured** from 10+3 phases to 16+4 phases:
+  - Phases 10-11: Production readiness + Play Store launch (CODE)
+  - Phases 12-14: Social media + fieldwork + community engagement (NO CODE)
+  - Phases 15-16: Virality/gamification + iOS/PWA (CODE)
+  - Phases 17-20: Merchant network, custom narration, LLM, revenue features (POST-LAUNCH)
+- **New sections added**: Competitive Landscape, Social Media Content Calendar, Community Engagement Contacts, Fieldwork Planning Guide
+- **Critical discovery**: 2026 is Salem's quadricentennial (Salem 400+) — once-in-a-generation marketing opportunity
+- **Key competitors identified**: Action Tour Guide (direct), Salem On Your Own (direct), VoiceMap, GPSmyCity
+- **Old Phase 10 + Future Phases archived** to MASTER_PLAN_ARCHIVE_Phase10_FuturePhases.md
+
+### Files Modified
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Major restructure: new ToC, expanded Phase 10, new Phases 11-16, Competitive Landscape, Social Media Calendar, Community Contacts, Fieldwork Guide, renumbered Future Phases 17-20
+- `SESSION-LOG.md` — This entry
+
+### Files Created
+- `MASTER_PLAN_ARCHIVE_Phase10_FuturePhases.md` — Archive of pre-Session 76 Phase 10 and Future Phases content
+
+### Decisions Made
+- Keep Android TTS for v1.0; plan transition to pre-recorded audio in Phase 18
+- Keep price tiers as-is ($0/$4.99/$9.99/$49.99-mo); adjust based on market data later
+- Social media starts IMMEDIATELY (no code dependency)
+- PWA is the fastest path to iOS users (2-3 weeks, leverage existing React web app)
+- Firebase Crashlytics + Analytics for production monitoring (free, lowest friction)
+- MOBAC for offline tile generation, bundle zoom 12-15 in APK (~60MB)
+- Coil 2.7.0 for image loading; WebP format for photos
+- Salem Chamber of Commerce membership ($360/yr) is the #1 business development priority
+- App must be on Play Store by September 1, 2026 (before October peak)
+
+### Open Items
+- Phase 10 work begins next session (emulator verification → Firebase → offline tiles → photos)
+- Social media account registration can happen today (no code needed)
+- Salem Chamber membership application can happen today
+- Field trip to Salem planned for late September 2026
+
+---
+
 ## Session: 2026-04-04 — Session 75: Phases 6-9 Complete (Tour Engine, Geofence, Narration, Directions, Events)
 
 ### Context
