@@ -2,6 +2,25 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-03d — POI Data Provenance Strategy Note
+
+### Context
+Session 72. Brief session — user raised strategic concern about POI data quality before Phase 5 begins.
+
+### Key Decision
+POIs need data provenance tracking for a paid app. Every POI must know its source (manual_curated, overpass_import, google_places, user_report, salem_project), have a verified_date, and a confidence score. This affects Phase 5 entity schema design — must add source/confidence/verified fields to TourPoi and SalemBusiness entities before populating them.
+
+### Changes Made
+- Saved project memory: `project_poi_provenance.md`
+- No code changes
+
+### Open Items
+- Phase 5 must incorporate provenance fields into Room entities before curating POI data
+- Need strategy for staleness detection (businesses closing, hours changing)
+- Consider correction/verification workflow
+
+---
+
 ## Session: 2026-04-03c — Phases 2-4: Salem App Shell, Content Database, Content Pipeline
 
 ### Context
