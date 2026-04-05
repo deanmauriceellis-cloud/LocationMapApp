@@ -2,6 +2,56 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-05 — Session 79: Recovery & Live Conversation Log (OMEN-006)
+
+### Context
+Previous session 79 was killed by context overflow during Phase 9A implementation. All in-flight context lost. This session recovered state from git diffs and implemented a crash-recovery mechanism.
+
+### Work Performed
+
+**Recovery**
+- Reconstructed Phase 9A state from uncommitted changes on disk
+- Confirmed all code survived: SplashActivity, TileSourceManager, cinematic zoom, tile source picker, layouts, themes, Lottie dep
+- Build verified: `assembleDebug` passes cleanly
+
+**OMEN-006 — Live Conversation Log (NEW GLOBAL DIRECTIVE)**
+- Implemented live append-only conversation log system at `docs/session-logs/`
+- Updated CLAUDE.md: Session Start step 4 (create log), Session End step 4 (finalize log), new "Live Conversation Log" section
+- Issued OMEN-006 global directive to `~/Development/OMEN/directives/ACTIVE.md` — applies to ALL projects, never expires
+- Pushed action items to all 7 project OMEN notes files (Salem, Vampires, Qabalah, TheWitchesOfSalem, KeyPadZoom, GeoInbox, LocationMapApp)
+- LocationMapApp marked as reference implementation (COMPLETE)
+- Created memory entry: `feedback_conversation_log.md`
+
+### Decisions Made
+1. Live conversation logs are mandatory for all projects (OMEN-006)
+2. Logs are append-only, timestamped, written to disk incrementally
+3. Phase 9A confirmed code-complete — needs emulator test and commit
+
+### Files Created
+- `docs/session-logs/session-079-2026-04-05.md` — First live conversation log
+- `~/Development/OMEN/directives/ACTIVE.md` — OMEN-006 added
+
+### Files Modified
+- `CLAUDE.md` — Live log protocol added to session start/end, architecture, reference table
+- `SESSION-LOG.md` — This entry
+- `~/Development/OMEN/notes/*.md` — Action items for OMEN-006 added to all 7 projects
+
+### Open Items
+- Phase 9A: Emulator test + commit (code complete, build verified)
+- COPPA deadline: 17 days remaining (April 22)
+- Credential audit (OMEN-002): Outstanding
+- Testing (OMEN-004): Outstanding
+
+### OMEN Compliance
+- OMEN-006 (Live Conversation Log): **COMPLETE** — reference implementation
+- NOTE-L012: Marked complete
+- All other notes: Unchanged from Session 78
+
+### Live Log
+Full conversation log: `docs/session-logs/session-079-2026-04-05.md`
+
+---
+
 ## Session: 2026-04-04 — Session 78: UX Transformation Plan (Phases 9A-9D)
 
 ### Context

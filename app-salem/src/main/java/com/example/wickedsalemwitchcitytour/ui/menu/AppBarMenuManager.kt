@@ -28,6 +28,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.ui.TileSourceManager
 import com.example.locationmapapp.ui.menu.MenuEventListener
 import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.ui.menu.PoiLayerId
@@ -103,7 +104,7 @@ class AppBarMenuManager(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // SLIM TOOLBAR — Weather + Home + spacer + DarkMode + Alerts + Grid + About
+    // SLIM TOOLBAR — Weather + Home + spacer + TileSource + Alerts + Grid + About
     // ─────────────────────────────────────────────────────────────────────────
 
     data class SlimToolbarRefs(
@@ -125,7 +126,7 @@ class AppBarMenuManager(
         alertsIcon: ImageView,
         gridButton: ImageView,
         statusLine: TextView,
-        darkModeIcon: ImageView? = null,
+        tileSourceIcon: ImageView? = null,
         homeIcon: ImageView? = null,
         aboutIcon: ImageView? = null,
         alertsBadge: TextView? = null,
@@ -169,22 +170,37 @@ class AppBarMenuManager(
             icon.setOnClickListener { menuEventListener.onAboutRequested() }
         }
 
-        // Dark mode toggle icon
-        darkModeIcon?.let { icon ->
-            val isDark = prefs.getBoolean(MenuPrefs.PREF_DARK_MODE, false)
-            icon.alpha = if (isDark) 1.0f else 0.4f
+        // Tile source picker icon — PopupMenu with Satellite/Street/Dark
+        tileSourceIcon?.let { icon ->
             icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
-            icon.setOnClickListener {
-                val newState = !prefs.getBoolean(MenuPrefs.PREF_DARK_MODE, false)
-                prefs.edit().putBoolean(MenuPrefs.PREF_DARK_MODE, newState).apply()
-                icon.alpha = if (newState) 1.0f else 0.4f
-                DebugLogger.i(TAG, "Dark mode toggled → $newState")
-                menuEventListener.onDarkModeToggled(newState)
-            }
+            icon.setOnClickListener { showTileSourcePopup(icon) }
         }
 
-        DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, Home, DarkMode, Alerts, Grid, About)")
+        DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, Home, TileSource, Alerts, Grid, About)")
         return SlimToolbarRefs(weatherIcon, alertsIcon, gridButton, statusLine, alertsBadge, layersBadge)
+    }
+
+    /**
+     * Show a PopupMenu with tile source options: Satellite, Street, Dark.
+     * Checks the currently active source and fires onTileSourceChanged on selection.
+     */
+    private fun showTileSourcePopup(anchor: View) {
+        val popup = PopupMenu(context, anchor)
+        val currentId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
+            ?: TileSourceManager.DEFAULT_SOURCE
+        TileSourceManager.ALL_IDS.forEachIndexed { index, id ->
+            val item = popup.menu.add(Menu.NONE, index, index, TileSourceManager.label(id))
+            item.isCheckable = true
+            item.isChecked = (id == currentId)
+        }
+        popup.setOnMenuItemClickListener { item ->
+            val selectedId = TileSourceManager.ALL_IDS[item.itemId]
+            prefs.edit().putString(MenuPrefs.PREF_TILE_SOURCE, selectedId).apply()
+            DebugLogger.i(TAG, "Tile source selected → $selectedId")
+            menuEventListener.onTileSourceChanged(selectedId)
+            true
+        }
+        popup.show()
     }
 
     /** Update the weather alert badge count on the alerts icon. */

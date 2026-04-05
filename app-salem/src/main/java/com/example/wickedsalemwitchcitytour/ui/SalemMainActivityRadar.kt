@@ -61,16 +61,8 @@ internal fun SalemMainActivity.addRadarOverlay() {
     }
 }
 
-internal fun SalemMainActivity.buildDarkTileSource(): org.osmdroid.tileprovider.tilesource.XYTileSource {
-    return org.osmdroid.tileprovider.tilesource.XYTileSource(
-        "CartoDB-DarkMatter", 0, 19, 256, ".png",
-        arrayOf(
-            "https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/",
-            "https://cartodb-basemaps-b.global.ssl.fastly.net/dark_all/",
-            "https://cartodb-basemaps-c.global.ssl.fastly.net/dark_all/",
-            "https://cartodb-basemaps-d.global.ssl.fastly.net/dark_all/"
-        )
-    )
+internal fun SalemMainActivity.buildDarkTileSource(): org.osmdroid.tileprovider.tilesource.ITileSource {
+    return TileSourceManager.buildSource(TileSourceManager.Id.DARK)
 }
 
 internal fun SalemMainActivity.refreshRadarOverlay() {

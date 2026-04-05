@@ -57,8 +57,9 @@ object MenuPrefs {
     const val PREF_ALERT_SOUND      = "alert_sound_on"
     const val PREF_ALERT_DISTANCE   = "alert_distance_nm"
 
-    // ── Dark Mode ────────────────────────────────────────────────────────
+    // ── Dark Mode / Tile Source ─────────────────────────────────────────
     const val PREF_DARK_MODE = "dark_mode_enabled"
+    const val PREF_TILE_SOURCE = "tile_source_id"
 
     // ── Radar Animation ──────────────────────────────────────────────────
     const val PREF_RADAR_ANIMATE    = "radar_animate_on"

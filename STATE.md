@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-04 Session 78 (UX Transformation Plan — Phases 9A-9D)
+## Last Updated: 2026-04-05 Session 79 (Recovery & OMEN-006 Live Conversation Log)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -21,7 +21,9 @@
 - **NEW: Satellite tiles** — USGS National Map Imagery (free, public domain, 15cm resolution over Salem, commercial use OK)
 - **NEW: Lottie chosen** for splash animation (`com.airbnb.android:lottie:6.4.0`)
 - **NEW: FREE tier is minimal** — Map + basic POIs + 1 tour preview + ads only. Transit/weather/tours require EXPLORER ($4.99)+
-- **NEW: Detailed plan file** — `.claude/plans/distributed-coalescing-pearl.md` has full implementation details
+- **NEW: Phase 9A code complete** — SplashActivity, TileSourceManager, cinematic zoom, tile source picker — build verified, needs emulator test + commit
+- **NEW: OMEN-006 issued** — Live conversation log directive, all projects. LocationMapApp is reference implementation.
+- **NEW: Live conversation logs** — `docs/session-logs/` for crash recovery (append-only, written during session)
 - **UI direction** — Tour guide view is the primary screen; LocationMapApp map view becomes a utility
 - **Branding work started** — AI Art Studio installed locally (`~/AI-Studio/`), splash screen concepts generated ("WitchKitty"), image morph transitions prototyped
 - **GeoInbox initialized** — `github.com/deanmauriceellis-cloud/GeoInbox`, Gmail API authenticated (`omenpicturefeed@gmail.com`)

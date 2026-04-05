@@ -53,7 +53,6 @@ import com.example.locationmapapp.util.DebugLogger
 import dagger.hilt.android.AndroidEntryPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
@@ -322,15 +321,15 @@ class SalemMainActivity : AppCompatActivity() {
             menuEventListener = menuEventListenerImpl
         )
         val toolbarRefs = appBarMenuManager.setupSlimToolbar(
-            weatherIcon  = binding.root.findViewById(R.id.toolbarWeatherIcon),
-            alertsIcon   = binding.root.findViewById(R.id.toolbarAlertsIcon),
-            gridButton   = binding.root.findViewById(R.id.toolbarGridButton),
-            statusLine   = binding.root.findViewById(R.id.toolbarStatusLine),
-            darkModeIcon = binding.root.findViewById(R.id.toolbarDarkModeIcon),
-            homeIcon     = binding.root.findViewById(R.id.toolbarHomeIcon),
-            aboutIcon    = binding.root.findViewById(R.id.toolbarAboutIcon),
-            alertsBadge  = binding.root.findViewById(R.id.alertsBadge),
-            layersBadge  = binding.root.findViewById(R.id.layersBadge)
+            weatherIcon    = binding.root.findViewById(R.id.toolbarWeatherIcon),
+            alertsIcon     = binding.root.findViewById(R.id.toolbarAlertsIcon),
+            gridButton     = binding.root.findViewById(R.id.toolbarGridButton),
+            statusLine     = binding.root.findViewById(R.id.toolbarStatusLine),
+            tileSourceIcon = binding.root.findViewById(R.id.toolbarTileSourceIcon),
+            homeIcon       = binding.root.findViewById(R.id.toolbarHomeIcon),
+            aboutIcon      = binding.root.findViewById(R.id.toolbarAboutIcon),
+            alertsBadge    = binding.root.findViewById(R.id.alertsBadge),
+            layersBadge    = binding.root.findViewById(R.id.layersBadge)
         )
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
@@ -579,20 +578,43 @@ class SalemMainActivity : AppCompatActivity() {
     // MAP SETUP
     // =========================================================================
 
+    /** True when arriving from SplashActivity — triggers cinematic zoom animation. */
+    internal var fromSplash = false
+
     internal fun setupMap() {
-        DebugLogger.i("SalemMainActivity", "setupMap() — initial center=Salem, MA zoom=15")
-        val darkModePrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
-        val isDarkMode = darkModePrefs.getBoolean(MenuPrefs.PREF_DARK_MODE, false)
+        fromSplash = intent?.getBooleanExtra(SplashActivity.EXTRA_FROM_SPLASH, false) == true
+        val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+        val tileSourceId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
+            ?: TileSourceManager.DEFAULT_SOURCE
+        DebugLogger.i("SalemMainActivity", "setupMap() — tileSource=$tileSourceId fromSplash=$fromSplash")
         binding.mapView.apply {
-            setTileSource(if (isDarkMode) buildDarkTileSource() else TileSourceFactory.MAPNIK)
+            setTileSource(TileSourceManager.buildSource(tileSourceId))
             setMultiTouchControls(true)
             // Disable built-in zoom buttons — we use the custom slider instead
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setBuiltInZoomControls(false)
             minZoomLevel = 3.0
-            maxZoomLevel = 19.0
-            controller.setZoom(15.0)
-            controller.setCenter(GeoPoint(42.521, -70.887)) // Salem, MA center
+            maxZoomLevel = if (tileSourceId == TileSourceManager.Id.SATELLITE)
+                TileSourceManager.USGS_MAX_ZOOM.toDouble() else 19.0
+            if (fromSplash) {
+                // Start zoomed out for cinematic zoom-in animation
+                controller.setZoom(4.0)
+                controller.setCenter(GeoPoint(39.8283, -98.5795)) // Center of US
+            } else {
+                controller.setZoom(15.0)
+                controller.setCenter(GeoPoint(42.521, -70.887)) // Salem, MA center
+            }
+        }
+        // Splash fallback: if no GPS fix within 3s, zoom to Salem center
+        if (fromSplash) {
+            binding.mapView.postDelayed({
+                if (!initialCenterDone && fromSplash) {
+                    DebugLogger.i("SalemMainActivity", "Splash fallback — no GPS fix, zooming to Salem center")
+                    performCinematicZoom(GeoPoint(42.521, -70.887))
+                    fromSplash = false
+                    initialCenterDone = true
+                }
+            }, 3000L)
         }
         setupZoomSlider()
         val eventsReceiver = object : MapEventsReceiver {
@@ -659,6 +681,44 @@ class SalemMainActivity : AppCompatActivity() {
         }
 
         DebugLogger.i("SalemMainActivity", "Map configured — overlays=${binding.mapView.overlays.size}")
+    }
+
+    /** Set map max zoom based on tile source — USGS satellite caps at 16, others at 19. */
+    internal fun applyTileSourceZoomLimits(tileSourceId: String) {
+        val maxZoom = if (tileSourceId == TileSourceManager.Id.SATELLITE)
+            TileSourceManager.USGS_MAX_ZOOM.toDouble() else 19.0
+        binding.mapView.maxZoomLevel = maxZoom
+        // If currently zoomed past new max, snap back
+        if (binding.mapView.zoomLevelDouble > maxZoom) {
+            binding.mapView.controller.setZoom(maxZoom)
+        }
+        DebugLogger.i("SalemMainActivity", "Max zoom set to $maxZoom for $tileSourceId")
+    }
+
+    /**
+     * Cinematic zoom-in animation: US from space → region → city → street level.
+     * Called when arriving from SplashActivity on first GPS fix (or fallback to Salem center).
+     *
+     * Sequence: zoom 4 → 10 (800ms) → GPS at 14 (1200ms) → ease to 16 (800ms)
+     * Final zoom capped at satellite max (16) when using USGS tiles.
+     */
+    internal fun performCinematicZoom(target: GeoPoint) {
+        DebugLogger.i("SalemMainActivity", "performCinematicZoom → ${target.latitude},${target.longitude}")
+        val map = binding.mapView
+        val maxZoom = map.maxZoomLevel.coerceAtMost(16.0)
+
+        // Phase 1: zoom 4→10, center on target region (800ms)
+        map.controller.animateTo(target, 10.0, 800L)
+
+        // Phase 2: zoom 10→14, center on exact target (1200ms)
+        map.postDelayed({
+            map.controller.animateTo(target, 14.0, 1200L)
+        }, 900L)
+
+        // Phase 3: ease to max zoom — street-level detail (800ms)
+        map.postDelayed({
+            map.controller.animateTo(target, maxZoom, 800L)
+        }, 2200L)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1020,9 +1080,15 @@ class SalemMainActivity : AppCompatActivity() {
                 initialCenterDone = true
                 lastPoiFetchPoint = point
                 lastApiCallTime = System.currentTimeMillis()
-                DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=18")
-                binding.mapView.controller.animateTo(point)
-                binding.mapView.controller.setZoom(18.0)
+                if (fromSplash) {
+                    DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — cinematic zoom-in")
+                    performCinematicZoom(point)
+                    fromSplash = false
+                } else {
+                    DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=18")
+                    binding.mapView.controller.animateTo(point)
+                    binding.mapView.controller.setZoom(18.0)
+                }
             } else {
                 DebugLogger.d("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
             }
@@ -1763,15 +1829,23 @@ class SalemMainActivity : AppCompatActivity() {
         // ── Dark Mode ────────────────────────────────────────────────────────
 
         override fun onDarkModeToggled(dark: Boolean) {
-            DebugLogger.i("SalemMainActivity", "onDarkModeToggled: $dark")
-            if (dark) {
-                binding.mapView.setTileSource(buildDarkTileSource())
-                toast("Dark mode enabled")
-            } else {
-                binding.mapView.setTileSource(TileSourceFactory.MAPNIK)
-                toast("Light mode enabled")
-            }
+            // Legacy toggle — delegate to tile source change
+            val id = if (dark) TileSourceManager.Id.DARK else TileSourceManager.Id.SATELLITE
+            onTileSourceChanged(id)
+        }
+
+        override fun onTileSourceChanged(tileSourceId: String) {
+            DebugLogger.i("SalemMainActivity", "onTileSourceChanged: $tileSourceId")
+            binding.mapView.setTileSource(TileSourceManager.buildSource(tileSourceId))
+            // Enforce max zoom for satellite tiles (USGS caps at 16)
+            applyTileSourceZoomLimits(tileSourceId)
             binding.mapView.invalidate()
+            // Persist the choice
+            getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(MenuPrefs.PREF_TILE_SOURCE, tileSourceId)
+                .apply()
+            toast("${TileSourceManager.label(tileSourceId)} tiles")
         }
 
         // ── Weather ───────────────────────────────────────────────────────────

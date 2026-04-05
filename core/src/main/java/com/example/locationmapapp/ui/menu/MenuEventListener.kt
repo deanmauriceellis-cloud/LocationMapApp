@@ -120,6 +120,9 @@ interface MenuEventListener {
     /** Toggle dark map tiles (CartoDB Dark Matter). */
     fun onDarkModeToggled(dark: Boolean)
 
+    /** Switch tile source (SATELLITE, STREET, DARK). Default no-op for backward compat. */
+    fun onTileSourceChanged(tileSourceId: String) {}
+
     // =========================================================================
     // POINTS OF INTEREST
     // =========================================================================

@@ -15,7 +15,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- Icon row: Weather | Home | spacer | DarkMode | Alerts | Grid | About -->
+    <!-- Icon row: Weather | Home | spacer | TileSource | Alerts | Grid | About -->
     <LinearLayout
         android:id="@+id/toolbarIconRow"
         android:layout_width="match_parent"
@@ -58,18 +58,18 @@
             android:layout_weight="1" />
 
         <ImageView
-            android:id="@+id/toolbarDarkModeIcon"
+            android:id="@+id/toolbarTileSourceIcon"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="@drawable/ic_dark_mode"
+            android:src="@drawable/ic_map_layers"
             android:scaleType="centerInside"
             android:padding="4dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
             android:layout_marginEnd="8dp"
-            android:contentDescription="Dark Mode"
-            android:tooltipText="Dark Mode" />
+            android:contentDescription="Map Layers"
+            android:tooltipText="Map Layers" />
 
         <FrameLayout
             android:layout_width="36dp"

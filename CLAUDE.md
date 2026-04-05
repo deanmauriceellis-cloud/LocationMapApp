@@ -14,12 +14,32 @@ Execute in order before ANY work:
 1. **Read OMEN notes** — Read `~/Development/OMEN/notes/locationmapapp.md` for action items from project management. These are operational: action items, reminders, follow-ups, questions. Address applicable items this session.
 2. **Read OMEN directives** — Read `~/Development/OMEN/directives/ACTIVE.md` for formal policy. Comply with all GLOBAL directives. Comply with TARGETED directives addressed to this project. OMEN directives take precedence over project-specific rules if there is a conflict.
 3. **Read context** — CLAUDE.md, WickedSalemWitchCityTour_MASTER_PLAN.md, STATE.md, most recent session log, relevant design docs.
-4. **Status report** — Current phase/step from MASTER_PLAN, last session summary, completed steps, next steps, blockers. Include OMEN note and directive compliance status.
-5. **Decision checkpoint** — Surface ALL pending questions in three categories:
+4. **Open live conversation log** — Create `docs/session-logs/session-NNN-YYYY-MM-DD.md` with session header. All significant actions, decisions, code changes, and reasoning during the session MUST be appended to this file as they happen. This is the crash-recovery mechanism — if the session dies, this log survives on disk.
+5. **Status report** — Current phase/step from MASTER_PLAN, last session summary, completed steps, next steps, blockers. Include OMEN note and directive compliance status.
+6. **Decision checkpoint** — Surface ALL pending questions in three categories:
    - Open decisions from the plan
    - OMEN notes/directives requiring action this session
    - Execution confirmation: "Next step is [X], will produce [Y]. Proceed?"
-6. **Await direction** — Never execute until user confirms.
+7. **Await direction** — Never execute until user confirms.
+
+## Live Conversation Log
+
+**Every session maintains a live log at `docs/session-logs/session-NNN-YYYY-MM-DD.md`.**
+
+This is the crash-recovery mechanism. If a session is killed (context overflow, disconnection, etc.), this file survives on disk and the next session can reconstruct full context from it.
+
+**What to log (append as it happens):**
+- Session start context (status, phase, blockers)
+- Every significant decision and reasoning
+- Every file created, modified, or deleted (with summary of changes)
+- Build/test results
+- User direction and confirmations
+- Errors encountered and how they were resolved
+- Open questions and their resolutions
+
+**Format:** Timestamped entries, append-only. Never rewrite earlier entries.
+
+**On session start:** Read the most recent log in `docs/session-logs/` if recovering from a killed session.
 
 ## Session End Protocol
 
@@ -28,7 +48,7 @@ Execute all steps in order:
 1. **Update living context docs** — Update CLAUDE.md, STATE.md, and WickedSalemWitchCityTour_MASTER_PLAN.md as needed.
 2. **Archive removed content** — Anything removed from any .md doc goes to `docs/archive/` with format `FILENAME_removed_YYYY-MM-DD.md`. Never silently delete.
 3. **Optimize context docs for loading** — Keep CLAUDE.md and STATE.md concise and current. Details in linked docs.
-4. **Write session log** — Append to SESSION-LOG.md covering: summary, work performed, decisions made, files created/modified/removed, open items, OMEN note/directive compliance.
+4. **Finalize conversation log** — Add session summary and final status to the live log in `docs/session-logs/`. Append summary to SESSION-LOG.md.
 5. **Commit and push** — Stage all changes, commit with descriptive message, push to remote. Local and remote must never drift apart.
 6. **Report to OMEN** — Write a session report to `~/Development/OMEN/reports/locationmapapp/session-NNN-YYYY-MM-DD.md` using the format at `~/Development/OMEN/templates/session-report.md`. This report must include: OMEN note acknowledgments, directive compliance, shared engine impact, security notes, test results, backward compatibility, conflicts with OMEN directives. A session without a report is an incomplete session.
 
@@ -77,7 +97,8 @@ LocationMapApp_v1.5/
 ├── salem-content/         — JVM content pipeline (imports from ~/Development/Salem/data/json/)
 ├── cache-proxy/           — Node.js caching proxy
 ├── web/                   — React web app
-├── docs/                  — Session logs, archive
+├── docs/session-logs/     — Live conversation logs (crash-recovery)
+├── docs/                  — Archive, other docs
 ├── STATE.md               — Current project state
 ├── SESSION-LOG.md         — Session history
 ├── WickedSalemWitchCityTour_MASTER_PLAN.md — 20-phase build plan
@@ -112,7 +133,8 @@ LocationMapApp_v1.5/
 | A (always) | `CLAUDE.md` | This file |
 | A (always) | `STATE.md` | Current project state |
 | A (always) | `WickedSalemWitchCityTour_MASTER_PLAN.md` | Full build plan |
-| B (session start) | `SESSION-LOG.md` | Session history |
+| A (recovery) | `docs/session-logs/` | Live conversation logs (crash-recovery) |
+| B (session start) | `SESSION-LOG.md` | Session history (summaries) |
 | C (reference) | `GOVERNANCE.md` | Legal/compliance (56KB) |
 | C (reference) | `IP.md` | Patent/copyright register |
 | C (reference) | `COMMERCIALIZATION.md` | Business model |
