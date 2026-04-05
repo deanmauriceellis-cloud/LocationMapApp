@@ -2,6 +2,80 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-04 — Session 77: Emulator Testing, GeoInbox Init, AI Art Studio & Splash Screen Prototyping
+
+### Context
+Post Session 76 (master plan overhaul). Session focused on app verification, infrastructure setup, and branding exploration.
+
+### Work Performed
+
+**GeoInbox Infrastructure**
+- Initialized git repo at `~/Development/GeoInbox/` (NOTE-G001)
+- Created private GitHub repo: `deanmauriceellis-cloud/GeoInbox`
+- Initial commit pushed — scaffold, gmail_auth.py, gitignore, env template
+- Gmail API already authenticated with `omenpicturefeed@gmail.com`
+
+**Emulator Testing (Salem_Tour_API34)**
+- Launched app on emulator, identified proxy IP mismatch (10.0.0.4 → 10.0.0.229)
+- Updated proxy IP in 16 Kotlin source files + 2 web config files
+- Created `locationmapapp` PostgreSQL database, applied schemas, set password auth
+- Verified features: Weather (working), Grid menu (working), Dark mode (working), Find/search (UI working, empty DB), About (working), Long-press GPS override (working), Alerts menu (working), POI markers from Overpass (working)
+- Issues found: Tours "No tours available", Events "No events loaded" — bundled Room DB not populated on fresh install; Chat table missing
+
+**AI Art Studio Installation**
+- Created install script: `~/Development/scripts/install-ai-art-studio.sh`
+- Installed Stable Diffusion WebUI Forge + ComfyUI at `~/AI-Studio/`
+- Downloaded models: DreamShaper XL Turbo, DreamShaper 8 (SD1.5), AnimateDiff v3, ControlNet, IP-Adapter, upscalers
+- Resolved multiple setup issues: pgAdmin GPG key, libgl1-mesa-glx rename, setuptools/pkg_resources, numpy/scikit-image compat
+
+**Splash Screen Prototyping**
+- Generated "WitchKitty" — black cat witch with cauldron, green glow (3 variations)
+- Explored AnimateDiff animation — found img2img approach produces minimal motion
+- Built anchor-based SLERP morph pipeline for image transitions
+- Created American Gothic → Wizard/Witch transformation (10-stage directed narrative)
+- Prototyped epic transformation: storm → fear → lightning → demonic → red eyes → transformation → green wisps → pentagram
+- Best approach identified: generate independent anchor keyframes, SLERP interpolate in latent space
+
+**Key UI Decision**
+- LocationMapApp map view becomes a **utility** (used when maps needed)
+- Tour guide view becomes the **primary screen**
+
+### Files Modified
+- `core/src/.../repository/*.kt` (12 files) — proxy IP 10.0.0.4 → 10.0.0.229
+- `app-salem/src/.../TcpLogStreamer.kt`, `SalemMainActivityFind.kt` — proxy IP update
+- `app/src/.../TcpLogStreamer.kt`, `MainActivityFind.kt` — proxy IP update
+- `web/.env.development`, `web/vite.config.ts` — proxy IP update
+- `STATE.md` — updated with session 77 changes
+- `SESSION-LOG.md` — this entry
+
+### Files Created
+- `~/Development/scripts/install-ai-art-studio.sh` — AI art studio installer
+- `~/AI-Studio/` — full Stable Diffusion installation (Forge + ComfyUI)
+- `~/AI-Studio/PROMPTS.md` — tuned prompts for WickedSalemWitchCityTour art
+- `~/Development/GeoInbox/.git/` — initialized repository
+
+### Decisions Made
+- Tour guide view is the primary screen, not the map
+- Local Stable Diffusion (RTX 3090) for all art generation — no subscription costs
+- Anchor-based SLERP is the best morph technique (vs chaining, AnimateDiff, or independent frames)
+- DreamShaper 8 (SD1.5) works better for animation than SDXL at 512x640 resolution
+
+### Open Items
+- Splash screen needs significant refinement
+- Tours/Events not loading — bundled Room DB issue (Phase 10 work)
+- COPPA deadline April 22 (18 days) — not addressed this session
+- Credential audit (OMEN-002) — not addressed this session
+- PostgreSQL chat_rooms table missing — non-critical
+
+### OMEN Compliance
+- NOTE-G001 (GeoInbox git init): **COMPLETED**
+- NOTE-L001 (CLAUDE.md): Previously completed
+- NOTE-L002/OMEN-002 (Credentials): Not addressed — proxy IP is not a credential
+- NOTE-L003 (COPPA): Not addressed — 18 days remaining
+- NOTE-L010 (GeoInbox): Acknowledged, repo initialized, pipeline scaffold exists
+
+---
+
 ## Session: 2026-04-04 — Session 76: Full Re-Evaluation & Master Plan Overhaul
 
 ### Context

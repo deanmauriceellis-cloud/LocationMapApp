@@ -31,7 +31,7 @@ class CommentRepository @Inject constructor(
     private val authRepository: AuthRepository
 ) {
     private val TAG = "CommentRepo"
-    private val BASE = "http://10.0.0.4:4300"
+    private val BASE = "http://10.0.0.229:4300"
     private val JSON_TYPE = "application/json".toMediaType()
 
     private val client = OkHttpClient.Builder()

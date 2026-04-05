@@ -41,7 +41,7 @@ class GeofenceDatabaseRepository @Inject constructor(
     private val context: Context
 ) {
     private val TAG = "GeofenceDbRepo"
-    private val BASE = "http://10.0.0.4:4300"
+    private val BASE = "http://10.0.0.229:4300"
     private val gson = Gson()
 
     private val client = OkHttpClient.Builder()

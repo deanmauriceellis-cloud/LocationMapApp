@@ -2021,7 +2021,7 @@ internal fun MainActivity.showGoToLocationDialog() {
                 try {
                     val results = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val url = okhttp3.HttpUrl.Builder()
-                            .scheme("http").host("10.0.0.4").port(3000)
+                            .scheme("http").host("10.0.0.229").port(3000)
                             .addPathSegment("geocode")
                             .addQueryParameter("q", query)
                             .addQueryParameter("limit", "5")

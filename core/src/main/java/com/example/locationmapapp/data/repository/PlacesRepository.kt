@@ -54,7 +54,7 @@ class PlacesRepository @Inject constructor(
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val PROXY_BASE    = "http://10.0.0.4:4300"
+    private val PROXY_BASE    = "http://10.0.0.229:4300"
     private val OVERPASS_URL  = "$PROXY_BASE/overpass"
 
     /** Session-level in-memory cache of radius hints keyed by "lat3:lon3" */

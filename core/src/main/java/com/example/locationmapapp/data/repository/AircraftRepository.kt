@@ -36,7 +36,7 @@ class AircraftRepository @Inject constructor() {
 
     suspend fun fetchAircraft(south: Double, west: Double, north: Double, east: Double): List<AircraftState> = withContext(Dispatchers.IO) {
         val bbox = "$south,$west,$north,$east"
-        val url = "http://10.0.0.4:4300/aircraft?bbox=$bbox"
+        val url = "http://10.0.0.229:4300/aircraft?bbox=$bbox"
         DebugLogger.d(TAG, "Fetching aircraft for bbox=$bbox")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -54,7 +54,7 @@ class AircraftRepository @Inject constructor() {
 
     /** Fetch a single aircraft by ICAO24 hex address (global, no bbox). Returns null if not found. */
     suspend fun fetchAircraftByIcao(icao24: String): AircraftState? = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:4300/aircraft?icao24=${icao24.lowercase()}"
+        val url = "http://10.0.0.229:4300/aircraft?icao24=${icao24.lowercase()}"
         DebugLogger.d(TAG, "Fetching aircraft icao24=$icao24")
         val t0 = System.currentTimeMillis()
         val response = client.newCall(Request.Builder().url(url).build()).execute()
@@ -70,7 +70,7 @@ class AircraftRepository @Inject constructor() {
 
     /** Fetch DB flight history for an aircraft. Returns chronological path points (2 per sighting). */
     suspend fun fetchFlightHistory(icao24: String): List<FlightPathPoint> = withContext(Dispatchers.IO) {
-        val url = "http://10.0.0.4:4300/db/aircraft/${icao24.lowercase()}"
+        val url = "http://10.0.0.229:4300/db/aircraft/${icao24.lowercase()}"
         DebugLogger.d(TAG, "Fetching flight history for $icao24")
         try {
             val response = client.newCall(Request.Builder().url(url).build()).execute()

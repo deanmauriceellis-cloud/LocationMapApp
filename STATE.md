@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-04 Session 76 (Full Re-Evaluation & Master Plan Overhaul)
+## Last Updated: 2026-04-04 Session 77 (Emulator Testing, GeoInbox Init, AI Art Studio)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -12,6 +12,10 @@
 - **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**
 - **Phases 12-14**: Social media, fieldwork, community engagement — **NO CODE, can start NOW**
 - **Critical timing**: 2026 is Salem's 400th anniversary (Salem 400+) — once-in-a-generation marketing window
+- **NEW: UI direction** — Tour guide view is the primary screen; LocationMapApp map view becomes a utility
+- **NEW: Branding work started** — AI Art Studio installed locally (`~/AI-Studio/`), splash screen concepts generated ("WitchKitty"), image morph transitions prototyped
+- **NEW: GeoInbox initialized** — `github.com/deanmauriceellis-cloud/GeoInbox`, Gmail API authenticated (`omenpicturefeed@gmail.com`)
+- **NEW: Proxy IP updated** — all source files changed from `10.0.0.4` to `10.0.0.229`
 - **Tour engine complete**: 3 pre-defined tours + custom tour builder + time-budget tours + route optimization
 - **GPS geofence triggers**: approach/entry/exit detection with auto-narration via Android TTS
 - **Walking directions**: OSRM integration via OSMBonusPack, turn-by-turn, "Walk Here" from any POI

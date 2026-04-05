@@ -34,7 +34,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module TcpLogStrea
  */
 object TcpLogStreamer {
 
-    private const val HOST = "10.0.0.4"
+    private const val HOST = "10.0.0.229"
     private const val PORT = 4301
     private const val TAG  = "TcpLogStreamer"
     private const val PRE_CONNECT_BUFFER_SIZE = 500
