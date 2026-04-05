@@ -2,6 +2,28 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-05 — Session 80: Phase 9A Emulator Test (PASSES)
+
+### Context
+Phase 9A code complete and build-verified from Session 79. This session focused on emulator testing.
+
+### Work Performed
+- Installed app-salem on Salem_Tour_API34 emulator (port 5570)
+- Tested full Phase 9A splash flow: dark purple background + WitchKitty Lottie animation → crossfade to SalemMainActivity → cinematic zoom (US → Salem street level) → USGS satellite tiles + POI labels
+- All Phase 9A features pass emulator test
+- Identified Forge (AI Art Studio, port 7860) is down — deferred
+
+### Decisions Made
+1. Phase 9A passes emulator test — more testing + commit next session
+2. First cold launch on emulator showed white splash background (class verification delay) — emulator-only, not a real-device concern
+
+### Open Items
+- Phase 9A: Commit pending (user wants more testing next session)
+- Tile source picker: not UI-tested via tap this session
+- Forge restart needed
+
+---
+
 ## Session: 2026-04-05 — Session 79: Recovery & Live Conversation Log (OMEN-006)
 
 ### Context

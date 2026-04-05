@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-05 Session 79 (Recovery & OMEN-006 Live Conversation Log)
+## Last Updated: 2026-04-05 Session 80 (Phase 9A Emulator Test — PASSES)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -21,7 +21,7 @@
 - **NEW: Satellite tiles** — USGS National Map Imagery (free, public domain, 15cm resolution over Salem, commercial use OK)
 - **NEW: Lottie chosen** for splash animation (`com.airbnb.android:lottie:6.4.0`)
 - **NEW: FREE tier is minimal** — Map + basic POIs + 1 tour preview + ads only. Transit/weather/tours require EXPLORER ($4.99)+
-- **NEW: Phase 9A code complete** — SplashActivity, TileSourceManager, cinematic zoom, tile source picker — build verified, needs emulator test + commit
+- **NEW: Phase 9A code complete + emulator tested** — SplashActivity, TileSourceManager, cinematic zoom, tile source picker — build verified, emulator tested (Session 80), needs commit + further testing next session
 - **NEW: OMEN-006 issued** — Live conversation log directive, all projects. LocationMapApp is reference implementation.
 - **NEW: Live conversation logs** — `docs/session-logs/` for crash recovery (append-only, written during session)
 - **UI direction** — Tour guide view is the primary screen; LocationMapApp map view becomes a utility
