@@ -1,21 +1,31 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-04 Session 77 (Emulator Testing, GeoInbox Init, AI Art Studio)
+## Last Updated: 2026-04-04 Session 78 (UX Transformation Plan — Phases 9A-9D)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
 - **WickedSalemWitchCityTour** (`app-salem/`) — GPS-guided Salem, MA tourist app
-- **Tiered pricing**: Free (ads, limited) / $4.99 Explorer / $9.99 Premium / $49.99-mo (Salem LLM)
-- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (16 phases + 4 future phases, supersedes all other plans)
+- **Tiered pricing**: Free (map+POIs+1 tour preview+ads) / $4.99 Explorer / $9.99 Premium / $49.99-mo (Salem LLM)
+- Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (16 phases + 4 future phases + 4 UX transformation phases, supersedes all other plans)
 - **Phases 1-9 complete** (core development done)
-- **Phase 10 next**: Production readiness — Firebase, offline tiles, photos, emulator verification, DB hardening
+- **NEW: Phases 9A-9D next** — UX Transformation (prioritized before Phase 10):
+  - **9A**: Splash screen (Lottie WitchKitty) + USGS satellite tiles + cinematic zoom-in
+  - **9B**: Feature tier matrix + FeatureGate system + stub billing + onboarding dialog
+  - **9C**: User settings screen (alert prefs, narration, map, notifications, quiet hours)
+  - **9D**: Contextual alert engine (historical facts, figure connections, business promos, frequency control)
+- **Phase 10**: Production readiness — Firebase, offline tiles, photos, emulator verification, DB hardening
 - **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**
 - **Phases 12-14**: Social media, fieldwork, community engagement — **NO CODE, can start NOW**
 - **Critical timing**: 2026 is Salem's 400th anniversary (Salem 400+) — once-in-a-generation marketing window
-- **NEW: UI direction** — Tour guide view is the primary screen; LocationMapApp map view becomes a utility
-- **NEW: Branding work started** — AI Art Studio installed locally (`~/AI-Studio/`), splash screen concepts generated ("WitchKitty"), image morph transitions prototyped
-- **NEW: GeoInbox initialized** — `github.com/deanmauriceellis-cloud/GeoInbox`, Gmail API authenticated (`omenpicturefeed@gmail.com`)
-- **NEW: Proxy IP updated** — all source files changed from `10.0.0.4` to `10.0.0.229`
+- **NEW: UX Transformation planned (Session 78)** — 4 phases (9A-9D), 20 new files, prioritized before Phase 10
+- **NEW: Satellite tiles** — USGS National Map Imagery (free, public domain, 15cm resolution over Salem, commercial use OK)
+- **NEW: Lottie chosen** for splash animation (`com.airbnb.android:lottie:6.4.0`)
+- **NEW: FREE tier is minimal** — Map + basic POIs + 1 tour preview + ads only. Transit/weather/tours require EXPLORER ($4.99)+
+- **NEW: Detailed plan file** — `.claude/plans/distributed-coalescing-pearl.md` has full implementation details
+- **UI direction** — Tour guide view is the primary screen; LocationMapApp map view becomes a utility
+- **Branding work started** — AI Art Studio installed locally (`~/AI-Studio/`), splash screen concepts generated ("WitchKitty"), image morph transitions prototyped
+- **GeoInbox initialized** — `github.com/deanmauriceellis-cloud/GeoInbox`, Gmail API authenticated (`omenpicturefeed@gmail.com`)
+- **Proxy IP updated** — all source files changed from `10.0.0.4` to `10.0.0.229`
 - **Tour engine complete**: 3 pre-defined tours + custom tour builder + time-budget tours + route optimization
 - **GPS geofence triggers**: approach/entry/exit detection with auto-narration via Android TTS
 - **Walking directions**: OSRM integration via OSMBonusPack, turn-by-turn, "Walk Here" from any POI

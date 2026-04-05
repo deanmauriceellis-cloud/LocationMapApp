@@ -24,37 +24,43 @@
 10. [Phase 8 — Walking Directions](#phase-8--walking-directions)
 11. [Phase 9 — Haunted Happenings & Events](#phase-9--haunted-happenings--events-integration)
 
+### UX Transformation (Phases 9A-9D — CODE, prioritized before Phase 10)
+12. [Phase 9A — Splash Screen & Satellite Map Entry](#phase-9a--splash-screen--satellite-map-entry)
+13. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
+14. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
+15. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
+
 ### Launch Readiness (Phases 10-11 — CODE)
-12. [Phase 10 — Production Readiness & Offline Infrastructure](#phase-10--production-readiness--offline-infrastructure)
-13. [Phase 11 — Branding, ASO & Play Store Launch](#phase-11--branding-aso--play-store-launch)
+16. [Phase 10 — Production Readiness & Offline Infrastructure](#phase-10--production-readiness--offline-infrastructure)
+17. [Phase 11 — Branding, ASO & Play Store Launch](#phase-11--branding-aso--play-store-launch)
 
 ### Marketing & Business Development (Phases 12-14 — NO CODE)
-14. [Phase 12 — Social Media & Digital Presence](#phase-12--social-media--digital-presence)
-15. [Phase 13 — Fieldwork & Content Photography](#phase-13--fieldwork--content-photography)
-16. [Phase 14 — Community Engagement & Salem Partnerships](#phase-14--community-engagement--salem-partnerships)
+18. [Phase 12 — Social Media & Digital Presence](#phase-12--social-media--digital-presence)
+19. [Phase 13 — Fieldwork & Content Photography](#phase-13--fieldwork--content-photography)
+20. [Phase 14 — Community Engagement & Salem Partnerships](#phase-14--community-engagement--salem-partnerships)
 
 ### Growth Features (Phases 15-16 — CODE)
-17. [Phase 15 — In-App Virality & Gamification](#phase-15--in-app-virality--gamification)
-18. [Phase 16 — iOS & Web Expansion (PWA)](#phase-16--ios--web-expansion-pwa)
+21. [Phase 15 — In-App Virality & Gamification](#phase-15--in-app-virality--gamification)
+22. [Phase 16 — iOS & Web Expansion (PWA)](#phase-16--ios--web-expansion-pwa)
 
 ### Future Phases (Post-Launch)
-19. [Phase 17 — Merchant Network & Advertising Platform](#phase-17--merchant-network--advertising-platform)
-20. [Phase 18 — Custom Narration & Audio Upgrade](#phase-18--custom-narration--audio-upgrade)
-21. [Phase 19 — Salem Village LLM Integration](#phase-19--salem-village-llm-integration)
-22. [Phase 20 — Additional Revenue Features](#phase-20--additional-revenue-features)
+23. [Phase 17 — Merchant Network & Advertising Platform](#phase-17--merchant-network--advertising-platform)
+24. [Phase 18 — Custom Narration & Audio Upgrade](#phase-18--custom-narration--audio-upgrade)
+25. [Phase 19 — Salem Village LLM Integration](#phase-19--salem-village-llm-integration)
+26. [Phase 20 — Additional Revenue Features](#phase-20--additional-revenue-features)
 
 ### Reference Sections
-23. [Competitive Landscape](#competitive-landscape)
-24. [Content Organization Strategy](#content-organization-strategy)
-25. [Tour Definitions](#tour-definitions)
-26. [Salem POI Master List](#salem-poi-master-list)
-27. [Data Sources Reference](#data-sources-reference)
-28. [Verification Checkpoints](#verification-checkpoints)
-29. [Business Model & Monetization](#business-model--monetization)
-30. [Technical Foundation — Audit Recommendations](#technical-foundation--audit-recommendations)
-31. [Social Media Content Calendar](#social-media-content-calendar)
-32. [Community Engagement Contacts](#community-engagement-contacts)
-33. [Fieldwork Planning Guide](#fieldwork-planning-guide)
+27. [Competitive Landscape](#competitive-landscape)
+28. [Content Organization Strategy](#content-organization-strategy)
+29. [Tour Definitions](#tour-definitions)
+30. [Salem POI Master List](#salem-poi-master-list)
+31. [Data Sources Reference](#data-sources-reference)
+32. [Verification Checkpoints](#verification-checkpoints)
+33. [Business Model & Monetization](#business-model--monetization)
+34. [Technical Foundation — Audit Recommendations](#technical-foundation--audit-recommendations)
+35. [Social Media Content Calendar](#social-media-content-calendar)
+36. [Community Engagement Contacts](#community-engagement-contacts)
+37. [Fieldwork Planning Guide](#fieldwork-planning-guide)
 
 ### Critical Timeline
 > **Salem 400+ quadricentennial is 2026 — the city's 400th anniversary.** Every organization in Salem is mobilized. This is a once-in-a-generation marketing window. App MUST be in Play Store by **September 1, 2026** to capture October (1M+ visitors). Missing October 2026 means waiting until October 2027.
@@ -852,6 +858,198 @@ GPS update → TourGeofenceManager.checkPosition()
 - [ ] Emulator: "On this date in 1692" shows for matching dates
 - [ ] Re-run content pipeline to regenerate salem_content.db with events
 - [ ] Git commit: "Phase 9: Events calendar — Haunted Happenings, exhibits, seasonal content"
+
+---
+
+## Phase 9A — Splash Screen & Satellite Map Entry
+
+**Goal:** Branded launch experience — animated WitchKitty splash screen transitions into USGS satellite aerial imagery with a cinematic zoom to the user's GPS position. Replace the dark mode toggle with a 3-way tile source picker.
+
+**Target:** 1-2 sessions | **Status:** NOT STARTED | **Added:** Session 78
+
+### Step 9A.1: Create WitchKitty Splash Screen
+- [ ] Create `SplashActivity.kt` — Full-screen, Lottie animation (2.5s), "Wicked Salem" text fade-in, crossfade to SalemMainActivity
+- [ ] Create `activity_splash.xml` — Centered LottieAnimationView on gradient background
+- [ ] Create `splash_background.xml` — Gradient `#1A0F2E` → `#2D1B4E`
+- [ ] Create/export `witchkitty_splash.json` — Lottie JSON from AI Art Studio WitchKitty assets
+- [ ] Add Lottie dependency: `com.airbnb.android:lottie:6.4.0` to `app-salem/build.gradle`
+- [ ] Move LAUNCHER intent-filter from SalemMainActivity to SplashActivity in AndroidManifest.xml
+- [ ] Add `Theme.WickedSalem.Splash` to themes.xml (no action bar, full screen)
+
+### Step 9A.2: USGS Satellite Tile Source
+- [ ] Create `TileSourceManager.kt` — Centralized tile source manager with `TileSourceId { SATELLITE, STREET, DARK }`
+- [ ] USGS URL: `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/` (free, public domain, 15cm resolution over Salem)
+- [ ] Change default tile source from MAPNIK to SATELLITE in `setupMap()`
+- [ ] Delegate `buildDarkTileSource()` to `TileSourceManager.buildSource(DARK)`
+- [ ] Add `PREF_TILE_SOURCE` to MenuPrefs, deprecate `PREF_DARK_MODE`
+
+### Step 9A.3: Dramatic Zoom-In Animation
+- [ ] When arriving from splash: start at zoom 4.0 (US from space), animate to 10.0 (800ms), to GPS at 15.0 (1200ms), ease to 17.0 (800ms)
+- [ ] Fallback: if no GPS fix within 3s, zoom to Salem center (42.521, -70.887) at zoom 15
+- [ ] Set `initialCenterDone` flag after animation to prevent GPS-center logic from fighting
+
+### Step 9A.4: Tile Source Picker (Replaces Dark Mode Toggle)
+- [ ] Create `ic_map_layers.xml` vector drawable
+- [ ] Replace `toolbarDarkModeIcon` with `toolbarTileSourceIcon` in toolbar layout
+- [ ] Replace dark mode click handler with PopupMenu (Satellite/Street/Dark)
+- [ ] Replace `onDarkModeToggled(Boolean)` with `onTileSourceChanged(String)` in MenuEventListener
+
+### Step 9A.5: Verify
+- [ ] Launch → WitchKitty splash → crossfade → satellite map → cinematic zoom to GPS
+- [ ] Layers icon shows 3 tile options, all switch correctly
+- [ ] All existing features (radar, transit, POIs, tours) work on satellite tiles
+- [ ] Tile preference persists across app restarts
+
+---
+
+## Phase 9B — Feature Tier Matrix & Gating Infrastructure
+
+**Goal:** Establish the freemium business model in code. Define what each tier unlocks, build the gating system, stub billing. No real billing yet — Phase 10 wires Google Play Billing.
+
+**Target:** 2-3 sessions | **Status:** NOT STARTED | **Added:** Session 78
+
+### Feature Tier Matrix
+
+| Feature | FREE | EXPLORER ($4.99) | PREMIUM ($9.99) | LLM ($49.99/mo) |
+|---------|------|-------------------|-----------------|------------------|
+| Core map + basic POIs | Y | Y | Y | Y |
+| Tour preview (1 tour, 3 stops) | Y | Y | Y | Y |
+| Short narration (approach only) | Y | Y | Y | Y |
+| Google Ads displayed | Y | Reduced | N | N |
+| Transit (MBTA) | N | Y | Y | Y |
+| Weather (full NWS + METAR) | N | Y | Y | Y |
+| Events calendar | N | Y | Y | Y |
+| All tours (full access) | N | Y | Y | Y |
+| Walking directions | N | Y | Y | Y |
+| Offline maps | N | Y | Y | Y |
+| Full narration (long form at stops) | N | N | Y | Y |
+| Historical deep content | N | N | Y | Y |
+| Custom tour builder | N | N | Y | Y |
+| Ambient discovery alerts | N | N | Y | Y |
+| Contextual "Did you know?" alerts | N | N | Y | Y |
+| Primary source quotes | N | N | Y | Y |
+| Salem Village LLM chat | N | N | N | Y |
+
+**Design decision:** FREE tier is deliberately minimal — strong upgrade incentive.
+
+### Step 9B.1: Define Tier & Feature Enums
+- [ ] Create `FeatureTier.kt` — Enum `FREE, EXPLORER, PREMIUM, SALEM_LLM` with `includes()` method
+- [ ] Create `FeatureMatrix.kt` — Maps each `Feature` enum to its minimum required tier
+
+### Step 9B.2: Create FeatureGate Singleton
+- [ ] Create `FeatureGate.kt` — `@Singleton`, `StateFlow<FeatureTier>`, `isUnlocked()`, `requireOrPrompt()` (shows upgrade dialog)
+
+### Step 9B.3: Add Tier to Data Models
+- [ ] Add `tier` field to `AuthUser` (default "FREE")
+- [ ] Add `min_tier` column to `Tour` and `TourPoi` Room entities (migration needed)
+
+### Step 9B.4: Wire Gate Checks into Features
+- [ ] Gate tour starts behind `Feature.FULL_TOURS`
+- [ ] Gate transit/weather/walking behind respective features
+- [ ] Gate long narration behind `Feature.FULL_NARRATION` (FREE gets short only)
+- [ ] Gate ambient mode behind `Feature.AMBIENT_ALERTS`
+
+### Step 9B.5: Stub Billing Manager
+- [ ] Create `BillingManager.kt` — Stub `initialize()`, `launchPurchaseFlow()`, `queryPurchases()`. "Coming Soon" toast.
+
+### Step 9B.6: First-Launch Tier Onboarding
+- [ ] Create `TierOnboardingDialog.kt` — 4-tier comparison card, "Continue Free" button
+- [ ] Show on first launch (flag: `onboarding_shown`)
+
+### Step 9B.7: Debug Tier Override
+- [ ] Add `/tier?set=PREMIUM` debug endpoint
+- [ ] Add tier override to debug intent handler
+
+### Step 9B.8: Verify
+- [ ] App defaults to FREE — tours locked with upgrade prompt
+- [ ] Debug `/tier?set=PREMIUM` unlocks everything
+- [ ] First launch shows tier comparison dialog
+- [ ] Tier persists across restarts
+
+---
+
+## Phase 9C — User Settings & Alert Preferences
+
+**Goal:** User-facing Settings screen accessible from the toolbar. Consolidates alert type toggles, narration preferences, map settings, and notification control.
+
+**Target:** 1-2 sessions | **Status:** NOT STARTED | **Added:** Session 78
+
+### Step 9C.1: Create Settings Activity
+- [ ] Create `SettingsActivity.kt` — `@AndroidEntryPoint`, toolbar + back button
+- [ ] Create `SettingsFragment.kt` — `PreferenceFragmentCompat` (uses existing `preference-ktx` dependency)
+- [ ] Create `activity_settings.xml` — Toolbar + FrameLayout container
+- [ ] Register in AndroidManifest.xml
+
+### Step 9C.2: Define Preference XML
+- [ ] Create `preferences.xml` with categories:
+  - Alert Types: Tour, Ambient discovery, Transit, Weather, Zone, Business (SwitchPreferences)
+  - Alert Frequency: ListPreference (High/Normal/Low/Minimal)
+  - Narration: Auto-narrate, Speed, Volume
+  - Map: Default tile source, Default zoom
+  - Notifications: Sound, Vibration, Quiet hours (with time pickers)
+  - Account: Current plan, Manage subscription
+- [ ] Create `arrays.xml` for ListPreference values
+
+### Step 9C.3: Add Preference Keys
+- [ ] Add all new `PREF_*` constants to `MenuPrefs.kt`
+
+### Step 9C.4: Add Settings to Toolbar
+- [ ] Create `ic_settings.xml` gear icon
+- [ ] Replace About icon with Settings gear on toolbar (move About into Settings)
+- [ ] Wire through `MenuEventListener.onSettingsRequested()` → launch SettingsActivity
+
+### Step 9C.5: Wire Settings to Runtime
+- [ ] NarrationManager reads speed/volume/auto-narrate from prefs + listens for changes
+- [ ] TourEngine checks tour/ambient alert prefs before firing events
+- [ ] SalemMainActivityGeofences checks geofence alert pref
+- [ ] StatusLineManager adds quiet hours check (suppress audio in time window)
+
+### Step 9C.6: Verify
+- [ ] Settings gear on toolbar → opens categorized preference screen
+- [ ] Narration speed change takes immediate effect
+- [ ] Tour alert toggle suppresses/enables approach narration
+- [ ] Quiet hours suppress audio but keep visual alerts
+- [ ] All settings persist across restarts
+
+---
+
+## Phase 9D — Contextual Alert System
+
+**Goal:** Transform limited ambient mode into a rich contextual alert engine. Fires for all nearby POIs, historical sites, businesses. Surfaces "Did you know?" facts, figure connections, primary source quotes, timeline events. Tier-gated and user-configurable.
+
+**Target:** 2-3 sessions | **Status:** NOT STARTED | **Added:** Session 78
+**Depends on:** Phase 9B (FeatureGate), Phase 9C (alert preferences)
+
+### Step 9D.1: Create ContextualAlertManager
+- [ ] Create `AlertModels.kt` — `ContextualAlertType` enum (HISTORICAL_FACT, POI_APPROACH, BUSINESS_PROMO, TIMELINE_EVENT, FIGURE_CONNECTION, PRIMARY_SOURCE) + `ContextualAlert` data class
+- [ ] Create `ContextualAlertManager.kt` — `@Singleton`, 150m trigger radius, SharedFlow emission, respects FeatureGate + user settings
+- [ ] Create `AlertFrequencyController.kt` — Frequency presets (High=1min, Normal=2min, Low=5min, Minimal=10min), hourly caps, session dedup
+
+### Step 9D.2: Replace Ambient Mode
+- [ ] In `TourEngine.onLocationUpdate()`: delegate to `contextualAlertManager.checkPosition()` when idle
+- [ ] Deprecate old `checkAmbientProximity()` method
+
+### Step 9D.3: Wire to UI
+- [ ] Create `SalemMainActivityAlerts.kt` — Extension file for alert observation + display
+- [ ] Insert `CONTEXTUAL_ALERT` priority level in StatusLineManager
+- [ ] Expose alerts in TourViewModel
+- [ ] Tap status line alert → detail card with full text + "Narrate" button
+
+### Step 9D.4: Add Spatial Queries
+- [ ] Add `getFactsNearby(lat, lng, radiusM)` to SalemContentRepository
+- [ ] Add `getFiguresNearby(lat, lng, radiusM)` to SalemContentRepository
+
+### Step 9D.5: Merchant Alerts (Tier-Gated)
+- [ ] FREE: Business alert with ad card
+- [ ] EXPLORER+: Clean info with "Recommended" badge
+- [ ] PREMIUM+: Full details, loyalty, discount codes
+
+### Step 9D.6: Verify
+- [ ] Near Salem Witch Museum without tour → "Did you know?" alert fires
+- [ ] Alerts respect 2-min interval + hourly cap
+- [ ] Settings toggles control which alert types fire
+- [ ] FREE tier sees ad cards on business alerts
+- [ ] Quiet hours suppress audio, keep visual
 
 ---
 

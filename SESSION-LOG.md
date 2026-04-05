@@ -2,6 +2,64 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-04 — Session 78: UX Transformation Plan (Phases 9A-9D)
+
+### Context
+Post Session 77. User directed a strategic pivot: recenter the app as a commercial Salem tour guide product before continuing with Phase 10 production readiness. Focus on branded launch experience, satellite imagery, feature tier gating, user settings, and contextual alerts.
+
+### Work Performed
+
+**UX Transformation Plan Created**
+- Designed and documented 4 new phases (9A-9D) inserted between Phase 9 and Phase 10 in the master plan
+- Phase 9A: Splash Screen & Satellite Map Entry (Lottie WitchKitty animation, USGS aerial tiles, cinematic zoom-in, tile source picker)
+- Phase 9B: Feature Tier Matrix & Gating Infrastructure (FREE/EXPLORER/PREMIUM/LLM tiers, FeatureGate singleton, stub billing, onboarding dialog)
+- Phase 9C: User Settings & Alert Preferences (SettingsActivity with PreferenceFragmentCompat, alert toggles, narration prefs, quiet hours)
+- Phase 9D: Contextual Alert System (ContextualAlertManager replacing ambient mode, historical facts, figure connections, business promos, frequency control)
+- 20 new files identified across all 4 phases
+- Detailed implementation plan saved to `.claude/plans/distributed-coalescing-pearl.md`
+
+**Tile Source Research**
+- Evaluated 7 satellite tile providers for commercial use with osmdroid
+- Selected USGS National Map Imagery: free, public domain, no API key, unlimited, 15cm resolution over Salem MA
+- Fallback identified: Mapbox Satellite (750K free tiles/month)
+- Rejected: ESRI (ToS violation for commercial), Bing (deprecated), MapTiler/Stadia (too expensive)
+
+**Master Plan Updated**
+- Inserted Phases 9A-9D into Table of Contents and body of WickedSalemWitchCityTour_MASTER_PLAN.md
+- Renumbered ToC entries (9A-9D at items 12-15, Phase 10 now item 16)
+- Phase numbering uses letter suffixes (9A, 9B, 9C, 9D) to avoid renumbering all subsequent phases
+
+### Decisions Made
+1. **Lottie** chosen for splash animation (over AnimatedVectorDrawable) — richer animation for WitchKitty
+2. **FREE tier is minimal** — map + basic POIs + 1 tour preview + ads only. Transit, weather, events, full tours all require EXPLORER ($4.99). Strong upgrade incentive.
+3. **USGS National Map** for satellite tiles — only option that is free, public domain, and commercially licensed
+4. **Phases 9A-9D prioritized before Phase 10** — UX transformation must happen before production readiness work
+5. **Phase dependency chain**: 9A and 9B are independent → 9C depends on both → 9D depends on 9B+9C
+
+### Files Modified
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Inserted Phases 9A-9D (ToC + body)
+- `STATE.md` — Updated current direction, added Session 78 decisions
+- `SESSION-LOG.md` — This entry
+- `.claude/plans/distributed-coalescing-pearl.md` — Detailed implementation plan (new)
+
+### Open Items
+- WitchKitty Lottie JSON file needs to be created/exported from AI Art Studio assets
+- Tours/Events still not loading on fresh install (bundled Room DB — Phase 10 work)
+- COPPA deadline April 22 (18 days) — not addressed this session
+- Credential audit (OMEN-002) — not addressed this session
+- Room migration needed for `min_tier` columns on Tour and TourPoi (Phase 9B)
+
+### OMEN Compliance
+- NOTE-L001 (CLAUDE.md): Previously completed
+- NOTE-L002/OMEN-002 (Credentials): Not addressed
+- NOTE-L003 (COPPA): Not addressed — 18 days remaining
+- NOTE-L005 (Phase 10 prereqs): Acknowledged — UX transformation now prioritized before Phase 10
+- NOTE-L008 (Pricing tiers): **ADDRESSED** — Feature tier matrix defined with exact feature-to-tier mapping
+- NOTE-L009 (Self-contained design): **PARTIALLY ADDRESSED** — FREE tier defined as offline-capable (map + POIs + bundled data)
+- OMEN-004 (Testing): Not addressed
+
+---
+
 ## Session: 2026-04-04 — Session 77: Emulator Testing, GeoInbox Init, AI Art Studio & Splash Screen Prototyping
 
 ### Context
