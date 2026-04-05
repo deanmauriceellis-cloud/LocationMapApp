@@ -26,10 +26,11 @@
 
 ### UX Transformation (Phases 9A-9D — CODE, prioritized before Phase 10)
 12. [Phase 9A — Splash Screen & Satellite Map Entry](#phase-9a--splash-screen--satellite-map-entry)
-13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation) **← PRIORITY**
-14. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
-15. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
-16. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
+13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation)
+14. [Phase 9T — Salem Walking Tour Restructure](#phase-9t--salem-walking-tour-restructure) **← PRIORITY**
+15. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
+16. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
+17. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
 
 ### Launch Readiness (Phases 10-11 — CODE)
 16. [Phase 10 — Production Readiness & Offline Infrastructure](#phase-10--production-readiness--offline-infrastructure)
@@ -986,6 +987,127 @@ Phase 9B (tier gating) is premature. The tour experience IS the product. Geofenc
 - [ ] Tour pause/resume survives app restart
 - [ ] Frida walking simulator is repeatable for regression testing
 - [ ] Git commit: "Phase 9A+: Tour hardening — offline tiles, pre-computed routes, Frida walk simulator, UX polish"
+
+---
+
+## Phase 9T — Salem Walking Tour Restructure
+
+**Goal:** Transform the tour from a linear stop-to-stop experience into an ambient content layer over downtown Salem. The city narrates itself as you walk — every historical POI, statue, street, civic building, and landmark has narration. Walking routes are suggestions, not requirements. Content triggers by proximity regardless of route.
+
+**Target:** 5-8 sessions | **Status:** NOT STARTED | **Added:** Session 85 | **Priority:** HIGHEST
+
+### Rationale
+The linear tour (stop 1 → 2 → 3) forces rigid routing. Tourists don't walk that way — they wander. The restructured "Salem Walking Tour" makes the entire downtown core a narrated experience. Walk anywhere within the bounded area and the app delivers rich historical content. This is the core product differentiator vs competitors (Action Tour Guide, Salem On Your Own). The narration dialog UI (image + text + buttons) also becomes the foundation for future merchant advertising.
+
+### Geographic Boundary
+Tour content is confined to downtown Salem's walkable core:
+- **Northwest:** Bridge Street
+- **East:** Flint Street
+- **South:** Mill Street / Harbor Street
+
+This is approximately 0.5 square miles of the densest historical area.
+
+### Step 9T.1: Define Geographic Boundary & Audit Existing POIs
+- [ ] Define the boundary polygon as precise lat/lng coordinates (Bridge St, Flint St, Mill/Harbor St)
+- [ ] Audit all 45 existing tour POIs — which fall inside the boundary?
+- [ ] Audit all Overpass/OSM POIs in the bounded area — identify historical, civic, monuments, churches, cemeteries
+- [ ] Identify all named streets within the boundary and their historical significance
+- [ ] Produce a narration point target list: aim for 80-120+ narration points total
+- [ ] Categorize by type: historical_site, street_corridor, civic_building, monument_statue, area_district, business_historical
+
+### Step 9T.2: Narration Point Catalog Schema
+- [ ] Design `NarrationPoint` data model (extends/replaces TourPoi for this use case):
+  - id, name, lat, lng, type (historical_site | street_corridor | civic_building | monument_statue | area_district)
+  - shortNarration (~50-100 words, approach trigger)
+  - longNarration (~200-400 words, entry trigger)
+  - imageAsset (optional — filename or URL for dialog image)
+  - geofenceRadiusM (20-50m depending on type)
+  - geofenceShape (circle for points, corridor for streets)
+  - priority (1=must-see through 5=minor)
+  - relatedFigureIds (link to historical_figures table)
+  - relatedFactIds (link to historical_facts table)
+  - relatedSourceIds (link to primary_sources table)
+  - actionButtons (JSON array of optional button configs for future use)
+  - dataSource, confidence, verified_date, stale_after (provenance)
+- [ ] Add Room entity and DAO for NarrationPoint
+- [ ] Add to salem-content pipeline (SalemNarrationPoints.kt)
+- [ ] Seed initial data from existing 32 downtown tour POIs
+
+### Step 9T.3: Narration Dialog UI
+- [ ] Build `NarrationDialogFragment` — the core content display component:
+  - **Top 1/3:** Image area (ImageView, optional — hide if no image, text expands)
+  - **Middle:** Title, category badge, scrollable narrative text
+  - **Bottom:** Action buttons row (Skip, Pause/Play, More Info) + TTS controls (speed, queue count)
+- [ ] Dialog appears as a bottom sheet or overlay — map stays visible behind it
+- [ ] TTS reads the narrative text simultaneously with display
+- [ ] "More Info" button shows related facts, primary sources, historical figures
+- [ ] Queue indicator: "3 more nearby" badge
+- [ ] Dialog dismissible by swipe or tap outside
+- [ ] Design for future reuse: same frame for merchant ads (image of business, description, Visit/Directions/Dismiss buttons)
+- [ ] Respect quiet mode: visual only, no TTS
+
+### Step 9T.4: Enhanced Content Queue System
+- [ ] Extend NarrationManager with priority queue (not just FIFO):
+  - Nearest narration point first
+  - Higher priority (1) before lower (5)
+  - No repeats within session (track played set)
+  - Minimum gap between narrations (configurable, default 5 seconds)
+  - Auto-advance: when one narration finishes, brief pause, then next
+- [ ] Queue state observable: current item, queue depth, next item preview
+- [ ] User controls: skip current, pause queue, clear queue, replay last
+- [ ] Handle overlapping geofences: when entering multiple zones simultaneously, enqueue all by priority/distance
+- [ ] De-duplication: if "Essex Street history" and "Essex Street architecture" both trigger, group or sequence them
+
+### Step 9T.5: Street Corridor Geofences
+- [ ] Add corridor geofence type: a polyline + buffer distance (e.g., 20m each side of street centerline)
+- [ ] Implement proximity-to-polyline check in TourGeofenceManager (point-to-segment distance)
+- [ ] Define corridors for historically significant streets within boundary:
+  - Essex Street, Federal Street, Chestnut Street, Charter Street, Derby Street, Washington Street, etc.
+- [ ] Each corridor has its own narration: street name origin, historical significance, notable events
+- [ ] Corridor narrations fire once per walk (not every time you cross the street)
+
+### Step 9T.6: Create Narration Content (80-120+ Points)
+- [ ] Write narrations for all existing downtown POIs that lack them
+- [ ] Write narrations for civic/government buildings: City Hall, courthouses, fire stations, police station, post office
+- [ ] Write narrations for churches and religious buildings within boundary
+- [ ] Write narrations for monuments and statues: Roger Conant, Hawthorne, Bewitched, Witch Trials Memorial
+- [ ] Write narrations for street corridors (8-12 major streets)
+- [ ] Write narrations for area/district entries: McIntire District, Chestnut Street row houses, Derby Wharf
+- [ ] Link narration points to related historical figures (49 available), facts (500), and primary sources (200)
+- [ ] Auto-generate draft narrations from Salem project data where possible, then curate
+- [ ] All narrations TTS-optimized: short sentences, natural speech, no academic formatting
+
+### Step 9T.7: Suggested Walking Loops
+- [ ] Design 2-3 suggested walking loops within the boundary:
+  - **Quick Loop** (~30 min, ~1.5km): Essex St pedestrian mall core, Witch House, Charter St Cemetery, waterfront return
+  - **Standard Loop** (~60 min, ~3km): adds McIntire District, Chestnut St, Common, Federal St
+  - **Grand Loop** (~90+ min, ~5km): covers the full bounded area comprehensively
+- [ ] Compute OSRM routes for each loop
+- [ ] Loops are suggestions only — content triggers regardless of route taken
+- [ ] Each loop shows estimated narration points along the way ("pass 25+ narrated locations")
+- [ ] Store as tour JSON files (reuse existing format with routeToNext geometry)
+
+### Step 9T.8: Integration & Testing
+- [ ] Wire NarrationDialogFragment to geofence events (replaces current toast + TTS-only flow)
+- [ ] Test with walk simulator through the full bounded area
+- [ ] Verify content queue handles dense areas (Essex St = 5+ points within 100m)
+- [ ] Verify corridor geofences fire correctly along streets
+- [ ] Verify no narration repeats within a walk session
+- [ ] Verify auto-advance pacing feels natural (not overwhelming)
+- [ ] Verify quiet mode (visual dialog only, no TTS)
+- [ ] Test in airplane mode — all content must work offline
+- [ ] Performance test: 120+ geofences checked on every GPS update must stay under 16ms
+
+### Step 9T.9: Verify
+- [ ] Walk simulator covers entire bounded area — all narration points fire
+- [ ] Content queue handles overlapping zones gracefully
+- [ ] Narration dialog displays correctly (image + text + buttons)
+- [ ] Street corridor narrations fire when walking along streets
+- [ ] Suggested loops render on map with route polylines
+- [ ] No GPS drift false triggers (hysteresis: 3s inside before trigger, 25m minimum radius)
+- [ ] User fatigue controls work: quiet mode, pace control, skip/pause/clear
+- [ ] All content plays offline (TTS, images from bundled assets, text from Room DB)
+- [ ] Git commit: "Phase 9T: Salem Walking Tour restructure — ambient content layer, narration dialog, content queue, 100+ narration points"
 
 ---
 

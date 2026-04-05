@@ -2,6 +2,21 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-05 — Session 85: Salem Walking Tour Restructure (planning)
+
+### Work Performed
+- Planning session: total restructure of the tour system from linear stop-to-stop to ambient content layer
+- Analyzed current assets (45 POIs, 49 figures, 500 facts, geofence/narration systems)
+- Delivered architectural recommendations: narration point taxonomy, content queue priority, dialog UI, walking loops, street corridor geofences, GPS mitigation, user fatigue controls
+- User approved approach
+- Created Phase 9T in master plan (9 steps, 5-8 session estimate) — inserted before Phase 9B as highest priority
+- Updated STATE.md with Phase 9T summary
+
+### Next Session
+Begin Phase 9T Step 1: geographic boundary definition + POI audit
+
+---
+
 ## Session: 2026-04-05 — Session 84: POI defaults, WitchKitty splash, map magnify, OSRM routes, walk simulator
 
 ### Work Performed

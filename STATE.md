@@ -18,10 +18,17 @@
   - ~~POI layer defaults~~ **DONE** — only Tourism/History, Civic, Entertainment ON by default; bbox filter respects prefs
   - ~~Splash screen~~ **DONE** — WitchKitty.png + Creepster font "Wicked Salem Witch Tours"
   - ~~Map magnify~~ **DONE** — x1-x5 scale toggle (1.0-3.0x) without changing zoom level
-  - End-to-end tour walk test (19 stops, all geofences, all TTS narrations, full UX flow)
-  - Tour UX polish (live distance indicator, seamless transitions)
-  - Geocode verify 8 new stop coordinates against satellite imagery
-  - **USER NOTE: Next session wants to redo the tour in a different way**
+  - End-to-end tour walk test, tour UX polish, geocode verify (deprioritized — superseded by 9T)
+- **Phase 9T IN QUEUE — Salem Walking Tour Restructure** (HIGHEST PRIORITY):
+  - Total tour paradigm shift: linear stop-to-stop → ambient content layer over downtown Salem
+  - Geographic bounds: Bridge St (NW), Flint St (E), Mill/Harbor St (S) — ~0.5 sq mile walkable core
+  - 80-120+ narration points: every historical POI, statue, street, civic building, landmark
+  - Narration dialog UI: image (top 1/3) + narrative text (middle) + action buttons (bottom)
+  - Content queue with priority, auto-advance, de-duplication, session tracking
+  - Street corridor geofences (polyline + buffer, not just circles)
+  - 2-3 suggested walking loops (30/60/90 min) — routes are suggestions, content triggers regardless
+  - Dialog design carries forward for future merchant advertising
+  - 9 steps: boundary audit → schema → dialog UI → queue → corridors → content → loops → integration → verify
 - **Phase 9B-9D after**: Feature tier matrix, user settings, contextual alerts
 - **Phase 10**: Production readiness — Firebase, photos, emulator verification, DB hardening
 - **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**
