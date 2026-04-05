@@ -26,9 +26,10 @@
 
 ### UX Transformation (Phases 9A-9D — CODE, prioritized before Phase 10)
 12. [Phase 9A — Splash Screen & Satellite Map Entry](#phase-9a--splash-screen--satellite-map-entry)
-13. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
-14. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
-15. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
+13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation) **← PRIORITY**
+14. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
+15. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
+16. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
 
 ### Launch Readiness (Phases 10-11 — CODE)
 16. [Phase 10 — Production Readiness & Offline Infrastructure](#phase-10--production-readiness--offline-infrastructure)
@@ -899,6 +900,92 @@ GPS update → TourGeofenceManager.checkPosition()
 - [ ] Layers icon shows 3 tile options, all switch correctly
 - [ ] All existing features (radar, transit, POIs, tours) work on satellite tiles
 - [ ] Tile preference persists across app restarts
+
+---
+
+## Phase 9A+ — Tour Hardening & Offline Foundation
+
+**Goal:** Make the Salem Essentials 14-stop tour bulletproof and fully offline. This is the product foundation — every future feature builds on a proven, working tour experience. The app must run completely offline on a tablet with no internet dependency.
+
+**Target:** 3-5 sessions | **Status:** NOT STARTED | **Added:** Session 82 | **Priority:** HIGHEST
+**Test Device:** Lenovo TB305FU tablet (Android 15, ARM64, Magisk root, Frida 17.9.1, serial HNY0CY0W)
+
+### Rationale
+Phase 9B (tier gating) is premature. The tour experience IS the product. Geofence triggers, TTS narration, map overlays, and stop advancement have never been validated end-to-end on a real walking simulation. Session 81 emulator testing showed 1/14 geofences firing — the FusedLocationProvider flow is unproven. Before layering features on top, the foundation must be solid.
+
+### Step 9A+.1: Bundle Offline Map Tiles for Salem
+- [ ] Generate `.mbtiles` tile archive for downtown Salem (~1 sq mile bounding box)
+- [ ] Include Esri World Imagery (satellite) tiles, zoom levels 12-19 (~60-100MB)
+- [ ] Include OpenStreetMap (street) tiles, zoom levels 12-19 as fallback
+- [ ] Add `MBTilesFileArchive` offline tile source to `TileSourceManager.kt`
+- [ ] Add offline-first fallback: try bundled tiles first, fetch from network only if not available
+- [ ] Tiles can be sideloaded to tablet storage (not APK-bundled — too large) or placed in app assets directory
+- [ ] Verify: satellite map renders on tablet in airplane mode
+
+### Step 9A+.2: Bundle Offline POI Data for Salem
+- [ ] Pre-populate Room database with Overpass POI data for Salem's walkable core (~1 sq mile)
+- [ ] Include restaurants, shops, museums, parks, parking, transit stops — all categories the app displays
+- [ ] Add offline POI query path in PlacesRepository: check local Room DB before calling proxy
+- [ ] Salem-specific POIs (37 curated + tour stops) already bundled — extend to general commercial POIs
+- [ ] Verify: POI markers display on tablet in airplane mode
+
+### Step 9A+.3: Pre-Compute Walking Route Geometry
+- [ ] Fetch OSRM routes for all 13 segments of Salem Essentials tour (stop 1→2, 2→3, ... 13→14)
+- [ ] Encode each route as a polyline in the tour JSON (`tour_essentials.json`)
+- [ ] Add `routeGeometry` field to tour stop schema (encoded polyline string)
+- [ ] Modify `WalkingDirections.kt` to check for bundled route geometry before calling OSRM
+- [ ] Repeat for Explorer (20 stops) and Grand (26 stops) tours
+- [ ] Verify: route polyline draws on map without internet
+
+### Step 9A+.4: Verify Tour Stop Coordinates
+- [ ] Cross-reference all 14 Salem Essentials stop coordinates against actual locations
+- [ ] Stops 1, 2, 3 share latitude 42.5216 — verify this is accurate (Essex Street alignment)
+- [ ] Verify geofence radii are appropriate for each stop (small memorial = 20m, large park = 80m)
+- [ ] Adjust any coordinates or radii that are off
+- [ ] Document verified coordinates with source (Google Maps, field measurement, etc.)
+
+### Step 9A+.5: Build Frida GPS Walking Simulator
+- [ ] Create Frida script (`frida-salem-walk.js`) with all 14 Salem Essentials waypoints plus interpolated street-following points between stops
+- [ ] Hook `FusedLocationProviderClient` and `LocationManager` on the tablet to inject synthetic GPS coordinates
+- [ ] Walk at realistic speed (~1.2 m/s) with GPS jitter (±2m), proper bearing, altitude, accuracy fields
+- [ ] Set `isFromMockProvider(false)` — app sees "real" GPS
+- [ ] Add Python control script: start, pause, speed up (5x/10x), jump to stop N, reset
+- [ ] Leverage gog-agent Frida infrastructure (Frida 17.9.1, Python bridge, tablet attachment pattern at `~/Development/gog-agent/`)
+- [ ] Verify: app receives continuous location updates at walking pace, geofences trigger reliably
+
+### Step 9A+.6: End-to-End Tour Walk Test
+- [ ] Deploy app to tablet, enable airplane mode
+- [ ] Run Frida walking simulator through all 14 stops
+- [ ] Verify each stop triggers: APPROACH → short TTS narration → ENTRY → long TTS narration → EXIT → transition narration
+- [ ] Listen to all 14 TTS narrations — evaluate pacing, clarity, content accuracy
+- [ ] Verify map behavior: route polyline visible, numbered markers update (gray→blue→green), HUD shows progress
+- [ ] Verify tour completion: summary screen with stats, clean exit
+- [ ] Document all issues found for fixing
+
+### Step 9A+.7: Tour UX Polish
+- [ ] Add continuous map follow during walking (not just on ENTRY events) — user's position stays centered
+- [ ] Add "next stop" distance indicator that updates live as user walks
+- [ ] Verify stop advancement is seamless: exit → transition TTS → approach next stop
+- [ ] Add graceful offline indicators: suppress weather/transit/aircraft UI when offline instead of showing broken buttons
+- [ ] Verify pause/resume with geofence restore works across app restart
+- [ ] Verify TTS respects phone ringer mode (silent = no speech)
+
+### Step 9A+.8: Offline TTS Verification
+- [ ] Confirm Google TTS `en-US` voice data is installed on tablet (already confirmed: `com.google.android.tts` present)
+- [ ] Test TTS output in airplane mode — verify no network dependency for speech synthesis
+- [ ] If tablet lacks offline voice data, document how to pre-install it
+
+### Step 9A+.9: Verify
+- [ ] Salem Essentials tour runs start-to-finish on tablet in airplane mode
+- [ ] All 14 geofences trigger at correct distances
+- [ ] All narrations play via TTS (approach, at-stop, transition)
+- [ ] Map displays satellite tiles from bundled archive
+- [ ] Walking route polyline displays from pre-computed geometry
+- [ ] POI markers display from bundled Room database
+- [ ] No crashes, no network calls, no blank screens
+- [ ] Tour pause/resume survives app restart
+- [ ] Frida walking simulator is repeatable for regression testing
+- [ ] Git commit: "Phase 9A+: Tour hardening — offline tiles, pre-computed routes, Frida walk simulator, UX polish"
 
 ---
 

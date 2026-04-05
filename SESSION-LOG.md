@@ -2,6 +2,23 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-05 ��� Session 82: Tour Hardening Plan — Phase 9A+ Added to MASTER_PLAN
+
+### Work Performed
+- Planning session — no code changes
+- Deep research: tour engine architecture, offline readiness audit, tablet capabilities, Frida GPS simulation
+- Verified Lenovo TB305FU tablet connection (Android 15, Magisk root, Frida 17.9.1, Google TTS)
+- Added Phase 9A+ (Tour Hardening & Offline Foundation) to MASTER_PLAN — highest priority, 9 steps
+- Key gaps identified: no offline tiles (blank map), no offline routes (OSRM dependency), no offline general POIs
+- Decision: Phase 9B deferred. Offline-first + Frida walk simulator on tablet = proven tour foundation
+
+### Files Changed
+- WickedSalemWitchCityTour_MASTER_PLAN.md (Phase 9A+ inserted between 9A and 9B)
+- STATE.md (updated direction, test device, offline requirements)
+- docs/session-logs/session-082-2026-04-05.md (created)
+
+---
+
 ## Session: 2026-04-05 — Session 81: Tour Startup UX + Satellite Upgrade + Tour Files
 
 ### Work Performed
