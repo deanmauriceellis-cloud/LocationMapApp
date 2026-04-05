@@ -2,6 +2,23 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-05 — Session 81: Tour Startup UX + Satellite Upgrade + Tour Files
+
+### Work Performed
+- Welcome dialog after splash: "Explore Salem" / "Take a Tour" choices
+- Enhanced tour selection: themed sections, POI category toggles, async loading spinner
+- Long-press teleport feeds tour engine (geofences trigger on teleport)
+- Fixed missing tour data in bundled Room DB (3 tours, 58 stops)
+- Satellite tiles: USGS zoom 16 → Esri World Imagery zoom 19
+- Created 3 self-contained tour JSON files (assets/tours/)
+- Full emulator test: welcome → tour select → start → geofence → TTS
+
+### Files Changed
+- SalemMainActivity.kt, SalemMainActivityTour.kt, TileSourceManager.kt, salem_content.db
+- NEW: assets/tours/tour_essentials.json, tour_explorer.json, tour_grand.json
+
+---
+
 ## Session: 2026-04-05 — Session 80: Phase 9A Emulator Test (PASSES)
 
 ### Context

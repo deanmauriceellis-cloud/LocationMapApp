@@ -62,6 +62,123 @@ internal var tourRoutePolyline: Polyline? = null
 internal val tourStopMarkers = mutableListOf<Marker>()
 internal var narrationBarView: View? = null
 internal var tourHudView: View? = null
+internal var welcomeShown = false
+
+// ═════════════════════════════════════════════════════════════════════════════
+// WELCOME DIALOG — shown once after cinematic zoom
+// ═════════════════════════════════════════════════════════════════════════════
+
+@SuppressLint("SetTextI18n")
+internal fun SalemMainActivity.showWelcomeDialog() {
+    if (welcomeShown) return
+    welcomeShown = true
+
+    val density = resources.displayMetrics.density
+    val dp = { v: Int -> (v * density).toInt() }
+
+    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+    dialog.setCancelable(false)
+
+    // ── Brand title ──
+    val title = TextView(this).apply {
+        text = "Wicked Salem"
+        textSize = 28f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        gravity = Gravity.CENTER
+        setPadding(0, dp(48), 0, dp(4))
+    }
+    val subtitle = TextView(this).apply {
+        text = "Witch City Tour"
+        textSize = 16f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setTypeface(Typeface.SERIF, Typeface.NORMAL)
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, dp(32))
+    }
+
+    // ── Choice cards ──
+    fun choiceCard(
+        icon: String, label: String, desc: String, onClick: () -> Unit
+    ): LinearLayout {
+        val bg = GradientDrawable().apply {
+            setColor(Color.parseColor(SALEM_SURFACE))
+            cornerRadius = dp(12).toFloat()
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = bg
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = dp(24); marginEnd = dp(24); bottomMargin = dp(16)
+            }
+            // Icon
+            addView(TextView(this@showWelcomeDialog).apply {
+                text = icon; textSize = 32f
+                setPadding(0, 0, dp(16), 0)
+            })
+            // Text column
+            val col = LinearLayout(this@showWelcomeDialog).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            col.addView(TextView(this@showWelcomeDialog).apply {
+                text = label; textSize = 18f
+                setTextColor(Color.parseColor(SALEM_GOLD))
+                setTypeface(null, Typeface.BOLD)
+            })
+            col.addView(TextView(this@showWelcomeDialog).apply {
+                text = desc; textSize = 13f
+                setTextColor(Color.parseColor(SALEM_TEXT))
+                setPadding(0, dp(4), 0, 0)
+            })
+            addView(col)
+            setOnClickListener { onClick() }
+        }
+    }
+
+    val exploreCard = choiceCard(
+        "\uD83D\uDDFA", "Explore Salem",
+        "See what\u2019s around you. Browse the map freely."
+    ) { dialog.dismiss() }
+
+    val tourCard = choiceCard(
+        "\uD83D\uDEB6", "Take a Tour",
+        "Guided walking tours with GPS narration."
+    ) { dialog.dismiss(); showTourSelectionDialog() }
+
+    // ── Hint ──
+    val hint = TextView(this).apply {
+        text = "Long-press the map to jump to any location"
+        textSize = 11f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        gravity = Gravity.CENTER
+        setPadding(0, dp(24), 0, dp(16))
+    }
+
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
+        addView(title)
+        addView(subtitle)
+        addView(exploreCard)
+        addView(tourCard)
+        addView(hint)
+    }
+
+    dialog.setContentView(root)
+    dialog.show()
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TOUR SELECTION DIALOG
@@ -69,12 +186,6 @@ internal var tourHudView: View? = null
 
 @SuppressLint("SetTextI18n")
 internal fun SalemMainActivity.showTourSelectionDialog() {
-    val tours = tourViewModel.availableTours.value
-    if (tours.isEmpty()) {
-        Toast.makeText(this, "No tours available", Toast.LENGTH_SHORT).show()
-        return
-    }
-
     // Check if a tour is already active — show resume dialog instead
     val currentState = tourViewModel.tourState.value
     if (currentState is TourState.Active || currentState is TourState.Paused) {
@@ -111,17 +222,111 @@ internal fun SalemMainActivity.showTourSelectionDialog() {
         addView(closeBtn)
     }
 
-    // ── Tour list ──
+    // ── Content container (populated once tours load) ──
     val listLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(12), 0, dp(12), dp(12))
     }
 
-    for (tour in tours) {
-        listLayout.addView(buildTourCard(tour, dp, dialog))
+    // ── Loading indicator ──
+    val loadingLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(dp(16), dp(48), dp(16), dp(48))
+        addView(ProgressBar(this@showTourSelectionDialog).apply {
+            isIndeterminate = true
+        })
+        addView(TextView(this@showTourSelectionDialog).apply {
+            text = "Loading tours\u2026"
+            textSize = 14f
+            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, 0)
+        })
+    }
+    listLayout.addView(loadingLayout)
+
+    val scroll = ScrollView(this).apply { addView(listLayout) }
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(Color.parseColor(SALEM_DARK))
+        addView(headerRow)
+        addView(scroll)
+    }
+    dialog.setContentView(root)
+    dialog.show()
+
+    // ── Observe tours and populate when ready ──
+    lifecycleScope.launch {
+        tourViewModel.availableTours.collectLatest { tours ->
+            if (tours.isEmpty()) return@collectLatest
+            val allPois = tourViewModel.allPois.value
+            runOnUiThread {
+                listLayout.removeAllViews()
+                populateTourList(listLayout, tours, allPois, dp, dialog)
+            }
+        }
+    }
+}
+
+/** Populate tour list content into the given layout. */
+@SuppressLint("SetTextI18n")
+private fun SalemMainActivity.populateTourList(
+    listLayout: LinearLayout,
+    tours: List<Tour>,
+    allPois: List<TourPoi>,
+    dp: (Int) -> Int,
+    dialog: Dialog
+) {
+    // ── Group tours by theme ──
+    val witchTrialsTours = tours.filter { it.theme == "essential_highlights" }
+    val otherTours = tours.filter { it.theme != "essential_highlights" }
+
+    if (witchTrialsTours.isNotEmpty()) {
+        listLayout.addView(sectionHeader("Salem Witch Trials", dp))
+        for (tour in witchTrialsTours) {
+            listLayout.addView(buildTourCard(tour, dp, dialog))
+        }
+    }
+    if (otherTours.isNotEmpty()) {
+        listLayout.addView(sectionHeader("Extended Tours", dp))
+        for (tour in otherTours) {
+            listLayout.addView(buildTourCard(tour, dp, dialog))
+        }
+    }
+
+    // ── POI category toggles ──
+    data class PoiCategoryInfo(val id: String, val label: String, val count: Int)
+    val categoryMap = allPois.groupBy { it.category }
+    val categoryOrder = listOf(
+        "witch_trials" to "Witch Trial Sites",
+        "maritime" to "Maritime & Historical",
+        "museums" to "Museums & Cultural",
+        "literary_sites" to "Literary Sites",
+        "parks_landmarks" to "Parks & Landmarks",
+        "visitor_services" to "Visitor Services"
+    )
+    val categories = categoryOrder.mapNotNull { (id, label) ->
+        val count = categoryMap[id]?.size ?: return@mapNotNull null
+        PoiCategoryInfo(id, label, count)
+    }
+
+    if (categories.isNotEmpty()) {
+        listLayout.addView(sectionHeader("Points of Interest", dp))
+        listLayout.addView(TextView(this).apply {
+            text = "These categories are shown on the map during your tour"
+            textSize = 12f
+            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+            setPadding(dp(4), 0, 0, dp(8))
+        })
+        for (cat in categories) {
+            listLayout.addView(categoryToggle(cat.id, cat.label, cat.count, dp))
+        }
     }
 
     // ── Special options: Time Budget + Build Your Own ──
+    listLayout.addView(sectionHeader("Customize", dp))
+
     fun specialBtn(label: String, subtitle: String, onClick: () -> Unit): LinearLayout {
         val cardBg = GradientDrawable().apply {
             setColor(Color.parseColor("#33C9A84C")) // gold tint
@@ -136,13 +341,13 @@ internal fun SalemMainActivity.showTourSelectionDialog() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = dp(8) }
-            addView(TextView(this@showTourSelectionDialog).apply {
+            addView(TextView(this@populateTourList).apply {
                 text = label
                 textSize = 15f
                 setTextColor(Color.parseColor(SALEM_GOLD))
                 setTypeface(null, Typeface.BOLD)
             })
-            addView(TextView(this@showTourSelectionDialog).apply {
+            addView(TextView(this@populateTourList).apply {
                 text = subtitle
                 textSize = 12f
                 setTextColor(Color.parseColor(SALEM_TEXT_DIM))
@@ -154,27 +359,67 @@ internal fun SalemMainActivity.showTourSelectionDialog() {
 
     listLayout.addView(specialBtn(
         "\u23F1 I Have X Minutes",
-        "Pick a time budget — we'll build the perfect tour"
+        "Pick a time budget \u2014 we\u2019ll build the perfect tour"
     ) { dialog.dismiss(); showTimeBudgetDialog() })
 
     listLayout.addView(specialBtn(
         "\u270E Build Your Own Tour",
         "Browse all POIs, pick stops, auto-optimize route"
     ) { dialog.dismiss(); showCustomTourBuilder() })
+}
 
-    val scroll = ScrollView(this).apply {
-        addView(listLayout)
+// ── Section header helper ──
+private fun SalemMainActivity.sectionHeader(text: String, dp: (Int) -> Int): TextView {
+    return TextView(this).apply {
+        this.text = text.uppercase()
+        textSize = 12f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(null, Typeface.BOLD)
+        letterSpacing = 0.1f
+        setPadding(dp(4), dp(16), 0, dp(8))
     }
+}
 
-    val root = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Color.parseColor(SALEM_DARK))
-        addView(headerRow)
-        addView(scroll)
+// ── POI category toggle row ──
+@SuppressLint("SetTextI18n")
+private fun SalemMainActivity.categoryToggle(
+    categoryId: String, label: String, count: Int, dp: (Int) -> Int
+): LinearLayout {
+    val checked = booleanArrayOf(true) // default: all categories on
+    val rowBg = GradientDrawable().apply {
+        setColor(Color.parseColor(SALEM_SURFACE))
+        cornerRadius = dp(6).toFloat()
     }
-
-    dialog.setContentView(root)
-    dialog.show()
+    val checkMark = TextView(this).apply {
+        text = "\u2611"
+        textSize = 18f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setPadding(0, 0, dp(12), 0)
+    }
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = rowBg
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(4) }
+        addView(checkMark)
+        addView(TextView(this@categoryToggle).apply {
+            text = "$label ($count)"
+            textSize = 14f
+            setTextColor(Color.parseColor(SALEM_TEXT))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        setOnClickListener {
+            checked[0] = !checked[0]
+            checkMark.text = if (checked[0]) "\u2611" else "\u2610"
+            checkMark.setTextColor(
+                Color.parseColor(if (checked[0]) SALEM_GOLD else SALEM_TEXT_DIM)
+            )
+        }
+    }
 }
 
 @SuppressLint("SetTextI18n")

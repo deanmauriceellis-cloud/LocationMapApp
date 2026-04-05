@@ -652,6 +652,8 @@ class SalemMainActivity : AppCompatActivity() {
                 stopIdlePopulate(clearState = true)
                 stopSilentFill()
                 viewModel.setManualLocation(p)
+                // Feed tour engine so geofences trigger at the teleported location
+                updateTourLocation(p)
                 // Zoom to 14 if currently zoomed out; leave alone if already 14+
                 val targetZoom = if (binding.mapView.zoomLevelDouble < 18.0) 18.0 else binding.mapView.zoomLevelDouble
                 binding.mapView.controller.animateTo(p, targetZoom, null)
@@ -705,7 +707,7 @@ class SalemMainActivity : AppCompatActivity() {
     internal fun performCinematicZoom(target: GeoPoint) {
         DebugLogger.i("SalemMainActivity", "performCinematicZoom → ${target.latitude},${target.longitude}")
         val map = binding.mapView
-        val maxZoom = map.maxZoomLevel.coerceAtMost(16.0)
+        val maxZoom = map.maxZoomLevel.coerceAtMost(19.0)
 
         // Phase 1: zoom 4→10, center on target region (800ms)
         map.controller.animateTo(target, 10.0, 800L)
@@ -719,6 +721,11 @@ class SalemMainActivity : AppCompatActivity() {
         map.postDelayed({
             map.controller.animateTo(target, maxZoom, 800L)
         }, 2200L)
+
+        // Phase 4: show welcome dialog after zoom settles
+        map.postDelayed({
+            showWelcomeDialog()
+        }, 3400L)
     }
 
     @SuppressLint("ClickableViewAccessibility")

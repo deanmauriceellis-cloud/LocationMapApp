@@ -67,20 +67,21 @@ object TileSourceManager {
     }
 
     /**
-     * USGS National Map Imagery — free, public domain, no API key required.
-     * 15cm resolution over Salem, MA. Commercial use permitted.
+     * Esri World Imagery — high-resolution satellite imagery.
+     * Zoom 0-19 (20 in some metro areas). No API key required.
+     * Attribution: "Sources: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
      *
      * ArcGIS tile servers use z/y/x ordering (not osmdroid's default z/x/y),
      * so we override getTileURLString to swap x and y.
      */
-    /** Max zoom for USGS imagery — server returns 404 above this. */
-    const val USGS_MAX_ZOOM = 16
+    /** Max zoom for satellite imagery. */
+    const val USGS_MAX_ZOOM = 19
 
     private fun buildUsgsSource(): OnlineTileSourceBase {
         return object : OnlineTileSourceBase(
-            "USGS-Imagery",
+            "Esri-WorldImagery",
             0, USGS_MAX_ZOOM, 256, "",
-            arrayOf("https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/")
+            arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")
         ) {
             override fun getTileURLString(pMapTileIndex: Long): String {
                 val z = MapTileIndex.getZoom(pMapTileIndex)
