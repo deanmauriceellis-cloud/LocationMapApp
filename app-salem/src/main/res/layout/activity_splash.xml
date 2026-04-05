@@ -5,29 +5,28 @@
   Module: activity_splash.xml — Branded splash screen layout
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/splash_background">
 
-    <!-- Centered Lottie animation -->
-    <com.airbnb.lottie.LottieAnimationView
-        android:id="@+id/splashAnimation"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
+    <!-- WitchKitty splash image — centered, fills most of screen -->
+    <ImageView
+        android:id="@+id/splashImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="120dp"
         android:layout_gravity="center"
-        android:layout_marginBottom="60dp"
-        app:lottie_rawRes="@raw/witchkitty_splash"
-        app:lottie_autoPlay="true"
-        app:lottie_loop="false" />
+        android:scaleType="centerInside"
+        android:src="@drawable/splash_witchkitty"
+        android:contentDescription="WitchKitty" />
 
-    <!-- App title text — fades in after animation starts -->
+    <!-- App title — scary Creepster font, fades in at bottom -->
     <LinearLayout
         android:id="@+id/splashTextContainer"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal|bottom"
-        android:layout_marginBottom="160dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="48dp"
         android:orientation="vertical"
         android:gravity="center_horizontal"
         android:alpha="0">
@@ -37,20 +36,29 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Wicked Salem"
-            android:textColor="@color/colorAccent"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:fontFamily="serif" />
+            android:textColor="#C9A84C"
+            android:textSize="42sp"
+            android:fontFamily="@font/creepster"
+            android:letterSpacing="0.08"
+            android:shadowColor="#88000000"
+            android:shadowDx="2"
+            android:shadowDy="3"
+            android:shadowRadius="6" />
 
         <TextView
             android:id="@+id/splashSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Witch City Tour"
-            android:textColor="@color/salemTextPrimary"
-            android:textSize="18sp"
-            android:fontFamily="serif"
-            android:layout_marginTop="4dp" />
+            android:text="Witch Tours"
+            android:textColor="#F5F0E8"
+            android:textSize="24sp"
+            android:fontFamily="@font/creepster"
+            android:letterSpacing="0.15"
+            android:layout_marginTop="2dp"
+            android:shadowColor="#88000000"
+            android:shadowDx="1"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
 
     </LinearLayout>
 

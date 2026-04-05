@@ -25,7 +25,8 @@ data class PoiCategory(
     val prefKey: String,
     val tags: List<String>,
     val subtypes: List<PoiSubtype>?,
-    val color: Int
+    val color: Int,
+    val defaultEnabled: Boolean = false
 )
 
 data class PoiSubtype(val label: String, val tags: List<String>)
@@ -100,7 +101,7 @@ object PoiCategories {
             color = Color.parseColor("#0277BD")
         ),
 
-        // 4 — Civic & Gov
+        // 4 — Civic & Gov (default ON — courthouses, town halls relevant to Salem history)
         PoiCategory(
             id = PoiLayerId.CIVIC,
             label = "Civic & Gov",
@@ -119,7 +120,8 @@ object PoiCategories {
                 PoiSubtype("Recycling",         listOf("amenity=recycling")),
                 PoiSubtype("Embassies",         listOf("office=diplomatic"))
             ),
-            color = Color.parseColor("#1A237E")
+            color = Color.parseColor("#1A237E"),
+            defaultEnabled = true
         ),
 
         // 5 — Parks & Rec
@@ -298,7 +300,7 @@ object PoiCategories {
             color = Color.parseColor("#4E342E")
         ),
 
-        // 13 — Tourism & History
+        // 13 — Tourism & History (default ON — primary layer for Salem tour app)
         PoiCategory(
             id = PoiLayerId.TOURISM_HISTORY,
             label = "Tourism & History",
@@ -326,7 +328,8 @@ object PoiCategories {
                 PoiSubtype("Aquariums",   listOf("tourism=aquarium")),
                 PoiSubtype("Theme Parks", listOf("tourism=theme_park"))
             ),
-            color = Color.parseColor("#FF6F00")
+            color = Color.parseColor("#FF6F00"),
+            defaultEnabled = true
         ),
 
         // 14 — Emergency Svc
@@ -360,7 +363,7 @@ object PoiCategories {
             color = Color.parseColor("#37474F")
         ),
 
-        // 16 — Entertainment
+        // 16 — Entertainment (default ON — haunted houses, theatres, event venues)
         PoiCategory(
             id = PoiLayerId.ENTERTAINMENT,
             label = "Entertainment",
@@ -393,7 +396,8 @@ object PoiCategories {
                 PoiSubtype("Mini Golf",     listOf("leisure=miniature_golf")),
                 PoiSubtype("Escape Rooms",  listOf("leisure=escape_game"))
             ),
-            color = Color.parseColor("#00838F")
+            color = Color.parseColor("#00838F"),
+            defaultEnabled = true
         ),
 
         // 17 — Offices & Services
@@ -416,4 +420,13 @@ object PoiCategories {
 
     /** Look up a category by its layer ID, or null. */
     fun find(id: String): PoiCategory? = ALL.find { it.id == id }
+
+    /** Build a set of OSM tag values (e.g. "restaurant", "museum") for enabled categories. */
+    fun enabledTagValues(prefs: android.content.SharedPreferences): Set<String> = buildSet {
+        for (cat in ALL) {
+            if (prefs.getBoolean(cat.prefKey, cat.defaultEnabled)) {
+                for (tag in cat.tags) add(tag.substringAfter("="))
+            }
+        }
+    }
 }

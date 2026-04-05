@@ -816,12 +816,19 @@ class AppBarMenuManager(
         return popup
     }
 
-    /** Default value for a given pref key (most default ON, aircraft defaults OFF). */
-    private fun prefDefault(prefKey: String): Boolean = when (prefKey) {
-        MenuPrefs.PREF_AIRCRAFT_DISPLAY, MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, MenuPrefs.PREF_POPULATE_POIS, MenuPrefs.PREF_MBTA_BUS_STOPS,
-        MenuPrefs.PREF_ALERT_SOUND, MenuPrefs.PREF_CAMERA_OVERLAY, MenuPrefs.PREF_SCHOOL_OVERLAY, MenuPrefs.PREF_FLOOD_OVERLAY, MenuPrefs.PREF_CROSSING_OVERLAY,
-        MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE -> false
-        else -> true
+    /** Default value for a given pref key. POI layers use PoiCategory.defaultEnabled
+     *  (only Tourism & History is ON by default). */
+    private fun prefDefault(prefKey: String): Boolean {
+        // Check if this is a POI layer pref — use the category's defaultEnabled
+        val poiCat = PoiCategories.ALL.find { it.prefKey == prefKey }
+        if (poiCat != null) return poiCat.defaultEnabled
+        // Non-POI prefs
+        return when (prefKey) {
+            MenuPrefs.PREF_AIRCRAFT_DISPLAY, MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, MenuPrefs.PREF_POPULATE_POIS, MenuPrefs.PREF_MBTA_BUS_STOPS,
+            MenuPrefs.PREF_ALERT_SOUND, MenuPrefs.PREF_CAMERA_OVERLAY, MenuPrefs.PREF_SCHOOL_OVERLAY, MenuPrefs.PREF_FLOOD_OVERLAY, MenuPrefs.PREF_CROSSING_OVERLAY,
+            MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE -> false
+            else -> true
+        }
     }
 
     /**

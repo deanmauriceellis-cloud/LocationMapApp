@@ -183,6 +183,16 @@ class SalemMainActivity : AppCompatActivity() {
     }
     internal var idlePopulateState: IdlePopulateState? = null
 
+    // Zoom toggle (x1/x2/x3 quick zoom)
+    internal var zoomToggleLevel: Int = 0  // 0=x1, 1=x2, 2=x3
+
+    // Walk simulator
+    internal var walkSimJob: kotlinx.coroutines.Job? = null
+    internal var walkSimRunning: Boolean = false
+
+    // Show-all-POIs debug toggle
+    internal var showAllPoisActive: Boolean = false
+
     // Weather auto-fetch
     internal var weatherMenuItem: android.view.MenuItem? = null
     internal var weatherIconView: ImageView? = null
@@ -425,7 +435,7 @@ class SalemMainActivity : AppCompatActivity() {
         }
 
         // Defer POI restore until first GPS fix so we query at the real location
-        val anyPoiEnabled = PoiCategories.ALL.any { prefs.getBoolean(it.prefKey, true) }
+        val anyPoiEnabled = PoiCategories.ALL.any { prefs.getBoolean(it.prefKey, it.defaultEnabled) }
         if (anyPoiEnabled) {
             pendingPoiRestore = true
             DebugLogger.i("SalemMainActivity", "onStart() POI restore deferred — waiting for GPS fix")
@@ -617,6 +627,9 @@ class SalemMainActivity : AppCompatActivity() {
             }, 3000L)
         }
         setupZoomSlider()
+        setupZoomToggle()
+        setupWalkSimButton()
+        setupShowAllPoisButton()
         val eventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                 var consumed = false
@@ -876,6 +889,114 @@ class SalemMainActivity : AppCompatActivity() {
         }
     }
 
+    /** Set up the bottom-left magnification toggle (x1 → x2 → x3 → x1).
+     *  Scales the map view visually without changing the actual zoom level. */
+    internal fun setupZoomToggle() {
+        val scaleFactors = floatArrayOf(1.0f, 1.5f, 2.0f, 2.5f, 3.0f) // x1–x5
+        val labels = arrayOf("x1", "x2", "x3", "x4", "x5")
+
+        binding.zoomToggleBtn.setOnClickListener {
+            zoomToggleLevel = (zoomToggleLevel + 1) % 5
+            val scale = scaleFactors[zoomToggleLevel]
+            binding.mapView.animate()
+                .scaleX(scale).scaleY(scale)
+                .setDuration(200L)
+                .start()
+            binding.zoomToggleLabel.text = labels[zoomToggleLevel]
+            DebugLogger.i("SalemMainActivity", "Map magnify → ${labels[zoomToggleLevel]} (scale $scale)")
+        }
+    }
+
+    /** Walk simulator button — starts/stops emulated GPS walk along the witch trials tour. */
+    internal fun setupWalkSimButton() {
+        binding.btnWalkSim.setOnClickListener {
+            if (walkSimRunning) {
+                stopWalkSim()
+            } else {
+                startWalkSim()
+            }
+        }
+    }
+
+    private fun startWalkSim() {
+        val routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+            .loadAllRoutePoints(this, "tour_witch_trials")
+        if (routePoints.isEmpty()) {
+            toast("No route data for tour_witch_trials")
+            return
+        }
+        walkSimRunning = true
+        binding.btnWalkSim.text = "Stop"
+        binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
+        DebugLogger.i("SalemMainActivity", "Walk sim started: ${routePoints.size} route points")
+
+        walkSimJob = lifecycleScope.launch {
+            val interpolated = interpolateWalkRoute(routePoints, 1.4f)
+            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
+            for (point in interpolated) {
+                if (walkSimJob?.isCancelled == true) break
+                viewModel.setManualLocation(point)
+                kotlinx.coroutines.delay(1000L)
+            }
+            // Walk complete
+            if (walkSimJob?.isCancelled != true) {
+                walkSimRunning = false
+                binding.btnWalkSim.text = "Walk"
+                binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
+                toast("Walk simulation complete")
+            }
+        }
+    }
+
+    private fun stopWalkSim() {
+        walkSimJob?.cancel()
+        walkSimJob = null
+        walkSimRunning = false
+        binding.btnWalkSim.text = "Walk"
+        binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
+        DebugLogger.i("SalemMainActivity", "Walk sim stopped")
+        toast("Walk stopped")
+    }
+
+    private fun interpolateWalkRoute(points: List<org.osmdroid.util.GeoPoint>, speedMps: Float): List<org.osmdroid.util.GeoPoint> {
+        if (points.size < 2) return points
+        val result = mutableListOf(points[0])
+        var residualM = 0.0
+        for (i in 0 until points.size - 1) {
+            val from = points[i]; val to = points[i + 1]
+            val segDist = com.example.wickedsalemwitchcitytour.tour.TourEngine.haversineM(
+                from.latitude, from.longitude, to.latitude, to.longitude)
+            if (segDist < 0.1) continue
+            var covered = residualM
+            while (covered < segDist) {
+                covered += speedMps
+                if (covered >= segDist) { residualM = covered - segDist; break }
+                val frac = covered / segDist
+                result.add(org.osmdroid.util.GeoPoint(
+                    from.latitude + (to.latitude - from.latitude) * frac,
+                    from.longitude + (to.longitude - from.longitude) * frac))
+            }
+        }
+        result.add(points.last())
+        return result
+    }
+
+    /** Show-all-POIs toggle — temporarily bypasses layer filtering. */
+    internal fun setupShowAllPoisButton() {
+        binding.btnShowAllPois.setOnClickListener {
+            showAllPoisActive = !showAllPoisActive
+            if (showAllPoisActive) {
+                binding.btnShowAllPois.setBackgroundResource(R.drawable.zoom_button_active_bg)
+                toast("Showing ALL POIs")
+            } else {
+                binding.btnShowAllPois.setBackgroundResource(R.drawable.zoom_toggle_bg)
+                toast("POI layer filter restored")
+            }
+            DebugLogger.i("SalemMainActivity", "Show all POIs → $showAllPoisActive")
+            loadCachedPoisForVisibleArea()
+        }
+    }
+
     // =========================================================================
     // LOCATION — startup centering fix
     // =========================================================================
@@ -1035,9 +1156,11 @@ class SalemMainActivity : AppCompatActivity() {
             }
 
             // ── 2. 100m dead zone — skip jitter when stationary ──
+            //    Bypassed in MANUAL mode (walk simulator) so every position update renders
+            val isManual = viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL
             if (!initialCenterDone) {
                 // First fix always processes — fall through
-            } else if (distanceBetween(lastGpsPoint, point) < 100f) {
+            } else if (!isManual && distanceBetween(lastGpsPoint, point) < 100f) {
                 DebugLogger.d("SalemMainActivity", "GPS jitter <100m — skipped")
                 // Still handle deferred restores even during jitter
                 handleDeferredRestores(point)
@@ -1082,22 +1205,28 @@ class SalemMainActivity : AppCompatActivity() {
             }
             idlePopulateState = null  // discard saved state — user has moved
 
-            // ── 4. Initial center — first fix only ──
-            if (followedVehicleId == null && !initialCenterDone) {
-                initialCenterDone = true
-                lastPoiFetchPoint = point
-                lastApiCallTime = System.currentTimeMillis()
-                if (fromSplash) {
-                    DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — cinematic zoom-in")
-                    performCinematicZoom(point)
-                    fromSplash = false
+            // ── 4. Center map on GPS — always follow unless tracking a vehicle/aircraft ──
+            if (followedVehicleId == null && followedAircraftIcao == null) {
+                if (!initialCenterDone) {
+                    initialCenterDone = true
+                    lastPoiFetchPoint = point
+                    lastApiCallTime = System.currentTimeMillis()
+                    if (fromSplash) {
+                        DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — cinematic zoom-in")
+                        performCinematicZoom(point)
+                        fromSplash = false
+                    } else {
+                        DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=18")
+                        binding.mapView.controller.animateTo(point)
+                        binding.mapView.controller.setZoom(18.0)
+                    }
                 } else {
-                    DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=18")
+                    // Continuous GPS follow — keep map centered on user
                     binding.mapView.controller.animateTo(point)
-                    binding.mapView.controller.setZoom(18.0)
+                    DebugLogger.d("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — following (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
                 }
             } else {
-                DebugLogger.d("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
+                DebugLogger.d("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — skipped center (following vehicle/aircraft)")
             }
 
             // ── 5. Weather auto-fetch — on first fix + every 30 min ──
@@ -1157,8 +1286,16 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 // Clear cluster markers when showing individual POIs
                 clearClusterMarkers()
-                // Viewport bbox fetch — replace ALL POI markers with only visible results
-                replaceAllPoiMarkers(places)
+                // Filter by enabled POI layers (bypassed when show-all-POIs debug toggle is active)
+                val filtered = if (showAllPoisActive) {
+                    places
+                } else {
+                    val menuPrefs = getSharedPreferences(com.example.locationmapapp.ui.menu.MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+                    val enabledTags = PoiCategories.enabledTagValues(menuPrefs)
+                    places.filter { it.category in enabledTags }
+                }
+                DebugLogger.i("SalemMainActivity", "POI layer filter: ${places.size} → ${filtered.size} (showAll=$showAllPoisActive)")
+                replaceAllPoiMarkers(filtered)
             } else {
                 // User-initiated search or category restore — data goes to proxy cache.
                 // Trigger a bbox refresh so the newly cached POIs appear on screen.

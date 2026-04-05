@@ -122,6 +122,79 @@
 
     </LinearLayout>
 
+    <!-- Bottom-left debug/tool button stack -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:elevation="6dp">
+
+        <!-- Show All POIs toggle -->
+        <TextView
+            android:id="@+id/btnShowAllPois"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/zoom_toggle_bg"
+            android:text="POI"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Walk simulator toggle -->
+        <TextView
+            android:id="@+id/btnWalkSim"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/zoom_toggle_bg"
+            android:text="Walk"
+            android:textColor="@android:color/white"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Magnify toggle -->
+        <FrameLayout
+            android:id="@+id/zoomToggleBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/zoom_toggle_bg"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:layout_marginBottom="4dp"
+                android:src="@drawable/ic_zoom_toggle"
+                android:contentDescription="Zoom toggle" />
+
+            <TextView
+                android:id="@+id/zoomToggleLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="4dp"
+                android:text="x1"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+        </FrameLayout>
+
+    </LinearLayout>
+
     <!-- FAB speed dial container (bottom-right) -->
     <LinearLayout
         android:id="@+id/fabMenu"

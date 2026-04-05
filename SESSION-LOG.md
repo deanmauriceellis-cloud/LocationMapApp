@@ -2,6 +2,22 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-05 — Session 84: POI defaults, WitchKitty splash, map magnify, OSRM routes, walk simulator
+
+### Work Performed
+- POI layer defaults: only Tourism/History, Civic, Entertainment ON by default; added bbox display filtering
+- Splash screen: WitchKitty.png image + Creepster horror font "Wicked Salem Witch Tours"
+- Map magnify button (x1-x5): visual zoom 1.0-3.0x without changing map zoom level
+- Pre-computed OSRM walking routes for witch trials tour: 19 segments + loop-back, 471 points, 8.6km
+- Tour route rendering: street-following polylines replace straight lines
+- GPS walk simulator: in-app Walk button + /walk-tour debug endpoint, 1.4 m/s walking pace
+- Continuous GPS follow: map tracks user position on every update (bypasses 100m dead zone in manual mode)
+- Show All POIs debug button: temporarily bypasses layer filter for testing
+- Bottom-left button stack: POI toggle, Walk toggle, Magnify toggle
+
+### User Note
+Next session: wants to redo the tour in a different way.
+
 ## Session: 2026-04-05 ��� Session 82: Tour Hardening Plan — Phase 9A+ Added to MASTER_PLAN
 
 ### Work Performed

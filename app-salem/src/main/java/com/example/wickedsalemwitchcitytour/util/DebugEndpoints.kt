@@ -32,12 +32,15 @@ import com.example.wickedsalemwitchcitytour.ui.debugTapMarker
 import com.example.wickedsalemwitchcitytour.ui.debugTogglePref
 import com.example.wickedsalemwitchcitytour.ui.debugVehicles
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.*
+import org.osmdroid.util.GeoPoint
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.*
 
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugEndpoints.kt"
@@ -63,6 +66,8 @@ class DebugEndpoints(
     private val geofenceViewModel: GeofenceViewModel
 ) {
     private val gson: Gson = GsonBuilder().setPrettyPrinting().serializeNulls().create()
+    private var walkJob: Job? = null
+    private val walkScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     suspend fun handle(method: String, path: String, params: Map<String, String>): EndpointResult {
         return when (path) {
@@ -90,6 +95,8 @@ class DebugEndpoints(
             "/overlays"         -> handleOverlays()
             "/geofences"        -> handleGeofences()
             "/geofences/alerts" -> handleGeofenceAlerts()
+            "/walk-tour"        -> handleWalkTour(params)
+            "/walk-stop"        -> handleWalkStop()
             else                -> EndpointResult(404, body = gson.toJson(mapOf("error" to "Not found: $path")))
         }
     }
@@ -122,6 +129,8 @@ class DebugEndpoints(
             mapOf("path" to "/overlays",        "method" to "GET", "description" to "List all map overlays with types and counts"),
             mapOf("path" to "/geofences",       "method" to "GET", "description" to "List all loaded geofence zones (TFR, cameras, schools, floods, crossings)"),
             mapOf("path" to "/geofences/alerts", "method" to "GET", "description" to "Active geofence alerts with zone type"),
+            mapOf("path" to "/walk-tour",        "method" to "GET", "description" to "Simulate walking a tour route. Params: tour=tour_witch_trials, speed=1.4 (m/s)"),
+            mapOf("path" to "/walk-stop",        "method" to "GET", "description" to "Stop the walking simulation"),
         )
         return EndpointResult(body = gson.toJson(mapOf("endpoints" to endpoints)))
     }
@@ -676,6 +685,99 @@ class DebugEndpoints(
             )
         }
         return EndpointResult(body = gson.toJson(data))
+    }
+
+    // ── Walk Tour Simulator ──────────────────────────────────────────────────
+
+    private fun handleWalkTour(params: Map<String, String>): EndpointResult {
+        val tourId = params["tour"] ?: "tour_witch_trials"
+        val speedMps = params["speed"]?.toFloatOrNull() ?: 1.4f // avg walking speed
+
+        // Stop any existing walk
+        walkJob?.cancel()
+
+        val routePoints = TourRouteLoader.loadAllRoutePoints(activity, tourId)
+        if (routePoints.isEmpty()) {
+            return EndpointResult(400, body = gson.toJson(mapOf("error" to "No route data for $tourId")))
+        }
+
+        // Interpolate the route into evenly-spaced points at 1-second intervals
+        val interpolated = interpolateRoute(routePoints, speedMps)
+
+        DebugLogger.i("DebugEndpoints", "Walk simulator: $tourId, ${interpolated.size} steps, speed=${speedMps}m/s, ETA=${interpolated.size}s")
+
+        walkJob = walkScope.launch {
+            for ((i, point) in interpolated.withIndex()) {
+                if (!isActive) break
+                withContext(Dispatchers.Main) {
+                    viewModel.setManualLocation(point)
+                }
+                delay(1000L) // 1 GPS fix per second
+            }
+            DebugLogger.i("DebugEndpoints", "Walk simulator complete")
+        }
+
+        val etaMin = interpolated.size / 60.0
+        return EndpointResult(body = gson.toJson(mapOf(
+            "status" to "walking",
+            "tour" to tourId,
+            "routePoints" to routePoints.size,
+            "interpolatedSteps" to interpolated.size,
+            "speedMps" to speedMps,
+            "etaMinutes" to "%.1f".format(etaMin)
+        )))
+    }
+
+    private fun handleWalkStop(): EndpointResult {
+        val wasActive = walkJob?.isActive == true
+        walkJob?.cancel()
+        walkJob = null
+        return EndpointResult(body = gson.toJson(mapOf(
+            "status" to "stopped",
+            "wasActive" to wasActive
+        )))
+    }
+
+    /**
+     * Interpolate route points into evenly-spaced positions at the given speed.
+     * Returns one GeoPoint per second of simulated walking.
+     */
+    private fun interpolateRoute(points: List<GeoPoint>, speedMps: Float): List<GeoPoint> {
+        if (points.size < 2) return points
+        val result = mutableListOf(points[0])
+        var residualM = 0.0 // distance left over from previous segment
+
+        for (i in 0 until points.size - 1) {
+            val from = points[i]
+            val to = points[i + 1]
+            val segDistM = haversineM(from.latitude, from.longitude, to.latitude, to.longitude)
+            if (segDistM < 0.1) continue
+
+            var covered = residualM
+            while (covered < segDistM) {
+                covered += speedMps
+                if (covered >= segDistM) {
+                    residualM = covered - segDistM
+                    break
+                }
+                val frac = covered / segDistM
+                val lat = from.latitude + (to.latitude - from.latitude) * frac
+                val lng = from.longitude + (to.longitude - from.longitude) * frac
+                result.add(GeoPoint(lat, lng))
+            }
+        }
+        result.add(points.last())
+        return result
+    }
+
+    private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val R = 6_371_000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = sin(dLat / 2).pow(2) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(dLon / 2).pow(2)
+        return R * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
     /** Run a block on the main thread and suspend until it completes. */

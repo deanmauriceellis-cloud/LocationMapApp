@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-05 Session 83 (Offline tiles + Witch Trials tour from Kate seed data)
+## Last Updated: 2026-04-05 Session 84 (POI defaults, splash WitchKitty, map magnify, OSRM routes, walk simulator, GPS follow)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -12,11 +12,16 @@
 - **Phase 9A+ IN PROGRESS — Tour Hardening & Offline Foundation** (HIGHEST PRIORITY):
   - ~~Offline map tiles~~ **DONE** — 3,295 tiles (Esri zoom 16-19 + OSM zoom 16-18), 40MB SQLite archive, verified offline
   - ~~Salem Witch Trials tour~~ **DONE** — 19-stop tour seeded from Kate data, 8 new POIs, 4 tours total
-  - Pre-computed walking route geometry (OSRM routes encoded in tour JSON — no network at runtime)
-  - Frida GPS walking simulator (custom script on rooted Lenovo tablet, realistic walking simulation)
+  - ~~Pre-computed walking route geometry~~ **DONE** — OSRM routes for all 19 segments + loop-back, 471 points, 8.6km loop
+  - ~~GPS walk simulator~~ **DONE** — in-app Walk button + debug HTTP endpoint, interpolates route at walking pace
+  - ~~Map follows GPS~~ **DONE** — continuous GPS follow (real + simulated), 100m dead zone bypassed in manual mode
+  - ~~POI layer defaults~~ **DONE** — only Tourism/History, Civic, Entertainment ON by default; bbox filter respects prefs
+  - ~~Splash screen~~ **DONE** — WitchKitty.png + Creepster font "Wicked Salem Witch Tours"
+  - ~~Map magnify~~ **DONE** — x1-x5 scale toggle (1.0-3.0x) without changing zoom level
   - End-to-end tour walk test (19 stops, all geofences, all TTS narrations, full UX flow)
-  - Tour UX polish (continuous map follow, live distance indicator, seamless transitions)
+  - Tour UX polish (live distance indicator, seamless transitions)
   - Geocode verify 8 new stop coordinates against satellite imagery
+  - **USER NOTE: Next session wants to redo the tour in a different way**
 - **Phase 9B-9D after**: Feature tier matrix, user settings, contextual alerts
 - **Phase 10**: Production readiness — Firebase, photos, emulator verification, DB hardening
 - **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**

@@ -4,10 +4,11 @@
     "name": "Salem Witch Trials Walking Tour",
     "theme": "witch_trials",
     "description": "Walk in the footsteps of the accused, the accusers, and the condemned. This GPS-guided tour traces the Salem witch hysteria of 1692 across nineteen stops, from the courthouse where the Court of Oyer and Terminer sentenced the innocent to the solemn memorial where their names are inscribed in stone. Every stop has a direct connection to the events of 1692. The route forms a walkable downtown loop of approximately three kilometers, taking about two hours including narration. Comfortable shoes recommended.",
-    "estimatedMinutes": 120,
-    "distanceKm": 3.0,
+    "estimatedMinutes": 19,
+    "distanceKm": 8.6,
     "stopCount": 19,
-    "difficulty": "moderate"
+    "difficulty": "moderate",
+    "isLoop": true
   },
   "stops": [
     {
@@ -29,19 +30,51 @@
       "admissionInfo": "Free (exterior viewing)",
       "hours": null,
       "phone": null,
-      "website": "https://salemwitchmuseum.com/locations/salem-courthouse-in-1692-site-of/"
+      "website": "https://salemwitchmuseum.com/locations/salem-courthouse-in-1692-site-of/",
+      "routeToNext": [
+        [
+          42.515316,
+          -70.892645
+        ],
+        [
+          42.515461,
+          -70.892672
+        ],
+        [
+          42.515516,
+          -70.892683
+        ],
+        [
+          42.515905,
+          -70.892763
+        ],
+        [
+          42.515921,
+          -70.892629
+        ],
+        [
+          42.515983,
+          -70.892134
+        ],
+        [
+          42.515999,
+          -70.892107
+        ]
+      ],
+      "routeDistanceM": 121,
+      "routeDurationS": 22
     },
     {
       "order": 2,
       "poiId": "noyes_home_site",
       "name": "Rev. Nicholas Noyes Home Site",
       "lat": 42.5159,
-      "lng": -70.8920,
+      "lng": -70.892,
       "address": "90 Washington St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 1,
-      "distanceMFromPrev": 70,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 121,
       "transitionNarration": "Walk a short distance north on Washington Street. Near number ninety stood the home of Reverend Nicholas Noyes, assistant minister of the First Church of Salem. He was the most aggressive clerical supporter of the executions.",
       "shortNarration": "Reverend Nicholas Noyes lived near this spot. He attended examinations, pressured prisoners to confess, and stood at the gallows exhorting the condemned. Sarah Good cursed him from the rope: I am no more a witch than you are a wizard, and if you take away my life, God will give you blood to drink.",
       "longNarration": "Reverend Nicholas Noyes was born in 1647, educated at Harvard, and served as the assistant minister of Salem's First Church. He brought unwavering theological certainty to the witch trials. Noyes attended examinations, visited prisoners in jail demanding confessions, and stood at the foot of the gallows pressing the condemned to repent. His most notorious moment came on July 19, 1692, when he exhorted Sarah Good to confess before her hanging. Good, defiant to the end, turned to him and spoke the words that would haunt his remaining years: I am no more a witch than you are a wizard, and if you take away my life, God will give you blood to drink. Noyes dismissed the curse, but Salem did not forget it. When he died in 1717, reportedly choking on his own blood from a hemorrhage, the community whispered that Good's prophecy had been fulfilled. Unlike his colleague Samuel Sewall, who publicly repented in 1697, Noyes never expressed doubt or remorse. He went to his grave believing he had fought the Devil and won. The building that stood here is long gone. Only the curse, and the story, remain.",
@@ -50,7 +83,39 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.515999,
+          -70.892107
+        ],
+        [
+          42.516049,
+          -70.892022
+        ],
+        [
+          42.516084,
+          -70.891898
+        ],
+        [
+          42.5161,
+          -70.891817
+        ],
+        [
+          42.516138,
+          -70.891403
+        ],
+        [
+          42.516144,
+          -70.891341
+        ],
+        [
+          42.516489,
+          -70.891408
+        ]
+      ],
+      "routeDistanceM": 105,
+      "routeDurationS": 27
     },
     {
       "order": 3,
@@ -61,8 +126,8 @@
       "address": "118 Washington St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 2,
-      "distanceMFromPrev": 120,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 105,
       "transitionNarration": "Continue north on Washington Street to approximately number one eighteen. Near here lived Judge John Hathorne, the most feared interrogator of the Salem witch trials.",
       "shortNarration": "Judge John Hathorne lived near this location. He was the lead examiner at nearly every major hearing. His aggressive questioning assumed guilt from the first word. He never apologized. His great-great-grandson Nathaniel added a W to the family name, becoming Hawthorne.",
       "longNarration": "Judge John Hathorne was the most relentless figure of the Salem witch trials. Born in 1641 to one of Salem's founding families, he served as a magistrate and led the preliminary examinations of accused witches with prosecutorial zeal. His questioning technique assumed guilt from the opening sentence. When the accused denied the charges, Hathorne demanded to know why they were tormenting the afflicted girls. When they protested innocence, he asked why the afflicted screamed in their presence. There was no safe answer. Hathorne examined Tituba, Sarah Good, Sarah Osborne, Martha Corey, Rebecca Nurse, and dozens of others. His interrogations were not inquiries but prosecutions, conducted before a crowd that included the afflicted, who would convulse and scream on cue. Unlike Samuel Sewall, who publicly repented in 1697, Hathorne never expressed remorse. He continued to serve in public office until his death in 1717. His great-great-grandson Nathaniel was so ashamed of the family legacy that he added a W to the surname, becoming Hawthorne, and spent his literary career exploring themes of guilt, sin, and hidden evil in Puritan New England.",
@@ -71,19 +136,43 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.516489,
+          -70.891408
+        ],
+        [
+          42.516144,
+          -70.891341
+        ],
+        [
+          42.515623,
+          -70.891241
+        ],
+        [
+          42.515559,
+          -70.891808
+        ],
+        [
+          42.515537,
+          -70.892008
+        ]
+      ],
+      "routeDistanceM": 161,
+      "routeDurationS": 25
     },
     {
       "order": 4,
       "poiId": "sheriff_corwin_home",
       "name": "Sheriff Corwin's Home / Joshua Ward House",
       "lat": 42.5155,
-      "lng": -70.8920,
+      "lng": -70.892,
       "address": "148 Washington St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 2,
-      "distanceMFromPrev": 110,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 161,
       "transitionNarration": "Walk back south on Washington Street to number one forty-eight. The building near here stands on the site of High Sheriff George Corwin's home. Corwin was just twenty-six years old when he carried out the arrests and executions.",
       "shortNarration": "High Sheriff George Corwin lived near this spot. At age twenty-six, he arrested the accused, oversaw the hangings at Proctor's Ledge, and personally pressed Giles Corey to death over two agonizing days. He also seized the property of the condemned for personal profit.",
       "longNarration": "High Sheriff George Corwin was twenty-six years old in 1692, the nephew of Judge Jonathan Corwin. Despite his youth, he was entrusted with carrying out the most terrible duties of the witch crisis. He arrested the accused, transported them to jail, and oversaw the executions at Proctor's Ledge. His most infamous act was the pressing of Giles Corey on September 19, 1692. Corey, an eighty-one-year-old farmer, refused to enter a plea, understanding that conviction would allow the sheriff to seize his property. Under English law, a defendant who stood mute could be subjected to peine forte et dure, pressing under heavy stones until they either entered a plea or died. Over two agonizing days, Corwin loaded stones onto Corey's chest. When Corey's tongue was pressed from his mouth, the sheriff reportedly pushed it back in with his cane. Corey's only words were more weight. He died without ever entering a plea, protecting his estate for his heirs. Corwin also seized property from the condemned and their families, enriching himself through the crisis. When Corwin died in 1696, Philip English attempted to seize his body for unpaid debts. The family reportedly hid the corpse in the basement walls of this house to prevent it. Please respect this private property.",
@@ -92,19 +181,51 @@
       "admissionInfo": "Free (exterior viewing only — private property)",
       "hours": null,
       "phone": null,
-      "website": "https://en.wikipedia.org/wiki/Joshua_Ward_House"
+      "website": "https://en.wikipedia.org/wiki/Joshua_Ward_House",
+      "routeToNext": [
+        [
+          42.515537,
+          -70.892008
+        ],
+        [
+          42.515503,
+          -70.892305
+        ],
+        [
+          42.515477,
+          -70.892534
+        ],
+        [
+          42.515461,
+          -70.892672
+        ],
+        [
+          42.515191,
+          -70.892621
+        ],
+        [
+          42.514957,
+          -70.892577
+        ],
+        [
+          42.514839,
+          -70.892555
+        ]
+      ],
+      "routeDistanceM": 125,
+      "routeDurationS": 20
     },
     {
       "order": 5,
       "poiId": "bridget_bishop_home",
       "name": "Bridget Bishop's Home Site",
       "lat": 42.5148,
-      "lng": -70.8930,
+      "lng": -70.893,
       "address": "71 Washington St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 1,
-      "distanceMFromPrev": 100,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 125,
       "transitionNarration": "Continue a short distance south on Washington Street toward number seventy-one. Near here Bridget Bishop kept her home and ran an unlicensed tavern. She was the very first person executed in the Salem witch trials.",
       "shortNarration": "Bridget Bishop lived near this spot and ran a tavern that drew complaints for serving cider late and permitting games of shovelboard. She wore a red bodice, had been married three times, and had been accused of witchcraft once before in sixteen eighty. She was the perfect first target.",
       "longNarration": "Bridget Bishop was the first person executed in the Salem witch trials, hanged at Proctor's Ledge on June 10, 1692. She was approximately sixty years old. She had been married three times, ran an unlicensed tavern or ordinary near this location, and wore clothing that scandalized Puritan sensibilities, particularly a red bodice that was entered into evidence at her trial. Her tavern served cider past decent hours and permitted shovelboard, a game associated with idleness and wagering. Young men gathered there in the evenings. In a community that demanded conformity, Bridget Bishop was conspicuously unconventional. She had been tried for witchcraft once before, in 1680, and acquitted. But the stain never washed out. When the afflicted girls began naming specters in 1692, Bishop's name was already waiting in the community's memory. Her trial was swift. The jury convicted her in a single day. When examined before the magistrates, she said simply: I am no witch. I know not what a witch is. At her orchard on nearby Church Street, workers had found poppets, small cloth dolls with pins, hidden in the cellar walls. This was treated as damning physical evidence. Eight days after her trial, she was led to the gallows. She was chosen first because she had no powerful family to object, no faction to protect her, and a reputation that the community had already convicted years before the court ever convened.",
@@ -113,19 +234,143 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.514839,
+          -70.892555
+        ],
+        [
+          42.514957,
+          -70.892577
+        ],
+        [
+          42.515191,
+          -70.892621
+        ],
+        [
+          42.515461,
+          -70.892672
+        ],
+        [
+          42.515516,
+          -70.892683
+        ],
+        [
+          42.515905,
+          -70.892763
+        ],
+        [
+          42.51622,
+          -70.892827
+        ],
+        [
+          42.516365,
+          -70.892846
+        ],
+        [
+          42.516437,
+          -70.892855
+        ],
+        [
+          42.516628,
+          -70.892889
+        ],
+        [
+          42.516742,
+          -70.89291
+        ],
+        [
+          42.516847,
+          -70.892928
+        ],
+        [
+          42.516921,
+          -70.892942
+        ],
+        [
+          42.517242,
+          -70.892999
+        ],
+        [
+          42.51758,
+          -70.893059
+        ],
+        [
+          42.517668,
+          -70.893075
+        ],
+        [
+          42.51773,
+          -70.893085
+        ],
+        [
+          42.517802,
+          -70.893096
+        ],
+        [
+          42.518116,
+          -70.893146
+        ],
+        [
+          42.518452,
+          -70.89322
+        ],
+        [
+          42.518463,
+          -70.893096
+        ],
+        [
+          42.518539,
+          -70.892237
+        ],
+        [
+          42.518561,
+          -70.891991
+        ],
+        [
+          42.518586,
+          -70.891713
+        ],
+        [
+          42.51861,
+          -70.891439
+        ],
+        [
+          42.518628,
+          -70.891234
+        ],
+        [
+          42.518631,
+          -70.891179
+        ],
+        [
+          42.518638,
+          -70.891095
+        ],
+        [
+          42.518628,
+          -70.890992
+        ],
+        [
+          42.518599,
+          -70.89085
+        ]
+      ],
+      "routeDistanceM": 602,
+      "routeDurationS": 74
     },
     {
       "order": 6,
       "poiId": "first_church_1692_site",
       "name": "First Church Meetinghouse 1692 Site",
-      "lat": 42.5190,
+      "lat": 42.519,
       "lng": -70.8907,
       "address": "231 Essex St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 3,
-      "distanceMFromPrev": 280,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 602,
       "transitionNarration": "Walk north on Washington Street, then turn right onto Essex Street. Near two thirty-one Essex, where the Daniel Low Building stands, the First Church of Salem's meetinghouse stood in 1692. This was where many of the preliminary examinations took place.",
       "shortNarration": "The First Church meetinghouse stood near this spot in 1692. It was the largest gathering place in Salem Town. When the examination hearings outgrew the smaller spaces in Salem Village, they moved here to accommodate the crowds that came to witness the spectacle.",
       "longNarration": "The First Church of Salem's meetinghouse, which stood near this location in 1692, became one of the principal stages of the witch trials drama. Established in 1629, the First Church was the oldest and most prestigious congregation in Salem. When the preliminary examinations of accused witches outgrew the small spaces in Salem Village, they moved to the Salem Town meetinghouse, where larger crowds could observe. Here the afflicted girls performed their terrifying theater, screaming, convulsing, and pointing at invisible specters while magistrates Hathorne and Corwin interrogated the accused. Reverend Nicholas Noyes preached from this pulpit, reinforcing the theological framework that made the prosecutions possible. Among the congregation's own members, several were accused, including the wealthy merchant Philip English and Martha Corey's husband Giles. The irony was bitter: the church that was meant to bind the community together became the arena where it tore itself apart. The original building was demolished long ago. The Daniel Low Building now occupies this site, but the ground beneath it witnessed some of the most dramatic confrontations of the entire crisis.",
@@ -134,7 +379,247 @@
       "admissionInfo": "Free (exterior viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.518599,
+          -70.89085
+        ],
+        [
+          42.518445,
+          -70.890093
+        ],
+        [
+          42.518429,
+          -70.890038
+        ],
+        [
+          42.518405,
+          -70.889998
+        ],
+        [
+          42.518368,
+          -70.889975
+        ],
+        [
+          42.518273,
+          -70.889955
+        ],
+        [
+          42.518251,
+          -70.891665
+        ],
+        [
+          42.518248,
+          -70.891786
+        ],
+        [
+          42.518236,
+          -70.89191
+        ],
+        [
+          42.518126,
+          -70.893039
+        ],
+        [
+          42.518116,
+          -70.893146
+        ],
+        [
+          42.518452,
+          -70.89322
+        ],
+        [
+          42.518529,
+          -70.893234
+        ],
+        [
+          42.51873,
+          -70.89327
+        ],
+        [
+          42.518848,
+          -70.893291
+        ],
+        [
+          42.518882,
+          -70.893297
+        ],
+        [
+          42.518974,
+          -70.893314
+        ],
+        [
+          42.519391,
+          -70.893374
+        ],
+        [
+          42.519459,
+          -70.893383
+        ],
+        [
+          42.519489,
+          -70.893388
+        ],
+        [
+          42.519537,
+          -70.893228
+        ],
+        [
+          42.519576,
+          -70.893097
+        ],
+        [
+          42.519626,
+          -70.89295
+        ],
+        [
+          42.519644,
+          -70.892897
+        ],
+        [
+          42.519652,
+          -70.892876
+        ],
+        [
+          42.519684,
+          -70.892786
+        ],
+        [
+          42.519749,
+          -70.892607
+        ],
+        [
+          42.519865,
+          -70.892283
+        ],
+        [
+          42.519891,
+          -70.892212
+        ],
+        [
+          42.519949,
+          -70.892042
+        ],
+        [
+          42.519958,
+          -70.892017
+        ],
+        [
+          42.519974,
+          -70.891971
+        ],
+        [
+          42.519997,
+          -70.891902
+        ],
+        [
+          42.520002,
+          -70.891888
+        ],
+        [
+          42.520047,
+          -70.891753
+        ],
+        [
+          42.520086,
+          -70.891636
+        ],
+        [
+          42.520094,
+          -70.891612
+        ],
+        [
+          42.520131,
+          -70.89151
+        ],
+        [
+          42.520159,
+          -70.891432
+        ],
+        [
+          42.520168,
+          -70.891408
+        ],
+        [
+          42.520227,
+          -70.891255
+        ],
+        [
+          42.520238,
+          -70.891229
+        ],
+        [
+          42.520294,
+          -70.891096
+        ],
+        [
+          42.520376,
+          -70.890908
+        ],
+        [
+          42.520435,
+          -70.890797
+        ],
+        [
+          42.520648,
+          -70.890399
+        ],
+        [
+          42.520672,
+          -70.89034
+        ],
+        [
+          42.520683,
+          -70.8903
+        ],
+        [
+          42.520692,
+          -70.890272
+        ],
+        [
+          42.520705,
+          -70.890203
+        ],
+        [
+          42.520708,
+          -70.890129
+        ],
+        [
+          42.520659,
+          -70.890115
+        ],
+        [
+          42.52054,
+          -70.890079
+        ],
+        [
+          42.520171,
+          -70.889966
+        ],
+        [
+          42.51996,
+          -70.889901
+        ],
+        [
+          42.519863,
+          -70.889871
+        ],
+        [
+          42.519785,
+          -70.889848
+        ],
+        [
+          42.519645,
+          -70.889806
+        ],
+        [
+          42.519459,
+          -70.889749
+        ]
+      ],
+      "routeDistanceM": 950,
+      "routeDurationS": 119
     },
     {
       "order": 7,
@@ -145,8 +630,8 @@
       "address": "188 Essex St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 25,
-      "walkingMinutesFromPrev": 1,
-      "distanceMFromPrev": 100,
+      "walkingMinutesFromPrev": 2,
+      "distanceMFromPrev": 950,
       "transitionNarration": "Walk a short distance east along Essex Street to approximately number one eighty-eight. The Ship Tavern stood near here, a gathering place where the drama of the trials spilled into everyday life.",
       "shortNarration": "The Ship Tavern stood near this location on Essex Street. In 1692, taverns were where news traveled, rumors spread, and public opinion formed. It was in places like this that the accusations gained their terrible momentum.",
       "longNarration": "The Ship Tavern, which stood near this location on Essex Street, was one of Salem Town's principal public houses in 1692. Taverns in colonial New England were far more than drinking establishments. They served as unofficial courthouses, newsrooms, and community gathering places. It was in taverns like this one that the accusations, confessions, and rumors of the witch trials were debated, amplified, and spread. Magistrates, ministers, merchants, and ordinary townspeople all passed through these doors. Witnesses rehearsed their testimony. The afflicted told their stories. The accused were discussed, judged, and condemned in conversation long before they ever stood before the court. Understanding the tavern culture of 1692 Salem is essential to understanding how the hysteria spread so quickly. In a world without newspapers, taverns were the media. What was said here on Monday became public knowledge by Tuesday and established fact by Sunday.",
@@ -155,7 +640,91 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.519459,
+          -70.889749
+        ],
+        [
+          42.519407,
+          -70.889733
+        ],
+        [
+          42.519087,
+          -70.889639
+        ],
+        [
+          42.519037,
+          -70.889624
+        ],
+        [
+          42.518813,
+          -70.889558
+        ],
+        [
+          42.518655,
+          -70.889511
+        ],
+        [
+          42.518514,
+          -70.88947
+        ],
+        [
+          42.518447,
+          -70.88945
+        ],
+        [
+          42.51843,
+          -70.889445
+        ],
+        [
+          42.518277,
+          -70.889411
+        ],
+        [
+          42.518255,
+          -70.889406
+        ],
+        [
+          42.518185,
+          -70.889388
+        ],
+        [
+          42.518144,
+          -70.889377
+        ],
+        [
+          42.518125,
+          -70.889375
+        ],
+        [
+          42.51805,
+          -70.889369
+        ],
+        [
+          42.517672,
+          -70.889351
+        ],
+        [
+          42.517345,
+          -70.88935
+        ],
+        [
+          42.517346,
+          -70.888421
+        ],
+        [
+          42.51695,
+          -70.888421
+        ],
+        [
+          42.5167,
+          -70.88842
+        ]
+      ],
+      "routeDistanceM": 386,
+      "routeDurationS": 52
     },
     {
       "order": 8,
@@ -163,11 +732,11 @@
       "name": "The Witch House / Jonathan Corwin House",
       "lat": 42.5167,
       "lng": -70.8884,
-      "address": "310\u00bd Essex St, Salem, MA 01970",
+      "address": "310½ Essex St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 3,
-      "distanceMFromPrev": 230,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 386,
       "transitionNarration": "Continue east on Essex Street, then bear slightly south. The dark-timbered house ahead with its steep gables is the Witch House, the only building still standing in Salem with direct ties to the sixteen ninety-two witch trials. Judge Jonathan Corwin lived here and likely examined accused witches in the front parlor.",
       "shortNarration": "This is the Witch House, the only structure still standing with direct ties to the Salem witch trials of 1692. Judge Jonathan Corwin lived here and conducted preliminary examinations of accused witches.",
       "longNarration": "The Witch House is the only remaining building in Salem with direct connections to the witchcraft trials of 1692. Built around 1675, it was the home of Judge Jonathan Corwin, one of the magistrates who conducted preliminary examinations of accused witches. Several of these examinations likely took place in this very house. Corwin served on the Court of Oyer and Terminer that tried and convicted the accused. The house has been restored to its seventeenth-century appearance and serves as a museum of life in the late sixteen hundreds. Period furnishings, apothecary items, and architectural details give visitors a window into Puritan daily life. The building was nearly demolished in the 1940s but was saved and moved slightly from its original location to accommodate road widening.",
@@ -176,7 +745,183 @@
       "admissionInfo": "$12 adults, $10 seniors/students, $8 children 6-14",
       "hours": "10:00 AM - 5:00 PM (seasonal, mid-March to November)",
       "phone": "(978) 744-8815",
-      "website": "https://thewitchhouse.org"
+      "website": "https://thewitchhouse.org",
+      "routeToNext": [
+        [
+          42.5167,
+          -70.88842
+        ],
+        [
+          42.51695,
+          -70.888421
+        ],
+        [
+          42.517346,
+          -70.888421
+        ],
+        [
+          42.517345,
+          -70.88935
+        ],
+        [
+          42.517672,
+          -70.889351
+        ],
+        [
+          42.51805,
+          -70.889369
+        ],
+        [
+          42.518125,
+          -70.889375
+        ],
+        [
+          42.518144,
+          -70.889377
+        ],
+        [
+          42.518185,
+          -70.889388
+        ],
+        [
+          42.518255,
+          -70.889406
+        ],
+        [
+          42.518277,
+          -70.889411
+        ],
+        [
+          42.51843,
+          -70.889445
+        ],
+        [
+          42.518447,
+          -70.88945
+        ],
+        [
+          42.518514,
+          -70.88947
+        ],
+        [
+          42.518655,
+          -70.889511
+        ],
+        [
+          42.518813,
+          -70.889558
+        ],
+        [
+          42.519037,
+          -70.889624
+        ],
+        [
+          42.519087,
+          -70.889639
+        ],
+        [
+          42.519407,
+          -70.889733
+        ],
+        [
+          42.519645,
+          -70.889806
+        ],
+        [
+          42.519785,
+          -70.889848
+        ],
+        [
+          42.519863,
+          -70.889871
+        ],
+        [
+          42.51996,
+          -70.889901
+        ],
+        [
+          42.520171,
+          -70.889966
+        ],
+        [
+          42.52054,
+          -70.890079
+        ],
+        [
+          42.520659,
+          -70.890115
+        ],
+        [
+          42.520708,
+          -70.890129
+        ],
+        [
+          42.52079,
+          -70.890153
+        ],
+        [
+          42.520843,
+          -70.890167
+        ],
+        [
+          42.52085,
+          -70.890169
+        ],
+        [
+          42.521005,
+          -70.890211
+        ],
+        [
+          42.521269,
+          -70.890282
+        ],
+        [
+          42.521277,
+          -70.890423
+        ],
+        [
+          42.521276,
+          -70.890576
+        ],
+        [
+          42.521267,
+          -70.89072
+        ],
+        [
+          42.521252,
+          -70.890863
+        ],
+        [
+          42.521218,
+          -70.891091
+        ],
+        [
+          42.521323,
+          -70.891124
+        ],
+        [
+          42.521559,
+          -70.891156
+        ],
+        [
+          42.521572,
+          -70.891162
+        ],
+        [
+          42.5216,
+          -70.891174
+        ],
+        [
+          42.521635,
+          -70.891189
+        ],
+        [
+          42.521691,
+          -70.891213
+        ]
+      ],
+      "routeDistanceM": 713,
+      "routeDurationS": 99
     },
     {
       "order": 9,
@@ -187,8 +932,8 @@
       "address": "318 Essex St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 3,
-      "distanceMFromPrev": 250,
+      "walkingMinutesFromPrev": 2,
+      "distanceMFromPrev": 713,
       "transitionNarration": "Walk back northwest along Essex Street toward the pedestrian mall. The elegant Ropes Mansion at three eighteen Essex dates to 1727. You may recognize it as the Allison house from the movie Hocus Pocus. But its witch trials connection runs deeper than Hollywood.",
       "shortNarration": "The Ropes Mansion was built in 1727 on land associated with the Corwin family, who were deeply involved in the witch trials. Judge Corwin lived just down the street. Film fans know it as the Allison house from Hocus Pocus.",
       "longNarration": "The Ropes Mansion, built in 1727, stands on Essex Street in what was the heart of Salem's mercantile and judicial elite during the witch trials era. The land on which it was constructed was associated with the Corwin family, whose most infamous member, Judge Jonathan Corwin, lived just down the street at the Witch House. The mansion itself was built a generation after the trials, but it represents the continuity of Salem's ruling families, the same families who held power during 1692. The Ropes family acquired the house in the 1760s and maintained it for over two centuries. Its formal gardens, among the finest surviving colonial gardens in New England, are free to visit. Film fans will recognize the mansion as the Allison house from the 1993 movie Hocus Pocus, which brought Salem's witch history to a new generation. The gardens are open during daylight hours and provide a peaceful respite along the tour.",
@@ -197,19 +942,135 @@
       "admissionInfo": "Free (exterior and gardens)",
       "hours": "Gardens open daylight hours",
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.521691,
+          -70.891213
+        ],
+        [
+          42.521635,
+          -70.891189
+        ],
+        [
+          42.5216,
+          -70.891174
+        ],
+        [
+          42.521572,
+          -70.891162
+        ],
+        [
+          42.521559,
+          -70.891156
+        ],
+        [
+          42.521323,
+          -70.891124
+        ],
+        [
+          42.521218,
+          -70.891091
+        ],
+        [
+          42.521202,
+          -70.891199
+        ],
+        [
+          42.521191,
+          -70.891274
+        ],
+        [
+          42.521179,
+          -70.891358
+        ],
+        [
+          42.521176,
+          -70.891376
+        ],
+        [
+          42.521165,
+          -70.891433
+        ],
+        [
+          42.521124,
+          -70.891657
+        ],
+        [
+          42.521119,
+          -70.891685
+        ],
+        [
+          42.521106,
+          -70.891753
+        ],
+        [
+          42.52106,
+          -70.891974
+        ],
+        [
+          42.52102,
+          -70.892147
+        ],
+        [
+          42.520991,
+          -70.892272
+        ],
+        [
+          42.520966,
+          -70.892381
+        ],
+        [
+          42.520951,
+          -70.89245
+        ],
+        [
+          42.520861,
+          -70.89285
+        ],
+        [
+          42.520999,
+          -70.892901
+        ],
+        [
+          42.521015,
+          -70.892909
+        ],
+        [
+          42.521023,
+          -70.892918
+        ],
+        [
+          42.521031,
+          -70.892931
+        ],
+        [
+          42.521033,
+          -70.892949
+        ],
+        [
+          42.521029,
+          -70.892981
+        ],
+        [
+          42.52103,
+          -70.892995
+        ]
+      ],
+      "routeDistanceM": 229,
+      "routeDurationS": 45
     },
     {
       "order": 10,
       "poiId": "philip_english_house",
       "name": "Philip English's Great House Site",
-      "lat": 42.5210,
-      "lng": -70.8930,
+      "lat": 42.521,
+      "lng": -70.893,
       "address": "Essex St & English St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 2,
-      "distanceMFromPrev": 120,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 229,
       "transitionNarration": "Continue west along Essex Street to the intersection with English Street. The street itself bears the name of Philip English, once the richest man in Salem. His grand mansion stood near here. His wealth, his foreign accent, and his pride made him a target.",
       "shortNarration": "Philip English's mansion stood near this corner. Born Philippe d'Anglois on the Isle of Jersey, he built a fortune of twenty-one ships, fourteen buildings, and a warehouse empire. In 1692, both he and his wife Mary were accused of witchcraft. They escaped to New York.",
       "longNarration": "Philip English was born Philippe d'Anglois on the Isle of Jersey in 1651. He arrived in Salem in the 1670s with nothing and built the largest commercial fortune in Essex County: twenty-one seagoing vessels, fourteen buildings, a warehouse on the wharf, and this mansion on Essex Street, the grandest private residence in the area. He married Mary Hollingworth from a respected merchant family, gaining the social legitimacy his foreign birth could not provide. But English was never fully accepted. His faint French accent, his Huguenot faith, and his visible wealth made him conspicuous in a culture that preached simplicity. When the accusations reached Salem's elite in the spring of 1692, both Philip and Mary were named. They were arrested and jailed. With the help of sympathetic ministers, they escaped imprisonment and fled to New York, where they sheltered until the trials ended. They returned to Salem, but the ordeal had destroyed Mary's health. She died in 1694 from the effects of her imprisonment. English spent the remaining forty-two years of his life in relentless litigation, pursuing restitution from the colony and from Sheriff Corwin, who had seized his property. When Corwin died in 1696, English reportedly attempted to seize the sheriff's body for debt. The building is long gone but English Street preserves his name.",
@@ -218,19 +1079,135 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.52103,
+          -70.892995
+        ],
+        [
+          42.521029,
+          -70.892981
+        ],
+        [
+          42.521033,
+          -70.892949
+        ],
+        [
+          42.521031,
+          -70.892931
+        ],
+        [
+          42.521023,
+          -70.892918
+        ],
+        [
+          42.521015,
+          -70.892909
+        ],
+        [
+          42.520999,
+          -70.892901
+        ],
+        [
+          42.520861,
+          -70.89285
+        ],
+        [
+          42.52084,
+          -70.892943
+        ],
+        [
+          42.520805,
+          -70.893096
+        ],
+        [
+          42.520735,
+          -70.893406
+        ],
+        [
+          42.520715,
+          -70.89346
+        ],
+        [
+          42.520687,
+          -70.893513
+        ],
+        [
+          42.520656,
+          -70.893576
+        ],
+        [
+          42.52063,
+          -70.893664
+        ],
+        [
+          42.520612,
+          -70.893756
+        ],
+        [
+          42.52055,
+          -70.894157
+        ],
+        [
+          42.52054,
+          -70.89423
+        ],
+        [
+          42.520536,
+          -70.894264
+        ],
+        [
+          42.520533,
+          -70.894323
+        ],
+        [
+          42.520525,
+          -70.894488
+        ],
+        [
+          42.520522,
+          -70.894544
+        ],
+        [
+          42.520516,
+          -70.894649
+        ],
+        [
+          42.520514,
+          -70.894692
+        ],
+        [
+          42.520512,
+          -70.894734
+        ],
+        [
+          42.520509,
+          -70.8948
+        ],
+        [
+          42.520508,
+          -70.894811
+        ],
+        [
+          42.520498,
+          -70.895
+        ]
+      ],
+      "routeDistanceM": 209,
+      "routeDurationS": 34
     },
     {
       "order": 11,
       "poiId": "ann_pudeator_home",
       "name": "Ann Pudeator Home Site",
       "lat": 42.5205,
-      "lng": -70.8950,
+      "lng": -70.895,
       "address": "35 Washington Square N, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 25,
-      "walkingMinutesFromPrev": 2,
-      "distanceMFromPrev": 120,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 209,
       "transitionNarration": "Walk north to Washington Square. Near number thirty-five Washington Square North stood the home of Ann Pudeator, a widow and healer who was hanged as a witch. Please respect this private residence.",
       "shortNarration": "Ann Pudeator lived near this location. She was a widow who worked as a nurse and healer. Her knowledge of medicine and herbs, which helped her neighbors in life, was used as evidence against her in court. She was hanged on September twenty-second, 1692.",
       "longNarration": "Ann Pudeator was a widow who lived near this location on Washington Square North. She was approximately seventy years old in 1692 and worked as a nurse and healer, skills that were both valued and feared in Puritan New England. The line between healing and witchcraft was dangerously thin. A woman who could cure illness with herbs and poultices could, in the fevered imagination of 1692, just as easily cause illness through supernatural means. Pudeator was accused of witchcraft in the spring of 1692. Testimony against her alleged that she had used ointments and greases for sinister purposes, and that people had sickened or died after encounters with her. She maintained her innocence throughout. She was tried, convicted, and hanged on September 22, 1692, alongside seven others in the last mass execution of the trials. Her case illustrates one of the cruelest aspects of the witch hunt: the very skills that made women valuable to their communities, healing, midwifery, herbal knowledge, could be reinterpreted as evidence of a compact with the Devil. Please respect this private residence.",
@@ -239,7 +1216,75 @@
       "admissionInfo": "Free (exterior viewing only — private residence)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.520498,
+          -70.895
+        ],
+        [
+          42.520508,
+          -70.894811
+        ],
+        [
+          42.520509,
+          -70.8948
+        ],
+        [
+          42.520512,
+          -70.894734
+        ],
+        [
+          42.520514,
+          -70.894692
+        ],
+        [
+          42.520516,
+          -70.894649
+        ],
+        [
+          42.520522,
+          -70.894544
+        ],
+        [
+          42.520525,
+          -70.894488
+        ],
+        [
+          42.520533,
+          -70.894323
+        ],
+        [
+          42.520536,
+          -70.894264
+        ],
+        [
+          42.52054,
+          -70.89423
+        ],
+        [
+          42.52055,
+          -70.894157
+        ],
+        [
+          42.520612,
+          -70.893756
+        ],
+        [
+          42.52063,
+          -70.893664
+        ],
+        [
+          42.520656,
+          -70.893576
+        ],
+        [
+          42.520702,
+          -70.893584
+        ]
+      ],
+      "routeDistanceM": 124,
+      "routeDurationS": 22
     },
     {
       "order": 12,
@@ -250,8 +1295,8 @@
       "address": "18 Washington Square W, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 40,
-      "walkingMinutesFromPrev": 1,
-      "distanceMFromPrev": 80,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 124,
       "transitionNarration": "Walk to the west side of Salem Common. The Hawthorne Hotel at eighteen Washington Square West stands near the site of Reverend John Higginson Junior's home. His father was the senior minister of First Church during the trials.",
       "shortNarration": "The Hawthorne Hotel stands near where Reverend John Higginson Junior lived. His father, Reverend John Higginson Senior, was the aged senior minister of the First Church during the trials. Though elderly and frail, Higginson supported the proceedings. The hotel itself, built in 1925, is reputedly one of the most haunted in America.",
       "longNarration": "The Hawthorne Hotel, built in 1925, stands near the site where Reverend John Higginson Junior's home once stood. His father, Reverend John Higginson Senior, was the elderly senior minister of Salem's First Church during the witch trials. Higginson Senior was in his eighties by 1692, largely inactive but still carrying the weight of his office. He supported the trials, lending the authority of his position to the proceedings. The younger Higginson lived here on Washington Square, placing him at the center of Salem's clerical and social establishment. Today the hotel is named for Nathaniel Hawthorne, whose own family's connection to the trials runs deep. Staff and guests have reported ghost sightings for decades, particularly on the sixth floor, making it reputedly one of the most haunted hotels in America. Whether the ghosts are real or not, the land beneath this building was home to men who helped decide the fate of the accused.",
@@ -260,19 +1305,163 @@
       "admissionInfo": "Hotel (public areas accessible)",
       "hours": null,
       "phone": "(978) 744-4080",
-      "website": "https://www.hawthornehotel.com"
+      "website": "https://www.hawthornehotel.com",
+      "routeToNext": [
+        [
+          42.520702,
+          -70.893584
+        ],
+        [
+          42.520656,
+          -70.893576
+        ],
+        [
+          42.520455,
+          -70.893543
+        ],
+        [
+          42.520253,
+          -70.893505
+        ],
+        [
+          42.520046,
+          -70.893466
+        ],
+        [
+          42.51961,
+          -70.893405
+        ],
+        [
+          42.519489,
+          -70.893388
+        ],
+        [
+          42.519459,
+          -70.893383
+        ],
+        [
+          42.519391,
+          -70.893374
+        ],
+        [
+          42.518974,
+          -70.893314
+        ],
+        [
+          42.518882,
+          -70.893297
+        ],
+        [
+          42.518848,
+          -70.893291
+        ],
+        [
+          42.51873,
+          -70.89327
+        ],
+        [
+          42.518529,
+          -70.893234
+        ],
+        [
+          42.518452,
+          -70.89322
+        ],
+        [
+          42.518116,
+          -70.893146
+        ],
+        [
+          42.517802,
+          -70.893096
+        ],
+        [
+          42.51773,
+          -70.893085
+        ],
+        [
+          42.517668,
+          -70.893075
+        ],
+        [
+          42.517673,
+          -70.893243
+        ],
+        [
+          42.51767,
+          -70.893796
+        ],
+        [
+          42.517671,
+          -70.893988
+        ],
+        [
+          42.517706,
+          -70.89405
+        ],
+        [
+          42.517905,
+          -70.894426
+        ],
+        [
+          42.517947,
+          -70.894494
+        ],
+        [
+          42.51802,
+          -70.894614
+        ],
+        [
+          42.518079,
+          -70.894788
+        ],
+        [
+          42.518105,
+          -70.894984
+        ],
+        [
+          42.51811,
+          -70.89502
+        ],
+        [
+          42.518116,
+          -70.89506
+        ],
+        [
+          42.518135,
+          -70.895183
+        ],
+        [
+          42.518137,
+          -70.895195
+        ],
+        [
+          42.518286,
+          -70.895221
+        ],
+        [
+          42.51854,
+          -70.895284
+        ],
+        [
+          42.518551,
+          -70.895287
+        ]
+      ],
+      "routeDistanceM": 576,
+      "routeDurationS": 56
     },
     {
       "order": 13,
       "poiId": "roger_conant_statue",
       "name": "Roger Conant Statue & Salem Common",
       "lat": 42.5186,
-      "lng": -70.8950,
+      "lng": -70.895,
       "address": "Brown St & Washington Square, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 30,
-      "walkingMinutesFromPrev": 2,
-      "distanceMFromPrev": 170,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 576,
       "transitionNarration": "Cross to the southeast corner of Salem Common. The cloaked figure ahead is Roger Conant, who founded Salem in 1626. Visitors often mistake his Puritan cloak for a witch's costume. Salem Common has served as public land since the sixteen thirties, and the community that gathered here in 1692 was already sixty-six years old.",
       "shortNarration": "This statue of Roger Conant, the founder of Salem in 1626, is one of the most photographed landmarks in the city. Visitors often mistake his Puritan cloak for a witch's outfit. By 1692, Salem was a well-established community with deep roots and old grudges.",
       "longNarration": "Roger Conant founded Salem in 1626, sixty-six years before the witch trials. This statue, erected in 1913, depicts him in the flowing cloak of a Puritan settler. Visitors frequently mistake the cloak for a witch's costume, an irony Conant would not have appreciated. Salem Common, the nine-acre green behind you, has served as public land since the 1630s, first for militia training and livestock grazing, later as the civic heart of the city. Understanding Salem's age is essential to understanding 1692. By the time the witch trials erupted, Salem was a mature community with established families, accumulated grudges, property disputes, and social hierarchies. The trials were not the act of a frontier settlement in panic. They were the product of a well-established community turning on itself. The Common was surrounded by the homes of Salem's elite, including several magistrates and ministers who played central roles in the crisis. Standing here, you are at the geographic center of the world that produced the witch trials.",
@@ -281,7 +1470,219 @@
       "admissionInfo": "Free",
       "hours": "Open 24 hours",
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.518551,
+          -70.895287
+        ],
+        [
+          42.518801,
+          -70.895366
+        ],
+        [
+          42.51887,
+          -70.895382
+        ],
+        [
+          42.518959,
+          -70.895398
+        ],
+        [
+          42.519068,
+          -70.895422
+        ],
+        [
+          42.519401,
+          -70.895431
+        ],
+        [
+          42.51955,
+          -70.895415
+        ],
+        [
+          42.519583,
+          -70.895411
+        ],
+        [
+          42.519665,
+          -70.895409
+        ],
+        [
+          42.519722,
+          -70.895409
+        ],
+        [
+          42.519769,
+          -70.895407
+        ],
+        [
+          42.51983,
+          -70.895578
+        ],
+        [
+          42.519777,
+          -70.895587
+        ],
+        [
+          42.51973,
+          -70.895589
+        ],
+        [
+          42.519714,
+          -70.89559
+        ],
+        [
+          42.519609,
+          -70.895606
+        ],
+        [
+          42.519596,
+          -70.895607
+        ],
+        [
+          42.519419,
+          -70.895615
+        ],
+        [
+          42.519254,
+          -70.89561
+        ],
+        [
+          42.519073,
+          -70.895588
+        ],
+        [
+          42.518906,
+          -70.895566
+        ],
+        [
+          42.518824,
+          -70.895547
+        ],
+        [
+          42.518774,
+          -70.895536
+        ],
+        [
+          42.518694,
+          -70.895517
+        ],
+        [
+          42.518368,
+          -70.895423
+        ],
+        [
+          42.518322,
+          -70.89541
+        ],
+        [
+          42.518289,
+          -70.895401
+        ],
+        [
+          42.518165,
+          -70.895365
+        ],
+        [
+          42.518061,
+          -70.895337
+        ],
+        [
+          42.518053,
+          -70.895257
+        ],
+        [
+          42.518046,
+          -70.895181
+        ],
+        [
+          42.518034,
+          -70.895069
+        ],
+        [
+          42.518024,
+          -70.89498
+        ],
+        [
+          42.517998,
+          -70.89479
+        ],
+        [
+          42.517965,
+          -70.894642
+        ],
+        [
+          42.517929,
+          -70.894511
+        ],
+        [
+          42.517905,
+          -70.894426
+        ],
+        [
+          42.517706,
+          -70.89405
+        ],
+        [
+          42.517671,
+          -70.893988
+        ],
+        [
+          42.517523,
+          -70.893871
+        ],
+        [
+          42.517372,
+          -70.893725
+        ],
+        [
+          42.517279,
+          -70.893638
+        ],
+        [
+          42.517257,
+          -70.893618
+        ],
+        [
+          42.516716,
+          -70.893116
+        ],
+        [
+          42.5167,
+          -70.893101
+        ],
+        [
+          42.516437,
+          -70.892855
+        ],
+        [
+          42.516365,
+          -70.892846
+        ],
+        [
+          42.51622,
+          -70.892827
+        ],
+        [
+          42.516152,
+          -70.893624
+        ],
+        [
+          42.516105,
+          -70.893664
+        ],
+        [
+          42.516056,
+          -70.893648
+        ],
+        [
+          42.515906,
+          -70.893624
+        ]
+      ],
+      "routeDistanceM": 757,
+      "routeDurationS": 69
     },
     {
       "order": 14,
@@ -289,11 +1690,11 @@
       "name": "Salem Witch Museum",
       "lat": 42.5159,
       "lng": -70.8937,
-      "address": "19\u00bd Washington Square N, Salem, MA 01970",
+      "address": "19½ Washington Square N, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 50,
-      "walkingMinutesFromPrev": 3,
-      "distanceMFromPrev": 200,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 757,
       "transitionNarration": "Walk south across Washington Square to the Gothic turrets of the Salem Witch Museum. This former church, built in 1846, houses thirteen life-size stage sets that retell the terror of 1692 through light and narration. This site was also the home of Reverend John Higginson Senior during the trials.",
       "shortNarration": "The Salem Witch Museum occupies a former church at the edge of Salem Common. Inside, thirteen stage sets with life-size figures tell the story of the 1692 witch trials through light and narration. This site was also the approximate location of Reverend John Higginson's home.",
       "longNarration": "The Salem Witch Museum is one of the most visited attractions in Salem. Housed in a former mid-nineteenth century church, it uses thirteen stage sets with life-size figures to dramatize the events of the 1692 witch hysteria. The main presentation takes visitors through the accusations, the trials, and the executions, with particular focus on key figures like Tituba, Bridget Bishop, and Rebecca Nurse. A second exhibition called Witches: Evolving Perceptions traces the concept of the witch from biblical times through modern Wicca. The building itself, a Gothic Revival structure originally built in 1846, adds to the atmosphere. The museum has been operating since 1972 and has become one of Salem's most iconic landmarks, visible from across Salem Common with its distinctive pointed turrets. This was also the approximate site of Reverend John Higginson's home during the trials. Higginson was the aged senior minister of the First Church who lent his authority to the proceedings.",
@@ -302,7 +1703,91 @@
       "admissionInfo": "$18 adults, $13.50 children 6-14, free under 6",
       "hours": "10:00 AM - 5:00 PM daily (extended October hours)",
       "phone": "(978) 744-1692",
-      "website": "https://salemwitchmuseum.com"
+      "website": "https://salemwitchmuseum.com",
+      "routeToNext": [
+        [
+          42.515906,
+          -70.893624
+        ],
+        [
+          42.515764,
+          -70.893602
+        ],
+        [
+          42.515506,
+          -70.893562
+        ],
+        [
+          42.51536,
+          -70.893541
+        ],
+        [
+          42.515255,
+          -70.893527
+        ],
+        [
+          42.515123,
+          -70.893502
+        ],
+        [
+          42.515183,
+          -70.892731
+        ],
+        [
+          42.515191,
+          -70.892621
+        ],
+        [
+          42.515461,
+          -70.892672
+        ],
+        [
+          42.515516,
+          -70.892683
+        ],
+        [
+          42.515905,
+          -70.892763
+        ],
+        [
+          42.51622,
+          -70.892827
+        ],
+        [
+          42.516365,
+          -70.892846
+        ],
+        [
+          42.516437,
+          -70.892855
+        ],
+        [
+          42.516459,
+          -70.892678
+        ],
+        [
+          42.516598,
+          -70.891429
+        ],
+        [
+          42.517615,
+          -70.89162
+        ],
+        [
+          42.51767,
+          -70.89163
+        ],
+        [
+          42.517669,
+          -70.891997
+        ],
+        [
+          42.517669,
+          -70.8924
+        ]
+      ],
+      "routeDistanceM": 602,
+      "routeDurationS": 100
     },
     {
       "order": 15,
@@ -313,8 +1798,8 @@
       "address": "Federal St & St. Peter's St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 35,
-      "walkingMinutesFromPrev": 3,
-      "distanceMFromPrev": 190,
+      "walkingMinutesFromPrev": 2,
+      "distanceMFromPrev": 602,
       "transitionNarration": "Walk south from the museum toward the intersection of Federal Street and Saint Peter's Street. This intersection was called Prison Lane in 1692. Near here stood the Salem jail where accused witches were held in conditions so appalling that several died before ever reaching trial.",
       "shortNarration": "The Salem jail stood near this intersection, called Prison Lane in 1692. At the peak of the crisis, over one hundred and fifty accused were crammed into a building just seventy feet long. Prisoners were chained in dark, filthy cells and charged for their own food and shackles.",
       "longNarration": "The Salem jail stood near this intersection of Federal Street and Saint Peter's Street, known as Prison Lane in 1692. The jail was a small, crude structure wholly unprepared for the flood of accused witches that filled it during the crisis. At the peak of the hysteria, over one hundred and fifty people were imprisoned across jails in Salem, Ipswich, and Boston. Conditions were appalling. Prisoners were chained to the walls in dark, unventilated cells. They were required to pay for their own food, firewood, and even the chains that bound them. Those who could not pay went hungry in the dark. At least five accused died in jail before ever reaching trial, including Sarah Osborne, who died in Boston jail on May 10, 1692, and the infant child of Sarah Good, born in prison and dead within days. Ann Foster, an elderly woman from Andover, died in jail after confessing under pressure. Tituba, the enslaved woman whose initial confession helped ignite the crisis, remained imprisoned for over a year because no one would pay her jail fees. The physical suffering endured in this place was as much a part of the witch trials as the hangings themselves.",
@@ -323,7 +1808,195 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": "https://www.historicsalem.org/historic-salem-jail.html"
+      "website": "https://www.historicsalem.org/historic-salem-jail.html",
+      "routeToNext": [
+        [
+          42.517669,
+          -70.8924
+        ],
+        [
+          42.517668,
+          -70.892902
+        ],
+        [
+          42.517668,
+          -70.893075
+        ],
+        [
+          42.517673,
+          -70.893243
+        ],
+        [
+          42.51767,
+          -70.893796
+        ],
+        [
+          42.517671,
+          -70.893988
+        ],
+        [
+          42.517706,
+          -70.89405
+        ],
+        [
+          42.517905,
+          -70.894426
+        ],
+        [
+          42.517947,
+          -70.894494
+        ],
+        [
+          42.51802,
+          -70.894614
+        ],
+        [
+          42.518079,
+          -70.894788
+        ],
+        [
+          42.518105,
+          -70.894984
+        ],
+        [
+          42.51811,
+          -70.89502
+        ],
+        [
+          42.518116,
+          -70.89506
+        ],
+        [
+          42.518135,
+          -70.895183
+        ],
+        [
+          42.518137,
+          -70.895195
+        ],
+        [
+          42.518148,
+          -70.895262
+        ],
+        [
+          42.518165,
+          -70.895365
+        ],
+        [
+          42.518061,
+          -70.895337
+        ],
+        [
+          42.517973,
+          -70.89532
+        ],
+        [
+          42.517953,
+          -70.895322
+        ],
+        [
+          42.517869,
+          -70.89533
+        ],
+        [
+          42.517787,
+          -70.895337
+        ],
+        [
+          42.517656,
+          -70.89539
+        ],
+        [
+          42.517461,
+          -70.895528
+        ],
+        [
+          42.517345,
+          -70.89561
+        ],
+        [
+          42.517228,
+          -70.895665
+        ],
+        [
+          42.517109,
+          -70.895696
+        ],
+        [
+          42.516858,
+          -70.895734
+        ],
+        [
+          42.516842,
+          -70.895736
+        ],
+        [
+          42.516781,
+          -70.895745
+        ],
+        [
+          42.516385,
+          -70.895815
+        ],
+        [
+          42.51635,
+          -70.895821
+        ],
+        [
+          42.516273,
+          -70.895834
+        ],
+        [
+          42.51592,
+          -70.895893
+        ],
+        [
+          42.515768,
+          -70.89592
+        ],
+        [
+          42.515403,
+          -70.895986
+        ],
+        [
+          42.51506,
+          -70.896055
+        ],
+        [
+          42.515006,
+          -70.896066
+        ],
+        [
+          42.514627,
+          -70.896136
+        ],
+        [
+          42.514388,
+          -70.896178
+        ],
+        [
+          42.514103,
+          -70.896235
+        ],
+        [
+          42.514002,
+          -70.896251
+        ],
+        [
+          42.513439,
+          -70.896335
+        ],
+        [
+          42.513442,
+          -70.896232
+        ],
+        [
+          42.513484,
+          -70.89512
+        ]
+      ],
+      "routeDistanceM": 894,
+      "routeDurationS": 76
     },
     {
       "order": 16,
@@ -334,8 +2007,8 @@
       "address": "51 Charter St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 50,
-      "walkingMinutesFromPrev": 3,
-      "distanceMFromPrev": 250,
+      "walkingMinutesFromPrev": 1,
+      "distanceMFromPrev": 894,
       "transitionNarration": "Walk south on Saint Peter's Street and turn left on Charter Street. The entrance to the Old Burying Point Cemetery is at fifty-one Charter Street. Established in 1637, this is one of the oldest cemeteries in the United States. Judge Hathorne, the most zealous witch trial magistrate, is buried here.",
       "shortNarration": "Charter Street Cemetery is one of the oldest burying grounds in the United States, established in 1637. Judge John Hathorne, the most zealous of the Salem witch trial magistrates and a direct ancestor of author Nathaniel Hawthorne, is buried here.",
       "longNarration": "Charter Street Cemetery, also known as the Old Burying Point, is the oldest burying ground in Salem and one of the oldest in the entire United States, established in 1637. The cemetery contains the graves of several figures connected to the witch trials, including Judge John Hathorne, the most zealous of the Salem witch trial magistrates and a direct ancestor of author Nathaniel Hawthorne. Governor Simon Bradstreet, who helped end the trials, is also interred here. Other notable burials include Captain Richard More, a Mayflower passenger. The cemetery's weathered slate headstones, many featuring carved skulls and winged death's heads, are striking examples of early colonial funerary art. The adjacent Witch Trials Memorial makes this a natural pairing for visitors interested in the 1692 events.",
@@ -344,7 +2017,39 @@
       "admissionInfo": "Free",
       "hours": "Daylight hours",
       "phone": null,
-      "website": "https://www.charterstreetcemetery.com/visiting"
+      "website": "https://www.charterstreetcemetery.com/visiting",
+      "routeToNext": [
+        [
+          42.513484,
+          -70.89512
+        ],
+        [
+          42.513442,
+          -70.896232
+        ],
+        [
+          42.513439,
+          -70.896335
+        ],
+        [
+          42.51336,
+          -70.896347
+        ],
+        [
+          42.513078,
+          -70.896385
+        ],
+        [
+          42.512637,
+          -70.896434
+        ],
+        [
+          42.512603,
+          -70.896438
+        ]
+      ],
+      "routeDistanceM": 193,
+      "routeDurationS": 24
     },
     {
       "order": 17,
@@ -355,8 +2060,8 @@
       "address": "24 Liberty St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 40,
-      "walkingMinutesFromPrev": 1,
-      "distanceMFromPrev": 70,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 193,
       "transitionNarration": "The memorial is directly adjacent to the cemetery. Walk to the entrance on Liberty Street. Nobel Laureate Elie Wiesel dedicated this space in 1992. Twenty stone benches bear the names and execution dates of the victims. Their protests of innocence are inscribed on the walls but cut off mid-sentence by the stone.",
       "shortNarration": "You are approaching the Salem Witch Trials Memorial. Dedicated in 1992 on the three hundredth anniversary of the trials. Twenty stone benches, each inscribed with the name of a victim, line this quiet park.",
       "longNarration": "The Salem Witch Trials Memorial stands as a solemn tribute to the twenty innocent people executed during the witch hysteria of 1692. Designed by architect James Cutler and artist Maggie Smith, it was dedicated on the tercentenary of the trials in August 1992. Nobel Laureate Elie Wiesel delivered the dedication speech. Twenty granite benches jut from the stone walls, each bearing the name, method, and date of execution of a victim. The entrance features the victims' protests of innocence, their words literally cut off mid-sentence by the stone walls. Locust trees cast dappled shadows over the space, chosen for their historical association with the gallows. This memorial serves as a permanent reminder of what happens when fear, intolerance, and injustice go unchecked.",
@@ -365,19 +2070,143 @@
       "admissionInfo": "Free",
       "hours": "Open 24 hours",
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.512603,
+          -70.896438
+        ],
+        [
+          42.512637,
+          -70.896434
+        ],
+        [
+          42.513078,
+          -70.896385
+        ],
+        [
+          42.51336,
+          -70.896347
+        ],
+        [
+          42.513439,
+          -70.896335
+        ],
+        [
+          42.514002,
+          -70.896251
+        ],
+        [
+          42.514006,
+          -70.89614
+        ],
+        [
+          42.514053,
+          -70.894894
+        ],
+        [
+          42.514056,
+          -70.894811
+        ],
+        [
+          42.514242,
+          -70.894835
+        ],
+        [
+          42.514251,
+          -70.894757
+        ],
+        [
+          42.514507,
+          -70.892601
+        ],
+        [
+          42.514518,
+          -70.892494
+        ],
+        [
+          42.514536,
+          -70.892359
+        ],
+        [
+          42.514632,
+          -70.891633
+        ],
+        [
+          42.51471,
+          -70.891063
+        ],
+        [
+          42.514828,
+          -70.890291
+        ],
+        [
+          42.514915,
+          -70.889828
+        ],
+        [
+          42.515027,
+          -70.889229
+        ],
+        [
+          42.515057,
+          -70.889068
+        ],
+        [
+          42.515073,
+          -70.888957
+        ],
+        [
+          42.515081,
+          -70.888852
+        ],
+        [
+          42.515088,
+          -70.888754
+        ],
+        [
+          42.515082,
+          -70.888409
+        ],
+        [
+          42.515078,
+          -70.888168
+        ],
+        [
+          42.515077,
+          -70.888102
+        ],
+        [
+          42.51507,
+          -70.887676
+        ],
+        [
+          42.515552,
+          -70.887677
+        ],
+        [
+          42.515725,
+          -70.887678
+        ],
+        [
+          42.516201,
+          -70.887679
+        ]
+      ],
+      "routeDistanceM": 1018,
+      "routeDurationS": 147
     },
     {
       "order": 18,
       "poiId": "alice_parker_home",
       "name": "Alice Parker Home Site",
       "lat": 42.5162,
-      "lng": -70.8880,
+      "lng": -70.888,
       "address": "54 Derby St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 25,
-      "walkingMinutesFromPrev": 4,
-      "distanceMFromPrev": 360,
+      "walkingMinutesFromPrev": 2,
+      "distanceMFromPrev": 1018,
       "transitionNarration": "Walk east from the memorial along Charter Street, then turn right onto Derby Street heading toward the harbor. Near number fifty-four Derby Street stood the home of Alice Parker, a fisherman's wife swept up in the hysteria.",
       "shortNarration": "Alice Parker lived near this spot on Derby Street. She was the wife of a fisherman, an ordinary woman with no power, no wealth, and no means of defense. She was hanged on September twenty-second, 1692, alongside seven others in the last mass execution of the trials.",
       "longNarration": "Alice Parker was the wife of a Salem fisherman, an ordinary woman who lived near this spot on Derby Street. She had no wealth, no political connections, and no means of mounting a defense against the accusations that swept her up in the summer of 1692. Testimony against her alleged that she had caused the deaths of several people through witchcraft, including a woman named Mary Warren and sailors lost at sea. The evidence was entirely spectral and hearsay. Parker maintained her innocence, but innocence was no defense in the Court of Oyer and Terminer. She was tried, convicted, and hanged on September 22, 1692, alongside Martha Corey, Mary Eastey, Ann Pudeator, Margaret Scott, Wilmot Redd, Samuel Wardwell, and Mary Parker. It was the last mass execution of the trials, eight people killed in a single day. Alice Parker's story is the story of most of the victims: not prominent, not powerful, not memorable to history except for the manner of their deaths. She represents the ordinary people, the fishermen's wives, the widows, the elderly, the poor, who had no champion and no escape when the accusations came.",
@@ -386,7 +2215,19 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.516201,
+          -70.887679
+        ],
+        [
+          42.516799,
+          -70.887681
+        ]
+      ],
+      "routeDistanceM": 66,
+      "routeDurationS": 10
     },
     {
       "order": 19,
@@ -397,8 +2238,8 @@
       "address": "60 Derby St, Salem, MA 01970",
       "category": "witch_trials",
       "geofenceRadiusM": 25,
-      "walkingMinutesFromPrev": 1,
-      "distanceMFromPrev": 80,
+      "walkingMinutesFromPrev": 0,
+      "distanceMFromPrev": 66,
       "transitionNarration": "Walk a short distance east on Derby Street to approximately number sixty. The Blue Anchor Tavern stood near here, one of the waterfront gathering places where Salem's maritime community mixed with its townspeople. This is the final stop on the Salem Witch Trials Walking Tour.",
       "shortNarration": "The Blue Anchor Tavern stood near this spot on Derby Street, close to the wharves where Salem's ships docked. In 1692, sailors, merchants, and townsfolk gathered here. Rumors traveled fast in taverns like this, and the accusations that destroyed lives often began with a whispered conversation over a mug of cider.",
       "longNarration": "The Blue Anchor Tavern stood near this location on Derby Street, close to the busy wharves where Salem's merchant ships loaded and unloaded cargo from around the world. Salem in 1692 was not just a Puritan settlement but a thriving seaport, and the waterfront taverns were where the town's maritime and domestic worlds intersected. Sailors brought news from other ports. Merchants discussed trade. And in the spring and summer of 1692, the conversation turned obsessively to witchcraft. Taverns like the Blue Anchor were the social media of colonial New England. A rumor spoken here at dusk could reach every household in Salem by morning. The accusations that destroyed families and ended lives did not begin in a courtroom. They began in places like this, over mugs of cider and bowls of stew, in whispered conversations that grew louder with each telling. This concludes the Salem Witch Trials Walking Tour. You have walked approximately three kilometers through the landscape of 1692. The people whose stories you have heard were real. Their suffering was real. And the forces that destroyed them, fear, conformity, the willingness to believe the worst about one's neighbors, are not relics of the past. Thank you for walking with us.",
@@ -407,7 +2248,127 @@
       "admissionInfo": "Free (street viewing, original building gone)",
       "hours": null,
       "phone": null,
-      "website": null
+      "website": null,
+      "routeToNext": [
+        [
+          42.516799,
+          -70.887681
+        ],
+        [
+          42.517347,
+          -70.887683
+        ],
+        [
+          42.517347,
+          -70.88785
+        ],
+        [
+          42.517347,
+          -70.888052
+        ],
+        [
+          42.517347,
+          -70.888287
+        ],
+        [
+          42.517346,
+          -70.888421
+        ],
+        [
+          42.517345,
+          -70.88935
+        ],
+        [
+          42.517672,
+          -70.889351
+        ],
+        [
+          42.517672,
+          -70.88948
+        ],
+        [
+          42.517672,
+          -70.889596
+        ],
+        [
+          42.517671,
+          -70.890611
+        ],
+        [
+          42.51767,
+          -70.891121
+        ],
+        [
+          42.51767,
+          -70.89163
+        ],
+        [
+          42.517669,
+          -70.891997
+        ],
+        [
+          42.517668,
+          -70.892902
+        ],
+        [
+          42.517668,
+          -70.893075
+        ],
+        [
+          42.51758,
+          -70.893059
+        ],
+        [
+          42.517242,
+          -70.892999
+        ],
+        [
+          42.516921,
+          -70.892942
+        ],
+        [
+          42.516847,
+          -70.892928
+        ],
+        [
+          42.516742,
+          -70.89291
+        ],
+        [
+          42.516628,
+          -70.892889
+        ],
+        [
+          42.516437,
+          -70.892855
+        ],
+        [
+          42.516365,
+          -70.892846
+        ],
+        [
+          42.51622,
+          -70.892827
+        ],
+        [
+          42.515905,
+          -70.892763
+        ],
+        [
+          42.515516,
+          -70.892683
+        ],
+        [
+          42.515461,
+          -70.892672
+        ],
+        [
+          42.515316,
+          -70.892645
+        ]
+      ],
+      "routeDistanceM": 804,
+      "routeDurationS": 109
     }
   ]
 }

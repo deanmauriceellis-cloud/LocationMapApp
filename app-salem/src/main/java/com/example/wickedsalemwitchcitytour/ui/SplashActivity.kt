@@ -13,11 +13,11 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.airbnb.lottie.LottieAnimationView
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
 
@@ -27,7 +27,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SplashActiv
 /**
  * SplashActivity — Branded launch screen for WickedSalemWitchCityTour.
  *
- * Flow: Lottie WitchKitty animation (2.5s) → "Wicked Salem" text fade-in →
+ * Flow: WitchKitty image with slow zoom (2.5s) → "Wicked Salem Witch Tours" text fade-in →
  * crossfade transition to SalemMainActivity with EXTRA_FROM_SPLASH flag
  * so the map can perform the cinematic zoom-in animation.
  */
@@ -56,8 +56,17 @@ class SplashActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_splash)
 
-        val animationView = findViewById<LottieAnimationView>(R.id.splashAnimation)
+        val splashImage = findViewById<ImageView>(R.id.splashImage)
         val textContainer = findViewById<android.view.View>(R.id.splashTextContainer)
+
+        // Slow zoom-in on the WitchKitty image (Ken Burns-style)
+        splashImage.scaleX = 1.0f
+        splashImage.scaleY = 1.0f
+        splashImage.animate()
+            .scaleX(1.15f).scaleY(1.15f)
+            .setDuration(ANIMATION_DURATION_MS)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
 
         // Fade in the title text after a short delay
         textContainer.animate()
@@ -67,7 +76,7 @@ class SplashActivity : AppCompatActivity() {
             .start()
 
         // When animation finishes, transition to main activity
-        animationView.postDelayed({
+        splashImage.postDelayed({
             launchMainActivity()
         }, ANIMATION_DURATION_MS)
     }

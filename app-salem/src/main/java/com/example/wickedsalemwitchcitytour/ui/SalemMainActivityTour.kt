@@ -29,6 +29,7 @@ import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.tour.ActiveTour
+import com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
 import com.example.wickedsalemwitchcitytour.tour.GeofenceEventType
 import com.example.wickedsalemwitchcitytour.tour.NarrationState
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceEvent
@@ -876,18 +877,42 @@ internal fun SalemMainActivity.removeNarrationBar() {
 internal fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
     clearTourOverlays()
 
-    val points = tourViewModel.getAllStopLocations()
-    if (points.isEmpty()) return
+    // Try to load pre-computed OSRM route geometry from tour JSON
+    val segments = TourRouteLoader.loadRouteSegments(this, activeTour.tour.id)
 
-    // Route polyline
-    val polyline = Polyline().apply {
-        setPoints(points)
-        outlinePaint.color = Color.parseColor(COLOR_ROUTE)
-        outlinePaint.strokeWidth = 4f
-        outlinePaint.isAntiAlias = true
+    if (segments.isNotEmpty()) {
+        // Draw street-following polylines for each segment
+        val allRoutePoints = mutableListOf<GeoPoint>()
+        for (seg in segments) {
+            if (allRoutePoints.isEmpty()) {
+                allRoutePoints.addAll(seg.points)
+            } else if (seg.points.isNotEmpty()) {
+                allRoutePoints.addAll(seg.points.drop(1))
+            }
+        }
+        val polyline = Polyline().apply {
+            setPoints(allRoutePoints)
+            outlinePaint.color = Color.parseColor(COLOR_ROUTE)
+            outlinePaint.strokeWidth = 5f
+            outlinePaint.isAntiAlias = true
+        }
+        binding.mapView.overlays.add(polyline)
+        tourRoutePolyline = polyline
+        DebugLogger.i("SalemMainActivityTour", "Drew routed polyline: ${allRoutePoints.size} points, ${segments.size} segments")
+    } else {
+        // Fallback: straight lines between stops (no OSRM data)
+        val points = tourViewModel.getAllStopLocations()
+        if (points.isEmpty()) return
+        val polyline = Polyline().apply {
+            setPoints(points)
+            outlinePaint.color = Color.parseColor(COLOR_ROUTE)
+            outlinePaint.strokeWidth = 4f
+            outlinePaint.isAntiAlias = true
+        }
+        binding.mapView.overlays.add(polyline)
+        tourRoutePolyline = polyline
+        DebugLogger.i("SalemMainActivityTour", "Drew straight-line polyline: ${points.size} stops (no route data)")
     }
-    binding.mapView.overlays.add(polyline)
-    tourRoutePolyline = polyline
 
     // Stop markers
     for ((i, stop) in activeTour.stops.withIndex()) {
