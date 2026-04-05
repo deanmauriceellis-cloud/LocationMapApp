@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-05 Session 82 (Tour Hardening Plan — Phase 9A+ added to MASTER_PLAN)
+## Last Updated: 2026-04-05 Session 83 (Offline tiles + Witch Trials tour from Kate seed data)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -9,20 +9,21 @@
 - Master plan: `WickedSalemWitchCityTour_MASTER_PLAN.md` (16 phases + 4 future phases + 5 UX transformation phases, supersedes all other plans)
 - **Phases 1-9 complete** (core development done)
 - **Phase 9A COMPLETE** — Splash screen, Esri satellite tiles (zoom 19), cinematic zoom, tile source picker, welcome dialog, tour selection, tour JSON files
-- **NEW: Phase 9A+ NEXT — Tour Hardening & Offline Foundation** (HIGHEST PRIORITY):
-  - Offline map tiles (bundled .mbtiles for downtown Salem, satellite + street, zoom 12-19)
-  - Offline POI data (pre-populate Room DB with Salem commercial POIs from Overpass)
+- **Phase 9A+ IN PROGRESS — Tour Hardening & Offline Foundation** (HIGHEST PRIORITY):
+  - ~~Offline map tiles~~ **DONE** — 3,295 tiles (Esri zoom 16-19 + OSM zoom 16-18), 40MB SQLite archive, verified offline
+  - ~~Salem Witch Trials tour~~ **DONE** — 19-stop tour seeded from Kate data, 8 new POIs, 4 tours total
   - Pre-computed walking route geometry (OSRM routes encoded in tour JSON — no network at runtime)
   - Frida GPS walking simulator (custom script on rooted Lenovo tablet, realistic walking simulation)
-  - End-to-end tour walk test (14 stops, all geofences, all TTS narrations, full UX flow)
+  - End-to-end tour walk test (19 stops, all geofences, all TTS narrations, full UX flow)
   - Tour UX polish (continuous map follow, live distance indicator, seamless transitions)
+  - Geocode verify 8 new stop coordinates against satellite imagery
 - **Phase 9B-9D after**: Feature tier matrix, user settings, contextual alerts
 - **Phase 10**: Production readiness — Firebase, photos, emulator verification, DB hardening
 - **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**
 - **Phases 12-14**: Social media, fieldwork, community engagement — **NO CODE, can start NOW**
 - **Critical timing**: 2026 is Salem's 400th anniversary (Salem 400+) — once-in-a-generation marketing window
 - **NEW: Test device confirmed** — Lenovo TB305FU tablet (Android 15, ARM64, Magisk root, Frida 17.9.1, SELinux Permissive, Google TTS installed). Serial: HNY0CY0W
-- **NEW: Offline-first requirement** — App must work fully offline on tablet. Tour engine, geofences, TTS, Room DB all confirmed offline-ready. Gaps: map tiles (network), walking directions (OSRM), general POI search (Overpass proxy)
+- **Offline-first VERIFIED** — Map tiles bundled (40MB), tour engine + geofences + TTS all offline-ready. Remaining gap: walking directions (OSRM)
 - **NEW: Satellite tiles upgraded** — USGS (zoom 16 max) → Esri World Imagery (zoom 19, street-level)
 - **Live conversation logs** — `docs/session-logs/` for crash recovery (append-only, written during session)
 - **UI direction** — Tour guide view is the primary screen; LocationMapApp map view becomes a utility

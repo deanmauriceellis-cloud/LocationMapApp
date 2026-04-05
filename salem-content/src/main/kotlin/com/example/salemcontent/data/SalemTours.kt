@@ -28,9 +28,9 @@ object SalemTours {
     private val now = System.currentTimeMillis()
     private val curated = Provenance("manual_curated", 1.0f, "2026-04-03", now, now, 0L)
 
-    fun allTours(): List<OutputTour> = listOf(essentialsTour, explorerTour, grandTour)
+    fun allTours(): List<OutputTour> = listOf(essentialsTour, explorerTour, grandTour, witchTrialsTour)
 
-    fun allStops(): List<OutputTourStop> = essentialsStops + explorerStops + grandStops
+    fun allStops(): List<OutputTourStop> = essentialsStops + explorerStops + grandStops + witchTrialsStops
 
     // ═══════════════════════════════════════════════════════════════════
     // Tour 1: Salem Essentials — 14 stops, ~90 min, ~2.2 km, easy
@@ -710,6 +710,196 @@ object SalemTours {
                 "in 1626 to the tragedy of 1692 to the vibrant city of today. " +
                 "Thank you for exploring Salem with us.",
             walkingMinutesFromPrev = 3, distanceMFromPrev = 190,
+            provenance = curated
+        )
+    )
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Tour 4: Salem Witch Trials — 19 stops, ~120 min, ~3.0 km, moderate
+    // Focused 1692 tour seeded from Kate data (Witch Museum walking tour)
+    // Clockwise: Court House → Washington St → Essex St → Salem Common →
+    //   Memorial → Derby St waterfront
+    // ═══════════════════════════════════════════════════════════════════
+
+    private val witchTrialsTour = OutputTour(
+        id = "tour_witch_trials",
+        name = "Salem Witch Trials Walking Tour",
+        theme = "witch_trials",
+        description = "Walk in the footsteps of the accused, the accusers, and the condemned. " +
+            "This GPS-guided tour traces the Salem witch hysteria of 1692 across nineteen stops, " +
+            "from the courthouse where the Court of Oyer and Terminer sentenced the innocent " +
+            "to the solemn memorial where their names are inscribed in stone. Every stop has a " +
+            "direct connection to the events of 1692. The route forms a walkable downtown loop " +
+            "of approximately three kilometers, taking about two hours including narration. " +
+            "Comfortable shoes recommended.",
+        estimatedMinutes = 120,
+        distanceKm = 3.0f,
+        stopCount = 19,
+        difficulty = "moderate",
+        sortOrder = 4,
+        provenance = curated
+    )
+
+    private val witchTrialsStops = listOf(
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "court_house_site", stopOrder = 1,
+            transitionNarration = "Welcome to the Salem Witch Trials Walking Tour. We begin " +
+                "at the heart of the tragedy. This tour will guide you through nineteen sites, " +
+                "each directly connected to the witch hysteria of 1692. Stand here on Washington " +
+                "Street. This is where the Court of Oyer and Terminer convened to try the accused.",
+            walkingMinutesFromPrev = 0, distanceMFromPrev = 0,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "noyes_home_site", stopOrder = 2,
+            transitionNarration = "Walk a short distance north on Washington Street. Near " +
+                "number ninety stood the home of Reverend Nicholas Noyes, assistant minister " +
+                "of the First Church of Salem. He was the most aggressive clerical supporter " +
+                "of the executions.",
+            walkingMinutesFromPrev = 1, distanceMFromPrev = 70,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "judge_hathorne_home", stopOrder = 3,
+            transitionNarration = "Continue north on Washington Street to approximately number " +
+                "one eighteen. Near here lived Judge John Hathorne, the most feared interrogator " +
+                "of the Salem witch trials.",
+            walkingMinutesFromPrev = 2, distanceMFromPrev = 120,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "sheriff_corwin_home", stopOrder = 4,
+            transitionNarration = "Walk back south on Washington Street to number one forty-eight. " +
+                "The building near here stands on the site of High Sheriff George Corwin's home. " +
+                "Corwin was just twenty-six years old when he carried out the arrests and executions.",
+            walkingMinutesFromPrev = 2, distanceMFromPrev = 110,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "bridget_bishop_home", stopOrder = 5,
+            transitionNarration = "Continue a short distance south on Washington Street toward " +
+                "number seventy-one. Near here Bridget Bishop kept her home and ran an unlicensed " +
+                "tavern. She was the very first person executed in the Salem witch trials.",
+            walkingMinutesFromPrev = 1, distanceMFromPrev = 100,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "first_church_1692_site", stopOrder = 6,
+            transitionNarration = "Walk north on Washington Street, then turn right onto Essex " +
+                "Street. Near two thirty-one Essex, where the Daniel Low Building stands, " +
+                "the First Church of Salem's meetinghouse stood in 1692. This was where many " +
+                "of the preliminary examinations took place.",
+            walkingMinutesFromPrev = 3, distanceMFromPrev = 280,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "ship_tavern_site", stopOrder = 7,
+            transitionNarration = "Walk a short distance east along Essex Street to approximately " +
+                "number one eighty-eight. The Ship Tavern stood near here, a gathering place " +
+                "where the drama of the trials spilled into everyday life.",
+            walkingMinutesFromPrev = 1, distanceMFromPrev = 100,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "witch_house", stopOrder = 8,
+            transitionNarration = "Continue east on Essex Street, then bear slightly south. " +
+                "The dark-timbered house ahead with its steep gables is the Witch House, " +
+                "the only building still standing in Salem with direct ties to the sixteen " +
+                "ninety-two witch trials.",
+            walkingMinutesFromPrev = 3, distanceMFromPrev = 230,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "ropes_mansion", stopOrder = 9,
+            transitionNarration = "Walk back northwest along Essex Street toward the pedestrian " +
+                "mall. The elegant Ropes Mansion at three eighteen Essex dates to 1727. " +
+                "You may recognize it as the Allison house from the movie Hocus Pocus.",
+            walkingMinutesFromPrev = 3, distanceMFromPrev = 250,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "philip_english_house", stopOrder = 10,
+            transitionNarration = "Continue west along Essex Street to the intersection with " +
+                "English Street. The street itself bears the name of Philip English, once the " +
+                "richest man in Salem. His grand mansion stood near here.",
+            walkingMinutesFromPrev = 2, distanceMFromPrev = 120,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "ann_pudeator_home", stopOrder = 11,
+            transitionNarration = "Walk north to Washington Square. Near number thirty-five " +
+                "Washington Square North stood the home of Ann Pudeator, a widow and healer " +
+                "who was hanged as a witch. Please respect this private residence.",
+            walkingMinutesFromPrev = 2, distanceMFromPrev = 120,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "hawthorne_hotel", stopOrder = 12,
+            transitionNarration = "Walk to the west side of Salem Common. The Hawthorne Hotel " +
+                "at eighteen Washington Square West stands near the site of Reverend John " +
+                "Higginson Junior's home. His father was the senior minister of First Church " +
+                "during the trials.",
+            walkingMinutesFromPrev = 1, distanceMFromPrev = 80,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "roger_conant_statue", stopOrder = 13,
+            transitionNarration = "Cross to the southeast corner of Salem Common. The cloaked " +
+                "figure ahead is Roger Conant, who founded Salem in 1626. Visitors often mistake " +
+                "his Puritan cloak for a witch's costume.",
+            walkingMinutesFromPrev = 2, distanceMFromPrev = 170,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "salem_witch_museum", stopOrder = 14,
+            transitionNarration = "Walk south across Washington Square to the Gothic turrets " +
+                "of the Salem Witch Museum. This former church, built in 1846, houses thirteen " +
+                "life-size stage sets that retell the terror of 1692.",
+            walkingMinutesFromPrev = 3, distanceMFromPrev = 200,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "salem_jail_site", stopOrder = 15,
+            transitionNarration = "Walk south from the museum toward the intersection of Federal " +
+                "Street and Saint Peter's Street. This was called Prison Lane in 1692. Near here " +
+                "stood the Salem jail where accused witches were held in conditions so appalling " +
+                "that several died before ever reaching trial.",
+            walkingMinutesFromPrev = 3, distanceMFromPrev = 190,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "charter_street_cemetery", stopOrder = 16,
+            transitionNarration = "Walk south on Saint Peter's Street and turn left on Charter " +
+                "Street. The entrance to the Old Burying Point Cemetery is at fifty-one Charter " +
+                "Street. Established in 1637, this is one of the oldest cemeteries in the United " +
+                "States. Judge Hathorne is buried here.",
+            walkingMinutesFromPrev = 3, distanceMFromPrev = 250,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "witch_trials_memorial", stopOrder = 17,
+            transitionNarration = "The memorial is directly adjacent to the cemetery. Walk to " +
+                "the entrance on Liberty Street. Nobel Laureate Elie Wiesel dedicated this " +
+                "space in 1992. Twenty stone benches bear the names and execution dates of " +
+                "the victims.",
+            walkingMinutesFromPrev = 1, distanceMFromPrev = 70,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "alice_parker_home", stopOrder = 18,
+            transitionNarration = "Walk east from the memorial along Charter Street, then turn " +
+                "right onto Derby Street heading toward the harbor. Near number fifty-four " +
+                "Derby Street stood the home of Alice Parker, a fisherman's wife swept up " +
+                "in the hysteria.",
+            walkingMinutesFromPrev = 4, distanceMFromPrev = 360,
+            provenance = curated
+        ),
+        OutputTourStop(
+            tourId = "tour_witch_trials", poiId = "blue_anchor_tavern", stopOrder = 19,
+            transitionNarration = "Walk a short distance east on Derby Street to approximately " +
+                "number sixty. The Blue Anchor Tavern stood near here. This is the final stop " +
+                "on the Salem Witch Trials Walking Tour. Thank you for walking with us.",
+            walkingMinutesFromPrev = 1, distanceMFromPrev = 80,
             provenance = curated
         )
     )

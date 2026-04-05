@@ -10,6 +10,7 @@
 package com.example.wickedsalemwitchcitytour
 
 import android.app.Application
+import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration
 import androidx.preference.PreferenceManager
@@ -21,9 +22,18 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WickedSalem
 class WickedSalemApp : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // 1. Set osmdroid base path in prefs BEFORE load() picks it up.
+        //    Ensures scoped storage compatibility on Android 10+.
+        OfflineTileManager.configureStoragePath(applicationContext)
+
+        // 2. Load osmdroid config (reads our base path from prefs).
         Configuration.getInstance().apply {
             load(applicationContext, PreferenceManager.getDefaultSharedPreferences(applicationContext))
             userAgentValue = "WickedSalemWitchCityTour/1.0 (Android)"
         }
+
+        // 3. Extract bundled offline tiles to osmdroid base path on first launch.
+        OfflineTileManager.extractArchiveIfNeeded(applicationContext)
     }
 }
