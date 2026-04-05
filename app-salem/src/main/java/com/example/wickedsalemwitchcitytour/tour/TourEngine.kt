@@ -561,6 +561,7 @@ class TourEngine @Inject constructor(
             ).also { it.totalStopCount = stops.size }
 
             val activeTour = ActiveTour(tour, stops, pois, progress)
+            geofenceManager.loadStops(stops, pois)
             _tourState.value = TourState.Paused(activeTour)
 
             DebugLogger.i(TAG, "Restored tour: ${tour.name} at stop ${progress.currentStopIndex}/${stops.size}")
