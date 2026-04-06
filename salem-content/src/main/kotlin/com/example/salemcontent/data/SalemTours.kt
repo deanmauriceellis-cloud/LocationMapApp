@@ -19,7 +19,7 @@ import com.example.salemcontent.pipeline.Provenance
  * - Include TTS-optimized transition narrations between every stop
  * - Carry geofence-ready coordinates via referenced TourPoi entries
  *
- * Tour 1: Salem Essentials — compact 14-stop downtown loop (~90 min)
+ * Tour 1: Walking Through Salem — flexible downtown discovery (~90 min)
  * Tour 2: Salem Explorer   — extended 20-stop figure-8 loop (~2 hr 15 min)
  * Tour 3: Grand Salem Tour — comprehensive 26-stop city-wide loop (~3.5 hr)
  */
@@ -33,18 +33,18 @@ object SalemTours {
     fun allStops(): List<OutputTourStop> = essentialsStops + explorerStops + grandStops + witchTrialsStops
 
     // ═══════════════════════════════════════════════════════════════════
-    // Tour 1: Salem Essentials — 14 stops, ~90 min, ~2.2 km, easy
-    // Counter-clockwise: NPS → west on Essex → north to Common →
-    //   south through trial sites → east to waterfront → return
+    // Tour 1: Walking Through Salem — 14 stops, ~90 min, ~2.2 km, easy
+    // Flexible downtown discovery: walk at your own pace, narration
+    //   triggers as you explore the historic district
     // ═══════════════════════════════════════════════════════════════════
 
     private val essentialsTour = OutputTour(
         id = "tour_essentials",
-        name = "Salem Essentials",
+        name = "Walking Through Salem",
         theme = "essential_highlights",
-        description = "The essential Salem experience in a compact downtown loop. " +
-            "Visit the must-see witch trials sites, world-class museums, and literary " +
-            "landmarks in under ninety minutes. Perfect for day-trippers and first-time visitors.",
+        description = "Walk through downtown Salem at your own pace and discover " +
+            "witch trials sites, world-class museums, and literary landmarks as you go. " +
+            "Narration triggers automatically as you explore. Perfect for first-time visitors.",
         estimatedMinutes = 90,
         distanceKm = 2.2f,
         stopCount = 14,
@@ -57,10 +57,10 @@ object SalemTours {
         // 1. Start — orientation
         OutputTourStop(
             tourId = "tour_essentials", poiId = "nps_visitor_center", stopOrder = 1,
-            transitionNarration = "Welcome to the Salem Essentials tour. We will loop through " +
-                "downtown Salem, visiting the most important witch trials sites, museums, and " +
-                "literary landmarks. Pick up a free map inside the visitor center, then head " +
-                "west toward Essex Street.",
+            transitionNarration = "Welcome to Walking Through Salem. Explore downtown at your " +
+                "own pace — we will narrate the most important witch trials sites, museums, and " +
+                "literary landmarks as you discover them. Pick up a free map inside the visitor " +
+                "center, then head in any direction.",
             walkingMinutesFromPrev = 0, distanceMFromPrev = 0,
             provenance = curated
         ),
@@ -189,7 +189,7 @@ object SalemTours {
             transitionNarration = "Walk west along Derby Street back toward downtown. " +
                 "The seated bronze figure of Nathaniel Hawthorne on Hawthorne Boulevard " +
                 "marks the end of your loop. The NPS Visitor Center is just a short walk " +
-                "north from here. You have completed the Salem Essentials tour.",
+                "north from here. You have completed Walking Through Salem.",
             walkingMinutesFromPrev = 4, distanceMFromPrev = 280,
             provenance = curated
         )

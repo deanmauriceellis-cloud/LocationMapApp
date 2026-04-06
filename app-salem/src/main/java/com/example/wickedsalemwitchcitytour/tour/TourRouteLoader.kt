@@ -51,21 +51,68 @@ object TourRouteLoader {
 
     /**
      * Load all route points as a single flat list (for walk simulation).
-     * Points flow through each segment in order, including the loop-back.
+     * If the tour has pre-computed OSRM geometry, points flow through each segment.
+     * Otherwise, falls back to the stop lat/lng coordinates directly.
      */
     fun loadAllRoutePoints(context: Context, tourId: String): List<GeoPoint> {
         val segments = loadRouteSegments(context, tourId)
-        if (segments.isEmpty()) return emptyList()
-        val allPoints = mutableListOf<GeoPoint>()
-        for (seg in segments) {
-            // Skip first point of subsequent segments to avoid duplicates at junctions
-            if (allPoints.isEmpty()) {
-                allPoints.addAll(seg.points)
-            } else if (seg.points.isNotEmpty()) {
-                allPoints.addAll(seg.points.drop(1))
+        if (segments.isNotEmpty()) {
+            val allPoints = mutableListOf<GeoPoint>()
+            for (seg in segments) {
+                if (allPoints.isEmpty()) {
+                    allPoints.addAll(seg.points)
+                } else if (seg.points.isNotEmpty()) {
+                    allPoints.addAll(seg.points.drop(1))
+                }
             }
+            return allPoints
         }
-        return allPoints
+        // Fallback: use stop coordinates as waypoints
+        return loadStopCoordinates(context, tourId)
+    }
+
+    /**
+     * Load stop lat/lng coordinates from the tour JSON (no route geometry needed).
+     */
+    private fun loadStopCoordinates(context: Context, tourId: String): List<GeoPoint> {
+        val filename = "tours/$tourId.json"
+        return try {
+            val json = context.assets.open(filename).bufferedReader().use { it.readText() }
+            val root = JsonParser.parseString(json).asJsonObject
+            val stops = root.getAsJsonArray("stops") ?: return emptyList()
+            val points = stops.map { s ->
+                val obj = s.asJsonObject
+                GeoPoint(obj.get("lat").asDouble, obj.get("lng").asDouble)
+            }
+            DebugLogger.i(TAG, "Loaded ${points.size} stop coordinates for $tourId (no route geometry)")
+            points
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Failed to load stop coordinates for $tourId: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Load the downtown Salem street-level walking route (OSRM-generated).
+     * This is the "Walking Through Salem" route — starts at PEM, loops through
+     * Essex St, Salem Common, Liberty, Charter, Derby waterfront, and back.
+     */
+    fun loadDowntownRoute(context: Context): List<GeoPoint> {
+        val filename = "tours/downtown_salem_route.json"
+        return try {
+            val json = context.assets.open(filename).bufferedReader().use { it.readText() }
+            val root = JsonParser.parseString(json).asJsonObject
+            val pointsArray = root.getAsJsonArray("points") ?: return emptyList()
+            val points = pointsArray.map { coord ->
+                val arr = coord.asJsonArray
+                GeoPoint(arr[0].asDouble, arr[1].asDouble)
+            }
+            DebugLogger.i(TAG, "Loaded downtown Salem route: ${points.size} points")
+            points
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "No downtown route: ${e.message}")
+            emptyList()
+        }
     }
 
     private fun parseRouteSegments(json: String): List<RouteSegment> {

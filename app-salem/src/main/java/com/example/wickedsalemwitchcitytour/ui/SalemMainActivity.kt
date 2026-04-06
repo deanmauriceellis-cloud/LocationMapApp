@@ -926,9 +926,9 @@ class SalemMainActivity : AppCompatActivity() {
 
     private fun startWalkSim() {
         val routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-            .loadAllRoutePoints(this, "tour_witch_trials")
+            .loadDowntownRoute(this)
         if (routePoints.isEmpty()) {
-            toast("No route data for tour_witch_trials")
+            toast("No downtown Salem route data")
             return
         }
         walkSimRunning = true

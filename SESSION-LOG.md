@@ -2,6 +2,13 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session: 2026-04-06 — Session 87: Tour 1 rename + downtown street route
+- Renamed Tour 1: "Salem Essentials" → "Walking Through Salem" (SalemTours.kt, tour_essentials.json, SQL, DB)
+- Walk simulator: replaced tour-stop-hopping with 352-point OSRM street-level route through downtown Salem
+- New asset: downtown_salem_route.json (PEM → Essex → Common → Liberty → Charter → Derby → back, 5.9km)
+- TourRouteLoader: added loadDowntownRoute() + loadStopCoordinates() fallback
+- Deployed to Lenovo tablet, pending verification next session
+
 ## Session: 2026-04-05 — Session 85: Salem Walking Tour Restructure (planning)
 
 ### Work Performed

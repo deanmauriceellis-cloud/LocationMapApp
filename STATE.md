@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-06 Session 86 (Phase 9T implementation, POI icons, data scraping, Bark TTS, narration system)
+## Last Updated: 2026-04-06 Session 87 (Tour 1 rename, downtown street route, walk simulator fix)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -34,6 +34,8 @@
 - **NEW: 1,416 POI icons generated** — 8 flavors (evil/cute/devil/psycho/undead/demon/zombie/witchcraft) × 177 subtypes
 - **NEW: Bark TTS installed** — ~/AI-Studio/bark/, RTX 3090 CUDA, voice clip generation ready
 - **NEW: Splash audio generated** — warlock + witch cackle with sox post-processing (phaser/reverb/echo)
+- **NEW: Tour 1 renamed** — "Salem Essentials" → "Walking Through Salem" (flexible downtown discovery)
+- **NEW: Downtown street route** — 352-point OSRM route through Salem streets (PEM→Essex→Common→Liberty→Charter→Derby→back), walk simulator follows real roads
 - **NEW: 861 businesses in Room DB** — up from 23 (23 curated + 848 scraped)
 - **NEW: 307 narration points in Room DB** — Wave 1 (113), Wave 2 (85), Wave 3 (109)
 - **Vision: Salem = Disneyland** — downtown is offline entertainment park, 10-mile radius over internet
