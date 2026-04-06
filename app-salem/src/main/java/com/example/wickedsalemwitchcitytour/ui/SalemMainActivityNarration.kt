@@ -91,12 +91,15 @@ internal fun SalemMainActivity.initNarrationSystem() {
             if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle && narrationAutoPlay) {
                 if (narrationQueue.isNotEmpty()) {
                     // TTS finished — play next in queue after brief pause
-                    kotlinx.coroutines.delay(2000) // 2s gap between narrations
+                    val gapMs = if (walkSimRunning) 500L else 2000L
+                    kotlinx.coroutines.delay(gapMs)
                     playNextNarration()
                 } else {
-                    // Queue empty — wait 5s then reach out to nearest un-narrated POI
-                    // This keeps narration flowing even between geofence zones
-                    kotlinx.coroutines.delay(5000)
+                    // Queue empty — reach out to nearest un-narrated POI
+                    // Walk sim: aggressive (500ms) to keep narration flowing continuously
+                    // Normal walk: relaxed (5s) so the app isn't constantly talking
+                    val silenceMs = if (walkSimRunning) 500L else 5000L
+                    kotlinx.coroutines.delay(silenceMs)
                     // Re-check: still idle and queue still empty?
                     if (narrationQueue.isEmpty()) {
                         val mgr = narrationGeofenceManager ?: return@collectLatest

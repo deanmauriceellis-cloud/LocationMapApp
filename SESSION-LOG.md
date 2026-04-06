@@ -2,6 +2,21 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 91: 2026-04-06 — Walk Sim Fixes, Narration Density, 100% Overpass Coverage
+
+### Summary
+Fixed 3 walk simulator bugs (interaction, interpolation, session reset), added walk sim narration mode with 3x expanded geofence entry radius and proximity-first reach-out, audited Overpass POI coverage and added 3 missing narration points for 100% coverage (817 total).
+
+### Changes Made
+- Walk sim stops on tap/long-press (was overwriting user position every second)
+- Route interpolation residual distance bug fixed (short segments not consuming carry-over)
+- Narration session resets on walk sim start (was skipping previously-narrated POIs)
+- Walk sim mode in NarrationGeofenceManager: 3x entry radius, 200m distance-first reach-out, 500ms delays
+- 3 new narration points (2x Salem Fire Dept, 1x Walgreens) — 817 total, 100% Overpass match
+- Reverted VoiceAuditionActivity manifest entry (NOTE-L013 cleanup)
+
+---
+
 ## Session 90: 2026-04-06 — Dual Narration Tiers (Free/Paid)
 - Ultra-short teaser narrations for all 814 POIs (avg 12 words, ~10 sec TTS) — free tier ambient audio
 - Promoted 702 existing short_narrations to long_narration — preserved as paid tier content

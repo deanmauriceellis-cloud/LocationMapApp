@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-06 Session 89 (Universal POI narrations, silence reach-out, priority queue)
+## Last Updated: 2026-04-06 Session 91 (Walk sim fixes, narration density, 100% Overpass coverage)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -37,9 +37,11 @@
 - **NEW: Tour 1 renamed** — "Salem Essentials" → "Walking Through Salem" (flexible downtown discovery)
 - **NEW: Downtown street route** — 352-point OSRM route through Salem streets (PEM→Essex→Common→Liberty→Charter→Derby→back), walk simulator follows real roads
 - **NEW: 861 businesses in Room DB** — up from 23 (23 curated + 848 scraped)
-- **NEW: 814 narration points in Room DB** — Wave 1 (112), Wave 2 (85), Wave 3 (109), Wave 4 (508) — 100% POI coverage
-- **NEW: Silence reach-out** — 5s silence → auto-narrates nearest valuable POI within 500m, never dead air
-- **NEW: Priority narration queue** — adPriority DESC (merchants first), priority ASC (historical value), distance tiebreaker
+- **NEW: 817 narration points in Room DB** — Wave 1 (112), Wave 2 (85), Wave 3 (109), Wave 4 (511) — 100% Overpass POI coverage
+- **NEW: Walk sim narration mode** — 3x entry geofence radius, 200m distance-first reach-out, 500ms gaps, session reset on start
+- **NEW: Walk sim interaction fixes** — tap/long-press stops walk sim, interpolation residual bug fixed
+- **NEW: Silence reach-out** — 5s silence → auto-narrates nearest valuable POI within 500m (200m in walk sim), never dead air
+- **NEW: Priority narration queue** — adPriority DESC (merchants first), priority ASC (historical value), distance tiebreaker; walk sim uses distance-first
 - **Vision: Salem = Disneyland** — downtown is offline entertainment park, 10-mile radius over internet
 - **Monetization: merchant tiers** — every POI controls its own content (icons, voice, narration, ads) based on payment
 - **Phase 9B-9D after**: Feature tier matrix, user settings, contextual alerts

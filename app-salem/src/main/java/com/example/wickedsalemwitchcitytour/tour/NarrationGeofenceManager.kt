@@ -26,6 +26,9 @@ class NarrationGeofenceManager {
 
     private var points: List<NarrationPoint> = emptyList()
 
+    /** Walk sim mode: expands entry radius and tightens reach-out for continuous narration */
+    var walkSimMode: Boolean = false
+
     /** Set of POI IDs that have been narrated today (resets at midnight) */
     private val narratedToday = mutableSetOf<String>()
 
@@ -142,8 +145,9 @@ class NarrationGeofenceManager {
             // Skip if already narrated today
             if (point.id in narratedToday) continue
 
-            // Check geofence zones
-            val entryRadius = point.geofenceRadiusM.toDouble()
+            // Check geofence zones — walk sim mode expands radius for broader coverage
+            val baseRadius = point.geofenceRadiusM.toDouble()
+            val entryRadius = if (walkSimMode) baseRadius * 3.0 else baseRadius
             val approachRadius = entryRadius * APPROACH_MULTIPLIER
 
             when {
@@ -189,22 +193,31 @@ class NarrationGeofenceManager {
     fun findNearestUnnarrated(): NearbyPoint? {
         if (lastLat == 0.0 && lastLng == 0.0) return null
 
+        // Walk sim: tighter radius (200m) so we don't narrate distant irrelevant POIs
+        // Normal walk: full 500m reach-out for coverage between geofence zones
+        val radius = if (walkSimMode) 200.0 else REACH_RADIUS_M
+
         val candidates = mutableListOf<NearbyPoint>()
         for (point in points) {
             if (point.id in narratedToday) continue
             val dist = haversine(lastLat, lastLng, point.lat, point.lng)
-            if (dist <= REACH_RADIUS_M) {
+            if (dist <= radius) {
                 candidates.add(NearbyPoint(point, dist))
             }
         }
         if (candidates.isEmpty()) return null
 
-        // Sort: adPriority DESC (merchants first), priority ASC (historical value), distance ASC
-        return candidates.minWithOrNull(compareBy<NearbyPoint>(
-            { -it.point.adPriority },    // higher ad priority = more important business
-            { it.point.priority },         // lower priority number = more important historically
-            { it.distanceM }               // closer is better as tiebreaker
-        ))
+        // Walk sim: distance-first so nearby POIs are always preferred (user sees them on map)
+        // Normal: merchants first, then historical importance, then distance
+        return if (walkSimMode) {
+            candidates.minByOrNull { it.distanceM }
+        } else {
+            candidates.minWithOrNull(compareBy<NearbyPoint>(
+                { -it.point.adPriority },    // higher ad priority = more important business
+                { it.point.priority },         // lower priority number = more important historically
+                { it.distanceM }               // closer is better as tiebreaker
+            ))
+        }
     }
 
     /**

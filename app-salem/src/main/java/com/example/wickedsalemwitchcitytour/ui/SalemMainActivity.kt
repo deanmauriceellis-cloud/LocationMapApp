@@ -639,6 +639,11 @@ class SalemMainActivity : AppCompatActivity() {
         val eventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                 var consumed = false
+                // Stop walk simulator if running — user tapped the map
+                if (walkSimRunning) {
+                    stopWalkSim()
+                    consumed = true
+                }
                 // Stop following any vehicle or aircraft
                 if (followedVehicleId != null || followedAircraftIcao != null) {
                     stopFollowing()
@@ -665,6 +670,8 @@ class SalemMainActivity : AppCompatActivity() {
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
                 DebugLogger.i("SalemMainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
+                // Stop walk simulator if running — user wants to teleport somewhere else
+                if (walkSimRunning) stopWalkSim()
                 // Stop populate scanner, idle scanner, and silent fill — user is moving to a new location
                 if (populateJob != null) stopPopulatePois()
                 stopProbe10km()
@@ -932,10 +939,14 @@ class SalemMainActivity : AppCompatActivity() {
             toast("No downtown Salem route data")
             return
         }
+        // Reset narration session so all POIs can trigger fresh (clears narratedToday + cooldowns)
+        narrationGeofenceManager?.resetSession()
+        // Enable walk sim mode: expanded geofence radius + tighter reach-out
+        narrationGeofenceManager?.walkSimMode = true
         walkSimRunning = true
         binding.btnWalkSim.text = "Stop"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
-        DebugLogger.i("SalemMainActivity", "Walk sim started: ${routePoints.size} route points")
+        DebugLogger.i("SalemMainActivity", "Walk sim started: ${routePoints.size} route points (narration session reset)")
 
         walkSimJob = lifecycleScope.launch {
             val interpolated = interpolateWalkRoute(routePoints, 1.4f)
@@ -959,6 +970,7 @@ class SalemMainActivity : AppCompatActivity() {
         walkSimJob?.cancel()
         walkSimJob = null
         walkSimRunning = false
+        narrationGeofenceManager?.walkSimMode = false
         binding.btnWalkSim.text = "Walk"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
         DebugLogger.i("SalemMainActivity", "Walk sim stopped")
@@ -974,6 +986,11 @@ class SalemMainActivity : AppCompatActivity() {
             val segDist = com.example.wickedsalemwitchcitytour.tour.TourEngine.haversineM(
                 from.latitude, from.longitude, to.latitude, to.longitude)
             if (segDist < 0.1) continue
+            // If carry-over from previous segment exceeds this segment, consume and skip
+            if (residualM >= segDist) {
+                residualM -= segDist
+                continue
+            }
             var covered = residualM
             while (covered < segDist) {
                 covered += speedMps
