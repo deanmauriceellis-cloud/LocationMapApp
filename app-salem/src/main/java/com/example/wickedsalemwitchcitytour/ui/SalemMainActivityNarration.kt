@@ -85,14 +85,28 @@ internal fun SalemMainActivity.initNarrationSystem() {
         }
     }
 
-    // Observe TTS completion to auto-advance queue
+    // Observe TTS completion to auto-advance queue, with silence reach-out
     lifecycleScope.launch {
         tourViewModel.narrationState.collectLatest { state ->
             if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle && narrationAutoPlay) {
-                // TTS finished — play next in queue after brief pause
                 if (narrationQueue.isNotEmpty()) {
+                    // TTS finished — play next in queue after brief pause
                     kotlinx.coroutines.delay(2000) // 2s gap between narrations
                     playNextNarration()
+                } else {
+                    // Queue empty — wait 5s then reach out to nearest un-narrated POI
+                    // This keeps narration flowing even between geofence zones
+                    kotlinx.coroutines.delay(5000)
+                    // Re-check: still idle and queue still empty?
+                    if (narrationQueue.isEmpty()) {
+                        val mgr = narrationGeofenceManager ?: return@collectLatest
+                        val nearest = mgr.findNearestUnnarrated()
+                        if (nearest != null) {
+                            DebugLogger.i("SalemMainActivity",
+                                "REACH-OUT: ${nearest.point.name} (${nearest.distanceM.toInt()}m away)")
+                            mgr.triggerReachOut(nearest)
+                        }
+                    }
                 }
             }
         }
@@ -104,6 +118,10 @@ internal fun SalemMainActivity.initNarrationSystem() {
 /**
  * Add a narration point to the queue.
  * @param jumpToFront if true (user tapped), interrupt current and play immediately
+ *
+ * In dense areas with multiple triggers, the queue is ordered by:
+ * 1. adPriority DESC (paying merchants first — revenue)
+ * 2. priority ASC (historical importance second — 1=must-hear, 5=filler)
  */
 internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFront: Boolean) {
     // Don't add duplicates
@@ -111,14 +129,27 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
     if (narrationQueue.any { it.id == point.id }) return
 
     if (jumpToFront || currentNarration == null) {
-        // Play immediately
+        // Play immediately (user tapped or nothing playing)
         narrationQueue.addFirst(point)
         playNextNarration()
     } else {
-        // Add to back of queue
-        narrationQueue.addLast(point)
+        // Insert by priority: merchants first, then historical importance
+        val insertIdx = narrationQueue.indexOfFirst { queued ->
+            // Insert before the first item that is less important
+            point.adPriority > queued.adPriority ||
+                (point.adPriority == queued.adPriority && point.priority < queued.priority)
+        }
+        if (insertIdx >= 0) {
+            // ArrayDeque doesn't have positional insert — rebuild
+            val list = narrationQueue.toMutableList()
+            list.add(insertIdx, point)
+            narrationQueue.clear()
+            list.forEach { narrationQueue.addLast(it) }
+        } else {
+            narrationQueue.addLast(point)
+        }
         updateQueueIndicator()
-        DebugLogger.i("SalemMainActivity", "Queued: ${point.name} (${narrationQueue.size} in queue)")
+        DebugLogger.i("SalemMainActivity", "Queued: ${point.name} [ad=${point.adPriority} pri=${point.priority}] (${narrationQueue.size} in queue)")
     }
 }
 

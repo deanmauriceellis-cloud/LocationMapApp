@@ -2,6 +2,14 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 89: 2026-04-06 — Universal POI Narrations + Silence Reach-Out
+- Wave 4: 508 new narration_points for all remaining businesses (814 total, 100% coverage)
+- Smart narration templates by category (cuisine-aware restaurants, atmospheric historic sites, etc.)
+- Silence reach-out: 5s quiet → auto-narrates nearest valuable POI within 500m
+- Priority narration queue: merchants first (adPriority), then historical value (priority), then distance
+- Database rebuilt: 2.7MB, 814 narration_points all with short_narration
+- Deployed to Lenovo TB305FU tablet
+
 ## Session: 2026-04-06 — Session 87: Tour 1 rename + downtown street route
 - Renamed Tour 1: "Salem Essentials" → "Walking Through Salem" (SalemTours.kt, tour_essentials.json, SQL, DB)
 - Walk simulator: replaced tour-stop-hopping with 352-point OSRM street-level route through downtown Salem

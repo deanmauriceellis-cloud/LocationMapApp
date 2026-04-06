@@ -46,6 +46,13 @@ class NarrationGeofenceManager {
     private var _nearby: List<NearbyPoint> = emptyList()
     val nearby: List<NearbyPoint> get() = _nearby
 
+    /** Timestamp of the last ENTRY event emission (normal or reach-out) */
+    private var lastEntryEmitTime = 0L
+
+    /** Last known user position (for reach-out queries from outside checkPosition) */
+    private var lastLat = 0.0
+    private var lastLng = 0.0
+
     companion object {
         /** Minimum time between repeated triggers for the same POI (ms) */
         private const val COOLDOWN_MS = 120_000L  // 2 minutes
@@ -61,6 +68,12 @@ class NarrationGeofenceManager {
 
         /** Minimum time inside geofence before triggering (prevents GPS drift false positives) */
         private const val DWELL_MS = 3_000L
+
+        /** Silence threshold — reach out to nearest POI after this much quiet (ms) */
+        private const val SILENCE_THRESHOLD_MS = 5_000L
+
+        /** Maximum reach-out radius (meters) — don't narrate something far away */
+        private const val REACH_RADIUS_M = 500.0
     }
 
     /** Initialize with context for persistent visit tracking */
@@ -113,7 +126,10 @@ class NarrationGeofenceManager {
     fun checkPosition(lat: Double, lng: Double): List<NearbyPoint> {
         val now = System.currentTimeMillis()
         checkMidnightReset()
+        lastLat = lat
+        lastLng = lng
         val nearbyList = mutableListOf<NearbyPoint>()
+        var emittedEntry = false
 
         for (point in points) {
             val distanceM = haversine(lat, lng, point.lat, point.lng)
@@ -136,6 +152,8 @@ class NarrationGeofenceManager {
                     if (!isOnCooldown(point.id, now)) {
                         narratedToday.add(point.id)
                         cooldowns[point.id] = now
+                        lastEntryEmitTime = now
+                        emittedEntry = true
                         _events.tryEmit(NarrationGeofenceEvent(
                             type = NarrationEventType.ENTRY,
                             point = point,
@@ -160,6 +178,55 @@ class NarrationGeofenceManager {
         // Sort by distance, limit
         _nearby = nearbyList.sortedBy { it.distanceM }.take(MAX_NEARBY)
         return _nearby
+    }
+
+    /**
+     * Find the best un-narrated point within reach-out radius.
+     * Priority order: paying merchants first, then historical importance, then distance.
+     * Called when silence exceeds threshold — keeps the narration flowing.
+     * Returns null if nothing available nearby.
+     */
+    fun findNearestUnnarrated(): NearbyPoint? {
+        if (lastLat == 0.0 && lastLng == 0.0) return null
+
+        val candidates = mutableListOf<NearbyPoint>()
+        for (point in points) {
+            if (point.id in narratedToday) continue
+            val dist = haversine(lastLat, lastLng, point.lat, point.lng)
+            if (dist <= REACH_RADIUS_M) {
+                candidates.add(NearbyPoint(point, dist))
+            }
+        }
+        if (candidates.isEmpty()) return null
+
+        // Sort: adPriority DESC (merchants first), priority ASC (historical value), distance ASC
+        return candidates.minWithOrNull(compareBy<NearbyPoint>(
+            { -it.point.adPriority },    // higher ad priority = more important business
+            { it.point.priority },         // lower priority number = more important historically
+            { it.distanceM }               // closer is better as tiebreaker
+        ))
+    }
+
+    /**
+     * Trigger a reach-out narration for the given point.
+     * Marks it as narrated and emits an ENTRY event.
+     */
+    fun triggerReachOut(nearbyPoint: NearbyPoint) {
+        val now = System.currentTimeMillis()
+        narratedToday.add(nearbyPoint.point.id)
+        cooldowns[nearbyPoint.point.id] = now
+        lastEntryEmitTime = now
+        _events.tryEmit(NarrationGeofenceEvent(
+            type = NarrationEventType.ENTRY,
+            point = nearbyPoint.point,
+            distanceM = nearbyPoint.distanceM
+        ))
+    }
+
+    /** Time since last narration entry event (ms). Used by activity to detect silence. */
+    fun msSinceLastEntry(): Long {
+        if (lastEntryEmitTime == 0L) return Long.MAX_VALUE
+        return System.currentTimeMillis() - lastEntryEmitTime
     }
 
     /** Reset daily tracking (e.g., when user starts a new walk) */

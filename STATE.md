@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-06 Session 87 (Tour 1 rename, downtown street route, walk simulator fix)
+## Last Updated: 2026-04-06 Session 89 (Universal POI narrations, silence reach-out, priority queue)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -25,7 +25,7 @@
   - ~~9T.3 Dialog UI~~ **DONE** — Proximity dock (bottom POI icons) + narration bottom sheet
   - ~~9T.4 Geofence system~~ **DONE** — NarrationGeofenceManager, 2min cooldown, session tracking
   - ~~9T.5 Corridors~~ **DONE** — CorridorGeofence + 10 Salem streets
-  - 9T.6 Narration content — **IN PROGRESS** (auto-generating 113 Wave 1 narrations)
+  - ~~9T.6 Narration content~~ **DONE** — All 814 POIs narrated (W1:112 + W2:85 + W3:109 + W4:508)
   - ~~9T.7 Walking loops~~ **DONE** — Quick (30min), Standard (60min), Grand (90min)
   - ~~9T.8 Integration~~ **DONE** — Wired GPS→geofence→dock+sheet in activity
   - 9T.9 Verification — TODO (walk simulator end-to-end test)
@@ -37,7 +37,9 @@
 - **NEW: Tour 1 renamed** — "Salem Essentials" → "Walking Through Salem" (flexible downtown discovery)
 - **NEW: Downtown street route** — 352-point OSRM route through Salem streets (PEM→Essex→Common→Liberty→Charter→Derby→back), walk simulator follows real roads
 - **NEW: 861 businesses in Room DB** — up from 23 (23 curated + 848 scraped)
-- **NEW: 307 narration points in Room DB** — Wave 1 (113), Wave 2 (85), Wave 3 (109)
+- **NEW: 814 narration points in Room DB** — Wave 1 (112), Wave 2 (85), Wave 3 (109), Wave 4 (508) — 100% POI coverage
+- **NEW: Silence reach-out** — 5s silence → auto-narrates nearest valuable POI within 500m, never dead air
+- **NEW: Priority narration queue** — adPriority DESC (merchants first), priority ASC (historical value), distance tiebreaker
 - **Vision: Salem = Disneyland** — downtown is offline entertainment park, 10-mile radius over internet
 - **Monetization: merchant tiers** — every POI controls its own content (icons, voice, narration, ads) based on payment
 - **Phase 9B-9D after**: Feature tier matrix, user settings, contextual alerts
