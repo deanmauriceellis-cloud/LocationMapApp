@@ -286,4 +286,11 @@ object PoiLayerId {
     const val AUTO_SERVICES   = "auto_services"
     const val ENTERTAINMENT   = "entertainment"
     const val OFFICES         = "offices"
+
+    // Salem-specific categories
+    const val WITCH_SHOP          = "witch_shop"
+    const val PSYCHIC             = "psychic"
+    const val GHOST_TOUR          = "ghost_tour"
+    const val HAUNTED_ATTRACTION  = "haunted_attraction"
+    const val HISTORIC_HOUSE      = "historic_house"
 }

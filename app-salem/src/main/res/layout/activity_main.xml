@@ -128,10 +128,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
         android:layout_marginStart="12dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="56dp"
         android:orientation="vertical"
         android:gravity="center_horizontal"
-        android:elevation="6dp">
+        android:elevation="16dp">
 
         <!-- Show All POIs toggle -->
         <TextView
@@ -213,7 +213,14 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
+        android:layout_marginBottom="100dp"
         android:src="@android:drawable/ic_menu_add"
         app:tint="@android:color/white" />
+
+    <!-- Proximity dock: nearby POI icons at bottom of screen (Phase 9T) -->
+    <include layout="@layout/proximity_dock" />
+
+    <!-- Narration bottom sheet: slides up on geofence trigger or dock tap (Phase 9T) -->
+    <include layout="@layout/narration_bottom_sheet" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

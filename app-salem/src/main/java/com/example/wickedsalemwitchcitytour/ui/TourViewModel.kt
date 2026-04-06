@@ -230,6 +230,18 @@ class TourViewModel @Inject constructor(
         }
     }
 
+    // ── Phase 9T: Narration points ─────────────────────────────────────
+
+    /** Load all narration points from the database */
+    suspend fun loadNarrationPoints(): List<com.example.wickedsalemwitchcitytour.content.model.NarrationPoint> {
+        return repository.getAllNarrationPoints()
+    }
+
+    /** Speak arbitrary text via the narration TTS engine */
+    fun speakNarration(text: String, label: String) {
+        narrationManager.speakHint(text, label)
+    }
+
     override fun onCleared() {
         super.onCleared()
         narrationManager.shutdown()

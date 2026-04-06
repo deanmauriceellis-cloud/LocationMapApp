@@ -81,6 +81,11 @@ class SalemMainActivity : AppCompatActivity() {
     internal val radarScheduler = RadarRefreshScheduler()
     internal lateinit var favoritesManager: com.example.locationmapapp.util.FavoritesManager
 
+    // Phase 9T: Narration system
+    internal var narrationGeofenceManager: com.example.wickedsalemwitchcitytour.tour.NarrationGeofenceManager? = null
+    internal var corridorManager: com.example.wickedsalemwitchcitytour.tour.CorridorGeofenceManager? = null
+    internal var proximityDock: ProximityDock? = null
+
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
     internal val clusterMarkers    = mutableListOf<Marker>()
@@ -353,6 +358,7 @@ class SalemMainActivity : AppCompatActivity() {
 
         setupMap()
         buildFabSpeedDial()
+        initNarrationSystem()
         observeViewModel()
         requestLocationPermission()
         // Post debug intent to next frame so it runs after onStart() restore
@@ -994,6 +1000,36 @@ class SalemMainActivity : AppCompatActivity() {
             }
             DebugLogger.i("SalemMainActivity", "Show all POIs → $showAllPoisActive")
             loadCachedPoisForVisibleArea()
+            // Also load narration points as map markers when showing all
+            if (showAllPoisActive) {
+                loadNarrationPointMarkers()
+            }
+        }
+    }
+
+    /** Load narration points as markers on the map */
+    internal fun loadNarrationPointMarkers() {
+        lifecycleScope.launch {
+            try {
+                val points = tourViewModel.loadNarrationPoints()
+                DebugLogger.i("SalemMainActivity", "Loading ${points.size} narration points as markers")
+                for (p in points) {
+                    val marker = Marker(binding.mapView)
+                    marker.position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
+                    marker.title = p.name
+                    marker.snippet = p.type.replace('_', ' ')
+                    marker.icon = MarkerIconHelper.forCategory(this@SalemMainActivity, p.type, 20)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    marker.setOnMarkerClickListener { _, _ ->
+                        enqueueNarration(p, jumpToFront = true)
+                        true
+                    }
+                    binding.mapView.overlays.add(marker)
+                }
+                binding.mapView.invalidate()
+            } catch (e: Exception) {
+                DebugLogger.e("SalemMainActivity", "Failed to load narration markers", e)
+            }
         }
     }
 

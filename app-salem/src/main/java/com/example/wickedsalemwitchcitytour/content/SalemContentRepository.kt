@@ -28,7 +28,8 @@ class SalemContentRepository @Inject constructor(
     private val primarySourceDao: PrimarySourceDao,
     private val tourDao: TourDao,
     private val tourStopDao: TourStopDao,
-    private val eventsCalendarDao: EventsCalendarDao
+    private val eventsCalendarDao: EventsCalendarDao,
+    private val narrationPointDao: NarrationPointDao
 ) {
 
     // ── Tours ────────────────────────────────────────────────────────────
@@ -159,6 +160,37 @@ class SalemContentRepository @Inject constructor(
     /** Touch the updated_at timestamp for a business. */
     suspend fun markBusinessUpdated(id: String) =
         salemBusinessDao.markUpdated(id, System.currentTimeMillis())
+
+    // ── Narration Points (Phase 9T) ────────────────────────────────────
+
+    suspend fun getAllNarrationPoints(): List<NarrationPoint> = narrationPointDao.getAll()
+
+    suspend fun getNarrationPointById(id: String): NarrationPoint? = narrationPointDao.findById(id)
+
+    suspend fun getNarrationPointsByType(type: String): List<NarrationPoint> =
+        narrationPointDao.findByType(type)
+
+    suspend fun getNarrationPointsByWave(wave: Int): List<NarrationPoint> =
+        narrationPointDao.findByWave(wave)
+
+    suspend fun getNarrationPointsNearby(lat: Double, lng: Double, radiusM: Double): List<NarrationPoint> {
+        val radiusDeg = radiusM / 111_000.0
+        return narrationPointDao.findNearby(lat, lng, radiusDeg)
+    }
+
+    suspend fun getNarrationPointsInBbox(
+        latMin: Double, latMax: Double, lngMin: Double, lngMax: Double
+    ): List<NarrationPoint> = narrationPointDao.findInBbox(latMin, latMax, lngMin, lngMax)
+
+    suspend fun searchNarrationPoints(query: String): List<NarrationPoint> =
+        narrationPointDao.search(query)
+
+    suspend fun getNarrationPointCount(): Int = narrationPointDao.count()
+
+    suspend fun getNarrationPointsWithNarration(): Int = narrationPointDao.countWithNarration()
+
+    suspend fun insertNarrationPoints(points: List<NarrationPoint>) =
+        narrationPointDao.insertAll(points)
 
     // ── Bulk Insert (for content pipeline) ───────────────────────────────
 

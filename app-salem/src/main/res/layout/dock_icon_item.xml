@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Single POI icon in the proximity dock.
+  Circular image with category-colored border and short name below.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="72dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <!-- Circular icon with colored border -->
+    <FrameLayout
+        android:layout_width="56dp"
+        android:layout_height="56dp">
+
+        <!-- Category color ring -->
+        <View
+            android:id="@+id/iconBorder"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/dock_icon_ring" />
+
+        <!-- POI icon image (loaded from assets) -->
+        <ImageView
+            android:id="@+id/iconImage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:contentDescription="POI icon" />
+
+    </FrameLayout>
+
+    <!-- POI name (truncated) -->
+    <TextView
+        android:id="@+id/iconName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxWidth="68dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:textColor="#DDDDDD"
+        android:textSize="9sp" />
+
+    <!-- Distance badge -->
+    <TextView
+        android:id="@+id/iconDistance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#888888"
+        android:textSize="8sp" />
+
+</LinearLayout>

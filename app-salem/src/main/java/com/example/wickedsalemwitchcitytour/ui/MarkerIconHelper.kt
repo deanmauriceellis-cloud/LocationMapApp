@@ -148,6 +148,34 @@ object MarkerIconHelper {
         "golf_course"    to Pair(R.drawable.ic_poi,           Color.parseColor("#00838F")),
         "marina"         to Pair(R.drawable.ic_poi,           Color.parseColor("#00838F")),
         "stadium"        to Pair(R.drawable.ic_poi,           Color.parseColor("#00838F")),
+
+        // ── Salem: Witch & Occult (#6A1B9A) ─────────────────────────────────
+        "shop_occult"    to Pair(R.drawable.ic_poi,           Color.parseColor("#6A1B9A")),
+        "witch_shop"     to Pair(R.drawable.ic_poi,           Color.parseColor("#6A1B9A")),
+
+        // ── Salem: Psychic & Tarot (#AB47BC) ────────────────────────────────
+        "shop_psychic"   to Pair(R.drawable.ic_poi,           Color.parseColor("#AB47BC")),
+        "psychic"        to Pair(R.drawable.ic_poi,           Color.parseColor("#AB47BC")),
+
+        // ── Salem: Ghost Tours (#E040FB) ────────────────────────────────────
+        "tour_ghost"     to Pair(R.drawable.ic_poi,           Color.parseColor("#E040FB")),
+        "ghost_tour"     to Pair(R.drawable.ic_poi,           Color.parseColor("#E040FB")),
+        "tour"           to Pair(R.drawable.ic_poi,           Color.parseColor("#E040FB")),
+
+        // ── Salem: Haunted Attractions (#D500F9) ────────────────────────────
+        "attraction_haunted" to Pair(R.drawable.ic_poi,       Color.parseColor("#D500F9")),
+        "haunted_attraction" to Pair(R.drawable.ic_poi,       Color.parseColor("#D500F9")),
+
+        // ── Salem: Historic Houses (#8D6E63) ────────────────────────────────
+        "historic"       to Pair(R.drawable.ic_poi,           Color.parseColor("#8D6E63")),
+        "historic_house" to Pair(R.drawable.ic_poi,           Color.parseColor("#8D6E63")),
+
+        // ── Salem: Other expanded types ─────────────────────────────────────
+        "venue"          to Pair(R.drawable.ic_poi,           Color.parseColor("#E91E63")),
+        "shop_retail"    to Pair(R.drawable.ic_poi,           Color.parseColor("#F57F17")),
+        "public"         to Pair(R.drawable.ic_civic,         Color.parseColor("#1A237E")),
+        "medical"        to Pair(R.drawable.ic_poi,           Color.parseColor("#D32F2F")),
+        "services"       to Pair(R.drawable.ic_poi,           Color.parseColor("#546E7A")),
     )
 
     // Default fallback

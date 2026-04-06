@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-05 Session 84 (POI defaults, splash WitchKitty, map magnify, OSRM routes, walk simulator, GPS follow)
+## Last Updated: 2026-04-06 Session 86 (Phase 9T implementation, POI icons, data scraping, Bark TTS, narration system)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
@@ -19,16 +19,25 @@
   - ~~Splash screen~~ **DONE** — WitchKitty.png + Creepster font "Wicked Salem Witch Tours"
   - ~~Map magnify~~ **DONE** — x1-x5 scale toggle (1.0-3.0x) without changing zoom level
   - End-to-end tour walk test, tour UX polish, geocode verify (deprioritized — superseded by 9T)
-- **Phase 9T IN QUEUE — Salem Walking Tour Restructure** (HIGHEST PRIORITY):
-  - Total tour paradigm shift: linear stop-to-stop → ambient content layer over downtown Salem
-  - Geographic bounds: Bridge St (NW), Flint St (E), Mill/Harbor St (S) — ~0.5 sq mile walkable core
-  - 80-120+ narration points: every historical POI, statue, street, civic building, landmark
-  - Narration dialog UI: image (top 1/3) + narrative text (middle) + action buttons (bottom)
-  - Content queue with priority, auto-advance, de-duplication, session tracking
-  - Street corridor geofences (polyline + buffer, not just circles)
-  - 2-3 suggested walking loops (30/60/90 min) — routes are suggestions, content triggers regardless
-  - Dialog design carries forward for future merchant advertising
-  - 9 steps: boundary audit → schema → dialog UI → queue → corridors → content → loops → integration → verify
+- **Phase 9T IN PROGRESS — Salem Walking Tour Restructure** (HIGHEST PRIORITY):
+  - ~~9T.1 Boundary audit~~ **DONE** — 539 downtown POIs, 307 narration priority, 113 Wave 1
+  - ~~9T.2 Schema~~ **DONE** — NarrationPoint entity (34 fields), DAO, Room DB v3
+  - ~~9T.3 Dialog UI~~ **DONE** — Proximity dock (bottom POI icons) + narration bottom sheet
+  - ~~9T.4 Geofence system~~ **DONE** — NarrationGeofenceManager, 2min cooldown, session tracking
+  - ~~9T.5 Corridors~~ **DONE** — CorridorGeofence + 10 Salem streets
+  - 9T.6 Narration content — **IN PROGRESS** (auto-generating 113 Wave 1 narrations)
+  - ~~9T.7 Walking loops~~ **DONE** — Quick (30min), Standard (60min), Grand (90min)
+  - ~~9T.8 Integration~~ **DONE** — Wired GPS→geofence→dock+sheet in activity
+  - 9T.9 Verification — TODO (walk simulator end-to-end test)
+- **NEW: Salem data scraped** — 848 POIs from Destination Salem + Haunted Happenings + OSM, merged/deduped
+- **NEW: 5 Salem-specific POI categories** — witch_shop, psychic, ghost_tour, haunted_attraction, historic_house (17→22 total)
+- **NEW: 1,416 POI icons generated** — 8 flavors (evil/cute/devil/psycho/undead/demon/zombie/witchcraft) × 177 subtypes
+- **NEW: Bark TTS installed** — ~/AI-Studio/bark/, RTX 3090 CUDA, voice clip generation ready
+- **NEW: Splash audio generated** — warlock + witch cackle with sox post-processing (phaser/reverb/echo)
+- **NEW: 861 businesses in Room DB** — up from 23 (23 curated + 848 scraped)
+- **NEW: 307 narration points in Room DB** — Wave 1 (113), Wave 2 (85), Wave 3 (109)
+- **Vision: Salem = Disneyland** — downtown is offline entertainment park, 10-mile radius over internet
+- **Monetization: merchant tiers** — every POI controls its own content (icons, voice, narration, ads) based on payment
 - **Phase 9B-9D after**: Feature tier matrix, user settings, contextual alerts
 - **Phase 10**: Production readiness — Firebase, photos, emulator verification, DB hardening
 - **Phase 11**: Branding, ASO & Play Store launch — target **September 1, 2026**

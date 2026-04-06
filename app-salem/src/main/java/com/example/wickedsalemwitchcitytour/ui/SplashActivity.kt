@@ -11,6 +11,7 @@ package com.example.wickedsalemwitchcitytour.ui
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.ImageView
@@ -34,11 +35,13 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SplashActiv
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
 
+    private var mediaPlayer: MediaPlayer? = null
+
     companion object {
         const val EXTRA_FROM_SPLASH = "from_splash"
-        private const val ANIMATION_DURATION_MS = 2500L
-        private const val TEXT_FADE_DELAY_MS = 800L
-        private const val TEXT_FADE_DURATION_MS = 600L
+        private const val ANIMATION_DURATION_MS = 5000L
+        private const val TEXT_FADE_DELAY_MS = 1200L
+        private const val TEXT_FADE_DURATION_MS = 800L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +61,17 @@ class SplashActivity : AppCompatActivity() {
 
         val splashImage = findViewById<ImageView>(R.id.splashImage)
         val textContainer = findViewById<android.view.View>(R.id.splashTextContainer)
+
+        // Play voiceover audio
+        try {
+            mediaPlayer = MediaPlayer.create(this, R.raw.splash_voiceover)?.apply {
+                setVolume(1.0f, 1.0f)
+                start()
+            }
+            DebugLogger.i("SplashActivity", "Splash voiceover playing")
+        } catch (e: Exception) {
+            DebugLogger.e("SplashActivity", "Voiceover failed", e)
+        }
 
         // Slow zoom-in on the WitchKitty image (Ken Burns-style)
         splashImage.scaleX = 1.0f
@@ -81,7 +95,15 @@ class SplashActivity : AppCompatActivity() {
         }, ANIMATION_DURATION_MS)
     }
 
+    override fun onDestroy() {
+        mediaPlayer?.release()
+        mediaPlayer = null
+        super.onDestroy()
+    }
+
     private fun launchMainActivity() {
+        mediaPlayer?.release()
+        mediaPlayer = null
         DebugLogger.i("SplashActivity", "Splash complete → launching SalemMainActivity")
         val intent = Intent(this, SalemMainActivity::class.java).apply {
             putExtra(EXTRA_FROM_SPLASH, true)

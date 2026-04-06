@@ -1307,6 +1307,20 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
 /** Call from the GPS update observer to keep the tour engine informed of current location. */
 internal fun SalemMainActivity.updateTourLocation(point: GeoPoint) {
     tourViewModel.onLocationUpdate(point)
+
+    // Phase 9T: Feed location to narration geofence manager + update proximity dock
+    narrationGeofenceManager?.let { mgr ->
+        val nearby = mgr.checkPosition(point.latitude, point.longitude)
+        proximityDock?.update(
+            point.latitude, point.longitude,
+            nearby.map { it.point }
+        )
+
+        // Also check street corridors
+        corridorManager?.checkPosition(point.latitude, point.longitude)?.forEach { trigger ->
+            DebugLogger.i("SalemMainActivity", "Corridor triggered: ${trigger.corridor.name} (${trigger.distanceM.toInt()}m)")
+        }
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

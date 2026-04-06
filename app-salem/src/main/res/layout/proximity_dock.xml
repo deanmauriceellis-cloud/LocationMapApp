@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WickedSalemWitchCityTour — Proximity Dock
+  Horizontal scrollable row of nearby POI icon circles at the bottom of the screen.
+  Tapping an icon opens the narration dialog for that POI.
+  Phase 9T: Salem Walking Tour Restructure
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/proximityDock"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_gravity="bottom"
+    android:layout_marginBottom="0dp"
+    android:layout_marginStart="60dp"
+    android:layout_marginEnd="60dp"
+    android:background="#CC1A1025"
+    android:elevation="12dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- "Nearby" label -->
+    <TextView
+        android:id="@+id/dockLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="0dp"
+        android:text="Nearby"
+        android:textColor="#AAAAAA"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <!-- Scrollable row of POI icon circles -->
+    <HorizontalScrollView
+        android:id="@+id/dockScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:scrollbars="none"
+        android:fadingEdge="horizontal"
+        android:fadingEdgeLength="24dp">
+
+        <LinearLayout
+            android:id="@+id/dockIconRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:gravity="center_vertical" />
+
+    </HorizontalScrollView>
+
+</FrameLayout>

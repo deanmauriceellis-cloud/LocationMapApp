@@ -6,6 +6,7 @@
 package com.example.salemcontent.pipeline
 
 import com.example.salemcontent.data.SalemBusinesses
+import com.example.salemcontent.data.SalemBusinessesExpanded
 import com.example.salemcontent.data.SalemEvents
 import com.example.salemcontent.data.SalemPois
 import com.example.salemcontent.data.SalemTours
@@ -72,8 +73,8 @@ class ContentPipeline(private val salemRoot: File) {
         println("\n[4/7] Loading curated POIs and businesses...")
         val tourPois = SalemPois.all()
         println("  Tour POIs: ${tourPois.size}")
-        val businesses = SalemBusinesses.all()
-        println("  Businesses: ${businesses.size}")
+        val businesses = SalemBusinesses.all() + SalemBusinessesExpanded.all()
+        println("  Businesses: ${businesses.size} (${SalemBusinesses.all().size} curated + ${SalemBusinessesExpanded.all().size} scraped)")
 
         println("\n[5/8] Loading tour definitions...")
         val tours = SalemTours.allTours()

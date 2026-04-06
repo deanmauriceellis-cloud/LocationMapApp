@@ -20,3 +20,7 @@ cache-proxy/geofence-databases/*.db
 web/node_modules/
 web/dist/
 web/tsconfig.tsbuildinfo
+app-salem/src/main/assets/poi-icons/
+app-salem/src/main/assets/salem_content.db.bak
+tools/poi-icons/
+tools/splash-audio/

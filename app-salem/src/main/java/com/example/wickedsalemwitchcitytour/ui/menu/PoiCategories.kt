@@ -16,7 +16,7 @@ import com.example.locationmapapp.ui.menu.PoiLayerId
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module PoiCategories.kt"
 
 /**
- * Central config for all 17 POI categories.
+ * Central config for all 22 POI categories (17 standard + 5 Salem-specific).
  * Menu items, toggles, restore, Overpass queries, and marker colors are all driven from this list.
  */
 data class PoiCategory(
@@ -415,6 +415,93 @@ object PoiCategories {
                 PoiSubtype("Tax Advisors", listOf("office=tax_advisor"))
             ),
             color = Color.parseColor("#546E7A")
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
+        // Salem-Specific Categories (18-22)
+        // ═══════════════════════════════════════════════════════════════
+
+        // 18 — Witch & Occult Shops
+        PoiCategory(
+            id = PoiLayerId.WITCH_SHOP,
+            label = "Witch & Occult Shops",
+            prefKey = "poi_witch_shop_on",
+            tags = listOf("shop=esoteric", "shop=occult", "shop=metaphysical"),
+            subtypes = listOf(
+                PoiSubtype("Witchcraft Shops",   listOf("shop=esoteric")),
+                PoiSubtype("Occult Supplies",    listOf("shop=occult")),
+                PoiSubtype("Metaphysical",       listOf("shop=metaphysical")),
+                PoiSubtype("Crystal Shops",      listOf("shop=crystal")),
+                PoiSubtype("Herb Shops",         listOf("shop=herbs"))
+            ),
+            color = Color.parseColor("#6A1B9A"),
+            defaultEnabled = true
+        ),
+
+        // 19 — Psychic & Tarot
+        PoiCategory(
+            id = PoiLayerId.PSYCHIC,
+            label = "Psychic & Tarot",
+            prefKey = "poi_psychic_on",
+            tags = listOf("shop=psychic", "amenity=psychic"),
+            subtypes = listOf(
+                PoiSubtype("Tarot Readings",     listOf("shop=tarot")),
+                PoiSubtype("Psychic Readings",   listOf("shop=psychic")),
+                PoiSubtype("Palm Readings",      listOf("shop=palmistry")),
+                PoiSubtype("Séances",            listOf("amenity=seance")),
+                PoiSubtype("Spiritual Healers",  listOf("amenity=spiritual"))
+            ),
+            color = Color.parseColor("#AB47BC"),
+            defaultEnabled = true
+        ),
+
+        // 20 — Ghost Tours
+        PoiCategory(
+            id = PoiLayerId.GHOST_TOUR,
+            label = "Ghost Tours",
+            prefKey = "poi_ghost_tour_on",
+            tags = listOf("tourism=ghost_tour"),
+            subtypes = listOf(
+                PoiSubtype("Walking Tours",      listOf("tourism=ghost_walk")),
+                PoiSubtype("Haunted Tours",      listOf("tourism=haunted_tour")),
+                PoiSubtype("Night Tours",        listOf("tourism=night_tour")),
+                PoiSubtype("Historical Tours",   listOf("tourism=historical_tour"))
+            ),
+            color = Color.parseColor("#E040FB"),
+            defaultEnabled = true
+        ),
+
+        // 21 — Haunted Attractions
+        PoiCategory(
+            id = PoiLayerId.HAUNTED_ATTRACTION,
+            label = "Haunted Attractions",
+            prefKey = "poi_haunted_attraction_on",
+            tags = listOf("tourism=haunted_attraction"),
+            subtypes = listOf(
+                PoiSubtype("Haunted Houses",     listOf("tourism=haunted_house")),
+                PoiSubtype("Scare Attractions",  listOf("tourism=scare")),
+                PoiSubtype("Wax Museums",        listOf("tourism=wax_museum")),
+                PoiSubtype("Escape Horror",      listOf("tourism=escape_horror"))
+            ),
+            color = Color.parseColor("#D500F9"),
+            defaultEnabled = true
+        ),
+
+        // 22 — Historic Houses
+        PoiCategory(
+            id = PoiLayerId.HISTORIC_HOUSE,
+            label = "Historic Houses",
+            prefKey = "poi_historic_house_on",
+            tags = listOf("historic=house", "building=historic"),
+            subtypes = listOf(
+                PoiSubtype("Colonial Houses",    listOf("historic=colonial_house")),
+                PoiSubtype("Witch Trial Houses", listOf("historic=witch_trial_house")),
+                PoiSubtype("Maritime Houses",    listOf("historic=maritime_house")),
+                PoiSubtype("Literary Houses",    listOf("historic=literary_house")),
+                PoiSubtype("Museum Houses",      listOf("historic=museum_house"))
+            ),
+            color = Color.parseColor("#8D6E63"),
+            defaultEnabled = true
         )
     )
 
