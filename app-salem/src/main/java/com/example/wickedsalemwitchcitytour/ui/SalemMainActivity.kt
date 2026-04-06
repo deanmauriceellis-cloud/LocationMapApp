@@ -925,6 +925,7 @@ class SalemMainActivity : AppCompatActivity() {
     }
 
     private fun startWalkSim() {
+        // Walk sim follows downtown Salem street route (PEM → Essex → Common → Derby → back)
         val routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
             .loadDowntownRoute(this)
         if (routePoints.isEmpty()) {

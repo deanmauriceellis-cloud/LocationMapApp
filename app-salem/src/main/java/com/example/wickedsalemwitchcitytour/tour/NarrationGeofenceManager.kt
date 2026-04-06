@@ -5,6 +5,8 @@
 
 package com.example.wickedsalemwitchcitytour.tour
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,11 +26,17 @@ class NarrationGeofenceManager {
 
     private var points: List<NarrationPoint> = emptyList()
 
-    /** Set of POI IDs that have been triggered this session (no repeats) */
-    private val triggeredThisSession = mutableSetOf<String>()
+    /** Set of POI IDs that have been narrated today (resets at midnight) */
+    private val narratedToday = mutableSetOf<String>()
+
+    /** The calendar day (day-of-year * 1000 + year) when narratedToday was last valid */
+    private var narratedDay: Int = 0
 
     /** Cooldown tracker: POI ID → last trigger timestamp */
     private val cooldowns = mutableMapOf<String, Long>()
+
+    /** Persistent visit counts per POI (survives app restarts, drives multi-pass narration) */
+    private var visitPrefs: SharedPreferences? = null
 
     /** Events emitted when a narration point is approached or entered */
     private val _events = MutableSharedFlow<NarrationGeofenceEvent>(extraBufferCapacity = 16)
@@ -55,16 +63,56 @@ class NarrationGeofenceManager {
         private const val DWELL_MS = 3_000L
     }
 
+    /** Initialize with context for persistent visit tracking */
+    fun init(context: Context) {
+        visitPrefs = context.getSharedPreferences("narration_visits", Context.MODE_PRIVATE)
+    }
+
     /** Load narration points to monitor */
     fun loadPoints(narrationPoints: List<NarrationPoint>) {
         points = narrationPoints
-        triggeredThisSession.clear()
+        checkMidnightReset()
         cooldowns.clear()
+    }
+
+    /**
+     * Get the narration text for a point based on how many times
+     * the user has visited it on previous days.
+     *
+     * Pass 1 (first visit): short_narration — basic intro
+     * Pass 2 (second visit): narration_pass_2 — historical deep-dive
+     * Pass 3 (third visit): narration_pass_3 — primary source quotes
+     * Pass 4+: cycles back to pass 1
+     *
+     * Falls through: if a pass has no content, uses the previous pass.
+     */
+    fun getNarrationForPass(point: NarrationPoint): String? {
+        val visits = getVisitCount(point.id)
+        val pass = (visits % 3) + 1  // 0→1, 1→2, 2→3, 3→1, ...
+
+        return when (pass) {
+            3 -> point.narrationPass3 ?: point.narrationPass2 ?: point.shortNarration
+            2 -> point.narrationPass2 ?: point.shortNarration
+            else -> point.shortNarration
+        }
+    }
+
+    /** Record that this POI was narrated today (increments persistent visit count) */
+    fun recordVisit(pointId: String) {
+        val prefs = visitPrefs ?: return
+        val count = prefs.getInt(pointId, 0)
+        prefs.edit().putInt(pointId, count + 1).apply()
+    }
+
+    /** Get lifetime visit count for a POI */
+    fun getVisitCount(pointId: String): Int {
+        return visitPrefs?.getInt(pointId, 0) ?: 0
     }
 
     /** Call on every GPS update. Returns updated nearby list for the dock. */
     fun checkPosition(lat: Double, lng: Double): List<NearbyPoint> {
         val now = System.currentTimeMillis()
+        checkMidnightReset()
         val nearbyList = mutableListOf<NearbyPoint>()
 
         for (point in points) {
@@ -75,6 +123,9 @@ class NarrationGeofenceManager {
                 nearbyList.add(NearbyPoint(point, distanceM))
             }
 
+            // Skip if already narrated today
+            if (point.id in narratedToday) continue
+
             // Check geofence zones
             val entryRadius = point.geofenceRadiusM.toDouble()
             val approachRadius = entryRadius * APPROACH_MULTIPLIER
@@ -82,8 +133,8 @@ class NarrationGeofenceManager {
             when {
                 // ENTRY: within geofence radius
                 distanceM <= entryRadius -> {
-                    if (point.id !in triggeredThisSession && !isOnCooldown(point.id, now)) {
-                        triggeredThisSession.add(point.id)
+                    if (!isOnCooldown(point.id, now)) {
+                        narratedToday.add(point.id)
                         cooldowns[point.id] = now
                         _events.tryEmit(NarrationGeofenceEvent(
                             type = NarrationEventType.ENTRY,
@@ -94,7 +145,7 @@ class NarrationGeofenceManager {
                 }
                 // APPROACH: within 2x geofence radius
                 distanceM <= approachRadius -> {
-                    if (point.id !in triggeredThisSession && !isOnCooldown(point.id, now)) {
+                    if (!isOnCooldown(point.id, now)) {
                         cooldowns[point.id] = now
                         _events.tryEmit(NarrationGeofenceEvent(
                             type = NarrationEventType.APPROACH,
@@ -111,19 +162,38 @@ class NarrationGeofenceManager {
         return _nearby
     }
 
-    /** Reset session tracking (e.g., when user starts a new walk) */
+    /** Reset daily tracking (e.g., when user starts a new walk) */
     fun resetSession() {
-        triggeredThisSession.clear()
+        narratedToday.clear()
         cooldowns.clear()
+        narratedDay = todayKey()
     }
 
-    /** Mark a specific point as triggered (e.g., user tapped it in dock) */
+    /** Mark a specific point as narrated today (e.g., user tapped it in dock) */
     fun markTriggered(pointId: String) {
-        triggeredThisSession.add(pointId)
+        narratedToday.add(pointId)
     }
 
-    /** Check if a point has been triggered this session */
-    fun isTriggered(pointId: String): Boolean = pointId in triggeredThisSession
+    /** Check if a point has been narrated today */
+    fun isTriggered(pointId: String): Boolean = pointId in narratedToday
+
+    /** Returns how many POIs have been narrated today */
+    fun narratedCount(): Int = narratedToday.size
+
+    /** Reset narrated set if the calendar day has changed (midnight rollover) */
+    private fun checkMidnightReset() {
+        val today = todayKey()
+        if (today != narratedDay) {
+            narratedToday.clear()
+            cooldowns.clear()
+            narratedDay = today
+        }
+    }
+
+    private fun todayKey(): Int {
+        val cal = java.util.Calendar.getInstance()
+        return cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
+    }
 
     private fun isOnCooldown(pointId: String, now: Long): Boolean {
         val lastTrigger = cooldowns[pointId] ?: return false

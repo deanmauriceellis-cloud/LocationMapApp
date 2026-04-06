@@ -5026,6 +5026,8 @@ CREATE TABLE IF NOT EXISTS narration_points (
   type TEXT NOT NULL,
   short_narration TEXT,
   long_narration TEXT,
+  narration_pass_2 TEXT,
+  narration_pass_3 TEXT,
   description TEXT,
   image_asset TEXT,
   voice_clip_asset TEXT,

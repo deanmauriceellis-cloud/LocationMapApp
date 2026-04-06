@@ -36,7 +36,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
     DebugLogger.i("SalemMainActivity", "initNarrationSystem() — Phase 9T setup")
 
     // Initialize managers
-    narrationGeofenceManager = NarrationGeofenceManager()
+    narrationGeofenceManager = NarrationGeofenceManager().apply { init(this@initNarrationSystem) }
     corridorManager = CorridorGeofenceManager()
 
     // Initialize proximity dock
@@ -128,11 +128,14 @@ internal fun SalemMainActivity.playNextNarration() {
     currentNarration = point
     showNarrationSheet(point)
 
-    // Auto-play TTS if narration text available
-    val text = point.shortNarration ?: point.description
+    // Auto-play TTS — select narration pass based on lifetime visit count
+    val mgr = narrationGeofenceManager
+    val text = mgr?.getNarrationForPass(point) ?: point.shortNarration ?: point.description
     if (text != null && narrationAutoPlay) {
         tourViewModel.speakNarration(text, point.name)
     }
+    // Record this visit for next-pass selection on future days
+    mgr?.recordVisit(point.id)
 }
 
 /**
@@ -147,7 +150,8 @@ internal fun SalemMainActivity.showNarrationSheet(point: NarrationPoint) {
         point.type.replace('_', ' ').split(' ')
             .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
-    val narrationText = point.shortNarration ?: point.description ?: "Narration coming soon."
+    val narrationText = narrationGeofenceManager?.getNarrationForPass(point)
+        ?: point.shortNarration ?: point.description ?: "Narration coming soon."
     sheet.findViewById<TextView>(R.id.narrationText)?.text = narrationText
 
     // Distance

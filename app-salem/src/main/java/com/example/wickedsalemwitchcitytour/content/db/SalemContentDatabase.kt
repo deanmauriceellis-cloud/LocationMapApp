@@ -27,7 +27,7 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         EventsCalendar::class,
         NarrationPoint::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class SalemContentDatabase : RoomDatabase() {
