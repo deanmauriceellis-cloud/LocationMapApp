@@ -2,6 +2,13 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 90: 2026-04-06 — Dual Narration Tiers (Free/Paid)
+- Ultra-short teaser narrations for all 814 POIs (avg 12 words, ~10 sec TTS) — free tier ambient audio
+- Promoted 702 existing short_narrations to long_narration — preserved as paid tier content
+- Smart generator: description mining, cuisine inference, name parsing, web junk filtering, 8-25 word enforcement
+- 100% coverage: all 814 POIs have both short (teaser) and long (full) narrations
+- Deployed to Lenovo TB305FU tablet
+
 ## Session 89: 2026-04-06 — Universal POI Narrations + Silence Reach-Out
 - Wave 4: 508 new narration_points for all remaining businesses (814 total, 100% coverage)
 - Smart narration templates by category (cuisine-aware restaurants, atmospheric historic sites, etc.)
