@@ -23,5 +23,8 @@
         <item name="android:windowFullscreen">true</item>
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
+        <!-- Android 12+ system splash screen customization -->
+        <item name="android:windowSplashScreenBackground">@color/salemDarkPurple</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_witchkitty</item>
     </style>
 </resources>

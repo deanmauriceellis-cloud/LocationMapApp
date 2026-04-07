@@ -51,6 +51,9 @@ class NarrationManager @Inject constructor(
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
+    /** Cached Voice objects by ID for fast switching */
+    private val voiceCache = mutableMapOf<String, android.speech.tts.Voice>()
+
     /** Whether auto-narration is enabled (user toggle). */
     var autoNarrationEnabled: Boolean = true
 
@@ -92,20 +95,31 @@ class NarrationManager @Inject constructor(
                 }
 
                 override fun onDone(utteranceId: String?) {
-                    DebugLogger.d(TAG, "TTS done: $utteranceId")
+                    DebugLogger.i(TAG, "TTS done: $utteranceId (queue remaining: ${queue.size})")
                     currentSegment = null
                     playNext()
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
-                    DebugLogger.w(TAG, "TTS error: $utteranceId")
+                    DebugLogger.e(TAG, "TTS ERROR: $utteranceId (queue remaining: ${queue.size})")
                     currentSegment = null
                     playNext()
                 }
             })
 
             DebugLogger.i(TAG, "TTS ready — Locale.US, rate=${speechRate}x")
+
+            // Cache voice objects for category-based switching
+            val voices = tts?.voices ?: emptySet()
+            for (v in voices) {
+                if (v.locale.language == "en" && !v.isNetworkConnectionRequired) {
+                    voiceCache[v.name] = v
+                }
+            }
+            val needed = CategoryVoiceMap.allUsedVoices
+            val found = needed.count { it in voiceCache }
+            DebugLogger.i(TAG, "Voice cache: $found/${needed.size} category voices available, ${voiceCache.size} total English offline")
         } else {
             ttsReady = false
             DebugLogger.e(TAG, "TTS init failed: status=$status")
@@ -165,12 +179,14 @@ class NarrationManager @Inject constructor(
     }
 
     /** Speak arbitrary text (for ambient mode hints). */
-    fun speakHint(text: String, poiName: String) {
+    fun speakHint(text: String, poiName: String, voiceId: String? = null) {
+        DebugLogger.i(TAG, "speakHint called: poi=$poiName voice=${voiceId ?: "default"} ttsReady=$ttsReady text=${text.take(40)}...")
         enqueue(NarrationSegment(
             id = "hint_${System.currentTimeMillis()}",
             text = text,
             type = SegmentType.HINT,
-            poiName = poiName
+            poiName = poiName,
+            voiceId = voiceId
         ))
     }
 
@@ -253,9 +269,11 @@ class NarrationManager @Inject constructor(
     private fun playNext() {
         val next = queue.removeFirstOrNull()
         if (next == null) {
+            DebugLogger.i(TAG, "playNext: queue empty → Idle")
             _state.value = NarrationState.Idle
             return
         }
+        DebugLogger.i(TAG, "playNext: ${next.type} — ${next.poiName} (${queue.size} remaining)")
         speak(next)
     }
 
@@ -263,11 +281,22 @@ class NarrationManager @Inject constructor(
         currentSegment = segment
         _state.value = NarrationState.Speaking(segment)
 
+        // Switch to category voice if specified
+        val voiceId = segment.voiceId
+        if (voiceId != null) {
+            val voice = voiceCache[voiceId]
+            if (voice != null) {
+                tts?.voice = voice
+            } else {
+                DebugLogger.w(TAG, "Voice not found: $voiceId — using current")
+            }
+        }
+
         val params = Bundle().apply {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
         }
         tts?.speak(segment.text, TextToSpeech.QUEUE_FLUSH, params, segment.id)
-        DebugLogger.i(TAG, "Speaking: ${segment.type} — ${segment.poiName}")
+        DebugLogger.i(TAG, "Speaking: ${segment.type} — ${segment.poiName} voice=${voiceId ?: "default"}")
     }
 
     /** Check phone ringer mode — don't speak if silent or vibrate. */
@@ -283,7 +312,9 @@ data class NarrationSegment(
     val id: String,
     val text: String,
     val type: SegmentType,
-    val poiName: String
+    val poiName: String,
+    /** TTS voice ID to use (null = keep current voice) */
+    val voiceId: String? = null
 )
 
 enum class SegmentType {

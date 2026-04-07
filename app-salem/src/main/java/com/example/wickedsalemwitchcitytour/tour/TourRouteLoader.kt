@@ -93,12 +93,18 @@ object TourRouteLoader {
     }
 
     /**
-     * Load the downtown Salem street-level walking route (OSRM-generated).
-     * This is the "Walking Through Salem" route — starts at PEM, loops through
-     * Essex St, Salem Common, Liberty, Charter, Derby waterfront, and back.
+     * Load the downtown Salem street-level walking route.
+     * Prefers the comprehensive test route if it exists (covers all business streets),
+     * otherwise falls back to the standard OSRM-generated loop.
      */
     fun loadDowntownRoute(context: Context): List<GeoPoint> {
-        val filename = "tours/downtown_salem_route.json"
+        // Prefer comprehensive test route for full coverage
+        val filename = try {
+            context.assets.open("tours/downtown_salem_test_route.json").close()
+            "tours/downtown_salem_test_route.json"
+        } catch (_: Exception) {
+            "tours/downtown_salem_route.json"
+        }
         return try {
             val json = context.assets.open(filename).bufferedReader().use { it.readText() }
             val root = JsonParser.parseString(json).asJsonObject

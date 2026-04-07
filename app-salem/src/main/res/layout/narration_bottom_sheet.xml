@@ -188,8 +188,24 @@
             android:layout_height="36dp"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/narration_btn_bg"
             android:text="Walk"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Show Geofence -->
+        <TextView
+            android:id="@+id/btnGeofence"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/narration_btn_bg"
+            android:text="Fence"
             android:textColor="#AAAAAA"
             android:textSize="12sp"
             android:gravity="center"

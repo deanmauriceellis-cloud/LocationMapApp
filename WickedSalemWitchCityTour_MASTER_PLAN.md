@@ -1294,6 +1294,15 @@ This is approximately 0.5 square miles of the densest historical area.
   - [ ] Tapping venue navigates to POI on map
   - [ ] "On this date in 1692" shows for matching dates
 
+### Step 10.1b: Pluggable MarkerIconProvider (core architecture)
+- [ ] Define `MarkerIconProvider` interface in `:core` module — `dot()`, `labeledDot()`, `forCategory()`, `clusterIcon()`
+- [ ] Generic `app` module implements with current colored dots / vector drawable icons (no change)
+- [ ] `app-salem` implements with witch-themed circle icons from `assets/poi-circle-icons/`
+- [ ] Register provider via Hilt DI — each app module injects its own implementation
+- [ ] Core map rendering code calls the interface, never a concrete icon class
+- [ ] Each app module brings its own visual identity without affecting others
+- [ ] Merchant override: paid businesses can supply custom icon via `custom_icon_asset` field in narration_points DB
+
 ### Step 10.2: Firebase Crashlytics & Analytics
 - [ ] Create Firebase project for WickedSalemWitchCityTour
 - [ ] Add `google-services.json` to `app-salem/`

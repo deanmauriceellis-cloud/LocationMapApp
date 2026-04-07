@@ -238,8 +238,8 @@ class TourViewModel @Inject constructor(
     }
 
     /** Speak arbitrary text via the narration TTS engine */
-    fun speakNarration(text: String, label: String) {
-        narrationManager.speakHint(text, label)
+    fun speakNarration(text: String, label: String, voiceId: String? = null) {
+        narrationManager.speakHint(text, label, voiceId)
     }
 
     override fun onCleared() {

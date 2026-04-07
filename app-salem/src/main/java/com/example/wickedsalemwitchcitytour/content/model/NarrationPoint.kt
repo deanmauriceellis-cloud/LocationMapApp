@@ -94,6 +94,10 @@ data class NarrationPoint(
     @ColumnInfo(name = "custom_icon_asset") val customIconAsset: String? = null,
     @ColumnInfo(name = "custom_voice_asset") val customVoiceAsset: String? = null,
     @ColumnInfo(name = "custom_description") val customDescription: String? = null,
+    /** TTS voice ID override (e.g. "en-gb-x-gba-local"). Null = use category default. */
+    @ColumnInfo(name = "voice_override") val voiceOverride: String? = null,
+    /** Pre-recorded audio asset path. If set, plays this instead of TTS. Highest priority. */
+    @ColumnInfo(name = "audio_asset") val audioAsset: String? = null,
 
     // ── Provenance ──
     @ColumnInfo(name = "data_source") val dataSource: String = "manual_curated",

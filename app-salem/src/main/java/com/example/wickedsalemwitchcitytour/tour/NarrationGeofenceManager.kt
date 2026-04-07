@@ -29,11 +29,11 @@ class NarrationGeofenceManager {
     /** Walk sim mode: expands entry radius and tightens reach-out for continuous narration */
     var walkSimMode: Boolean = false
 
-    /** Set of POI IDs that have been narrated today (resets at midnight) */
-    private val narratedToday = mutableSetOf<String>()
+    /** POI ID → timestamp when narrated (expires after 12 hours) */
+    private val narratedAt = mutableMapOf<String, Long>()
 
-    /** The calendar day (day-of-year * 1000 + year) when narratedToday was last valid */
-    private var narratedDay: Int = 0
+    /** How long before a POI can repeat (ms) */
+    private val REPEAT_WINDOW_MS = 12 * 60 * 60 * 1000L  // 12 hours
 
     /** Cooldown tracker: POI ID → last trigger timestamp */
     private val cooldowns = mutableMapOf<String, Long>()
@@ -87,7 +87,7 @@ class NarrationGeofenceManager {
     /** Load narration points to monitor */
     fun loadPoints(narrationPoints: List<NarrationPoint>) {
         points = narrationPoints
-        checkMidnightReset()
+        purgeExpired()
         cooldowns.clear()
     }
 
@@ -125,14 +125,22 @@ class NarrationGeofenceManager {
         return visitPrefs?.getInt(pointId, 0) ?: 0
     }
 
+    /** GPS check counter for periodic summary logging */
+    private var checkCount = 0L
+    private var lastSummaryTime = 0L
+
     /** Call on every GPS update. Returns updated nearby list for the dock. */
     fun checkPosition(lat: Double, lng: Double): List<NearbyPoint> {
         val now = System.currentTimeMillis()
-        checkMidnightReset()
+        purgeExpired()
         lastLat = lat
         lastLng = lng
+        checkCount++
         val nearbyList = mutableListOf<NearbyPoint>()
-        var emittedEntry = false
+        var entryCount = 0
+        var approachCount = 0
+        var skippedNarrated = 0
+        var skippedCooldown = 0
 
         for (point in points) {
             val distanceM = haversine(lat, lng, point.lat, point.lng)
@@ -142,8 +150,11 @@ class NarrationGeofenceManager {
                 nearbyList.add(NearbyPoint(point, distanceM))
             }
 
-            // Skip if already narrated today
-            if (point.id in narratedToday) continue
+            // Skip if narrated within 12-hour window
+            if (isNarrated(point.id, now)) {
+                if (distanceM <= point.geofenceRadiusM * (if (walkSimMode) 3.0 else 1.0)) skippedNarrated++
+                continue
+            }
 
             // Check geofence zones — walk sim mode expands radius for broader coverage
             val baseRadius = point.geofenceRadiusM.toDouble()
@@ -154,21 +165,26 @@ class NarrationGeofenceManager {
                 // ENTRY: within geofence radius
                 distanceM <= entryRadius -> {
                     if (!isOnCooldown(point.id, now)) {
-                        narratedToday.add(point.id)
+                        narratedAt[point.id] = now
                         cooldowns[point.id] = now
                         lastEntryEmitTime = now
-                        emittedEntry = true
+                        entryCount++
+                        com.example.locationmapapp.util.DebugLogger.i("NARR-GEO",
+                            "ENTRY: ${point.name} dist=${distanceM.toInt()}m radius=${entryRadius.toInt()}m walkSim=$walkSimMode")
                         _events.tryEmit(NarrationGeofenceEvent(
                             type = NarrationEventType.ENTRY,
                             point = point,
                             distanceM = distanceM
                         ))
+                    } else {
+                        skippedCooldown++
                     }
                 }
                 // APPROACH: within 2x geofence radius
                 distanceM <= approachRadius -> {
                     if (!isOnCooldown(point.id, now)) {
                         cooldowns[point.id] = now
+                        approachCount++
                         _events.tryEmit(NarrationGeofenceEvent(
                             type = NarrationEventType.APPROACH,
                             point = point,
@@ -179,10 +195,24 @@ class NarrationGeofenceManager {
             }
         }
 
+        // Periodic summary every 60 seconds
+        if (now - lastSummaryTime >= 60_000L) {
+            lastSummaryTime = now
+            val activeNarrated = narratedAt.count { now - it.value < REPEAT_WINDOW_MS }
+            com.example.locationmapapp.util.DebugLogger.i("NARR-GEO",
+                "SUMMARY: check#$checkCount pos=${lat.format(5)},${lng.format(5)} " +
+                "nearby=${nearbyList.size} narrated=$activeNarrated/${points.size} " +
+                "entries=$entryCount approaches=$approachCount " +
+                "skippedNarrated=$skippedNarrated skippedCooldown=$skippedCooldown " +
+                "walkSim=$walkSimMode")
+        }
+
         // Sort by distance, limit
         _nearby = nearbyList.sortedBy { it.distanceM }.take(MAX_NEARBY)
         return _nearby
     }
+
+    private fun Double.format(digits: Int) = "%.${digits}f".format(this)
 
     /**
      * Find the best un-narrated point within reach-out radius.
@@ -193,13 +223,14 @@ class NarrationGeofenceManager {
     fun findNearestUnnarrated(): NearbyPoint? {
         if (lastLat == 0.0 && lastLng == 0.0) return null
 
-        // Walk sim: tighter radius (200m) so we don't narrate distant irrelevant POIs
-        // Normal walk: full 500m reach-out for coverage between geofence zones
-        val radius = if (walkSimMode) 200.0 else REACH_RADIUS_M
+        // Keep reach-out tight — narrate what's actually nearby, not blocks away
+        // Walk sim: 200m (route is predictable), Real GPS: 150m (about 1.5 blocks)
+        val radius = if (walkSimMode) 200.0 else 150.0
+        val now = System.currentTimeMillis()
 
         val candidates = mutableListOf<NearbyPoint>()
         for (point in points) {
-            if (point.id in narratedToday) continue
+            if (isNarrated(point.id, now)) continue
             val dist = haversine(lastLat, lastLng, point.lat, point.lng)
             if (dist <= radius) {
                 candidates.add(NearbyPoint(point, dist))
@@ -207,17 +238,14 @@ class NarrationGeofenceManager {
         }
         if (candidates.isEmpty()) return null
 
-        // Walk sim: distance-first so nearby POIs are always preferred (user sees them on map)
-        // Normal: merchants first, then historical importance, then distance
-        return if (walkSimMode) {
-            candidates.minByOrNull { it.distanceM }
-        } else {
-            candidates.minWithOrNull(compareBy<NearbyPoint>(
-                { -it.point.adPriority },    // higher ad priority = more important business
-                { it.point.priority },         // lower priority number = more important historically
-                { it.distanceM }               // closer is better as tiebreaker
-            ))
-        }
+        // Distance-first: narrate what the user is actually near, not some distant merchant.
+        // Merchant priority only breaks ties at similar distance (within 50m of each other).
+        return candidates.minWithOrNull(compareBy<NearbyPoint>(
+            { (it.distanceM / 50).toInt() },  // bucket by ~50m bands — nearby always wins
+            { -it.point.adPriority },          // within same band: merchants first
+            { it.point.priority },              // then historical importance
+            { it.distanceM }                    // exact distance tiebreaker
+        ))
     }
 
     /**
@@ -226,7 +254,7 @@ class NarrationGeofenceManager {
      */
     fun triggerReachOut(nearbyPoint: NearbyPoint) {
         val now = System.currentTimeMillis()
-        narratedToday.add(nearbyPoint.point.id)
+        narratedAt[nearbyPoint.point.id] = now
         cooldowns[nearbyPoint.point.id] = now
         lastEntryEmitTime = now
         _events.tryEmit(NarrationGeofenceEvent(
@@ -242,37 +270,36 @@ class NarrationGeofenceManager {
         return System.currentTimeMillis() - lastEntryEmitTime
     }
 
-    /** Reset daily tracking (e.g., when user starts a new walk) */
+    /** Reset tracking (e.g., when user starts a new walk sim) */
     fun resetSession() {
-        narratedToday.clear()
+        narratedAt.clear()
         cooldowns.clear()
-        narratedDay = todayKey()
     }
 
-    /** Mark a specific point as narrated today (e.g., user tapped it in dock) */
+    /** Mark a specific point as narrated (e.g., user tapped it in dock) */
     fun markTriggered(pointId: String) {
-        narratedToday.add(pointId)
+        narratedAt[pointId] = System.currentTimeMillis()
     }
 
-    /** Check if a point has been narrated today */
-    fun isTriggered(pointId: String): Boolean = pointId in narratedToday
+    /** Check if a point has been narrated within the repeat window */
+    fun isTriggered(pointId: String): Boolean = isNarrated(pointId, System.currentTimeMillis())
 
-    /** Returns how many POIs have been narrated today */
-    fun narratedCount(): Int = narratedToday.size
-
-    /** Reset narrated set if the calendar day has changed (midnight rollover) */
-    private fun checkMidnightReset() {
-        val today = todayKey()
-        if (today != narratedDay) {
-            narratedToday.clear()
-            cooldowns.clear()
-            narratedDay = today
-        }
+    /** Returns how many POIs have been narrated in the current window */
+    fun narratedCount(): Int {
+        val now = System.currentTimeMillis()
+        return narratedAt.count { now - it.value < REPEAT_WINDOW_MS }
     }
 
-    private fun todayKey(): Int {
-        val cal = java.util.Calendar.getInstance()
-        return cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
+    /** Check if a POI was narrated within the 12-hour repeat window */
+    private fun isNarrated(pointId: String, now: Long): Boolean {
+        val ts = narratedAt[pointId] ?: return false
+        return (now - ts) < REPEAT_WINDOW_MS
+    }
+
+    /** Remove expired entries older than the repeat window */
+    private fun purgeExpired() {
+        val now = System.currentTimeMillis()
+        narratedAt.entries.removeIf { now - it.value >= REPEAT_WINDOW_MS }
     }
 
     private fun isOnCooldown(pointId: String, now: Long): Boolean {

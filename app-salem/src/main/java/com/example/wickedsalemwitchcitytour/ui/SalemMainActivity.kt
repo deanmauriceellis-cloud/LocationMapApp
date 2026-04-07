@@ -613,12 +613,12 @@ class SalemMainActivity : AppCompatActivity() {
             maxZoomLevel = if (tileSourceId == TileSourceManager.Id.SATELLITE)
                 TileSourceManager.USGS_MAX_ZOOM.toDouble() else 19.0
             if (fromSplash) {
-                // Start zoomed out for cinematic zoom-in animation
-                controller.setZoom(4.0)
-                controller.setCenter(GeoPoint(39.8283, -98.5795)) // Center of US
+                // Start on Salem at street level — no wasted tile loading
+                controller.setZoom(18.0)
+                controller.setCenter(GeoPoint(42.5225, -70.8897)) // Downtown Salem
             } else {
-                controller.setZoom(15.0)
-                controller.setCenter(GeoPoint(42.521, -70.887)) // Salem, MA center
+                controller.setZoom(18.0)
+                controller.setCenter(GeoPoint(42.5225, -70.8897)) // Downtown Salem
             }
         }
         // Splash fallback: if no GPS fix within 3s, zoom to Salem center
@@ -809,6 +809,7 @@ class SalemMainActivity : AppCompatActivity() {
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 updateZoomBubble()
+                refreshNarrationIcons()
                 val zoom = binding.mapView.zoomLevelDouble
                 if (!filterAndMapActive) {
                     scheduleAircraftReload()
@@ -1025,30 +1026,68 @@ class SalemMainActivity : AppCompatActivity() {
         }
     }
 
+    /** Narration point markers — stored for zoom-based icon refresh */
+    internal val narrationMarkers = mutableListOf<Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.NarrationPoint>>()
+    private var lastNarrationIconZoom = -1
+
     /** Load narration points as markers on the map */
     internal fun loadNarrationPointMarkers() {
         lifecycleScope.launch {
             try {
                 val points = tourViewModel.loadNarrationPoints()
                 DebugLogger.i("SalemMainActivity", "Loading ${points.size} narration points as markers")
+                val zoom = binding.mapView.zoomLevelDouble
                 for (p in points) {
                     val marker = Marker(binding.mapView)
                     marker.position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
                     marker.title = p.name
                     marker.snippet = p.type.replace('_', ' ')
-                    marker.icon = MarkerIconHelper.forCategory(this@SalemMainActivity, p.type, 20)
-                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    marker.icon = narrationIconForZoom(p.type, p.name, zoom)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     marker.setOnMarkerClickListener { _, _ ->
                         enqueueNarration(p, jumpToFront = true)
                         true
                     }
                     binding.mapView.overlays.add(marker)
+                    narrationMarkers.add(marker to p)
                 }
+                lastNarrationIconZoom = zoomBucket(zoom)
                 binding.mapView.invalidate()
             } catch (e: Exception) {
                 DebugLogger.e("SalemMainActivity", "Failed to load narration markers", e)
             }
         }
+    }
+
+    /** Zoom bucket: 0=far, 1=medium, 2=close, 3=street — triggers icon refresh on change */
+    private fun zoomBucket(zoom: Double): Int = when {
+        zoom < 15 -> 0
+        zoom < 17 -> 1
+        zoom < 18 -> 2
+        else -> 3
+    }
+
+    /** Get the right icon for a narration point based on current zoom */
+    private fun narrationIconForZoom(type: String, name: String, zoom: Double): android.graphics.drawable.BitmapDrawable {
+        return when {
+            zoom >= 18 -> MarkerIconHelper.labeledDot(this, type, name)
+            zoom >= 17 -> MarkerIconHelper.dot(this, type, 20)
+            zoom >= 15 -> MarkerIconHelper.dot(this, type, 12)
+            else -> MarkerIconHelper.dot(this, type, 8)
+        }
+    }
+
+    /** Called from scroll/zoom listener — refresh narration marker icons when zoom bucket changes */
+    internal fun refreshNarrationIcons() {
+        if (narrationMarkers.isEmpty()) return
+        val zoom = binding.mapView.zoomLevelDouble
+        val bucket = zoomBucket(zoom)
+        if (bucket == lastNarrationIconZoom) return
+        lastNarrationIconZoom = bucket
+        for ((marker, point) in narrationMarkers) {
+            marker.icon = narrationIconForZoom(point.type, point.name, zoom)
+        }
+        binding.mapView.invalidate()
     }
 
     // =========================================================================
@@ -1147,7 +1186,8 @@ class SalemMainActivity : AppCompatActivity() {
             FabDef("Search Here",  R.drawable.ic_search,        "#4A148C") { searchFromCurrentLocation() },
             FabDef("Weather",      R.drawable.ic_wx_default,    "#006064") { showWeatherDialog() },
             FabDef("GPS / Manual", R.drawable.ic_gps,           "#37474F") { toggleLocationMode() },
-            FabDef("Debug Log",    R.drawable.ic_debug,         "#424242") { startActivity(Intent(this, DebugLogActivity::class.java)) }
+            FabDef("Debug Log",    R.drawable.ic_debug,         "#424242") { startActivity(Intent(this, DebugLogActivity::class.java)) },
+            FabDef("Voices",       R.drawable.ic_debug,         "#6A1B9A") { startActivity(Intent(this, com.example.wickedsalemwitchcitytour.debug.VoiceTestActivity::class.java)) }
         )
 
         val container = binding.fabMenu
@@ -1200,11 +1240,19 @@ class SalemMainActivity : AppCompatActivity() {
             val speedMph = update.speedMps?.let { it * 2.23694 }
             lastGpsSpeedMph = speedMph
 
-            // ── 1. Adaptive GPS interval: fast → 10s, slow → 60s ──
-            val desiredInterval = if ((speedMph ?: 0.0) > 20.0) 10_000L else 60_000L
+            // ── 1. Adaptive GPS interval ──
+            //   Driving (>20 mph): 10s — coarse is fine
+            //   Walking with narration active: 5s — need frequent checks for 20-50m geofences
+            //   Stationary/slow without narration: 60s — battery saver
+            val narrationActive = narrationGeofenceManager != null
+            val desiredInterval = when {
+                (speedMph ?: 0.0) > 20.0 -> 10_000L
+                narrationActive -> 5_000L
+                else -> 60_000L
+            }
             if (desiredInterval != currentGpsIntervalMs) {
                 currentGpsIntervalMs = desiredInterval
-                val minInterval = if (desiredInterval == 10_000L) 5_000L else 30_000L
+                val minInterval = if (desiredInterval <= 5_000L) 2_000L else if (desiredInterval == 10_000L) 5_000L else 30_000L
                 DebugLogger.i("SalemMainActivity", "GPS interval → ${desiredInterval}ms (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
                 viewModel.restartLocationUpdates(desiredInterval, minInterval)
             }
@@ -1215,12 +1263,16 @@ class SalemMainActivity : AppCompatActivity() {
             if (!initialCenterDone) {
                 // First fix always processes — fall through
             } else if (!isManual && distanceBetween(lastGpsPoint, point) < 100f) {
-                DebugLogger.d("SalemMainActivity", "GPS jitter <100m — skipped")
+                DebugLogger.d("SalemMainActivity", "GPS jitter <100m — skipped (map only)")
                 // Still handle deferred restores even during jitter
                 handleDeferredRestores(point)
 
                 // ── Update status line with GPS position ──
                 updateIdleStatusLine(point.latitude, point.longitude, speedMph)
+
+                // ── NARRATION: feed every GPS update regardless of dead zone ──
+                // Geofence radii are 20-50m; the 100m dead zone is for map/marker only
+                updateTourLocation(point)
 
                 // ── Idle auto-populate: start full scanner after 5 min stationary ──
                 val idleMs = System.currentTimeMillis() - lastSignificantMoveTime

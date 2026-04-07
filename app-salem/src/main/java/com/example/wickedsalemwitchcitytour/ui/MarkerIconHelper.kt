@@ -43,6 +43,164 @@ object MarkerIconHelper {
         }
     }
 
+    // ── Circle icon asset cache (witch-themed POI icons from Stable Diffusion) ──
+    private val circleIconCache = mutableMapOf<String, Bitmap?>()
+
+    /** OSM tag value → asset path under poi-circle-icons/ (without .png) */
+    private val CIRCLE_ICON_MAP = mapOf(
+        // Food & Drink
+        "restaurant" to "food_drink/restaurant", "fast_food" to "food_drink/fast_food",
+        "cafe" to "food_drink/cafe", "bar" to "food_drink/bar", "pub" to "food_drink/pub",
+        "ice_cream" to "food_drink/ice_cream", "bakery" to "food_drink/bakery",
+        "pastry" to "food_drink/pastry", "confectionery" to "food_drink/candy",
+        "alcohol" to "food_drink/liquor", "wine" to "food_drink/wine", "deli" to "food_drink/deli",
+        "butcher" to "food_drink/butcher", "seafood" to "food_drink/seafood",
+        "marketplace" to "food_drink/marketplace", "brewery" to "food_drink/brewery",
+        "winery" to "food_drink/winery", "distillery" to "food_drink/distillery",
+        // Fuel & Charging
+        "fuel" to "fuel_charging/gas_station", "gas_station" to "fuel_charging/gas_station",
+        "charging_station" to "fuel_charging/charging_station",
+        // Transit
+        "station" to "transit/train_station", "train_station" to "transit/train_station",
+        "bus_station" to "transit/bus_station", "aerodrome" to "transit/airport",
+        "bicycle_rental" to "transit/bike_rental", "ferry_terminal" to "transit/ferry",
+        "taxi" to "transit/taxi",
+        // Civic & Gov
+        "townhall" to "civic/town_hall", "courthouse" to "civic/courthouse",
+        "post_office" to "civic/post_office", "government" to "civic/gov_office",
+        "community_centre" to "civic/community_centre", "recycling" to "civic/recycling",
+        "civic" to "civic/town_hall", "public" to "civic/community_centre",
+        // Parks & Rec
+        "park" to "parks_rec/park", "nature_reserve" to "parks_rec/nature_reserve",
+        "playground" to "parks_rec/playground", "pitch" to "parks_rec/sports_field",
+        "swimming_pool" to "parks_rec/pool", "dog_park" to "parks_rec/dog_park",
+        "garden" to "parks_rec/garden", "slipway" to "parks_rec/boat_ramp",
+        "fountain" to "parks_rec/fountain", "toilets" to "parks_rec/restroom",
+        "beach_resort" to "parks_rec/beach",
+        // Shopping
+        "supermarket" to "shopping/supermarket", "convenience" to "shopping/convenience",
+        "mall" to "shopping/mall", "department_store" to "shopping/mall",
+        "clothes" to "shopping/clothing", "shoes" to "shopping/shoes",
+        "jewelry" to "shopping/jewelry", "hairdresser" to "shopping/hair_salon",
+        "barber" to "shopping/barber", "beauty" to "shopping/beauty_spa",
+        "massage" to "shopping/beauty_spa", "tattoo" to "shopping/tattoo",
+        "books" to "shopping/bookstore", "gift" to "shopping/gift_shop",
+        "florist" to "shopping/florist", "hardware" to "shopping/hardware",
+        "mobile_phone" to "shopping/phone_store", "pet" to "shopping/pet_store",
+        "electronics" to "shopping/electronics", "bicycle" to "shopping/bicycle_shop",
+        "second_hand" to "shopping/thrift", "cannabis" to "shopping/cannabis",
+        // Healthcare
+        "hospital" to "healthcare/hospital", "pharmacy" to "healthcare/pharmacy",
+        "clinic" to "healthcare/clinic", "dentist" to "healthcare/dentist",
+        "doctors" to "healthcare/doctor", "veterinary" to "healthcare/veterinary",
+        "nursing_home" to "healthcare/nursing_home", "medical" to "healthcare/clinic",
+        // Education
+        "school" to "education/school", "library" to "education/library",
+        "college" to "education/college", "university" to "education/university",
+        "childcare" to "education/childcare", "kindergarten" to "education/childcare",
+        // Lodging
+        "hotel" to "lodging/hotel", "motel" to "lodging/motel", "hostel" to "lodging/hostel",
+        "camp_site" to "lodging/campground", "guest_house" to "lodging/guest_house",
+        "caravan_site" to "lodging/rv_park",
+        // Parking
+        "parking" to "parking/parking",
+        // Finance
+        "bank" to "finance/bank", "atm" to "finance/atm",
+        // Worship
+        "place_of_worship" to "worship/place_of_worship",
+        // Tourism & History
+        "museum" to "tourism_history/museum", "attraction" to "tourism_history/attraction",
+        "viewpoint" to "tourism_history/viewpoint", "memorial" to "tourism_history/memorial",
+        "monument" to "tourism_history/monument", "artwork" to "tourism_history/public_art",
+        "gallery" to "tourism_history/gallery", "information" to "tourism_history/info_point",
+        "cemetery" to "tourism_history/cemetery", "building" to "tourism_history/historic_building",
+        "ruins" to "tourism_history/ruins", "maritime" to "tourism_history/maritime",
+        "zoo" to "tourism_history/zoo", "aquarium" to "tourism_history/aquarium",
+        "theme_park" to "tourism_history/theme_park", "historic" to "tourism_history/historic_building",
+        // Emergency
+        "police" to "emergency/police", "fire_station" to "emergency/fire_station",
+        // Auto Services
+        "car_repair" to "auto_services/repair_shop", "car_wash" to "auto_services/car_wash",
+        "car_rental" to "auto_services/car_rental", "tyres" to "auto_services/tire_shop",
+        "car" to "auto_services/dealership",
+        // Entertainment
+        "fitness_centre" to "entertainment/fitness", "sports_centre" to "entertainment/sports_centre",
+        "golf_course" to "entertainment/golf", "marina" to "entertainment/marina",
+        "stadium" to "entertainment/stadium", "theatre" to "entertainment/theatre",
+        "cinema" to "entertainment/cinema", "nightclub" to "entertainment/nightclub",
+        "events_venue" to "entertainment/event_venue", "arts_centre" to "entertainment/arts_centre",
+        "amusement_arcade" to "entertainment/arcade", "ice_rink" to "entertainment/ice_rink",
+        "bowling_alley" to "entertainment/bowling", "miniature_golf" to "entertainment/mini_golf",
+        "escape_game" to "entertainment/escape_room",
+        // Offices
+        "company" to "offices/company", "estate_agent" to "offices/real_estate",
+        "lawyer" to "offices/law_office", "insurance" to "offices/insurance",
+        "tax_advisor" to "offices/tax_advisor", "services" to "offices/company",
+        // Salem: Witch & Occult
+        "esoteric" to "witch_shop/witchcraft_shop", "occult" to "witch_shop/occult_supplies",
+        "metaphysical" to "witch_shop/metaphysical", "crystal" to "witch_shop/crystal_shop",
+        "herbs" to "witch_shop/herb_shop", "witch_shop" to "witch_shop/witchcraft_shop",
+        "shop_occult" to "witch_shop/occult_supplies",
+        // Salem: Psychic & Tarot
+        "psychic" to "psychic/psychic_reading", "tarot" to "psychic/tarot",
+        "palmistry" to "psychic/palm_reading", "seance" to "psychic/seance",
+        "spiritual" to "psychic/spiritual_healer", "shop_psychic" to "psychic/psychic_reading",
+        // Salem: Ghost Tours
+        "ghost_tour" to "ghost_tour/haunted_tour", "ghost_walk" to "ghost_tour/walking_tour",
+        "haunted_tour" to "ghost_tour/haunted_tour", "night_tour" to "ghost_tour/night_tour",
+        "historical_tour" to "ghost_tour/historical_tour", "tour_ghost" to "ghost_tour/haunted_tour",
+        "tour" to "ghost_tour/walking_tour",
+        // Salem: Haunted Attractions
+        "haunted_attraction" to "haunted_attraction/haunted_house",
+        "haunted_house" to "haunted_attraction/haunted_house",
+        "attraction_haunted" to "haunted_attraction/haunted_house",
+        "wax_museum" to "haunted_attraction/wax_museum",
+        // Salem: Historic Houses
+        "historic_house" to "historic_house/colonial_house",
+        "colonial_house" to "historic_house/colonial_house",
+        "witch_trial_house" to "historic_house/witch_trial_house",
+        // Venue / Other / catch-all narration_point types
+        "venue" to "entertainment/event_venue",
+        "shop" to "shopping/gift_shop",
+        "services" to "offices/company",
+        "other" to "tourism_history/info_point",
+        "historic_site" to "tourism_history/historic_building",
+        "public_art" to "tourism_history/public_art",
+        "lodging" to "lodging/guest_house",
+        "hotel" to "lodging/hotel",
+        "witch_museum" to "tourism_history/museum",
+        "community_center" to "civic/community_centre",
+        "visitor_info" to "tourism_history/info_point",
+        "medical" to "healthcare/clinic",
+        "public" to "civic/community_centre",
+    )
+
+    /**
+     * Load a circle icon PNG from assets, scaled to the given size in pixels.
+     * Returns null if no matching icon exists for this category.
+     */
+    private fun loadCircleIcon(context: Context, category: String, sizePx: Int): Bitmap? {
+        val assetPath = CIRCLE_ICON_MAP[category.lowercase()] ?: return null
+        val fullPath = "poi-circle-icons/$assetPath.png"
+        val key = "$fullPath|$sizePx"
+
+        // Check cache (null = tried and failed, don't retry)
+        if (circleIconCache.containsKey(key)) return circleIconCache[key]
+
+        return try {
+            val input = context.assets.open(fullPath)
+            val original = BitmapFactory.decodeStream(input)
+            input.close()
+            val scaled = Bitmap.createScaledBitmap(original, sizePx, sizePx, true)
+            if (scaled !== original) original.recycle()
+            circleIconCache[key] = scaled
+            scaled
+        } catch (e: Exception) {
+            circleIconCache[key] = null  // cache the miss
+            null
+        }
+    }
+
     // ── Category → (drawableRes, tintColor) ───────────────────────────────────
     private val CATEGORY_MAP = mapOf(
         // ── System markers ──────────────────────────────────────────────────
@@ -218,15 +376,34 @@ object MarkerIconHelper {
     }
 
     /**
-     * Tiny colored dot for POI markers: filled circle with a darker center point.
-     * Fixed 5x5 dp (scales with density) — minimal footprint at any zoom level.
+     * POI marker icon: witch-themed circle icon from assets if available,
+     * otherwise falls back to the tiny colored dot.
+     * @param sizeDp icon size — use 12 for dense/low-zoom, 20 for medium, 28 for close-up
      */
-    fun dot(context: Context, category: String): BitmapDrawable {
+    fun dot(context: Context, category: String, sizeDp: Int = 12): BitmapDrawable {
+        val density = context.resources.displayMetrics.density
+        val sizePx = (sizeDp * density).toInt()
+        val key = "cdot|$category|$sizePx"
+        cache[key]?.let { return it }
+
+        // Try circle icon from assets first
+        val circleIcon = loadCircleIcon(context, category, sizePx)
+        if (circleIcon != null) {
+            val result = BitmapDrawable(context.resources, circleIcon)
+            cache[key] = result
+            return result
+        }
+
+        // Fallback: colored dot
         val (_, color) = CATEGORY_MAP[category.lowercase()] ?: DEFAULT
-        return dot(context, color)
+        return dotFallback(context, color)
     }
 
     fun dot(context: Context, color: Int): BitmapDrawable {
+        return dotFallback(context, color)
+    }
+
+    private fun dotFallback(context: Context, color: Int): BitmapDrawable {
         val key = "dot|$color"
         cache[key]?.let { return it }
 
@@ -237,13 +414,10 @@ object MarkerIconHelper {
         val cy = sizePx / 2f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Outer circle — semi-transparent fill
         paint.style = Paint.Style.FILL
         paint.color = color
         paint.alpha = 160
         canvas.drawCircle(cx, cy, cx, paint)
-
-        // Center dot — fully opaque
         paint.alpha = 255
         canvas.drawCircle(cx, cy, cx * 0.35f, paint)
 
@@ -343,7 +517,8 @@ object MarkerIconHelper {
         val key = "ldot|$color|$typeLabel|$nameLabel"
         cache[key]?.let { return it }
 
-        val dotSize = (6 * density).toInt().coerceAtLeast(6)
+        val iconSizeDp = 32
+        val iconSizePx = (iconSizeDp * density).toInt()
 
         val typePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color
@@ -364,14 +539,14 @@ object MarkerIconHelper {
         val nameH = if (nameLabel.isNotEmpty()) (namePaint.textSize + 2 * density).toInt() else 0
         val gap = (2 * density).toInt()
 
-        val totalW = maxOf(dotSize, typeW, nameW) + (8 * density).toInt()
-        val totalH = typeH + gap + dotSize + gap + nameH
+        val totalW = maxOf(iconSizePx, typeW, nameW) + (8 * density).toInt()
+        val totalH = typeH + gap + iconSizePx + gap + nameH
         val cx = totalW / 2f
 
         val bitmap = Bitmap.createBitmap(totalW, totalH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // Category type label (above dot)
+        // Category type label (above icon)
         if (typeLabel.isNotEmpty()) {
             val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = Color.WHITE; alpha = 210; style = Paint.Style.FILL
@@ -383,18 +558,26 @@ object MarkerIconHelper {
             canvas.drawText(typeLabel, cx, typeH - 4 * density, typePaint)
         }
 
-        // Dot
-        val dotCy = typeH + gap + dotSize / 2f
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL; this.color = color; alpha = 160
+        // Circle icon (or fallback dot)
+        val iconTop = typeH + gap
+        val circleIcon = loadCircleIcon(context, category, iconSizePx)
+        if (circleIcon != null) {
+            val iconLeft = ((totalW - iconSizePx) / 2f).toInt()
+            canvas.drawBitmap(circleIcon, iconLeft.toFloat(), iconTop.toFloat(), null)
+        } else {
+            // Fallback dot
+            val dotCy = iconTop + iconSizePx / 2f
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL; this.color = color; alpha = 160
+            }
+            canvas.drawCircle(cx, dotCy, iconSizePx / 4f, dotPaint)
+            dotPaint.alpha = 255
+            canvas.drawCircle(cx, dotCy, iconSizePx * 0.1f, dotPaint)
         }
-        canvas.drawCircle(cx, dotCy, dotSize / 2f, dotPaint)
-        dotPaint.alpha = 255
-        canvas.drawCircle(cx, dotCy, dotSize * 0.175f, dotPaint)
 
         // Name label (below dot)
         if (nameLabel.isNotEmpty()) {
-            val nameTop = typeH + gap + dotSize + gap
+            val nameTop = typeH + gap + iconSizePx + gap
             val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = Color.WHITE; alpha = 210; style = Paint.Style.FILL
             }

@@ -7,9 +7,12 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import android.graphics.Color
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.overlay.Polygon
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
@@ -88,26 +91,36 @@ internal fun SalemMainActivity.initNarrationSystem() {
     // Observe TTS completion to auto-advance queue, with silence reach-out
     lifecycleScope.launch {
         tourViewModel.narrationState.collectLatest { state ->
+            DebugLogger.i("NARR-STATE", "narrationState → $state (autoPlay=$narrationAutoPlay, queueSize=${narrationQueue.size})")
             if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle && narrationAutoPlay) {
+                // Clear currentNarration — TTS is done, allow next entry to play immediately
+                currentNarration = null
+                DebugLogger.i("NARR-STATE", "  Idle → currentNarration cleared, queueSize=${narrationQueue.size}")
+
                 if (narrationQueue.isNotEmpty()) {
                     // TTS finished — play next in queue after brief pause
                     val gapMs = if (walkSimRunning) 500L else 2000L
+                    DebugLogger.i("NARR-STATE", "  Queue has ${narrationQueue.size} → advancing after ${gapMs}ms")
                     kotlinx.coroutines.delay(gapMs)
                     playNextNarration()
                 } else {
-                    // Queue empty — reach out to nearest un-narrated POI
-                    // Walk sim: aggressive (500ms) to keep narration flowing continuously
-                    // Normal walk: relaxed (5s) so the app isn't constantly talking
+                    // Queue empty — wait, then either play queued items or reach out
                     val silenceMs = if (walkSimRunning) 500L else 5000L
                     kotlinx.coroutines.delay(silenceMs)
-                    // Re-check: still idle and queue still empty?
-                    if (narrationQueue.isEmpty()) {
+                    if (narrationQueue.isNotEmpty()) {
+                        // Items queued during the silence delay — play them
+                        DebugLogger.i("NARR-STATE", "  Queue filled during silence (${narrationQueue.size}) → playing")
+                        playNextNarration()
+                    } else {
+                        // Still empty — reach out to nearest un-narrated POI
                         val mgr = narrationGeofenceManager ?: return@collectLatest
                         val nearest = mgr.findNearestUnnarrated()
                         if (nearest != null) {
-                            DebugLogger.i("SalemMainActivity",
-                                "REACH-OUT: ${nearest.point.name} (${nearest.distanceM.toInt()}m away)")
+                            DebugLogger.i("NARR-STATE",
+                                "  REACH-OUT: ${nearest.point.name} (${nearest.distanceM.toInt()}m)")
                             mgr.triggerReachOut(nearest)
+                        } else {
+                            DebugLogger.i("NARR-STATE", "  Nothing nearby to reach out to")
                         }
                     }
                 }
@@ -127,12 +140,20 @@ internal fun SalemMainActivity.initNarrationSystem() {
  * 2. priority ASC (historical importance second — 1=must-hear, 5=filler)
  */
 internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFront: Boolean) {
+    DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
-    if (point.id == currentNarration?.id) return
-    if (narrationQueue.any { it.id == point.id }) return
+    if (point.id == currentNarration?.id) {
+        DebugLogger.i("NARR-QUEUE", "SKIP duplicate (current): ${point.name}")
+        return
+    }
+    if (narrationQueue.any { it.id == point.id }) {
+        DebugLogger.i("NARR-QUEUE", "SKIP duplicate (queued): ${point.name}")
+        return
+    }
 
     if (jumpToFront || currentNarration == null) {
         // Play immediately (user tapped or nothing playing)
+        DebugLogger.i("NARR-QUEUE", "PLAY NOW: ${point.name} (jumpToFront=$jumpToFront, currentNull=${currentNarration == null})")
         narrationQueue.addFirst(point)
         playNextNarration()
     } else {
@@ -158,15 +179,28 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
 
 /** Play the next narration point from the queue */
 internal fun SalemMainActivity.playNextNarration() {
-    val point = narrationQueue.pollFirst() ?: return
+    val point = narrationQueue.pollFirst()
+    if (point == null) {
+        DebugLogger.i("NARR-PLAY", "playNextNarration: queue empty, nothing to play")
+        return
+    }
     currentNarration = point
+    DebugLogger.i("NARR-PLAY", "playNextNarration: ${point.name} (${narrationQueue.size} remaining in queue)")
     showNarrationSheet(point)
 
     // Auto-play TTS — select narration pass based on lifetime visit count
     val mgr = narrationGeofenceManager
     val text = mgr?.getNarrationForPass(point) ?: point.shortNarration ?: point.description
+
+    // Resolve voice: POI override > category default
+    val voiceId = point.voiceOverride
+        ?: com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.type)
+    DebugLogger.i("NARR-PLAY", "  text=${if (text != null) "${text.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay")
     if (text != null && narrationAutoPlay) {
-        tourViewModel.speakNarration(text, point.name)
+        DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakNarration() voice=$voiceId")
+        tourViewModel.speakNarration(text, point.name, voiceId)
+    } else {
+        DebugLogger.w("NARR-PLAY", "  → NOT speaking: text=${text != null} autoPlay=$narrationAutoPlay")
     }
     // Record this visit for next-pass selection on future days
     mgr?.recordVisit(point.id)
@@ -224,6 +258,9 @@ internal fun SalemMainActivity.showNarrationSheet(point: NarrationPoint) {
     sheet.findViewById<View>(R.id.btnDirections)?.setOnClickListener {
         Toast.makeText(this, "Directions to ${point.name}", Toast.LENGTH_SHORT).show()
     }
+    sheet.findViewById<View>(R.id.btnGeofence)?.setOnClickListener {
+        toggleGeofenceOverlay(point)
+    }
 }
 
 private fun SalemMainActivity.updateQueueIndicator() {
@@ -251,4 +288,81 @@ private fun formatDistanceM(meters: Double): String = when {
     meters < 100 -> "${meters.toInt()}m"
     meters < 1000 -> "${(meters / 10).toInt() * 10}m"
     else -> "${"%.1f".format(meters / 1000)}km"
+}
+
+// ── Geofence overlay ────────────────────────────────────────────────────
+
+/** Currently displayed geofence overlay (null = hidden) */
+private var geofenceOverlay: Polygon? = null
+private var geofenceOverlayPointId: String? = null
+
+/**
+ * Toggle the geofence circle for a narration point on the map.
+ * Shows entry radius (solid) and approach radius (dashed outline).
+ * Tapping again or tapping for a different POI replaces it.
+ */
+internal fun SalemMainActivity.toggleGeofenceOverlay(point: NarrationPoint) {
+    // Remove existing overlay
+    geofenceOverlay?.let { binding.mapView.overlays.remove(it) }
+
+    // If same POI tapped again, just hide
+    if (geofenceOverlayPointId == point.id) {
+        geofenceOverlay = null
+        geofenceOverlayPointId = null
+        binding.mapView.invalidate()
+        Toast.makeText(this, "Geofence hidden", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    val center = GeoPoint(point.lat, point.lng)
+    val walkSim = narrationGeofenceManager?.walkSimMode == true
+    val baseRadius = point.geofenceRadiusM.toDouble()
+    val entryRadius = if (walkSim) baseRadius * 3.0 else baseRadius
+    val approachRadius = entryRadius * 2.0
+
+    // Entry zone — filled circle
+    val entryCircle = Polygon().apply {
+        points = Polygon.pointsAsCircle(center, entryRadius)
+        fillPaint.color = Color.argb(50, 76, 175, 80)   // green fill 20%
+        outlinePaint.color = Color.argb(180, 76, 175, 80) // green outline
+        outlinePaint.strokeWidth = 3f
+        title = "${point.name} — entry ${entryRadius.toInt()}m${if (walkSim) " (walk sim 3x)" else ""}"
+    }
+
+    // Approach zone — outline only
+    val approachCircle = Polygon().apply {
+        points = Polygon.pointsAsCircle(center, approachRadius)
+        fillPaint.color = Color.argb(20, 255, 193, 7)    // amber fill 8%
+        outlinePaint.color = Color.argb(120, 255, 193, 7) // amber outline
+        outlinePaint.strokeWidth = 2f
+        title = "${point.name} — approach ${approachRadius.toInt()}m"
+    }
+
+    // Add approach first (behind), then entry (on top)
+    binding.mapView.overlays.add(approachCircle)
+    binding.mapView.overlays.add(entryCircle)
+
+    // Track for removal — store entry circle as the "main" overlay, remove both later
+    geofenceOverlay = entryCircle
+    geofenceOverlayPointId = point.id
+
+    // Center map on the POI
+    binding.mapView.controller.animateTo(center)
+
+    binding.mapView.invalidate()
+    Toast.makeText(this, "Geofence: entry=${entryRadius.toInt()}m approach=${approachRadius.toInt()}m", Toast.LENGTH_SHORT).show()
+
+    // Store approach circle for cleanup too
+    entryCircle.relatedObject = approachCircle
+}
+
+/** Remove any active geofence overlay (call when narration sheet hides) */
+internal fun SalemMainActivity.clearGeofenceOverlay() {
+    geofenceOverlay?.let { entry ->
+        binding.mapView.overlays.remove(entry)
+        (entry.relatedObject as? Polygon)?.let { binding.mapView.overlays.remove(it) }
+    }
+    geofenceOverlay = null
+    geofenceOverlayPointId = null
+    binding.mapView.invalidate()
 }
