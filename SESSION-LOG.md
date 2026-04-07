@@ -2,6 +2,38 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 94: 2026-04-07 — RadioIntelligence Collector Role Intake (Research)
+
+### Summary
+Research session, no code. Mapped the portfolio active-scanning layer across WWWatcher Phase 20, RadioLogger, and LocationMapApp Salem in response to the new OMEN-008 directive (NOTE-L014). Identified shared analyzer DNA (WWWatcher session 068 ported analyzers from RadioLogger Kotlin → Rust, 89 unit tests), the consent-model asymmetry between operator-owned vs consenting-proxy collectors, and the unified-hash-space load-bearing legal disclosure requirement. Saved deep architectural picture to memory so next session can pick up immediately. Flagged Privacy Policy drafting (OMEN-008 §8) as the top priority for next session — it is the only currently unblocked work on the RadioIntelligence track and gates everything downstream.
+
+### Cross-Project Intake
+- WWWatcher Phase 20 — foundation done session 068; live capture sessions 069–075 in progress in parallel shell
+- RadioLogger — field-running on operator test fleet; source designation per NOTE-RL002
+- RadioIntelligence — pre-code, constituted by OMEN-008 (2026-04-07); LocationMapApp Salem is the constrained third collector
+- Wire format coordination: WWWatcher session 073 plans JSON `SensorMessage` over TCP — natural template for Salem's eventual uploader
+
+### Memory Updates
+- NEW: `project_radiointelligence_collector_role.md` — full cross-project picture, three collectors, shared analyzer DNA, OMEN-008 constraints, file map
+- NEW: `project_next_session_priority.md` — Privacy Policy drafting top priority with three drafting constraints + 10-element required Privacy Policy structure
+- MEMORY.md index updated with both new entries at top, next-session priority bolded
+
+### State Updates
+- STATE.md — TOP PRIORITY section added at top
+- SESSION-LOG.md — this entry
+
+### Build & Deploy
+None. Research session.
+
+### Open Items for Next Session
+1. **TOP PRIORITY** — Draft layered Privacy Policy text per OMEN-008 §8 (BLOCKING all RadioIntelligence Salem ingest)
+2. Coordinate JSON `SensorMessage` wire format with WWWatcher's parallel shell (sessions 069/073)
+3. User visual verification of Session 93 marker icon fix on tablet HNY0CY0W
+4. 9T.9 walk simulator end-to-end verification (pending since Session 91)
+5. NOTE-L013 cleanup: delete `app/src/main/java/com/example/locationmapapp/debug/VoiceAuditionActivity.kt`
+
+---
+
 ## Session 93: 2026-04-06 — Crash Recovery + Marker Icon ANR Fix
 
 ### Summary

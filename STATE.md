@@ -1,6 +1,9 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-06 Session 93 (Marker icon ANR fix; recovered Session 92 from crash)
+## Last Updated: 2026-04-07 Session 94 (RadioIntelligence collector role intake — research session, no code)
+
+## TOP PRIORITY — Next Session
+**Draft layered Privacy Policy text for OMEN-008 Salem stream** (NOTE-L014, BLOCKING). All three drafting constraints captured in memory: `project_next_session_priority.md`. Full architectural picture in `project_radiointelligence_collector_role.md`. No Salem RF ingest code may be added until Privacy Policy is drafted and OMEN-reviewed. Coordinate wire format with WWWatcher Phase 20 (sessions 069/073 in parallel shell).
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
