@@ -2,6 +2,55 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 93: 2026-04-06 — Crash Recovery + Marker Icon ANR Fix
+
+### Summary
+Recovered crashed Session 92 (committed 169 files / 8,618 insertions as `40778c2`). Diagnosed root cause of POI marker icon ANR on the Salem map: `MarkerIconHelper.labeledDot` allocating 817 bitmaps synchronously on main thread during zoom-bucket transition (17→18), compounded by undersized LRU cache. Applied surgical fix preserving labeled-icon visual.
+
+### Changes Made
+- `MarkerIconHelper.kt:37` — `MAX_CACHE_SIZE` 500 → 2000 (fits 817 narration + POI dots + system markers)
+- `MarkerIconHelper.kt:165` — added `"shop_retail" to "shopping/gift_shop"` (covers 122 businesses falling through to colored-dot fallback)
+- `SalemMainActivity.kt:1080` — viewport filter in `refreshNarrationIcons`, only iterates markers in current `boundingBox`
+- Memory: new `feedback_poi_icon_architecture.md` (POI icons are per-app, not server-side)
+- Memory: updated `feedback_conversation_log.md` (strict real-time append rule, cited Session 92 incident)
+
+### Bugs Found via ANR Trace
+- Pulled `/data/anr/anr_2026-04-06-21-52-14-034` from emulator-5570 (Input dispatching timed out 5010ms)
+- Stack: `Bitmap.createBitmap (4 nested) ← labeledDot ← narrationIconForZoom ← refreshNarrationIcons ← onZoom ← MapAnimatorListener.onAnimationUpdate`
+- 817 cache misses on first zoom into bucket 3 (zoom ≥18) — name-specific cache key + 500-entry cap = thrash forever
+
+### Build & Deploy
+- `:app-salem:assembleDebug` BUILD SUCCESSFUL in 22s
+- Installed on tablet HNY0CY0W
+- Awaiting user visual verification
+
+---
+
+## Session 92: 2026-04-06 — GPS Narration Bugfixes, Category Voices, Witch Circle Icons
+
+### Summary
+Crashed mid-session (context overflow). Recovered and committed in Session 93 as `40778c2`. Live log captured first 3 bug fixes; remaining work reconstructed from git diff.
+
+### Changes Made
+- **3 GPS narration bug fixes (real-world Salem walk):**
+  1. `SalemMainActivity.kt:1217` — 100m GPS dead zone was skipping narration system entirely; added `updateTourLocation(point)` inside dead zone block (map skips jitter, narration system gets every update)
+  2. `SalemMainActivity.kt:1204` — 60s GPS interval too slow at walking speed (90m gaps); added 5s tier when narration active
+  3. `SalemMainActivityNarration.kt` — TTS queue race condition: `currentNarration` never cleared on Idle → blocked all future playback. Fix: clear on Idle + retry queue after silence delay
+- **12-hour per-POI repeat window** — replaced midnight reset (`narratedToday: Set`) with `narratedAt: Map<String, Long>` + `purgeExpired()`
+- **Category voice switching** — new `CategoryVoiceMap.kt`, NarrationManager voice cache + per-segment voice override
+- **NarrationPoint schema** — added `voice_override` and `audio_asset` columns
+- **Witch-themed circle icons** — `MarkerIconHelper.kt` extended with 100+ category→PNG mappings, `loadCircleIcon()` loads/scales/caches PNGs from `assets/poi-circle-icons/`
+- **150 generated icons** across 22 categories via `tools/generate-poi-circle-icons.py` (Stable Diffusion via Forge, DreamShaper XL Turbo)
+- **Reach-out tuning** — real GPS reduced from 500m to 150m, distance-first with 50m banding
+- **Downtown test route** — `TourRouteLoader.kt` prefers comprehensive street coverage route
+- **VoiceTestActivity** — new debug activity for voice audition
+- **Extensive NARR-GEO debug logging** throughout pipeline
+
+### Commit
+- `40778c2 Session 92: GPS narration bugfixes, category voices, witch circle icons` — 169 files, 8,618 insertions
+
+---
+
 ## Session 91: 2026-04-06 — Walk Sim Fixes, Narration Density, 100% Overpass Coverage
 
 ### Summary

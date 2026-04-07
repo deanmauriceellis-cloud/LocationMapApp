@@ -1,6 +1,6 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-06 Session 91 (Walk sim fixes, narration density, 100% Overpass coverage)
+## Last Updated: 2026-04-06 Session 93 (Marker icon ANR fix; recovered Session 92 from crash)
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`

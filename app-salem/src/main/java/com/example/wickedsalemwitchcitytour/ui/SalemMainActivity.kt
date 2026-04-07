@@ -1084,9 +1084,16 @@ class SalemMainActivity : AppCompatActivity() {
         val bucket = zoomBucket(zoom)
         if (bucket == lastNarrationIconZoom) return
         lastNarrationIconZoom = bucket
+        // Only refresh markers in the current viewport — avoids ANR from iterating
+        // 800+ markers at every zoom-bucket transition
+        val visible = binding.mapView.boundingBox
+        var refreshed = 0
         for ((marker, point) in narrationMarkers) {
+            if (!visible.contains(marker.position)) continue
             marker.icon = narrationIconForZoom(point.type, point.name, zoom)
+            refreshed++
         }
+        DebugLogger.i("SalemMainActivity", "refreshNarrationIcons: bucket=$bucket refreshed=$refreshed/${narrationMarkers.size}")
         binding.mapView.invalidate()
     }
 

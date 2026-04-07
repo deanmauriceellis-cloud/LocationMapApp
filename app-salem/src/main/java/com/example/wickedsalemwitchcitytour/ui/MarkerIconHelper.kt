@@ -34,7 +34,7 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MarkerIconH
 object MarkerIconHelper {
 
     private const val TAG = "MarkerIconHelper"
-    private const val MAX_CACHE_SIZE = 500
+    private const val MAX_CACHE_SIZE = 2000
 
     // LRU cache: access-order LinkedHashMap evicts oldest entries beyond MAX_CACHE_SIZE
     private val cache = object : LinkedHashMap<String, BitmapDrawable>(128, 0.75f, true) {
@@ -162,6 +162,7 @@ object MarkerIconHelper {
         // Venue / Other / catch-all narration_point types
         "venue" to "entertainment/event_venue",
         "shop" to "shopping/gift_shop",
+        "shop_retail" to "shopping/gift_shop",
         "services" to "offices/company",
         "other" to "tourism_history/info_point",
         "historic_site" to "tourism_history/historic_building",
