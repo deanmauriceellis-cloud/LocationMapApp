@@ -2,6 +2,58 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 99: 2026-04-08 — Phase 9P.3 + 9P.4 DONE (Admin Auth + Admin POI Endpoints) + OMEN-002 File-Side Cleanup
+
+### Summary
+Three things in one session, all on a single architectural arc: harden the cache-proxy admin surface, then build the first write endpoints on top of it. **Phase 9P.3** added `cache-proxy/lib/admin-auth.js` — a `requireBasicAuth` middleware with constant-time comparison via `crypto.timingSafeEqual` (length-padded so even length comparison can't leak info), reading `ADMIN_USER`/`ADMIN_PASS` from env at request time, returning `401 + WWW-Authenticate: Basic realm="LocationMapApp Admin"` on failure and `503` if env vars are unset. Mounted globally on `/admin/*` in `server.js` and applied per-route to `POST /cache/clear` to fix the latent S96 unauthenticated-admin-route bug. 7/7 smoke tests pass. **Phase 9P.4** built `cache-proxy/lib/admin-pois.js` (~290 lines): six endpoints under `/admin/salem/pois/*` covering all three POI kinds (`tour`, `business`, `narration`) with kind-specific field whitelists, JSONB-aware update clause builder, soft-delete semantics (PUT and move refuse against deleted rows; DELETE/restore distinguish 404 vs 409), and lat/lng range validation. Required an in-scope schema migration: only `salem_narration_points` had `deleted_at` going in, so added the column + active partial indexes to `salem_tour_pois` and `salem_businesses`, applied the ALTER TABLE live, updated `salem-schema.sql` with `IF NOT EXISTS` clauses for reproducibility, and updated `lib/salem.js` public reads (`/salem/pois`, `/salem/pois/:id`, `/salem/businesses`) to filter `deleted_at IS NULL` so soft delete is functional end-to-end (otherwise it would be theatrical — admin "deletes" a POI but the public app still shows it). 24/24 smoke tests pass. **OMEN-002 file-side cleanup** done as a precondition: lifted `DATABASE_URL`, `OPENSKY_CLIENT_ID`, `OPENSKY_CLIENT_SECRET` out of `bin/restart-proxy.sh` into a new gitignored `cache-proxy/.env`; rewrote the script to source `.env` via `set -a; source ...; set +a`; created tracked `cache-proxy/.env.example` template; added `cache-proxy/.env`, `.env`, `.env.local` to `.gitignore`. Both old credential strings confirmed absent from the tracked file via grep. Credentials are still in git history — full closure requires operator-side rotation flagged for Session 100.
+
+### Decisions
+1. **OMEN-002 cleanup before 9P.3, not after.** User chose option (A): clean up the existing leaked credentials before introducing the new `ADMIN_USER`/`ADMIN_PASS` env vars, so the new vars don't perpetuate the bad pattern. File-side migration was straightforward (move secrets, gitignore, script sources `.env`); credential rotation is left for the operator because OpenSky requires a portal login and DB password rotation is a one-line `ALTER USER` the operator should run themselves.
+2. **Constant-time comparison with length padding.** `crypto.timingSafeEqual` throws on length mismatch, which would leak length information about the expected credentials. Padded both sides to `max(len)` with zero-fill, then verified equal lengths separately. Standard pattern, but worth doing right.
+3. **Read env vars at request time, not module load.** Means the operator can change `ADMIN_USER`/`ADMIN_PASS` in `cache-proxy/.env`, restart, and the new values take effect without any module-cache concerns. Also enables future runtime rotation if needed.
+4. **`/cache/stats` left public, only `/cache/clear` gated.** Stats is read-only telemetry; clear is destructive. Different blast radius, different access policy.
+5. **Schema migration for `deleted_at` was in-scope, not scope creep.** The 9P.4 master plan calls for soft delete on all three kinds. Only `salem_narration_points` had the column. Adding it to the other two (with `IF NOT EXISTS` for idempotency) is a precondition for the master plan task, not a tangent.
+6. **Public read endpoints in `lib/salem.js` had to filter `deleted_at IS NULL`.** Without this, soft delete is theatrical — admin "deletes" something but the user-facing app still shows it. Three-line change, behavior is what users would expect from soft delete. Flagged in the session log as a small scope expansion beyond the literal master plan task.
+7. **Whitelisted partial updates, not PUT-replace semantics.** "Full update" in the master plan is interpreted as "update any field you provide, leave others alone". Safer for an admin tool — accidental missing field doesn't clobber existing data. Whitelist enforced per kind so non-existent or system-managed columns (`created_at`, `updated_at`, `deleted_at`) cannot be written via the API.
+8. **JSONB-aware update clause builder.** Seven JSONB columns across the three tables (`subcategories`, `tags`, `related_figure_ids`, etc.). Auto-stringify and cast via `$N::jsonb`. Centralized in `buildUpdateClause` so each endpoint stays small.
+9. **Soft delete semantics: PUT/move refuse against deleted rows.** Forces a deliberate "restore first" workflow rather than letting an admin update a tombstoned POI by accident. DELETE returns 409 (not 404) when the row exists but is already deleted, distinguishing it from "does not exist".
+10. **GET single still returns deleted rows; GET list excludes them by default.** Admin workflows often need to inspect a tombstone before deciding to restore. List view defaults to "active only" but supports `?include_deleted=true` for cleanup workflows.
+
+### Files Changed
+- `.gitignore` — added `cache-proxy/.env`, `.env`, `.env.local`
+- `bin/restart-proxy.sh` — sources `cache-proxy/.env`, no hardcoded credentials
+- `cache-proxy/.env.example` — NEW (placeholder template)
+- `cache-proxy/lib/admin-auth.js` — NEW (~140 lines, Basic Auth middleware)
+- `cache-proxy/lib/admin.js` — `/cache/clear` gated by `requireBasicAuth`
+- `cache-proxy/lib/admin-pois.js` — NEW (~290 lines, six endpoints)
+- `cache-proxy/lib/salem.js` — public reads filter `deleted_at IS NULL`
+- `cache-proxy/salem-schema.sql` — `deleted_at` added to tour_pois and businesses with active indexes
+- `cache-proxy/server.js` — admin auth wired in, `admin-pois` module registered, banner updated
+- `STATE.md` — TOP PRIORITY rewritten for Session 100 (9P.4a + 9P.5)
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — 9P.3 + 9P.4 marked DONE with bonus notes
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-099-2026-04-08.md` — live conversation log
+
+### Verification
+- **9P.3 smoke tests** (7/7 pass): `GET /admin/ping` no auth → 401 + WWW-Authenticate; wrong pass → 401; wrong user → 401; correct creds → 200; `POST /cache/clear` no auth → 401 (was 200 before — latent bug fixed); correct creds → 200; `GET /cache/stats` no auth → 200 (intentionally public)
+- **9P.4 smoke tests** (24/24 pass): list w/o kind → 400; list narration limit=3 → 200 with 3 rows; list no auth → 401; GET single → 200; GET nonexistent → 404; GET bad kind → 400; PUT description+priority → 200, updated_at refreshed; PUT lat=999 → 400; PUT empty body → 400; PUT non-whitelisted-only → 400 (whitelist works); POST move → 200 with from/to JSON; POST move bad lng → 400; DELETE → 200; DELETE again → 409; PUT against deleted → 409; GET single still returns deleted row; list include_deleted=false → count=0; list include_deleted=true → count=1; restore → 200; restore again → 409; move back to original coords → 200; PUT priority back → 200; PUT description=null (clean restore) → 200, NULL in DB
+- **Test row** (`andrew_safford_house`) verified back to bundled-SQL state via direct PG query: `description=NULL, priority=2, wave=1, lat=42.5230254, lng=-70.8909076`
+- **Live PG migration** applied: both new `deleted_at` columns and active indexes confirmed via `information_schema.columns`
+- **Both old credential strings** (`fuckers123`, `6m3uBQ5HXwSzJeLemRJK12G8Ux4L5veR`) confirmed absent from `bin/restart-proxy.sh` via grep
+
+### Build & Deploy
+- Schema migration: `psql -U witchdoctor -d locationmapapp -h localhost -c "ALTER TABLE salem_tour_pois ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ; ..."` (idempotent)
+- Proxy startup: `bin/restart-proxy.sh` (now sources `cache-proxy/.env`). New banner lines: `Admin: GET /cache/stats, POST /cache/clear (Basic Auth), GET /admin/ping (Basic Auth)` and `AdminPOI: GET /admin/salem/pois?kind=..., GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)` and `Admin auth: configured`
+
+### Open Items for Session 100
+1. **OMEN-002 history rotation** — needs operator action: rotate DB password via `ALTER USER witchdoctor WITH PASSWORD '<new>';`, rotate `OPENSKY_CLIENT_SECRET` via OpenSky web portal, then update `cache-proxy/.env`
+2. **Set real `ADMIN_PASS`** in `cache-proxy/.env` (currently the smoke-test value `salem-tour-9P3-test`)
+3. **Phase 9P.4a** — Per-mode category visibility schema (small, schema-only)
+4. **Phase 9P.5** — Duplicates detection endpoint (one endpoint, ~50 lines)
+5. **Carryover** — NOTE-L013 cleanup, 9T.9 walk simulator verification, NOTE-L014 OMEN-008 Privacy Policy drafting (still on the books, still blocking RadioIntelligence Salem ingest)
+
+---
+
 ## Session 98: 2026-04-08 — Phase 9P.A.1 + 9P.A.2 DONE (Schema + Importer)
 
 ### Summary

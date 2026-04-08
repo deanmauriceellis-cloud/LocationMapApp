@@ -17,6 +17,9 @@ poi-cache.json
 scan-cells.json
 overnight-runs/
 cache-proxy/geofence-databases/*.db
+cache-proxy/.env
+.env
+.env.local
 web/node_modules/
 web/dist/
 web/tsconfig.tsbuildinfo

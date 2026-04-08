@@ -1160,26 +1160,30 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [ ] Verify final row count matches the bundled SQL count (~814)
 - [ ] Spot-check 10 random rows against the source JSON for fidelity
 
-#### Step 9P.3: HTTP Basic Auth middleware
-- [ ] Create `cache-proxy/lib/admin-auth.js` exporting `requireBasicAuth(req, res, next)`
-- [ ] Reads `ADMIN_USER` and `ADMIN_PASS` from env, returns 401 + `WWW-Authenticate: Basic` on missing/wrong credentials
-- [ ] Add `ADMIN_USER` and `ADMIN_PASS` to `.env.example` with placeholder values (per OMEN-002, no real credentials in tracked files)
-- [ ] Mount as global middleware on `/admin/*` in `cache-proxy/server.js`
-- [ ] **Lock down `/cache/clear`** under the same middleware (latent unauthenticated-admin-route bug found in Session 96 survey)
-- [ ] Smoke test: `curl /admin/ping` → 401, `curl -u user:pass /admin/ping` → 200
+#### Step 9P.3: HTTP Basic Auth middleware — DONE (Session 99, 2026-04-08)
+- [x] Created `cache-proxy/lib/admin-auth.js` exporting `requireBasicAuth(req, res, next)` — constant-time comparison via `crypto.timingSafeEqual` with length-padding
+- [x] Reads `ADMIN_USER` and `ADMIN_PASS` from env at request time, returns 401 + `WWW-Authenticate: Basic realm="LocationMapApp Admin"` on failure, 503 if env vars unset
+- [x] Added `ADMIN_USER` and `ADMIN_PASS` to `cache-proxy/.env.example` with placeholders. Also created `cache-proxy/.env` (gitignored) — see OMEN-002 cleanup notes below
+- [x] Mounted as `app.use('/admin', requireBasicAuth)` global middleware in `cache-proxy/server.js`
+- [x] **Locked down `POST /cache/clear`** with per-route `requireBasicAuth` (the latent S96 bug)
+- [x] Smoke tests: 7/7 pass (no-auth → 401, wrong creds → 401, correct creds → 200, on both `/admin/ping` and `/cache/clear`; `/cache/stats` left public as read-only telemetry)
 
-#### Step 9P.4: Admin POI write endpoints
-- [ ] Create `cache-proxy/lib/admin-pois.js`
-- [ ] Endpoints (all under `/admin/salem/pois/*`, all auth-gated):
-  - `GET /admin/salem/pois?kind=tour|business|narration&category=<>&bbox=<>` — list with filters
-  - `GET /admin/salem/pois/:kind/:id` — single POI with all fields
-  - `PUT /admin/salem/pois/:kind/:id` — full update (returns updated row)
-  - `POST /admin/salem/pois/:kind/:id/move` — lat/lng-only update (returns old + new coords)
-  - `DELETE /admin/salem/pois/:kind/:id` — soft delete (sets `deleted_at`)
-  - `POST /admin/salem/pois/:kind/:id/restore` — undo soft delete
-- [ ] All write endpoints update `updated_at` automatically
-- [ ] Validation: lat in [-90, 90], lng in [-180, 180], required fields present, category valid against taxonomy
-- [ ] Smoke test each endpoint with curl
+**Bonus (OMEN-002 file-side cleanup, done same step):** moved `DATABASE_URL`, `OPENSKY_CLIENT_ID`, `OPENSKY_CLIENT_SECRET` out of `bin/restart-proxy.sh` into the new gitignored `cache-proxy/.env`. Script now sources `.env` via `set -a; source ...; set +a`. Both old credential strings confirmed absent from the tracked file. Credentials still exist in git history — rotation flagged for operator action.
+
+#### Step 9P.4: Admin POI write endpoints — DONE (Session 99, 2026-04-08)
+- [x] Created `cache-proxy/lib/admin-pois.js` (~290 lines, per-kind config + whitelisted partial updates)
+- [x] Endpoints (all under `/admin/salem/pois/*`, gated by /admin Basic Auth):
+  - [x] `GET /admin/salem/pois?kind=tour|business|narration&category=&s=&w=&n=&e=&q=&include_deleted=&limit=` — list with filters (bbox uses s/w/n/e per existing convention)
+  - [x] `GET /admin/salem/pois/:kind/:id` — single POI (admin sees soft-deleted rows for tombstone inspection)
+  - [x] `PUT /admin/salem/pois/:kind/:id` — partial update via whitelisted field sets (refuses if soft-deleted; must restore first)
+  - [x] `POST /admin/salem/pois/:kind/:id/move` — lat/lng-only, returns `{from: {lat,lng}, to: {lat,lng}}` (refuses if soft-deleted)
+  - [x] `DELETE /admin/salem/pois/:kind/:id` — soft delete (409 if already deleted)
+  - [x] `POST /admin/salem/pois/:kind/:id/restore` — undo soft delete (409 if not deleted)
+- [x] All write endpoints set `updated_at = NOW()` automatically
+- [x] Validation: `lat ∈ [-90,90]`, `lng ∈ [-180,180]`, JSONB fields stringified+cast, category cannot be cleared to empty. Full taxonomy validation deferred to Phase 9P.6 (TypeScript port of `PoiCategories.kt`)
+- [x] Smoke tests: 24/24 pass (all six endpoints, including 4xx paths and a full delete→restore round-trip)
+
+**Bonus (in-scope schema migration):** added `deleted_at TIMESTAMPTZ` + `idx_..._active` partial indexes to `salem_tour_pois` and `salem_businesses` (only `salem_narration_points` had `deleted_at` going in). Updated `cache-proxy/salem-schema.sql` so the migration is reproducible. Updated `lib/salem.js` public reads (`/salem/pois`, `/salem/pois/:id`, `/salem/businesses`) to filter `deleted_at IS NULL` so soft delete is functional end-to-end (otherwise it would be theatrical — admin "deletes" a POI but the app still shows it).
 
 #### Step 9P.4a: Per-mode category visibility schema (added Session 97)
 - [ ] Each POI category needs **two** visibility flags going forward: free-roam mode (current behavior) and historic tour mode (Phase 9R)

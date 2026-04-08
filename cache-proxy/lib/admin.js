@@ -16,7 +16,8 @@ module.exports = function(app, deps) {
           scanCells, SCAN_CELLS_FILE,
           openskyRateState, openskyConfigured,
           OPENSKY_EFFECTIVE_LIMIT, OPENSKY_MIN_INTERVAL_MS,
-          getImportState, getOverpassQueueLength } = deps;
+          getImportState, getOverpassQueueLength,
+          requireBasicAuth } = deps;
 
   app.get('/cache/stats', (req, res) => {
     const memUsage = process.memoryUsage();
@@ -56,7 +57,10 @@ module.exports = function(app, deps) {
     });
   });
 
-  app.post('/cache/clear', (req, res) => {
+  // /cache/clear is a destructive admin operation. Per Phase 9P.3 it is gated
+  // behind Basic Auth (the same middleware that protects /admin/*). This was a
+  // latent unauthenticated route flagged in the Session 96 survey.
+  app.post('/cache/clear', requireBasicAuth, (req, res) => {
     const count = cache.size;
     const hintCount = radiusHints.size;
     const bufferCount = importBuffer.length;

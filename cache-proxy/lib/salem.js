@@ -31,7 +31,9 @@ module.exports = function (app, deps) {
   app.get('/salem/pois', requirePg, async (req, res) => {
     try {
       const { category, source, stale, lat, lng, radius, q, limit = 200 } = req.query;
-      let sql = 'SELECT * FROM salem_tour_pois WHERE 1=1';
+      // Phase 9P.4: filter soft-deleted rows from public reads. Admin endpoints
+      // (/admin/salem/pois/*) can opt in to seeing deleted rows via ?include_deleted=true.
+      let sql = 'SELECT * FROM salem_tour_pois WHERE deleted_at IS NULL';
       const params = [];
       let idx = 1;
 
@@ -59,7 +61,8 @@ module.exports = function (app, deps) {
 
   app.get('/salem/pois/:id', requirePg, async (req, res) => {
     try {
-      const { rows } = await pgPool.query('SELECT * FROM salem_tour_pois WHERE id = $1', [req.params.id]);
+      // Phase 9P.4: public read excludes soft-deleted rows
+      const { rows } = await pgPool.query('SELECT * FROM salem_tour_pois WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
       if (!rows.length) return res.status(404).json({ error: 'Not found' });
       res.json(rows[0]);
     } catch (err) {
@@ -72,7 +75,8 @@ module.exports = function (app, deps) {
   app.get('/salem/businesses', requirePg, async (req, res) => {
     try {
       const { type, source, stale, q, limit = 500 } = req.query;
-      let sql = 'SELECT * FROM salem_businesses WHERE 1=1';
+      // Phase 9P.4: filter soft-deleted rows from public reads
+      let sql = 'SELECT * FROM salem_businesses WHERE deleted_at IS NULL';
       const params = [];
       let idx = 1;
 

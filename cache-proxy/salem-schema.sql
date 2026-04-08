@@ -52,13 +52,18 @@ CREATE TABLE IF NOT EXISTS salem_tour_pois (
   verified_date          TIMESTAMPTZ,
   created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  stale_after            TIMESTAMPTZ
+  stale_after            TIMESTAMPTZ,
+  deleted_at             TIMESTAMPTZ                        -- soft delete (NULL = active), Phase 9P.4
 );
+
+-- Phase 9P.4: backfill deleted_at on existing deployments
+ALTER TABLE salem_tour_pois ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_salem_pois_category ON salem_tour_pois (category);
 CREATE INDEX IF NOT EXISTS idx_salem_pois_lat_lng ON salem_tour_pois (lat, lng);
 CREATE INDEX IF NOT EXISTS idx_salem_pois_data_source ON salem_tour_pois (data_source);
 CREATE INDEX IF NOT EXISTS idx_salem_pois_stale ON salem_tour_pois (stale_after) WHERE stale_after IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_pois_active ON salem_tour_pois (id) WHERE deleted_at IS NULL;
 
 -- ════════════════════════════════════════════════════════════════════
 -- Salem Businesses — restaurants, bars, shops, lodging, attractions
@@ -87,13 +92,18 @@ CREATE TABLE IF NOT EXISTS salem_businesses (
   verified_date     TIMESTAMPTZ,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  stale_after       TIMESTAMPTZ
+  stale_after       TIMESTAMPTZ,
+  deleted_at        TIMESTAMPTZ                              -- soft delete (NULL = active), Phase 9P.4
 );
+
+-- Phase 9P.4: backfill deleted_at on existing deployments
+ALTER TABLE salem_businesses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_salem_biz_type ON salem_businesses (business_type);
 CREATE INDEX IF NOT EXISTS idx_salem_biz_lat_lng ON salem_businesses (lat, lng);
 CREATE INDEX IF NOT EXISTS idx_salem_biz_data_source ON salem_businesses (data_source);
 CREATE INDEX IF NOT EXISTS idx_salem_biz_stale ON salem_businesses (stale_after) WHERE stale_after IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_biz_active ON salem_businesses (id) WHERE deleted_at IS NULL;
 
 -- ════════════════════════════════════════════════════════════════════
 -- Salem Narration Points — ambient narration POIs (Phase 9P, Session 98)

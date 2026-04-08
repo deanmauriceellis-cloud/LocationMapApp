@@ -44,12 +44,30 @@ function requirePg(req, res, next) {
 const config = require('./lib/config');
 const cacheModule = require('./lib/cache');
 const opensky = require('./lib/opensky');
+const adminAuth = require('./lib/admin-auth');
+
+// Validate admin auth config at startup. We do not refuse to start the proxy if
+// ADMIN_USER/ADMIN_PASS are missing — public routes still work — but every
+// /admin/* and /cache/clear request will return 503 until they're set.
+const adminAuthConfigured = adminAuth.ensureConfigured();
+
+// Mount Basic Auth on the admin namespace before any /admin/* routes register.
+// /cache/clear (the historical unauthenticated admin route from S96 survey)
+// is gated explicitly inside lib/admin.js via the requireBasicAuth dep below.
+app.use('/admin', adminAuth.requireBasicAuth);
+
+// /admin/ping smoke-test route — proves the middleware is mounted correctly.
+app.get('/admin/ping', (req, res) => {
+  res.json({ ok: true, route: '/admin/ping' });
+});
 
 // ── Build shared deps object ─────────────────────────────────────────────────
 const deps = {
   pgPool,
   requirePg,
   io,
+  // Admin auth
+  requireBasicAuth: adminAuth.requireBasicAuth,
   // Config
   JWT_SECRET: config.JWT_SECRET,
   JWT_ACCESS_EXPIRY: config.JWT_ACCESS_EXPIRY,
@@ -164,6 +182,9 @@ require('./lib/salem')(app, deps);
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);
 
+// Admin POI write endpoints (Phase 9P.4) — gated by /admin Basic Auth
+require('./lib/admin-pois')(app, deps);
+
 // ── Start ───────────────────────────────────────────────────────────────────
 
 server.listen(PORT, '0.0.0.0', () => {
@@ -186,5 +207,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`        JWT: ${process.env.JWT_SECRET ? 'secret configured' : 'WARNING — using random secret'}`);
   console.log('Scan:   GET /scan-cells');
   console.log('Salem:  GET /salem/pois, /salem/businesses, /salem/figures, /salem/timeline, /salem/sources, /salem/tours, /salem/events, /salem/sync, /salem/stats');
-  console.log('Admin:  GET /cache/stats, POST /cache/clear');
+  console.log('Admin:  GET /cache/stats, POST /cache/clear (Basic Auth), GET /admin/ping (Basic Auth)');
+  console.log('AdminPOI: GET /admin/salem/pois?kind=tour|business|narration, GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)');
+  console.log(`        Admin auth: ${adminAuthConfigured ? 'configured' : 'NOT CONFIGURED — set ADMIN_USER and ADMIN_PASS'}`);
 });
