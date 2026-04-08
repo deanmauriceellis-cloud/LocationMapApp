@@ -1,9 +1,20 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-08 Session 97 (Phase 9P expanded with tour-mode hooks; Phase 9Q + 9R added for Salem domain bridge and historic tour mode; hybrid tour model committed)
+## Last Updated: 2026-04-08 Session 98 (Phase 9P.A.1 + 9P.A.2 DONE — schema + importer; 814 narration_points migrated to PostgreSQL canonical)
 
-## TOP PRIORITY — Next Session (Session 98)
-**Phase 9P.1 — Add `salem_narration_points` table to PostgreSQL.** First code work of Phase 9P.A (Migration & Backend Foundation). Then 9P.2 — write the one-shot importer that brings ~814 narration points out of bundled `salem_content.sql` into PostgreSQL. After 9P.A lands, the admin tool work in 9P.B (~3-4 sessions) ships the operator UI for fixing position errors and overlapping icons.
+## TOP PRIORITY — Next Session (Session 99)
+**Phase 9P.3 — HTTP Basic Auth middleware.** Add `cache-proxy/lib/admin-auth.js` exporting `requireBasicAuth` middleware. Read `ADMIN_USER` / `ADMIN_PASS` from env. Add to `.env.example` with placeholders. Mount on `/admin/*` in `server.js`. **Lock down `/cache/clear`** (currently unauthenticated — latent bug found in Session 96 survey). Then 9P.4 (admin POI write endpoints), 9P.4a (per-mode category visibility schema), 9P.5 (duplicates detection endpoint).
+
+## Phase 9P.A status (Backend Foundation)
+- ✓ **9P.1 DONE** — `salem_narration_points` table (42 cols, 7 indexes) added to `cache-proxy/salem-schema.sql`, migration ran clean
+- ✓ **9P.2 DONE** — `cache-proxy/scripts/import-narration-points.js` written (uses `better-sqlite3` to parse bundled SQL with multi-line statement handling, then UPSERT to PG via `pg`). Imported 814 rows, exact match to bundled SQL. Wave breakdown: W1=112, W2=85, W3=109, W4=508. 29 categories, 10 data sources. **PostgreSQL is now canonical for Salem narration points.**
+- ⏳ 9P.3 — HTTP Basic Auth middleware (next session)
+- ⏳ 9P.4 — Admin POI write endpoints
+- ⏳ 9P.4a — Per-mode category visibility schema
+- ⏳ 9P.5 — Duplicates detection endpoint
+
+## Outstanding (flagged in Session 98, not fixing yet)
+- **OMEN-002 violation in `bin/restart-proxy.sh`** — DATABASE_URL with password and OPENSKY_CLIENT_SECRET hardcoded in tracked file. Predates Session 98. Recommended cleanup before Phase 9P.3 to set the precedent for the new ADMIN_USER/ADMIN_PASS env vars. Cleanup means rotating both credentials (since they're in git history) and moving to a gitignored `cache-proxy/.env`. Surface to user before next code session.
 
 **Three-phase expanded vision (Session 97 planning):**
 - **Phase 9P** — POI Admin Tool. ~4-5 sessions. Operator-facing CMS for POI metadata. Two new steps added in S97: 9P.4a (per-mode category visibility schema) and 9P.10a (read-only "Linked Historical Content" tab in edit dialog).

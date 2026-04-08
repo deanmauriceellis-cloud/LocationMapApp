@@ -2,6 +2,51 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 98: 2026-04-08 — Phase 9P.A.1 + 9P.A.2 DONE (Schema + Importer)
+
+### Summary
+First code session of the Phase 9P series. Added the new `salem_narration_points` PostgreSQL table (42 columns, 7 indexes — mirroring the bundled SQL's full column set including merchant_tier and ad_priority for the future advertising business) and wrote a one-shot importer at `cache-proxy/scripts/import-narration-points.js` that brings 814 narration points out of the bundled `salem_content.sql` and into PostgreSQL. PostgreSQL is now the canonical source of truth for editable Salem narration points, exactly per the Session 96 architectural decision. Wave breakdown verified: W1=112, W2=85, W3=109, W4=508 — exact match to the bundled SQL (3 fewer than STATE.md's stale 817; bundled SQL is the truth). Three honest investigation iterations were needed to land cleanly: (1) the schema initially missed 12 columns from the bundled SQL including the merchant fields, fixed by dropping the empty table and re-running; (2) the line-based extractor was breaking on multi-line INSERTs where ~7 rows have literal newlines inside the `hours` field, fixed by accumulating until reaching `;` outside a string literal with proper escape-pair handling; (3) the importer's idempotency was verified by TRUNCATE + re-run. Stopped at the 9P.A.1+9P.A.2 milestone per the conservative recommendation rather than racing through 9P.3-9P.5 in the same session.
+
+### OMEN-002 finding (predates Session 98, flagged for cleanup before 9P.3)
+While hunting for the DATABASE_URL, found `bin/restart-proxy.sh:19` contains the PostgreSQL password as a hardcoded credential, and line 22 contains `OPENSKY_CLIENT_SECRET`. Both files are tracked in git. This is an OMEN-002 violation that predates this session. Recommended cleanup: rotate both credentials (since they're in git history), move to a gitignored `cache-proxy/.env`, have the script `source` it. Should be done **before Phase 9P.3** (which adds `ADMIN_USER` / `ADMIN_PASS` to the env model) so the new vars don't perpetuate the bad pattern. Surfaced to user, awaiting decision on rotation timing.
+
+### Decisions
+1. **Schema mirrors bundled SQL exactly.** Initial schema was missing 12 columns including `merchant_tier` and `ad_priority` (foundation fields for the future advertising business). Caught the gap during data inspection, dropped the empty table, expanded the schema, re-ran the migration. Net result: PostgreSQL preserves 100% of bundled-SQL data fidelity. 42 columns total. The `merchant_tier`/`ad_priority` fields ship NULL/0 today and become editable in Phase 17 — schema is ready ahead of time.
+2. **Importer reads from bundled SQL, not JSON.** The bundled SQL is the most complete source — JSON files have raw POIs without narrations. better-sqlite3 (already a cache-proxy dep) loads extracted INSERTs into in-memory SQLite, Node reads rows, UPSERTs to PostgreSQL. No fragile regex parsing of SQL.
+3. **Multi-line INSERT extractor.** ~7 rows have literal newlines in `hours` (Satanic Temple Salem Art Gallery, etc). The extractor now accumulates lines until it sees `;` at end-of-line outside a string literal. Single-quote escape pairs (`''`) are properly skipped.
+4. **Stopped at the 9P.A.1+9P.A.2 milestone.** Could have pushed through to 9P.5 but the schema migration + canonical-source establishment is the load-bearing piece of Phase 9P.A. Better to commit + push that cleanly than to race through three more endpoints in the same session.
+5. **STATE.md was stale by 3 rows.** STATE.md said 817 narration points; bundled SQL has 814. Bundled SQL is the truth. Updated STATE.md.
+
+### Files Changed
+- `cache-proxy/salem-schema.sql` — added `salem_narration_points` table (42 cols, 7 indexes) between `salem_businesses` and `salem_historical_figures`
+- `cache-proxy/scripts/import-narration-points.js` — NEW (~290 lines, idempotent UPSERT importer with multi-line SQL parsing)
+- STATE.md — updated for 9P.A.1+9P.A.2 done, next priority is 9P.3
+- SESSION-LOG.md — this entry
+- `docs/session-logs/session-098-2026-04-08.md` — live conversation log
+
+### Verification
+- `\d salem_narration_points` shows all 42 columns and 7 indexes
+- `SELECT count(*) FROM salem_narration_points` = 814
+- Wave breakdown: W1=112, W2=85, W3=109, W4=508 (matches bundled SQL exactly)
+- 29 distinct categories, 10 distinct data_source values (preserves multi-source dedup provenance)
+- Spot-check: Salem Witch Museum, 1692 Before and After both present with expected attributes
+- 675 (83%) have descriptions, 324 (40%) have phones, 393 (48%) have websites
+- Importer is idempotent: re-run after TRUNCATE produced identical results
+
+### Build & Deploy
+- Schema migration: `psql -U witchdoctor -d locationmapapp -h localhost -f cache-proxy/salem-schema.sql` (idempotent, only added new table)
+- Importer: `DATABASE_URL=postgres://... node cache-proxy/scripts/import-narration-points.js` (run twice — first run to surface schema gaps, second run after fix to land cleanly)
+
+### Open Items for Session 99
+1. **OMEN-002 cleanup decision** — rotate DATABASE_URL password + OPENSKY_CLIENT_SECRET, move to gitignored `.env`, BEFORE adding ADMIN_USER/ADMIN_PASS in 9P.3. Or accept the existing exposure and only fix the new vars. User decision needed.
+2. **Phase 9P.3** — HTTP Basic Auth middleware in `cache-proxy/lib/admin-auth.js`, mount on `/admin/*`, lock down `/cache/clear`
+3. **Phase 9P.4** — Admin POI write endpoints (GET/PUT/DELETE/MOVE under `/admin/salem/pois/*`)
+4. **Phase 9P.4a** — Per-mode category visibility schema (two prefKeys per category, free-roam vs tour-mode defaults)
+5. **Phase 9P.5** — Duplicates detection endpoint
+6. **Carryover** — NOTE-L013 cleanup, 9T.9 walk simulator verification, OMEN-008 Privacy Policy drafting (deferred)
+
+---
+
 ## Session 97: 2026-04-08 — Phase 9Q + 9R Added; Hybrid Historic Tour Model Committed
 
 ### Summary

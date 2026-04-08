@@ -96,6 +96,81 @@ CREATE INDEX IF NOT EXISTS idx_salem_biz_data_source ON salem_businesses (data_s
 CREATE INDEX IF NOT EXISTS idx_salem_biz_stale ON salem_businesses (stale_after) WHERE stale_after IS NOT NULL;
 
 -- ════════════════════════════════════════════════════════════════════
+-- Salem Narration Points — ambient narration POIs (Phase 9P, Session 98)
+-- Imported from tools/salem-data/narration-priority-pois.json and the
+-- bundled narration_points table in salem-content/salem_content.sql.
+-- PostgreSQL becomes the canonical source of truth going forward; the
+-- JSON files retire to historical-artifact status after the migration.
+-- ════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS salem_narration_points (
+  id                 TEXT PRIMARY KEY,
+  name               TEXT NOT NULL,
+  lat                DOUBLE PRECISION NOT NULL,
+  lng                DOUBLE PRECISION NOT NULL,
+  address            TEXT,
+  -- Bundled SQL uses 'type' for category; we use 'category' to match PoiCategories.kt
+  -- and CMS conventions. Importer maps bundled.type → category.
+  category           TEXT NOT NULL,
+  subcategory        TEXT,
+  -- Narration content
+  short_narration    TEXT,
+  long_narration     TEXT,
+  description        TEXT,
+  -- Multipass POI engagement (NOT historical curriculum — see Phase 9R for that).
+  -- Pass1 = first-visit teaser, Pass2 = deeper dive, Pass3 = primary-sources flavor.
+  -- Not in bundled SQL today; populated later by a separate pipeline.
+  pass1_narration    TEXT,
+  pass2_narration    TEXT,
+  pass3_narration    TEXT,
+  -- Geofence + tour metadata
+  geofence_radius_m  INTEGER NOT NULL DEFAULT 40,
+  geofence_shape     TEXT NOT NULL DEFAULT 'circle',  -- 'circle' | 'corridor'
+  corridor_points    TEXT,                              -- serialized polyline for corridor shape
+  priority           INTEGER NOT NULL DEFAULT 3,
+  wave               INTEGER,
+  -- Contact metadata
+  phone              TEXT,
+  website            TEXT,
+  hours              TEXT,
+  -- Media assets (default — merchant overrides below take precedence at runtime)
+  image_asset        TEXT,
+  voice_clip_asset   TEXT,
+  -- Cross-references to historical content (populated by Phase 9Q building→POI bridge backfill)
+  related_figure_ids JSONB DEFAULT '[]',
+  related_fact_ids   JSONB DEFAULT '[]',
+  related_source_ids JSONB DEFAULT '[]',
+  -- Action button JSON config (Visit / Directions / More Info / etc.)
+  action_buttons     JSONB DEFAULT '[]',
+  -- Merchant advertising fields (foundation for Phase 17; populated/edited later)
+  merchant_tier      INTEGER NOT NULL DEFAULT 0,       -- 0=none, 1=basic, 2=premium, 3=featured
+  ad_priority        INTEGER NOT NULL DEFAULT 0,       -- queue priority boost for paying merchants
+  custom_icon_asset  TEXT,                              -- merchant-supplied icon override
+  custom_voice_asset TEXT,                              -- merchant-supplied voice clip override
+  custom_description TEXT,                              -- merchant-supplied description override
+  -- Source metadata (where this POI came from)
+  source_id          TEXT,
+  source_categories  JSONB DEFAULT '[]',
+  tags               JSONB DEFAULT '[]',
+  -- Provenance & Staleness (matches existing salem_* table pattern)
+  data_source        TEXT NOT NULL DEFAULT 'overpass_import',
+  confidence         REAL NOT NULL DEFAULT 0.8,
+  verified_date      TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  stale_after        TIMESTAMPTZ,
+  deleted_at         TIMESTAMPTZ                        -- soft delete (NULL = active)
+);
+
+CREATE INDEX IF NOT EXISTS idx_salem_narration_category ON salem_narration_points (category);
+CREATE INDEX IF NOT EXISTS idx_salem_narration_lat_lng ON salem_narration_points (lat, lng);
+CREATE INDEX IF NOT EXISTS idx_salem_narration_data_source ON salem_narration_points (data_source);
+CREATE INDEX IF NOT EXISTS idx_salem_narration_wave ON salem_narration_points (wave) WHERE wave IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_narration_active ON salem_narration_points (id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_narration_stale ON salem_narration_points (stale_after) WHERE stale_after IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_narration_merchant_tier ON salem_narration_points (merchant_tier) WHERE merchant_tier > 0;
+
+-- ════════════════════════════════════════════════════════════════════
 -- Historical Figures
 -- ════════════════════════════════════════════════════════════════════
 
