@@ -1,9 +1,18 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-08 Session 96 (POI admin tool planning, scope + 4 architectural decisions confirmed, Phase 9P added to master plan)
+## Last Updated: 2026-04-08 Session 97 (Phase 9P expanded with tour-mode hooks; Phase 9Q + 9R added for Salem domain bridge and historic tour mode; hybrid tour model committed)
 
-## TOP PRIORITY — Next Session
-**Phase 9P — POI Admin Tool (Developer Infrastructure).** Start with Phase 9P.A (migration & backend). Step 9P.1 = add `salem_narration_points` table to PostgreSQL. Step 9P.2 = write the one-shot importer that brings the ~814 narration points out of the bundled SQL into PostgreSQL. Full plan and all 14 steps in `WickedSalemWitchCityTour_MASTER_PLAN.md` Phase 9P. **4 architectural decisions locked** (Session 96 dialog): PostgreSQL is canonical, HTTP Basic Auth, hand-port categories to TypeScript, no live OTA sync. **Three new web deps to be added at Phase 9P.B:** react-arborist, react-hook-form, @headlessui/react.
+## TOP PRIORITY — Next Session (Session 98)
+**Phase 9P.1 — Add `salem_narration_points` table to PostgreSQL.** First code work of Phase 9P.A (Migration & Backend Foundation). Then 9P.2 — write the one-shot importer that brings ~814 narration points out of bundled `salem_content.sql` into PostgreSQL. After 9P.A lands, the admin tool work in 9P.B (~3-4 sessions) ships the operator UI for fixing position errors and overlapping icons.
+
+**Three-phase expanded vision (Session 97 planning):**
+- **Phase 9P** — POI Admin Tool. ~4-5 sessions. Operator-facing CMS for POI metadata. Two new steps added in S97: 9P.4a (per-mode category visibility schema) and 9P.10a (read-only "Linked Historical Content" tab in edit dialog).
+- **Phase 9Q** — Salem Domain Content Bridge. ~2-3 sessions. Builds the `building_id → poi_id` translation layer that Salem JSON requires (Salem uses `building_id`, LocationMapApp uses POI; the bridge lives on the LocationMapApp side). Imports 425 buildings + the new 202-article newspaper corpus (Salem session 044, ~13.5 hours TTS-ready content via `tts_full_text` field). Backfills historical FKs by graph traversal: `building_id → POI` populates `salem_historical_figures.primary_poi_id`, `salem_historical_facts.poi_id`, `salem_timeline_events.poi_id`, `salem_primary_sources.poi_id` (all currently NULL).
+- **Phase 9R** — Historic Tour Mode (App-Side). ~4-6 sessions. Opt-in tour mode that suppresses ambient POI narration, plays curated 1692 historical content as user walks. **Hybrid model:** user picks a chapter, chapter is a curated route through 4-8 POIs in chronological story order, content fires by GPS proximity but in guaranteed-narrative order. 7 chapters drafted: Strange Behavior in the Parris Household → First Accusations → Examinations → Court of Oyer and Terminer → Bridget Bishop & First Execution → Summer of Death → Aftermath. Newspaper articles play as long-form readings (~4 min each, one per chapter). Per-mode category visibility (free-roam keeps current toggles, historic tour gets restrictive defaults).
+
+**Total runway for full vision:** 9-12 sessions across 9P + 9Q + 9R. Salem 400+ launch deadline is September 1, 2026 — ship 9P first to get the operator-facing tool in hand, assess 9Q+9R against runway after.
+
+**Cross-project dependency (Salem):** Phase 9Q consumes the Salem Oracle newspaper corpus (NEW in Salem session 044). Schema at `~/Development/Salem/data/json/newspapers/README.md`. Each article has `events_referenced` JSONB field — the load-bearing join key for the bridge chain `newspaper → event → building → POI`.
 
 **Deferred (not abandoned):** OMEN-008 Privacy Policy drafting (NOTE-L014). Still on the books, still blocking RadioIntelligence Salem ingest, but no longer top of stack. Can be drafted asynchronously (it's writing, not coding) between admin-tool sessions if appetite allows.
 

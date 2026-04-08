@@ -29,7 +29,9 @@
 13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation)
 14. [Phase 9T — Salem Walking Tour Restructure](#phase-9t--salem-walking-tour-restructure)
 15. [Phase 9P — POI Admin Tool (Developer Infrastructure)](#phase-9p--poi-admin-tool-developer-infrastructure) **← PRIORITY**
-16. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
+16. [Phase 9Q — Salem Domain Content Bridge](#phase-9q--salem-domain-content-bridge)
+17. [Phase 9R — Historic Tour Mode (App-Side)](#phase-9r--historic-tour-mode-app-side)
+18. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
 16. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
 17. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
 
@@ -1179,6 +1181,15 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [ ] Validation: lat in [-90, 90], lng in [-180, 180], required fields present, category valid against taxonomy
 - [ ] Smoke test each endpoint with curl
 
+#### Step 9P.4a: Per-mode category visibility schema (added Session 97)
+- [ ] Each POI category needs **two** visibility flags going forward: free-roam mode (current behavior) and historic tour mode (Phase 9R)
+- [ ] Two-prefKey scheme: `poi_<category>_on_freeroam` and `poi_<category>_on_tour`
+- [ ] TypeScript config (`web/src/config/poiCategories.ts`, see Step 9P.6) carries both `freeRoamDefault` and `historicTourDefault` per category
+- [ ] Free-roam defaults = current `defaultEnabled` values from `PoiCategories.kt`
+- [ ] Historic tour defaults = restrictive: history/civic/witch_shop/witch_museum/historic_house/cemetery ON, food/lodging/shopping/services OFF
+- [ ] Migration plan: existing `poi_<category>_on` SharedPreferences keys become the freeroam values on first launch; tour-mode keys initialized to `historicTourDefault`
+- [ ] Document the migration in the Phase 9R rollout notes
+
 #### Step 9P.5: Duplicates detection endpoint
 - [ ] `GET /admin/salem/pois/duplicates?radius=15` — returns groups of POIs within N meters of each other
 - [ ] Implementation: Haversine distance in SQL (PostGIS not assumed)
@@ -1241,6 +1252,18 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [ ] Cancel → close dialog, no save
 - [ ] Form-dirty indicator: warn before close if unsaved changes
 
+#### Step 9P.10a: "Linked Historical Content" tab in edit dialog (added Session 97)
+- [ ] Add a read-only **Linked Historical Content** tab to the edit dialog (between Narration and Provenance)
+- [ ] Shows historical content tied to this POI via the building→POI bridge built in Phase 9Q:
+  - Historical figures whose `primary_poi_id` resolves to this POI
+  - Historical facts whose `poi_id` resolves to this POI
+  - Timeline events whose `poi_id` resolves to this POI
+  - Primary sources whose `poi_id` resolves to this POI
+  - Newspaper articles whose `events_referenced` contains an event linked to this POI (transitive 2-hop join)
+- [ ] **Until Phase 9Q is complete, this tab shows:** "No links yet — see Phase 9Q (Salem Domain Content Bridge)"
+- [ ] **Editing the linkages happens in Phase 9Q.6** (Building Map admin panel), NOT in this tab — this tab is read-only forever
+- [ ] Add a count badge to the tab label: "Linked Historical Content (5)" so the operator can see at a glance which POIs have historical depth
+
 #### Step 9P.11: Highlight duplicates toggle
 - [ ] Header button "Highlight Duplicates" in `AdminLayout.tsx`
 - [ ] On click → fetch `/admin/salem/pois/duplicates?radius=15`
@@ -1290,6 +1313,199 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - Multi-user roles — not needed for single-operator localnet
 - Full duplicate-merge UI with metadata reconciliation — Phase 9P.D
 - Categories table in PostgreSQL (vs. duplicated TypeScript) — deferred unification
+- Building → POI bridge construction — Phase 9Q
+- Historic Tour Mode app feature — Phase 9R
+
+---
+
+## Phase 9Q — Salem Domain Content Bridge
+
+**Goal:** Build the translation layer between Salem's historical-domain ontology (`building_id`, the Salem Village/Town historical buildings) and LocationMapApp's POI ontology (modern coordinates on a map). Once the building→POI bridge exists, every Salem historical entity (figures, facts, events, primary sources, newspapers via `events_referenced`) becomes queryable by POI through graph traversal — and the schema's currently-NULL FK columns finally get populated.
+
+**Target:** 2-3 sessions | **Status:** PLANNING | **Added:** Session 97 | **Priority:** queued behind Phase 9P
+
+### Rationale
+Investigation in Session 97 surfaced two critical facts about the LocationMapApp ↔ Salem cross-project boundary:
+
+1. **Salem's spatial unit is `building_id`, not POI.** Salem JSON entities reference historical 1692 buildings (Putnam house, Parris parsonage, Meeting House, etc.). They have no POI field and no knowledge of LocationMapApp's existence. The translation `building_id → poi_id` must live entirely on the LocationMapApp side, in `salem-content/`.
+2. **A new content stream landed in Salem session 044:** 202 daily Salem Oracle newspaper articles (Nov 1 1691 → May 9 1693, ~13.5 hours of TTS-ready content) with `tts_full_text` and `events_referenced` fields. The `events_referenced` field is the join key that lets newspapers reach POIs transitively: newspaper → event → building → POI.
+
+The historical FK columns in `salem_historical_figures.primary_poi_id`, `salem_historical_facts.poi_id`, `salem_timeline_events.poi_id`, and `salem_primary_sources.poi_id` are all currently NULL because the bridge has never been built. Phase 9Q builds it.
+
+### Cross-project dependency
+Salem session 044 (2026-04-07) added the newspaper corpus per OMEN-S004. Schema documented at `~/Development/Salem/data/json/newspapers/README.md`. **Each newspaper article carries `events_referenced` (list of anchor/minor event IDs)** — this is the load-bearing join field for the bridge. Salem maintains the corpus; LocationMapApp consumes it via a new Reader following the existing pattern (NpcReader, FactReader, EventReader, PrimarySourceReader, NEW NewspaperReader).
+
+### Step 9Q.1: salem_buildings table + BuildingReader
+- [ ] Add `CREATE TABLE salem_buildings` to `cache-proxy/salem-schema.sql` (mirror Salem JSON building schema: id, name, building_type, historical_period, address_modern, lat_modern, lng_modern, still_exists, notes, provenance fields)
+- [ ] Run schema migration against local PostgreSQL
+- [ ] Create `salem-content/src/main/kotlin/.../readers/BuildingReader.kt` following the existing reader pattern
+- [ ] Reader ingests all 425 building JSON files from `~/Development/Salem/data/json/buildings/`
+- [ ] Add `cache-proxy/scripts/import-buildings.js` for the SQL load (the JVM pipeline writes the SQL; the JS importer runs it against PostgreSQL)
+- [ ] Verify final row count (~425)
+
+### Step 9Q.2: salem_building_poi_map join table
+- [ ] Add `CREATE TABLE salem_building_poi_map` to `cache-proxy/salem-schema.sql`:
+  - `building_id TEXT REFERENCES salem_buildings(id)`
+  - `poi_kind TEXT NOT NULL` — `'tour_poi'` | `'business'` | `'narration'`
+  - `poi_id TEXT NOT NULL`
+  - `link_type TEXT NOT NULL` — `'exact'` | `'memorial'` | `'representative'` | `'nearby'`
+  - `confidence REAL DEFAULT 1.0`
+  - `notes TEXT`
+  - Provenance fields
+  - `PRIMARY KEY (building_id, poi_kind, poi_id)`
+- [ ] Many-to-many by design: a single building may map to multiple POIs (e.g., a destroyed building's two surviving foundations); a single POI may represent multiple historical buildings (e.g., a museum complex)
+- [ ] Indexes: `(building_id)`, `(poi_kind, poi_id)`, `(link_type)`
+
+### Step 9Q.3: Draft auto-mapping + manual curation
+- [ ] Write `cache-proxy/scripts/draft-building-poi-map.js`:
+  - For each building in `salem_buildings`, attempt name-match against `salem_tour_pois`, `salem_businesses`, and `salem_narration_points` (case-insensitive substring + trigram similarity)
+  - If a building has `lat_modern`/`lng_modern`, also try geo-proximity match (POIs within 50m)
+  - Output a draft CSV at `tools/salem-data/draft-building-poi-map.csv` with columns: building_id, building_name, suggested_poi_kind, suggested_poi_id, suggested_poi_name, distance_m, name_similarity, link_type_guess, confidence_guess
+  - **Does NOT write to PostgreSQL.** Operator reviews the CSV.
+- [ ] Operator manually curates the CSV (likely 2-4 hours of review for ~425 buildings, of which probably only 50-80 will have actual POI mappings)
+- [ ] Curated CSV → `cache-proxy/scripts/import-building-poi-map.js` writes to `salem_building_poi_map`
+- [ ] Buildings with no POI mapping get NO row in the bridge (NULL = unmapped, by absence)
+- [ ] Spot-check 10 mappings against the source data for fidelity
+
+### Step 9Q.4: salem_newspaper_articles table + NewspaperReader
+- [ ] Add `CREATE TABLE salem_newspaper_articles` to schema:
+  - `id TEXT PRIMARY KEY`, `publish_date DATE NOT NULL`, `headline TEXT NOT NULL`, `body TEXT`, `tts_full_text TEXT NOT NULL`
+  - `events_referenced JSONB DEFAULT '[]'` — list of anchor/minor event IDs
+  - `figures_referenced JSONB DEFAULT '[]'` — convenience denormalization for fast lookups
+  - `audio_seconds_estimate INTEGER` — for tour pacing
+  - Provenance fields
+  - Index: `(publish_date)`, GIN index on `events_referenced`
+- [ ] Create `salem-content/src/main/kotlin/.../readers/NewspaperReader.kt`
+- [ ] Ingest all 202 newspaper JSONs from `~/Development/Salem/data/json/newspapers/`
+- [ ] Verify final row count = 202, date range = Nov 1 1691 → May 9 1693
+
+### Step 9Q.5: Backfill historical FKs by graph traversal
+- [ ] Write `cache-proxy/scripts/populate-historical-fks.js`
+- [ ] For each row in `salem_historical_figures`:
+  - Read `building_id` from the figure's source JSON (re-ingest if needed)
+  - Look up `building_id` in `salem_building_poi_map`
+  - If a mapping with `link_type='exact'` or `link_type='representative'` exists, set `primary_poi_id` to that POI
+  - If multiple POIs match, pick the one with highest confidence; record alternates in a separate `salem_historical_figure_aliases` table (deferred to 9Q.6 if needed)
+- [ ] Same logic for `salem_historical_facts.poi_id`, `salem_timeline_events.poi_id`, `salem_primary_sources.poi_id`
+- [ ] Idempotent: re-runnable as the bridge grows
+- [ ] Verification: count NULLs before and after; expect 50-80% of historical entities to gain a POI link
+
+### Step 9Q.6: Building Map admin panel
+- [ ] Extend the Phase 9P admin tool with a new top-level view: **Building Map**
+- [ ] Two-pane layout: list of buildings on the left (with search + filter by mapped/unmapped status), Leaflet map on the right showing POIs
+- [ ] Click a building → highlights its currently-mapped POI(s) on the map (red rings) + shows building metadata in a side panel
+- [ ] To map a new POI: click the building, then click a POI on the map → modal: "Link [building name] to [POI name] as [exact / memorial / representative / nearby]?"
+- [ ] To unmap: click the existing mapping in the side panel, click Remove
+- [ ] After every save, the admin tool re-runs `populate-historical-fks.js` automatically (or at least flags it as stale)
+- [ ] Operator can iteratively grow the bridge over time without leaving the tool
+
+### Step 9Q.7: Verification
+- [ ] Pick 5 known historical events from the 1692 timeline (e.g., "examination of Tituba", "Bridget Bishop's execution")
+- [ ] Query: "what POIs are linked to this event?"
+- [ ] Manually verify the answers make geographic sense
+- [ ] Pick 3 newspaper articles, query: "what POIs are linked to this article via events_referenced?"
+- [ ] Verify the chain works
+- [ ] Pick 3 POIs known to have historical depth (e.g., Witch House, Old Burying Point, Salem Common), query: "what historical content is linked to this POI?"
+- [ ] Verify counts match expectations
+- [ ] Update Phase 9P.10a "Linked Historical Content" tab in the admin tool — should now show non-empty results
+- [ ] Git commit: "Phase 9Q: Salem domain content bridge — buildings, building→POI map, newspapers, historical FK backfill"
+
+### Out of scope for Phase 9Q (deferred)
+- Building→POI bridge UI for mass operations (bulk import from CSV is fine, mass UI editing is later)
+- Confidence-weighted FK selection (use highest-confidence mapping for v1; ambiguity resolution UI deferred)
+- `salem_historical_figure_aliases` table (only built if 9Q.5 reveals real ambiguity)
+- Machine learning for auto-suggesting building↔POI matches (manual curation is fine for ~425 buildings)
+
+---
+
+## Phase 9R — Historic Tour Mode (App-Side)
+
+**Goal:** Add an opt-in **Historic Tour Mode** to the Salem app that suppresses ambient POI narration, plays curated historical content (figures, facts, events, primary sources, newspaper articles) as the user walks, and uses tour-mode-specific category visibility settings. Implements the **hybrid model** (user picks a chapter; chapter is a curated route through 4-8 POIs in chronological order; content fires by GPS proximity but in guaranteed-narrative order because the route is curated).
+
+**Target:** 4-6 sessions | **Status:** PLANNING | **Added:** Session 97 | **Priority:** queued behind Phase 9Q
+
+### Rationale
+The current app has only one mode: **free-roam ambient narration**, where any POI within geofence range fires its narration. This is great for casual wandering but breaks storytelling — a user could hear about the executions before they hear about the accusations. The 1692 Witch Trials story is inherently chronological and demands narrative ordering.
+
+The hybrid tour model preserves walking agency while locking narrative coherence at the chapter level:
+- User picks a chapter (e.g., "The Accusations Begin", "The Trials", "The Executions")
+- Each chapter = a curated route through 4-8 POIs in chronological story order
+- As user walks the chapter route, content fires by GPS proximity but in guaranteed-narrative order because the route is curated
+- Newspaper articles play as long-form readings (~4 min each, one per chapter, not all 202)
+- Ambient narrations from non-tour POIs are fully suppressed
+- User can exit historic tour mode at any time and return to free-roam
+
+### Pre-requisites
+- Phase 9P complete (admin tool exists, narration_points in PostgreSQL)
+- Phase 9Q complete (building→POI bridge populated, historical FKs backfilled, newspaper table populated)
+- Per-mode category visibility schema in place (Step 9P.4a)
+
+### Step 9R.1: Tour mode state machine
+- [ ] Add `TourMode` enum to `TourViewModel` (or equivalent state holder): `FreeRoam` | `HistoricTour`
+- [ ] Default: `FreeRoam`. Persisted in SharedPreferences.
+- [ ] Formalize the existing implicit ambient suppression (currently `TourEngine.ambientModeEnabled` checked at line 314) into an explicit state-machine rule: ambient hints fire ONLY when `tourMode == FreeRoam` AND no active tour
+- [ ] When `tourMode == HistoricTour`, ambient is fully suppressed; only the historic tour content sequencer drives narration
+
+### Step 9R.2: Per-mode category visibility runtime
+- [ ] Implement the two-prefKey lookup designed in Step 9P.4a
+- [ ] `PoiCategories.isCategoryVisible(category, mode)` returns the appropriate boolean
+- [ ] Settings UI: existing free-roam toggles work as before; new tour-mode toggles appear only when in tour mode (or under a "Historic Tour Settings" expandable section)
+- [ ] First-launch migration: existing `poi_<category>_on` SharedPref keys become the freeroam values; tour-mode keys initialized to the restrictive defaults from `PoiCategories.kt`
+
+### Step 9R.3: Historic tour chapter definitions
+- [ ] Define 5-7 chapters covering the 1692 timeline:
+  - Chapter 1: "Strange Behavior in the Parris Household" (Jan-Feb 1692)
+  - Chapter 2: "The First Accusations" (late Feb-March 1692)
+  - Chapter 3: "Examinations and Spectral Evidence" (March-April 1692)
+  - Chapter 4: "The Court of Oyer and Terminer" (May-June 1692)
+  - Chapter 5: "Bridget Bishop and the First Execution" (June 1692)
+  - Chapter 6: "Summer of Death" (July-September 1692)
+  - Chapter 7: "Aftermath and Reversal" (October 1692-1693)
+- [ ] For each chapter: 4-8 POIs in walking order, 1 newspaper article anchor, list of associated figures/events/primary sources
+- [ ] Store as JSON config in `app-salem/src/main/assets/historic-tour-chapters.json` (sourced from PostgreSQL via the publish loop)
+- [ ] Each chapter has an estimated walk time (15-30 min)
+
+### Step 9R.4: Historic tour content sequencer
+- [ ] New class `HistoricTourSequencer` (in `core` or `app-salem`)
+- [ ] Given an active chapter, current GPS, and walked POIs, decide what to play next
+- [ ] Sequence: chapter intro narration → newspaper article (~4 min) → primary sources for the anchor event → historical figures' brief intros → next POI cue
+- [ ] Pacing: between content items, brief silence (~5s) so user can absorb
+- [ ] Skip controls: skip current item, skip to next POI, pause chapter
+- [ ] When user reaches the chapter's last POI: chapter outro narration → "next chapter" prompt
+
+### Step 9R.5: NarrationPlayer support for newspaper TTS
+- [ ] Extend `NarrationPlayer` to handle long-form newspaper articles (`tts_full_text`, ~4 min each)
+- [ ] Pause/resume at sentence boundaries
+- [ ] Display the article headline + date as the narration plays
+- [ ] Provide a transcript view (scrollable text) for users who prefer reading
+- [ ] Accessibility: TTS speed control, font size control for transcript
+
+### Step 9R.6: Historic tour mode UI
+- [ ] Splash screen: tour mode toggle ("Free Roam" / "Historic Tour")
+- [ ] Tour mode banner: persistent header indicator when in `HistoricTour` mode ("Historic Tour: Chapter 3 — The Examinations")
+- [ ] Chapter picker: scrollable list of chapters, each with thumbnail + estimated time + "Start Chapter" button
+- [ ] In-tour HUD: current chapter, current content item, queue depth, "Pause" + "Skip" + "Exit Tour" buttons
+- [ ] Map visual change: only chapter POIs visible (others greyed/hidden), chapter route polyline drawn on map
+- [ ] Exit tour confirmation modal ("Exit chapter? Your progress will be saved.")
+
+### Step 9R.7: Walk simulator end-to-end test
+- [ ] Run walk simulator in `HistoricTour` mode through a complete chapter (e.g., Chapter 5)
+- [ ] Verify content sequences correctly: chapter intro → newspaper → primary sources → figures → next POI cue
+- [ ] Verify ambient suppression: non-chapter POIs do NOT fire narration
+- [ ] Verify mode toggle works: switching to free-roam mid-chapter pauses chapter and resumes ambient
+- [ ] Verify per-mode category visibility: free-roam categories restored on mode switch, tour categories restored on switch back
+- [ ] Verify map visual change works correctly
+- [ ] Verify TTS handles long-form newspaper articles without choking
+- [ ] Run all 7 chapters end-to-end with walk simulator over multiple sessions
+- [ ] Git commit: "Phase 9R: Historic Tour Mode — chapter sequencer, newspaper TTS, per-mode visibility, hybrid model"
+
+### Out of scope for Phase 9R (deferred)
+- Pre-rendered audio for newspapers (use on-device TTS for v1; pre-rendered audio is a v1.1 quality upgrade — ~400MB at 64kbps OGG, too big for the v1 APK)
+- Custom voice characters for historic tour (Bark TTS witch/warlock voices) — v1 uses standard Android TTS; character voices are Phase 18
+- Branching narratives based on user choices — not in scope, the 1692 timeline is linear
+- Multiplayer / shared chapter progress with friends — not in scope
+- Historic tour mode for non-Salem deployments — Salem-specific feature
+- Translation to other languages — Phase 11 ASO work covers internationalization
 
 ---
 
