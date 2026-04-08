@@ -27,8 +27,9 @@
 ### UX Transformation (Phases 9A-9D — CODE, prioritized before Phase 10)
 12. [Phase 9A — Splash Screen & Satellite Map Entry](#phase-9a--splash-screen--satellite-map-entry)
 13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation)
-14. [Phase 9T — Salem Walking Tour Restructure](#phase-9t--salem-walking-tour-restructure) **← PRIORITY**
-15. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
+14. [Phase 9T — Salem Walking Tour Restructure](#phase-9t--salem-walking-tour-restructure)
+15. [Phase 9P — POI Admin Tool (Developer Infrastructure)](#phase-9p--poi-admin-tool-developer-infrastructure) **← PRIORITY**
+16. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
 16. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
 17. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
 
@@ -994,7 +995,7 @@ Phase 9B (tier gating) is premature. The tour experience IS the product. Geofenc
 
 **Goal:** Transform the tour from a linear stop-to-stop experience into an ambient content layer over downtown Salem. The city narrates itself as you walk — every historical POI, statue, street, civic building, and landmark has narration. Walking routes are suggestions, not requirements. Content triggers by proximity regardless of route.
 
-**Target:** 5-8 sessions | **Status:** NOT STARTED | **Added:** Session 85 | **Priority:** HIGHEST
+**Target:** 5-8 sessions | **Status:** IN PROGRESS (9T.9 verification pending) | **Added:** Session 85 | **Priority:** displaced by Phase 9P (Session 96)
 
 ### Rationale
 The linear tour (stop 1 → 2 → 3) forces rigid routing. Tourists don't walk that way — they wander. The restructured "Salem Walking Tour" makes the entire downtown core a narrated experience. Walk anywhere within the bounded area and the app delivers rich historical content. This is the core product differentiator vs competitors (Action Tour Guide, Salem On Your Own). The narration dialog UI (image + text + buttons) also becomes the foundation for future merchant advertising.
@@ -1108,6 +1109,187 @@ This is approximately 0.5 square miles of the densest historical area.
 - [ ] User fatigue controls work: quiet mode, pace control, skip/pause/clear
 - [ ] All content plays offline (TTS, images from bundled assets, text from Room DB)
 - [ ] Git commit: "Phase 9T: Salem Walking Tour restructure — ambient content layer, narration dialog, content queue, 100+ narration points"
+
+---
+
+## Phase 9P — POI Admin Tool (Developer Infrastructure)
+
+**Goal:** A web-based admin tool that runs on the operator's development machine for managing all Salem POIs — curated tour stops, businesses, and narration points. Tree on the left (category → subcategory → POI), Leaflet map in the center showing all POIs, click-to-edit dialog with tabbed attribute groups, drag-to-reposition. Foundation for fixing position errors, deduplicating overlapping icons, and (eventually) managing merchant-paid advertisements.
+
+**Target:** 4-5 sessions | **Status:** PLANNING COMPLETE (Session 96) | **Added:** Session 96 | **Priority:** HIGHEST
+
+### Rationale
+Two real pain points motivate this work: (a) POI position errors visible on the map, (b) overlapping icons in dense areas, both inherited from the Overpass scrape feeding the 814 narration points. Editing POI data via SQL or by re-running Python pipeline scripts is unsustainable as the dataset grows. A proper admin tool also lays the groundwork for the merchant advertising business model (Phase 17) — when paying merchants need their listings updated, the tool already exists. Scoped narrowly for v1: operator-only, localnet, no merchant features, no audit log, no photo uploads, no live OTA sync.
+
+### Architectural Decisions (Session 96 dialog)
+1. **Data foundation:** Migrate `narration_points` from bundled SQL into a new PostgreSQL `salem_narration_points` table. PostgreSQL becomes the single source of truth for all editable Salem POIs going forward. JSON files in `tools/salem-data/` retire to historical artifact status.
+2. **Auth:** HTTP Basic Auth via env vars (`ADMIN_USER` / `ADMIN_PASS`). Browser handles native prompt. Localnet single-admin model (operator + wife).
+3. **Categories:** Hand-port `PoiCategories.kt` (520 lines, 22 categories, 153+ subtypes) into TypeScript config in `web/src/config/poiCategories.ts`. Cross-reference comments in both files. Unification deferred.
+4. **Sync:** No live OTA. Edit → "Publish" rebuilds `salem-content/salem_content.sql` from PostgreSQL → next APK build ships fresh data.
+
+### Stack additions (3 new dependencies)
+- `react-arborist` — virtualized tree for ~860 POIs
+- `react-hook-form` — POI edit form state management
+- `@headlessui/react` — Tabs component for the edit dialog
+- (`leaflet.markercluster` may already be in the web app — verify in Phase 9P.9)
+
+---
+
+### Phase 9P.A — Migration & Backend Foundation
+
+#### Step 9P.1: Add `salem_narration_points` table to PostgreSQL
+- [ ] Add `CREATE TABLE salem_narration_points` to `cache-proxy/salem-schema.sql`
+- [ ] Schema mirrors `salem_businesses` provenance pattern + narration-specific fields:
+  - `id TEXT PRIMARY KEY`, `name`, `lat`, `lng`, `address`, `category`, `subcategory`
+  - `short_narration`, `long_narration`, `pass1_narration`, `pass2_narration`, `pass3_narration` (multipass)
+  - `geofence_radius_m INTEGER DEFAULT 40`, `priority INTEGER`, `wave INTEGER`
+  - `tags JSONB`, `image_asset TEXT`
+  - Provenance: `data_source`, `confidence`, `verified_date`, `created_at`, `updated_at`, `stale_after`, `deleted_at` (soft delete)
+- [ ] Indexes: `(category)`, `(lat, lng)`, `(data_source)`, `(deleted_at) WHERE deleted_at IS NULL`
+- [ ] Run schema migration against local PostgreSQL: `psql -U postgres -d locationmapapp -f cache-proxy/salem-schema.sql`
+- [ ] Verify table exists and is empty
+
+#### Step 9P.2: Write narration points importer (one-shot)
+- [ ] Create `cache-proxy/scripts/import-narration-points.js`
+- [ ] Read `tools/salem-data/narration-priority-pois.json` (or `merged-salem-pois.json` if richer)
+- [ ] For each POI: derive ID via the same slug rule used in `generate_narration_sql.py`, set `data_source` based on origin (`destination_salem` / `haunted_happenings` / `openstreetmap`), populate provenance fields with `confidence` matching original source quality
+- [ ] If multipass narrations exist in `salem-content/salem_content.sql`, parse them out and populate the multipass columns (otherwise leave NULL — they get backfilled later)
+- [ ] INSERT into `salem_narration_points` in batches of 100, transactional
+- [ ] Verify final row count matches the bundled SQL count (~814)
+- [ ] Spot-check 10 random rows against the source JSON for fidelity
+
+#### Step 9P.3: HTTP Basic Auth middleware
+- [ ] Create `cache-proxy/lib/admin-auth.js` exporting `requireBasicAuth(req, res, next)`
+- [ ] Reads `ADMIN_USER` and `ADMIN_PASS` from env, returns 401 + `WWW-Authenticate: Basic` on missing/wrong credentials
+- [ ] Add `ADMIN_USER` and `ADMIN_PASS` to `.env.example` with placeholder values (per OMEN-002, no real credentials in tracked files)
+- [ ] Mount as global middleware on `/admin/*` in `cache-proxy/server.js`
+- [ ] **Lock down `/cache/clear`** under the same middleware (latent unauthenticated-admin-route bug found in Session 96 survey)
+- [ ] Smoke test: `curl /admin/ping` → 401, `curl -u user:pass /admin/ping` → 200
+
+#### Step 9P.4: Admin POI write endpoints
+- [ ] Create `cache-proxy/lib/admin-pois.js`
+- [ ] Endpoints (all under `/admin/salem/pois/*`, all auth-gated):
+  - `GET /admin/salem/pois?kind=tour|business|narration&category=<>&bbox=<>` — list with filters
+  - `GET /admin/salem/pois/:kind/:id` — single POI with all fields
+  - `PUT /admin/salem/pois/:kind/:id` — full update (returns updated row)
+  - `POST /admin/salem/pois/:kind/:id/move` — lat/lng-only update (returns old + new coords)
+  - `DELETE /admin/salem/pois/:kind/:id` — soft delete (sets `deleted_at`)
+  - `POST /admin/salem/pois/:kind/:id/restore` — undo soft delete
+- [ ] All write endpoints update `updated_at` automatically
+- [ ] Validation: lat in [-90, 90], lng in [-180, 180], required fields present, category valid against taxonomy
+- [ ] Smoke test each endpoint with curl
+
+#### Step 9P.5: Duplicates detection endpoint
+- [ ] `GET /admin/salem/pois/duplicates?radius=15` — returns groups of POIs within N meters of each other
+- [ ] Implementation: Haversine distance in SQL (PostGIS not assumed)
+- [ ] Response shape: `[{ "centroid": [lat, lng], "members": [{ kind, id, name, lat, lng, distance_m }] }]`
+- [ ] Configurable radius (default 15m, max 100m)
+- [ ] Excludes soft-deleted rows
+- [ ] Verify against known overlapping POIs in the dataset
+
+---
+
+### Phase 9P.B — Admin UI
+
+#### Step 9P.6: Hand-port category taxonomy to TypeScript
+- [ ] Create `web/src/config/poiCategories.ts`
+- [ ] Port all 22 categories + 153+ subtypes from `app-salem/src/main/java/.../ui/menu/PoiCategories.kt`
+- [ ] Same shape: id, label, color, default-visible flag, subtypes array, OSM tag mappings
+- [ ] Add cross-reference comment at top of both files: "// Mirror of poiCategories.ts — see Phase 9P.6"
+- [ ] Add a TODO at the top of both files for future unification (Phase 9C or later)
+
+#### Step 9P.7: Admin route + Basic Auth gating in web app
+- [ ] Add `/admin` route to `web/src/App.tsx` (or wherever routing lives — verify Vite routing setup)
+- [ ] Browser handles Basic Auth prompt automatically when admin endpoints return 401
+- [ ] Create `web/src/admin/AdminLayout.tsx` shell with header, left tree pane, center map pane
+- [ ] Header buttons: [Highlight Duplicates] [Publish] [Logout]
+- [ ] Logout works via `XMLHttpRequest` 401 trick (or fresh-tab workaround — document choice)
+
+#### Step 9P.8: POI tree (react-arborist)
+- [ ] `npm install react-arborist` in `web/`
+- [ ] Create `web/src/admin/PoiTree.tsx`
+- [ ] Fetch all POIs once via `/admin/salem/pois` (no bbox filter — full dataset)
+- [ ] Group by category → subcategory → POI rows
+- [ ] Show count per category and per subcategory in the tree label
+- [ ] Click POI row → emits select event (triggers map pan/zoom + edit dialog)
+- [ ] Search bar at the top of the tree filters by name (client-side, ~860 rows is fine)
+- [ ] Soft-deleted POIs hidden by default, toggle to show
+
+#### Step 9P.9: Admin map (Leaflet + clustering + draggable markers)
+- [ ] Create `web/src/admin/AdminMap.tsx`
+- [ ] Reuse existing Leaflet setup from `web/src/components/MapView.tsx` where possible
+- [ ] Verify `leaflet.markercluster` is already a dep; install if not
+- [ ] Render all POIs as clustered markers, color by category (matches PoiCategories config)
+- [ ] Click marker → opens edit dialog
+- [ ] Marker drag enabled (`marker.dragging.enable()`)
+- [ ] On `dragend` → modal: "Move 'X' from (old) to (new)? [Cancel] [Save]"
+- [ ] Save → POST to `/admin/salem/pois/:kind/:id/move` → marker stays at new position on success, snaps back on failure
+- [ ] Tree selection → map pans/zooms to selected POI
+
+#### Step 9P.10: Edit dialog with tabbed attribute groups
+- [ ] `npm install react-hook-form @headlessui/react` in `web/`
+- [ ] Create `web/src/admin/PoiEditDialog.tsx`
+- [ ] Headlessui Tabs across the top: **General** · **Location** · **Hours & Contact** · **Narration** · **Provenance** · **Danger Zone**
+- [ ] **General tab:** name, address, category dropdown (from poiCategories.ts), subcategory dropdown (filtered by category), tags (JSONB array editor)
+- [ ] **Location tab:** lat/lng inputs (manual override), geofence_radius_m, priority
+- [ ] **Hours & Contact tab:** hours (text), phone, website
+- [ ] **Narration tab:** short_narration, long_narration, multipass passes (textarea each, char counts)
+- [ ] **Provenance tab:** data_source (dropdown), confidence (0-1 slider), verified_date (date picker), stale_after, created_at/updated_at (read-only)
+- [ ] **Danger Zone tab:** soft delete button with confirm modal
+- [ ] Save → PUT to `/admin/salem/pois/:kind/:id`
+- [ ] Optimistic update: update tree + map immediately, revert on failure
+- [ ] Cancel → close dialog, no save
+- [ ] Form-dirty indicator: warn before close if unsaved changes
+
+#### Step 9P.11: Highlight duplicates toggle
+- [ ] Header button "Highlight Duplicates" in `AdminLayout.tsx`
+- [ ] On click → fetch `/admin/salem/pois/duplicates?radius=15`
+- [ ] Draw red rings around POIs that have ≥1 neighbor within 15m
+- [ ] Click red ring → opens a side panel listing the duplicate group with Compare / Pick Winner buttons (basic UX, full merge UI deferred to v1.5)
+- [ ] Toggle off → rings clear
+
+---
+
+### Phase 9P.C — Publish Loop
+
+#### Step 9P.12: Rebuild salem_content.sql from PostgreSQL
+- [ ] Create `cache-proxy/scripts/rebuild-salem-content-sql.js`
+- [ ] Reads from PostgreSQL: `salem_tour_pois`, `salem_businesses`, `salem_narration_points`, all related tables
+- [ ] Generates `salem-content/salem_content.sql` matching the existing format that the salem-content Gradle module expects
+- [ ] Excludes soft-deleted rows (where `deleted_at IS NOT NULL`)
+- [ ] Idempotent: running twice produces identical output
+- [ ] Verify Gradle build of `salem-content` module still succeeds with regenerated SQL
+- [ ] Verify Room migration is not triggered (schema unchanged from app's perspective)
+
+#### Step 9P.13: Publish button in admin UI
+- [ ] Header button "Publish" in `AdminLayout.tsx`
+- [ ] On click → POST `/admin/publish` → triggers `rebuild-salem-content-sql.js` server-side
+- [ ] Show progress + result (success/fail, row counts, generated file size)
+- [ ] Display info banner explaining the loop: "Publish regenerates salem_content.sql. Next APK build will ship the updated data."
+
+#### Step 9P.14: End-to-end verification
+- [ ] Run admin tool, edit a POI's name
+- [ ] Move a marker on the map, save the new position
+- [ ] Soft delete a duplicate POI
+- [ ] Click Publish, verify `salem-content/salem_content.sql` is updated
+- [ ] Run `./gradlew :app-salem:assembleDebug`
+- [ ] Install the APK on the test tablet (HNY0CY0W)
+- [ ] Verify the edited POI appears with the new name
+- [ ] Verify the moved POI appears at the new location
+- [ ] Verify the soft-deleted POI is gone from the app
+- [ ] Walk simulator end-to-end through the bounded area — narration still works
+- [ ] Git commit: "Phase 9P: POI admin tool — narration_points migration + admin UI + publish loop"
+
+---
+
+### Out of scope for v1 (deferred)
+- Photo upload (GeoInbox integration) — Phase 9P.D or later
+- Merchant accounts and self-service editing — Phase 17
+- Audit log and change-tracking — Phase 17 (when payments enter the picture)
+- Live OTA sync (Server → Android) — Phase 10 or later
+- Multi-user roles — not needed for single-operator localnet
+- Full duplicate-merge UI with metadata reconciliation — Phase 9P.D
+- Categories table in PostgreSQL (vs. duplicated TypeScript) — deferred unification
 
 ---
 

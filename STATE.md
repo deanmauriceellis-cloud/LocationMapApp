@@ -1,9 +1,11 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-07 Session 94 (RadioIntelligence collector role intake — research session, no code)
+## Last Updated: 2026-04-08 Session 96 (POI admin tool planning, scope + 4 architectural decisions confirmed, Phase 9P added to master plan)
 
 ## TOP PRIORITY — Next Session
-**Draft layered Privacy Policy text for OMEN-008 Salem stream** (NOTE-L014, BLOCKING). All three drafting constraints captured in memory: `project_next_session_priority.md`. Full architectural picture in `project_radiointelligence_collector_role.md`. No Salem RF ingest code may be added until Privacy Policy is drafted and OMEN-reviewed. Coordinate wire format with WWWatcher Phase 20 (sessions 069/073 in parallel shell).
+**Phase 9P — POI Admin Tool (Developer Infrastructure).** Start with Phase 9P.A (migration & backend). Step 9P.1 = add `salem_narration_points` table to PostgreSQL. Step 9P.2 = write the one-shot importer that brings the ~814 narration points out of the bundled SQL into PostgreSQL. Full plan and all 14 steps in `WickedSalemWitchCityTour_MASTER_PLAN.md` Phase 9P. **4 architectural decisions locked** (Session 96 dialog): PostgreSQL is canonical, HTTP Basic Auth, hand-port categories to TypeScript, no live OTA sync. **Three new web deps to be added at Phase 9P.B:** react-arborist, react-hook-form, @headlessui/react.
+
+**Deferred (not abandoned):** OMEN-008 Privacy Policy drafting (NOTE-L014). Still on the books, still blocking RadioIntelligence Salem ingest, but no longer top of stack. Can be drafted asynchronously (it's writing, not coding) between admin-tool sessions if appetite allows.
 
 ## Current Direction
 - **Multi-module platform refactor** — `:core`, `:app`, `:app-salem`, `:salem-content`
