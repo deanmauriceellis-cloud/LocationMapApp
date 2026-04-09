@@ -31,7 +31,7 @@ export const BUSINESS_FIELDS = [
 export const NARRATION_FIELDS = [
   'name', 'lat', 'lng', 'address', 'category', 'subcategory',
   'short_narration', 'long_narration', 'description',
-  'pass1_narration', 'pass2_narration', 'pass3_narration',
+  'narration_pass_2', 'narration_pass_3',
   'geofence_radius_m', 'geofence_shape', 'corridor_points',
   'priority', 'wave', 'phone', 'website', 'hours',
   'image_asset', 'voice_clip_asset',
