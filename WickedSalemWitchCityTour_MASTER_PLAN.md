@@ -1260,15 +1260,18 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [x] Logout uses the **XMLHttpRequest 401 trick**: synchronous XHR to `/api/admin/salem/pois` with deliberately wrong `logout:wrongpassword` credentials in the open() call. The browser caches the new (wrong) credentials for the origin, replacing the good ones; the next admin API call therefore re-prompts. After the XHR, `window.location.reload()` forces a fresh render so the prompt appears immediately. Wrapped in try/catch because some browsers throw on deprecated sync XHR. Documented inline.
 - [x] `npx tsc --noEmit` in `web/` passes clean
 
-#### Step 9P.8: POI tree (react-arborist)
-- [ ] `npm install react-arborist` in `web/`
-- [ ] Create `web/src/admin/PoiTree.tsx`
-- [ ] Fetch all POIs once via `/admin/salem/pois` (no bbox filter — full dataset)
-- [ ] Group by category → subcategory → POI rows
-- [ ] Show count per category and per subcategory in the tree label
-- [ ] Click POI row → emits select event (triggers map pan/zoom + edit dialog)
-- [ ] Search bar at the top of the tree filters by name (client-side, ~860 rows is fine)
-- [ ] Soft-deleted POIs hidden by default, toggle to show
+#### Step 9P.8: POI tree (react-arborist) — DONE (Session 103, 2026-04-08)
+- [x] `npm install react-arborist` in `web/` — landed at v3.4.3 (16 packages added). Pre-existing audit warnings on `vite`/`picomatch`/`socket.io-parser` are unrelated to react-arborist; deferred to a separate cleanup pass.
+- [x] Create `web/src/admin/PoiTree.tsx` — ~330 lines, fully commented including data-shape recon, auth-flow rationale, and the 3-vs-4-level tree decision below.
+- [x] Fetch all POIs via `/api/admin/salem/pois?kind=...&include_deleted=true&limit=2000`. The endpoint requires a `kind` query param so the tree fires **three** GETs: `tour` (45 rows) sequentially first, then `business` (861) and `narration` (814) in parallel. The sequential first call ensures the browser's Basic Auth dialog fires exactly once; subsequent fetches reuse cached credentials. Total: 1,720 active POIs (matches PG canonical count).
+- [x] **Three-level grouping (kind → category → POI rows), not four.** The original spec said "category → subcategory → POI rows" but DB recon at the start of S103 showed: tour uses 7 distinct `category` values, business uses 19 distinct `business_type` values, narration uses 29 distinct `category` values — **and `salem_narration_points.subcategory` is NULL for all 814 rows.** `salem_tour_pois.subcategories` is a JSONB list of refinements (not a single column suitable for grouping). The fourth level isn't physically present in the data, so the tree collapses to three. When narration's subcategory column gets backfilled (or tour's JSONB list gets promoted), add the level back into `buildTree()` without restructuring the file.
+- [x] Counts per kind and per category shown in the tree label (right-aligned, tabular-nums); also a totals strip in the toolbar (`1,720 POIs (tour 45 · biz 861 · narration 814)`) that reflects the show-deleted toggle.
+- [x] Click POI row → emits `onSelect({kind, poi})` event. AdminLayout currently logs the selection to console; map pan/zoom (9P.9) and edit dialog (9P.10) will consume the event in subsequent steps.
+- [x] Search bar at the top of the tree filters by name (client-side). Implemented via react-arborist's `searchTerm` + `searchMatch` props — predicate matches POI nodes by case-insensitive substring; library handles ancestor visibility automatically (matching POIs keep their kind/category nodes open).
+- [x] Soft-deleted POIs hidden by default with a "Show soft-deleted POIs" checkbox. The `include_deleted=true` URL param fetches everything once at mount; the toggle then rebuilds the tree from the cached rows so flipping the checkbox is instant and never re-prompts for auth. Deleted rows render greyed-out italic with a "(deleted)" suffix.
+- [x] Wired into `AdminLayout.tsx` left pane, replacing the placeholder. AdminLayout exposes `handlePoiSelect` callback (currently `console.log`).
+- [x] Container sizing: react-arborist needs explicit pixel `width`/`height`. Added a small `useElementSize` hook backed by `ResizeObserver` so the tree fills the left pane and reflows on browser resize.
+- [x] `cd web && npx tsc --noEmit` clean (zero output, exit 0).
 
 #### Step 9P.9: Admin map (Leaflet + clustering + draggable markers)
 - [ ] Create `web/src/admin/AdminMap.tsx`

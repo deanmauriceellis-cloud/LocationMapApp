@@ -1,16 +1,17 @@
-// AdminLayout — Phase 9P.B Step 9P.7
+// AdminLayout — Phase 9P.B Step 9P.7 (shell), 9P.8 (POI tree wired in)
 //
 // Shell for the LocationMapApp Salem POI admin tool. Three-pane layout:
 //   ┌─────────────────────────────────────────────────────────────────────┐
 //   │ Header  [Highlight Duplicates] [Publish]  Oracle: —   [Logout]      │
 //   ├──────────────────────┬──────────────────────────────────────────────┤
-//   │ POI tree (9P.8)      │ Map view (9P.9)                              │
+//   │ POI tree (9P.8 ✓)    │ Map view (9P.9)                              │
 //   │ react-arborist       │ Leaflet                                      │
 //   │                      │                                              │
 //   └──────────────────────┴──────────────────────────────────────────────┘
 //
-// The shell contains placeholders only. Subsequent steps fill in content:
-//   9P.8  — POI tree (left pane)
+// Step status:
+//   9P.7  ✓ shell (this file)
+//   9P.8  ✓ POI tree (PoiTree.tsx, wired into the left pane)
 //   9P.9  — Admin map view (center pane)
 //   9P.10 — POI edit dialog (modal triggered from tree/map)
 //   9P.10b — Salem Oracle integration (the "Oracle: —" pill goes live + a
@@ -25,6 +26,7 @@
 // browser's cached credentials. There is no in-page login form by design.
 
 import { useCallback } from 'react'
+import { PoiTree, type PoiSelection } from './PoiTree'
 
 export function AdminLayout() {
   const handleHighlightDuplicates = useCallback(() => {
@@ -39,6 +41,13 @@ export function AdminLayout() {
     // up admin edits. This is the "publish loop" half of the user's
     // "update both the database and where they are sourced" requirement.
     console.log('[admin] Publish clicked — wiring lands in 9P.13')
+  }, [])
+
+  const handlePoiSelect = useCallback((selection: PoiSelection) => {
+    // 9P.8: emits selection only — log for now. The map view (9P.9) will
+    // pan/zoom to selection.poi, and the edit dialog (9P.10) will open with
+    // selection.poi as its initial state.
+    console.log('[admin] POI selected:', selection.kind, selection.poi.id, selection.poi.name)
   }, [])
 
   const handleLogout = useCallback(() => {
@@ -114,14 +123,8 @@ export function AdminLayout() {
           <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-600">
             POIs
           </div>
-          <div className="flex-1 overflow-auto p-3 text-sm text-slate-500">
-            {/* TODO 9P.8 — replace with <PoiTree /> (react-arborist) */}
-            <p className="italic">POI tree lands in Step 9P.8 (react-arborist).</p>
-            <p className="mt-2 text-xs">
-              Will fetch all 1,720 POIs once via{' '}
-              <code className="bg-slate-100 px-1 rounded">/api/admin/salem/pois</code>{' '}
-              and group them by kind → category → subcategory.
-            </p>
+          <div className="flex-1 min-h-0">
+            <PoiTree onSelect={handlePoiSelect} />
           </div>
         </aside>
 
