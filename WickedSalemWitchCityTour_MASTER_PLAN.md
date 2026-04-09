@@ -1215,7 +1215,27 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [x] Bbox prefilter (`ABS(lat-lat) <= radius/111000` AND `ABS(lng-lng) <= radius/60000`) cuts the join before Haversine, keeping latency well under 1s on the ~1700-row Salem dataset
 - [x] Smoke tested against the live dataset: 7/7 pass — default radius=15m surfaces 101 clusters; the top cluster has 27 narration POIs chained together near downtown Essex Street (a known dense block where Destination Salem and OSM imports overlapped); a separate 3-POI cluster at coordinates (42.5235097, -70.8952337) shows three POIs ("Bluebikes", "St. Peter's Church", "Downtown Salem") sharing the exact same location — likely an import default that the operator should fix in the admin UI
 
-**Phase 9P.A — Backend Foundation — COMPLETE** with 9P.5. The four foundation steps (9P.1 schema, 9P.2 importer, 9P.3 auth middleware, 9P.4 admin POI write endpoints, 9P.4a per-mode visibility schema, 9P.5 duplicates) are all done. **Phase 9P.B — Admin UI** (in `web/`) starts next session.
+**Phase 9P.A — Backend Foundation — COMPLETE** with 9P.5. The six foundation steps (9P.1 schema, 9P.2 importer, 9P.3 auth middleware, 9P.4 admin POI write endpoints, 9P.4a per-mode visibility schema, 9P.5 duplicates) are all done. **Phase 9P.B — Admin UI** (in `web/`) starts next session.
+
+#### Step 9P.A.3: Migrate `tour_pois` and `salem_businesses` to PostgreSQL — DONE (Session 101, 2026-04-08)
+
+**Why:** After Phase 9P.4 the admin write endpoints existed for all three POI kinds, but the PG copies of `salem_tour_pois` and `salem_businesses` were empty (only `narration_points` was migrated in S98). That meant any admin PUT/DELETE/move on a tour or business POI returned 404. The admin tool was functionally non-functional for two-thirds of the POIs. This step mirrors the S98 narration migration for the other two tables, completing the architectural shift the user articulated as: "update in admin tool has to update both the database and where-ever they are sourced."
+
+**Implementation:** New `cache-proxy/scripts/import-tour-pois-and-businesses.js` (~270 lines). Uses `better-sqlite3` to read from `salem-content/salem_content.db` directly (cleaner than parsing the bundled SQL file the way S98 did) and `pg` to UPSERT into PostgreSQL.
+
+- [x] Source: `salem-content/salem_content.db` (the bundled SQLite — verified working with the Android app, most authoritative current snapshot)
+- [x] Type conversions: JSON TEXT → JSONB (`subcategories`, `tags`); INTEGER 0/1 → BOOLEAN (`requires_transportation`, `wheelchair_accessible`, `seasonal`); INTEGER Unix-millis → TIMESTAMPTZ (with `0` → NULL for `stale_after`); TEXT YYYY-MM-DD → TIMESTAMPTZ (PG handles directly)
+- [x] **UPSERT, not TRUNCATE+INSERT.** Six tables reference `salem_tour_pois` via FK (`salem_historical_figures.primary_poi_id`, `salem_historical_facts.poi_id`, `salem_timeline_events.poi_id`, `salem_primary_sources.poi_id`, `salem_tour_stops.poi_id`, `salem_events_calendar.venue_poi_id`) — even though those references are currently NULL, PG refuses to TRUNCATE a referenced table without CASCADE. UPSERT (`ON CONFLICT (id) DO UPDATE SET ...`) avoids the issue and is fully idempotent.
+- [x] Imported: **45 tour POIs, 861 salem_businesses** (matching source counts exactly)
+- [x] PG totals after migration: tour=45, business=861, narration=814 → **1,720 active POIs**, all canonical in PG
+- [x] Sample row spot-check: `witch_trials_memorial` (tour) and `hex` (business) both correct, JSONB arrays parsed cleanly
+- [x] Smoke tests after restart: list (45 / 861), GET single (both), PUT update (both — were previously 404), DELETE/restore round-trip (both), duplicates endpoint now sees all 1,720 POIs and reports 550 clusters with top cluster of 54 members (up from 101 / 27 when only narration_points was in PG — confirms cross-kind duplicate detection now works as designed)
+
+**The bundled `salem-content/salem_content.db` is now a downstream artifact** — like the bundled SQL was for narration_points after S98. It will need to be regenerated from PG when Phase 9P.C (publish loop) lands, so APK builds pick up admin edits. Until 9P.C ships, edits via the admin tool will be PG-only and will not propagate to the next APK build. Flagged as a known constraint for the operator.
+
+**Files:**
+- `cache-proxy/scripts/import-tour-pois-and-businesses.js` — NEW
+- (no schema changes — `salem_tour_pois` and `salem_businesses` PG tables already existed from earlier sessions; `deleted_at` column was added in S99)
 
 ---
 

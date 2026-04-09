@@ -1,9 +1,9 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-08 Session 100 (Phase 9P.A COMPLETE — 9P.4a + 9P.5 done; Backend Foundation finished; 38/38 smoke tests pass across S99+S100)
+## Last Updated: 2026-04-08 Session 101 (POI inventory PDF generated + Phase 9P.A.3 — tour_pois + salem_businesses migrated to PG; admin tool now functional for ALL three POI kinds)
 
-## TOP PRIORITY — Next Session (Session 101)
-**Phase 9P.B — Admin UI in `web/`.** Phase 9P.A (Backend Foundation) is complete. Phase 9P.B starts with **Step 9P.6**: hand-port the 22-category POI taxonomy from `app-salem/.../ui/menu/PoiCategories.kt` to a new `web/src/config/poiCategories.ts` (same shape: id, label, color, default-visible flags including `historicTourDefault` from 9P.4a, subtypes array, OSM tag mappings). Then **Step 9P.7**: add `/admin` route to the React app (`web/src/App.tsx`), `web/src/admin/AdminLayout.tsx` shell with header (Highlight Duplicates / Publish / Logout), left tree pane, center map pane. Browser handles Basic Auth prompt automatically when admin endpoints return 401. Then 9P.8 (POI tree via `react-arborist`), 9P.9 (map view), 9P.10+ (edit dialog).
+## TOP PRIORITY — Next Session
+**Phase 9P.B — Admin UI in `web/`.** Phase 9P.A (Backend Foundation) is complete. Phase 9P.A.3 (Session 101) closed the gap that made the admin tool non-functional for tour and business kinds — all 1,720 POIs are now canonical in PG. Phase 9P.B starts with **Step 9P.6**: hand-port the 22-category POI taxonomy from `app-salem/.../ui/menu/PoiCategories.kt` to a new `web/src/config/poiCategories.ts` (same shape: id, label, color, default-visible flags including `historicTourDefault` from 9P.4a, subtypes array, OSM tag mappings). Then **Step 9P.7**: add `/admin` route to the React app (`web/src/App.tsx`), `web/src/admin/AdminLayout.tsx` shell with header (Highlight Duplicates / Publish / Logout), left tree pane, center map pane. Browser handles Basic Auth prompt automatically when admin endpoints return 401. Then **9P.8** (POI tree via `react-arborist` — the user's left-side tree list requirement), 9P.9 (map view), 9P.10+ (edit dialog).
 
 **Also surface at session start:**
 1. **OMEN-002 history rotation** still pending — needs operator action: `ALTER USER witchdoctor WITH PASSWORD '<new>';` + log into OpenSky portal to regenerate `OPENSKY_CLIENT_SECRET`, then update `cache-proxy/.env`. Test password `salem-tour-9P3-test` in `cache-proxy/.env` should also be replaced with a real strong value before relying on the admin auth in any non-test context.
@@ -13,11 +13,18 @@
 
 ## Phase 9P.A status (Backend Foundation) — COMPLETE
 - ✓ **9P.1 DONE** (S98) — `salem_narration_points` table (42 cols, 7 indexes)
-- ✓ **9P.2 DONE** (S98) — Importer landed 814 rows; PostgreSQL canonical for narration points
-- ✓ **9P.3 DONE** (S99) — HTTP Basic Auth middleware (`cache-proxy/lib/admin-auth.js`), mounted on `/admin/*`, `/cache/clear` locked down. 7/7 smoke tests pass.
-- ✓ **9P.4 DONE** (S99) — Admin POI write endpoints (`cache-proxy/lib/admin-pois.js`): six routes covering all three POI kinds with kind-specific field whitelists. 24/24 smoke tests pass. In-scope: `deleted_at` migration on tour_pois + businesses, public-read filter update.
-- ✓ **9P.4a DONE** (S100) — Per-mode category visibility schema. `historicTourDefault: Boolean` field added to `PoiCategory` data class in `app-salem/.../ui/menu/PoiCategories.kt`. Helper getters `freeRoamPrefKey` and `tourPrefKey`. 6 categories opted in to historic tour mode (CIVIC, WORSHIP, TOURISM_HISTORY, WITCH_SHOP, GHOST_TOUR, HISTORIC_HOUSE); other 16 OFF. SharedPreferences migration plan documented in master plan as a Phase 9R rollout note (the actual migration code lives in 9R when historic tour mode ships). `./gradlew :app-salem:compileDebugKotlin` BUILD SUCCESSFUL.
-- ✓ **9P.5 DONE** (S100) — Duplicates detection endpoint (`GET /admin/salem/pois/duplicates?radius=15`). Bbox-prefiltered self-join across all three POI tables via CTE with Haversine in SQL; JS-side union-find clustering. Default radius 15m, max 100m, soft-deleted rows excluded. 7/7 smoke tests pass on live data: top cluster at 15m radius surfaces 27 narration POIs chained around downtown Essex Street; a 3-POI cluster shows "Bluebikes", "St. Peter's Church", "Downtown Salem" sharing identical coordinates (clear import default that the admin UI should help operator fix).
+- ✓ **9P.2 DONE** (S98) — Importer landed 814 narration rows; PG canonical for narration
+- ✓ **9P.3 DONE** (S99) — HTTP Basic Auth middleware; `/cache/clear` locked down
+- ✓ **9P.4 DONE** (S99) — Admin POI write endpoints; six routes, all three POI kinds, soft-delete-aware
+- ✓ **9P.4a DONE** (S100) — `historicTourDefault` field on `PoiCategory`, 6 categories opted into historic tour mode
+- ✓ **9P.5 DONE** (S100) — Duplicates detection endpoint with cross-kind clustering
+- ✓ **9P.A.3 DONE** (S101) — `salem_tour_pois` (45 rows) and `salem_businesses` (861 rows) migrated to PG via `cache-proxy/scripts/import-tour-pois-and-businesses.js`. **Admin tool now functional for ALL three POI kinds.** PG totals: tour=45, business=861, narration=814 → **1,720 active POIs canonical in PG**. Bundled `salem-content/salem_content.db` is now a downstream artifact and will need Phase 9P.C publish loop to regenerate it before APK builds pick up admin edits.
+
+## POI Inventory PDF (S101)
+- `tools/generate-poi-inventory-pdf.py` — Python + reportlab Platypus, sources from bundled `salem-content/salem_content.db`
+- Output: `docs/poi-inventory-2026-04-08.pdf` (gitignored), 1,163 pages, 2.5 MB, all 1,723 POIs with every field
+- venv at `tools/.poi-pdf-venv/` (gitignored, reportlab 4.4.10)
+- Re-run: `tools/.poi-pdf-venv/bin/python tools/generate-poi-inventory-pdf.py`
 
 ## OMEN-002 status
 - ✓ **File-side cleanup DONE** (S99) — `bin/restart-proxy.sh` no longer contains hardcoded credentials. Sources `cache-proxy/.env` (gitignored) via `set -a; source ...; set +a`. `cache-proxy/.env.example` committed as a template. Both old credential strings (`fuckers123`, `6m3uBQ5HXwSzJeLemRJK12G8Ux4L5veR`) confirmed absent from tracked file.
