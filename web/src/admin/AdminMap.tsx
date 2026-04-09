@@ -349,7 +349,7 @@ function MoveConfirm({ pending, onConfirm, onCancel, busy, error }: MoveConfirmP
 
 function Legend({ counts }: { counts: { tour: number; business: number; narration: number } }) {
   return (
-    <div className="absolute top-2 right-2 z-[400] bg-white/95 border border-slate-300 rounded shadow px-3 py-2 text-xs">
+    <div className="absolute top-2 right-2 z-[100] bg-white/95 border border-slate-300 rounded shadow px-3 py-2 text-xs">
       <div className="font-semibold text-slate-700 mb-1">Legend</div>
       {(['tour', 'business', 'narration'] as PoiKind[]).map((k) => (
         <div key={k} className="flex items-center gap-2">

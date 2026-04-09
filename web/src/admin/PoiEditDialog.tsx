@@ -534,7 +534,7 @@ export function PoiEditDialog({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/65" aria-hidden="true" />
         </TransitionChild>
 
         {/* Panel */}
@@ -588,7 +588,7 @@ export function PoiEditDialog({
                 className="flex-1 min-h-0 flex flex-col"
               >
                 <TabGroup as="div" className="flex-1 min-h-0 flex flex-col">
-                  <TabList className="px-4 pt-2 border-b border-slate-200 flex gap-1 overflow-x-auto">
+                  <TabList className="px-4 pt-2 border-b border-slate-200 flex flex-wrap gap-1">
                     <Tab className={tabClass}>General</Tab>
                     <Tab className={tabClass}>Location</Tab>
                     <Tab className={tabClass}>Hours &amp; Contact</Tab>

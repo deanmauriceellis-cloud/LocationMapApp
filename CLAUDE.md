@@ -56,7 +56,7 @@ Execute all steps in order:
 
 ## Project Status
 
-**Version:** v1.5.69 (107 sessions completed as of 2026-04-09; S106 → S107 was a cross-midnight + crash-recovery pair that landed Phase 9P.10b)
+**Version:** v1.5.69 (108 sessions completed as of 2026-04-09; S108 was a short admin-UI polish session — tab wrap + backdrop opacity + legend z-index — between S107's 9P.10b finalization and the upcoming 9P.11 work)
 **Phases 1-9 + 9A+ + 9T (8/9):** COMPLETE — core development, offline foundation, ambient narration done
 **Phase 9P (POI Admin Tool) IN PROGRESS:** 9P.A (backend) DONE; 9P.B (admin UI) 6/8 done — 9P.6 taxonomy, 9P.7 AdminLayout shell, 9P.8 POI tree, 9P.9 admin map view, 9P.10 edit dialog, 9P.10b Salem Oracle integration all landed; **next: 9P.11 Highlight Duplicates wiring**
 **Phase 9Q (Salem Domain Content Bridge):** not started — building→POI translation + 425 buildings + 202 newspapers
