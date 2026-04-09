@@ -1241,12 +1241,16 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 
 ### Phase 9P.B — Admin UI
 
-#### Step 9P.6: Hand-port category taxonomy to TypeScript
-- [ ] Create `web/src/config/poiCategories.ts`
-- [ ] Port all 22 categories + 153+ subtypes from `app-salem/src/main/java/.../ui/menu/PoiCategories.kt`
-- [ ] Same shape: id, label, color, default-visible flag, subtypes array, OSM tag mappings
-- [ ] Add cross-reference comment at top of both files: "// Mirror of poiCategories.ts — see Phase 9P.6"
-- [ ] Add a TODO at the top of both files for future unification (Phase 9C or later)
+#### Step 9P.6: Hand-port category taxonomy to TypeScript — DONE (Session 101, 2026-04-08)
+- [x] Created `web/src/config/poiCategories.ts` (~535 lines)
+- [x] Ported all 22 categories + 175+ subtypes from `PoiCategories.kt`
+- [x] Same shape preserved: id, label, prefKey, tags (string[]), subtypes (PoiSubtype[] | null), color (hex), defaultEnabled, **historicTourDefault** (from 9P.4a)
+- [x] Per-mode helper functions: `freeRoamPrefKey(cat)`, `tourPrefKey(cat)`, plus `enabledTagValues(visibility, mode)` mirroring the Kotlin `enabledTagValues(prefs)`
+- [x] `PoiLayerId` constant exported (the 22 ID strings)
+- [x] `findPoiCategory(id)` lookup helper
+- [x] Cross-reference comment added to BOTH files: `PoiCategories.kt` notes the mirror at `web/src/config/poiCategories.ts` and `poiCategories.ts` notes the source at `app-salem/.../ui/menu/PoiCategories.kt`. Both files include a TODO for unifying the two sources via a code generator or shared JSON config in Phase 9C or later.
+- [x] **Distinct from existing `web/src/config/categories.ts`** which is the 17-category taxonomy used by the GENERIC public web app for OSM POI classification (different shape: `tagMatches: { key, values }[]`). The two files coexist; the existing `categories.ts` is untouched so the public web app behavior is unchanged. The new `poiCategories.ts` is the source of truth for the Salem admin tool's category model.
+- [x] `npx tsc --noEmit` in `web/` passes clean (no type errors across the project)
 
 #### Step 9P.7: Admin route + Basic Auth gating in web app
 - [ ] Add `/admin` route to `web/src/App.tsx` (or wherever routing lives — verify Vite routing setup)

@@ -19,6 +19,12 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module PoiCategori
  * Central config for all 22 POI categories (17 standard + 5 Salem-specific).
  * Menu items, toggles, restore, Overpass queries, and marker colors are all driven from this list.
  *
+ * ── Mirror file (Phase 9P.6, Session 101) ──
+ * This file is mirrored in TypeScript at `web/src/config/poiCategories.ts` for the Salem POI Admin Tool.
+ * Any change to category IDs, labels, prefKeys, tags, subtypes, colors, defaultEnabled, or
+ * historicTourDefault MUST be mirrored there. The two files are intentionally line-aligned where possible.
+ * TODO (Phase 9C or later): unify the two sources via a code generator or shared JSON config.
+ *
  * ── Per-mode visibility (Phase 9P.4a) ──
  * Each category carries TWO independent default-visibility flags:
  *   - `defaultEnabled` — used in **free-roam mode** (the default app experience).
