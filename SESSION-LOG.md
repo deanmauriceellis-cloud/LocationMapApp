@@ -2,6 +2,69 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 107: 2026-04-09 — Phase 9P.B Step 9P.10b finalization (recovery + commit)
+
+### Summary
+Crash-recovery + commit session for the cross-midnight S106 work. S106 ran 2026-04-08 → 2026-04-09 and implemented Phase 9P.B Step 9P.10b (Salem Oracle integration) end-to-end including the live smoke test, but the session ended without committing — three artifacts were left dirty on disk: untracked `web/src/admin/oracleClient.ts` (~248 lines), modified `web/src/admin/AdminLayout.tsx` (+137/-8 with the Oracle status pill polling), and modified `web/src/admin/PoiEditDialog.tsx` (+440/-1 with the Generate sub-dialog modal). S107 verified the work was complete and clean: re-ran `cd web && npx tsc --noEmit` (exit 0), re-ran `npm run build` (clean, 539 modules, 802.45 kB / 234.29 kB gzip — identical to S106 final numbers, no drift), confirmed the live Salem Oracle was still up at `http://localhost:8088` (PID 8167, `available:true`, 3891 facts / 4950 primary sources / 63 POIs / 202 newspapers loaded, same Oracle session S106 hit), and committed the work as `a498562` titled "Session 106 → 107: Phase 9P.B Step 9P.10b — Salem Oracle integration". The commit included `STATE.md` and `WickedSalemWitchCityTour_MASTER_PLAN.md` (both already updated by S106), the new `oracleClient.ts`, the modified `AdminLayout.tsx` and `PoiEditDialog.tsx`, both session-106 live log files (the 04-08 stub and the 04-09 cross-midnight finalization log), and the new S107 live log. Master plan and STATE.md left as-is from S106 (no further changes needed). Updated `~/.claude/projects/.../memory/project_next_session_priority.md` to point at Phase 9P.B Step 9P.11 (Highlight Duplicates wiring) as the new top priority. **NOTE-L015 confirmed stale a second time** in S107: `~/Development/SalemCommercial/` still does not exist on this workstation; the OMEN-016d "grand cutover" has not landed here; the `salem-content/` hardcoded paths are still valid. Both S106 and S107 OMEN reports surface this for retraction or re-attempt. After S107 commit, this session-end follow-up updates `CLAUDE.md` (107 sessions, v1.5.69) and prepends this entry to `SESSION-LOG.md`.
+
+### Decisions
+1. **Treat the dirty disk state as recovery, not as parallel branching.** S106's work was substantively complete and matched the master plan §1332-1387 build task list exactly; the right move was to verify + commit, not rewrite or rebase.
+2. **Re-ran tsc + build to confirm no drift** between S106's final state and the current disk. Identical outputs → green to commit.
+3. **Skipped a redundant `/api/oracle/ask` smoke test** because S106 already did two real ones and the typed client matches the live API exactly.
+4. **Did not touch master plan or STATE.md** — both were already correctly updated by S106.
+5. **Did not touch `session-106-*.md` live logs** — both files (the 04-08 stub and the 04-09 cross-midnight finalization log) are S106's work product and should remain as-written for traceability.
+6. **Bumped session count to 107 in CLAUDE.md** because S107 is the canonical "completion" session per the commit hash, even though S106 did the implementation work. The OMEN reports for both sessions remain separate to preserve accountability.
+
+### Files Changed
+- (committed by S107) `web/src/admin/oracleClient.ts`, `web/src/admin/AdminLayout.tsx`, `web/src/admin/PoiEditDialog.tsx`, `STATE.md`, `WickedSalemWitchCityTour_MASTER_PLAN.md`, `docs/session-logs/session-106-2026-04-09.md`, `docs/session-logs/session-107-2026-04-09.md` — all part of commit `a498562`
+- `~/.claude/projects/.../memory/project_next_session_priority.md` — rewritten by S107 to point at 9P.11
+- `CLAUDE.md` — modified (this session, post-commit follow-up: bumped session count 106 → 107)
+- `SESSION-LOG.md` — modified (this session, this entry)
+- `~/Development/OMEN/reports/locationmapapp/session-106-2026-04-09.md` — S106 OMEN report
+- `~/Development/OMEN/reports/locationmapapp/session-107-2026-04-09.md` — S107 OMEN report (this session)
+
+### Status
+- Phase 9P.B: **6/8 done** (9P.6, 9P.7, 9P.8, 9P.9, 9P.10, 9P.10b)
+- Next step: **Phase 9P.B Step 9P.11 — Highlight Duplicates wiring**
+- 9P.10a still deferred (stub in dialog, blocked on Phase 9Q)
+- Commit `a498562` lands the implementation; this session-end follow-up adds the doc-level wrap-up
+
+---
+
+## Session 106: 2026-04-09 — Phase 9P.B Step 9P.10b (Salem Oracle "Generate with AI" integration)
+
+### Summary
+Built **Phase 9P.B Step 9P.10b** end-to-end against the live Salem Oracle. New `web/src/admin/oracleClient.ts` (~225 lines) is a typed wrapper for the Salem testapp's HTTP API at `http://localhost:8088/api/oracle/*` (override via `VITE_SALEM_ORACLE_URL`). It exports `getStatus`, `ask`, `listPois`, `isAskOk` plus typed shapes (`OracleStatus`, `OracleAskOk`/`OracleAskErr`, `OraclePrimarySource`, `OraclePoiSummary`); a custom `OracleNetworkError` distinguishes connection failures from successful HTTP responses with `error` envelopes; `fetchWithTimeout` uses `AbortController` with 5s timeouts on status/catalog calls and 120s on `ask` (60s minimum per `oracle-api.md`, 120s for cold-cache headroom). `AdminLayout.tsx` grew a polled state machine (`loading`/`ready`/`unavailable`) that hits `/api/oracle/status` at mount and every 30s; click-to-recheck supplements the timer; the new `OraclePill` component renders three visual states with rich tooltips (ready: corpus counts + history turn count; down: start command + reason). The pill's `oracleAvailable` is mirrored down to `PoiEditDialog` via two new props plus `onOracleRefresh`. `PoiEditDialog.tsx` grew an `OracleLauncher` component with two variants — a banner at the top of the Narration tab and a compact button under the General tab description textarea — both opening the same nested Headless UI `<Dialog>` (z-1100, layered above the main edit dialog at z-1000). The sub-dialog has a prompt textarea + Reset history checkbox (default ON, auto-flips OFF after first generation so iterate works without re-checking) + Generate button → `oracleClient.ask({ question, current_poi_id: poi.id, reset })`; a violet spinner panel during the call; the returned `text` rendered in a slate panel with `whitespace-pre-wrap` and turn count; "Insert into short_narration / long_narration / description" buttons filtered through `has(field)` (so tour POIs without those fields don't see no-op buttons); an Iterate button that forces `reset:false` regardless of checkbox state; up to 8 `primary_sources` rendered in a collapsible `<details>` block with attribution + score + verbatim text + modern_gloss in amber callouts. Insert flow: `setValue(field, text, { shouldDirty: true, shouldTouch: true })` so the existing react-hook-form dirty-tracking → PUT pipeline picks it up automatically. **Audit log:** `localStorage[salem-oracle-audit]` capped at 500 entries FIFO, logged on **insert** events only (not on generate — generate-but-discard is just thinking out loud), with `{ ts, poi_id, poi_kind, field, question, text, primary_sources, history_turn_count }`. Concurrent calls serialized client-side per master plan §1383. **End-to-end smoke test passed against live Oracle** (PID 8167, started by operator mid-session): two real `POST /api/oracle/ask` calls verified all 9 expected `OracleAskOk` fields present, 8 `primary_sources` populated correctly, `current_poi_id="lma_smoke_test_poi_id_not_a_real_one"` accepted as arbitrary string per master plan §1352. `npx tsc --noEmit` clean, `npm run build` clean (539 modules, 802 kB / 234 kB gz, +12 kB / +3 kB gz over S105). **NOTE-L015 flagged stale to OMEN** in this session's report — `~/Development/SalemCommercial/` does not exist on this workstation, the cutover never landed here, the `salem-content/` pipeline is healthy.
+
+### Decisions
+1. **Direct browser → Oracle calls, no Vite proxy.** Per master plan §1341 and `oracle-api.md`, the Oracle serves permissive CORS. The existing `/api/*` Vite proxy strips `/api` and forwards to the cache-proxy at `http://10.0.0.229:4300`, which has no `/oracle/*` routes — routing through it would not work. Direct call avoids the indirection and matches the contract.
+2. **Configurable base URL via `VITE_SALEM_ORACLE_URL`.** Default `http://localhost:8088`. Useful when the operator runs the admin tool from a LAN host while the Salem testapp runs on the dev box; the testapp binds to `*:8088` so the LAN reach works as long as the base URL is set.
+3. **Status polling at mount + every 30s.** Cheap (sub-millisecond on the Salem side, 5s client timeout). Click-to-recheck supplements the timer so the operator never has to wait for the next tick after starting the testapp.
+4. **Three-state pill machine** (`loading`/`ready`/`unavailable`) instead of a binary boolean. The loading state matters because the first poll has 5s of latency on cold start, and rendering the pill as "down" during that window would be misleading.
+5. **Sub-dialog as nested Headless UI `<Dialog>` at z-1100.** Pros: focus trap, ESC handling, backdrop click, visual layering all handled by Headless UI; con: nested dialogs aren't a documented happy path in HUI v2 but tested cleanly here.
+6. **Reset checkbox auto-flips OFF after first successful generation.** Spec says first call should reset history (cross-POI bleed protection) but iterate calls should not. Auto-flipping is the natural UX.
+7. **Two launcher placements, one shared sub-dialog state.** Narration tab gets a banner-style `OracleLauncher`, General tab gets a compact variant under the description textarea — both open the same sub-dialog. Insert buttons filtered through `has(field)` so POI kinds without `short_narration`/`long_narration` don't see no-op buttons.
+8. **Audit log on INSERT, not GENERATE.** Generate-but-discard is just thinking out loud and shouldn't pollute the log. Insert is the moment of acceptance.
+9. **Insert buttons replace, not append.** Operator sees the result before clicking, so it's an intentional commit. `setValue(field, text, { shouldDirty: true, shouldTouch: true })` — the existing react-hook-form dirty-tracking + PUT pipeline picks it up automatically.
+10. **NOTE-L015 surfaced as stale at session start.** Filesystem check confirmed `~/Development/SalemCommercial/` does not exist; LMA's `salem-content/` hardcoded paths still resolve. No code changes — would have been a no-op breaking change against valid paths. Flagged in the OMEN session report for retraction or re-attempt.
+
+### Files Changed
+- `web/src/admin/oracleClient.ts` — NEW (~225 lines, typed Salem Oracle client)
+- `web/src/admin/AdminLayout.tsx` — modified (+126 lines: state machine, polling, `OraclePill` component, prop wiring)
+- `web/src/admin/PoiEditDialog.tsx` — modified (+440 lines: Oracle sub-dialog, two `OracleLauncher` placements, audit log helper, new `OracleLauncher` component)
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — modified (Step 9P.10b heading + 7 build tasks marked DONE with implementation notes)
+- `STATE.md` — modified (header bumped to S106; TOP PRIORITY → 9P.11; 9P.10b row marked DONE)
+- `SESSION-LOG.md` — modified (this entry)
+- `docs/session-logs/session-106-2026-04-09.md` — NEW (live conversation log)
+
+### Status
+- Phase 9P.B: **6/8 done** (9P.6, 9P.7, 9P.8, 9P.9, 9P.10, **9P.10b**)
+- Next step: **Phase 9P.B Step 9P.11 — Highlight Duplicates wiring** (the existing `/api/admin/salem/pois/duplicates?radius=15` endpoint built in 9P.5 needs UI on the admin map)
+- 9P.10a still deferred (stub in dialog, blocked on Phase 9Q)
+- Salem Oracle is now a documented cross-project dev surface (consumption only — read-only, dev-only, browser-direct, no APK/production impact)
+
+---
+
 ## Session 105: 2026-04-08 — Phase 9P.B Step 9P.10 (POI edit dialog — tabbed Headless UI modal)
 
 ### Summary
