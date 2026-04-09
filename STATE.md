@@ -1,9 +1,9 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-08 Session 101 (POI inventory PDF generated + Phase 9P.A.3 — tour_pois + salem_businesses migrated to PG; admin tool now functional for ALL three POI kinds)
+## Last Updated: 2026-04-08 Session 102 (Phase 9P.B Step 9P.7 — Admin route + AdminLayout shell landed)
 
 ## TOP PRIORITY — Next Session
-**Phase 9P.B Step 9P.7 — Admin route + AdminLayout shell in `web/`.** Phase 9P.A (Backend Foundation) is complete and Phase 9P.B Step 9P.6 (TypeScript port of 22-category POI taxonomy → `web/src/config/poiCategories.ts`) landed in Session 101. Next: add `/admin` route to `web/src/App.tsx`, create `web/src/admin/AdminLayout.tsx` shell with header (Highlight Duplicates / Publish / Logout / **Oracle status pill**), left tree pane area, center map pane area. Browser handles Basic Auth prompt automatically when admin endpoints return 401. Then **9P.8** (POI tree via `react-arborist` — the user's left-side tree list requirement; needs `npm install react-arborist`), then 9P.9 (map view), 9P.10 (edit dialog), **9P.10b (Salem Oracle "Generate with AI" integration — see `~/Development/Salem/docs/oracle-api.md` for the contract)**, eventually Phase 9P.C (publish loop: regenerate `salem-content/salem_content.db` from PG so APK builds pick up admin edits).
+**Phase 9P.B Step 9P.8 — POI tree via `react-arborist`.** Phase 9P.A (Backend Foundation) is complete; Step 9P.6 (TS taxonomy port) landed S101; Step 9P.7 (admin route + AdminLayout shell) landed S102. Next: `npm install react-arborist` in `web/`, create `web/src/admin/PoiTree.tsx`, fetch all 1,720 POIs once via `/api/admin/salem/pois` (the first admin call — this is when the browser's Basic Auth prompt fires), group by kind → category → subcategory, render in the left pane, click POI row → emit select event for the map (9P.9) and edit dialog (9P.10). Search bar at top filters by name (client-side, 1,720 rows is fine). Soft-deleted POIs hidden by default with a toggle. After 9P.8: 9P.9 (admin map), 9P.10 (edit dialog), **9P.10b (Salem Oracle "Generate with AI" integration — see `~/Development/Salem/docs/oracle-api.md`)**, then Phase 9P.C (publish loop: regenerate `salem-content/salem_content.db` from PG so APK builds pick up admin edits).
 
 ## Salem Oracle API integration (Phase 9P.10b — added Session 101)
 The Salem sibling project exposes a dev-side LLM-backed API at `http://localhost:8088` that the admin tool can call to compose, revise, summarize, or expand POI descriptions. Reference: `~/Development/Salem/docs/oracle-api.md` (492 lines, owned by Salem). Key endpoints: `/api/oracle/status` (health), `/api/oracle/ask` (main composition with `current_poi_id` context pinning, 5-15s latency), `/api/oracle/pois`, `/api/oracle/poi?id=`, `/api/oracle/newspapers`. Salem corpus is read-only from this API. The Oracle backs gemma3:27b on the operator's RTX 3090. **Critical conceptual point:** Salem's 63 historical POIs (`salem_poi_*` IDs) are DISTINCT from LocationMapApp's 1,720 POIs — same geography, different datasets. The Oracle's `current_poi_id` field accepts any string for context pinning; pass the LocationMapApp POI id directly. Spec lives in master plan as Step 9P.10b.
@@ -22,6 +22,17 @@ The Salem sibling project exposes a dev-side LLM-backed API at `http://localhost
 - ✓ **9P.4a DONE** (S100) — `historicTourDefault` field on `PoiCategory`, 6 categories opted into historic tour mode
 - ✓ **9P.5 DONE** (S100) — Duplicates detection endpoint with cross-kind clustering
 - ✓ **9P.A.3 DONE** (S101) — `salem_tour_pois` (45 rows) and `salem_businesses` (861 rows) migrated to PG via `cache-proxy/scripts/import-tour-pois-and-businesses.js`. **Admin tool now functional for ALL three POI kinds.** PG totals: tour=45, business=861, narration=814 → **1,720 active POIs canonical in PG**. Bundled `salem-content/salem_content.db` is now a downstream artifact and will need Phase 9P.C publish loop to regenerate it before APK builds pick up admin edits.
+
+## Phase 9P.B status (Admin UI) — IN PROGRESS
+- ✓ **9P.6 DONE** (S101) — TS port of 22-category POI taxonomy → `web/src/config/poiCategories.ts`
+- ✓ **9P.7 DONE** (S102) — `/admin` route + `web/src/admin/AdminLayout.tsx` shell. Path-based dispatch in `main.tsx` (no `react-router-dom` dep). Header has Highlight Duplicates / Publish stubs, Oracle status pill placeholder (wires up in 9P.10b), Logout via XHR 401 trick. Three-pane layout: header / left tree pane (320px) / center map pane. Tree and map are placeholders pointing at 9P.8 and 9P.9.
+- ⏳ **9P.8** — POI tree (react-arborist) — NEXT
+- ⏳ **9P.9** — Admin map view (Leaflet)
+- ⏳ **9P.10** — Edit dialog (tabbed)
+- ⏳ **9P.10a** — Linked Historical Content tab (read-only)
+- ⏳ **9P.10b** — Salem Oracle "Generate with AI" integration
+- ⏳ **9P.11** — Highlight Duplicates wiring
+- ⏳ **9P.13** — Publish wiring (Phase 9P.C publish loop)
 
 ## POI Inventory PDF (S101)
 - `tools/generate-poi-inventory-pdf.py` — Python + reportlab Platypus, sources from bundled `salem-content/salem_content.db`

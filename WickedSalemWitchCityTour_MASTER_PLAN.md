@@ -1252,12 +1252,13 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [x] **Distinct from existing `web/src/config/categories.ts`** which is the 17-category taxonomy used by the GENERIC public web app for OSM POI classification (different shape: `tagMatches: { key, values }[]`). The two files coexist; the existing `categories.ts` is untouched so the public web app behavior is unchanged. The new `poiCategories.ts` is the source of truth for the Salem admin tool's category model.
 - [x] `npx tsc --noEmit` in `web/` passes clean (no type errors across the project)
 
-#### Step 9P.7: Admin route + Basic Auth gating in web app
-- [ ] Add `/admin` route to `web/src/App.tsx` (or wherever routing lives — verify Vite routing setup)
-- [ ] Browser handles Basic Auth prompt automatically when admin endpoints return 401
-- [ ] Create `web/src/admin/AdminLayout.tsx` shell with header, left tree pane, center map pane
-- [ ] Header buttons: [Highlight Duplicates] [Publish] [Logout]
-- [ ] Logout works via `XMLHttpRequest` 401 trick (or fresh-tab workaround — document choice)
+#### Step 9P.7: Admin route + Basic Auth gating in web app — DONE (Session 102, 2026-04-08)
+- [x] `/admin` route added via path-based dispatch in `web/src/main.tsx` (chose this over `react-router-dom` to avoid a routing dep — the public web app has no other routing needs and the admin tool is a single screen). Vite's dev server falls back to `index.html` for unknown paths so `/admin` works in `vite dev` and `vite preview`. Production hosting must mirror that fallback if `/admin` is ever exposed beyond dev.
+- [x] Basic Auth gating: no in-page login form. The first admin API call from the page (the tree fetch in 9P.8) will trigger the browser's native Basic Auth dialog because the cache-proxy admin endpoints (Phase 9P.3 middleware) return 401 with `WWW-Authenticate: Basic`. Subsequent requests reuse the browser's cached credentials automatically (same-origin via the vite `/api` proxy).
+- [x] `web/src/admin/AdminLayout.tsx` created (~140 lines). Three-pane layout: header bar (slate-800), left tree pane (white, 320px wide), center map pane (slate-200). Tree and map are placeholder content with TODO comments pointing at the steps that fill them in (9P.8, 9P.9, 9P.11, 9P.13). The header diagram is reproduced as a comment block at the top of the file.
+- [x] Header buttons: **[Highlight Duplicates]** (slate, stub for 9P.11), **[Publish]** (emerald, stub for 9P.13), **Oracle: —** pill (right-side, stub for 9P.10b — `title` attribute documents that the pill goes live in 9P.10b), **[Logout]** (slate).
+- [x] Logout uses the **XMLHttpRequest 401 trick**: synchronous XHR to `/api/admin/salem/pois` with deliberately wrong `logout:wrongpassword` credentials in the open() call. The browser caches the new (wrong) credentials for the origin, replacing the good ones; the next admin API call therefore re-prompts. After the XHR, `window.location.reload()` forces a fresh render so the prompt appears immediately. Wrapped in try/catch because some browsers throw on deprecated sync XHR. Documented inline.
+- [x] `npx tsc --noEmit` in `web/` passes clean
 
 #### Step 9P.8: POI tree (react-arborist)
 - [ ] `npm install react-arborist` in `web/`
