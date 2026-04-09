@@ -48,10 +48,24 @@
 // tree fetch in 9P.8) triggers the prompt; subsequent requests reuse the
 // browser's cached credentials. There is no in-page login form by design.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PoiTree, type PoiKind, type PoiRow, type PoiSelection } from './PoiTree'
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog } from './PoiEditDialog'
+import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
+
+// 9P.10b: how often the header pill re-checks the Oracle. The check itself
+// is sub-millisecond on the Salem side and 5s timeout client-side, so this
+// is cheap; we re-poll because the operator may bounce the testapp between
+// admin actions and the pill should reflect that within ~30s without a
+// manual page reload.
+const ORACLE_POLL_MS = 30_000
+
+/** UI state for the header Oracle pill. */
+type OraclePillState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; status: OracleStatus & { available: true } }
+  | { kind: 'unavailable'; reason: string }
 
 export function AdminLayout() {
   // Shared POI dataset — populated by PoiTree's onDataLoaded callback after
@@ -61,6 +75,45 @@ export function AdminLayout() {
   const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
   // 9P.10: edit dialog visibility. Marker click opens it; tree click does not.
   const [editOpen, setEditOpen] = useState(false)
+
+  // 9P.10b: live Oracle health pill in the header. We poll once at mount and
+  // every ORACLE_POLL_MS thereafter, in addition to letting the edit dialog
+  // re-trigger a poll on demand if the operator wants to retry after starting
+  // the testapp. mountedRef guards against `setState` after unmount in the
+  // 5s status timeout race.
+  const [oraclePill, setOraclePill] = useState<OraclePillState>({ kind: 'loading' })
+  const mountedRef = useRef(true)
+
+  const refreshOracleStatus = useCallback(async () => {
+    try {
+      const status = await getStatus()
+      if (!mountedRef.current) return
+      if (status.available) {
+        setOraclePill({ kind: 'ready', status })
+      } else {
+        setOraclePill({
+          kind: 'unavailable',
+          reason: status.reason || 'Oracle reported unavailable',
+        })
+      }
+    } catch (e) {
+      if (!mountedRef.current) return
+      setOraclePill({
+        kind: 'unavailable',
+        reason: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    void refreshOracleStatus()
+    const id = window.setInterval(() => void refreshOracleStatus(), ORACLE_POLL_MS)
+    return () => {
+      mountedRef.current = false
+      window.clearInterval(id)
+    }
+  }, [refreshOracleStatus])
 
   const handleDataLoaded = useCallback((data: Record<PoiKind, PoiRow[]>) => {
     setByKind(data)
@@ -229,13 +282,8 @@ export function AdminLayout() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Oracle status pill (placeholder — wired up in 9P.10b) */}
-        <div
-          className="px-2 py-1 text-xs rounded-full bg-slate-700 text-slate-300"
-          title="Salem Oracle status — wired up in Phase 9P.10b"
-        >
-          Oracle: —
-        </div>
+        {/* Oracle status pill (9P.10b — live polled) */}
+        <OraclePill state={oraclePill} onRefresh={refreshOracleStatus} />
 
         <button
           type="button"
@@ -279,10 +327,83 @@ export function AdminLayout() {
         poi={selectedPoi?.poi ?? null}
         kind={selectedPoi?.kind ?? null}
         knownCategories={knownCategories}
+        oracleAvailable={oraclePill.kind === 'ready'}
+        onOracleRefresh={refreshOracleStatus}
         onSaved={handlePoiSaved}
         onDeleted={handlePoiDeleted}
         onClose={handleEditClose}
       />
     </div>
+  )
+}
+
+// ─── Oracle status pill ─────────────────────────────────────────────────────
+//
+// Three visual states:
+//   loading      grey  "Oracle: …"        — first poll in flight
+//   ready        green "Oracle: ready"    — LLM up, corpora loaded
+//   unavailable  rose  "Oracle: down"     — connection refused / LLM error
+//
+// Click anywhere on the pill to force a re-poll without waiting for the
+// 30s tick. Tooltip explains how to start the testapp when the pill is rose.
+
+interface OraclePillProps {
+  state: OraclePillState
+  onRefresh: () => void | Promise<void>
+}
+
+function OraclePill({ state, onRefresh }: OraclePillProps) {
+  const handleClick = () => {
+    void onRefresh()
+  }
+
+  if (state.kind === 'loading') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className="px-2 py-1 text-xs rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600"
+        title="Checking Salem Oracle status…"
+      >
+        Oracle: …
+      </button>
+    )
+  }
+
+  if (state.kind === 'ready') {
+    const s = state.status
+    const tooltip =
+      `Salem Oracle ready at ${ORACLE_BASE} — gemma3:27b backed by the full Salem corpus\n` +
+      `${s.fact_count.toLocaleString()} facts · ` +
+      `${s.primary_source_count.toLocaleString()} primary sources · ` +
+      `${s.poi_count} POIs · ${s.newspaper_count} newspapers\n` +
+      `History: ${s.history_len} turns · click to re-check`
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className="px-2 py-1 text-xs rounded-full bg-emerald-700 text-emerald-50 hover:bg-emerald-600"
+        title={tooltip}
+      >
+        Oracle: ready
+      </button>
+    )
+  }
+
+  // unavailable
+  const tooltip =
+    `Oracle is unavailable: ${state.reason}\n\n` +
+    `Start the Salem testapp:\n` +
+    `  bash ~/Development/Salem/scripts/start-testapp.sh\n\n` +
+    `Then click this pill to re-check.`
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="px-2 py-1 text-xs rounded-full bg-rose-700 text-rose-50 hover:bg-rose-600"
+      title={tooltip}
+    >
+      Oracle: down
+    </button>
   )
 }

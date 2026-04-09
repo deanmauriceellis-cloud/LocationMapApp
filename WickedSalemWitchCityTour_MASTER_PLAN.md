@@ -1329,7 +1329,7 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [ ] **Editing the linkages happens in Phase 9Q.6** (Building Map admin panel), NOT in this tab — this tab is read-only forever
 - [ ] Add a count badge to the tab label: "Linked Historical Content (5)" so the operator can see at a glance which POIs have historical depth
 
-#### Step 9P.10b: Salem Oracle "Generate with AI" integration (added Session 101)
+#### Step 9P.10b: Salem Oracle "Generate with AI" integration — DONE Session 106 (2026-04-09)
 
 The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that the admin tool can call to compose, revise, summarize, or expand POI descriptions, narrations, and historical context. This is the editorial assist surface for the description layers of the admin tool.
 
@@ -1352,19 +1352,22 @@ The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that 
 **Important conceptual point:** Salem's POI catalog (63 historical 1692-era POIs, IDs like `salem_poi_landmark_hathorne_mansion`) is **DISTINCT** from LocationMapApp's POI tables (1,720 modern Salem POIs across `salem_tour_pois`, `salem_businesses`, `salem_narration_points`). They overlap in real-world geography (the Hathorne mansion site is in both) but are separate datasets. The admin tool edits LocationMapApp POIs; the Oracle is the editorial brain that knows the Salem corpus.
 
 **Build tasks:**
-- [ ] Add `web/src/admin/oracleClient.ts` — typed client wrapping the Oracle endpoints, default base URL `http://localhost:8088` (configurable)
-- [ ] Add an "Oracle: ready / unavailable" status pill in `AdminLayout.tsx` header (poll `/api/oracle/status` once at mount)
-- [ ] Add **"Generate with Salem Oracle"** button to the **Narration tab** of `PoiEditDialog.tsx` (Step 9P.10):
-  - Opens a sub-dialog with: prompt textarea, "Reset history" checkbox, "Generate" button
-  - Calls `POST /api/oracle/ask` with `current_poi_id` set to the LocationMapApp POI's id (NOT a Salem catalog id — the Oracle's `current_poi_id` field accepts any string and uses it for context pinning)
-  - Shows a 5-15s spinner while waiting (latency caveat from oracle-api.md)
-  - Displays the returned `text` plus the up-to-8 `primary_sources` quoted with attribution
-  - "Insert into short_narration" / "Insert into long_narration" / "Insert into description" buttons that paste the result into the matching field
-  - "Iterate" button to send a follow-up prompt without resetting history (the Oracle keeps a 6-turn rolling context for follow-ups like "make that two sentences shorter")
-- [ ] Add the same button to the **General tab** for the `description` field (mirrors the workflow from oracle-api.md's worked example)
-- [ ] Surface `primary_sources` citations in the UI when they appear — the Oracle's quotes have receipts and the operator should see them
-- [ ] Capture the full Oracle response (text + primary_sources + question + timestamp) in a local audit log per accepted generation, so revisions are traceable. Stored client-side in localStorage; not pushed to PG until/unless we add an editorial-history feature.
-- [ ] Handle Oracle unavailable: show "Oracle is unavailable — start `~/Development/Salem/scripts/start-testapp.sh` and reload" instead of failing silently
+- [x] Add `web/src/admin/oracleClient.ts` — typed client wrapping the Oracle endpoints, default base URL `http://localhost:8088` (configurable via `VITE_SALEM_ORACLE_URL` env var). Exports `getStatus`, `ask`, `listPois`, `isAskOk` plus typed response shapes (`OracleStatus`, `OracleAskOk`, `OracleAskErr`, `OraclePrimarySource`, `OraclePoiSummary`). 5s timeout on status/catalog endpoints, 120s default on `ask` (60s minimum per spec, 120s for headroom on cold-cache turns). `OracleNetworkError` distinguishes connection failures from successful HTTP responses with `error` envelopes. **S106 verified** against live Oracle: response shape matches contract exactly (9 fields in `OracleAskOk`, all primary_source fields populated, `current_poi_id` accepts arbitrary strings per master plan §1352).
+- [x] Add an "Oracle: ready / unavailable" status pill in `AdminLayout.tsx` header. Polled at mount + every 30s; click forces immediate re-poll. Three visual states: loading (grey "Oracle: …"), ready (emerald "Oracle: ready" with rich tooltip showing fact/PS/POI/newspaper counts + history turn count), unavailable (rose "Oracle: down" with tooltip pointing at `bash ~/Development/Salem/scripts/start-testapp.sh`). The pill state is mirrored down to `PoiEditDialog` via the new `oracleAvailable` prop so the Generate buttons disable cleanly when the testapp is offline.
+- [x] Add **"Generate with Salem Oracle"** button to the **Narration tab** of `PoiEditDialog.tsx` (Step 9P.10):
+  - Banner-style launcher (`OracleLauncher` component, full-width variant) at the top of the Narration tab
+  - Opens a nested Headless UI `Dialog` (z-1100, sits above the main edit dialog at z-1000)
+  - Sub-dialog has: prompt textarea, "Reset Oracle conversation history" checkbox (default ON for first call, auto-flips OFF after first successful generation so iterate works without re-checking), "Generate" button
+  - Calls `oracleClient.ask({ question, current_poi_id: poi.id, reset })` with the LocationMapApp POI's id directly (NOT a Salem catalog id)
+  - Spinner panel shows during the call with text explaining "Asking the Oracle… typically 5-15s. The LLM is gemma3:27b on the workstation GPU; concurrent calls would queue, so this is sequential."
+  - Returned `text` rendered in a slate panel with `whitespace-pre-wrap`; turn count shown as "Oracle response · turn N"
+  - Up to 8 `primary_sources` rendered in a collapsed `<details>` block with attribution, score, verbatim text, and modern_gloss in amber callouts
+  - "Insert into short_narration / long_narration / description" buttons (filtered through `has(field)` so tour POIs without those fields don't show buttons that would be no-ops). Each calls `setValue(field, oracleResult.text, { shouldDirty: true, shouldTouch: true })` so the existing react-hook-form dirty-tracking → PUT pipeline picks it up automatically
+  - "Iterate" button passes `reset: false` regardless of checkbox state to keep the rolling history alive
+- [x] Add the same launcher to the **General tab** for the `description` field (compact variant, sits inline below the description textarea)
+- [x] Surface `primary_sources` citations in the UI — collapsible `<details>` with score, attribution, verbatim text, modern gloss
+- [x] Capture the full Oracle response (text + primary_sources + question + timestamp + poi_id + kind + target_field + history_turn_count) in `localStorage` under key `salem-oracle-audit`. Capped at 500 entries with FIFO rotation. Logged on **insert** (when the operator accepts a generation by clicking an Insert button), not on generation, since generate-but-discard is just thinking out loud. Best-effort: localStorage quota or JSON failures are warned to console, not surfaced.
+- [x] Handle Oracle unavailable: dedicated rose-colored warning panel inside the sub-dialog with the start command and a "Re-check status" button that calls AdminLayout's `onOracleRefresh`. Generate / Iterate buttons disable when `oracleAvailable=false`.
 
 **Workflow** (from oracle-api.md's worked example, adapted for LocationMapApp):
 1. Operator picks a POI to edit in the tree (Step 9P.8) → edit dialog opens (Step 9P.10)

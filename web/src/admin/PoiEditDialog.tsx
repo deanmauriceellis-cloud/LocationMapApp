@@ -60,6 +60,50 @@ import {
   NUMERIC_FIELDS,
   DATE_FIELDS,
 } from './poiAdminFields'
+import {
+  ask as oracleAsk,
+  isAskOk,
+  type OracleAskOk,
+  type OraclePrimarySource,
+} from './oracleClient'
+
+// ─── Oracle audit log (9P.10b) ────────────────────────────────────────────
+//
+// Per master plan §1366: "Capture the full Oracle response (text + primary_
+// sources + question + timestamp) in a local audit log per accepted generation,
+// so revisions are traceable. Stored client-side in localStorage; not pushed
+// to PG until/unless we add an editorial-history feature."
+//
+// We log on INSERT (not on generate) — i.e. when the operator actually accepts
+// a generation by pasting it into a form field. Generate-but-discard is not
+// audited, since it's just thinking out loud.
+
+const ORACLE_AUDIT_KEY = 'salem-oracle-audit'
+const ORACLE_AUDIT_MAX = 500 // cap to keep localStorage manageable
+
+interface OracleAuditEntry {
+  ts: string
+  poi_id: string
+  poi_kind: PoiKind
+  field: string
+  question: string
+  text: string
+  primary_sources: OraclePrimarySource[]
+  history_turn_count: number
+}
+
+function appendOracleAudit(entry: OracleAuditEntry): void {
+  try {
+    const raw = localStorage.getItem(ORACLE_AUDIT_KEY)
+    const arr: OracleAuditEntry[] = raw ? JSON.parse(raw) : []
+    arr.push(entry)
+    while (arr.length > ORACLE_AUDIT_MAX) arr.shift()
+    localStorage.setItem(ORACLE_AUDIT_KEY, JSON.stringify(arr))
+  } catch (e) {
+    // localStorage quota or JSON parse — non-fatal, audit is best-effort
+    console.warn('[oracle-audit] failed to append:', e)
+  }
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +120,18 @@ export interface PoiEditDialogProps {
    * Operator can type new values; this is just hints.
    */
   knownCategories: string[]
+  /**
+   * 9P.10b: whether the Salem Oracle is currently reachable, mirrored from
+   * AdminLayout's polled status. When false, the "Generate with Salem Oracle"
+   * buttons are disabled with a tooltip pointing at the start script.
+   */
+  oracleAvailable: boolean
+  /**
+   * 9P.10b: ask AdminLayout to re-poll Oracle status. Wired to a "Re-check"
+   * action in the Generate sub-dialog so the operator can recover after
+   * starting the testapp without closing the edit dialog.
+   */
+  onOracleRefresh: () => void | Promise<void>
   /** Called after a successful PUT, with the full updated row from the API. */
   onSaved: (kind: PoiKind, updated: PoiRow) => void
   /** Called after a successful soft-delete, so AdminLayout can patch the row. */
@@ -218,6 +274,8 @@ export function PoiEditDialog({
   poi,
   kind,
   knownCategories,
+  oracleAvailable,
+  onOracleRefresh,
   onSaved,
   onDeleted,
   onClose,
@@ -236,6 +294,7 @@ export function PoiEditDialog({
     handleSubmit,
     formState: { dirtyFields, isDirty, isSubmitting },
     reset,
+    setValue,
   } = useForm<FieldValues>({
     defaultValues,
     // Re-init when defaults change (POI swap)
@@ -246,6 +305,105 @@ export function PoiEditDialog({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // ─── Oracle sub-dialog state (9P.10b) ──────────────────────────────────────
+  // The "Generate with Salem Oracle" button on the Narration tab (and General
+  // tab, for description) opens a nested modal where the operator types a
+  // prompt, hits Generate, waits 5-15s, then either pastes the result into
+  // a target field or iterates with a follow-up.
+  const [oracleOpen, setOracleOpen] = useState(false)
+  const [oraclePrompt, setOraclePrompt] = useState('')
+  const [oracleReset, setOracleReset] = useState(true) // default: fresh history
+  const [oracleBusy, setOracleBusy] = useState(false)
+  const [oracleError, setOracleError] = useState<string | null>(null)
+  const [oracleResult, setOracleResult] = useState<OracleAskOk | null>(null)
+  // The question that produced `oracleResult`, kept separately so the audit
+  // log records the *posed* question even if the operator clears the textarea
+  // before clicking Insert.
+  const [oracleResultQuestion, setOracleResultQuestion] = useState<string>('')
+
+  const openOracleDialog = useCallback(() => {
+    // Fresh open: clear last result so the operator isn't looking at stale
+    // text from a prior POI's session. Default to reset=true so the first
+    // call after opening doesn't carry context from another POI.
+    setOraclePrompt('')
+    setOracleError(null)
+    setOracleResult(null)
+    setOracleResultQuestion('')
+    setOracleReset(true)
+    setOracleOpen(true)
+  }, [])
+
+  const closeOracleDialog = useCallback(() => {
+    if (oracleBusy) return // ignore close while a request is in flight
+    setOracleOpen(false)
+  }, [oracleBusy])
+
+  // Run a single Oracle ask. Used by both the initial Generate button and
+  // the Iterate follow-up button. The only behavioral difference is the
+  // `reset` flag: initial Generate uses the operator-controlled checkbox;
+  // Iterate always passes false to keep history rolling.
+  const runOracleAsk = useCallback(
+    async (forceReset: boolean | null) => {
+      if (!poi || !kind) return
+      const question = oraclePrompt.trim()
+      if (!question) {
+        setOracleError('Prompt is empty')
+        return
+      }
+      if (oracleBusy) return // serialize per master plan §1383
+      setOracleBusy(true)
+      setOracleError(null)
+      try {
+        const resp = await oracleAsk({
+          question,
+          current_poi_id: poi.id,
+          reset: forceReset === null ? oracleReset : forceReset,
+        })
+        if (!isAskOk(resp)) {
+          setOracleError(resp.error)
+          return
+        }
+        setOracleResult(resp)
+        setOracleResultQuestion(question)
+        // Subsequent calls in this session should iterate by default — flip
+        // reset off so the rolling history accumulates without the operator
+        // having to remember to uncheck it.
+        setOracleReset(false)
+      } catch (e) {
+        setOracleError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setOracleBusy(false)
+      }
+    },
+    [poi, kind, oraclePrompt, oracleReset, oracleBusy],
+  )
+
+  // Paste the latest Oracle text into a form field, mark it dirty so the
+  // existing Save flow picks it up, and append an audit log entry. The
+  // sub-dialog stays open so the operator can iterate or insert into a
+  // second field if they want — they close it manually when done.
+  const insertOracleInto = useCallback(
+    (field: string) => {
+      if (!oracleResult || !poi || !kind) return
+      setValue(field, oracleResult.text, {
+        shouldDirty: true,
+        shouldValidate: false,
+        shouldTouch: true,
+      })
+      appendOracleAudit({
+        ts: new Date().toISOString(),
+        poi_id: poi.id,
+        poi_kind: kind,
+        field,
+        question: oracleResultQuestion,
+        text: oracleResult.text,
+        primary_sources: oracleResult.primary_sources ?? [],
+        history_turn_count: oracleResult.history_turn_count,
+      })
+    },
+    [oracleResult, oracleResultQuestion, poi, kind, setValue],
+  )
 
   // ─── Save flow ─────────────────────────────────────────────────────────────
 
@@ -352,8 +510,18 @@ export function PoiEditDialog({
   const has = (f: string) => allowed.has(f)
   const reg = (f: string) => register(f)
 
+  // List of insertable target fields the current POI kind actually has, in
+  // the order the operator most likely wants them. Filtered through `has()`
+  // so a tour POI doesn't see "Insert into pass3_narration".
+  const insertableFields = [
+    { field: 'short_narration', label: 'Insert into short_narration' },
+    { field: 'long_narration', label: 'Insert into long_narration' },
+    { field: 'description', label: 'Insert into description' },
+  ].filter((f) => has(f.field))
+
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
+    <Fragment>
     <Transition show={open} as={Fragment}>
       <Dialog onClose={handleClose} className="relative z-[1000]">
         {/* Backdrop */}
@@ -531,6 +699,13 @@ export function PoiEditDialog({
                             rows={4}
                             {...reg('description')}
                             className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-mono"
+                          />
+                          {/* 9P.10b — Oracle launcher mirrored on General tab */}
+                          <OracleLauncher
+                            oracleAvailable={oracleAvailable}
+                            onClick={openOracleDialog}
+                            label="Generate description with Salem Oracle"
+                            compact
                           />
                         </FieldRow>
                       )}
@@ -783,12 +958,12 @@ export function PoiEditDialog({
 
                     {/* ─── Narration ───────────────────────────────────────── */}
                     <TabPanel className="space-y-4">
-                      {/*
-                        TODO 9P.10b — "Generate with Salem Oracle" button slot.
-                        Will call POST /api/oracle/ask with current_poi_id=poi.id
-                        and let the operator paste results into short_narration,
-                        long_narration, or description.
-                      */}
+                      {/* 9P.10b — "Generate with Salem Oracle" launcher */}
+                      <OracleLauncher
+                        oracleAvailable={oracleAvailable}
+                        onClick={openOracleDialog}
+                        label="Generate narration with Salem Oracle"
+                      />
 
                       {has('short_narration') && (
                         <FieldRow label="Short narration" htmlFor="short_narration">
@@ -1188,6 +1363,341 @@ export function PoiEditDialog({
         </div>
       </Dialog>
     </Transition>
+
+    {/* ─── Oracle "Generate" sub-dialog (9P.10b) ──────────────────────────── */}
+    <Transition show={oracleOpen} as={Fragment}>
+      <Dialog
+        onClose={closeOracleDialog}
+        className="relative z-[1100]"
+      >
+        <TransitionChild
+          as={Fragment}
+          enter="ease-out duration-150"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-100"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
+        </TransitionChild>
+
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-150"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-100"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <DialogPanel className="w-[720px] max-w-[95vw] max-h-[88vh] flex flex-col bg-white rounded-lg shadow-2xl text-slate-800">
+              {/* Header */}
+              <div className="flex items-start justify-between px-4 py-3 border-b border-slate-200">
+                <div className="min-w-0">
+                  <DialogTitle className="text-base font-semibold flex items-center gap-2">
+                    <span className="text-violet-700">✦</span>
+                    Generate with Salem Oracle
+                  </DialogTitle>
+                  <p className="text-xs text-slate-500 truncate">
+                    Editing <span className="font-mono">{poi.id}</span> · context
+                    pinned to this POI ({kind})
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeOracleDialog}
+                  disabled={oracleBusy}
+                  className="text-slate-400 hover:text-slate-700 text-xl leading-none disabled:opacity-30"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+                {/* Prompt input */}
+                <div className="space-y-1">
+                  <label
+                    htmlFor="oracle-prompt"
+                    className="block text-xs font-medium text-slate-700"
+                  >
+                    Prompt
+                  </label>
+                  <textarea
+                    id="oracle-prompt"
+                    rows={4}
+                    value={oraclePrompt}
+                    onChange={(e) => setOraclePrompt(e.target.value)}
+                    disabled={oracleBusy}
+                    placeholder='e.g. "Rewrite this description as a single 90-word tour-guide paragraph for spoken audio. Lead with what makes this place haunted, not its founding date."'
+                    className="w-full px-2 py-1 text-sm border border-slate-300 rounded resize-y disabled:bg-slate-50"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    The Oracle is told this POI is the immediate referent —
+                    use &quot;this&quot;, &quot;the description&quot;,
+                    &quot;him/her&quot;, etc. freely.
+                  </p>
+                </div>
+
+                {/* Options row */}
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={oracleReset}
+                      onChange={(e) => setOracleReset(e.target.checked)}
+                      disabled={oracleBusy}
+                    />
+                    Reset Oracle conversation history
+                    <span
+                      className="text-slate-400"
+                      title="The Oracle keeps a single shared 6-turn rolling history across all callers. Reset clears it before this turn."
+                    >
+                      (?)
+                    </span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => void runOracleAsk(null)}
+                    disabled={oracleBusy || !oracleAvailable || !oraclePrompt.trim()}
+                    title={
+                      !oracleAvailable
+                        ? 'Oracle is unavailable — start ~/Development/Salem/scripts/start-testapp.sh and click the header pill'
+                        : 'Asks the Salem LLM to compose content. Typically 5-15s per call.'
+                    }
+                    className="px-4 py-1.5 text-sm rounded bg-violet-700 text-white hover:bg-violet-600 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  >
+                    {oracleBusy ? 'Generating…' : 'Generate'}
+                  </button>
+                </div>
+
+                {/* Oracle unavailable warning */}
+                {!oracleAvailable && (
+                  <div className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded space-y-2">
+                    <p className="font-medium">
+                      Salem Oracle is unavailable.
+                    </p>
+                    <p>
+                      Start it with:{' '}
+                      <code className="px-1 py-0.5 bg-white border border-rose-200 rounded font-mono">
+                        bash ~/Development/Salem/scripts/start-testapp.sh
+                      </code>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void onOracleRefresh()}
+                      className="px-2 py-1 text-xs rounded bg-rose-700 text-white hover:bg-rose-600"
+                    >
+                      Re-check status
+                    </button>
+                  </div>
+                )}
+
+                {/* Spinner */}
+                {oracleBusy && (
+                  <div className="flex items-center gap-3 px-3 py-3 bg-violet-50 border border-violet-200 rounded">
+                    <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-violet-800">
+                      Asking the Oracle… typically 5-15s. The LLM is gemma3:27b
+                      on the workstation GPU; concurrent calls would queue, so
+                      this is sequential.
+                    </p>
+                  </div>
+                )}
+
+                {/* Error */}
+                {oracleError && !oracleBusy && (
+                  <div className="p-3 text-xs font-mono text-rose-800 bg-rose-50 border border-rose-200 rounded break-words">
+                    {oracleError}
+                  </div>
+                )}
+
+                {/* Result */}
+                {oracleResult && !oracleBusy && (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-1">
+                        Oracle response · turn {oracleResult.history_turn_count}
+                      </p>
+                      <p className="text-sm text-slate-800 whitespace-pre-wrap">
+                        {oracleResult.text}
+                      </p>
+                    </div>
+
+                    {/* Insert buttons */}
+                    {insertableFields.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {insertableFields.map(({ field, label }) => (
+                          <button
+                            key={field}
+                            type="button"
+                            onClick={() => insertOracleInto(field)}
+                            className="px-3 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-500"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {insertableFields.length === 0 && (
+                      <p className="text-xs italic text-slate-500">
+                        This POI kind has no narration / description field to
+                        insert into. Copy the text manually if you need it.
+                      </p>
+                    )}
+
+                    {/* Iterate */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
+                      <p className="text-[11px] text-slate-500 flex-1">
+                        To iterate, type a follow-up above (e.g. &quot;make
+                        that two sentences shorter&quot;) and hit Iterate. The
+                        Oracle&apos;s 6-turn rolling history carries forward.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void runOracleAsk(false)}
+                        disabled={oracleBusy || !oracleAvailable || !oraclePrompt.trim()}
+                        className="px-3 py-1 text-xs rounded bg-violet-600 text-white hover:bg-violet-500 disabled:bg-slate-300"
+                      >
+                        Iterate
+                      </button>
+                    </div>
+
+                    {/* Primary sources */}
+                    {oracleResult.primary_sources?.length > 0 && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-slate-600 hover:text-slate-800 font-medium">
+                          Primary sources ({oracleResult.primary_sources.length})
+                        </summary>
+                        <ul className="mt-2 space-y-2">
+                          {oracleResult.primary_sources.map((src, i) => (
+                            <li
+                              key={i}
+                              className="p-2 bg-amber-50 border border-amber-200 rounded"
+                            >
+                              <p className="font-medium text-amber-900">
+                                {src.attribution}
+                                {typeof src.score === 'number' && (
+                                  <span className="ml-2 text-amber-700 font-mono">
+                                    (score {src.score.toFixed(2)})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="mt-1 text-amber-800 italic whitespace-pre-wrap">
+                                {src.verbatim_text}
+                              </p>
+                              {src.modern_gloss && (
+                                <p className="mt-1 text-[11px] text-amber-700">
+                                  Gloss: {src.modern_gloss}
+                                </p>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={closeOracleDialog}
+                  disabled={oracleBusy}
+                  className="px-3 py-1 text-sm rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-50"
+                >
+                  Done
+                </button>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+    </Fragment>
   )
 }
 
+// ─── Oracle launcher button (9P.10b) ────────────────────────────────────────
+//
+// Small inline button that opens the Oracle sub-dialog. Lives on the
+// Narration tab as a prominent banner-style action and on the General tab
+// (compact variant) under the description field.
+
+interface OracleLauncherProps {
+  oracleAvailable: boolean
+  onClick: () => void
+  label: string
+  compact?: boolean
+}
+
+function OracleLauncher({
+  oracleAvailable,
+  onClick,
+  label,
+  compact,
+}: OracleLauncherProps) {
+  const tooltip = oracleAvailable
+    ? 'Asks the Salem LLM to compose content. 5-15 seconds per call.'
+    : 'Salem Oracle unavailable — start the testapp and reload.'
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={tooltip}
+        className={[
+          'mt-1 inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-colors',
+          oracleAvailable
+            ? 'bg-violet-100 text-violet-800 hover:bg-violet-200'
+            : 'bg-slate-100 text-slate-500',
+        ].join(' ')}
+      >
+        <span aria-hidden>✦</span>
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className={[
+        'flex items-center justify-between gap-3 p-3 rounded border',
+        oracleAvailable
+          ? 'bg-violet-50 border-violet-200'
+          : 'bg-slate-50 border-slate-200',
+      ].join(' ')}
+    >
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-violet-900 flex items-center gap-1">
+          <span aria-hidden>✦</span> Salem Oracle
+        </p>
+        <p className="text-[11px] text-slate-600">
+          {oracleAvailable
+            ? 'Ask the LLM to compose, rewrite, or expand narration content. Pinned to this POI for context.'
+            : 'Currently unavailable. Start the Salem testapp to enable generation.'}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        title={tooltip}
+        className={[
+          'px-3 py-1.5 text-xs rounded transition-colors whitespace-nowrap',
+          oracleAvailable
+            ? 'bg-violet-700 text-white hover:bg-violet-600'
+            : 'bg-slate-300 text-slate-700 hover:bg-slate-400',
+        ].join(' ')}
+      >
+        {label}
+      </button>
+    </div>
+  )
+}
