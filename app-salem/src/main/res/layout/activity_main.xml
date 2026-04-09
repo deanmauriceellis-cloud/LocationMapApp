@@ -217,6 +217,36 @@
         android:src="@android:drawable/ic_menu_add"
         app:tint="@android:color/white" />
 
+    <!-- GPS Journey toggle (Phase 9T+, S109) — bottom-left, mirrors fabMain.
+         Tap to show/hide the recorded GPS journey path on the map. Recording
+         itself is always-on while the activity is alive (Option B). -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnGpsToggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="100dp"
+        android:src="@drawable/ic_gps"
+        android:contentDescription="Toggle GPS journey path visibility"
+        app:tint="@android:color/white" />
+
+    <TextView
+        android:id="@+id/btnGpsToggleLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="22dp"
+        android:layout_marginBottom="80dp"
+        android:text="GPS"
+        android:textColor="@android:color/white"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:shadowColor="#000000"
+        android:shadowDx="1"
+        android:shadowDy="1"
+        android:shadowRadius="2" />
+
     <!-- Proximity dock: nearby POI icons at bottom of screen (Phase 9T) -->
     <include layout="@layout/proximity_dock" />
 

@@ -50,7 +50,9 @@ import com.example.wickedsalemwitchcitytour.ui.radar.RadarRefreshScheduler
 import com.example.wickedsalemwitchcitytour.util.DebugEndpoints
 import com.example.wickedsalemwitchcitytour.util.DebugHttpServer
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.userdata.GpsTrackRecorder
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.util.GeoPoint
@@ -80,6 +82,22 @@ class SalemMainActivity : AppCompatActivity() {
     internal lateinit var appBarMenuManager: AppBarMenuManager
     internal val radarScheduler = RadarRefreshScheduler()
     internal lateinit var favoritesManager: com.example.locationmapapp.util.FavoritesManager
+
+    /**
+     * GPS Journey recorder (Phase 9T+, S109). Field-injected by Hilt.
+     * Records every GPS fix the activity sees into [com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase]
+     * with a 24h rolling retention. Recording is always-on while the activity is alive (Option B);
+     * the bottom-left "GPS" FAB controls only whether the path polyline is displayed on the map.
+     */
+    @Inject
+    internal lateinit var gpsTrackRecorder: GpsTrackRecorder
+
+    /**
+     * Magenta polyline that paints the user's recent GPS journey on the map.
+     * Lazy-created in [initGpsTrackOverlay] during onCreate. Lives in the activity
+     * scope; not shared with any other module.
+     */
+    internal var gpsTrackOverlay: Polyline? = null
 
     // Phase 9T: Narration system
     internal var narrationGeofenceManager: com.example.wickedsalemwitchcitytour.tour.NarrationGeofenceManager? = null
@@ -359,6 +377,10 @@ class SalemMainActivity : AppCompatActivity() {
         setupMap()
         buildFabSpeedDial()
         initNarrationSystem()
+        // ── GPS Journey: prune stale data, init the polyline overlay, wire toggle ──
+        gpsTrackRecorder.pruneStaleAtStartup()
+        initGpsTrackOverlay()
+        setupGpsToggleButton()
         observeViewModel()
         requestLocationPermission()
         // Post debug intent to next frame so it runs after onStart() restore
@@ -1236,6 +1258,107 @@ class SalemMainActivity : AppCompatActivity() {
     internal fun closeFabMenu() { fabMenuOpen = false; binding.fabMenu.visibility = View.GONE;    updateFabTriggerIcon(false) }
 
     // =========================================================================
+    // GPS JOURNEY (Phase 9T+, S109) — Option B: always record, toggle controls visibility
+    // =========================================================================
+
+    private val GPS_TRACK_PREFS = "app_bar_menu_prefs"
+    private val GPS_TRACK_PREF_KEY = "gps_track_visible"
+    private val GPS_TRACK_TINT_ON  = Color.parseColor("#80FF80")  // soft green when visible
+    private val GPS_TRACK_TINT_OFF = Color.parseColor("#888888")  // gray when hidden
+
+    /**
+     * Creates the magenta journey polyline immediately (empty), adds it to the map
+     * if the user preference says visible, then asynchronously seeds it with the
+     * last 24h of recorded points from [GpsTrackRecorder].
+     *
+     * The empty-first-then-seed pattern means [observeViewModel]'s GPS handler can
+     * unconditionally call `gpsTrackOverlay?.actualPoints.add(...)` from frame 1
+     * without a null check race. The async seed runs on the Main dispatcher (per
+     * lifecycleScope default) so it serializes cleanly with the GPS observer's
+     * point appends.
+     */
+    private fun initGpsTrackOverlay() {
+        val polyline = Polyline().apply {
+            outlinePaint.apply {
+                color = Color.parseColor("#B3FF00FF")  // semi-transparent magenta (~70% alpha)
+                strokeWidth = 8f
+                isAntiAlias = true
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+            title = "GPS journey"
+        }
+        gpsTrackOverlay = polyline
+        if (isGpsTrackVisible()) {
+            // Insert at index 0 so it paints below POI markers and the GPS marker
+            binding.mapView.overlays.add(0, polyline)
+        }
+
+        lifecycleScope.launch {
+            val recent = gpsTrackRecorder.getRecent24h()
+            // Any fixes that arrived during the suspend are already in actualPoints
+            // (added by the GPS observer on Main). Prepend the historical to keep
+            // chronological order and avoid losing those in-flight appends.
+            val pendingNew = polyline.actualPoints.toList()
+            val merged = recent.map { GeoPoint(it.lat, it.lng) } + pendingNew
+            polyline.setPoints(merged)
+            binding.mapView.invalidate()
+            DebugLogger.i(
+                "SalemMainActivity",
+                "GPS journey overlay seeded — ${recent.size} historical + ${pendingNew.size} in-flight points (visible=${isGpsTrackVisible()})"
+            )
+        }
+    }
+
+    /**
+     * Wires the bottom-left "GPS" FAB to add/remove the journey polyline from the
+     * map. Persists the visibility preference; recording is unaffected (Option B).
+     */
+    private fun setupGpsToggleButton() {
+        val btn = binding.btnGpsToggle
+        btn.imageTintList = android.content.res.ColorStateList.valueOf(
+            if (isGpsTrackVisible()) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF
+        )
+        btn.setOnClickListener {
+            val newVisible = !isGpsTrackVisible()
+            setGpsTrackVisible(newVisible)
+            btn.imageTintList = android.content.res.ColorStateList.valueOf(
+                if (newVisible) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF
+            )
+            gpsTrackOverlay?.let { polyline ->
+                if (newVisible) {
+                    if (!binding.mapView.overlays.contains(polyline)) {
+                        binding.mapView.overlays.add(0, polyline)
+                    }
+                } else {
+                    binding.mapView.overlays.remove(polyline)
+                }
+                binding.mapView.invalidate()
+            }
+            Toast.makeText(
+                this,
+                if (newVisible) "GPS journey path: ON" else "GPS journey path: OFF",
+                Toast.LENGTH_SHORT
+            ).show()
+            DebugLogger.i(
+                "SalemMainActivity",
+                "GPS journey toggled → ${if (newVisible) "VISIBLE" else "HIDDEN"} (recording always on)"
+            )
+        }
+    }
+
+    private fun isGpsTrackVisible(): Boolean =
+        getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
+            .getBoolean(GPS_TRACK_PREF_KEY, true)
+
+    private fun setGpsTrackVisible(visible: Boolean) {
+        getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(GPS_TRACK_PREF_KEY, visible)
+            .apply()
+    }
+
+    // =========================================================================
     // OBSERVERS
     // =========================================================================
 
@@ -1246,6 +1369,24 @@ class SalemMainActivity : AppCompatActivity() {
             val point = update.point
             val speedMph = update.speedMps?.let { it * 2.23694 }
             lastGpsSpeedMph = speedMph
+
+            // ── 0. GPS Journey: record every fix to user_data.db (Option B, S109) ──
+            //    Recording is independent of the dead-zone gate AND of the visibility
+            //    toggle — we capture every fix the activity sees so the journey log
+            //    has continuous data even when the visual marker is parked.
+            gpsTrackRecorder.recordFix(
+                lat = point.latitude,
+                lng = point.longitude,
+                accuracyM = update.accuracy,
+                speedMps = update.speedMps,
+                bearingDeg = update.bearing
+            )
+            gpsTrackOverlay?.let { polyline ->
+                polyline.actualPoints.add(GeoPoint(point.latitude, point.longitude))
+                if (binding.mapView.overlays.contains(polyline)) {
+                    binding.mapView.invalidate()
+                }
+            }
 
             // ── 1. Adaptive GPS interval ──
             //   Driving (>20 mph): 10s — coarse is fine
