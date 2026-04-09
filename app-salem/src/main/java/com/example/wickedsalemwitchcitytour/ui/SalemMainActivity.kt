@@ -1264,13 +1264,32 @@ class SalemMainActivity : AppCompatActivity() {
                 viewModel.restartLocationUpdates(desiredInterval, minInterval)
             }
 
-            // ── 2. 100m dead zone — skip jitter when stationary ──
-            //    Bypassed in MANUAL mode (walk simulator) so every position update renders
+            // ── 2. Proportional dead zone — drop fixes within 2× reported accuracy ──
+            //    S109 fix: replaces the old fixed 100m threshold. At slow downtown driving
+            //    speeds (13-15 mph ≈ 6 m/s) the 100m threshold made the cursor refresh only
+            //    every 100m/6m/s ≈ 15 seconds — exactly the user-reported "10-15 sec GPS
+            //    updates" symptom. The chip and the GMS request are both fine; the entire
+            //    bug was here.
+            //
+            //    New rule: dead zone = 2× reported accuracy, clamped to [5m, 100m].
+            //      • 5m floor   — always allow real movement >5m, never freeze the cursor
+            //                     when GPS is reporting good accuracy.
+            //      • 100m ceil  — worst-case multipath safety net, matches the old behavior.
+            //      • 2× acc     — when accuracy widens (urban canyon, tree cover, indoors)
+            //                     the dead zone widens with it, so jitter is still absorbed
+            //                     under degraded conditions.
+            //
+            //    Self-adapts across walking, slow driving, and L1-only multipath without
+            //    needing mode-specific logic. Bypassed in MANUAL mode (walk simulator) so
+            //    every position update renders.
             val isManual = viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL
+            val deadZoneMeters = (update.accuracy * 2f).coerceIn(5f, 100f)
             if (!initialCenterDone) {
                 // First fix always processes — fall through
-            } else if (!isManual && distanceBetween(lastGpsPoint, point) < 100f) {
-                DebugLogger.d("SalemMainActivity", "GPS jitter <100m — skipped (map only)")
+            } else if (!isManual && distanceBetween(lastGpsPoint, point) < deadZoneMeters) {
+                DebugLogger.d("SalemMainActivity",
+                    "GPS dead zone ${"%.1f".format(deadZoneMeters)}m " +
+                    "(acc=${"%.1f".format(update.accuracy)}m) — skipped (map only)")
                 // Still handle deferred restores even during jitter
                 handleDeferredRestores(point)
 
@@ -1278,7 +1297,7 @@ class SalemMainActivity : AppCompatActivity() {
                 updateIdleStatusLine(point.latitude, point.longitude, speedMph)
 
                 // ── NARRATION: feed every GPS update regardless of dead zone ──
-                // Geofence radii are 20-50m; the 100m dead zone is for map/marker only
+                // Geofence radii are 20-50m; the dead zone is for map/marker only
                 updateTourLocation(point)
 
                 // ── Idle auto-populate: start full scanner after 5 min stationary ──
@@ -1313,7 +1332,7 @@ class SalemMainActivity : AppCompatActivity() {
             // ── 3b. Significant move — reset idle timer and cancel idle populate ──
             lastSignificantMoveTime = System.currentTimeMillis()
             if (idlePopulateJob?.isActive == true) {
-                DebugLogger.i("SalemMainActivity", "GPS moved >100m — stopping idle auto-populate")
+                DebugLogger.i("SalemMainActivity", "GPS moved beyond dead zone — stopping idle auto-populate")
                 stopIdlePopulate(clearState = true)
             }
             idlePopulateState = null  // discard saved state — user has moved
