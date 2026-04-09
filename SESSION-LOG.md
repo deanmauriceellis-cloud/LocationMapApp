@@ -2,6 +2,42 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 105: 2026-04-08 — Phase 9P.B Step 9P.10 (POI edit dialog — tabbed Headless UI modal)
+
+### Summary
+Built `web/src/admin/PoiEditDialog.tsx` (~1,193 lines) and `web/src/admin/poiAdminFields.ts` (~75 lines, TS mirror of `cache-proxy/lib/admin-pois.js` field whitelists). The dialog is a Headless UI v2 `<Dialog>` + `<TabGroup>` modal with kind-aware tabs (General · Location · Hours & Contact · Narration · Provenance · Linked Historical (9P.10a stub) · Danger Zone) covering every column in `TOUR_FIELDS`/`BUSINESS_FIELDS`/`NARRATION_FIELDS`. Form state via `react-hook-form`; only `formState.dirtyFields` are sent to `PUT /api/admin/salem/pois/:kind/:id` so the partial-update endpoint never gets a clobbering full row. JSONB textareas pretty-print on load (`JSON.stringify(value, null, 2)`) and `JSON.parse` on submit — parse failures surface inline and abort save. Numeric fields coerce empty→null and abort on non-numeric strings. Date fields slice to YYYY-MM-DD. Tour-only boolean flags render as checkboxes. The category field is a free-text input + `<datalist>` of observed values from the loaded snapshot (computed in AdminLayout via a new `knownCategories` memo: 7 categories for tour, 19 business_types, 29 categories for narration). Soft-delete in the Danger Zone tab uses an inline confirm prompt (no nested dialog) → `DELETE /api/admin/salem/pois/:kind/:id` → `onDeleted` callback patches the row's `deleted_at` in the shared `byKind` snapshot so the tree ghosts it and the map drops it. Save flow: PUT → `onSaved(kind, updated)` patches the row in `byKind` + resets the form to the new baseline + closes. Cancel with dirty fields → `window.confirm("Discard and close?")`. Footer shows dirty-field count "N field(s) modified" or "No changes". **Open-trigger split:** marker click in `AdminMap` opens the dialog AND selects (per master plan §1296); tree click only selects + flies the map. Implemented via two new AdminLayout callbacks (`handleTreeSelect` and `handleMapSelect`) replacing the single `handlePoiSelect` from S104. `react-hook-form@7.72.1` and `@headlessui/react@2.2.10` installed (20 packages added, no new audit warnings). `npx tsc --noEmit` clean. `npm run build` clean (538 modules, 790KB bundle, no new warnings beyond pre-existing chunk-size note).
+
+### Decisions
+1. **Single dialog component, kind-aware via prop, conditional fields with `has(field)` guards.** Three separate dialog components (one per kind) would have ~70% duplicated JSX for the shared fields (name, lat, lng, address, phone, website, hours, image_asset, provenance) and would force the maintainer to remember to mirror changes across three files. One file with `has('subcategories') && (...)` blocks is uglier per-line but objectively easier to keep aligned with the cache-proxy whitelist.
+2. **TS mirror of cache-proxy whitelists in `poiAdminFields.ts`** rather than fetching the schema or re-deriving from PG metadata. The cache-proxy already enforces the whitelist server-side; the client mirror just keeps the form scoped to writable fields. The two files must stay aligned when columns are added — comment at the top of `poiAdminFields.ts` calls this out explicitly.
+3. **`react-hook-form` `formState.dirtyFields` for partial-update payloads.** The PUT endpoint is partial-update friendly. Sending only dirty fields means: no accidental clobbering of server-only fields, no needless `updated_at` bumps, no full-row payloads for one-field changes, and the dialog footer can show an honest "N field(s) modified" count.
+4. **JSONB editor as raw textarea + JSON.parse on submit.** A real array editor would have been nicer for `tags`, `subcategories`, `related_*_ids`, etc., but the JSONB columns store heterogeneous shapes (some are string arrays, some are object arrays like `action_buttons`) so a generic editor is the only honest option for now. Parse-on-submit with inline error surfacing is the simplest correct path; a proper structured editor can land in a later step if the operator pushes back.
+5. **Category field is free-text + `<datalist>`, NOT a fixed dropdown from `poiCategories.ts`.** The Android app's 22-category taxonomy doesn't match what's actually in the DB (7 tour categories, 19 business_types, 29 narration categories). Forcing a dropdown would lock the operator out of new values. Free text + datalist of observed values gives autocomplete without the lockout. Computed in AdminLayout via a `knownCategories` memo so the dialog doesn't need access to the full dataset.
+6. **Open trigger split: marker click opens, tree click does not.** The master plan §1296 says "click marker → opens edit dialog (placeholder until 9P.10)" — opening the modal on every tree click would launch a dialog while the operator is just navigating. Two callbacks: `handleTreeSelect` (select-only) and `handleMapSelect` (select + flip `editOpen=true`). The single `handlePoiSelect` from S104 was split.
+7. **9P.10a Linked Historical Content tab is a stub** ("No links yet — see Phase 9Q") since Phase 9Q hasn't run. The tab exists in the dialog so the muscle memory is right; the real implementation lands after the building→POI bridge is built.
+8. **9P.10b Salem Oracle integration deferred to its own step** — the master plan calls for a "Generate with Salem Oracle" button on the Narration tab that opens its own sub-dialog and POSTs to `http://localhost:8088/api/oracle/ask`. Marked with a TODO comment in the file at the slot where the button will land. Keeping S105 scoped to the form itself.
+9. **Soft-delete confirm is an inline prompt inside the Danger Zone tab, not a nested dialog.** Nested Headless UI dialogs would fight for focus management and add a dependency on `Disclosure` or another nesting primitive. An inline `confirmDelete` boolean state with cancel/confirm buttons is simpler and stays within the tab.
+10. **Did NOT add an Oracle button to the General tab's `description` field even though master plan §1355 says to.** That's part of 9P.10b. Added a TODO comment at the top of the Narration tab pointing at the slot.
+
+### Files Changed
+- `web/src/admin/PoiEditDialog.tsx` — NEW (~1,193 lines)
+- `web/src/admin/poiAdminFields.ts` — NEW (~75 lines, TS mirror of cache-proxy whitelists)
+- `web/src/admin/AdminLayout.tsx` — modified (split `handlePoiSelect` into `handleTreeSelect`/`handleMapSelect`; added `editOpen` state, `handlePoiSaved`, `handlePoiDeleted`, `handleEditClose` callbacks, `knownCategories` memo; rendered `<PoiEditDialog>` at the layout root; doc comment block refreshed)
+- `web/package.json` + `web/package-lock.json` — `react-hook-form@^7.72.1` + `@headlessui/react@^2.2.10` added (20 packages, no new audit warnings)
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Step 9P.10 marked DONE with full implementation checklist
+- `STATE.md` — Last Updated → S105; TOP PRIORITY → Step 9P.10b; Phase 9P.B status row for 9P.10
+- `CLAUDE.md` — session count 104 → 105; Phase 9P.B status 3/8 → 5/8; "next" pointer → 9P.10b
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-105-2026-04-08.md` — live conversation log
+- `~/.claude/.../memory/project_next_session_priority.md` — refreshed to point at Step 9P.10b (Salem Oracle)
+
+### Verification
+- `cd web && npx tsc --noEmit` → exit 0, zero diagnostics
+- `cd web && npm run build` → success, 538 modules transformed, dist/assets/index-*.js 790.08 kB / gzip 231.06 kB, no new warnings
+- NOT browser-tested by Claude — the save/delete flows and the JSONB parse-on-submit handling are unverified end-to-end. First operator smoke test happens next session.
+
+---
+
 ## Session 104: 2026-04-08 — Phase 9P.B Step 9P.9 (Admin map view via Leaflet + markercluster) + assessment delta review
 
 ### Summary

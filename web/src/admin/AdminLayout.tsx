@@ -1,4 +1,4 @@
-// AdminLayout — Phase 9P.B Step 9P.7 (shell), 9P.8 (POI tree), 9P.9 (map)
+// AdminLayout — Phase 9P.B Steps 9P.7-9P.10
 //
 // Shell for the LocationMapApp Salem POI admin tool. Three-pane layout:
 //   ┌─────────────────────────────────────────────────────────────────────┐
@@ -6,18 +6,26 @@
 //   ├──────────────────────┬──────────────────────────────────────────────┤
 //   │ POI tree (9P.8 ✓)    │ Map view (9P.9 ✓)                            │
 //   │ react-arborist       │ Leaflet + cluster                            │
-//   │                      │                                              │
+//   │                      │  + edit dialog modal (9P.10 ✓)               │
 //   └──────────────────────┴──────────────────────────────────────────────┘
 //
 // Step status:
 //   9P.7  ✓ shell (this file)
 //   9P.8  ✓ POI tree (PoiTree.tsx, wired into the left pane)
 //   9P.9  ✓ Admin map view (AdminMap.tsx, wired into the center pane)
-//   9P.10 — POI edit dialog (modal triggered from tree/map)
+//   9P.10 ✓ POI edit dialog (PoiEditDialog.tsx; opens from marker click)
+//   9P.10a — Linked Historical Content tab (currently a stub in the dialog)
 //   9P.10b — Salem Oracle integration (the "Oracle: —" pill goes live + a
 //            "Generate with Salem Oracle" button appears in the edit dialog)
 //   9P.11 — Highlight Duplicates wiring
 //   9P.13 — Publish wiring
+//
+// ─── Selection vs. edit-open semantics (9P.10) ─────────────────────────────
+// Tree click: SELECTS the POI → AdminMap flies to it + gold-rings the marker.
+//             Does NOT open the edit dialog (operator may just be browsing).
+// Marker click: SELECTS *and* OPENS the edit dialog (per master plan §1296).
+// This is implemented via two callbacks: handleTreeSelect (just sets the
+// selection) and handleMapSelect (sets the selection + flips editOpen=true).
 //
 // Data model (9P.9):
 //   PoiTree owns the initial fetch of all 1,720 POIs (kind=tour|business|
@@ -40,9 +48,10 @@
 // tree fetch in 9P.8) triggers the prompt; subsequent requests reuse the
 // browser's cached credentials. There is no in-page login form by design.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { PoiTree, type PoiKind, type PoiRow, type PoiSelection } from './PoiTree'
 import { AdminMap } from './AdminMap'
+import { PoiEditDialog } from './PoiEditDialog'
 
 export function AdminLayout() {
   // Shared POI dataset — populated by PoiTree's onDataLoaded callback after
@@ -50,6 +59,8 @@ export function AdminLayout() {
   // both panes always see identical data) and to AdminMap.
   const [byKind, setByKind] = useState<Record<PoiKind, PoiRow[]> | null>(null)
   const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
+  // 9P.10: edit dialog visibility. Marker click opens it; tree click does not.
+  const [editOpen, setEditOpen] = useState(false)
 
   const handleDataLoaded = useCallback((data: Record<PoiKind, PoiRow[]>) => {
     setByKind(data)
@@ -69,11 +80,81 @@ export function AdminLayout() {
     console.log('[admin] Publish clicked — wiring lands in 9P.13')
   }, [])
 
-  const handlePoiSelect = useCallback((selection: PoiSelection) => {
-    // 9P.9: lift the selection so AdminMap can fly to it. The edit dialog
-    // (9P.10) will read this same state to know which POI to populate.
+  // Tree click — selects only (drives map fly-to + ring), does NOT open
+  // the edit dialog. The operator may just be browsing the tree.
+  const handleTreeSelect = useCallback((selection: PoiSelection) => {
     setSelectedPoi(selection)
   }, [])
+
+  // Marker click — selects AND opens the edit dialog (master plan §1296).
+  const handleMapSelect = useCallback((selection: PoiSelection) => {
+    setSelectedPoi(selection)
+    setEditOpen(true)
+  }, [])
+
+  // 9P.10: when the dialog saves successfully, patch the matching row in the
+  // shared byKind snapshot so the tree (via externalByKind) and the map (via
+  // its byKind prop) reflect the new field values without re-fetching.
+  const handlePoiSaved = useCallback(
+    (kind: PoiKind, updated: PoiRow) => {
+      setByKind((prev) => {
+        if (!prev) return prev
+        const next = { ...prev }
+        next[kind] = prev[kind].map((row) =>
+          row.id === updated.id ? { ...row, ...updated } : row,
+        )
+        return next
+      })
+      setSelectedPoi((prev) => {
+        if (!prev || prev.kind !== kind || prev.poi.id !== updated.id) return prev
+        return { kind, poi: { ...prev.poi, ...updated } }
+      })
+    },
+    [],
+  )
+
+  // 9P.10: when the dialog soft-deletes, mark the row as deleted in the
+  // shared snapshot. PoiTree filters deleted rows by default (toggle reveals);
+  // AdminMap excludes deleted rows from the map entirely.
+  const handlePoiDeleted = useCallback(
+    (kind: PoiKind, id: string, deletedAt: string) => {
+      setByKind((prev) => {
+        if (!prev) return prev
+        const next = { ...prev }
+        next[kind] = prev[kind].map((row) =>
+          row.id === id ? { ...row, deleted_at: deletedAt } : row,
+        )
+        return next
+      })
+      // Drop the selection — the deleted POI shouldn't keep the gold ring.
+      setSelectedPoi((prev) =>
+        prev && prev.kind === kind && prev.poi.id === id ? null : prev,
+      )
+    },
+    [],
+  )
+
+  const handleEditClose = useCallback(() => {
+    setEditOpen(false)
+  }, [])
+
+  // Observed category / business_type values from the loaded dataset, used
+  // to populate the edit dialog's <datalist> autocomplete. Computed once
+  // per byKind change. The tree currently has 7 categories for tour, 19
+  // business_types, and 29 narration categories.
+  const knownCategories = useMemo(() => {
+    if (!selectedPoi || !byKind) return []
+    const rows = byKind[selectedPoi.kind] ?? []
+    const set = new Set<string>()
+    for (const row of rows) {
+      const v =
+        selectedPoi.kind === 'business'
+          ? (row.business_type as string | undefined)
+          : (row.category as string | undefined)
+      if (v) set.add(v)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [byKind, selectedPoi])
 
   const handlePoiMoved = useCallback(
     (kind: PoiKind, id: string, lat: number, lng: number) => {
@@ -174,7 +255,7 @@ export function AdminLayout() {
           </div>
           <div className="flex-1 min-h-0">
             <PoiTree
-              onSelect={handlePoiSelect}
+              onSelect={handleTreeSelect}
               onDataLoaded={handleDataLoaded}
               externalByKind={byKind}
             />
@@ -186,11 +267,22 @@ export function AdminLayout() {
           <AdminMap
             byKind={byKind}
             selectedPoi={selectedPoi}
-            onPoiSelect={handlePoiSelect}
+            onPoiSelect={handleMapSelect}
             onPoiMoved={handlePoiMoved}
           />
         </main>
       </div>
+
+      {/* Edit dialog (9P.10) — opens on marker click */}
+      <PoiEditDialog
+        open={editOpen}
+        poi={selectedPoi?.poi ?? null}
+        kind={selectedPoi?.kind ?? null}
+        knownCategories={knownCategories}
+        onSaved={handlePoiSaved}
+        onDeleted={handlePoiDeleted}
+        onClose={handleEditClose}
+      />
     </div>
   )
 }

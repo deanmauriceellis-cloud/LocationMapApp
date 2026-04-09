@@ -1293,20 +1293,29 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 **Net new files:** `web/src/admin/AdminMap.tsx` (~370 lines).
 **Modified:** `web/src/admin/AdminLayout.tsx` (lifted `byKind` + `selectedPoi` state, wired AdminMap into center pane), `web/src/admin/PoiTree.tsx` (added `onDataLoaded` + `externalByKind` props), `web/src/index.css` (MarkerCluster CSS imports + `.admin-poi-marker` reset).
 
-#### Step 9P.10: Edit dialog with tabbed attribute groups
-- [ ] `npm install react-hook-form @headlessui/react` in `web/`
-- [ ] Create `web/src/admin/PoiEditDialog.tsx`
-- [ ] Headlessui Tabs across the top: **General** · **Location** · **Hours & Contact** · **Narration** · **Provenance** · **Danger Zone**
-- [ ] **General tab:** name, address, category dropdown (from poiCategories.ts), subcategory dropdown (filtered by category), tags (JSONB array editor)
-- [ ] **Location tab:** lat/lng inputs (manual override), geofence_radius_m, priority
-- [ ] **Hours & Contact tab:** hours (text), phone, website
-- [ ] **Narration tab:** short_narration, long_narration, multipass passes (textarea each, char counts)
-- [ ] **Provenance tab:** data_source (dropdown), confidence (0-1 slider), verified_date (date picker), stale_after, created_at/updated_at (read-only)
-- [ ] **Danger Zone tab:** soft delete button with confirm modal
-- [ ] Save → PUT to `/admin/salem/pois/:kind/:id`
-- [ ] Optimistic update: update tree + map immediately, revert on failure
-- [ ] Cancel → close dialog, no save
-- [ ] Form-dirty indicator: warn before close if unsaved changes
+#### Step 9P.10: Edit dialog with tabbed attribute groups — DONE (Session 105)
+- [x] `npm install react-hook-form @headlessui/react` in `web/`
+- [x] Create `web/src/admin/PoiEditDialog.tsx` (~1200 lines)
+- [x] Created `web/src/admin/poiAdminFields.ts` — TS mirror of `cache-proxy/lib/admin-pois.js` whitelists (TOUR_FIELDS / BUSINESS_FIELDS / NARRATION_FIELDS, JSONB_FIELDS, BOOLEAN_FIELDS, NUMERIC_FIELDS, DATE_FIELDS)
+- [x] Headless UI v2 `<TabGroup>` across the top: **General** · **Location** · **Hours & Contact** · **Narration** · **Provenance** · **Linked Historical** (9P.10a stub) · **Danger Zone**
+- [x] **General tab:** name, address, category (free-text + `<datalist>` of observed values), business_type (business), subcategory (narration), cuisine_type (business), historical_period (tour), description, historical_note (business), image_asset, admission_info (tour), price_range (business), rating (business), boolean toggles (tour: requires_transportation, wheelchair_accessible, seasonal), JSONB editors for `subcategories` (tour) and `tags` (business/narration)
+- [x] **Location tab:** lat / lng (number inputs), geofence_radius_m, geofence_shape (narration), corridor_points (narration), priority, wave (narration). Includes a "drag the marker on the map for fine adjustments" hint.
+- [x] **Hours & Contact tab:** hours, phone, website
+- [x] **Narration tab:** short_narration, long_narration, pass1/2/3 (narration only — labelled "basic / historical deep-dive / primary sources"), voice_clip_asset (narration), custom_description / custom_icon_asset / custom_voice_asset (narration merchant overrides), JSONB editors for related_figure_ids / related_fact_ids / related_source_ids / action_buttons / source_categories (narration), source_id (narration), merchant_tier / ad_priority (narration). **9P.10b placeholder comment** marks where the Salem Oracle "Generate" button will land.
+- [x] **Provenance tab:** data_source, confidence (number 0-1), verified_date (date picker), stale_after (date picker), read-only created_at / updated_at footer
+- [x] **Linked Historical tab (9P.10a stub):** placeholder card "No links yet — see Phase 9Q (Salem Domain Content Bridge)" plus a note that editing happens in Phase 9Q.6
+- [x] **Danger Zone tab:** soft delete button → inline confirm prompt → DELETE `/admin/salem/pois/:kind/:id`. Disabled when row is already soft-deleted. Surfaces server errors inline.
+- [x] Save → PUT `/admin/salem/pois/:kind/:id` with **dirty-fields-only payload** via `react-hook-form`'s `formState.dirtyFields`. JSONB textareas are JSON.parsed at submit time; parse failure shows inline error and aborts save. Empty JSONB textarea → `[]`. Empty string → `null`. Numeric fields are coerced; non-numeric strings abort save with field-name error.
+- [x] On save success: `onSaved(kind, updated)` patches the matching row in AdminLayout's shared `byKind` snapshot (mirrors `handlePoiMoved` pattern). Tree and map both reflect the new field values immediately, no re-fetch.
+- [x] On save failure (network or 4xx): error stays in the dialog, form state preserved, operator can fix and retry. 409 (soft-deleted row) is handled — the dialog shows an amber banner if the row arrives already deleted.
+- [x] Cancel → close dialog. If form has unsaved changes (`isDirty`), `window.confirm("Discard and close?")` first.
+- [x] Footer save bar shows dirty-field count ("3 field(s) modified") or "No changes". Save button is disabled when not dirty.
+- [x] **Open trigger:** marker click in `AdminMap` (per master plan). Tree click only selects + flies to — does NOT open the dialog. Implemented via two callbacks in AdminLayout: `handleTreeSelect` (select-only) and `handleMapSelect` (select + flip `editOpen=true`).
+- [x] **Soft-delete patches the snapshot:** `onDeleted(kind, id, deletedAt)` callback marks the row deleted in `byKind`; the tree ghosts it (with show-deleted toggle off, it disappears) and the map drops it.
+- [x] `npx tsc --noEmit` clean. `npm run build` succeeds (790KB bundle, no new warnings beyond pre-existing chunk-size note).
+
+**Net new files:** `web/src/admin/PoiEditDialog.tsx` (~1200 lines), `web/src/admin/poiAdminFields.ts` (~75 lines).
+**Modified:** `web/src/admin/AdminLayout.tsx` (split `handlePoiSelect` into `handleTreeSelect` / `handleMapSelect`; added `editOpen` state, `handlePoiSaved`, `handlePoiDeleted`, `handleEditClose`, `knownCategories` memo; rendered `<PoiEditDialog>` at the root of the layout).
 
 #### Step 9P.10a: "Linked Historical Content" tab in edit dialog (added Session 97)
 - [ ] Add a read-only **Linked Historical Content** tab to the edit dialog (between Narration and Provenance)
