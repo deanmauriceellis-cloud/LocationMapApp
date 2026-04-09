@@ -13,6 +13,7 @@ import android.content.Context
 import com.example.locationmapapp.data.model.PlaceResult
 import com.example.locationmapapp.data.model.PopulateSearchResult
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.JsonParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,7 @@ class PlacesRepository @Inject constructor(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
     private val PROXY_BASE    = "http://10.0.0.229:4300"

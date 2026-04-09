@@ -12,6 +12,7 @@ package com.example.locationmapapp.data.repository
 import com.example.locationmapapp.data.model.CommentsResponse
 import com.example.locationmapapp.data.model.PoiComment
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,6 +38,7 @@ class CommentRepository @Inject constructor(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
     suspend fun fetchComments(osmType: String, osmId: Long): CommentsResponse = withContext(Dispatchers.IO) {

@@ -93,6 +93,17 @@ class SalemMainActivity : AppCompatActivity() {
     internal lateinit var gpsTrackRecorder: GpsTrackRecorder
 
     /**
+     * POI proximity encounter tracker (S110). Field-injected by Hilt.
+     * Tracks every time the user comes within ~100m of a narration POI: opens
+     * a row, updates min/max distance + duration + fix count on each subsequent
+     * fix, and finalizes when the POI leaves the proximity radius. The data is
+     * persisted in [com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase]
+     * for after-the-fact review.
+     */
+    @Inject
+    internal lateinit var poiEncounterTracker: com.example.wickedsalemwitchcitytour.userdata.PoiEncounterTracker
+
+    /**
      * Magenta polyline that paints the user's recent GPS journey on the map.
      * Lazy-created in [initGpsTrackOverlay] during onCreate. Lives in the activity
      * scope; not shared with any other module.
@@ -100,9 +111,30 @@ class SalemMainActivity : AppCompatActivity() {
     internal var gpsTrackOverlay: Polyline? = null
 
     // Phase 9T: Narration system
-    internal var narrationGeofenceManager: com.example.wickedsalemwitchcitytour.tour.NarrationGeofenceManager? = null
+    /**
+     * Singleton (Hilt) — survives Activity recreation so the dedup state
+     * (`narratedAt`, `cooldowns`) doesn't reset on orientation change.
+     * S110 lift; see NarrationGeofenceManager class docs.
+     */
+    @Inject
+    internal lateinit var narrationGeofenceManager: com.example.wickedsalemwitchcitytour.tour.NarrationGeofenceManager
     internal var corridorManager: com.example.wickedsalemwitchcitytour.tour.CorridorGeofenceManager? = null
     internal var proximityDock: ProximityDock? = null
+
+    /**
+     * Wall-clock timestamp (System.currentTimeMillis) of the most recent
+     * `viewModel.currentLocation` emission. 0 means we have never seen a fix.
+     *
+     * Used by the narration silence reach-out (SalemMainActivityNarration.kt) and
+     * by the GPS-OBS heartbeat coroutine (started in observeViewModel) to detect
+     * stale-fix conditions. The reach-out is suppressed when this is older than
+     * GPS_STALE_THRESHOLD_MS, which is the S110 fix for the runaway loop where
+     * the app cycled through nearby Salem POIs at a 15-minute-old position.
+     */
+    internal var lastFixAtMs: Long = 0L
+
+    /** Treat the location stream as stale after this much silence (ms). */
+    internal val GPS_STALE_THRESHOLD_MS = 30_000L
 
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
@@ -331,7 +363,25 @@ class SalemMainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DebugLogger.i("SalemMainActivity", "onCreate() start — device=${android.os.Build.MODEL} SDK=${android.os.Build.VERSION.SDK_INT}")
+        DebugLogger.i("SalemMainActivity", "onCreate() start — device=${android.os.Build.MODEL} SDK=${android.os.Build.VERSION.SDK_INT} savedInstanceState=${savedInstanceState != null}")
+        // S110 — lifecycle observer for diagnostic logging. Helps post-mortems
+        // distinguish "process death" (no graceful onPause / onDestroy logs)
+        // from "configuration change" (changingConfigurations=true) from
+        // "user backgrounded the app" (changingConfigurations=false).
+        lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+                DebugLogger.i("LIFECYCLE", "onResume")
+            }
+            override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
+                DebugLogger.i("LIFECYCLE", "onPause changingConfig=${this@SalemMainActivity.isChangingConfigurations} finishing=${this@SalemMainActivity.isFinishing}")
+            }
+            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) {
+                DebugLogger.i("LIFECYCLE", "onStop")
+            }
+            override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
+                DebugLogger.i("LIFECYCLE", "onDestroy changingConfig=${this@SalemMainActivity.isChangingConfigurations} finishing=${this@SalemMainActivity.isFinishing}")
+            }
+        })
         DebugHttpServer.start()
 
         Configuration.getInstance().apply {
@@ -381,6 +431,8 @@ class SalemMainActivity : AppCompatActivity() {
         gpsTrackRecorder.pruneStaleAtStartup()
         initGpsTrackOverlay()
         setupGpsToggleButton()
+        // ── POI proximity tracker (S110): prune old encounters at startup ──
+        poiEncounterTracker.pruneStaleAtStartup()
         observeViewModel()
         requestLocationPermission()
         // Post debug intent to next frame so it runs after onStart() restore
@@ -503,6 +555,11 @@ class SalemMainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         DebugHttpServer.stop()
+        // S110: log any active POI proximity encounters that were in flight
+        // when the activity was destroyed. The DB rows already hold their
+        // last-known values; this is just for the diagnostic log so a
+        // post-mortem reader can see what was open at destroy time.
+        poiEncounterTracker.flushAll()
         DebugLogger.i("SalemMainActivity","onDestroy()")
     }
 
@@ -963,9 +1020,9 @@ class SalemMainActivity : AppCompatActivity() {
             return
         }
         // Reset narration session so all POIs can trigger fresh (clears narratedToday + cooldowns)
-        narrationGeofenceManager?.resetSession()
+        narrationGeofenceManager.resetSession()
         // Enable walk sim mode: expanded geofence radius + tighter reach-out
-        narrationGeofenceManager?.walkSimMode = true
+        narrationGeofenceManager.walkSimMode = true
         walkSimRunning = true
         binding.btnWalkSim.text = "Stop"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
@@ -993,7 +1050,7 @@ class SalemMainActivity : AppCompatActivity() {
         walkSimJob?.cancel()
         walkSimJob = null
         walkSimRunning = false
-        narrationGeofenceManager?.walkSimMode = false
+        narrationGeofenceManager.walkSimMode = false
         binding.btnWalkSim.text = "Walk"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
         DebugLogger.i("SalemMainActivity", "Walk sim stopped")
@@ -1316,15 +1373,11 @@ class SalemMainActivity : AppCompatActivity() {
      */
     private fun setupGpsToggleButton() {
         val btn = binding.btnGpsToggle
-        btn.imageTintList = android.content.res.ColorStateList.valueOf(
-            if (isGpsTrackVisible()) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF
-        )
+        btn.setTextColor(if (isGpsTrackVisible()) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF)
         btn.setOnClickListener {
             val newVisible = !isGpsTrackVisible()
             setGpsTrackVisible(newVisible)
-            btn.imageTintList = android.content.res.ColorStateList.valueOf(
-                if (newVisible) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF
-            )
+            btn.setTextColor(if (newVisible) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF)
             gpsTrackOverlay?.let { polyline ->
                 if (newVisible) {
                     if (!binding.mapView.overlays.contains(polyline)) {
@@ -1365,12 +1418,94 @@ class SalemMainActivity : AppCompatActivity() {
     internal fun observeViewModel() {
         DebugLogger.i("SalemMainActivity", "observeViewModel() — attaching all observers")
 
+        // ── GPS-OBS heartbeat (S110) ──
+        //   Tick every 10 seconds. Logs in three cases:
+        //     1. State TRANSITION (healthy → stale, stale → recovered, no-fix → first-fix) — logged immediately
+        //     2. Periodic OK heartbeat — once per 60 seconds (every 6 ticks) while healthy, so the
+        //        post-mortem reader can confirm the coroutine is alive even when nothing's wrong
+        //     3. STALE-still — once per 30 seconds while held in stale state, so we don't spam
+        //   Without case (2), the heartbeat looks dead during normal operation and you can't tell
+        //   the difference between "GPS is fine, heartbeat ticking silently" and "heartbeat
+        //   coroutine crashed".
+        lifecycleScope.launch {
+            DebugLogger.i("GPS-OBS", "HEARTBEAT START — tick=10s, stale-threshold=${GPS_STALE_THRESHOLD_MS / 1000}s, ok-log=60s")
+            var lastOkLogAt = 0L
+            var lastStaleLogAt = 0L
+            var wasStale = false
+            while (true) {
+                kotlinx.coroutines.delay(10_000L)
+                val now = System.currentTimeMillis()
+                if (lastFixAtMs == 0L) {
+                    // Pre-first-fix — log every 30s while we wait
+                    if (now - lastStaleLogAt >= 30_000L) {
+                        DebugLogger.w("GPS-OBS", "HEARTBEAT no-fix-yet (waiting for first emission)")
+                        lastStaleLogAt = now
+                    }
+                    continue
+                }
+                val ageMs = now - lastFixAtMs
+                val isStale = ageMs > GPS_STALE_THRESHOLD_MS
+                when {
+                    // Transition: healthy → stale
+                    isStale && !wasStale -> {
+                        DebugLogger.w("GPS-OBS",
+                            "HEARTBEAT STALE (transition) — last fix ${ageMs / 1000}s ago, narration reach-out suppressed")
+                        wasStale = true
+                        lastStaleLogAt = now
+                    }
+                    // Transition: stale → healthy
+                    !isStale && wasStale -> {
+                        DebugLogger.i("GPS-OBS",
+                            "HEARTBEAT recovered — fresh fix after ${ageMs}ms")
+                        wasStale = false
+                        lastOkLogAt = now
+                    }
+                    // Steady-state stale: throttled to once per 30s
+                    isStale -> {
+                        if (now - lastStaleLogAt >= 30_000L) {
+                            DebugLogger.w("GPS-OBS",
+                                "HEARTBEAT still-stale — last fix ${ageMs / 1000}s ago")
+                            lastStaleLogAt = now
+                        }
+                    }
+                    // Steady-state healthy: throttled to once per 60s
+                    else -> {
+                        if (now - lastOkLogAt >= 60_000L) {
+                            DebugLogger.i("GPS-OBS",
+                                "HEARTBEAT ok — last fix age=${ageMs / 1000}s")
+                            lastOkLogAt = now
+                        }
+                    }
+                }
+            }
+        }
+
         viewModel.currentLocation.observe(this) { update ->
             val point = update.point
             val speedMph = update.speedMps?.let { it * 2.23694 }
             lastGpsSpeedMph = speedMph
 
-            // ── 0. GPS Journey: record every fix to user_data.db (Option B, S109) ──
+            // ── 0a. GPS staleness tracking (S110) ──
+            //    Stamp wall-clock timestamp on EVERY fix BEFORE any other logic.
+            //    The narration reach-out gate uses this to suppress reach-out
+            //    when the location stream goes silent (driving out of GPS coverage,
+            //    process-suspended, etc.). The GPS-OBS log line below is the
+            //    "every fix the activity sees" record — combined with the
+            //    GPS-OBS heartbeat coroutine, it gives a complete timeline of
+            //    GPS health for post-mortem debugging.
+            val previousFixAt = lastFixAtMs
+            lastFixAtMs = System.currentTimeMillis()
+            val gapMs = if (previousFixAt == 0L) 0L else (lastFixAtMs - previousFixAt)
+            DebugLogger.i(
+                "GPS-OBS",
+                "fix lat=${"%.5f".format(point.latitude)} lng=${"%.5f".format(point.longitude)} " +
+                "acc=${"%.1f".format(update.accuracy)}m " +
+                "speed=${update.speedMps?.let { "${"%.2f".format(it)}mps" } ?: "?"} " +
+                "bearing=${update.bearing?.let { "${"%.0f".format(it)}°" } ?: "?"} " +
+                "gap=${gapMs}ms"
+            )
+
+            // ── 0b. GPS Journey: record every fix to user_data.db (Option B, S109) ──
             //    Recording is independent of the dead-zone gate AND of the visibility
             //    toggle — we capture every fix the activity sees so the journey log
             //    has continuous data even when the visual marker is parked.
@@ -1392,7 +1527,11 @@ class SalemMainActivity : AppCompatActivity() {
             //   Driving (>20 mph): 10s — coarse is fine
             //   Walking with narration active: 5s — need frequent checks for 20-50m geofences
             //   Stationary/slow without narration: 60s — battery saver
-            val narrationActive = narrationGeofenceManager != null
+            //
+            //   S110: narration manager is now a Hilt singleton, so it's always present
+            //   while the activity is alive. The old null-check was the proxy for
+            //   "narration system initialized?"; that's now structurally guaranteed.
+            val narrationActive = true
             val desiredInterval = when {
                 (speedMph ?: 0.0) > 20.0 -> 10_000L
                 narrationActive -> 5_000L

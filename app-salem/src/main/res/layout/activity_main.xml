@@ -128,10 +128,26 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
         android:layout_marginStart="12dp"
-        android:layout_marginBottom="56dp"
+        android:layout_marginBottom="168dp"
         android:orientation="vertical"
         android:gravity="center_horizontal"
         android:elevation="16dp">
+
+        <!-- GPS Journey path visibility toggle (Phase 9T+, S109/S110) -->
+        <TextView
+            android:id="@+id/btnGpsToggle"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/zoom_toggle_bg"
+            android:text="GPS"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Toggle GPS journey path visibility" />
 
         <!-- Show All POIs toggle -->
         <TextView
@@ -216,36 +232,6 @@
         android:layout_marginBottom="100dp"
         android:src="@android:drawable/ic_menu_add"
         app:tint="@android:color/white" />
-
-    <!-- GPS Journey toggle (Phase 9T+, S109) — bottom-left, mirrors fabMain.
-         Tap to show/hide the recorded GPS journey path on the map. Recording
-         itself is always-on while the activity is alive (Option B). -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btnGpsToggle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="100dp"
-        android:src="@drawable/ic_gps"
-        android:contentDescription="Toggle GPS journey path visibility"
-        app:tint="@android:color/white" />
-
-    <TextView
-        android:id="@+id/btnGpsToggleLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_marginStart="22dp"
-        android:layout_marginBottom="80dp"
-        android:text="GPS"
-        android:textColor="@android:color/white"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:shadowColor="#000000"
-        android:shadowDx="1"
-        android:shadowDy="1"
-        android:shadowRadius="2" />
 
     <!-- Proximity dock: nearby POI icons at bottom of screen (Phase 9T) -->
     <include layout="@layout/proximity_dock" />

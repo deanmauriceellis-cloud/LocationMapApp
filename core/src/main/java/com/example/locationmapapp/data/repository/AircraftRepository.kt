@@ -12,6 +12,7 @@ package com.example.locationmapapp.data.repository
 import com.example.locationmapapp.data.model.AircraftState
 import com.example.locationmapapp.data.model.FlightPathPoint
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,6 +33,7 @@ class AircraftRepository @Inject constructor() {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
     suspend fun fetchAircraft(south: Double, west: Double, north: Double, east: Double): List<AircraftState> = withContext(Dispatchers.IO) {

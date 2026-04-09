@@ -15,6 +15,7 @@ import com.example.locationmapapp.data.model.MbtaTripScheduleEntry
 import com.example.locationmapapp.data.model.MbtaVehicle
 import com.example.locationmapapp.data.model.MbtaVehicleStatus
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,6 +53,7 @@ class MbtaRepository @Inject constructor() {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .addInterceptor { chain ->
             // MBTA requires Accept header for JSON:API
             val req = chain.request().newBuilder()

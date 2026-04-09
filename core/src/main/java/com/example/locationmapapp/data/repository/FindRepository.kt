@@ -15,6 +15,7 @@ import com.example.locationmapapp.data.model.FindResult
 import com.example.locationmapapp.data.model.PoiWebsite
 import com.example.locationmapapp.data.model.SearchResponse
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,6 +37,7 @@ class FindRepository @Inject constructor() {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
     // Client-side counts cache (10 min) — avoids repeated network on dialog reopen

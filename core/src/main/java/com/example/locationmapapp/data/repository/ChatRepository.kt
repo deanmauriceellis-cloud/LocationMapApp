@@ -12,6 +12,7 @@ package com.example.locationmapapp.data.repository
 import com.example.locationmapapp.data.model.ChatMessage
 import com.example.locationmapapp.data.model.ChatRoom
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.JsonParser
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -42,6 +43,7 @@ class ChatRepository @Inject constructor(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
     private var socket: Socket? = null

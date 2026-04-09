@@ -1311,17 +1311,21 @@ internal fun SalemMainActivity.updateTourLocation(point: GeoPoint) {
     tourViewModel.onLocationUpdate(point)
 
     // Phase 9T: Feed location to narration geofence manager + update proximity dock
-    narrationGeofenceManager?.let { mgr ->
-        val nearby = mgr.checkPosition(point.latitude, point.longitude)
-        proximityDock?.update(
-            point.latitude, point.longitude,
-            nearby.map { it.point }
-        )
+    val nearby = narrationGeofenceManager.checkPosition(point.latitude, point.longitude)
+    proximityDock?.update(
+        point.latitude, point.longitude,
+        nearby.map { it.point }
+    )
 
-        // Also check street corridors
-        corridorManager?.checkPosition(point.latitude, point.longitude)?.forEach { trigger ->
-            DebugLogger.i("SalemMainActivity", "Corridor triggered: ${trigger.corridor.name} (${trigger.distanceM.toInt()}m)")
-        }
+    // S110: Feed the same nearby list to the POI encounter tracker, which opens /
+    // updates / closes "I got close to this POI" rows in user_data.db. The tracker
+    // applies its own 100m proximity filter (narrower than the manager's 300m
+    // nearby radius) so only "actually walked past it" encounters get recorded.
+    poiEncounterTracker.recordObservation(nearby, System.currentTimeMillis())
+
+    // Also check street corridors
+    corridorManager?.checkPosition(point.latitude, point.longitude)?.forEach { trigger ->
+        DebugLogger.i("SalemMainActivity", "Corridor triggered: ${trigger.corridor.name} (${trigger.distanceM.toInt()}m)")
     }
 }
 

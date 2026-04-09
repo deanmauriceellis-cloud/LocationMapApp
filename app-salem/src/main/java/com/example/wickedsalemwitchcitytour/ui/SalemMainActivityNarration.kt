@@ -38,8 +38,9 @@ private var narrationAutoPlay = true
 internal fun SalemMainActivity.initNarrationSystem() {
     DebugLogger.i("SalemMainActivity", "initNarrationSystem() — Phase 9T setup")
 
-    // Initialize managers
-    narrationGeofenceManager = NarrationGeofenceManager().apply { init(this@initNarrationSystem) }
+    // narrationGeofenceManager is Hilt-injected (S110) — already constructed.
+    // Don't replace it here; the singleton lift is what preserves dedup state
+    // across Activity recreation.
     corridorManager = CorridorGeofenceManager()
 
     // Initialize proximity dock
@@ -57,7 +58,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
         try {
             val points = tourViewModel.loadNarrationPoints()
             if (points.isNotEmpty()) {
-                narrationGeofenceManager?.loadPoints(points)
+                narrationGeofenceManager.loadPoints(points)
                 // Show proximity dock immediately
                 proximityDock?.show()
                 // Also load narration point markers on the map
@@ -73,7 +74,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
 
     // Observe narration geofence events — auto-queue on entry
     lifecycleScope.launch {
-        narrationGeofenceManager?.events?.collectLatest { event ->
+        narrationGeofenceManager.events.collectLatest { event ->
             when (event.type) {
                 NarrationEventType.APPROACH -> {
                     DebugLogger.i("SalemMainActivity",
@@ -112,15 +113,32 @@ internal fun SalemMainActivity.initNarrationSystem() {
                         DebugLogger.i("NARR-STATE", "  Queue filled during silence (${narrationQueue.size}) → playing")
                         playNextNarration()
                     } else {
+                        // ── S110 staleness gate ──
+                        //    Suppress reach-out entirely when GPS is stale. Without
+                        //    this, the reach-out logic happily searches for the
+                        //    "nearest unnarrated POI" against a frozen position
+                        //    and cycles through every POI in the cluster — the
+                        //    bug that ran the user through downtown Salem while
+                        //    they were sitting at home.
+                        val now = System.currentTimeMillis()
+                        val ageMs = if (lastFixAtMs == 0L) Long.MAX_VALUE else (now - lastFixAtMs)
+                        if (ageMs > GPS_STALE_THRESHOLD_MS) {
+                            DebugLogger.w("NARR-STATE",
+                                "  REACH-OUT SUPPRESSED: GPS stale " +
+                                "(age=${if (ageMs == Long.MAX_VALUE) "never" else "${ageMs / 1000}s"}, " +
+                                "threshold=${GPS_STALE_THRESHOLD_MS / 1000}s)")
+                            return@collectLatest
+                        }
+
                         // Still empty — reach out to nearest un-narrated POI
-                        val mgr = narrationGeofenceManager ?: return@collectLatest
-                        val nearest = mgr.findNearestUnnarrated()
+                        val nearest = narrationGeofenceManager.findNearestUnnarrated()
                         if (nearest != null) {
                             DebugLogger.i("NARR-STATE",
-                                "  REACH-OUT: ${nearest.point.name} (${nearest.distanceM.toInt()}m)")
-                            mgr.triggerReachOut(nearest)
+                                "  REACH-OUT: ${nearest.point.name} (${nearest.distanceM.toInt()}m) gpsAge=${ageMs}ms")
+                            narrationGeofenceManager.triggerReachOut(nearest)
                         } else {
-                            DebugLogger.i("NARR-STATE", "  Nothing nearby to reach out to")
+                            DebugLogger.i("NARR-STATE",
+                                "  Nothing within 15m reach-out radius (gpsAge=${ageMs}ms)")
                         }
                     }
                 }
@@ -189,8 +207,8 @@ internal fun SalemMainActivity.playNextNarration() {
     showNarrationSheet(point)
 
     // Auto-play TTS — select narration pass based on lifetime visit count
-    val mgr = narrationGeofenceManager
-    val text = mgr?.getNarrationForPass(point) ?: point.shortNarration ?: point.description
+    val text = narrationGeofenceManager.getNarrationForPass(point)
+        ?: point.shortNarration ?: point.description
 
     // Resolve voice: POI override > category default
     val voiceId = point.voiceOverride
@@ -203,7 +221,7 @@ internal fun SalemMainActivity.playNextNarration() {
         DebugLogger.w("NARR-PLAY", "  → NOT speaking: text=${text != null} autoPlay=$narrationAutoPlay")
     }
     // Record this visit for next-pass selection on future days
-    mgr?.recordVisit(point.id)
+    narrationGeofenceManager.recordVisit(point.id)
 }
 
 /**
@@ -218,7 +236,7 @@ internal fun SalemMainActivity.showNarrationSheet(point: NarrationPoint) {
         point.type.replace('_', ' ').split(' ')
             .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
-    val narrationText = narrationGeofenceManager?.getNarrationForPass(point)
+    val narrationText = narrationGeofenceManager.getNarrationForPass(point)
         ?: point.shortNarration ?: point.description ?: "Narration coming soon."
     sheet.findViewById<TextView>(R.id.narrationText)?.text = narrationText
 
@@ -315,7 +333,7 @@ internal fun SalemMainActivity.toggleGeofenceOverlay(point: NarrationPoint) {
     }
 
     val center = GeoPoint(point.lat, point.lng)
-    val walkSim = narrationGeofenceManager?.walkSimMode == true
+    val walkSim = narrationGeofenceManager.walkSimMode
     val baseRadius = point.geofenceRadiusM.toDouble()
     val entryRadius = if (walkSim) baseRadius * 3.0 else baseRadius
     val approachRadius = entryRadius * 2.0

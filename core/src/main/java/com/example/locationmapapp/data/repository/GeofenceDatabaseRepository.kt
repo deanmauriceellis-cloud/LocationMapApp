@@ -18,6 +18,7 @@ import com.example.locationmapapp.data.model.TfrShape
 import com.example.locationmapapp.data.model.TfrZone
 import com.example.locationmapapp.data.model.ZoneType
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -47,6 +48,7 @@ class GeofenceDatabaseRepository @Inject constructor(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
+        .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
     private val dbDir: File

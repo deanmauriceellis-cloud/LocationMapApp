@@ -10,6 +10,7 @@
 package com.example.wickedsalemwitchcitytour
 
 import android.app.Application
+import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration
@@ -22,6 +23,13 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WickedSalem
 class WickedSalemApp : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // 0. Wire up persistent DebugLogger file sink BEFORE anything else logs.
+        //    Captures everything to /sdcard/Android/data/<pkg>/files/logs/debug-YYYYMMDD.log
+        //    so logs survive process death — the gap that broke today's
+        //    drive bug investigation. Pull with `adb pull` after a session.
+        DebugLogger.initFileSink(applicationContext)
+        DebugLogger.i("WickedSalemApp", "onCreate — file sink wired up")
 
         // 1. Set osmdroid base path in prefs BEFORE load() picks it up.
         //    Ensures scoped storage compatibility on Android 10+.

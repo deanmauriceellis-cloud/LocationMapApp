@@ -2001,6 +2001,7 @@ internal fun SalemMainActivity.showGoToLocationDialog() {
     val geocodeClient = okhttp3.OkHttpClient.Builder()
         .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .addInterceptor(com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor())
         .build()
 
     val doSearch = {

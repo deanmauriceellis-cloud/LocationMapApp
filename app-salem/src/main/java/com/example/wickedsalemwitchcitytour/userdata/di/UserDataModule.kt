@@ -12,6 +12,7 @@ package com.example.wickedsalemwitchcitytour.userdata.di
 import android.content.Context
 import androidx.room.Room
 import com.example.wickedsalemwitchcitytour.userdata.dao.GpsTrackPointDao
+import com.example.wickedsalemwitchcitytour.userdata.dao.PoiEncounterDao
 import com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase
 import dagger.Module
 import dagger.Provides
@@ -38,4 +39,8 @@ object UserDataModule {
     @Provides
     fun provideGpsTrackPointDao(db: UserDataDatabase): GpsTrackPointDao =
         db.gpsTrackPointDao()
+
+    @Provides
+    fun providePoiEncounterDao(db: UserDataDatabase): PoiEncounterDao =
+        db.poiEncounterDao()
 }

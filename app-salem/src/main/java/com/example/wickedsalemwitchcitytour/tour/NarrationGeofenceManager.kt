@@ -8,6 +8,9 @@ package com.example.wickedsalemwitchcitytour.tour
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlin.math.*
@@ -20,9 +23,19 @@ import kotlin.math.*
  * Emits NarrationGeofenceEvent when the user approaches or enters a narration point's zone.
  * Also provides a sorted list of nearby points for the proximity dock.
  *
- * Phase 9T: Salem Walking Tour Restructure
+ * Phase 9T: Salem Walking Tour Restructure.
+ *
+ * S110: Promoted to Hilt @Singleton so the in-memory dedup state (`narratedAt`,
+ * `cooldowns`) survives Activity recreation (orientation change, configuration
+ * change). Previously a fresh instance was constructed in `initNarrationSystem()`
+ * on every recreate, which wiped the dedup set and caused already-narrated POIs
+ * to retrigger. State still does not survive process death — that needs a
+ * SharedPreferences mirror, deferred.
  */
-class NarrationGeofenceManager {
+@Singleton
+class NarrationGeofenceManager @Inject constructor(
+    @ApplicationContext context: Context
+) {
 
     private var points: List<NarrationPoint> = emptyList()
 
@@ -39,7 +52,8 @@ class NarrationGeofenceManager {
     private val cooldowns = mutableMapOf<String, Long>()
 
     /** Persistent visit counts per POI (survives app restarts, drives multi-pass narration) */
-    private var visitPrefs: SharedPreferences? = null
+    private val visitPrefs: SharedPreferences =
+        context.getSharedPreferences("narration_visits", Context.MODE_PRIVATE)
 
     /** Events emitted when a narration point is approached or entered */
     private val _events = MutableSharedFlow<NarrationGeofenceEvent>(extraBufferCapacity = 16)
@@ -75,20 +89,30 @@ class NarrationGeofenceManager {
         /** Silence threshold — reach out to nearest POI after this much quiet (ms) */
         private const val SILENCE_THRESHOLD_MS = 5_000L
 
-        /** Maximum reach-out radius (meters) — don't narrate something far away */
-        private const val REACH_RADIUS_M = 500.0
+        /**
+         * Maximum reach-out radius for the silence reach-out (meters).
+         * S110: tightened from 150m → 15m. Salem has dense POI clusters; the
+         * loose 150m radius let the reach-out grab POIs an entire block away
+         * — and once GPS went stale, it cycled through the entire downtown
+         * cluster as a runaway loop. 15m means the POI must be essentially
+         * underfoot to trigger a reach-out narration.
+         */
+        private const val REACH_RADIUS_M = 15.0
+
+        /** Same cap, but expanded under walk sim mode where the route is predictable. */
+        private const val REACH_RADIUS_WALKSIM_M = 25.0
     }
 
-    /** Initialize with context for persistent visit tracking */
-    fun init(context: Context) {
-        visitPrefs = context.getSharedPreferences("narration_visits", Context.MODE_PRIVATE)
-    }
-
-    /** Load narration points to monitor */
+    /** Load narration points to monitor.
+     *
+     *  S110: no longer clears cooldowns. Cooldowns are short-lived (2 minutes)
+     *  and naturally expire — clearing them on every Activity recreate would
+     *  defeat the purpose of the singleton lift, which is to prevent repeat
+     *  triggers after orientation changes. Cooldowns now survive recreate
+     *  along with `narratedAt`. */
     fun loadPoints(narrationPoints: List<NarrationPoint>) {
         points = narrationPoints
         purgeExpired()
-        cooldowns.clear()
     }
 
     /**
@@ -219,13 +243,15 @@ class NarrationGeofenceManager {
      * Priority order: paying merchants first, then historical importance, then distance.
      * Called when silence exceeds threshold — keeps the narration flowing.
      * Returns null if nothing available nearby.
+     *
+     * S110: radius tightened to 15m (real GPS) / 25m (walk sim). See REACH_RADIUS_M
+     * documentation. Caller must additionally gate this on GPS-fix freshness — the
+     * manager has no notion of how stale `lastLat / lastLng` are.
      */
     fun findNearestUnnarrated(): NearbyPoint? {
         if (lastLat == 0.0 && lastLng == 0.0) return null
 
-        // Keep reach-out tight — narrate what's actually nearby, not blocks away
-        // Walk sim: 200m (route is predictable), Real GPS: 150m (about 1.5 blocks)
-        val radius = if (walkSimMode) 200.0 else 150.0
+        val radius = if (walkSimMode) REACH_RADIUS_WALKSIM_M else REACH_RADIUS_M
         val now = System.currentTimeMillis()
 
         val candidates = mutableListOf<NearbyPoint>()
