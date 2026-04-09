@@ -2,8 +2,17 @@
 
 ## Last Updated: 2026-04-09 Session 110 (side quest: runaway narration loop fix + verbose persistent logging + cache-proxy circuit breaker + POI proximity encounter tracker)
 
-## TOP PRIORITY — Next Session
-**Phase 9P.B Step 9P.11 — Highlight Duplicates wiring.** Carried over from S107 → S108 → S109 → S110. Phase 9P.A complete; 9P.6/9P.7/9P.8/9P.9/9P.10/9P.10b all landed (S101→S106). S108 added admin-UI polish; **S109 AND S110 were side quests** triggered by field-test bug reports. Neither progressed 9P.11. **Four sessions in a row** have not advanced 9P.11 — the priority needs strict enforcement on the next start, OR the operator may want to rotate priorities given how often field-test bugs interrupt admin-tool work.
+## TOP PRIORITY — Next Session (S111)
+**1. (FIRST) Protocol optimization.** Operator queued this as the first task for S111 at the end of S110. Session start/end have gotten too slow — ~2,500 lines of context reads at start (with chunked re-reads), ~3,800 read + ~900 written at end, with the same session story duplicated across 4 places (live log, SESSION-LOG.md, STATE.md, OMEN report). Concrete scope:
+- (A) Compress STATE.md to current-state-only (~200 lines max, no more session-by-session history)
+- (B) Archive SESSION-LOG.md sessions older than ~S100 to `SESSION-LOG-ARCHIVE.md` (currently 2,190+ lines, needs to drop to ~500)
+- (C) Make OMEN session report a thin pointer to the live log instead of duplicating content (~80 lines instead of 250)
+- (D) Stop touching CLAUDE.md every session
+- (E) Update CLAUDE.md session-start protocol for parallel + head-only reads
+- (F) Update CLAUDE.md session-end protocol so the session story is written ONCE in the live log; everywhere else gets a 2-3 line pointer
+- Net impact: ~540 lines saved per start, ~2,800 lines saved per end, ~80% latency cut on the read phase. See `project_next_session_priority.md` memory file for full detail.
+
+**2. (SECOND) Phase 9P.B Step 9P.11 — Highlight Duplicates wiring.** Carried over from S107 → S108 → S109 → S110. Phase 9P.A complete; 9P.6/9P.7/9P.8/9P.9/9P.10/9P.10b all landed (S101→S106). S108 added admin-UI polish; **S109 AND S110 were side quests** triggered by field-test bug reports. Neither progressed 9P.11. **Four sessions in a row** have not advanced 9P.11 — once the protocol optimization lands, 9P.11 is the next concrete code task.
 
 **Next step (9P.11):** Wire the existing `Highlight Duplicates` header button (currently a console.log stub at `AdminLayout.tsx:69-73`) to the existing `/api/admin/salem/pois/duplicates?radius=15` endpoint built in 9P.5 (S100). On click → fetch the duplicate clusters → draw red rings on the admin map at the cluster center coordinates → click a red ring opens a side panel listing the duplicate group with Compare / Pick Winner buttons (basic UX, full merge UI deferred to v1.5 per master plan §1393). Toggle off → rings clear. Reference: `WickedSalemWitchCityTour_MASTER_PLAN.md` Step 9P.11 (search the heading). After 9P.11: Phase 9P.C publish loop (9P.12-9P.14: rebuild `salem-content/salem_content.sql` from PG, wire the Publish button, end-to-end APK rebuild verification).
 
