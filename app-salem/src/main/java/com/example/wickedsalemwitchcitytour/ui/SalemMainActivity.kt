@@ -1300,9 +1300,22 @@ class SalemMainActivity : AppCompatActivity() {
                 // Geofence radii are 20-50m; the dead zone is for map/marker only
                 updateTourLocation(point)
 
-                // ── Idle auto-populate: start full scanner after 5 min stationary ──
+                // ── Idle auto-populate: start full scanner after 10 min stationary ──
+                //
+                // S109: gated to TOUR MODE ONLY. In Explore mode the spiral pulls in POIs
+                // far outside the visible viewport, which is wasted bandwidth and irrelevant
+                // to the user (they're browsing, not following a route). On a tour, the
+                // outward spiral usefully prefetches the next stop's neighbourhood while
+                // the user lingers at the current stop, so the data is ready as they walk
+                // point-to-point. Active OR Paused both count as "on a tour" — if the user
+                // paused at a stop to take a photo, prefetching is still useful. Idle /
+                // Loading / Completed / Error all skip the trigger.
+                val tourState = tourViewModel.tourState.value
+                val tourActive = tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active
+                    || tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
                 val idleMs = System.currentTimeMillis() - lastSignificantMoveTime
                 if (idleMs > 600_000L
+                    && tourActive
                     && idlePopulateJob?.isActive != true
                     && populateJob == null
                     && followedVehicleId == null && followedAircraftIcao == null
