@@ -2,6 +2,62 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 101: 2026-04-08 — POI Inventory PDF + Phase 9P.A.3 Migration + Phase 9P.6 TypeScript Port + Salem Oracle API Spec (Phase 9P.10b)
+
+### Summary
+Four pieces of work in one session, all converging on making the POI Admin Tool actually buildable. **(1) POI inventory PDF** — `tools/generate-poi-inventory-pdf.py` produces a 1,163-page PDF (`docs/poi-inventory-2026-04-08.pdf`, 2.5 MB, gitignored) listing all 1,723 POIs from the bundled `salem-content/salem_content.db` (45 tour + 861 business + 817 narration) with every field of every POI fully written out, organized by category → subcategory. Implementation: Python + reportlab Platypus, 2-column key/value tables, JSON pretty-printing, NULL → '—'. New isolated venv at `tools/.poi-pdf-venv/` (gitignored, fully reversible). **(2) Phase 9P.A.3 — Migrate `tour_pois` and `salem_businesses` to PostgreSQL** — closes the architectural gap that made the admin tool non-functional for two-thirds of POI kinds. Before this commit, `salem_tour_pois` and `salem_businesses` PG tables were empty, so admin PUT/DELETE/move on those kinds returned 404. New `cache-proxy/scripts/import-tour-pois-and-businesses.js` (~270 lines) reads directly from the bundled SQLite via `better-sqlite3` and UPSERTs into PG (UPSERT, not TRUNCATE+INSERT, because six tables FK-reference `salem_tour_pois` for the future Phase 9Q backfill). Type conversions: JSON TEXT → JSONB, INTEGER 0/1 → BOOLEAN, Unix-millis → TIMESTAMPTZ. After migration: tour=45, business=861, narration=814 — 1,720 active POIs all canonical in PG. 9/9 smoke tests pass. The duplicates endpoint jumped from 101 clusters to 550 (top cluster 27 → 54 members) — cross-kind duplicate detection now active. **(3) Phase 9P.6 — TypeScript port of POI category taxonomy** — new `web/src/config/poiCategories.ts` (~535 lines) faithfully mirrors `app-salem/.../ui/menu/PoiCategories.kt` with all 22 categories (17 standard + 5 Salem-specific), all 175+ subtypes, all per-mode visibility flags including `historicTourDefault` from 9P.4a, plus helper functions `freeRoamPrefKey`, `tourPrefKey`, `enabledTagValues`, `findPoiCategory`, and the `PoiLayerId` constant. Cross-reference comments added to BOTH files pointing at each other. The existing `web/src/config/categories.ts` (17 categories, different shape) is left untouched — the two coexist for now, TODO Phase 9C+ unification. `npx tsc --noEmit` clean. **(4) Salem Oracle API integration spec (Phase 9P.10b)** — user surfaced the cross-project capability at session end: the Salem sibling project exposes a dev-side LLM-backed API at `http://localhost:8088` (gemma3:27b on the operator's RTX 3090, backed by 3,891 facts + 4,950 primary source chunks + 63 historical POIs + 202 newspaper articles) that the admin tool can call to compose, revise, summarize, or expand POI descriptions. Read the full Oracle contract at `~/Development/Salem/docs/oracle-api.md` (492 lines, owned by Salem). Added a new Step 9P.10b to the master plan specifying the integration: typed `oracleClient.ts`, "Generate with Salem Oracle" button in the Narration and General tabs of the edit dialog, sub-dialog with prompt + reset + generate, 5-15s spinner, primary source citations surfaced in UI, insert / iterate workflow per the Oracle's 6-turn rolling context, client-side audit log per accepted generation. Critical conceptual point: Salem's 63 historical POIs are DISTINCT from LocationMapApp's 1,720 POIs — same geography, different datasets — so the Oracle is editorial brain only (read from Salem, write to LocationMapApp PG). New memory entry `reference_salem_oracle_api.md` so future sessions don't have to re-read the Salem doc.
+
+### Decisions
+1. **PDF source = bundled SQLite, not PG.** The bundled `salem-content/salem_content.db` is the most inclusive single source — narration_points has 817 rows there vs 814 in PG (3-row delta from S98 dedup, the bundled DB is more inclusive). Sourcing from one place is also simpler than mixing PG + bundled.
+2. **Skip psycopg2.** Don't need PG access from the PDF script if I source from bundled SQLite. sqlite3 is built-in to Python; only reportlab needs to be installed.
+3. **Isolated venv, not system pip install.** Python 3.12 on Ubuntu has PEP 668; venv is the right pattern. Created `tools/.poi-pdf-venv/`, gitignored, fully reversible.
+4. **Use bundled SQLite directly via `better-sqlite3` for the migration**, not the SQL file parsing approach S98 used. Cleaner, less error-prone, and `better-sqlite3` was already a cache-proxy dep.
+5. **UPSERT, not TRUNCATE+INSERT, for the migration.** Six tables FK-reference `salem_tour_pois` (`salem_historical_figures`, `salem_historical_facts`, `salem_timeline_events`, `salem_primary_sources`, `salem_tour_stops`, `salem_events_calendar`) — even though those references are currently NULL, PG refuses TRUNCATE without CASCADE. UPSERT avoids the issue entirely and is fully idempotent.
+6. **Public read endpoints in `lib/salem.js` were already updated in S99** to filter `deleted_at IS NULL` for tour_pois and businesses — so the migration didn't need any further read-side change.
+7. **For Phase 9P.6, keep existing `categories.ts` untouched and create a new `poiCategories.ts`.** Two different shapes (`tagMatches` grouped by key vs flat `tags: string[]`), two different consumers (public web app vs Salem admin tool). Don't risk a behavior change in the public web app. TODO Phase 9C+ unification via codegen or shared JSON config.
+8. **Salem Oracle API integration is editorial-only.** Salem corpus is read-only from this API; admin tool only writes to LocationMapApp's PG. Explicitly do NOT try to write to Salem from the admin tool; that's against the API contract and Salem's editorial workflow.
+9. **The Oracle's `current_poi_id` field accepts any string.** When calling from the LocationMapApp admin tool, pass the LocationMapApp POI id directly (not a Salem catalog id) — the Oracle uses it for context pinning regardless of source.
+10. **5-15s latency is unavoidable.** The Oracle runs on a single RTX 3090 with one model loaded; concurrent requests serialize naturally. Don't fight it — show a spinner of at least 5s expected duration, set client timeout ≥60s, and queue follow-ups instead of firing parallel.
+
+### Files Changed
+- `tools/generate-poi-inventory-pdf.py` — NEW (~280 lines, Python + reportlab)
+- `tools/.poi-pdf-venv/` — NEW (gitignored, isolated venv with reportlab 4.4.10)
+- `docs/poi-inventory-2026-04-08.pdf` — NEW (gitignored, 1,163 pages, 2.5 MB)
+- `cache-proxy/scripts/import-tour-pois-and-businesses.js` — NEW (~270 lines)
+- `web/src/config/poiCategories.ts` — NEW (~535 lines)
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/menu/PoiCategories.kt` — added cross-reference comment to the data class doc block
+- `.gitignore` — added `tools/.poi-pdf-venv/`, `docs/poi-inventory*.pdf`
+- `STATE.md` — TOP PRIORITY rewritten for Phase 9P.B Step 9P.7; added Salem Oracle API integration section
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Step 9P.A.3, Step 9P.6, Step 9P.10b all added/marked DONE
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-101-2026-04-08.md` — live conversation log
+- `~/.claude/.../memory/reference_salem_oracle_api.md` — NEW memory entry (cross-session persistence)
+- `~/.claude/.../memory/MEMORY.md` — index updated
+
+### Verification
+- **PDF:** `pdfinfo` confirms 1,163 pages, PDF v1.4, title set, valid metadata. `pdftotext` spot-checks at page 1 (cover, "1723 total") and page 100 (mid-doc, "The Peabody Diner" cafe in Peabody) render cleanly.
+- **9P.A.3 migration:** PG row counts verified (tour=45, business=861, narration=814 → 1,720 active). Sample rows (`witch_trials_memorial`, `hex`) verified with JSONB arrays parsed cleanly. 9/9 smoke tests against admin endpoints all pass — list, GET single, PUT update (was 404 before), DELETE/restore round-trip, duplicates endpoint surfaces 550 clusters (up from 101).
+- **9P.6 TypeScript port:** `cd web && npx tsc --noEmit` → no errors across the entire web project. The new `poiCategories.ts` compiles cleanly with the existing types and doesn't break any existing imports.
+- **Oracle API spec:** read the full 492-line Salem doc; Phase 9P.10b spec covers all 6 endpoints used by the admin tool plus the constraints, latency, conceptual gotchas, and operator UI affordances.
+
+### Build & Deploy
+- PDF generation: `tools/.poi-pdf-venv/bin/python tools/generate-poi-inventory-pdf.py` (re-run anytime, idempotent)
+- Migration: `node cache-proxy/scripts/import-tour-pois-and-businesses.js` (idempotent UPSERT)
+- TypeScript verification: `cd web && npx tsc --noEmit`
+- Three commits pushed: `8271e6e` (PDF), `7f81b0d` (9P.A.3), `9e25c61` (9P.6)
+
+### Open Items for Session 102
+1. **Phase 9P.B Step 9P.7** — `/admin` route in `web/src/App.tsx` + `web/src/admin/AdminLayout.tsx` shell with header (Highlight Duplicates / Publish / Logout / **Oracle status pill**), 2-pane layout
+2. **Step 9P.8** — POI tree via `react-arborist` (the user's left-side tree list requirement); needs `npm install react-arborist`
+3. **Step 9P.9** — map view with `react-leaflet` (already a dep)
+4. **Step 9P.10** — edit dialog with tabbed attribute groups (`react-hook-form`, `@headlessui/react`)
+5. **Step 9P.10b — Salem Oracle "Generate with AI" integration** — typed client + UI buttons + sub-dialog (per master plan spec)
+6. **Phase 9P.C — publish loop** (regenerate `salem-content/salem_content.db` from PG so APK builds pick up admin edits)
+7. **OMEN-002 history rotation** still pending operator action (rotate DB password via `ALTER USER`, regenerate `OPENSKY_CLIENT_SECRET` via portal, set real `ADMIN_PASS` in `cache-proxy/.env`)
+8. **Long-deferred carryover:** NOTE-L013 voice debug cleanup, 9T.9 walk simulator verification, NOTE-L014 OMEN-008 Privacy Policy drafting
+
+---
+
 ## Session 100: 2026-04-08 — Phase 9P.A COMPLETE (9P.4a Per-Mode Visibility Schema + 9P.5 Duplicates Detection)
 
 ### Summary

@@ -1307,6 +1307,63 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [ ] **Editing the linkages happens in Phase 9Q.6** (Building Map admin panel), NOT in this tab — this tab is read-only forever
 - [ ] Add a count badge to the tab label: "Linked Historical Content (5)" so the operator can see at a glance which POIs have historical depth
 
+#### Step 9P.10b: Salem Oracle "Generate with AI" integration (added Session 101)
+
+The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that the admin tool can call to compose, revise, summarize, or expand POI descriptions, narrations, and historical context. This is the editorial assist surface for the description layers of the admin tool.
+
+**Reference doc:** `~/Development/Salem/docs/oracle-api.md` (the canonical contract — ALWAYS consult this before changing the integration; cross-project, owned by Salem)
+
+**Where the Oracle lives:**
+- Salem dev workstation, port 8088 (override `SALEM_PORT`)
+- Started via `~/Development/Salem/scripts/start-testapp.sh`
+- Permissive CORS — admin tool can call directly from the browser
+- No auth, dev-only, single shared LLM (gemma3:27b on operator's RTX 3090)
+- Latency: 5-15s per `ask` call, sub-ms for catalog endpoints
+
+**Endpoints we'll use:**
+- `GET /api/oracle/status` — health check at admin tool startup; show "Oracle: ready / unavailable" indicator
+- `POST /api/oracle/ask` — main composition endpoint with context pinning (`current_poi_id`, `current_newspaper_date`, `reset`)
+- `GET /api/oracle/pois` — Salem's 63 catalog POIs (29 buildings + 34 landmarks); for the linked-historical-content browser
+- `GET /api/oracle/poi?id=...` — fetch a Salem POI's full record (linked NPCs, events, newspaper articles)
+- `GET /api/oracle/newspapers` + `GET /api/oracle/newspaper?date=...` — 202 daily newspaper articles ("The Salem Oracle")
+
+**Important conceptual point:** Salem's POI catalog (63 historical 1692-era POIs, IDs like `salem_poi_landmark_hathorne_mansion`) is **DISTINCT** from LocationMapApp's POI tables (1,720 modern Salem POIs across `salem_tour_pois`, `salem_businesses`, `salem_narration_points`). They overlap in real-world geography (the Hathorne mansion site is in both) but are separate datasets. The admin tool edits LocationMapApp POIs; the Oracle is the editorial brain that knows the Salem corpus.
+
+**Build tasks:**
+- [ ] Add `web/src/admin/oracleClient.ts` — typed client wrapping the Oracle endpoints, default base URL `http://localhost:8088` (configurable)
+- [ ] Add an "Oracle: ready / unavailable" status pill in `AdminLayout.tsx` header (poll `/api/oracle/status` once at mount)
+- [ ] Add **"Generate with Salem Oracle"** button to the **Narration tab** of `PoiEditDialog.tsx` (Step 9P.10):
+  - Opens a sub-dialog with: prompt textarea, "Reset history" checkbox, "Generate" button
+  - Calls `POST /api/oracle/ask` with `current_poi_id` set to the LocationMapApp POI's id (NOT a Salem catalog id — the Oracle's `current_poi_id` field accepts any string and uses it for context pinning)
+  - Shows a 5-15s spinner while waiting (latency caveat from oracle-api.md)
+  - Displays the returned `text` plus the up-to-8 `primary_sources` quoted with attribution
+  - "Insert into short_narration" / "Insert into long_narration" / "Insert into description" buttons that paste the result into the matching field
+  - "Iterate" button to send a follow-up prompt without resetting history (the Oracle keeps a 6-turn rolling context for follow-ups like "make that two sentences shorter")
+- [ ] Add the same button to the **General tab** for the `description` field (mirrors the workflow from oracle-api.md's worked example)
+- [ ] Surface `primary_sources` citations in the UI when they appear — the Oracle's quotes have receipts and the operator should see them
+- [ ] Capture the full Oracle response (text + primary_sources + question + timestamp) in a local audit log per accepted generation, so revisions are traceable. Stored client-side in localStorage; not pushed to PG until/unless we add an editorial-history feature.
+- [ ] Handle Oracle unavailable: show "Oracle is unavailable — start `~/Development/Salem/scripts/start-testapp.sh` and reload" instead of failing silently
+
+**Workflow** (from oracle-api.md's worked example, adapted for LocationMapApp):
+1. Operator picks a POI to edit in the tree (Step 9P.8) → edit dialog opens (Step 9P.10)
+2. Operator clicks "Generate with Salem Oracle" on the Narration tab
+3. Sub-dialog opens; operator types "Rewrite this description as a single 90-word tour-guide paragraph for spoken audio" or similar
+4. Oracle returns prose + primary sources in 5-15s
+5. Operator reviews, optionally iterates ("make that two sentences shorter"), accepts
+6. Generated text gets pasted into the field; on Save, the existing `PUT /admin/salem/pois/:kind/:id` endpoint persists it to PG
+7. Eventually Phase 9P.C publish loop regenerates `salem-content/salem_content.db` so the next APK build picks up the edit
+
+**Operator instructions surfaced in UI:**
+- Tooltip on the "Oracle: ready" pill: "Salem Oracle running at http://localhost:8088 — gemma3:27b backed by the full Salem corpus"
+- Tooltip on the "Generate" button: "Asks the Salem LLM to compose content. 5-15 seconds per call. Single shared conversation history — use Reset to start fresh."
+
+**Constraints to respect:**
+- Don't fire concurrent Oracle calls from the same operator session — Ollama serializes them anyway, just queue client-side
+- Show a spinner of at least 5s expected duration; the operator should not assume the call hung
+- Respect the 60s minimum client timeout suggested in oracle-api.md
+- Salem corpus is **read-only** from this API — the admin tool never tries to write to Salem. The admin tool writes only to LocationMapApp's PG (via existing 9P.4 endpoints).
+- No production deployment of the Oracle — it's dev-workstation-only. Don't add a "publish to Oracle" feature; that's not how it works.
+
 #### Step 9P.11: Highlight duplicates toggle
 - [ ] Header button "Highlight Duplicates" in `AdminLayout.tsx`
 - [ ] On click → fetch `/admin/salem/pois/duplicates?radius=15`
