@@ -1130,10 +1130,10 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 4. **Sync:** No live OTA. Edit → "Publish" rebuilds `salem-content/salem_content.sql` from PostgreSQL → next APK build ships fresh data.
 
 ### Stack additions (3 new dependencies)
-- `react-arborist` — virtualized tree for ~860 POIs
-- `react-hook-form` — POI edit form state management
-- `@headlessui/react` — Tabs component for the edit dialog
-- (`leaflet.markercluster` may already be in the web app — verify in Phase 9P.9)
+- `react-arborist` — virtualized tree for ~860 POIs (installed S103 v3.4.3)
+- `react-hook-form` — POI edit form state management (Step 9P.10)
+- `@headlessui/react` — Tabs component for the edit dialog (Step 9P.10)
+- `leaflet.markercluster` — installed S104 (v1.5.3) for the admin map cluster layer; was NOT already in the web app despite the original guess
 
 ---
 
@@ -1273,16 +1273,25 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 - [x] Container sizing: react-arborist needs explicit pixel `width`/`height`. Added a small `useElementSize` hook backed by `ResizeObserver` so the tree fills the left pane and reflows on browser resize.
 - [x] `cd web && npx tsc --noEmit` clean (zero output, exit 0).
 
-#### Step 9P.9: Admin map (Leaflet + clustering + draggable markers)
-- [ ] Create `web/src/admin/AdminMap.tsx`
-- [ ] Reuse existing Leaflet setup from `web/src/components/MapView.tsx` where possible
-- [ ] Verify `leaflet.markercluster` is already a dep; install if not
-- [ ] Render all POIs as clustered markers, color by category (matches PoiCategories config)
-- [ ] Click marker → opens edit dialog
-- [ ] Marker drag enabled (`marker.dragging.enable()`)
-- [ ] On `dragend` → modal: "Move 'X' from (old) to (new)? [Cancel] [Save]"
-- [ ] Save → POST to `/admin/salem/pois/:kind/:id/move` → marker stays at new position on success, snaps back on failure
-- [ ] Tree selection → map pans/zooms to selected POI
+#### Step 9P.9: Admin map (Leaflet + clustering + draggable markers) — DONE (Session 104)
+- [x] Create `web/src/admin/AdminMap.tsx`
+- [x] Reuse existing Leaflet setup from `web/src/components/Map/MapView.tsx` where possible (same react-leaflet 5.0 + leaflet 1.9 stack, same `MapContainer` + `TileLayer` pattern, same global `index.css` import for leaflet CSS)
+- [x] `leaflet.markercluster` was NOT yet installed — `npm install leaflet.markercluster @types/leaflet.markercluster` added 2 packages, no new vulnerabilities introduced (3 pre-existing high-severity vulns from S103 audit are unchanged). MarkerCluster CSS imported in `web/src/index.css`.
+- [x] Render all ~1,720 active POIs as clustered markers — **color by KIND not category** (tour=red `#dc2626`, business=blue `#2563eb`, narration=green `#059669`). The 22-category taxonomy applies primarily to the tree's grouping; on the map the operator needs to see "what kind of POI is this" at a glance, and there are too many categories to color-distinguish meaningfully. Per-category coloring can be revisited in 9P.11 (highlight duplicates) if needed.
+- [x] Click marker → fires `onPoiSelect({kind, poi})` which lifts to AdminLayout and will open the edit dialog in 9P.10
+- [x] Marker drag enabled — every marker is constructed with `draggable: true, autoPan: true`
+- [x] On `dragend` → confirm modal overlay (not a Leaflet popup; renders over the map at z-index 500) showing kind, name, id, from coords, to coords, Haversine distance, [Cancel] [Confirm move]
+- [x] Save → POST `/api/admin/salem/pois/:kind/:id/move` with `{lat, lng}`. On success: AdminLayout's `onPoiMoved` callback patches the row in shared `byKind` (so PoiTree's `externalByKind` rerender stays consistent), marker stays at new position. On failure or Cancel: `marker.setLatLng(origin)` reverts.
+- [x] Tree selection → map pans/zooms to selected POI via `<FlyToSelected>` child component using `useMap().flyTo([lat,lng], max(currentZoom,17), {duration: 0.6})`. Selected marker gets a gold ring (`stroke: #facc15`, larger size) — recolored in a separate effect that touches just the previously- and currently-selected marker icons rather than rebuilding the cluster.
+- [x] **Architectural note:** chose imperative `L.markerClusterGroup` driven via `useMap()` rather than the `react-leaflet-markercluster` wrapper. The wrapper is built for react-leaflet v4 and hasn't caught up to v5 (which we use). 30 lines of imperative code vs. another dependency on a wrapper that lags upstream. Rebuilds happen only when `byKind` changes; selection changes recolor in place.
+- [x] **Data sharing:** PoiTree gained an `onDataLoaded` callback + `externalByKind` prop. AdminLayout hoists the dataset on first load and feeds both panes from one shared snapshot — single fetch, single Basic Auth prompt, drag-to-move updates flow back through the same state.
+- [x] **Soft-deleted handling:** soft-deleted rows are filtered from the map (the map is the operator's spatial workspace and tombstones add clutter); PoiTree still shows them behind its existing toggle.
+- [x] `disableClusteringAtZoom: 18` so the operator can drag individual POIs at deepest zoom; `maxClusterRadius: 50`; `spiderfyOnMaxZoom: true` for overlapping POIs at lower zooms.
+- [x] Top-right legend overlay shows kind colors + visible counts.
+- [x] `npx tsc --noEmit` clean.
+
+**Net new files:** `web/src/admin/AdminMap.tsx` (~370 lines).
+**Modified:** `web/src/admin/AdminLayout.tsx` (lifted `byKind` + `selectedPoi` state, wired AdminMap into center pane), `web/src/admin/PoiTree.tsx` (added `onDataLoaded` + `externalByKind` props), `web/src/index.css` (MarkerCluster CSS imports + `.admin-poi-marker` reset).
 
 #### Step 9P.10: Edit dialog with tabbed attribute groups
 - [ ] `npm install react-hook-form @headlessui/react` in `web/`

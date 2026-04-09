@@ -1,23 +1,38 @@
-// AdminLayout — Phase 9P.B Step 9P.7 (shell), 9P.8 (POI tree wired in)
+// AdminLayout — Phase 9P.B Step 9P.7 (shell), 9P.8 (POI tree), 9P.9 (map)
 //
 // Shell for the LocationMapApp Salem POI admin tool. Three-pane layout:
 //   ┌─────────────────────────────────────────────────────────────────────┐
 //   │ Header  [Highlight Duplicates] [Publish]  Oracle: —   [Logout]      │
 //   ├──────────────────────┬──────────────────────────────────────────────┤
-//   │ POI tree (9P.8 ✓)    │ Map view (9P.9)                              │
-//   │ react-arborist       │ Leaflet                                      │
+//   │ POI tree (9P.8 ✓)    │ Map view (9P.9 ✓)                            │
+//   │ react-arborist       │ Leaflet + cluster                            │
 //   │                      │                                              │
 //   └──────────────────────┴──────────────────────────────────────────────┘
 //
 // Step status:
 //   9P.7  ✓ shell (this file)
 //   9P.8  ✓ POI tree (PoiTree.tsx, wired into the left pane)
-//   9P.9  — Admin map view (center pane)
+//   9P.9  ✓ Admin map view (AdminMap.tsx, wired into the center pane)
 //   9P.10 — POI edit dialog (modal triggered from tree/map)
 //   9P.10b — Salem Oracle integration (the "Oracle: —" pill goes live + a
 //            "Generate with Salem Oracle" button appears in the edit dialog)
 //   9P.11 — Highlight Duplicates wiring
 //   9P.13 — Publish wiring
+//
+// Data model (9P.9):
+//   PoiTree owns the initial fetch of all 1,720 POIs (kind=tour|business|
+//   narration). It calls back via onDataLoaded once at mount, AdminLayout
+//   stores the dataset in `byKind`, and passes it to AdminMap so the map
+//   does NOT re-fetch (one Basic Auth prompt, one network round-trip).
+//   After a successful drag-to-move, AdminMap calls onPoiMoved → AdminLayout
+//   patches the lat/lng on the matching row in `byKind`, then PoiTree
+//   re-renders against the same shared snapshot via the externalByKind prop.
+//
+// Selection model (9P.9):
+//   Clicking a POI in either the tree OR a marker on the map sets
+//   `selectedPoi` here. PoiTree has no selected-row prop today (its visual
+//   highlight is internal to react-arborist), but AdminMap consumes
+//   `selectedPoi` to fly to the row and gold-ring the marker.
 //
 // Auth model: HTTP Basic Auth via the browser's native dialog. The
 // cache-proxy admin endpoints (Phase 9P.3 middleware) return 401 with
@@ -25,10 +40,21 @@
 // tree fetch in 9P.8) triggers the prompt; subsequent requests reuse the
 // browser's cached credentials. There is no in-page login form by design.
 
-import { useCallback } from 'react'
-import { PoiTree, type PoiSelection } from './PoiTree'
+import { useCallback, useState } from 'react'
+import { PoiTree, type PoiKind, type PoiRow, type PoiSelection } from './PoiTree'
+import { AdminMap } from './AdminMap'
 
 export function AdminLayout() {
+  // Shared POI dataset — populated by PoiTree's onDataLoaded callback after
+  // the initial fetch, then passed down to PoiTree (as externalByKind, so
+  // both panes always see identical data) and to AdminMap.
+  const [byKind, setByKind] = useState<Record<PoiKind, PoiRow[]> | null>(null)
+  const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
+
+  const handleDataLoaded = useCallback((data: Record<PoiKind, PoiRow[]>) => {
+    setByKind(data)
+  }, [])
+
   const handleHighlightDuplicates = useCallback(() => {
     // TODO 9P.11 — fetch /api/admin/salem/pois/duplicates?radius=15 and draw
     // red rings on the map view.
@@ -44,11 +70,34 @@ export function AdminLayout() {
   }, [])
 
   const handlePoiSelect = useCallback((selection: PoiSelection) => {
-    // 9P.8: emits selection only — log for now. The map view (9P.9) will
-    // pan/zoom to selection.poi, and the edit dialog (9P.10) will open with
-    // selection.poi as its initial state.
-    console.log('[admin] POI selected:', selection.kind, selection.poi.id, selection.poi.name)
+    // 9P.9: lift the selection so AdminMap can fly to it. The edit dialog
+    // (9P.10) will read this same state to know which POI to populate.
+    setSelectedPoi(selection)
   }, [])
+
+  const handlePoiMoved = useCallback(
+    (kind: PoiKind, id: string, lat: number, lng: number) => {
+      // Patch the matching row's lat/lng in the shared snapshot. Both the
+      // tree (via externalByKind) and the map (via byKind) re-render off
+      // this — the tree's display doesn't show coords, but its emitted
+      // PoiSelection rides the new values forward to the edit dialog.
+      setByKind((prev) => {
+        if (!prev) return prev
+        const next = { ...prev }
+        next[kind] = prev[kind].map((row) =>
+          row.id === id ? { ...row, lat, lng } : row,
+        )
+        return next
+      })
+      // If the moved POI is currently selected, update the selection too so
+      // the gold-ringed marker doesn't lag behind the new position.
+      setSelectedPoi((prev) => {
+        if (!prev || prev.kind !== kind || prev.poi.id !== id) return prev
+        return { kind, poi: { ...prev.poi, lat, lng } }
+      })
+    },
+    [],
+  )
 
   const handleLogout = useCallback(() => {
     // Browser-cached HTTP Basic Auth has no formal logout. The widely-used
@@ -124,22 +173,22 @@ export function AdminLayout() {
             POIs
           </div>
           <div className="flex-1 min-h-0">
-            <PoiTree onSelect={handlePoiSelect} />
+            <PoiTree
+              onSelect={handlePoiSelect}
+              onDataLoaded={handleDataLoaded}
+              externalByKind={byKind}
+            />
           </div>
         </aside>
 
         {/* Center pane — map view (9P.9) */}
         <main className="flex-1 relative bg-slate-200 min-h-0">
-          {/* TODO 9P.9 — replace with <AdminMapView /> (Leaflet) */}
-          <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-            <div className="text-center max-w-md px-4">
-              <p className="text-base italic">Admin map view lands in Step 9P.9.</p>
-              <p className="mt-2 text-xs">
-                Will render all selected POIs as markers, support click-to-edit,
-                and host the duplicates highlight overlay (9P.11).
-              </p>
-            </div>
-          </div>
+          <AdminMap
+            byKind={byKind}
+            selectedPoi={selectedPoi}
+            onPoiSelect={handlePoiSelect}
+            onPoiMoved={handlePoiMoved}
+          />
         </main>
       </div>
     </div>

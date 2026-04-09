@@ -56,9 +56,12 @@ Execute all steps in order:
 
 ## Project Status
 
-**Version:** v1.5.68 (76 sessions completed)
-**Phases 1-9:** COMPLETE (core development done)
-**Phase 10 next:** Production readiness — Firebase, offline tiles, photos, emulator verification, DB hardening
+**Version:** v1.5.68 (104 sessions completed as of 2026-04-08)
+**Phases 1-9 + 9A+ + 9T (8/9):** COMPLETE — core development, offline foundation, ambient narration done
+**Phase 9P (POI Admin Tool) IN PROGRESS:** 9P.A (backend) DONE; 9P.B (admin UI) 3/8 done — 9P.6 taxonomy port, 9P.7 AdminLayout shell, 9P.8 POI tree, 9P.9 admin map view all landed; **next: 9P.10 edit dialog**
+**Phase 9Q (Salem Domain Content Bridge):** not started — building→POI translation + 425 buildings + 202 newspapers
+**Phase 9R (Historic Tour Mode):** not started — opt-in chapter-based 1692 tour
+**Phase 10 (Production readiness):** DEFERRED behind 9P + 9Q + 9R — Firebase, photos, DB hardening, emulator verification
 **Phase 11:** Branding, ASO & Play Store launch — target September 1, 2026
 **Critical:** Salem 400+ quadricentennial is 2026. App must be in Play Store by September to capture October (1M+ visitors).
 

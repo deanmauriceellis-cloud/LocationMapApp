@@ -290,14 +290,34 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
 export interface PoiTreeProps {
   /** Called when the user activates a POI row (click or Enter). */
   onSelect?: (selection: PoiSelection) => void
+  /**
+   * Called once after the initial load completes successfully. The admin
+   * map (9P.9) consumes the same dataset and uses this to avoid a second
+   * fetch (and a second Basic Auth prompt race). Also fired again if the
+   * tree later refetches (e.g. after a publish — wired in 9P.13).
+   */
+  onDataLoaded?: (byKind: Record<PoiKind, PoiRow[]>) => void
+  /**
+   * Externally-mutated POI data. When provided, the tree uses this snapshot
+   * instead of its own fetched copy. The admin map drives this after a
+   * successful drag-to-move so the tree's coordinate columns (which are not
+   * displayed but ride along to the edit dialog) stay consistent with the
+   * map's marker positions.
+   */
+  externalByKind?: Record<PoiKind, PoiRow[]> | null
 }
 
-export function PoiTree({ onSelect }: PoiTreeProps) {
+export function PoiTree({ onSelect, onDataLoaded, externalByKind }: PoiTreeProps) {
   const [byKind, setByKind] = useState<Record<PoiKind, PoiRow[]> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [containerRef, size] = useElementSize()
+
+  // External overrides the internal copy when present. The internal copy is
+  // still loaded once at mount so the tree works standalone (and so the
+  // onDataLoaded callback fires for parents that want to share the dataset).
+  const effectiveByKind = externalByKind ?? byKind
 
   useEffect(() => {
     let cancelled = false
@@ -312,7 +332,9 @@ export function PoiTree({ onSelect }: PoiTreeProps) {
           fetchKind('narration'),
         ])
         if (cancelled) return
-        setByKind({ tour, business, narration })
+        const data = { tour, business, narration }
+        setByKind(data)
+        onDataLoaded?.(data)
       } catch (e) {
         if (cancelled) return
         setError(e instanceof Error ? e.message : String(e))
@@ -322,12 +344,15 @@ export function PoiTree({ onSelect }: PoiTreeProps) {
     return () => {
       cancelled = true
     }
+    // onDataLoaded is intentionally excluded from deps — we only want to
+    // load once at mount, and the parent should pass a stable callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const treeData = useMemo(() => {
-    if (!byKind) return []
-    return buildTree(byKind, showDeleted)
-  }, [byKind, showDeleted])
+    if (!effectiveByKind) return []
+    return buildTree(effectiveByKind, showDeleted)
+  }, [effectiveByKind, showDeleted])
 
   const handleActivate = useCallback(
     (node: NodeApi<TreeNode>) => {
@@ -340,14 +365,14 @@ export function PoiTree({ onSelect }: PoiTreeProps) {
   // Counts for the toolbar — visible (filtered) totals so the user can see
   // the impact of the show-deleted toggle.
   const visibleCounts = useMemo(() => {
-    if (!byKind) return null
+    if (!effectiveByKind) return null
     const visible = (rows: PoiRow[]) =>
       showDeleted ? rows.length : rows.filter((r) => !r.deleted_at).length
-    const tour = visible(byKind.tour)
-    const business = visible(byKind.business)
-    const narration = visible(byKind.narration)
+    const tour = visible(effectiveByKind.tour)
+    const business = visible(effectiveByKind.business)
+    const narration = visible(effectiveByKind.narration)
     return { tour, business, narration, total: tour + business + narration }
-  }, [byKind, showDeleted])
+  }, [effectiveByKind, showDeleted])
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -387,7 +412,7 @@ export function PoiTree({ onSelect }: PoiTreeProps) {
             <p className="font-semibold mb-1">Failed to load POIs.</p>
             <p className="font-mono whitespace-pre-wrap break-words">{error}</p>
           </div>
-        ) : !byKind ? (
+        ) : !effectiveByKind ? (
           <p className="p-3 text-xs text-slate-500 italic">Loading POIs…</p>
         ) : size.height === 0 || size.width === 0 ? null : (
           <Tree<TreeNode>
