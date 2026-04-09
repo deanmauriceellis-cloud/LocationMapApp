@@ -27,3 +27,5 @@ app-salem/src/main/assets/poi-icons/
 app-salem/src/main/assets/salem_content.db.bak
 tools/poi-icons/
 tools/splash-audio/
+tools/.poi-pdf-venv/
+docs/poi-inventory*.pdf
