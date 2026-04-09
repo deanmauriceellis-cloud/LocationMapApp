@@ -2,6 +2,69 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 109: 2026-04-09 — Side quest: column drift + GPS observer + GPS Journey recorder
+
+### Summary
+Side-quest session triggered by two operator pivots away from the carry-over 9P.11 task. **First pivot:** "the admin tool doesn't have all the POIs the app sees" — investigation confirmed `salem_tour_pois` (45) + `salem_businesses` (861) + `salem_narration_points` (814) = 1,720 POIs are all surfaced in the admin, the apparent "missing" POIs were either generic Overpass POIs (deliberate scope split, never in admin) or the operator misremembering. BUT the dig surfaced that **PG `salem_narration_points` had been carrying 814 NULL-narration rows since Phase 9P.2** — the importer was reading `salem-content/salem_content.sql` but that file's narration_points INSERTs all have `short_narration / long_narration / narration_pass_2 / narration_pass_3 = NULL`. The actual content lives in separate UPDATE files (`narration_content.sql`, `wave4_narration_content.sql`, `teaser_narrations.sql`, `promote_short_to_long.sql`) that the salem-content build pipeline applies AFTER the main INSERT to produce the populated `.db`. Switched the importer to read `salem_content.db` directly via better-sqlite3, removed the ~80-line SQL text parser, and incidentally fixed a column-name drift between PG (`pass1_narration / pass2_narration / pass3_narration`) and the bundled DB / Room entity (`narration_pass_2 / narration_pass_3`) by dropping the orphan `pass1_narration` (it was conceptually duplicate of `short_narration` per `NarrationGeofenceManager.kt:98`) and renaming pass2/3 PG-side. PG narration_points now has **817 fully populated rows** (short=817, long=817, narration_pass_2=12, narration_pass_3=12). Three "stale overpass" rows with `created_at = 0` triggered a separate fix via a `toTimestampOrNow()` helper. **Second pivot:** "GPS was terrible during my Salem test" on the Lenovo TB305FU — `adb dumpsys location` showed the chip is fine (lifetime mean TTFF 6.49s, accuracy 3.09m, 4 constellations: GPS+GLONASS+BeiDou+Galileo, 0% failure rate, last fix in Salem with hAcc=2.3m + 21 satellites tracked). The bug was `SalemMainActivity.kt:1272`'s `100m` static dead zone — at slow Salem traffic speeds (~6 m/s), 100m takes exactly 15 seconds, mathematically matching the operator's "10-15 sec GPS updates" report. Replaced with `(update.accuracy * 2f).coerceIn(5f, 100f)`, self-adapting across walking, slow driving, and L1-only multipath without mode-specific tuning. Two more fixes shipped: idlePopulate trigger gated to tour mode only (was wasting bandwidth in Explore mode pulling in POIs far outside the visible viewport), and a NEW "GPS Journey" feature — always-on Room recorder in a separate `UserDataDatabase`, 24h rolling retention, bottom-left FAB toggles polyline visibility (recording independent of toggle, manual on/off deferred to utility menu). Built debug APK and installed on the Lenovo for operator's next Salem test walk. **NO progress on 9P.11 this session** — Phase 9P.B is still 6/8 done. Also surfaced but not fixed: `DWELL_MS` in `NarrationGeofenceManager` is dead code (declared, never referenced — single fix glimpses can fire false-positive narration triggers in dense POI areas), and the narration queue has no stale-pop check (queues 5+ POIs in dense clusters and commits the operator to ~3-4 minutes of audio even after they walk away).
+
+### Decisions
+1. **Conform PG to bundled, not bundled to PG, for the narration column rename.** PG side has fewer call sites (cache-proxy + admin UI = 5 files) and is purely admin-tool consumed. Renaming bundled would require Room schema migration v3→v4 + salem-content build pipeline change + Android side regression risk. Chose the lower blast radius. PG is canonical for the *data*; column names are just labels.
+2. **Dropped `pass1_narration` entirely.** Per `tools/salem-data/generate_multipass_narrations.py:5` and `NarrationGeofenceManager.kt:98`, "Pass 1: Standard narration (already exists in short_narration)" — the PG schema's separate `pass1_narration` column was an orphan that was never populated, never referenced by any read path, never going to be. Schema was carrying dead weight.
+3. **Importer now reads from `.db`, not `.sql`.** This is a meaningful semantic shift but it's the only way to actually populate PG with the narration text. The .sql file is the unpopulated source; the .db is the post-build artifact with all UPDATE files applied. Per the pre-existing salem-content build pipeline, the .db is the source of truth for narration content.
+4. **Defaulted `created_at` / `updated_at` to `now()` for the 3 stale overpass rows.** These had `created_at = 0` in the bundled DB, which `toTimestamp(0)` converts to `null`, which violates PG NOT NULL. Could have skipped those rows entirely or marked them with an "unknown timestamp" sentinel. Chose `now()` because it's the least-bad approximation and lets all 817 rows successfully import. The data quality issue is pre-existing in the bundled DB and out of scope.
+5. **GPS proportional dead zone keys off `update.accuracy`, not `loc.accuracy`.** The activity's location flow goes through `LocationUpdate` (a UI-layer data class), not the raw `android.location.Location`. The accuracy field is on `update`, not on `point` (which is a `GeoPoint` from osmdroid with no accuracy field). First commit attempt used `point.accuracy` and failed compile — fixed by switching to `update.accuracy`.
+6. **idlePopulate gate uses `is Active || is Paused`.** Active alone would skip the case where the operator paused at a tour stop to take a photo — the spiral is still useful in that case. Idle / Loading / Completed / Error all skip.
+7. **Three separate commits for column drift / dead zone / idlePopulate gate**, achieved via Edit-revert-reapply on `SalemMainActivity.kt` since the dead zone fix and the idlePopulate gate touch the same file in adjacent regions. Clean bisect targets at the cost of one extra Edit cycle. The user's stated preference was "I'd recommend three separate commits so each is its own bisect target" from earlier in the conversation.
+8. **GPS Journey feature is Option B** (recording always on, toggle controls display only), not Option A (toggle controls both). User explicit choice.
+9. **GPS Journey storage in a NEW `UserDataDatabase`**, not the existing `SalemContentDatabase`. The latter is meant to be regenerated by the Phase 9P.C publish loop; mixing user-mutable journey data into it would create a regeneration hazard. Separation is non-negotiable for the architecture's long-term health.
+10. **No batching in the GPS recorder.** GPS arrives at 5-60s intervals. Room insert overhead at that rate is negligible (<5ms per insert on the Lenovo). Avoiding batching means there's no "lost the last 5 fixes when the process was killed" failure mode. Re-evaluate only if profiling shows it matters.
+11. **Polyline race-safety: empty-first then async-seed.** The polyline is created on the Main thread immediately (so the GPS observer's `addPoint` calls can never see a null reference), then the historical 24h is loaded asynchronously and merged with any in-flight points before `setPoints` is called. No mutex needed because both branches run on Main.
+12. **DWELL_MS dead-code discovery is documented but not fixed.** Operator asked the right question ("does dwell make sense at 5s sampling?"), investigation showed the constant exists but is unwired. Recommended fix is a per-POI `firstSeenInside: Long?` map with "require 2 consecutive fixes" semantics, ~10 lines. Not applied because operator's stated scope was "fix the dead zone" + "fix the idlePopulate gate" + "build the GPS Journey feature" — adding the dwell fix would be scope creep without explicit authorization.
+13. **APK built and installed on the Lenovo TB305FU before push.** Operator's next action is a Salem test walk; they need the binary on the device. Used `./gradlew :app-salem:assembleDebug` and `adb -s HNY0CY0W install -r`. Build verified clean.
+
+### Files Changed
+**Commit 1 — column drift cleanup (08d431e):**
+- `cache-proxy/salem-schema.sql` — drop `pass1_narration`, rename `pass2_narration / pass3_narration`, rewrite multipass comment block to document tier vs pass distinction
+- `cache-proxy/lib/admin-pois.js` — `NARRATION_FIELDS` whitelist updated
+- `cache-proxy/scripts/import-narration-points.js` — source switched from `.sql` → `.db`, removed `extractNarrationPointsSql()` and `updateStringState()` helpers (~80 lines deleted), UPSERT column rename, `toTimestampOrNow()` helper for the 3 stale rows
+- `web/src/admin/poiAdminFields.ts` — `NARRATION_FIELDS` whitelist (line-aligned with cache-proxy mirror)
+- `web/src/admin/PoiEditDialog.tsx` — drop `pass1_narration` FieldRow block, rename `pass2_narration / pass3_narration` IDs / `reg()` / `has()` calls, hint text on Pass 2 explaining "Pass 1 is short_narration above"
+- `docs/session-logs/session-109-2026-04-09.md` — NEW (live conversation log, started at session start)
+
+**Commit 2 — GPS proportional dead zone (d229498):**
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/SalemMainActivity.kt` — replace `< 100f` with `< deadZoneMeters` where `deadZoneMeters = (update.accuracy * 2f).coerceIn(5f, 100f)`, rewrite the dead zone comment block to explain the math, update stale "GPS moved >100m" log message to "GPS moved beyond dead zone"
+
+**Commit 3 — idlePopulate tour gate (524a26e):**
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/SalemMainActivity.kt` — add `tourActive` check (`tourState is TourState.Active || tourState is TourState.Paused`) to the idlePopulate trigger, rewrite the comment block, fix stale "5 min" → "10 min" comment
+
+**Commit 4 — GPS Journey recorder + visibility toggle (5428795):**
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/userdata/db/GpsTrackPoint.kt` — NEW Room entity (id, ts_ms, lat, lng, accuracy_m, speed_mps, bearing_deg)
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/userdata/dao/GpsTrackPointDao.kt` — NEW DAO (insert, getRecent, deleteOlderThan, count, deleteAll)
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/userdata/db/UserDataDatabase.kt` — NEW Room v1, separate from `SalemContentDatabase`, lives in app data dir (NOT in assets)
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/userdata/di/UserDataModule.kt` — NEW Hilt `@Provides @Singleton` for DB + DAO
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/userdata/GpsTrackRecorder.kt` — NEW singleton, fire-and-forget `recordFix()`, hourly piggyback prune, `getRecent24h()`, `pruneStaleAtStartup()`
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/SalemMainActivity.kt` — `@Inject` recorder, `gpsTrackOverlay: Polyline?` field, `initGpsTrackOverlay()` (race-safe empty-first-then-async-seed), `setupGpsToggleButton()`, `isGpsTrackVisible() / setGpsTrackVisible()` SharedPreferences helpers, `recordFix()` call at the very TOP of the GPS observer (BEFORE the dead zone gate)
+- `app-salem/src/main/res/layout/activity_main.xml` — new `btnGpsToggle` FloatingActionButton at `bottom|start` with `marginBottom=100dp` mirroring fabMain on the right, "GPS" TextView label below
+
+**Commit 5 — session end docs (this commit):**
+- `STATE.md` — header bumped to S109, new "S109 fixes summary" section with all 4 commits + 2 known-but-not-fixed items
+- `CLAUDE.md` — version bumped to v1.5.70, session count 108 → 109 with full S109 summary
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-109-2026-04-09.md` — finalized with session-end section
+- `~/Development/OMEN/reports/locationmapapp/session-109-2026-04-09.md` — NEW (OMEN session report)
+
+### Status
+- Phase 9P.B: still **6/8 done** (9P.6, 9P.7, 9P.8, 9P.9, 9P.10, 9P.10b) — no progress on 9P.11 this session
+- Phase 9T+ added: GPS Journey recorder shipped (new feature, not previously in master plan)
+- Next step: **Phase 9P.B Step 9P.11 — Highlight Duplicates wiring** (carried over from S107 → S108 → S109 → S110)
+- 9P.10a still deferred (blocked on Phase 9Q)
+- All open OMEN items still tracked: NOTE-L013 (debug Activity cleanup), NOTE-L014 / OMEN-008 (Privacy Policy), NOTE-L015 (stale, surfaced again), OMEN-002 (history rotation), OMEN-004 (first Kotlin unit test, deadline 2026-04-30 = ~3 weeks)
+- New tech debt: `DWELL_MS` dead code in `NarrationGeofenceManager`, narration queue has no stale-pop check
+- APK built and installed on Lenovo TB305FU (HNY0CY0W) for operator's next Salem test walk
+- Working tree expected to be clean at S110 start
+
+---
+
 ## Session 108: 2026-04-09 — Admin UI polish (tab wrap + backdrop opacity + legend z-index)
 
 ### Summary
