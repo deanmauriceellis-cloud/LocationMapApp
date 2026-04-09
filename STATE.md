@@ -1,9 +1,9 @@
 # LocationMapApp v1.5 — Project State
 
-## Last Updated: 2026-04-08 Session 99 (Phase 9P.3 + 9P.4 DONE — admin auth + admin POI write endpoints; OMEN-002 file-side cleanup; 31/31 smoke tests pass)
+## Last Updated: 2026-04-08 Session 100 (Phase 9P.A COMPLETE — 9P.4a + 9P.5 done; Backend Foundation finished; 38/38 smoke tests pass across S99+S100)
 
-## TOP PRIORITY — Next Session (Session 100)
-**Phase 9P.4a — Per-mode category visibility schema** (small, schema-only). Two-prefKey scheme: `poi_<category>_on_freeroam` and `poi_<category>_on_tour`. Free-roam defaults = current `defaultEnabled` from `PoiCategories.kt`; historic-tour defaults = restrictive (history/civic/witch_shop/witch_museum/historic_house/cemetery ON, food/lodging/shopping/services OFF). Document migration plan in 9R rollout notes. Then **Phase 9P.5** — duplicates detection endpoint (`GET /admin/salem/pois/duplicates?radius=15`, Haversine in SQL, ~50 lines). After 9P.4a + 9P.5, Phase 9P.A (Backend Foundation) is complete and Phase 9P.B (Admin UI in `web/`) starts.
+## TOP PRIORITY — Next Session (Session 101)
+**Phase 9P.B — Admin UI in `web/`.** Phase 9P.A (Backend Foundation) is complete. Phase 9P.B starts with **Step 9P.6**: hand-port the 22-category POI taxonomy from `app-salem/.../ui/menu/PoiCategories.kt` to a new `web/src/config/poiCategories.ts` (same shape: id, label, color, default-visible flags including `historicTourDefault` from 9P.4a, subtypes array, OSM tag mappings). Then **Step 9P.7**: add `/admin` route to the React app (`web/src/App.tsx`), `web/src/admin/AdminLayout.tsx` shell with header (Highlight Duplicates / Publish / Logout), left tree pane, center map pane. Browser handles Basic Auth prompt automatically when admin endpoints return 401. Then 9P.8 (POI tree via `react-arborist`), 9P.9 (map view), 9P.10+ (edit dialog).
 
 **Also surface at session start:**
 1. **OMEN-002 history rotation** still pending — needs operator action: `ALTER USER witchdoctor WITH PASSWORD '<new>';` + log into OpenSky portal to regenerate `OPENSKY_CLIENT_SECRET`, then update `cache-proxy/.env`. Test password `salem-tour-9P3-test` in `cache-proxy/.env` should also be replaced with a real strong value before relying on the admin auth in any non-test context.
@@ -11,13 +11,13 @@
 3. **NOTE-L013** debug `VoiceAuditionActivity.kt` cleanup still pending.
 4. **Phase 9T.9** walk simulator end-to-end verification still TODO.
 
-## Phase 9P.A status (Backend Foundation)
+## Phase 9P.A status (Backend Foundation) — COMPLETE
 - ✓ **9P.1 DONE** (S98) — `salem_narration_points` table (42 cols, 7 indexes)
 - ✓ **9P.2 DONE** (S98) — Importer landed 814 rows; PostgreSQL canonical for narration points
-- ✓ **9P.3 DONE** (S99) — HTTP Basic Auth middleware (`cache-proxy/lib/admin-auth.js`), mounted on `/admin/*`, `/cache/clear` locked down. 7/7 smoke tests pass. Constant-time comparison via `crypto.timingSafeEqual`.
-- ✓ **9P.4 DONE** (S99) — Admin POI write endpoints (`cache-proxy/lib/admin-pois.js`, ~290 lines): GET list (kind/category/bbox/q filters), GET single, PUT partial update, POST move, DELETE soft, POST restore. All three POI kinds (`tour` / `business` / `narration`) supported with kind-specific field whitelists. 24/24 smoke tests pass. **In-scope migration:** added `deleted_at` + active indexes to `salem_tour_pois` and `salem_businesses`; updated `lib/salem.js` public reads to filter soft-deleted rows.
-- ⏳ 9P.4a — Per-mode category visibility schema (next session)
-- ⏳ 9P.5 — Duplicates detection endpoint (next session)
+- ✓ **9P.3 DONE** (S99) — HTTP Basic Auth middleware (`cache-proxy/lib/admin-auth.js`), mounted on `/admin/*`, `/cache/clear` locked down. 7/7 smoke tests pass.
+- ✓ **9P.4 DONE** (S99) — Admin POI write endpoints (`cache-proxy/lib/admin-pois.js`): six routes covering all three POI kinds with kind-specific field whitelists. 24/24 smoke tests pass. In-scope: `deleted_at` migration on tour_pois + businesses, public-read filter update.
+- ✓ **9P.4a DONE** (S100) — Per-mode category visibility schema. `historicTourDefault: Boolean` field added to `PoiCategory` data class in `app-salem/.../ui/menu/PoiCategories.kt`. Helper getters `freeRoamPrefKey` and `tourPrefKey`. 6 categories opted in to historic tour mode (CIVIC, WORSHIP, TOURISM_HISTORY, WITCH_SHOP, GHOST_TOUR, HISTORIC_HOUSE); other 16 OFF. SharedPreferences migration plan documented in master plan as a Phase 9R rollout note (the actual migration code lives in 9R when historic tour mode ships). `./gradlew :app-salem:compileDebugKotlin` BUILD SUCCESSFUL.
+- ✓ **9P.5 DONE** (S100) — Duplicates detection endpoint (`GET /admin/salem/pois/duplicates?radius=15`). Bbox-prefiltered self-join across all three POI tables via CTE with Haversine in SQL; JS-side union-find clustering. Default radius 15m, max 100m, soft-deleted rows excluded. 7/7 smoke tests pass on live data: top cluster at 15m radius surfaces 27 narration POIs chained around downtown Essex Street; a 3-POI cluster shows "Bluebikes", "St. Peter's Church", "Downtown Salem" sharing identical coordinates (clear import default that the admin UI should help operator fix).
 
 ## OMEN-002 status
 - ✓ **File-side cleanup DONE** (S99) — `bin/restart-proxy.sh` no longer contains hardcoded credentials. Sources `cache-proxy/.env` (gitignored) via `set -a; source ...; set +a`. `cache-proxy/.env.example` committed as a template. Both old credential strings (`fuckers123`, `6m3uBQ5HXwSzJeLemRJK12G8Ux4L5veR`) confirmed absent from tracked file.

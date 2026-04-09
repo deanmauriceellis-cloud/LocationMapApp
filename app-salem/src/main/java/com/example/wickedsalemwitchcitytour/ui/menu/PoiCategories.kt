@@ -18,6 +18,24 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module PoiCategori
 /**
  * Central config for all 22 POI categories (17 standard + 5 Salem-specific).
  * Menu items, toggles, restore, Overpass queries, and marker colors are all driven from this list.
+ *
+ * ── Per-mode visibility (Phase 9P.4a) ──
+ * Each category carries TWO independent default-visibility flags:
+ *   - `defaultEnabled` — used in **free-roam mode** (the default app experience).
+ *     This is what the existing user-facing app reads today via `prefKey`.
+ *   - `historicTourDefault` — used in **historic tour mode** (Phase 9R, opt-in).
+ *     Tour mode applies a more restrictive default set focused on 1692 narrative content
+ *     (history, civic, worship, witch shops, ghost tours, historic houses ON; everything
+ *     else OFF) so the map doesn't drown the historic story in modern POI clutter.
+ *
+ * The two-prefKey naming convention for the migration (Phase 9R rollout):
+ *   - free-roam pref key  = `<prefKey>` (existing) — alias `freeRoamPrefKey`
+ *   - tour-mode pref key  = `<prefKey>_tour`        — `tourPrefKey`
+ *
+ * 9P.4a is **schema only**: the data shape is in place and `historicTourDefault` is
+ * populated for every category. The actual SharedPreferences migration code (read
+ * existing `<prefKey>` value into `<prefKey>_tour` defaulting to `historicTourDefault`)
+ * lives in Phase 9R when historic tour mode ships.
  */
 data class PoiCategory(
     val id: String,
@@ -26,8 +44,15 @@ data class PoiCategory(
     val tags: List<String>,
     val subtypes: List<PoiSubtype>?,
     val color: Int,
-    val defaultEnabled: Boolean = false
-)
+    val defaultEnabled: Boolean = false,
+    val historicTourDefault: Boolean = false
+) {
+    /** Phase 9P.4a: alias for clarity — same as `prefKey`, names the free-roam SharedPreferences key. */
+    val freeRoamPrefKey: String get() = prefKey
+
+    /** Phase 9P.4a: derived tour-mode SharedPreferences key — appends `_tour` suffix to `prefKey`. */
+    val tourPrefKey: String get() = "${prefKey}_tour"
+}
 
 data class PoiSubtype(val label: String, val tags: List<String>)
 
@@ -121,7 +146,8 @@ object PoiCategories {
                 PoiSubtype("Embassies",         listOf("office=diplomatic"))
             ),
             color = Color.parseColor("#1A237E"),
-            defaultEnabled = true
+            defaultEnabled = true,
+            historicTourDefault = true  // 1692 courthouses, town halls central to Salem witch trials narrative
         ),
 
         // 5 — Parks & Rec
@@ -297,7 +323,10 @@ object PoiCategories {
             prefKey = "poi_worship_on",
             tags = listOf("amenity=place_of_worship"),
             subtypes = null,
-            color = Color.parseColor("#4E342E")
+            color = Color.parseColor("#4E342E"),
+            // OFF in free-roam (clutter), ON in historic tour (1692 churches central to narrative —
+            // Salem Village Church, First Church of Salem, etc.)
+            historicTourDefault = true
         ),
 
         // 13 — Tourism & History (default ON — primary layer for Salem tour app)
@@ -329,7 +358,8 @@ object PoiCategories {
                 PoiSubtype("Theme Parks", listOf("tourism=theme_park"))
             ),
             color = Color.parseColor("#FF6F00"),
-            defaultEnabled = true
+            defaultEnabled = true,
+            historicTourDefault = true  // Heart of historic tour mode — memorials, monuments, museums, cemeteries
         ),
 
         // 14 — Emergency Svc
@@ -435,7 +465,8 @@ object PoiCategories {
                 PoiSubtype("Herb Shops",         listOf("shop=herbs"))
             ),
             color = Color.parseColor("#6A1B9A"),
-            defaultEnabled = true
+            defaultEnabled = true,
+            historicTourDefault = true  // Modern Salem witch shops fit the historic tour atmosphere
         ),
 
         // 19 — Psychic & Tarot
@@ -468,7 +499,8 @@ object PoiCategories {
                 PoiSubtype("Historical Tours",   listOf("tourism=historical_tour"))
             ),
             color = Color.parseColor("#E040FB"),
-            defaultEnabled = true
+            defaultEnabled = true,
+            historicTourDefault = true  // Ghost tours are historic-tour-adjacent
         ),
 
         // 21 — Haunted Attractions
@@ -501,7 +533,8 @@ object PoiCategories {
                 PoiSubtype("Museum Houses",      listOf("historic=museum_house"))
             ),
             color = Color.parseColor("#8D6E63"),
-            defaultEnabled = true
+            defaultEnabled = true,
+            historicTourDefault = true  // Witch trial houses, colonial houses central to 1692 narrative
         )
     )
 

@@ -2,6 +2,50 @@
 
 > Sessions prior to v1.5.51 archived in `SESSION-LOG-ARCHIVE.md`.
 
+## Session 100: 2026-04-08 — Phase 9P.A COMPLETE (9P.4a Per-Mode Visibility Schema + 9P.5 Duplicates Detection)
+
+### Summary
+Two small steps that finish Phase 9P.A (Backend Foundation). **Phase 9P.4a (Per-mode category visibility schema)** added a `historicTourDefault: Boolean = false` field to the `PoiCategory` data class in `app-salem/.../ui/menu/PoiCategories.kt`, plus helper getters `freeRoamPrefKey` and `tourPrefKey` codifying the two-prefKey naming convention (`<existing prefKey>` for free-roam, `<existing prefKey>_tour` for tour mode). Six categories opted in to historic tour mode with inline justification: CIVIC (1692 courthouses), WORSHIP (Salem Village Church central to narrative — deliberate split where free-roam keeps it OFF as clutter but tour mode turns it ON), TOURISM_HISTORY (heart of historic content), WITCH_SHOP (modern witch shops fit the atmosphere), GHOST_TOUR (historic-tour-adjacent), and HISTORIC_HOUSE (witch trial houses). Three categories go the opposite way (free-roam ON, tour OFF) — ENTERTAINMENT, PSYCHIC, HAUNTED_ATTRACTION — because their modern flavor distracts from the 1692 narrative. The actual SharedPreferences migration code is deferred to Phase 9R when historic tour mode ships; 9P.4a only ships the schema. The migration plan is documented in the master plan as a Phase 9R rollout note. `./gradlew :app-salem:compileDebugKotlin` BUILD SUCCESSFUL. **Phase 9P.5 (Duplicates detection endpoint)** added `GET /admin/salem/pois/duplicates?radius=15` to `cache-proxy/lib/admin-pois.js` (~140 new lines). Architecture: bbox-prefiltered self-join across all three POI tables via a `WITH all_pois AS (...UNION ALL...)` CTE; Haversine distance computed in pure SQL (no PostGIS); JS-side cluster grouping via union-find with path compression; transitive clustering (chained POIs collapse into one cluster — correct semantics for duplicate detection). Default radius 15m, max 100m (silently capped above 100), `radius=0` and `radius=banana` rejected with 400. Excludes soft-deleted rows. 7/7 smoke tests pass on the live ~1,696-POI Salem dataset in ~500ms. Notable real-data findings: top 27-member cluster at 15m radius chains POIs around the corner of Essex Street in downtown Salem (Pamplemousse, Tipples and Mash Tours, Witch City Ink, and 24 more — a known dense block where Destination Salem and OSM imports both saw the same shops); a 3-POI cluster at exact identical coordinates (42.5235097, -70.8952337) shows "Bluebikes", "St. Peter's Church", and "Downtown Salem" sharing one location, a clear import default that the admin UI should help the operator fix. **Phase 9P.A — Backend Foundation — COMPLETE.** Phase 9P.B (Admin UI in `web/`) starts next session.
+
+### Decisions
+1. **Schema-only for 9P.4a, no migration code yet.** The master plan says "schema". Adding the data shape (the new field + helpers + doc comment) is what 9P.4a delivers; the actual SharedPreferences migration to populate `<prefKey>_tour` keys and the mode-aware reads are Phase 9R deliverables. This keeps 9P.4a small (~30 lines of Kotlin total) and doesn't ship dead code.
+2. **`historicTourDefault = true` only on 6 categories, implicit false on the other 16.** Matches the existing project house style where `defaultEnabled = true` only appears on categories that need it. Adding `historicTourDefault = false` to 16 categories would be verbose churn that obscures intent.
+3. **WORSHIP gets a deliberate free-roam/tour split.** Free-roam keeps it OFF (clutter — there are many places of worship in any city, not all 1692-relevant). Tour mode turns it ON (Salem Village Church, First Church of Salem, etc. are central to the witch trials narrative). This is exactly the kind of category where the per-mode flag earns its keep.
+4. **Bbox prefilter on the duplicates self-join.** Without it, the join is O(N²) ≈ 2.9M Haversine evaluations on the ~1,696-POI dataset. The lat prefilter (`ABS(a.lat - b.lat) <= radius/111000`) is exact since 1° latitude is uniformly ~111 km. The lng prefilter (`ABS(a.lng - b.lng) <= radius/60000`) uses 60000 m/degree as a conservative lower bound that overshoots in Salem (~82000 m/degree at 42.5°N) — overshoots without affecting correctness, just doesn't prune as much. Net result: ~500ms query latency.
+5. **Transitive clustering via union-find, not strict pairwise.** When POI A is within 15m of B, B within 15m of C, and C within 15m of D, all four collapse into one cluster of 4 — even if A and D are 60m apart. This is the correct semantics for duplicate detection in the context of this admin tool: chained dense POIs in one tight area are likely the same physical thing fragmented across imports. Strict pairwise would miss the chain and fragment the cluster into pairs.
+6. **Members within each cluster sorted by distance from centroid asc; clusters sorted by member_count desc.** Biggest dupes first in the response so the admin UI can lead with the worst offenders. Members within a cluster surface the centroid-closest first so the operator sees the "anchor" POI before the outliers.
+7. **One commit shipping Phase 9P.A complete.** User chose "one commit" at session start. 9P.4a + 9P.5 are conceptually distinct but they're the last two steps of a coherent unit (Backend Foundation). Cleaner history to land them together as "Phase 9P.A complete" than to split.
+
+### Files Changed
+- `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/menu/PoiCategories.kt` — added `historicTourDefault` field + helper getters + doc comment block; opted 6 categories into historic tour mode with inline justification comments
+- `cache-proxy/lib/admin-pois.js` — added `GET /admin/salem/pois/duplicates` endpoint (~140 new lines)
+- `cache-proxy/server.js` — banner updated to advertise the new route
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — 9P.4a + 9P.5 marked DONE with implementation notes; Phase 9P.A marked COMPLETE
+- `STATE.md` — TOP PRIORITY rewritten for Session 101 (Phase 9P.B Admin UI in `web/`)
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-100-2026-04-08.md` — live conversation log
+
+### Verification
+- **9P.4a:** `./gradlew :app-salem:compileDebugKotlin` → BUILD SUCCESSFUL in 24s. Only an unrelated pre-existing deprecation warning on `setBuiltInZoomControls` in `SalemMainActivity.kt:611`. `grep historicTourDefault` confirms 6 `historicTourDefault = true` lines on the right categories plus the data class default at line 48.
+- **9P.5 smoke tests** (7/7 pass): no auth → 401; default radius=15m → 200, 101 clusters with top cluster of 27 members near downtown Essex Street; radius=30m → 84 clusters; radius=100m → 53 clusters; radius=200 silently capped at 100; radius=0 → 400; radius=banana → 400
+- **Real-data spot check:** the duplicates endpoint surfaced a real cleanup target — three POIs at exact identical coordinates (Bluebikes / St. Peter's Church / Downtown Salem) that were clearly imported with default coordinates and need operator attention. This is exactly the use case the duplicates endpoint exists for.
+- **Performance:** full query against 1,696 POIs returned in ~500ms with the bbox prefilter. Without prefilter would be O(N²) ≈ 2.9M Haversine evaluations.
+
+### Build & Deploy
+- Kotlin compile: `./gradlew :app-salem:compileDebugKotlin` (no APK rebuild needed for this session — schema-only Kotlin change)
+- Proxy restart: `bin/restart-proxy.sh` (now sources `cache-proxy/.env` from S99 cleanup; admin auth still uses smoke-test password `salem-tour-9P3-test`)
+- Banner now shows: `AdminPOI: GET /admin/salem/pois?kind=tour|business|narration, GET /admin/salem/pois/duplicates?radius=, GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)`
+
+### Open Items for Session 101
+1. **Phase 9P.B starts** — Phase 9P.A (Backend Foundation) is complete; Admin UI work begins in `web/`
+2. **Step 9P.6** (next concrete code task) — hand-port the 22-category POI taxonomy from `PoiCategories.kt` to `web/src/config/poiCategories.ts` with the same shape (including the new `historicTourDefault` field from 9P.4a)
+3. **Step 9P.7** — `/admin` route in `web/src/App.tsx`, `web/src/admin/AdminLayout.tsx` shell with header/tree/map panes
+4. **OMEN-002 history rotation** still pending operator action (rotate DB password + OpenSky secret via portal)
+5. **Real ADMIN_PASS** still needs to be set in `cache-proxy/.env` (currently smoke-test value)
+6. **Long-deferred carryover:** NOTE-L013 voice debug cleanup, 9T.9 walk simulator verification, NOTE-L014 OMEN-008 Privacy Policy drafting
+
+---
+
 ## Session 99: 2026-04-08 — Phase 9P.3 + 9P.4 DONE (Admin Auth + Admin POI Endpoints) + OMEN-002 File-Side Cleanup
 
 ### Summary

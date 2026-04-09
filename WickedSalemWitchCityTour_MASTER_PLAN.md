@@ -1185,22 +1185,37 @@ Two real pain points motivate this work: (a) POI position errors visible on the 
 
 **Bonus (in-scope schema migration):** added `deleted_at TIMESTAMPTZ` + `idx_..._active` partial indexes to `salem_tour_pois` and `salem_businesses` (only `salem_narration_points` had `deleted_at` going in). Updated `cache-proxy/salem-schema.sql` so the migration is reproducible. Updated `lib/salem.js` public reads (`/salem/pois`, `/salem/pois/:id`, `/salem/businesses`) to filter `deleted_at IS NULL` so soft delete is functional end-to-end (otherwise it would be theatrical — admin "deletes" a POI but the app still shows it).
 
-#### Step 9P.4a: Per-mode category visibility schema (added Session 97)
-- [ ] Each POI category needs **two** visibility flags going forward: free-roam mode (current behavior) and historic tour mode (Phase 9R)
-- [ ] Two-prefKey scheme: `poi_<category>_on_freeroam` and `poi_<category>_on_tour`
-- [ ] TypeScript config (`web/src/config/poiCategories.ts`, see Step 9P.6) carries both `freeRoamDefault` and `historicTourDefault` per category
-- [ ] Free-roam defaults = current `defaultEnabled` values from `PoiCategories.kt`
-- [ ] Historic tour defaults = restrictive: history/civic/witch_shop/witch_museum/historic_house/cemetery ON, food/lodging/shopping/services OFF
-- [ ] Migration plan: existing `poi_<category>_on` SharedPreferences keys become the freeroam values on first launch; tour-mode keys initialized to `historicTourDefault`
-- [ ] Document the migration in the Phase 9R rollout notes
+#### Step 9P.4a: Per-mode category visibility schema — DONE (Session 100, 2026-04-08)
+- [x] Added `historicTourDefault: Boolean = false` field to the `PoiCategory` data class in `app-salem/.../ui/menu/PoiCategories.kt`
+- [x] Two-prefKey naming convention documented as helper getters on `PoiCategory`:
+  - `freeRoamPrefKey: String get() = prefKey` (alias for clarity — same as the existing `prefKey`)
+  - `tourPrefKey: String get() = "${prefKey}_tour"` (appends `_tour` suffix)
+- [x] Free-roam defaults preserved unchanged (still drive off `defaultEnabled` exactly as before — zero behavior change for the current app)
+- [x] Historic tour defaults populated for all 22 categories:
+  - **ON in tour mode (6):** CIVIC, WORSHIP, TOURISM_HISTORY, WITCH_SHOP, GHOST_TOUR, HISTORIC_HOUSE
+  - **OFF in tour mode (16):** everything else (food, lodging, shopping, services, modern entertainment, parks, healthcare, education, finance, parking, transit, fuel, emergency, auto services, offices, psychic, haunted attractions)
+  - **Notable split:** WORSHIP is `defaultEnabled=false` (clutter in free-roam) but `historicTourDefault=true` (1692 churches like Salem Village Church and First Church of Salem are central to the witch trials narrative). PSYCHIC and HAUNTED_ATTRACTION go the opposite way: `defaultEnabled=true` (modern Salem flavor) but `historicTourDefault=false` (distract from 1692 narrative).
+- [x] TypeScript config (`web/src/config/poiCategories.ts`) **deferred to Phase 9P.6** as the master plan specifies. 9P.4a is the Kotlin schema; 9P.6 hand-ports it into TypeScript with the same shape.
+- [x] Compiled clean (`./gradlew :app-salem:compileDebugKotlin` BUILD SUCCESSFUL)
 
-#### Step 9P.5: Duplicates detection endpoint
-- [ ] `GET /admin/salem/pois/duplicates?radius=15` — returns groups of POIs within N meters of each other
-- [ ] Implementation: Haversine distance in SQL (PostGIS not assumed)
-- [ ] Response shape: `[{ "centroid": [lat, lng], "members": [{ kind, id, name, lat, lng, distance_m }] }]`
-- [ ] Configurable radius (default 15m, max 100m)
-- [ ] Excludes soft-deleted rows
-- [ ] Verify against known overlapping POIs in the dataset
+**Migration plan (Phase 9R rollout — to be implemented when historic tour mode ships):**
+- On first launch in a build that includes historic tour mode, run a one-shot SharedPreferences migration:
+  - For each `PoiCategory` in `PoiCategories.ALL`: read the existing `<prefKey>` value (defaulting to `defaultEnabled` if missing); write that same value to `<prefKey>_tour` only if `<prefKey>_tour` doesn't already exist; initialize `<prefKey>_tour` from `historicTourDefault` if neither exists. Important: the migration must only RUN ONCE — guarded by a `prefs_migrated_to_per_mode_v1` boolean.
+  - The existing `<prefKey>` keys remain in use as the free-roam values; the new `<prefKey>_tour` keys are read only when historic tour mode is active.
+  - Active mode is selected by a top-level `current_mode_pref` (`freeroam` | `tour`) that historic tour mode UI sets when the user opts in.
+  - All POI-visibility-reading code paths (currently `enabledTagValues(prefs)` and similar) become mode-aware: `prefs.getBoolean(if (mode == TOUR) cat.tourPrefKey else cat.freeRoamPrefKey, if (mode == TOUR) cat.historicTourDefault else cat.defaultEnabled)`.
+- This migration is a Phase 9R deliverable, NOT a 9P.4a deliverable. 9P.4a only ships the data shape so 9R has somewhere to land.
+
+#### Step 9P.5: Duplicates detection endpoint — DONE (Session 100, 2026-04-08)
+- [x] `GET /admin/salem/pois/duplicates?radius=15` added to `cache-proxy/lib/admin-pois.js`
+- [x] Implementation: bbox-prefiltered self-join across all three POI tables (`salem_tour_pois`, `salem_businesses`, `salem_narration_points`) via a `WITH all_pois AS (...UNION ALL...)` CTE; Haversine distance in pure SQL (no PostGIS dependency); JS-side cluster grouping via union-find with path compression
+- [x] Response shape: `{ radius_m, count, clusters: [{ centroid: {lat, lng}, member_count, members: [{ kind, id, name, lat, lng, distance_m_from_centroid }] }] }` — clusters sorted by member_count desc; members within each cluster sorted by distance from centroid asc
+- [x] Configurable radius: default 15m, max 100m (silently capped above 100), `radius=0` and `radius=banana` both rejected with 400
+- [x] Excludes soft-deleted rows (`WHERE deleted_at IS NULL` in each leg of the CTE)
+- [x] Bbox prefilter (`ABS(lat-lat) <= radius/111000` AND `ABS(lng-lng) <= radius/60000`) cuts the join before Haversine, keeping latency well under 1s on the ~1700-row Salem dataset
+- [x] Smoke tested against the live dataset: 7/7 pass — default radius=15m surfaces 101 clusters; the top cluster has 27 narration POIs chained together near downtown Essex Street (a known dense block where Destination Salem and OSM imports overlapped); a separate 3-POI cluster at coordinates (42.5235097, -70.8952337) shows three POIs ("Bluebikes", "St. Peter's Church", "Downtown Salem") sharing the exact same location — likely an import default that the operator should fix in the admin UI
+
+**Phase 9P.A — Backend Foundation — COMPLETE** with 9P.5. The four foundation steps (9P.1 schema, 9P.2 importer, 9P.3 auth middleware, 9P.4 admin POI write endpoints, 9P.4a per-mode visibility schema, 9P.5 duplicates) are all done. **Phase 9P.B — Admin UI** (in `web/`) starts next session.
 
 ---
 

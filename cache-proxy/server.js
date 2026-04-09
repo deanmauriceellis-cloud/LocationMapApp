@@ -208,6 +208,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Scan:   GET /scan-cells');
   console.log('Salem:  GET /salem/pois, /salem/businesses, /salem/figures, /salem/timeline, /salem/sources, /salem/tours, /salem/events, /salem/sync, /salem/stats');
   console.log('Admin:  GET /cache/stats, POST /cache/clear (Basic Auth), GET /admin/ping (Basic Auth)');
-  console.log('AdminPOI: GET /admin/salem/pois?kind=tour|business|narration, GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)');
+  console.log('AdminPOI: GET /admin/salem/pois?kind=tour|business|narration, GET /admin/salem/pois/duplicates?radius=, GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)');
   console.log(`        Admin auth: ${adminAuthConfigured ? 'configured' : 'NOT CONFIGURED — set ADMIN_USER and ADMIN_PASS'}`);
 });

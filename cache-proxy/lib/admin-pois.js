@@ -19,6 +19,8 @@
  * Routes:
  *   GET    /admin/salem/pois?kind=&category=&s=&w=&n=&e=&include_deleted=
  *          (kind required; category and bbox optional)
+ *   GET    /admin/salem/pois/duplicates?radius=15  (Phase 9P.5)
+ *          (cross-kind clusters of POIs within N meters of each other)
  *   GET    /admin/salem/pois/:kind/:id
  *   PUT    /admin/salem/pois/:kind/:id          — partial update
  *   POST   /admin/salem/pois/:kind/:id/move     — lat/lng-only update
@@ -254,6 +256,171 @@ module.exports = function(app, deps) {
       res.json({ kind, count: rows.length, pois: rows });
     } catch (err) {
       console.error('[AdminPois] list error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── GET /admin/salem/pois/duplicates — cross-kind duplicate detection ─────
+  // Phase 9P.5. Returns clusters of POIs within `radius` meters of each other,
+  // across all three tables. Excludes soft-deleted rows. Default radius 15m,
+  // max 100m. Implementation: bbox-prefiltered self-join with Haversine in SQL,
+  // then JS-side union-find clustering.
+  //
+  // Response shape:
+  //   { radius_m, count, clusters: [{ centroid: {lat, lng}, members: [{kind, id, name, lat, lng, distance_m_from_centroid}] }] }
+  app.get('/admin/salem/pois/duplicates', requirePg, async (req, res) => {
+    try {
+      const radiusRaw = parseFloat(req.query.radius || '15');
+      if (!Number.isFinite(radiusRaw) || radiusRaw <= 0) {
+        return res.status(400).json({ error: 'radius must be a positive number (meters)' });
+      }
+      const radius = Math.min(radiusRaw, 100);
+
+      // Bounding-box prefilter constants. Latitude is ~111000 m/degree
+      // everywhere; longitude is ~111000 * cos(lat). Salem is ~42.5°N where
+      // cos ≈ 0.737, so we use a conservative 60000 m/degree lower bound to
+      // avoid pruning real candidates near the poles.
+      const latBoxDegrees = radius / 111000.0;
+      const lngBoxDegrees = radius / 60000.0;
+
+      // CTE unions all three POI tables, projecting only the columns we need.
+      // Self-join uses (kind, id) ordering to ensure each pair appears once.
+      // Haversine distance computed twice — once in WHERE for filtering, once
+      // in SELECT for the response. PostgreSQL's planner is smart enough that
+      // this doesn't measurably hurt; rewriting via LATERAL is overkill here.
+      const sql = `
+        WITH all_pois AS (
+          SELECT 'tour'::text AS kind, id, name, lat, lng
+            FROM salem_tour_pois WHERE deleted_at IS NULL
+          UNION ALL
+          SELECT 'business'::text AS kind, id, name, lat, lng
+            FROM salem_businesses WHERE deleted_at IS NULL
+          UNION ALL
+          SELECT 'narration'::text AS kind, id, name, lat, lng
+            FROM salem_narration_points WHERE deleted_at IS NULL
+        )
+        SELECT
+          a.kind AS a_kind, a.id AS a_id, a.name AS a_name, a.lat AS a_lat, a.lng AS a_lng,
+          b.kind AS b_kind, b.id AS b_id, b.name AS b_name, b.lat AS b_lat, b.lng AS b_lng,
+          6371000.0 * 2.0 * ASIN(SQRT(
+            POWER(SIN(RADIANS(b.lat - a.lat) / 2.0), 2) +
+            COS(RADIANS(a.lat)) * COS(RADIANS(b.lat)) *
+            POWER(SIN(RADIANS(b.lng - a.lng) / 2.0), 2)
+          )) AS distance_m
+        FROM all_pois a
+        JOIN all_pois b
+          ON (a.kind, a.id) < (b.kind, b.id)
+         AND ABS(a.lat - b.lat) <= $2
+         AND ABS(a.lng - b.lng) <= $3
+        WHERE 6371000.0 * 2.0 * ASIN(SQRT(
+                POWER(SIN(RADIANS(b.lat - a.lat) / 2.0), 2) +
+                COS(RADIANS(a.lat)) * COS(RADIANS(b.lat)) *
+                POWER(SIN(RADIANS(b.lng - a.lng) / 2.0), 2)
+              )) <= $1
+        ORDER BY distance_m ASC
+      `;
+
+      const { rows: pairs } = await pgPool.query(sql, [radius, latBoxDegrees, lngBoxDegrees]);
+
+      if (pairs.length === 0) {
+        return res.json({ radius_m: radius, count: 0, clusters: [] });
+      }
+
+      // ── JS-side cluster grouping via union-find ─────────────────────────────
+      // Each POI is keyed by `${kind}:${id}`. Walk every pair, union the two
+      // endpoints. After all unions, group nodes by their root and produce
+      // one cluster per group.
+
+      const parent = new Map();
+      const nodeData = new Map(); // key → { kind, id, name, lat, lng }
+
+      function find(x) {
+        let root = x;
+        while (parent.get(root) !== root) root = parent.get(root);
+        // Path compression
+        let cur = x;
+        while (parent.get(cur) !== root) {
+          const next = parent.get(cur);
+          parent.set(cur, root);
+          cur = next;
+        }
+        return root;
+      }
+
+      function union(x, y) {
+        const rx = find(x);
+        const ry = find(y);
+        if (rx !== ry) parent.set(rx, ry);
+      }
+
+      function ensureNode(kind, id, name, lat, lng) {
+        const key = `${kind}:${id}`;
+        if (!parent.has(key)) {
+          parent.set(key, key);
+          nodeData.set(key, {
+            kind,
+            id,
+            name,
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+          });
+        }
+        return key;
+      }
+
+      for (const p of pairs) {
+        const a = ensureNode(p.a_kind, p.a_id, p.a_name, p.a_lat, p.a_lng);
+        const b = ensureNode(p.b_kind, p.b_id, p.b_name, p.b_lat, p.b_lng);
+        union(a, b);
+      }
+
+      // Group by root
+      const clusters = new Map(); // root → array of node data
+      for (const key of parent.keys()) {
+        const root = find(key);
+        if (!clusters.has(root)) clusters.set(root, []);
+        clusters.get(root).push(nodeData.get(key));
+      }
+
+      // Build response: only clusters with ≥2 members (singletons can't exist
+      // here anyway since every node came from a pair, but defensive)
+      function haversineMeters(lat1, lng1, lat2, lng2) {
+        const toRad = (d) => d * Math.PI / 180;
+        const R = 6371000;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                  Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.asin(Math.sqrt(a));
+      }
+
+      const result = [];
+      for (const members of clusters.values()) {
+        if (members.length < 2) continue;
+        const centroidLat = members.reduce((s, m) => s + m.lat, 0) / members.length;
+        const centroidLng = members.reduce((s, m) => s + m.lng, 0) / members.length;
+        const enriched = members.map(m => ({
+          ...m,
+          distance_m_from_centroid: Math.round(
+            haversineMeters(centroidLat, centroidLng, m.lat, m.lng) * 100
+          ) / 100,
+        }));
+        // Sort members by distance from centroid (closest first)
+        enriched.sort((a, b) => a.distance_m_from_centroid - b.distance_m_from_centroid);
+        result.push({
+          centroid: { lat: centroidLat, lng: centroidLng },
+          member_count: members.length,
+          members: enriched,
+        });
+      }
+
+      // Sort clusters by member count descending (biggest duplicates first)
+      result.sort((a, b) => b.member_count - a.member_count);
+
+      res.json({ radius_m: radius, count: result.length, clusters: result });
+    } catch (err) {
+      console.error('[AdminPois] duplicates error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
