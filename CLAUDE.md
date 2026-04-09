@@ -8,19 +8,28 @@
 
 ## Session Start Protocol
 
-Execute in order before ANY work:
+Execute in order before ANY work. Reads should be PARALLEL and HEAD-ONLY where noted — keep the read phase under 1,000 lines of context whenever possible.
 
-0. **Sync with remote** — `git fetch origin`, compare HEAD vs origin/main. Pull if behind. Alert if diverged. Never work on stale state.
-1. **Read OMEN notes** — Read `~/Development/OMEN/notes/locationmapapp.md` for action items from project management. These are operational: action items, reminders, follow-ups, questions. Address applicable items this session.
-2. **Read OMEN directives** — Read `~/Development/OMEN/directives/ACTIVE.md` for formal policy. Comply with all GLOBAL directives. Comply with TARGETED directives addressed to this project. OMEN directives take precedence over project-specific rules if there is a conflict.
-3. **Read context** — CLAUDE.md, WickedSalemWitchCityTour_MASTER_PLAN.md, STATE.md, most recent session log, relevant design docs.
-4. **Open live conversation log** — Create `docs/session-logs/session-NNN-YYYY-MM-DD.md` with session header. All significant actions, decisions, code changes, and reasoning during the session MUST be appended to this file as they happen. This is the crash-recovery mechanism — if the session dies, this log survives on disk.
-5. **Status report** — Current phase/step from MASTER_PLAN, last session summary, completed steps, next steps, blockers. Include OMEN note and directive compliance status.
-6. **Decision checkpoint** — Surface ALL pending questions in three categories:
+0. **Sync with remote** — `git fetch origin`, compare HEAD vs `origin/master`. Pull if behind. Alert if diverged. Never work on stale state.
+1. **Parallel read phase** (one tool call, all in parallel):
+   - `~/Development/OMEN/notes/locationmapapp.md` — full file, action items addressed to this project
+   - `~/Development/OMEN/directives/ACTIVE.md` — **head 200 lines only** (newest directives are at the top; deeper history is reference-only)
+   - `STATE.md` — full file (it is now ~150 lines, current-state-only)
+   - Most recent session log in `docs/session-logs/` (only the most recent — older logs only on demand)
+   - `MEMORY.md` is already loaded automatically; do not re-read unless a specific memory file is needed
+   - **DO NOT read `SESSION-LOG.md` at session start.** It is a backwards-looking changelog. The current state lives in `STATE.md` and the most recent live log; SESSION-LOG.md is only consulted on demand for historical context.
+   - **DO NOT re-read `CLAUDE.md`** unless specifically investigating a protocol or structural question — it is loaded automatically by the harness.
+2. **Open live conversation log** — Create `docs/session-logs/session-NNN-YYYY-MM-DD.md` with session header. **This is the canonical record of the session.** All significant actions, decisions, code changes, and reasoning MUST be appended here as they happen. This is the crash-recovery mechanism — if the session dies, this log survives on disk.
+3. **Status report** — One concise message to the user summarizing: TOP PRIORITY (from STATE.md), current phase/step, last session summary (from the most recent live log), completed steps, next steps, blockers, applicable OMEN items.
+4. **Decision checkpoint** — Surface ALL pending questions in three categories:
    - Open decisions from the plan
    - OMEN notes/directives requiring action this session
    - Execution confirmation: "Next step is [X], will produce [Y]. Proceed?"
-7. **Await direction** — Never execute until user confirms.
+5. **Await direction** — Never execute until the user confirms.
+
+**Read full files only on demand.** If a specific question requires the full `SESSION-LOG.md`, the full `ACTIVE.md`, or any of the C-priority reference docs (`GOVERNANCE.md`, `IP.md`, `COMMERCIALIZATION.md`, `DESIGN-REVIEW.md`, `CURRENT_TESTING.md`), read them when the question arises — not at session start.
+
+**Recovery from a killed session:** Read the most recent `docs/session-logs/session-NNN-YYYY-MM-DD.md` first to reconstruct in-flight context, then proceed with the parallel read phase as normal.
 
 ## Live Conversation Log
 
@@ -43,27 +52,77 @@ This is the crash-recovery mechanism. If a session is killed (context overflow, 
 
 ## Session End Protocol
 
-Execute all steps in order:
+**The session story is written ONCE — in the live log at `docs/session-logs/session-NNN-YYYY-MM-DD.md`. Everywhere else gets a thin pointer.** This is the load-bearing rule of the optimized protocol. Do not duplicate the story across STATE.md, SESSION-LOG.md, and the OMEN report — that wastes context budget and creates four places to keep in sync.
 
-1. **Update living context docs** — Update CLAUDE.md, STATE.md, and WickedSalemWitchCityTour_MASTER_PLAN.md as needed.
-2. **Archive removed content** — Anything removed from any .md doc goes to `docs/archive/` with format `FILENAME_removed_YYYY-MM-DD.md`. Never silently delete.
-3. **Optimize context docs for loading** — Keep CLAUDE.md and STATE.md concise and current. Details in linked docs.
-4. **Finalize conversation log** — Add session summary and final status to the live log in `docs/session-logs/`. Append summary to SESSION-LOG.md.
-5. **Commit and push** — Stage all changes, commit with descriptive message, push to remote. Local and remote must never drift apart.
-6. **Report to OMEN** — Write a session report to `~/Development/OMEN/reports/locationmapapp/session-NNN-YYYY-MM-DD.md` using the format at `~/Development/OMEN/templates/session-report.md`. This report must include: OMEN note acknowledgments, directive compliance, shared engine impact, security notes, test results, backward compatibility, conflicts with OMEN directives. A session without a report is an incomplete session.
+Execute in order:
+
+1. **Finalize the live log** — Append a closing session summary and final status to `docs/session-logs/session-NNN-YYYY-MM-DD.md`. This is the canonical record. Everything else in this protocol references it.
+2. **Append to SESSION-LOG.md** — Add ONE entry with the session header line + a 2-3 sentence summary + a pointer to the live log. **Do not duplicate decisions, file lists, or detailed reasoning** — those live in the live log and `git log -p`. Example:
+   ```
+   ## Session NNN: YYYY-MM-DD — One-line title
+
+   Two-or-three sentence summary of what shipped.
+
+   Full session detail: `docs/session-logs/session-NNN-YYYY-MM-DD.md`. Commit: `<sha>`.
+   ```
+3. **Roll the SESSION-LOG.md window** — If `SESSION-LOG.md` now contains more than 10 sessions, move the oldest entries to the top of `SESSION-LOG-ARCHIVE.md` (newest archived first). Target: keep the 10 most recent sessions in `SESSION-LOG.md`.
+4. **Update STATE.md only if it changed** — STATE.md is a snapshot, not a changelog. Only update it if (a) the TOP PRIORITY changed, (b) a phase status changed, (c) a carry-forward item was resolved or added, or (d) a new OMEN item appeared. **Do not append session summaries to STATE.md.** Keep it under 200 lines. If the file ever drifts above 200 lines, stop and compress it on the spot.
+5. **Update CLAUDE.md only if structure or protocols changed** — CLAUDE.md should be stable. Touch it ONLY when (a) project structure changes (new module, new key reference file), (b) the session start/end protocol itself changes, or (c) the tech stack changes. Do NOT update CLAUDE.md every session.
+6. **Update the master plan only if a phase status changed** — `WickedSalemWitchCityTour_MASTER_PLAN.md` only gets touched when a phase or step transitions state (planned → in-progress → done → blocked).
+7. **Archive removed content** — Anything removed from any tracked .md doc goes to `docs/archive/` with format `FILENAME_removed_YYYY-MM-DD.md`. Never silently delete.
+8. **Commit and push** — Stage all changes, commit with a descriptive message, push to remote. Local and remote must never drift apart.
+9. **Write the OMEN report** — Use the **thin template** below. **Do not duplicate Files Changed or Decisions Made** from the live log — those are already in `git log -p` and in the live log. The OMEN report carries only OMEN-specific content. Write to `~/Development/OMEN/reports/locationmapapp/session-NNN-YYYY-MM-DD.md`.
+
+### Thin OMEN report template (~80 lines max)
+
+```markdown
+# LocationMapApp Session NNN — YYYY-MM-DD
+
+**Branch:** master | **Commit:** <sha> | **Live log:** `~/Development/LocationMapApp_v1.5/docs/session-logs/session-NNN-YYYY-MM-DD.md`
+
+## Summary
+Two or three sentences. What shipped, what was deferred, what blocked.
+
+## OMEN Note Acknowledgments
+- NOTE-LXXX — status (acknowledged / acted on / still pending / surfaced again — Nth session)
+- (only notes touched or relevant this session; skip the standing ones unless status changed)
+
+## OMEN Directive Compliance
+- OMEN-XXX — status against this session's work (compliant / no-op / conflict)
+- (only directives that apply to what shipped; skip the inapplicable ones)
+
+## Shared Engine Impact
+- (any change that affects core/, the cache-proxy, or anything other projects depend on; "none" is a valid answer)
+
+## Cross-project Notes
+- (anything OMEN should relay to a sibling project — Salem, GeoInbox, RadioIntelligence, etc.; "none" is a valid answer)
+
+## Open Items for OMEN
+- (only things requiring OMEN action — operator credential rotations, directive amendments, cutovers, sign-offs)
+
+## Reference
+- Full session detail (decisions, file changes, reasoning, build results): see live log path above.
+- Commit detail: `git show <sha>` in the LocationMapApp repo.
+```
+
+**Skip these sections from the old report format** (they live in the live log + git):
+- Files Changed table
+- Decisions Made list
+- Build/test results detail
+- Reasoning narrative
+- Code snippets
+
+If OMEN needs any of that, it can read the live log directly — the path is in the report header.
+
+**A session without a live log + a SESSION-LOG.md pointer + a thin OMEN report is an incomplete session.**
 
 ---
 
 ## Project Status
 
-**Version:** v1.5.71 (110 sessions completed as of 2026-04-09). Latest session: see `STATE.md` for current state and `SESSION-LOG.md` for the most recent session entry. Older session details archived to `SESSION-LOG.md` and `docs/session-logs/`.
-**Phases 1-9 + 9A+ + 9T (8/9):** COMPLETE — core development, offline foundation, ambient narration done
-**Phase 9P (POI Admin Tool) IN PROGRESS:** 9P.A (backend) DONE; 9P.B (admin UI) 6/8 done — 9P.6 taxonomy, 9P.7 AdminLayout shell, 9P.8 POI tree, 9P.9 admin map view, 9P.10 edit dialog, 9P.10b Salem Oracle integration all landed; **next: 9P.11 Highlight Duplicates wiring**
-**Phase 9Q (Salem Domain Content Bridge):** not started — building→POI translation + 425 buildings + 202 newspapers
-**Phase 9R (Historic Tour Mode):** not started — opt-in chapter-based 1692 tour
-**Phase 10 (Production readiness):** DEFERRED behind 9P + 9Q + 9R — Firebase, photos, DB hardening, emulator verification
-**Phase 11:** Branding, ASO & Play Store launch — target September 1, 2026
-**Critical:** Salem 400+ quadricentennial is 2026. App must be in Play Store by September to capture October (1M+ visitors).
+> **Current state — phase, version, session count, top priority — lives in `STATE.md`.** This section is intentionally minimal so CLAUDE.md does not need to be touched every session. If you need to know what is in flight right now, read `STATE.md`.
+
+**Critical timing:** Salem 400+ quadricentennial is 2026. App must be in Play Store by **September 1, 2026** to capture October's 1M+ visitors. This is the only date that constrains every other planning decision.
 
 ---
 
@@ -131,17 +190,18 @@ LocationMapApp_v1.5/
 
 ## Key Reference Files
 
-| Priority | File | Purpose |
-|----------|------|---------|
-| A (always) | `CLAUDE.md` | This file |
-| A (always) | `STATE.md` | Current project state |
-| A (always) | `WickedSalemWitchCityTour_MASTER_PLAN.md` | Full build plan |
-| A (recovery) | `docs/session-logs/` | Live conversation logs (crash-recovery) |
-| B (session start) | `SESSION-LOG.md` | Session history (summaries) |
-| C (reference) | `GOVERNANCE.md` | Legal/compliance (56KB) |
-| C (reference) | `IP.md` | Patent/copyright register |
-| C (reference) | `COMMERCIALIZATION.md` | Business model |
-| C (reference) | `DESIGN-REVIEW.md` | Architecture decisions |
-| C (reference) | `CURRENT_TESTING.md` | Test checklist |
+| Priority | File | Purpose | When to read |
+|----------|------|---------|--------------|
+| A (always) | `CLAUDE.md` | This file | Auto-loaded |
+| A (always) | `STATE.md` | Current snapshot — TOP PRIORITY, phase status, open items | Session start (parallel read) |
+| A (always) | `docs/session-logs/session-NNN-*.md` | Most recent live conversation log (canonical record) | Session start (parallel read) |
+| A (reference) | `WickedSalemWitchCityTour_MASTER_PLAN.md` | Full build plan, phase specs | On demand when entering a new phase or step |
+| B (on demand) | `SESSION-LOG.md` | Rolling 10-session summary index with pointers to live logs | Only when investigating recent history; do NOT read at session start |
+| B (on demand) | `SESSION-LOG-ARCHIVE.md` | Older session summaries (S001-S100 + pre-v1.5.51) | Only when investigating older history |
+| C (on demand) | `GOVERNANCE.md` | Legal/compliance (56KB) | When the work touches legal, privacy, or compliance |
+| C (on demand) | `IP.md` | Patent/copyright register | When the work touches a patentable innovation |
+| C (on demand) | `COMMERCIALIZATION.md` | Business model | When the work touches monetization or tier gating |
+| C (on demand) | `DESIGN-REVIEW.md` | Architecture decisions | When the work touches a design previously reviewed |
+| C (on demand) | `CURRENT_TESTING.md` | Test checklist | When entering Phase 10 or running regression |
 
-_Document Version: 0.1.0 — Created by OMEN Session 003 (2026-04-04)_
+_Document Version: 0.2.0 — Optimized session protocols by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._
