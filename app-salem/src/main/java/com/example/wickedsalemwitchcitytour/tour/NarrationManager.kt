@@ -190,6 +190,47 @@ class NarrationManager @Inject constructor(
         ))
     }
 
+    /**
+     * S113 — Speak arbitrary text with a caller-supplied tag embedded in the
+     * utterance id. Lets the caller later cancel segments by tag via
+     * [cancelSegmentsWithTag]. Used by PoiDetailSheet to interrupt its own
+     * read-through on user click / sheet dismiss without affecting unrelated
+     * ambient narration still queued.
+     */
+    fun speakTaggedHint(tag: String, text: String, poiName: String, voiceId: String? = null) {
+        enqueue(NarrationSegment(
+            id = "${tag}_${System.nanoTime()}",
+            text = text,
+            type = SegmentType.HINT,
+            poiName = poiName,
+            voiceId = voiceId
+        ))
+    }
+
+    /**
+     * S113 — Remove every queued segment whose id starts with the given tag,
+     * and if the currently-speaking segment has that tag, stop it and move on
+     * to the next non-tagged segment. Unrelated narration continues.
+     */
+    fun cancelSegmentsWithTag(tag: String) {
+        val beforeSize = queue.size
+        val iter = queue.iterator()
+        while (iter.hasNext()) {
+            if (iter.next().id.startsWith(tag)) iter.remove()
+        }
+        val removedQueued = beforeSize - queue.size
+
+        val current = currentSegment
+        if (current != null && current.id.startsWith(tag)) {
+            tts?.stop()
+            currentSegment = null
+            DebugLogger.i(TAG, "cancelSegmentsWithTag($tag): killed current + removed $removedQueued queued")
+            playNext()
+        } else if (removedQueued > 0) {
+            DebugLogger.i(TAG, "cancelSegmentsWithTag($tag): removed $removedQueued queued (current unaffected)")
+        }
+    }
+
     // ── Playback Controls ───────────────────────────────────────────────
 
     fun pause() {

@@ -119,9 +119,18 @@ internal fun SalemMainActivity.initNarrationSystem() {
     corridorManager = CorridorGeofenceManager()
 
     // Initialize proximity dock
+    //
+    // S113: Dock tap now opens the POI Detail Sheet instead of enqueueing
+    // the narration. Ambient narration continues in the background; the
+    // sheet will queue its own read-through via a dedicated TTS tag so it
+    // can interrupt only its own speech on dismiss/click.
     proximityDock = ProximityDock(this, binding.root).apply {
         onPoiTapped = { point ->
-            enqueueNarration(point, jumpToFront = true)
+            DebugLogger.i(
+                "SalemMainActivity",
+                "DOCK TAP id=${point.id} name=${point.name} → showing PoiDetailSheet"
+            )
+            PoiDetailSheet.show(point, supportFragmentManager)
         }
     }
 
@@ -534,6 +543,51 @@ internal fun SalemMainActivity.showNarrationSheet(point: NarrationPoint) {
     // Show the sheet
     sheet.visibility = View.VISIBLE
 
+    // S113 iter-3: Tapping anywhere on the bottom banner (except the
+    // Skip/Listen/More/Walk/Fence button row which has its own
+    // handlers) opens the full POI Detail Sheet for the currently-
+    // narrated point. Without this, the banner was dead-clickable —
+    // operator tapped "the first announcement" and nothing happened.
+    //
+    // We attach the listener to the sheet root; individual buttons
+    // further down already have their own setOnClickListener calls
+    // which will consume touches on those button regions before the
+    // root sees them, so this only fires on empty-area taps.
+    sheet.setOnClickListener {
+        DebugLogger.i(
+            "SalemMainActivity",
+            "BANNER TAP id=${point.id} name=${point.name} → showing PoiDetailSheet"
+        )
+        PoiDetailSheet.show(point, supportFragmentManager)
+    }
+    // Also make the title and narration text regions explicitly
+    // clickable and route to the same handler — these are the most
+    // likely tap targets and may not receive the root's click on
+    // certain Android versions when they have their own clickable
+    // parent chain.
+    sheet.findViewById<TextView>(R.id.narrationTitle)?.apply {
+        isClickable = true
+        isFocusable = true
+        setOnClickListener {
+            DebugLogger.i(
+                "SalemMainActivity",
+                "BANNER TITLE TAP id=${point.id} name=${point.name} → showing PoiDetailSheet"
+            )
+            PoiDetailSheet.show(point, supportFragmentManager)
+        }
+    }
+    sheet.findViewById<TextView>(R.id.narrationText)?.apply {
+        isClickable = true
+        isFocusable = true
+        setOnClickListener {
+            DebugLogger.i(
+                "SalemMainActivity",
+                "BANNER TEXT TAP id=${point.id} name=${point.name} → showing PoiDetailSheet"
+            )
+            PoiDetailSheet.show(point, supportFragmentManager)
+        }
+    }
+
     // Action buttons
     sheet.findViewById<View>(R.id.btnSkip)?.setOnClickListener {
         tourViewModel.speakNarration("", "")  // stop current TTS
@@ -682,13 +736,24 @@ internal fun SalemMainActivity.showNarrationHighlight(point: NarrationPoint) {
 
     val center = GeoPoint(point.lat, point.lng)
 
-    // Inner ring — bright solid gold, marks the POI center
+    // Inner ring — bright solid gold, marks the POI center.
+    //
+    // S113 iter-3 fix: The ring must NOT intercept taps meant for the POI
+    // marker underneath. osmdroid's default Polygon.onSingleTapConfirmed
+    // will consume the tap if title is set (opens its info window). We:
+    //   (1) leave title null so there is no info window to open
+    //   (2) install a no-op click listener that returns false, so even if
+    //       a future osmdroid version adds default tap behavior, the tap
+    //       falls through to the marker
+    //   (3) insert at overlay index 0 (bottom), below the markers, so
+    //       osmdroid's top-down tap dispatch hits the marker first
     val inner = Polygon().apply {
         points = Polygon.pointsAsCircle(center, HIGHLIGHT_INNER_RADIUS_M)
         fillPaint.color = Color.argb(80, 255, 215, 0)     // gold @ ~31% alpha
         outlinePaint.color = Color.argb(255, 255, 215, 0) // gold solid stroke
         outlinePaint.strokeWidth = 6f
-        title = "Now narrating: ${point.name}"
+        // title intentionally unset — do not intercept taps
+        setOnClickListener { _, _, _ -> false }
     }
 
     // Outer ring — faded gold, will pulse via the animation job
@@ -697,14 +762,20 @@ internal fun SalemMainActivity.showNarrationHighlight(point: NarrationPoint) {
         fillPaint.color = Color.argb(40, 255, 215, 0)     // gold @ ~16% alpha (animated)
         outlinePaint.color = Color.argb(180, 255, 215, 0) // gold faded stroke
         outlinePaint.strokeWidth = 3f
+        // title intentionally unset — do not intercept taps
+        setOnClickListener { _, _, _ -> false }
     }
 
-    // Add outer first (behind), then inner (on top)
-    binding.mapView.overlays.add(outer)
-    binding.mapView.overlays.add(inner)
+    // Add at index 0 (bottom of overlay stack) so markers are drawn and
+    // tap-dispatched on top. Visual result: ring halo shows around the
+    // marker icon, marker remains tappable.
+    binding.mapView.overlays.add(0, outer)
+    binding.mapView.overlays.add(1, inner)
     narrationHighlightInner = inner
     narrationHighlightOuter = outer
     binding.mapView.invalidate()
+    DebugLogger.i("SalemMainActivity",
+        "HIGHLIGHT drawn at index 0-1 for ${point.name} (below markers)")
 
     // Pulse the outer ring's alpha while narration is active.
     // 6-step cycle = 1.8 sec per pulse, alpha cycles 30 → 110 → 30.

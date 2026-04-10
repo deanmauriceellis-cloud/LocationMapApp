@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  poi_hero_placeholder_red.xml — Session 113
+
+  Bright red placeholder shown as the hero image for POIs that do not yet
+  have a curated asset assigned via the admin tool. Makes it screamingly
+  obvious which POIs are part of the "assign hero" worklist.
+
+  Replaced by merchant / admin override images in a future session.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+       android:shape="rectangle">
+    <solid android:color="#D32F2F" />
+</shape>

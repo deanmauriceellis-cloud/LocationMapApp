@@ -1,0 +1,534 @@
+/*
+ * WickedSalemWitchCityTour v1.0
+ * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ *
+ * This source code is proprietary and confidential.
+ * Unauthorized copying, modification, or distribution is
+ * strictly prohibited.
+ */
+
+package com.example.wickedsalemwitchcitytour.ui
+
+import android.app.Dialog
+import android.content.DialogInterface
+import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Bundle
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.Window
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.FragmentManager
+import androidx.fragment.app.activityViewModels
+import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import dagger.hilt.android.AndroidEntryPoint
+import org.json.JSONObject
+
+/**
+ * POI Detail — full-screen dialog (Session 113, iteration 2).
+ *
+ * Opens when the user taps a POI on the map marker or in the proximity dock.
+ * Fills the entire window (no background map visible) so stray taps cannot
+ * leak through to the map below. This was the v1 bug: a BottomSheet allowed
+ * tapping map markers above it, which opened a second sheet with mismatched
+ * audio vs. view.
+ *
+ * Layout:
+ *   - Top 20% of the initial window height: hero image (fitXY stretch)
+ *   - Scrollable body: overview row (icon + name + type + address + phone)
+ *     + Visit Website button + Overview / About / The Story narrative sections
+ *     + "Things You Can Do" action buttons
+ *
+ * TTS behavior (iteration 2):
+ *   - On open, any lingering `sheet_*` TTS segments from a previously-
+ *     dismissed sheet are cancelled FIRST so a stale narration cannot play
+ *     over a new sheet's view.
+ *   - Then the sheet queues, as tagged segments that queue behind whatever
+ *     ambient narration is currently playing:
+ *       1. Name + type
+ *       2. A single contact line: address + phone + website acknowledgement
+ *       3. Short narration (if populated)
+ *       4. Description (if populated and distinct from Short)
+ *       5. Long narration / Pass 2 (if populated and distinct from the above)
+ *   - Action buttons are NOT read. UI labels are NOT read. Operator spec.
+ *   - Any user action inside the sheet (close, dismiss, website button, any
+ *     action button) cancels the sheet's tagged segments so the TTS matches
+ *     the view.
+ *
+ * Verbose lifecycle logging: every fragment callback logs the POI id, so a
+ * future crash can be traced end-to-end in the persistent debug log.
+ */
+@AndroidEntryPoint
+class PoiDetailSheet : DialogFragment() {
+
+    private val tourViewModel: TourViewModel by activityViewModels()
+
+    private lateinit var poi: NarrationPoint
+
+    /** Stable per-sheet tag used as the utterance-id prefix for this sheet's
+     *  TTS segments. Lets [cancelSheetRead] drop only this sheet's queued
+     *  speech while leaving unrelated ambient narration alone. */
+    private val ttsTag: String by lazy { "sheet_${poi.id}_" }
+
+    // ── Dialog configuration ────────────────────────────────────────────
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Full-screen style with no floating chrome. We draw our own
+        // background in the layout via @color/salemBackground.
+        setStyle(STYLE_NO_FRAME, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        DebugLogger.i(TAG, "onCreate saved=${savedInstanceState != null}")
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val dialog = super.onCreateDialog(savedInstanceState)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.BLACK))
+            setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT
+            )
+        }
+        return dialog
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Defensive: re-assert full-screen after the window is attached.
+        // Some OEMs (Lenovo included) can reapply default dialog insets on
+        // start; this ensures the sheet always fills the screen.
+        dialog?.window?.setLayout(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT
+        )
+        DebugLogger.i(TAG, "onStart id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        DebugLogger.i(TAG, "onResume id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+    }
+
+    override fun onPause() {
+        DebugLogger.i(TAG, "onPause id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+        super.onPause()
+    }
+
+    override fun onStop() {
+        DebugLogger.i(TAG, "onStop id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+        super.onStop()
+    }
+
+    override fun onDestroyView() {
+        DebugLogger.i(TAG, "onDestroyView id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+        super.onDestroyView()
+    }
+
+    override fun onDestroy() {
+        DebugLogger.i(TAG, "onDestroy id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+        super.onDestroy()
+    }
+
+    override fun onCancel(dialog: DialogInterface) {
+        DebugLogger.i(TAG, "onCancel id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+        cancelSheetRead()
+        super.onCancel(dialog)
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        DebugLogger.i(TAG, "onDismiss id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+        cancelSheetRead()
+        super.onDismiss(dialog)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        DebugLogger.i(TAG, "onConfigurationChanged id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+    }
+
+    // ── View creation ───────────────────────────────────────────────────
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        val poiJson = requireArguments().getString(ARG_POI_JSON)
+            ?: throw IllegalArgumentException("PoiDetailSheet missing $ARG_POI_JSON")
+        poi = parseNarrationPoint(poiJson)
+            ?: throw IllegalArgumentException("PoiDetailSheet: invalid POI payload")
+        DebugLogger.i(
+            TAG,
+            "onCreateView id=${poi.id} name=${poi.name} type=${poi.type} " +
+                "hasShort=${!poi.shortNarration.isNullOrBlank()} " +
+                "hasDesc=${!poi.description.isNullOrBlank()} " +
+                "hasLong=${!poi.longNarration.isNullOrBlank()} " +
+                "hasAddr=${!poi.address.isNullOrBlank()} " +
+                "hasPhone=${!poi.phone.isNullOrBlank()} " +
+                "hasSite=${!poi.website.isNullOrBlank()}"
+        )
+        return inflater.inflate(R.layout.poi_detail_sheet, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        DebugLogger.i(TAG, "onViewCreated id=${poi.id}")
+
+        bindHero(view)
+        bindOverview(view)
+        bindWebsiteButton(view)
+        val (shortText, aboutText, storyText) = bindNarrationSections(view)
+        bindActions(view)
+
+        queueSheetReadThrough(shortText, aboutText, storyText)
+    }
+
+    // ── Hero strip ──────────────────────────────────────────────────────
+
+    private fun bindHero(view: View) {
+        val heroContainer = view.findViewById<ViewGroup>(R.id.heroContainer)
+        val heroImage = view.findViewById<ImageView>(R.id.heroImage)
+        val heroOverlay = view.findViewById<TextView>(R.id.heroOverlayLabel)
+        val btnClose = view.findViewById<TextView>(R.id.btnClose)
+
+        // 20% of the initial screen height — fixed per operator spec.
+        val screenH = resources.displayMetrics.heightPixels
+        heroContainer.layoutParams.height = (screenH * 0.20).toInt()
+        heroContainer.requestLayout()
+
+        val result = PoiHeroResolver.applyTo(requireContext(), poi, heroImage)
+        val isRed = result is PoiHeroResolver.HeroResult.RedPlaceholder
+        heroOverlay.visibility = if (isRed) View.VISIBLE else View.GONE
+        DebugLogger.i(TAG, "hero resolved id=${poi.id} red=$isRed")
+
+        btnClose.setOnClickListener {
+            DebugLogger.i(TAG, "close clicked id=${poi.id}")
+            cancelSheetRead()
+            dismiss()
+        }
+    }
+
+    // ── Overview row ────────────────────────────────────────────────────
+
+    private fun bindOverview(view: View) {
+        PoiHeroResolver.applyTo(
+            requireContext(),
+            poi,
+            view.findViewById<ImageView>(R.id.overviewIcon)
+        )
+
+        view.findViewById<TextView>(R.id.overviewName).text = poi.name
+        view.findViewById<TextView>(R.id.overviewType).text =
+            poi.type.replace('_', ' ')
+
+        view.findViewById<TextView>(R.id.overviewAddress).apply {
+            val addr = poi.address
+            if (!addr.isNullOrBlank()) {
+                text = addr
+                visibility = View.VISIBLE
+            }
+        }
+        view.findViewById<TextView>(R.id.overviewPhone).apply {
+            val phone = poi.phone
+            if (!phone.isNullOrBlank()) {
+                text = phone
+                visibility = View.VISIBLE
+            }
+        }
+    }
+
+    // ── Website button ──────────────────────────────────────────────────
+
+    private fun bindWebsiteButton(view: View) {
+        val btn = view.findViewById<TextView>(R.id.btnWebsite)
+        val site = poi.website?.takeIf { it.isNotBlank() } ?: return
+        btn.visibility = View.VISIBLE
+        btn.setOnClickListener {
+            DebugLogger.i(TAG, "website clicked id=${poi.id} url=$site")
+            cancelSheetRead()
+            val hostActivity = this.activity as? SalemMainActivity
+            if (hostActivity != null) {
+                hostActivity.showFullScreenWebView(site, poi.name)
+            } else {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site)))
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "Fallback browser failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // ── Narration sections ──────────────────────────────────────────────
+
+    private fun bindNarrationSections(view: View): Triple<String?, String?, String?> {
+        val labelShort = view.findViewById<TextView>(R.id.labelShort)
+        val bodyShort = view.findViewById<TextView>(R.id.bodyShort)
+        val labelAbout = view.findViewById<TextView>(R.id.labelAbout)
+        val bodyAbout = view.findViewById<TextView>(R.id.bodyAbout)
+        val labelStory = view.findViewById<TextView>(R.id.labelStory)
+        val bodyStory = view.findViewById<TextView>(R.id.bodyStory)
+
+        val shortText = poi.shortNarration?.takeIf { it.isNotBlank() }
+        val aboutText = poi.description?.takeIf { it.isNotBlank() && it != shortText }
+        val storyText = (poi.longNarration?.takeIf { it.isNotBlank() }
+            ?: poi.narrationPass2?.takeIf { it.isNotBlank() })
+            ?.takeIf { it != shortText && it != aboutText }
+
+        if (shortText != null) {
+            bodyShort.text = shortText
+        } else {
+            labelShort.visibility = View.GONE
+            bodyShort.visibility = View.GONE
+        }
+
+        if (aboutText != null) {
+            labelAbout.visibility = View.VISIBLE
+            bodyAbout.visibility = View.VISIBLE
+            bodyAbout.text = aboutText
+        }
+
+        if (storyText != null) {
+            labelStory.visibility = View.VISIBLE
+            bodyStory.visibility = View.VISIBLE
+            bodyStory.text = storyText
+        }
+
+        return Triple(shortText, aboutText, storyText)
+    }
+
+    // ── Action buttons (rendered only — NOT narrated) ───────────────────
+
+    private fun bindActions(view: View) {
+        val container = view.findViewById<LinearLayout>(R.id.actionsContainer)
+        container.removeAllViews()
+        val actions = PoiActionSynthesizer.buildActions(poi)
+
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        // The website visit is already rendered as the big primary button
+        // above the narrative sections; skip it here to avoid a duplicate.
+        val visibleActions = actions.filterNot {
+            it is PoiActionSynthesizer.Action.VisitWebsite && poi.website?.isNotBlank() == true
+        }
+
+        if (visibleActions.isEmpty()) {
+            val empty = TextView(requireContext()).apply {
+                text = "No additional actions."
+                textSize = 13f
+                setTextColor(Color.parseColor("#B8AFA0"))
+                setPadding(0, dp(8), 0, 0)
+            }
+            container.addView(empty)
+            return
+        }
+
+        for (action in visibleActions) {
+            val btn = TextView(requireContext()).apply {
+                text = when (action) {
+                    is PoiActionSynthesizer.Action.VisitWebsite -> action.label
+                    is PoiActionSynthesizer.Action.Call -> "${action.label}  ·  ${action.phone}"
+                    is PoiActionSynthesizer.Action.Directions -> action.label
+                    is PoiActionSynthesizer.Action.Hours -> "${action.label}  ·  ${action.hours}"
+                    is PoiActionSynthesizer.Action.Unknown -> action.label
+                }
+                textSize = 14f
+                setTextColor(Color.parseColor("#F5F0E8"))
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#2A2A3C"))
+                    cornerRadius = dp(8).toFloat()
+                    setStroke(dp(1), Color.parseColor("#C9A84C"))
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(8) }
+
+                val interactive = action !is PoiActionSynthesizer.Action.Hours &&
+                        action !is PoiActionSynthesizer.Action.Unknown
+                isClickable = interactive
+                isFocusable = interactive
+                if (interactive) {
+                    setOnClickListener { onActionClicked(action) }
+                } else {
+                    alpha = 0.85f
+                }
+            }
+            container.addView(btn)
+        }
+    }
+
+    private fun onActionClicked(action: PoiActionSynthesizer.Action) {
+        DebugLogger.i(TAG, "action clicked id=${poi.id} action=${action::class.simpleName}")
+        cancelSheetRead()
+        when (action) {
+            is PoiActionSynthesizer.Action.VisitWebsite -> {
+                (activity as? SalemMainActivity)?.showFullScreenWebView(action.url, poi.name)
+            }
+            is PoiActionSynthesizer.Action.Call -> {
+                try {
+                    startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${action.phone}")))
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "No dialer available: ${e.message}")
+                }
+            }
+            is PoiActionSynthesizer.Action.Directions -> {
+                val label = Uri.encode(poi.name)
+                val geo = Uri.parse("geo:${action.lat},${action.lng}?q=${action.lat},${action.lng}($label)")
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, geo))
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "No maps app available: ${e.message}")
+                }
+            }
+            is PoiActionSynthesizer.Action.Hours -> { /* inline display only */ }
+            is PoiActionSynthesizer.Action.Unknown -> { /* no-op */ }
+        }
+    }
+
+    // ── TTS read-through (trimmed per S113 iteration 2 operator spec) ──
+
+    private fun queueSheetReadThrough(
+        shortText: String?,
+        aboutText: String?,
+        storyText: String?
+    ) {
+        // Drop ANY lingering sheet segments from a previously-dismissed
+        // sheet, regardless of POI. Prevents audio-vs-view mismatch when
+        // the user opens a second sheet before the first's read finishes.
+        tourViewModel.cancelSheetReading(SHEET_TAG_PREFIX)
+
+        val name = poi.name
+
+        // Segment 1: name + top identifying info (address, phone,
+        // website acknowledgement) as one readable sentence. Deliberately
+        // conversational — does NOT read the UI labels, does NOT read the
+        // URL aloud, does NOT enumerate the action buttons.
+        val intro = buildString {
+            append(name).append(". ")
+            append(poi.type.replace('_', ' ')).append(". ")
+            poi.address?.takeIf { it.isNotBlank() }?.let { append("Located at $it. ") }
+            poi.phone?.takeIf { it.isNotBlank() }?.let { append("Phone ${it}. ") }
+            if (!poi.website.isNullOrBlank()) append("They have a website. ")
+        }
+        tourViewModel.speakSheetSection(ttsTag, intro.trim(), name)
+        DebugLogger.i(TAG, "tts enqueue intro id=${poi.id} len=${intro.length}")
+
+        // Segments 2..N: just the narratives. One segment per populated
+        // description field. No headers, no UI labels, no action summary.
+        shortText?.let {
+            tourViewModel.speakSheetSection(ttsTag, it, name)
+            DebugLogger.i(TAG, "tts enqueue short id=${poi.id} len=${it.length}")
+        }
+        aboutText?.let {
+            tourViewModel.speakSheetSection(ttsTag, it, name)
+            DebugLogger.i(TAG, "tts enqueue about id=${poi.id} len=${it.length}")
+        }
+        storyText?.let {
+            tourViewModel.speakSheetSection(ttsTag, it, name)
+            DebugLogger.i(TAG, "tts enqueue story id=${poi.id} len=${it.length}")
+        }
+    }
+
+    private fun cancelSheetRead() {
+        // Drop all sheet-tagged segments (prefix match), not just this
+        // sheet's. If a user rapidly taps a second POI, the first sheet's
+        // onDismiss fires AFTER the second sheet has already queued its
+        // segments — cancelling only our own tag would work, but blanket
+        // prefix cancellation is simpler and equivalent in practice.
+        tourViewModel.cancelSheetReading(SHEET_TAG_PREFIX)
+        DebugLogger.i(TAG, "cancelSheetRead id=${if (::poi.isInitialized) poi.id else "pre-view"}")
+    }
+
+    companion object {
+        private const val TAG = "PoiDetailSheet"
+        private const val ARG_POI_JSON = "poi_json"
+        /** Common prefix for every sheet-initiated TTS utterance. */
+        private const val SHEET_TAG_PREFIX = "sheet_"
+
+        fun show(poi: NarrationPoint, fragmentManager: FragmentManager) {
+            DebugLogger.i(TAG, "show() request id=${poi.id} name=${poi.name}")
+            // Dismiss any currently-showing PoiDetailSheet under the same
+            // tag before showing this one. FragmentManager normally
+            // handles same-tag replacement, but we also want the old
+            // fragment's onDismiss to fire so its TTS cancel runs before
+            // we queue new segments.
+            (fragmentManager.findFragmentByTag(TAG_SHOW) as? PoiDetailSheet)?.dismissAllowingStateLoss()
+            val sheet = PoiDetailSheet()
+            sheet.arguments = Bundle().apply {
+                putString(ARG_POI_JSON, narrationPointToJson(poi))
+            }
+            sheet.show(fragmentManager, TAG_SHOW)
+        }
+
+        private const val TAG_SHOW = "poi_detail_sheet"
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Argument passing helpers
+//
+// NarrationPoint is a Room @Entity data class, not Parcelable, so we
+// round-trip just the fields the sheet actually displays through JSON.
+// Small surface area, no plugin dependency, and keeps the coupling
+// localized to this file.
+// ────────────────────────────────────────────────────────────────────────
+
+private fun narrationPointToJson(poi: NarrationPoint): String = JSONObject().apply {
+    put("id", poi.id)
+    put("name", poi.name)
+    put("lat", poi.lat)
+    put("lng", poi.lng)
+    putOpt("address", poi.address)
+    put("type", poi.type)
+    putOpt("short_narration", poi.shortNarration)
+    putOpt("long_narration", poi.longNarration)
+    putOpt("narration_pass_2", poi.narrationPass2)
+    putOpt("description", poi.description)
+    putOpt("phone", poi.phone)
+    putOpt("website", poi.website)
+    putOpt("hours", poi.hours)
+    putOpt("action_buttons", poi.actionButtons)
+    put("ad_priority", poi.adPriority)
+}.toString()
+
+private fun parseNarrationPoint(s: String): NarrationPoint? {
+    return try {
+        val o = JSONObject(s)
+        NarrationPoint(
+            id = o.getString("id"),
+            name = o.getString("name"),
+            lat = o.getDouble("lat"),
+            lng = o.getDouble("lng"),
+            address = o.optString("address", "").takeIf { it.isNotEmpty() },
+            type = o.getString("type"),
+            shortNarration = o.optString("short_narration", "").takeIf { it.isNotEmpty() },
+            longNarration = o.optString("long_narration", "").takeIf { it.isNotEmpty() },
+            narrationPass2 = o.optString("narration_pass_2", "").takeIf { it.isNotEmpty() },
+            description = o.optString("description", "").takeIf { it.isNotEmpty() },
+            phone = o.optString("phone", "").takeIf { it.isNotEmpty() },
+            website = o.optString("website", "").takeIf { it.isNotEmpty() },
+            hours = o.optString("hours", "").takeIf { it.isNotEmpty() },
+            actionButtons = o.optString("action_buttons", "").takeIf { it.isNotEmpty() },
+            adPriority = o.optInt("ad_priority", 0)
+        )
+    } catch (_: Exception) {
+        null
+    }
+}

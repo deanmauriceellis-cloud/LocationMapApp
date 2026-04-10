@@ -1237,7 +1237,15 @@ class SalemMainActivity : AppCompatActivity() {
                     marker.icon = narrationIconForZoom(p.type, p.name, zoom)
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     marker.setOnMarkerClickListener { _, _ ->
-                        enqueueNarration(p, jumpToFront = true)
+                        // S113: Map marker tap opens the POI Detail Sheet
+                        // instead of enqueuing narration directly. Ambient
+                        // narration keeps playing; the sheet queues its own
+                        // tagged TTS read-through on open.
+                        DebugLogger.i(
+                            "SalemMainActivity",
+                            "MARKER TAP id=${p.id} name=${p.name} type=${p.type} → showing PoiDetailSheet"
+                        )
+                        PoiDetailSheet.show(p, supportFragmentManager)
                         true
                     }
                     binding.mapView.overlays.add(marker)

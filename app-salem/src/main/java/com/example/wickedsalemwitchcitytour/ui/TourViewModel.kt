@@ -242,6 +242,20 @@ class TourViewModel @Inject constructor(
         narrationManager.speakHint(text, label, voiceId)
     }
 
+    /**
+     * S113 — Enqueue a POI-detail-sheet section for TTS read-through, tagged
+     * so the sheet can cancel only its own segments on user click or dismiss.
+     * The tag is typically `"sheet_${poi.id}"`.
+     */
+    fun speakSheetSection(tag: String, text: String, label: String, voiceId: String? = null) {
+        narrationManager.speakTaggedHint(tag, text, label, voiceId)
+    }
+
+    /** S113 — Cancel every queued sheet-read segment matching this tag. */
+    fun cancelSheetReading(tag: String) {
+        narrationManager.cancelSegmentsWithTag(tag)
+    }
+
     override fun onCleared() {
         super.onCleared()
         narrationManager.shutdown()
