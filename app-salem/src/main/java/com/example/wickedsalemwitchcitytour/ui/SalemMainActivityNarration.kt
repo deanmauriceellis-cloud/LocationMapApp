@@ -22,10 +22,30 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 
-/** Narration queue — auto-advances through nearby POIs */
+/** Narration queue — auto-advances through nearby POIs.
+ *
+ *  S112: This queue is now SOURCE-OF-TRUTH for both the audio play order and
+ *  the proximity dock display. Insertion is order-agnostic (`addLast`); selection
+ *  happens at dequeue time, where the queue is filtered by distance to the
+ *  current user position (>50m → discarded) and sorted by tier (paid → historic
+ *  → attraction → rest), then closest within tier wins. The dock renders the
+ *  same filtered+sorted snapshot so dock order = play order. */
 private val narrationQueue = ArrayDeque<NarrationPoint>()
 private var currentNarration: NarrationPoint? = null
 private var narrationAutoPlay = true
+
+/**
+ * S112: file-scope cache of the most recent user GPS position, fed by
+ * SalemMainActivityTour.updateTourLocation(). Used by the dequeue logic to
+ * compute distance for the 50m discard filter and the within-tier closest-wins
+ * selection. (0.0, 0.0) means "no fix yet" — dequeue falls back to FIFO until
+ * the first real fix arrives.
+ */
+private var lastUserLat: Double = 0.0
+private var lastUserLng: Double = 0.0
+
+/** S112: queue discard radius. POIs farther than this from the user are dropped. */
+private const val QUEUE_DISCARD_RADIUS_M = 50.0
 
 /**
  * Initialize the Phase 9T narration system:
@@ -150,15 +170,32 @@ internal fun SalemMainActivity.initNarrationSystem() {
 }
 
 /**
+ * S112: Push the latest GPS position into the narration queue subsystem.
+ * Called from SalemMainActivityTour.updateTourLocation() on every GPS fix.
+ * Triggers a dock refresh so distances stay current as the user moves.
+ */
+internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Double) {
+    lastUserLat = lat
+    lastUserLng = lng
+    refreshProximityDockFromQueue()
+}
+
+/**
  * Add a narration point to the queue.
  * @param jumpToFront if true (user tapped), interrupt current and play immediately
  *
- * In dense areas with multiple triggers, the queue is ordered by:
- * 1. adPriority DESC (paying merchants first — revenue)
- * 2. priority ASC (historical importance second — 1=must-hear, 5=filler)
+ * S112: Insertion is now order-agnostic — selection happens at dequeue time
+ * where the queue is filtered by distance to the user (>50m → drop) and sorted
+ * by tier (paid > historic > attraction > rest), with closest-within-tier as
+ * the tiebreaker. The previous adPriority/priority insertion sort is removed
+ * because the new tier system supersedes it.
+ *
+ * jumpToFront still works: user tap on the dock plays immediately, bypassing
+ * the tier filter (explicit user intent overrides auto-prioritization).
  */
 internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFront: Boolean) {
-    DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
+    val tier = NarrationTierClassifier.classify(point)
+    DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} tier=$tier ad=${point.adPriority} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
     if (point.id == currentNarration?.id) {
         DebugLogger.i("NARR-QUEUE", "SKIP duplicate (current): ${point.name}")
@@ -170,36 +207,87 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
     }
 
     if (jumpToFront || currentNarration == null) {
-        // Play immediately (user tapped or nothing playing)
+        // Play immediately (user tapped or nothing playing).
+        // jumpToFront bypasses the tier sort — user tap is explicit intent.
         DebugLogger.i("NARR-QUEUE", "PLAY NOW: ${point.name} (jumpToFront=$jumpToFront, currentNull=${currentNarration == null})")
         narrationQueue.addFirst(point)
         playNextNarration()
     } else {
-        // Insert by priority: merchants first, then historical importance
-        val insertIdx = narrationQueue.indexOfFirst { queued ->
-            // Insert before the first item that is less important
-            point.adPriority > queued.adPriority ||
-                (point.adPriority == queued.adPriority && point.priority < queued.priority)
-        }
-        if (insertIdx >= 0) {
-            // ArrayDeque doesn't have positional insert — rebuild
-            val list = narrationQueue.toMutableList()
-            list.add(insertIdx, point)
-            narrationQueue.clear()
-            list.forEach { narrationQueue.addLast(it) }
-        } else {
-            narrationQueue.addLast(point)
-        }
+        // Just append. The dequeue logic will pick the correct order at play time.
+        narrationQueue.addLast(point)
         updateQueueIndicator()
-        DebugLogger.i("SalemMainActivity", "Queued: ${point.name} [ad=${point.adPriority} pri=${point.priority}] (${narrationQueue.size} in queue)")
+        refreshProximityDockFromQueue()
+        DebugLogger.i("SalemMainActivity", "Queued: ${point.name} [tier=$tier ad=${point.adPriority}] (${narrationQueue.size} in queue)")
     }
 }
 
-/** Play the next narration point from the queue */
+/**
+ * S112: Pick the next NarrationPoint to play, applying the dequeue rules:
+ *   1. Drop everything farther than 50m from the current user position.
+ *   2. Find the highest non-empty tier (PAID → HISTORIC → ATTRACTION → REST).
+ *   3. Within that tier, return the closest POI to the user.
+ *
+ * The picked entry is REMOVED from the queue. Returns null if the queue is
+ * empty after filtering.
+ *
+ * Falls back to pure FIFO if no GPS fix has arrived yet (lat=lng=0.0) — this
+ * preserves cold-start behavior where the queue might receive a jumpToFront
+ * tap before any GPS is available.
+ */
+private fun SalemMainActivity.pickNextFromQueue(): NarrationPoint? {
+    if (narrationQueue.isEmpty()) return null
+
+    // Cold start fallback — no GPS yet, return FIFO order
+    if (lastUserLat == 0.0 && lastUserLng == 0.0) {
+        return narrationQueue.pollFirst()  // pollFirst returns null if empty
+    }
+
+    // Step 1: drop anything > 50m from current position
+    val survivors = mutableListOf<NarrationPoint>()
+    val droppedNames = mutableListOf<String>()
+    for (point in narrationQueue) {
+        val dist = haversineM(lastUserLat, lastUserLng, point.lat, point.lng)
+        if (dist > QUEUE_DISCARD_RADIUS_M) {
+            droppedNames.add("${point.name}(${dist.toInt()}m)")
+        } else {
+            survivors.add(point)
+        }
+    }
+    if (droppedNames.isNotEmpty()) {
+        DebugLogger.i("NARR-QUEUE",
+            "Dequeue dropped ${droppedNames.size} stale (>${QUEUE_DISCARD_RADIUS_M.toInt()}m): " +
+            droppedNames.take(5).joinToString(", ") +
+            if (droppedNames.size > 5) " +${droppedNames.size - 5} more" else ""
+        )
+    }
+
+    // Rebuild the queue with only the survivors (keeps the queue clean for next iteration)
+    narrationQueue.clear()
+    narrationQueue.addAll(survivors)
+
+    if (survivors.isEmpty()) return null
+
+    // Step 2: find highest non-empty tier; Step 3: closest within that tier
+    for (tier in NarrationTier.values()) {
+        val candidates = survivors.filter { NarrationTierClassifier.classify(it) == tier }
+        if (candidates.isEmpty()) continue
+        val winner = candidates.minByOrNull { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }
+            ?: continue
+        narrationQueue.remove(winner)
+        DebugLogger.i("NARR-QUEUE",
+            "Picked ${winner.name} tier=$tier dist=${haversineM(lastUserLat, lastUserLng, winner.lat, winner.lng).toInt()}m " +
+            "(${candidates.size} in tier, ${survivors.size} total survivors)")
+        return winner
+    }
+    return null
+}
+
+/** Play the next narration point from the queue (S112: tier+distance dequeue) */
 internal fun SalemMainActivity.playNextNarration() {
-    val point = narrationQueue.pollFirst()
+    val point = pickNextFromQueue()
     if (point == null) {
-        DebugLogger.i("NARR-PLAY", "playNextNarration: queue empty, nothing to play")
+        DebugLogger.i("NARR-PLAY", "playNextNarration: queue empty after filter, nothing to play")
+        refreshProximityDockFromQueue()
         return
     }
     currentNarration = point
@@ -222,6 +310,39 @@ internal fun SalemMainActivity.playNextNarration() {
     }
     // Record this visit for next-pass selection on future days
     narrationGeofenceManager.recordVisit(point.id)
+    refreshProximityDockFromQueue()
+}
+
+/**
+ * S112: Refresh the proximity dock from the current queue snapshot.
+ * Computes the same filter+sort the dequeue logic uses, then hands the result
+ * to the dock so the visible dock order matches what the user is about to hear.
+ *
+ * Called from: every enqueue, every dequeue, every GPS position update.
+ */
+internal fun SalemMainActivity.refreshProximityDockFromQueue() {
+    val dock = proximityDock ?: return
+
+    if (narrationQueue.isEmpty()) {
+        dock.updateFromQueue(emptyList(), lastUserLat, lastUserLng)
+        return
+    }
+
+    if (lastUserLat == 0.0 && lastUserLng == 0.0) {
+        // No GPS yet — show queue in insertion order, no filter
+        dock.updateFromQueue(narrationQueue.toList(), 0.0, 0.0)
+        return
+    }
+
+    // Same filter+sort the dequeue would apply: <=50m, tier order, closest-in-tier
+    val sorted = narrationQueue
+        .filter { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= QUEUE_DISCARD_RADIUS_M }
+        .sortedWith(compareBy(
+            { NarrationTierClassifier.classify(it).ordinal },
+            { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }
+        ))
+
+    dock.updateFromQueue(sorted, lastUserLat, lastUserLng)
 }
 
 /**

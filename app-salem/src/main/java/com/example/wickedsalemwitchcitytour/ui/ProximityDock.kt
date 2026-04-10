@@ -131,6 +131,64 @@ class ProximityDock(private val context: Context, private val rootView: View) {
         }
     }
 
+    /**
+     * S112: Render a pre-sorted list of NarrationPoints (the narration queue
+     * snapshot, in tier+distance order) directly into the dock. The dock
+     * preserves the caller's order — no internal re-sorting — so the dock
+     * order matches the audio play order exactly. Top of dock = next to play.
+     *
+     * @param items the queue snapshot, already filtered to <=50m and sorted
+     *              by tier then distance by the caller
+     * @param userLat current user latitude (for distance display)
+     * @param userLng current user longitude (for distance display)
+     * @param maxItems max icons to render (default 10)
+     */
+    fun updateFromQueue(items: List<NarrationPoint>, userLat: Double, userLng: Double,
+                         maxItems: Int = 10) {
+        val visibleItems = items.take(maxItems)
+
+        dockLabel.text = if (visibleItems.isEmpty()) "No POIs in queue" else "Queue (${items.size})"
+
+        iconRow.removeAllViews()
+
+        if (visibleItems.isEmpty()) {
+            // Hide the dock entirely when the queue is empty — the dock is
+            // tied to the voice queue (S112), so an empty queue means
+            // nothing pending to hear.
+            dockContainer.visibility = View.GONE
+            return
+        }
+        dockContainer.visibility = View.VISIBLE
+
+        val inflater = LayoutInflater.from(context)
+        for (point in visibleItems) {
+            val item = inflater.inflate(R.layout.dock_icon_item, iconRow, false)
+
+            val iconView = item.findViewById<ImageView>(R.id.iconImage)
+            loadPoiIcon(point, iconView)
+
+            val border = item.findViewById<View>(R.id.iconBorder)
+            val colorHex = categoryColors[point.type] ?: "#6A1B9A"
+            val ring = border.background as? GradientDrawable
+            ring?.setStroke(
+                (2 * context.resources.displayMetrics.density).toInt(),
+                Color.parseColor(colorHex)
+            )
+
+            item.findViewById<TextView>(R.id.iconName).text = point.name
+            // Compute distance for display only — caller has already filtered/sorted
+            val distance = if (userLat != 0.0 || userLng != 0.0) {
+                haversine(userLat, userLng, point.lat, point.lng)
+            } else 0.0
+            item.findViewById<TextView>(R.id.iconDistance).text =
+                if (distance > 0.0) formatDistance(distance) else ""
+
+            item.setOnClickListener { onPoiTapped?.invoke(point) }
+
+            iconRow.addView(item)
+        }
+    }
+
     fun show() { dockContainer.visibility = View.VISIBLE }
     fun hide() { dockContainer.visibility = View.GONE }
 

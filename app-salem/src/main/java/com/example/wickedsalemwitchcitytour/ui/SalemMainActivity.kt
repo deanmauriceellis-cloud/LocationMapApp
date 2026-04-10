@@ -1085,7 +1085,17 @@ class SalemMainActivity : AppCompatActivity() {
         return result
     }
 
-    /** Show-all-POIs toggle — temporarily bypasses layer filtering. */
+    /**
+     * S112: POI button toggle — ON shows all POIs, OFF shows only the
+     * historic + attraction + paid customer tiers (the curated set the
+     * operator wants to see by default during a tour). The OFF state used
+     * to fall back to the per-category SharedPreferences toggles, but the
+     * operator wants OFF to mean a fixed tier filter.
+     *
+     * Both branches re-render OSM POIs and narration markers; the actual
+     * filtering happens in `loadCachedPoisForVisibleArea` (OSM places) and
+     * `loadNarrationPointMarkers` (Salem narration data).
+     */
     internal fun setupShowAllPoisButton() {
         binding.btnShowAllPois.setOnClickListener {
             showAllPoisActive = !showAllPoisActive
@@ -1094,14 +1104,13 @@ class SalemMainActivity : AppCompatActivity() {
                 toast("Showing ALL POIs")
             } else {
                 binding.btnShowAllPois.setBackgroundResource(R.drawable.zoom_toggle_bg)
-                toast("POI layer filter restored")
+                toast("Historic + attractions only")
             }
             DebugLogger.i("SalemMainActivity", "Show all POIs → $showAllPoisActive")
             loadCachedPoisForVisibleArea()
-            // Also load narration points as map markers when showing all
-            if (showAllPoisActive) {
-                loadNarrationPointMarkers()
-            }
+            // S112: Always reload the narration markers — both branches need them,
+            // but the OFF branch filters them down to historic + attraction + paid.
+            loadNarrationPointMarkers()
         }
     }
 
@@ -1109,12 +1118,40 @@ class SalemMainActivity : AppCompatActivity() {
     internal val narrationMarkers = mutableListOf<Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.NarrationPoint>>()
     private var lastNarrationIconZoom = -1
 
-    /** Load narration points as markers on the map */
+    /**
+     * Load narration points as markers on the map.
+     *
+     * S112: Honors the POI button (`showAllPoisActive`):
+     *   - ON  → all narration points are loaded (full set)
+     *   - OFF → only points classified as PAID, HISTORIC, or ATTRACTION
+     *
+     * Always removes any previously-loaded narration markers from the map
+     * before loading the new set, so toggling the button is fully reversible.
+     */
     internal fun loadNarrationPointMarkers() {
         lifecycleScope.launch {
             try {
-                val points = tourViewModel.loadNarrationPoints()
-                DebugLogger.i("SalemMainActivity", "Loading ${points.size} narration points as markers")
+                // Remove any previously loaded narration markers (they may be a
+                // different filtered subset from a prior toggle state)
+                for ((marker, _) in narrationMarkers) {
+                    binding.mapView.overlays.remove(marker)
+                }
+                narrationMarkers.clear()
+
+                val allPoints = tourViewModel.loadNarrationPoints()
+                val points = if (showAllPoisActive) {
+                    allPoints
+                } else {
+                    // OFF: only show paid + historic + attraction tiers
+                    allPoints.filter { p ->
+                        val tier = com.example.wickedsalemwitchcitytour.tour.NarrationTierClassifier.classify(p)
+                        tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.PAID ||
+                        tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.HISTORIC ||
+                        tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.ATTRACTION
+                    }
+                }
+                DebugLogger.i("SalemMainActivity",
+                    "Loading ${points.size} narration points as markers (showAll=$showAllPoisActive, total=${allPoints.size})")
                 val zoom = binding.mapView.zoomLevelDouble
                 for (p in points) {
                     val marker = Marker(binding.mapView)
@@ -1711,13 +1748,16 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 // Clear cluster markers when showing individual POIs
                 clearClusterMarkers()
-                // Filter by enabled POI layers (bypassed when show-all-POIs debug toggle is active)
+                // S112: POI button filter — ON shows all OSM POIs, OFF shows only the
+                // historic + attraction tier set (paid customers don't apply to OSM
+                // places — adPriority is a NarrationPoint-only field).
                 val filtered = if (showAllPoisActive) {
                     places
                 } else {
-                    val menuPrefs = getSharedPreferences(com.example.locationmapapp.ui.menu.MenuPrefs.PREFS_NAME, MODE_PRIVATE)
-                    val enabledTags = PoiCategories.enabledTagValues(menuPrefs)
-                    places.filter { it.category in enabledTags }
+                    places.filter {
+                        com.example.wickedsalemwitchcitytour.tour.NarrationTierClassifier
+                            .isHistoricOrAttractionTag(it.category)
+                    }
                 }
                 DebugLogger.i("SalemMainActivity", "POI layer filter: ${places.size} → ${filtered.size} (showAll=$showAllPoisActive)")
                 replaceAllPoiMarkers(filtered)
@@ -2824,6 +2864,13 @@ class SalemMainActivity : AppCompatActivity() {
 
         override fun onHomeRequested() {
             resetIdleTimer()
+            // S112: Tapping home stops the walk simulator and reverts to real GPS.
+            // The walk sim was pushing synthetic positions via setManualLocation;
+            // stopping it lets the real LocationManager fixes flow through again.
+            if (walkSimRunning) {
+                DebugLogger.i("SalemMainActivity", "onHomeRequested — stopping walk simulator, reverting to real GPS")
+                stopWalkSim()
+            }
             val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
             if (prefs.getBoolean(MenuPrefs.PREF_HOME_SET, false)) {
                 val lat = prefs.getFloat(MenuPrefs.PREF_HOME_LAT, 0f).toDouble()

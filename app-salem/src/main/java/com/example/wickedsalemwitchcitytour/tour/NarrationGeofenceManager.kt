@@ -42,11 +42,20 @@ class NarrationGeofenceManager @Inject constructor(
     /** Walk sim mode: expands entry radius and tightens reach-out for continuous narration */
     var walkSimMode: Boolean = false
 
-    /** POI ID → timestamp when narrated (expires after 12 hours) */
+    /** POI ID → timestamp when narrated (expires after REPEAT_WINDOW_MS) */
     private val narratedAt = mutableMapOf<String, Long>()
 
-    /** How long before a POI can repeat (ms) */
-    private val REPEAT_WINDOW_MS = 12 * 60 * 60 * 1000L  // 12 hours
+    /**
+     * How long before a POI can repeat (ms).
+     *
+     * S112: Reduced from 12 hours → 1 hour per operator direction.
+     * Rationale: 12h was too long for typical session use; reducing to 1h
+     * lets POIs repeat on a return-loop drive or after a short break, which
+     * is the common case for sightseeing. Process death still clears this
+     * map entirely (in-memory only), so first-fix-per-session is always
+     * a fresh narration regardless of this window.
+     */
+    private val REPEAT_WINDOW_MS = 1 * 60 * 60 * 1000L  // 1 hour
 
     /** Cooldown tracker: POI ID → last trigger timestamp */
     private val cooldowns = mutableMapOf<String, Long>()
@@ -206,8 +215,16 @@ class NarrationGeofenceManager @Inject constructor(
                 }
                 // APPROACH: within 2x geofence radius
                 distanceM <= approachRadius -> {
+                    // S112 fix: APPROACH events do NOT consume the entry cooldown.
+                    // Previously this branch set `cooldowns[point.id] = now`, which
+                    // meant the very next fix (5-10 sec later) when the user was
+                    // inside the entry radius would see `isOnCooldown == true` and
+                    // skip the ENTRY event entirely. The dense-area starvation bug
+                    // surfaced in S112 field tests was rooted here: ~30 POIs were
+                    // silenced per drive because APPROACH burned the credit ENTRY
+                    // would have used. APPROACH now emits its dock-update event
+                    // without touching the cooldown.
                     if (!isOnCooldown(point.id, now)) {
-                        cooldowns[point.id] = now
                         approachCount++
                         _events.tryEmit(NarrationGeofenceEvent(
                             type = NarrationEventType.APPROACH,
@@ -316,7 +333,7 @@ class NarrationGeofenceManager @Inject constructor(
         return narratedAt.count { now - it.value < REPEAT_WINDOW_MS }
     }
 
-    /** Check if a POI was narrated within the 12-hour repeat window */
+    /** Check if a POI was narrated within the repeat window (S112: 1 hour) */
     private fun isNarrated(pointId: String, now: Long): Boolean {
         val ts = narratedAt[pointId] ?: return false
         return (now - ts) < REPEAT_WINDOW_MS

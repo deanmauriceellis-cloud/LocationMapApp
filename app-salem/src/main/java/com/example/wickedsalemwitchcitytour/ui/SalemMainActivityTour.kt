@@ -1310,12 +1310,16 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
 internal fun SalemMainActivity.updateTourLocation(point: GeoPoint) {
     tourViewModel.onLocationUpdate(point)
 
-    // Phase 9T: Feed location to narration geofence manager + update proximity dock
+    // Phase 9T: Feed location to narration geofence manager (drives ENTRY/APPROACH events).
     val nearby = narrationGeofenceManager.checkPosition(point.latitude, point.longitude)
-    proximityDock?.update(
-        point.latitude, point.longitude,
-        nearby.map { it.point }
-    )
+
+    // S112: Push the user position into the narration extension's file-scope cache,
+    // and refresh the proximity dock from the current queue snapshot. The dock now
+    // shows the play queue (filtered to <=50m, tier-sorted), not the raw nearby list,
+    // so the dock order matches what the user is about to hear. The previous
+    // proximityDock.update() call (raw distance-only sort over all 817 points) is
+    // gone — that view of the world is replaced by the queue snapshot view.
+    updateNarrationUserPosition(point.latitude, point.longitude)
 
     // S110: Feed the same nearby list to the POI encounter tracker, which opens /
     // updates / closes "I got close to this POI" rows in user_data.db. The tracker
