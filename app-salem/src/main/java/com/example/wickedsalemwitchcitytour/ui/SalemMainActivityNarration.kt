@@ -18,7 +18,10 @@ import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
 import com.example.wickedsalemwitchcitytour.tour.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 
@@ -46,6 +49,22 @@ private var lastUserLng: Double = 0.0
 
 /** S112: queue discard radius. POIs farther than this from the user are dropped. */
 private const val QUEUE_DISCARD_RADIUS_M = 50.0
+
+/**
+ * S112: Glowing highlight ring drawn around the currently-narrated POI on the
+ * map. The inner Polygon is the bright ring; its `relatedObject` carries the
+ * outer (faded) ring for two-layer cleanup. The animation job pulses the outer
+ * ring's alpha while narration is active.
+ */
+private var narrationHighlightInner: Polygon? = null
+private var narrationHighlightOuter: Polygon? = null
+private var narrationHighlightAnimJob: Job? = null
+
+/** S112: visual radius of the inner highlight ring (meters). */
+private const val HIGHLIGHT_INNER_RADIUS_M = 25.0
+
+/** S112: visual radius of the outer (pulsing) highlight ring (meters). */
+private const val HIGHLIGHT_OUTER_RADIUS_M = 50.0
 
 /**
  * Initialize the Phase 9T narration system:
@@ -147,6 +166,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
                                 "  REACH-OUT SUPPRESSED: GPS stale " +
                                 "(age=${if (ageMs == Long.MAX_VALUE) "never" else "${ageMs / 1000}s"}, " +
                                 "threshold=${GPS_STALE_THRESHOLD_MS / 1000}s)")
+                            clearNarrationHighlight()  // S112+: nothing more coming → no ring
                             return@collectLatest
                         }
 
@@ -159,6 +179,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
                         } else {
                             DebugLogger.i("NARR-STATE",
                                 "  Nothing within 15m reach-out radius (gpsAge=${ageMs}ms)")
+                            clearNarrationHighlight()  // S112+: nothing more coming → no ring
                         }
                     }
                 }
@@ -287,12 +308,14 @@ internal fun SalemMainActivity.playNextNarration() {
     val point = pickNextFromQueue()
     if (point == null) {
         DebugLogger.i("NARR-PLAY", "playNextNarration: queue empty after filter, nothing to play")
+        clearNarrationHighlight()  // S112+: nothing playing → no ring
         refreshProximityDockFromQueue()
         return
     }
     currentNarration = point
     DebugLogger.i("NARR-PLAY", "playNextNarration: ${point.name} (${narrationQueue.size} remaining in queue)")
     showNarrationSheet(point)
+    showNarrationHighlight(point)  // S112+: glowing ring on the POI being announced
 
     // Auto-play TTS — select narration pass based on lifetime visit count
     val text = narrationGeofenceManager.getNarrationForPass(point)
@@ -503,5 +526,81 @@ internal fun SalemMainActivity.clearGeofenceOverlay() {
     }
     geofenceOverlay = null
     geofenceOverlayPointId = null
+    binding.mapView.invalidate()
+}
+
+// ─── S112+: Glowing highlight ring around the currently-narrated POI ─────────
+
+/**
+ * Draw a glowing gold ring at the POI being narrated. Two concentric circles
+ * (inner solid, outer faded) plus a coroutine that pulses the outer ring's
+ * alpha so it visibly "breathes" while the narration plays.
+ *
+ * Auto-replaces any prior highlight (so successive narrations move the ring
+ * cleanly from one POI to the next without manual cleanup at the call site).
+ */
+internal fun SalemMainActivity.showNarrationHighlight(point: NarrationPoint) {
+    // Tear down any existing highlight first
+    clearNarrationHighlight()
+
+    val center = GeoPoint(point.lat, point.lng)
+
+    // Inner ring — bright solid gold, marks the POI center
+    val inner = Polygon().apply {
+        points = Polygon.pointsAsCircle(center, HIGHLIGHT_INNER_RADIUS_M)
+        fillPaint.color = Color.argb(80, 255, 215, 0)     // gold @ ~31% alpha
+        outlinePaint.color = Color.argb(255, 255, 215, 0) // gold solid stroke
+        outlinePaint.strokeWidth = 6f
+        title = "Now narrating: ${point.name}"
+    }
+
+    // Outer ring — faded gold, will pulse via the animation job
+    val outer = Polygon().apply {
+        points = Polygon.pointsAsCircle(center, HIGHLIGHT_OUTER_RADIUS_M)
+        fillPaint.color = Color.argb(40, 255, 215, 0)     // gold @ ~16% alpha (animated)
+        outlinePaint.color = Color.argb(180, 255, 215, 0) // gold faded stroke
+        outlinePaint.strokeWidth = 3f
+    }
+
+    // Add outer first (behind), then inner (on top)
+    binding.mapView.overlays.add(outer)
+    binding.mapView.overlays.add(inner)
+    narrationHighlightInner = inner
+    narrationHighlightOuter = outer
+    binding.mapView.invalidate()
+
+    // Pulse the outer ring's alpha while narration is active.
+    // 6-step cycle = 1.8 sec per pulse, alpha cycles 30 → 110 → 30.
+    narrationHighlightAnimJob = lifecycleScope.launch {
+        var phase = 0
+        while (isActive) {
+            val targetAlpha = when (phase) {
+                0 -> 30
+                1 -> 55
+                2 -> 80
+                3 -> 110
+                4 -> 80
+                else -> 55  // phase 5
+            }
+            val outerNow = narrationHighlightOuter ?: break
+            outerNow.fillPaint.alpha = targetAlpha
+            binding.mapView.postInvalidate()
+            delay(300L)
+            phase = (phase + 1) % 6
+        }
+    }
+}
+
+/**
+ * Remove the narration highlight ring (both circles + cancel pulse animation).
+ * Safe to call when no highlight is active.
+ */
+internal fun SalemMainActivity.clearNarrationHighlight() {
+    narrationHighlightAnimJob?.cancel()
+    narrationHighlightAnimJob = null
+    narrationHighlightInner?.let { binding.mapView.overlays.remove(it) }
+    narrationHighlightOuter?.let { binding.mapView.overlays.remove(it) }
+    narrationHighlightInner = null
+    narrationHighlightOuter = null
     binding.mapView.invalidate()
 }
