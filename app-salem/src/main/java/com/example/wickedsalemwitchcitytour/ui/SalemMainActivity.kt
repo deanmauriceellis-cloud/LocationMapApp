@@ -427,6 +427,20 @@ class SalemMainActivity : AppCompatActivity() {
         setupMap()
         buildFabSpeedDial()
         initNarrationSystem()
+
+        // S112+: Clear the narration history (narratedAt + cooldowns) on every
+        // FRESH activity creation so all POIs are eligible to fire from a clean
+        // slate. savedInstanceState == null means this is NOT a config-change
+        // recreate (orientation, dark mode, etc.) — those are handled by the
+        // S110 Hilt singleton lift, which preserves narratedAt on purpose to
+        // prevent the runaway-loop bug from re-firing already-narrated POIs on
+        // every rotation. Cold launches and post-process-death restarts come
+        // through here with savedInstanceState == null and get a clean reset.
+        if (savedInstanceState == null) {
+            narrationGeofenceManager.resetSession()
+            DebugLogger.i("SalemMainActivity", "Fresh start — narration history cleared (1h wait reset to 0)")
+        }
+
         // ── GPS Journey: prune stale data, init the polyline overlay, wire toggle ──
         gpsTrackRecorder.pruneStaleAtStartup()
         initGpsTrackOverlay()

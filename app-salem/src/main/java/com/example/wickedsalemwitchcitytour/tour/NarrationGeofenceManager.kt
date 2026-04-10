@@ -183,15 +183,20 @@ class NarrationGeofenceManager @Inject constructor(
                 nearbyList.add(NearbyPoint(point, distanceM))
             }
 
-            // Skip if narrated within 12-hour window
+            // Skip if already narrated within the repeat window (S112: 1 hour)
             if (isNarrated(point.id, now)) {
-                if (distanceM <= point.geofenceRadiusM * (if (walkSimMode) 3.0 else 1.0)) skippedNarrated++
+                if (distanceM <= point.geofenceRadiusM) skippedNarrated++
                 continue
             }
 
-            // Check geofence zones — walk sim mode expands radius for broader coverage
+            // S112+: walk-sim mode no longer inflates the entry radius. Walk-sim
+            // and real GPS now use the same per-POI geofenceRadiusM. The 3x
+            // inflation was a test-mode artifact that produced 75-120m entry zones,
+            // which then conflicted with the queue's 50m discard threshold and
+            // starved the dequeue. Walk-sim should behave identically to real
+            // walking so the test reflects reality.
             val baseRadius = point.geofenceRadiusM.toDouble()
-            val entryRadius = if (walkSimMode) baseRadius * 3.0 else baseRadius
+            val entryRadius = baseRadius
             val approachRadius = entryRadius * APPROACH_MULTIPLIER
 
             when {

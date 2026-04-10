@@ -477,9 +477,9 @@ internal fun SalemMainActivity.toggleGeofenceOverlay(point: NarrationPoint) {
     }
 
     val center = GeoPoint(point.lat, point.lng)
-    val walkSim = narrationGeofenceManager.walkSimMode
     val baseRadius = point.geofenceRadiusM.toDouble()
-    val entryRadius = if (walkSim) baseRadius * 3.0 else baseRadius
+    // S112+: walk-sim no longer inflates the radius — same numbers as real GPS.
+    val entryRadius = baseRadius
     val approachRadius = entryRadius * 2.0
 
     // Entry zone — filled circle
@@ -488,7 +488,7 @@ internal fun SalemMainActivity.toggleGeofenceOverlay(point: NarrationPoint) {
         fillPaint.color = Color.argb(50, 76, 175, 80)   // green fill 20%
         outlinePaint.color = Color.argb(180, 76, 175, 80) // green outline
         outlinePaint.strokeWidth = 3f
-        title = "${point.name} — entry ${entryRadius.toInt()}m${if (walkSim) " (walk sim 3x)" else ""}"
+        title = "${point.name} — entry ${entryRadius.toInt()}m"
     }
 
     // Approach zone — outline only
