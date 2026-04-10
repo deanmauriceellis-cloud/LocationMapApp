@@ -47,24 +47,33 @@ private var narrationAutoPlay = true
 private var lastUserLat: Double = 0.0
 private var lastUserLng: Double = 0.0
 
-/** S112: queue discard radius. POIs farther than this from the user are dropped. */
-private const val QUEUE_DISCARD_RADIUS_M = 50.0
+/**
+ * S112: Standard queue discard radius. POIs farther than this from the user
+ * are dropped at dequeue. In high-density areas (3+ POIs within this radius)
+ * the dequeue tightens to HIGH_DENSITY_DISCARD_RADIUS_M for focused selection.
+ */
+private const val STANDARD_DISCARD_RADIUS_M = 50.0
+
+/** S112: Tight discard radius used when HD mode triggers. */
+private const val HIGH_DENSITY_DISCARD_RADIUS_M = 25.0
+
+/** S112: POI count within standard radius that triggers HD mode. */
+private const val HIGH_DENSITY_THRESHOLD = 3
 
 /**
  * S112: Glowing highlight ring drawn around the currently-narrated POI on the
- * map. The inner Polygon is the bright ring; its `relatedObject` carries the
- * outer (faded) ring for two-layer cleanup. The animation job pulses the outer
- * ring's alpha while narration is active.
+ * map. The inner Polygon is the bright ring; the outer Polygon pulses around
+ * it. Both are sized to hug the POI icon visually rather than mark a geofence.
  */
 private var narrationHighlightInner: Polygon? = null
 private var narrationHighlightOuter: Polygon? = null
 private var narrationHighlightAnimJob: Job? = null
 
-/** S112: visual radius of the inner highlight ring (meters). */
-private const val HIGHLIGHT_INNER_RADIUS_M = 25.0
+/** S112+: visual radius of the inner highlight ring — small, hugs the POI icon. */
+private const val HIGHLIGHT_INNER_RADIUS_M = 5.0
 
-/** S112: visual radius of the outer (pulsing) highlight ring (meters). */
-private const val HIGHLIGHT_OUTER_RADIUS_M = 50.0
+/** S112+: visual radius of the outer (pulsing) highlight ring — small halo. */
+private const val HIGHLIGHT_OUTER_RADIUS_M = 9.0
 
 /**
  * Initialize the Phase 9T narration system:
@@ -263,12 +272,27 @@ private fun SalemMainActivity.pickNextFromQueue(): NarrationPoint? {
         return narrationQueue.pollFirst()  // pollFirst returns null if empty
     }
 
-    // Step 1: drop anything > 50m from current position
+    // S112+: Density-aware discard radius. Count POIs within the standard 50m
+    // radius first; if 3+, switch to the tighter 25m HD radius for selection.
+    val nearby50Count = narrationQueue.count {
+        haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= STANDARD_DISCARD_RADIUS_M
+    }
+    val discardRadius = if (nearby50Count >= HIGH_DENSITY_THRESHOLD) {
+        HIGH_DENSITY_DISCARD_RADIUS_M
+    } else {
+        STANDARD_DISCARD_RADIUS_M
+    }
+    if (nearby50Count >= HIGH_DENSITY_THRESHOLD) {
+        DebugLogger.i("NARR-QUEUE",
+            "HD MODE: $nearby50Count POIs within ${STANDARD_DISCARD_RADIUS_M.toInt()}m → tightening to ${HIGH_DENSITY_DISCARD_RADIUS_M.toInt()}m")
+    }
+
+    // Step 1: drop anything > discardRadius from current position
     val survivors = mutableListOf<NarrationPoint>()
     val droppedNames = mutableListOf<String>()
     for (point in narrationQueue) {
         val dist = haversineM(lastUserLat, lastUserLng, point.lat, point.lng)
-        if (dist > QUEUE_DISCARD_RADIUS_M) {
+        if (dist > discardRadius) {
             droppedNames.add("${point.name}(${dist.toInt()}m)")
         } else {
             survivors.add(point)
@@ -276,7 +300,7 @@ private fun SalemMainActivity.pickNextFromQueue(): NarrationPoint? {
     }
     if (droppedNames.isNotEmpty()) {
         DebugLogger.i("NARR-QUEUE",
-            "Dequeue dropped ${droppedNames.size} stale (>${QUEUE_DISCARD_RADIUS_M.toInt()}m): " +
+            "Dequeue dropped ${droppedNames.size} stale (>${discardRadius.toInt()}m): " +
             droppedNames.take(5).joinToString(", ") +
             if (droppedNames.size > 5) " +${droppedNames.size - 5} more" else ""
         )
@@ -357,9 +381,20 @@ internal fun SalemMainActivity.refreshProximityDockFromQueue() {
         return
     }
 
-    // Same filter+sort the dequeue would apply: <=50m, tier order, closest-in-tier
+    // S112+: Same density-aware discard radius the dequeue uses, so the dock
+    // shows the same set of POIs that the dequeue is actually choosing from.
+    val nearby50Count = narrationQueue.count {
+        haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= STANDARD_DISCARD_RADIUS_M
+    }
+    val discardRadius = if (nearby50Count >= HIGH_DENSITY_THRESHOLD) {
+        HIGH_DENSITY_DISCARD_RADIUS_M
+    } else {
+        STANDARD_DISCARD_RADIUS_M
+    }
+
+    // Same filter+sort the dequeue would apply: tier order, closest-in-tier
     val sorted = narrationQueue
-        .filter { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= QUEUE_DISCARD_RADIUS_M }
+        .filter { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= discardRadius }
         .sortedWith(compareBy(
             { NarrationTierClassifier.classify(it).ordinal },
             { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }

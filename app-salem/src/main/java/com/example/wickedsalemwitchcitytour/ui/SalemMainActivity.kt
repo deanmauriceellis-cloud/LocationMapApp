@@ -110,6 +110,19 @@ class SalemMainActivity : AppCompatActivity() {
      */
     internal var gpsTrackOverlay: Polyline? = null
 
+    /**
+     * S112+: User trigger ring debug overlay — three concentric outline circles
+     * centered on the user's GPS position at 12m / 25m / 50m radii. No fill.
+     * Updated on every GPS fix from observeViewModel(). Provides at-a-glance
+     * visibility for what POIs are within each trigger band:
+     *   - 50m (outer)  = standard discard radius
+     *   - 25m (middle) = high-density mode discard radius
+     *   - 12m (inner)  = "right on top of it" reference
+     */
+    internal var userTriggerRing50: org.osmdroid.views.overlay.Polygon? = null
+    internal var userTriggerRing25: org.osmdroid.views.overlay.Polygon? = null
+    internal var userTriggerRing12: org.osmdroid.views.overlay.Polygon? = null
+
     // Phase 9T: Narration system
     /**
      * Singleton (Hilt) — survives Activity recreation so the dedup state
@@ -1071,6 +1084,55 @@ class SalemMainActivity : AppCompatActivity() {
         toast("Walk stopped")
     }
 
+    // =========================================================================
+    // S112+: USER TRIGGER RINGS — debug overlay showing the 12m/25m/50m
+    // distance bands centered on the user's GPS position. Outline only,
+    // no fill, color-coded by trigger band semantics.
+    // =========================================================================
+
+    /**
+     * Lazy-creates the three concentric outline circles on the first GPS fix
+     * and updates their positions on every subsequent fix. Called from the
+     * GPS observer in observeViewModel().
+     */
+    internal fun updateUserTriggerRings(point: GeoPoint) {
+        // Create on first call
+        if (userTriggerRing50 == null) {
+            userTriggerRing50 = org.osmdroid.views.overlay.Polygon().apply {
+                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 50.0)
+                fillPaint.color = android.graphics.Color.TRANSPARENT
+                outlinePaint.color = android.graphics.Color.argb(180, 76, 175, 80)  // green
+                outlinePaint.strokeWidth = 2f
+                title = "Standard discard radius — 50m"
+            }
+            userTriggerRing25 = org.osmdroid.views.overlay.Polygon().apply {
+                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 25.0)
+                fillPaint.color = android.graphics.Color.TRANSPARENT
+                outlinePaint.color = android.graphics.Color.argb(220, 255, 193, 7)  // amber
+                outlinePaint.strokeWidth = 3f
+                title = "High-density discard radius — 25m"
+            }
+            userTriggerRing12 = org.osmdroid.views.overlay.Polygon().apply {
+                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 12.0)
+                fillPaint.color = android.graphics.Color.TRANSPARENT
+                outlinePaint.color = android.graphics.Color.argb(240, 244, 67, 54)  // red
+                outlinePaint.strokeWidth = 4f
+                title = "Right on top of POI — 12m"
+            }
+            // Add largest first (drawn behind), smallest last (drawn on top)
+            binding.mapView.overlays.add(userTriggerRing50)
+            binding.mapView.overlays.add(userTriggerRing25)
+            binding.mapView.overlays.add(userTriggerRing12)
+            DebugLogger.i("SalemMainActivity", "User trigger rings created (12m/25m/50m)")
+        } else {
+            // Update existing rings — recompute their points around the new center.
+            userTriggerRing50?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 50.0)
+            userTriggerRing25?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 25.0)
+            userTriggerRing12?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 12.0)
+        }
+        binding.mapView.invalidate()
+    }
+
     private fun interpolateWalkRoute(points: List<org.osmdroid.util.GeoPoint>, speedMps: Float): List<org.osmdroid.util.GeoPoint> {
         if (points.size < 2) return points
         val result = mutableListOf(points[0])
@@ -1573,6 +1635,9 @@ class SalemMainActivity : AppCompatActivity() {
                     binding.mapView.invalidate()
                 }
             }
+
+            // S112+: Update the user trigger ring debug overlay (12m/25m/50m) on every fix.
+            updateUserTriggerRings(point)
 
             // ── 1. Adaptive GPS interval ──
             //   Driving (>20 mph): 10s — coarse is fine
