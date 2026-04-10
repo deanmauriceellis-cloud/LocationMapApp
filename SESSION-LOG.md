@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 102-111. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 103-112. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 112: 2026-04-09 — Major narration overhaul: tiered queue, density cascade, ahead-only filter, glowing highlight ring, walk-sim 3x removal, fresh-start reset, POI button tier filter, home-stops-walksim
+
+Operator field test surfaced three distinct narration bugs (APPROACH-cooldown, walk-sim 3x starvation, sequencing) plus the GPS journey line backgrounding issue (diagnosed not fixed). Shipped 5 commits ending with a 3-level density cascade (40m/30m/20m discard tiers) + bearing-based ahead-only filter that picks the closest in-front POI within the highest non-empty tier, plus a glowing pulsing highlight ring on the active POI and a debug overlay showing the discard radii as outline circles around the walking icon. Operator confirmed "working much better. Success!" on the final walk.
+
+Full session detail (all 5 commits, 7 design questions, debug log analysis, tier classifier, bearing math): `docs/session-logs/session-112-2026-04-09.md`. Commits: `7ca0602`, `95f25f2`, `dded0e6`, `1f63113`, `8a94a06`.
+
+---
 
 ## Session 111: 2026-04-09 — Protocol optimization (compress STATE.md, archive S001-S101, rewrite session protocols, thin OMEN report template)
 
@@ -356,37 +364,5 @@ Built `web/src/admin/PoiTree.tsx` (~330 lines) and wired it into the AdminLayout
 
 ### Verification
 - `cd web && npx tsc --noEmit` → clean exit, zero errors
-
----
-
-## Session 102: 2026-04-08 — Phase 9P.B Step 9P.7 (Admin route + AdminLayout shell)
-
-### Summary
-First step of Phase 9P.B Admin UI build-out. Added a `/admin` route to the web app via path-based dispatch in `web/src/main.tsx` — chose this over installing `react-router-dom` because the public web app has no other routing needs and the admin tool is a single screen, so the dep was unjustified weight. Created `web/src/admin/AdminLayout.tsx` (~140 lines) with the full three-pane shell: header bar (slate-800) carrying **[Highlight Duplicates]** and **[Publish]** stubs (wired up in 9P.11 and 9P.13), an **Oracle: —** placeholder pill (wired up in 9P.10b), and a **[Logout]** button that uses the synchronous XMLHttpRequest 401 trick (sync XHR to `/api/admin/salem/pois` with deliberately wrong `logout:wrongpassword` credentials in `xhr.open()`, then `window.location.reload()` — overwrites the browser's cached Basic Auth credentials so the next admin call re-prompts). Left tree pane (white, 320px wide) and center map pane (slate-200) are placeholders with TODO comments pointing at the steps that fill them in (9P.8 and 9P.9). ASCII layout diagram and inline rationale for every design decision are included in the file header. Auth model: no in-page login form — the first admin API call from the page (the tree fetch in 9P.8) triggers the browser's native Basic Auth dialog because the cache-proxy admin endpoints (Phase 9P.3 middleware) return 401 with `WWW-Authenticate: Basic`. Subsequent requests reuse the browser's cached credentials automatically (same-origin via the vite `/api` proxy). `npx tsc --noEmit` clean. Also: refreshed the stale `project_next_session_priority.md` memory entry that still pointed at Privacy Policy drafting from S94 — now points at Phase 9P.B Step 9P.8 with concrete next-session steps and explicitly demotes NOTE-L014 to secondary.
-
-### Decisions
-1. **Path-based dispatch over `react-router-dom`.** The public web app currently has zero routing logic. The admin tool is a single screen. Adding a router dep is unjustified weight. `window.location.pathname.startsWith('/admin')` in `main.tsx` is one line and produces the same UX. Vite's dev server falls back to `index.html` for unknown paths so `/admin` works in `vite dev` and `vite preview`. Production hosting must mirror that fallback if `/admin` is ever exposed beyond dev — documented in the master plan and inline.
-2. **No in-page login form.** Browser-native Basic Auth is the right tool when the auth surface is exactly one operator and the credentials live in `cache-proxy/.env`. The browser handles the prompt automatically when an admin endpoint returns 401, caches the credentials for the origin, and includes them on subsequent requests transparently (same-origin via the vite `/api` proxy). The first call to `/api/admin/salem/pois` (which lands in 9P.8) is the trigger.
-3. **Logout via XMLHttpRequest 401 trick.** HTTP Basic Auth has no formal logout. The widely-used workaround is to fire a synchronous XHR with deliberately wrong credentials at a URL the server will reject; the browser caches the new (wrong) credentials, replacing the good ones. We point at `/api/admin/salem/pois` with `logout:wrongpassword` in `xhr.open()`, then `window.location.reload()` to force a fresh prompt on the next admin call. Wrapped in try/catch because some browsers throw on deprecated sync XHR. Documented inline as a known footgun, not a blocker.
-4. **Oracle pill is a static placeholder for now.** Phase 9P.10b will wire it to poll `/api/oracle/status` (Salem Oracle on port 8088). The pill's `title` attribute documents this so a future session sees the contract without re-reading the master plan.
-5. **Light mode only for the admin tool.** No spec for dark mode in 9P.7. Public web app's dark mode toggle is irrelevant here — admin tool is a different consumer and a different audience (operator-only, dev-side).
-6. **Tailwind for styling.** Consistent with the rest of the web app. No new CSS deps.
-7. **Stale memory must be refreshed at session start, not session end.** The `project_next_session_priority.md` entry was written after S94 and still listed Privacy Policy drafting as the top priority — but S101 reprioritized in STATE.md and the memory was never updated. Session 102 caught the stale state in the start protocol and refreshed it. Lesson: when STATE.md and a memory entry conflict, STATE.md is more recent and authoritative.
-
-### Files Changed
-- `web/src/admin/AdminLayout.tsx` — NEW (~140 lines)
-- `web/src/main.tsx` — modified (path-based dispatch)
-- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Step 9P.7 marked DONE with full notes
-- `STATE.md` — Last Updated → S102; new Phase 9P.B status section; TOP PRIORITY → Step 9P.8
-- `SESSION-LOG.md` — this entry
-- `docs/session-logs/session-102-2026-04-08.md` — live conversation log
-- `~/.claude/.../memory/project_next_session_priority.md` — stale entry refreshed
-
-### Verification
-- `cd web && npx tsc --noEmit` → clean exit, zero errors across the project
-
-### What's next
-- **Phase 9P.B Step 9P.8** — POI tree (`react-arborist`). `npm install react-arborist`, create `web/src/admin/PoiTree.tsx`, fetch all 1,720 POIs once via `/api/admin/salem/pois`, group by kind → category → subcategory, render in the left pane (replacing the current placeholder), search bar at top filters by name client-side, soft-deleted POIs hidden by default. The first admin API call from this is when the browser's Basic Auth prompt actually fires.
-- After 9P.8: 9P.9 (admin map), 9P.10 (edit dialog), 9P.10b (Salem Oracle integration), 9P.11 (Highlight Duplicates wiring), 9P.13 (Publish wiring), Phase 9P.C (publish loop regenerating bundled `.db` from PG).
 
 ---
