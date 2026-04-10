@@ -48,17 +48,44 @@ private var lastUserLat: Double = 0.0
 private var lastUserLng: Double = 0.0
 
 /**
- * S112: Standard queue discard radius. POIs farther than this from the user
- * are dropped at dequeue. In high-density areas (3+ POIs within this radius)
- * the dequeue tightens to HIGH_DENSITY_DISCARD_RADIUS_M for focused selection.
+ * S112+: Three-level discard radius cascade. The dequeue starts at the
+ * standard radius and tightens stepwise as density increases:
+ *   - STANDARD (40m): sparse mode, broad reach
+ *   - HIGH     (30m): 3+ POIs within 40m → tighten focus
+ *   - SUPER    (20m): 3+ POIs within 30m → very tight, "right in front of you"
+ *
+ * Each level drops POIs farther than the radius before tier evaluation.
  */
-private const val STANDARD_DISCARD_RADIUS_M = 50.0
+private const val STANDARD_DISCARD_RADIUS_M = 40.0
+private const val HIGH_DENSITY_DISCARD_RADIUS_M = 30.0
+private const val SUPER_HIGH_DENSITY_DISCARD_RADIUS_M = 20.0
 
-/** S112: Tight discard radius used when HD mode triggers. */
-private const val HIGH_DENSITY_DISCARD_RADIUS_M = 25.0
-
-/** S112: POI count within standard radius that triggers HD mode. */
+/** S112+: POI count within standard radius that triggers HD mode. */
 private const val HIGH_DENSITY_THRESHOLD = 3
+
+/** S112+: POI count within HD radius that triggers SUPER-HD mode. */
+private const val SUPER_HIGH_DENSITY_THRESHOLD = 3
+
+/**
+ * S112+: Bearing-based "ahead" filter — track the user's movement direction
+ * computed from the prev → current GPS positions. POIs whose bearing from
+ * the user is more than this many degrees off the movement direction are
+ * dropped at dequeue (they're behind the user). 90° half-angle = entire
+ * front half-circle, which eliminates only POIs strictly behind.
+ */
+private const val AHEAD_CONE_HALF_ANGLE_DEG = 90.0
+
+/** S112+: Minimum movement (meters) before we update the bearing. Below this
+ *  the GPS jitter is too large to compute a reliable direction. */
+private const val BEARING_UPDATE_MIN_MOVE_M = 1.0
+
+/** S112+: Cached movement bearing in degrees (0=N, 90=E, 180=S, 270=W).
+ *  Null until the first meaningful movement is observed. */
+private var lastMovementBearing: Double? = null
+
+/** S112+: Previous user position used to compute movement bearing. */
+private var prevUserLat: Double = 0.0
+private var prevUserLng: Double = 0.0
 
 /**
  * S112: Glowing highlight ring drawn around the currently-narrated POI on the
@@ -202,12 +229,62 @@ internal fun SalemMainActivity.initNarrationSystem() {
 /**
  * S112: Push the latest GPS position into the narration queue subsystem.
  * Called from SalemMainActivityTour.updateTourLocation() on every GPS fix.
- * Triggers a dock refresh so distances stay current as the user moves.
+ *
+ * S112+: Also computes the movement bearing from the prev → current
+ * positions when the move is large enough to be meaningful (>= 1m). The
+ * bearing drives the "ahead-only" filter at dequeue time.
  */
 internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Double) {
+    // Update movement bearing if we have a meaningful step
+    if (lastUserLat != 0.0 || lastUserLng != 0.0) {
+        val moved = haversineM(lastUserLat, lastUserLng, lat, lng)
+        if (moved >= BEARING_UPDATE_MIN_MOVE_M) {
+            lastMovementBearing = bearingDeg(lastUserLat, lastUserLng, lat, lng)
+            prevUserLat = lastUserLat
+            prevUserLng = lastUserLng
+        }
+    }
     lastUserLat = lat
     lastUserLng = lng
     refreshProximityDockFromQueue()
+}
+
+/**
+ * S112+: Compute compass bearing from (lat1,lng1) → (lat2,lng2) in degrees.
+ * 0 = North, 90 = East, 180 = South, 270 = West. Result normalized to [0, 360).
+ */
+private fun bearingDeg(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+    val phi1 = Math.toRadians(lat1)
+    val phi2 = Math.toRadians(lat2)
+    val dLng = Math.toRadians(lng2 - lng1)
+    val y = kotlin.math.sin(dLng) * kotlin.math.cos(phi2)
+    val x = kotlin.math.cos(phi1) * kotlin.math.sin(phi2) -
+            kotlin.math.sin(phi1) * kotlin.math.cos(phi2) * kotlin.math.cos(dLng)
+    return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
+}
+
+/**
+ * S112+: Smallest absolute difference between two compass bearings, in degrees.
+ * Result is in [0, 180]. Used to test "is POI ahead of me" — if angleDiff
+ * (bearingToPoi, movementBearing) <= AHEAD_CONE_HALF_ANGLE_DEG, the POI is
+ * within the front half-circle.
+ */
+private fun angleDiffDeg(a: Double, b: Double): Double {
+    var diff = (a - b + 540.0) % 360.0 - 180.0
+    if (diff < 0) diff = -diff
+    return diff
+}
+
+/**
+ * S112+: Returns true if the POI is "ahead" of the user — meaning the bearing
+ * from user → POI is within the AHEAD_CONE_HALF_ANGLE_DEG cone of the user's
+ * current movement direction. If we don't have a movement bearing yet (cold
+ * start, stationary forever), all POIs pass.
+ */
+private fun isPoiAhead(poiLat: Double, poiLng: Double): Boolean {
+    val moveBearing = lastMovementBearing ?: return true
+    val poiBearing = bearingDeg(lastUserLat, lastUserLng, poiLat, poiLng)
+    return angleDiffDeg(poiBearing, moveBearing) <= AHEAD_CONE_HALF_ANGLE_DEG
 }
 
 /**
@@ -272,37 +349,57 @@ private fun SalemMainActivity.pickNextFromQueue(): NarrationPoint? {
         return narrationQueue.pollFirst()  // pollFirst returns null if empty
     }
 
-    // S112+: Density-aware discard radius. Count POIs within the standard 50m
-    // radius first; if 3+, switch to the tighter 25m HD radius for selection.
-    val nearby50Count = narrationQueue.count {
+    // S112+: Three-level density cascade. Count POIs within each radius and
+    // pick the tightest level whose threshold is exceeded.
+    val nearbyStandard = narrationQueue.count {
         haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= STANDARD_DISCARD_RADIUS_M
     }
-    val discardRadius = if (nearby50Count >= HIGH_DENSITY_THRESHOLD) {
-        HIGH_DENSITY_DISCARD_RADIUS_M
-    } else {
-        STANDARD_DISCARD_RADIUS_M
+    val nearbyHd = narrationQueue.count {
+        haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= HIGH_DENSITY_DISCARD_RADIUS_M
     }
-    if (nearby50Count >= HIGH_DENSITY_THRESHOLD) {
+    val discardRadius = when {
+        nearbyHd >= SUPER_HIGH_DENSITY_THRESHOLD -> SUPER_HIGH_DENSITY_DISCARD_RADIUS_M
+        nearbyStandard >= HIGH_DENSITY_THRESHOLD -> HIGH_DENSITY_DISCARD_RADIUS_M
+        else -> STANDARD_DISCARD_RADIUS_M
+    }
+    val mode = when (discardRadius) {
+        SUPER_HIGH_DENSITY_DISCARD_RADIUS_M -> "SUPER-HD"
+        HIGH_DENSITY_DISCARD_RADIUS_M -> "HD"
+        else -> "STANDARD"
+    }
+    if (discardRadius < STANDARD_DISCARD_RADIUS_M) {
         DebugLogger.i("NARR-QUEUE",
-            "HD MODE: $nearby50Count POIs within ${STANDARD_DISCARD_RADIUS_M.toInt()}m → tightening to ${HIGH_DENSITY_DISCARD_RADIUS_M.toInt()}m")
+            "$mode MODE: $nearbyStandard POIs in ${STANDARD_DISCARD_RADIUS_M.toInt()}m, $nearbyHd in ${HIGH_DENSITY_DISCARD_RADIUS_M.toInt()}m → discard=${discardRadius.toInt()}m")
     }
 
-    // Step 1: drop anything > discardRadius from current position
+    // Step 1: drop anything > discardRadius (out of range) OR behind the user
     val survivors = mutableListOf<NarrationPoint>()
     val droppedNames = mutableListOf<String>()
+    val droppedBehind = mutableListOf<String>()
     for (point in narrationQueue) {
         val dist = haversineM(lastUserLat, lastUserLng, point.lat, point.lng)
         if (dist > discardRadius) {
             droppedNames.add("${point.name}(${dist.toInt()}m)")
-        } else {
-            survivors.add(point)
+            continue
         }
+        if (!isPoiAhead(point.lat, point.lng)) {
+            droppedBehind.add("${point.name}(${dist.toInt()}m)")
+            continue
+        }
+        survivors.add(point)
     }
     if (droppedNames.isNotEmpty()) {
         DebugLogger.i("NARR-QUEUE",
             "Dequeue dropped ${droppedNames.size} stale (>${discardRadius.toInt()}m): " +
             droppedNames.take(5).joinToString(", ") +
             if (droppedNames.size > 5) " +${droppedNames.size - 5} more" else ""
+        )
+    }
+    if (droppedBehind.isNotEmpty()) {
+        DebugLogger.i("NARR-QUEUE",
+            "Dequeue dropped ${droppedBehind.size} behind-user: " +
+            droppedBehind.take(5).joinToString(", ") +
+            if (droppedBehind.size > 5) " +${droppedBehind.size - 5} more" else ""
         )
     }
 
@@ -381,20 +478,25 @@ internal fun SalemMainActivity.refreshProximityDockFromQueue() {
         return
     }
 
-    // S112+: Same density-aware discard radius the dequeue uses, so the dock
-    // shows the same set of POIs that the dequeue is actually choosing from.
-    val nearby50Count = narrationQueue.count {
+    // S112+: Same three-level density cascade the dequeue uses, plus the
+    // bearing-based "ahead" filter, so the dock shows exactly the set of POIs
+    // the dequeue is actually choosing from.
+    val nearbyStandard = narrationQueue.count {
         haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= STANDARD_DISCARD_RADIUS_M
     }
-    val discardRadius = if (nearby50Count >= HIGH_DENSITY_THRESHOLD) {
-        HIGH_DENSITY_DISCARD_RADIUS_M
-    } else {
-        STANDARD_DISCARD_RADIUS_M
+    val nearbyHd = narrationQueue.count {
+        haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= HIGH_DENSITY_DISCARD_RADIUS_M
+    }
+    val discardRadius = when {
+        nearbyHd >= SUPER_HIGH_DENSITY_THRESHOLD -> SUPER_HIGH_DENSITY_DISCARD_RADIUS_M
+        nearbyStandard >= HIGH_DENSITY_THRESHOLD -> HIGH_DENSITY_DISCARD_RADIUS_M
+        else -> STANDARD_DISCARD_RADIUS_M
     }
 
-    // Same filter+sort the dequeue would apply: tier order, closest-in-tier
+    // Same filter+sort the dequeue would apply: in-range, ahead, tier order, closest-in-tier
     val sorted = narrationQueue
         .filter { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) <= discardRadius }
+        .filter { isPoiAhead(it.lat, it.lng) }
         .sortedWith(compareBy(
             { NarrationTierClassifier.classify(it).ordinal },
             { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }

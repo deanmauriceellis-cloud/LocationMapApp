@@ -112,16 +112,16 @@ class SalemMainActivity : AppCompatActivity() {
 
     /**
      * S112+: User trigger ring debug overlay — three concentric outline circles
-     * centered on the user's GPS position at 12m / 25m / 50m radii. No fill.
-     * Updated on every GPS fix from observeViewModel(). Provides at-a-glance
-     * visibility for what POIs are within each trigger band:
-     *   - 50m (outer)  = standard discard radius
-     *   - 25m (middle) = high-density mode discard radius
-     *   - 12m (inner)  = "right on top of it" reference
+     * centered on the user's GPS position at 20m / 30m / 40m radii. No fill.
+     * Updated on every GPS fix from observeViewModel(). Each ring matches one
+     * level of the dequeue's density cascade:
+     *   - 40m (outer)  = STANDARD discard radius
+     *   - 30m (middle) = HIGH_DENSITY discard radius
+     *   - 20m (inner)  = SUPER_HIGH_DENSITY discard radius
      */
-    internal var userTriggerRing50: org.osmdroid.views.overlay.Polygon? = null
-    internal var userTriggerRing25: org.osmdroid.views.overlay.Polygon? = null
-    internal var userTriggerRing12: org.osmdroid.views.overlay.Polygon? = null
+    internal var userTriggerRing40: org.osmdroid.views.overlay.Polygon? = null
+    internal var userTriggerRing30: org.osmdroid.views.overlay.Polygon? = null
+    internal var userTriggerRing20: org.osmdroid.views.overlay.Polygon? = null
 
     // Phase 9T: Narration system
     /**
@@ -1085,9 +1085,9 @@ class SalemMainActivity : AppCompatActivity() {
     }
 
     // =========================================================================
-    // S112+: USER TRIGGER RINGS — debug overlay showing the 12m/25m/50m
+    // S112+: USER TRIGGER RINGS — debug overlay showing the 20m/30m/40m
     // distance bands centered on the user's GPS position. Outline only,
-    // no fill, color-coded by trigger band semantics.
+    // no fill, color-coded by density-cascade tier.
     // =========================================================================
 
     /**
@@ -1097,38 +1097,38 @@ class SalemMainActivity : AppCompatActivity() {
      */
     internal fun updateUserTriggerRings(point: GeoPoint) {
         // Create on first call
-        if (userTriggerRing50 == null) {
-            userTriggerRing50 = org.osmdroid.views.overlay.Polygon().apply {
-                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 50.0)
+        if (userTriggerRing40 == null) {
+            userTriggerRing40 = org.osmdroid.views.overlay.Polygon().apply {
+                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 40.0)
                 fillPaint.color = android.graphics.Color.TRANSPARENT
                 outlinePaint.color = android.graphics.Color.argb(180, 76, 175, 80)  // green
                 outlinePaint.strokeWidth = 2f
-                title = "Standard discard radius — 50m"
+                title = "STANDARD discard radius — 40m"
             }
-            userTriggerRing25 = org.osmdroid.views.overlay.Polygon().apply {
-                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 25.0)
+            userTriggerRing30 = org.osmdroid.views.overlay.Polygon().apply {
+                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 30.0)
                 fillPaint.color = android.graphics.Color.TRANSPARENT
                 outlinePaint.color = android.graphics.Color.argb(220, 255, 193, 7)  // amber
                 outlinePaint.strokeWidth = 3f
-                title = "High-density discard radius — 25m"
+                title = "HIGH-DENSITY discard radius — 30m"
             }
-            userTriggerRing12 = org.osmdroid.views.overlay.Polygon().apply {
-                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 12.0)
+            userTriggerRing20 = org.osmdroid.views.overlay.Polygon().apply {
+                points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 20.0)
                 fillPaint.color = android.graphics.Color.TRANSPARENT
                 outlinePaint.color = android.graphics.Color.argb(240, 244, 67, 54)  // red
                 outlinePaint.strokeWidth = 4f
-                title = "Right on top of POI — 12m"
+                title = "SUPER-HIGH-DENSITY discard radius — 20m"
             }
             // Add largest first (drawn behind), smallest last (drawn on top)
-            binding.mapView.overlays.add(userTriggerRing50)
-            binding.mapView.overlays.add(userTriggerRing25)
-            binding.mapView.overlays.add(userTriggerRing12)
-            DebugLogger.i("SalemMainActivity", "User trigger rings created (12m/25m/50m)")
+            binding.mapView.overlays.add(userTriggerRing40)
+            binding.mapView.overlays.add(userTriggerRing30)
+            binding.mapView.overlays.add(userTriggerRing20)
+            DebugLogger.i("SalemMainActivity", "User trigger rings created (20m/30m/40m)")
         } else {
             // Update existing rings — recompute their points around the new center.
-            userTriggerRing50?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 50.0)
-            userTriggerRing25?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 25.0)
-            userTriggerRing12?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 12.0)
+            userTriggerRing40?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 40.0)
+            userTriggerRing30?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 30.0)
+            userTriggerRing20?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 20.0)
         }
         binding.mapView.invalidate()
     }
