@@ -2,26 +2,27 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-09 — Session 112 (major narration overhaul: tiered queue + density cascade + ahead-only filter + glowing highlight + walk-sim 3x removal + fresh-start reset + POI button tier filter + home-stops-walksim)
+**Last updated:** 2026-04-09 — Session 113 (POI Detail Sheet — full-screen dialog with hero + descriptions + tagged TTS read-through; hero regen deferred pending new SalemIntelligence sibling project)
 
 ---
 
-## TOP PRIORITY — Next Session (S113)
+## TOP PRIORITY — Next Session (S114)
 
-**Phase 9P.B Step 9P.11 — Highlight Duplicates wiring.** Carried over from S107 → S108 → S109 → S110 → S111 → S112 (six sessions in a row interrupted by protocol work, layout fixes, and field-test bug triage). Concrete scope:
+**Admin tool hero image override chain.** Operator said in S113 Q2: next session priority, above the old 9P.11/9Q/9R plan. Concrete scope:
 
-- Header button stub at `web/src/admin/AdminLayout.tsx:69-73` (currently `console.log`)
-- Wire to existing `GET /api/admin/salem/pois/duplicates?radius=15` endpoint (landed 9P.5, S100)
-- Click → fetch clusters → red rings on `AdminMap` at cluster centers
-- Click ring → side panel with the duplicate group + Compare / Pick Winner buttons
-- Toggle off → rings clear
-- Reference: `WickedSalemWitchCityTour_MASTER_PLAN.md` Step 9P.11 (~line 1392)
-- Default scope: basic UX. Full merge UI is deferred per master plan §1393.
-- **Estimated:** one session, single commit.
+1. **PG column:** add `hero_image_asset TEXT` to `salem_narration_points`, `salem_tour_pois`, and `salem_businesses`. Default NULL.
+2. **Admin tool UI:** file-upload + preview + assign widget in `web/src/admin/PoiEditDialog.tsx`. Two layers — merchant paid asset (top priority) and admin-assigned asset (fallback to hash-pinned pool, then to red placeholder).
+3. **Publish loop (mini):** a dedicated sync path that copies admin-assigned hero assets from PG-referenced storage into `app-salem/src/main/assets/poi-icons/_heroes/{poi_id}.png` at build time (or pre-build script). Room DB stays on the hash-pinned fallback until Phase 9P.C lands the full publish pipeline.
+4. **Android side:** `PoiHeroResolver.resolve()` now checks the new `heroImageAsset` column FIRST, then falls back to the existing category-folder hash-pinned pick, then to red. (Currently only the latter two.)
+5. **Red worklist query:** admin tool gets a "POIs missing hero" filter backed by the new column so operator can walk the list and assign.
 
-**After 9P.11:** Phase 9P.C publish loop (9P.12-9P.14): rebuild `salem-content/salem_content.sql` from PG, wire the Publish button, end-to-end APK rebuild verification.
+**SalemIntelligence dependency:** the S113 plan to regenerate the 1,416-image character pool with a refined SD prompt is DEFERRED. Operator is building `~/Development/SalemIntelligence` as a separate product — a knowledgebase + LLM that generates per-business descriptions AND hero prompts. The regen pass is blocked until SalemIntelligence ships (~1 day of operator work). Until then, the hash-pinned pool + red placeholder is the correct intermediate state.
 
-**Skip 9P.10a** (Linked Historical Content tab — currently a stub) until Phase 9Q has run.
+**After admin hero chain:** background research task to fill missing POI fields (phone/website/hours/booking URL). Operator S113: "run a background task locally to research all the new (and old POI's) that don't have advanced information."
+
+**Phase 9P.B Step 9P.11 Highlight Duplicates** — still stated but DEMOTED per S113 operator direction "refinement loop supersedes." Carried S107 → S108 → S109 → S110 → S111 → S112 → S113 (7 sessions). Concrete scope still the same: wire `web/src/admin/AdminLayout.tsx:69-73` stub to `GET /api/admin/salem/pois/duplicates?radius=15`, red rings on AdminMap, click → side panel.
+
+**Skip 9P.10a** (Linked Historical Content tab) until Phase 9Q has run.
 
 ---
 
@@ -31,22 +32,24 @@
 |---|---|---|
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
-| **9P.B** Admin UI | **6/8 done** | 9P.6 taxonomy, 9P.7 shell, 9P.8 tree, 9P.9 map, 9P.10 edit dialog, 9P.10b Salem Oracle. Pending: 9P.11 (NEXT), 9P.13 publish wiring. 9P.10a blocked on 9Q. |
+| **9P.B** Admin UI | **6/8 done** | 9P.6 taxonomy, 9P.7 shell, 9P.8 tree, 9P.9 map, 9P.10 edit dialog, 9P.10b Salem Oracle. Pending: 9P.11 (demoted), 9P.13 publish wiring. 9P.10a blocked on 9Q. |
+| **9P.B+** Hero override chain | **NEXT (S114)** | PG `hero_image_asset` column, admin upload/assign UI, mini publish loop for hero assets, PoiHeroResolver priority check. Supersedes 9P.11 per S113 operator direction. |
 | **9P.C** Publish loop | not started | 9P.12-9P.14 |
 | **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers |
 | **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9P+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
+| **Cross-project** SalemIntelligence | not started (operator building) | New sibling project at `~/Development/SalemIntelligence` — knowledgebase + LLM for per-business descriptions and hero SD prompts. Blocks the hero asset regen pass until it ships. |
 
-**Sessions completed:** 112 (last entries in `SESSION-LOG.md`). Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 113 (last entries in `SESSION-LOG.md`). Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
-## Carry-forward Items (NOT blocking 9P.11)
+## Carry-forward Items (NOT blocking the hero override chain)
 
-**S112 narration overhaul recap:** S112 shipped a tiered narration queue (PAID > HISTORIC > ATTRACTION > REST), 3-level density cascade (40m → 30m → 20m discard radius), bearing-based ahead-only filter (90° front half-circle), glowing highlight ring on the active POI, debug overlay rings (20m/30m/40m) around the user marker, walk-sim 3× radius removal, fresh-start `narratedAt` reset on cold launch, POI button tier filter, home-button-stops-walksim, and the APPROACH-cooldown bug fix. The S110 "narration queue stale-pop check" carry-forward is now resolved by the queue redesign and removed from this list. 5 commits: `7ca0602`, `95f25f2`, `dded0e6`, `1f63113`, `8a94a06`.
+**S113 POI Detail Sheet recap:** S113 shipped a full-screen `DialogFragment` that opens on dock tap, map marker tap, OR narration banner tap. Hero strip (20% of screen, `fitXY` stretch, deterministic hash-pinned from `poi-icons/{category}/` pool or red `ASSIGN HERO` placeholder), overview row, Visit Website through existing in-app WebView, short/about/story sections from `shortNarration`/`description`/`longNarration`, synthesized action list (Call/Directions/Hours — not narrated). Tagged TTS read-through via new `speakTaggedHint` + `cancelSegmentsWithTag` on NarrationManager — reads only `name+type+address+phone+website-ack` + descriptions, drops stale segments at open AND close via prefix match, doesn't touch ambient queue. Three iterations in one session: initial Bottom sheet build → full-screen conversion + TTS trim → S112 highlight-ring tap-interception fix (polygons moved to overlay index 0 with null titles and non-consuming click listeners) + narration banner click wiring + verbose click logging at every entry point. 1 commit: `2826145`.
 
-**Still pending (carry into S113+):**
+**Still pending (carry into S114+):**
 - **`DWELL_MS = 3_000L` dead code** in `NarrationGeofenceManager` — declared, never wired. Single jittery fixes can fire false-positive narration in dense areas. ~10 lines to fix with a per-POI fix-count gate.
 - **GPS journey line backgrounding bug** — `viewModel.currentLocation.observe(this)` is bound to the activity's STARTED lifecycle, so the recorder stops receiving fixes when the activity goes to onPause/onStop (screen off, app backgrounded). Diagnosed in S112; fix options proposed: (a) singleton recorder rewire ~30 lines, (b) foreground service ~150 lines. Not chosen, not implemented.
 - **18:09-18:15 lifecycle churn** (S110 known issue) — 10 activity recreates with `changingConfig=true` in 6 minutes. Trigger still unknown.
@@ -65,11 +68,12 @@
 ## OMEN Open Items
 
 1. **NOTE-L014 / OMEN-008 — Privacy Policy drafting** (BLOCKING RadioIntelligence Salem ingest). Async writing work; can be drafted between admin-tool sessions.
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed** on this workstation. Surface in every session report until OMEN executes or retracts. **Six sessions running.**
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed** on this workstation. Surface in every session report until OMEN executes or retracts. **Seven sessions running.**
 3. **NOTE-L013 — debug `VoiceAuditionActivity.kt` cleanup** still pending (low priority).
 4. **OMEN-002 history rotation** — operator action only: `ALTER USER witchdoctor WITH PASSWORD '<new>';` + regenerate `OPENSKY_CLIENT_SECRET` via portal + replace test `ADMIN_PASS=salem-tour-9P3-test` in `cache-proxy/.env` with a real strong value before relying on admin auth in any non-test context.
 5. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, ~3 weeks).
 6. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
+7. **Cross-project dependency: SalemIntelligence** — new sibling project at `~/Development/SalemIntelligence` (operator building). Knowledgebase + LLM that generates per-business descriptions and custom SD prompts for POI and hero imagery. Blocks the LocationMapApp hero asset regen pass until it ships. Flag for OMEN's Shared Engine Registry.
 
 ---
 

@@ -1,12 +1,41 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 102, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 103, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 102, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 103, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
 
 ---
 
-# Sessions S001-S102 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S103 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
 
+
+## Session 103: 2026-04-08 — Phase 9P.B Step 9P.8 (POI tree via react-arborist)
+
+### Summary
+Built `web/src/admin/PoiTree.tsx` (~330 lines) and wired it into the AdminLayout left pane, replacing the 9P.7 placeholder. Tree fetches all 1,720 active POIs across the three kinds (`tour` 45 sequential first to fire the Basic Auth prompt cleanly, then `business` 861 + `narration` 814 in parallel reusing cached credentials) via `/api/admin/salem/pois?kind=...&include_deleted=true&limit=2000`, groups them as **kind → category → POI rows**, renders with react-arborist's virtualized list, supports client-side name search via `searchTerm`/`searchMatch`, soft-deleted toggle (client-side filter on the cached rows — no re-fetch, no re-prompt), counts per kind/category in the row labels and a totals strip in the toolbar, and emits `onSelect({kind, poi})` events into AdminLayout (currently `console.log`'d — the map pan/zoom in 9P.9 and edit dialog in 9P.10 will consume them). `useElementSize` ResizeObserver hook supplies the explicit pixel `width`/`height` that react-arborist needs for its virtualized list. `react-arborist@^3.4.3` added to `web/package.json` (16 packages, peer requirement is open-ended `react: >= 16.14` so React 19 is fine). Three pre-existing high-severity transitive audit warnings (`vite`, `picomatch`, `socket.io-parser`) surfaced but NOT introduced by this install — flagged for a separate cleanup pass. `npx tsc --noEmit` clean.
+
+### Decisions
+1. **Three-level tree, not four.** The master plan and the next-session memory both said "kind → category → subcategory → POI rows" (4 levels). Recon at session start queried PG and found: tour uses 7 distinct `category` values, business uses 19 distinct `business_type` values, narration uses 29 distinct `category` values — and `salem_narration_points.subcategory` is **NULL for all 814 rows**. `salem_tour_pois.subcategories` is a JSONB list of refinements (not a single column suitable for grouping). The fourth level isn't physically present in the data, so the tree collapses to three. Documented the deviation in the `PoiTree.tsx` header so a future session can re-add the fourth level when narration's subcategory column gets backfilled (or tour's JSONB list gets promoted) by editing `buildTree()` only.
+2. **Sequential `tour` first, then parallel `business`+`narration`.** The first call to `/api/admin/salem/pois` triggers the browser's native HTTP Basic Auth dialog. Firing 3 simultaneous 401-eligible requests races the dialog and can cause some browsers to show the prompt multiple times. Awaiting `tour` (the smallest, 45 rows) sequentially first ensures the user sees exactly one prompt; once the browser caches credentials, the other two kinds fetch in parallel reusing them. Universal modern browser behavior — if a future session sees auth prompts firing 3x, the fix is to also serialize business+narration.
+3. **Fetch with `include_deleted=true` once, filter client-side.** The "Show soft-deleted POIs" toggle rebuilds the tree from the cached rows. Flipping it is instant and never re-prompts for auth. Deleted rows render greyed-out italic with a "(deleted)" suffix.
+4. **No taxonomy lookup at grouping time.** Categories in the DB are domain-specific OSM-style strings (`witch_trials`, `shop_retail`, `historic_site`, etc.), NOT layer IDs from `web/src/config/poiCategories.ts` (which uses `FOOD_DRINK`, `SHOPPING`, etc.). Decided not to attempt a lookup — just `groupBy` on the raw field. Each kind has its own vocabulary; overlapping names (e.g. `restaurant` in both business and narration) are scoped under their kind so no collision. The taxonomy file remains the source of truth for the *edit dialog* (9P.10) when the operator picks a category from a dropdown, but it's not needed for the tree's grouping shape.
+5. **`useElementSize` ResizeObserver hook.** react-arborist requires explicit pixel `width`/`height` for its virtualized list. The hook handles measurement and reflow on browser resize so the tree fills the left pane. Future drag-handle for the left pane gets resize-responsiveness for free.
+6. **`disableMultiSelection`/`disableEdit`/`disableDrag`/`disableDrop` all true.** The tree is read-only; mutations happen through the edit dialog (9P.10) and the admin map (9P.9). Locking down the unused react-arborist features is one less surface area to reason about.
+7. **Defensive `parseFloat` on lat/lng.** node-postgres returns DOUBLE PRECISION as JS numbers in the current driver version, but the coerce is cheap insurance for the 9P.9 map view in case a future serializer ever string-ifies them.
+8. **Pre-existing audit warnings deferred.** `npm audit` after the react-arborist install reported 3 high-severity transitive deps (`picomatch`, `socket.io-parser`, `vite`) — none introduced by react-arborist. Verified they live under `node_modules/{vite,tinyglobby,socket.io}/...`, all pre-existing. Tracked for a separate cleanup pass; not blocking 9P.8.
+
+### Files Changed
+- `web/src/admin/PoiTree.tsx` — NEW (~330 lines)
+- `web/src/admin/AdminLayout.tsx` — modified (import `PoiTree`/`PoiSelection`, add `handlePoiSelect` callback, replace left-pane placeholder, update header comment)
+- `web/package.json` + `web/package-lock.json` — `react-arborist@^3.4.3` added
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Step 9P.8 marked DONE with full implementation notes including the 3-vs-4-level tree decision
+- `STATE.md` — Last Updated → S103; Phase 9P.B status row for 9P.8; TOP PRIORITY → Step 9P.9 (Admin map view)
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-103-2026-04-08.md` — live conversation log
+
+### Verification
+- `cd web && npx tsc --noEmit` → clean exit, zero errors
+
+---
 
 ## Session 102: 2026-04-08 — Phase 9P.B Step 9P.7 (Admin route + AdminLayout shell)
 
