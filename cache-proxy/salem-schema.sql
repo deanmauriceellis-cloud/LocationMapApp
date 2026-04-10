@@ -374,3 +374,103 @@ CREATE TABLE IF NOT EXISTS salem_sync_state (
   row_count    INTEGER DEFAULT 0,
   checksum     TEXT
 );
+
+-- ════════════════════════════════════════════════════════════════════
+-- POI Taxonomy (Phase 9P.B+, Session 114)
+-- ════════════════════════════════════════════════════════════════════
+--
+-- Two lookup tables mirroring the canonical POI taxonomy defined in
+--   app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/menu/PoiCategories.kt
+--   web/src/config/poiCategories.ts              (line-aligned mirror)
+--
+-- 22 categories x ~176 subcategories (exact count comes from the seed
+-- script `cache-proxy/scripts/sync-poi-taxonomy.js` — rerun that script
+-- whenever poiCategories.ts changes).
+--
+-- Subcategory PK format: `{CATEGORY_ID}__{slug}` — e.g. `FOOD_DRINK__restaurants`.
+-- This lets POI tables FK directly to the subcategory row without needing
+-- a separate category_id column on the POI side.
+--
+-- Scope note: salem_tour_pois is DELIBERATELY excluded from this taxonomy.
+-- Its `category` column holds tour-chapter themes (witch_trials, maritime,
+-- literary, landmark, museum, park, visitor_services) which are a different
+-- concept from the PoiCategories.kt layer taxonomy. Tour POIs are 45 curated
+-- rows with bespoke metadata and are handled in their own path.
+-- ════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS salem_poi_categories (
+  id                     TEXT PRIMARY KEY,            -- e.g. 'FOOD_DRINK' — matches PoiLayerId
+  label                  TEXT NOT NULL,               -- e.g. 'Food & Drink'
+  pref_key               TEXT NOT NULL,               -- e.g. 'poi_food_drink_on'
+  tags                   JSONB NOT NULL DEFAULT '[]', -- flat OSM tag list, key=value form
+  color                  TEXT NOT NULL,               -- e.g. '#BF360C'
+  default_enabled        BOOLEAN NOT NULL DEFAULT FALSE,
+  historic_tour_default  BOOLEAN NOT NULL DEFAULT FALSE,
+  display_order          INTEGER NOT NULL,            -- 1..N from POI_CATEGORIES array order
+  source                 TEXT NOT NULL DEFAULT 'poiCategories.ts',
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS salem_poi_subcategories (
+  id                     TEXT PRIMARY KEY,            -- e.g. 'FOOD_DRINK__restaurants'
+  category_id            TEXT NOT NULL REFERENCES salem_poi_categories(id) ON DELETE RESTRICT,
+  label                  TEXT NOT NULL,               -- e.g. 'Restaurants'
+  slug                   TEXT NOT NULL,               -- e.g. 'restaurants' (unique within category)
+  tags                   JSONB NOT NULL DEFAULT '[]', -- per-subtype OSM tag list
+  display_order          INTEGER NOT NULL,            -- 1..N from subtypes array order
+  source                 TEXT NOT NULL DEFAULT 'poiCategories.ts',
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (category_id, slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_salem_poi_subcat_category ON salem_poi_subcategories (category_id);
+
+-- ────────────────────────────────────────────────────────────────────
+-- New POI taxonomy columns on salem_businesses
+-- (nullable; populated by the S115 backfill pass)
+-- ────────────────────────────────────────────────────────────────────
+
+ALTER TABLE salem_businesses ADD COLUMN IF NOT EXISTS category    TEXT;
+ALTER TABLE salem_businesses ADD COLUMN IF NOT EXISTS subcategory TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_salem_biz_category    ON salem_businesses (category)    WHERE category IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_biz_subcategory ON salem_businesses (subcategory) WHERE subcategory IS NOT NULL;
+
+-- ────────────────────────────────────────────────────────────────────
+-- Foreign keys to the taxonomy lookup tables
+--
+-- These guard the NEW columns (nullable, enforced from day 1) and the
+-- existing `subcategory` column on salem_narration_points (NULL on all
+-- 814 rows today — safe to FK immediately).
+--
+-- NOT FK'd this session:
+--   - salem_narration_points.category  — 814 rows of legacy lowercase
+--     coarse values ('shop','restaurant','services',...). FK added in
+--     S115 after the backfill normalizes them to PoiLayerId form.
+--   - salem_tour_pois.*                — different category concept
+--     (tour-chapter themes), explicitly scoped out of this taxonomy.
+-- ────────────────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  -- salem_narration_points.subcategory -> salem_poi_subcategories(id)
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_salem_narration_subcategory') THEN
+    ALTER TABLE salem_narration_points
+      ADD CONSTRAINT fk_salem_narration_subcategory
+      FOREIGN KEY (subcategory) REFERENCES salem_poi_subcategories(id) ON DELETE RESTRICT;
+  END IF;
+
+  -- salem_businesses.category -> salem_poi_categories(id)
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_salem_business_category') THEN
+    ALTER TABLE salem_businesses
+      ADD CONSTRAINT fk_salem_business_category
+      FOREIGN KEY (category) REFERENCES salem_poi_categories(id) ON DELETE RESTRICT;
+  END IF;
+
+  -- salem_businesses.subcategory -> salem_poi_subcategories(id)
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_salem_business_subcategory') THEN
+    ALTER TABLE salem_businesses
+      ADD CONSTRAINT fk_salem_business_subcategory
+      FOREIGN KEY (subcategory) REFERENCES salem_poi_subcategories(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
