@@ -1,12 +1,57 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 103, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 104, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 103, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 104, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
 
 ---
 
-# Sessions S001-S103 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S104 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
 
+
+## Session 104: 2026-04-08 — Phase 9P.B Step 9P.9 (Admin map view via Leaflet + markercluster) + assessment delta review
+
+### Summary
+Built `web/src/admin/AdminMap.tsx` (~370 lines) and wired it into the AdminLayout center pane, replacing the 9P.9 placeholder. Map renders all ~1,720 active POIs as a single `L.markerClusterGroup` driven imperatively via `useMap()` (rather than the `react-leaflet-markercluster` wrapper, which is stuck on react-leaflet v4 while we're on v5). Markers are color-coded by kind (tour=red `#dc2626`, business=blue `#2563eb`, narration=green `#059669`) using cached `L.divIcon` SVG circles, with a separate single-marker recolor effect for selection highlighting (gold ring) so selection clicks don't trigger full cluster rebuilds. Tree-click → AdminLayout `selectedPoi` state → `<FlyToSelected>` calls `map.flyTo([lat,lng], max(currentZoom,17), {duration: 0.6})`. Marker drag captures origin at `dragstart`, fires confirm modal at `dragend` with kind/name/id/from/to/Haversine distance, Confirm POSTs to `/api/admin/salem/pois/:kind/:id/move`, AdminLayout's `onPoiMoved` callback patches the matching row in the shared `byKind` snapshot so PoiTree (consuming the same data via the new `externalByKind` prop) stays consistent. Cancel and HTTP failure both call `marker.setLatLng(origin)` to revert. Soft-deleted rows are filtered from the map (still visible in the tree behind its existing toggle). Top-right legend overlay shows kind colors + visible counts. Cluster config: `disableClusteringAtZoom: 18`, `maxClusterRadius: 50`, `spiderfyOnMaxZoom: true`. PoiTree gained two optional props: `onDataLoaded` (fires once after initial fetch) and `externalByKind` (snapshot override) — lets AdminLayout hoist the dataset and feed both panes from one shared fetch with one Basic Auth prompt. `leaflet.markercluster@1.5.3` + `@types/leaflet.markercluster` installed (2 packages added, NO new audit warnings — the 3 pre-existing high-severity transitives from S103 are unchanged). MarkerCluster CSS imported in `web/src/index.css`; `.admin-poi-marker` reset added to strip leaflet's default white divIcon background. `npx tsc --noEmit` clean. Side-task before code work: per user request, did a delta review of all OMEN notes (L001–L014) and directives (OMEN-002 through OMEN-011) against current project state — see live log for full table. Live demo via `bin/restart-proxy.sh` + `bin/start-web.sh` confirmed end-to-end: cache-proxy 4300 + vite dev 4302 + Basic Auth + 1,720 POI counts.
+
+### Decisions
+1. **Imperative cluster layer over `react-leaflet-markercluster`.** The wrapper is built for react-leaflet v4. We're on v5, which introduced internal API changes the wrapper hasn't caught up to. The official escape hatch is to use `useMap()` and drive the cluster group imperatively. ~30 lines of imperative code beats another upstream-lagging dependency, especially given the project already has 3 pre-existing high-severity audit warnings.
+2. **Color by KIND, not category.** The 22-category taxonomy belongs to the tree's grouping. On the map the operator needs at-a-glance "what kind is this" — and there are too many categories to color-distinguish meaningfully. Per-category coloring can be revisited in 9P.11 (highlight duplicates) if needed.
+3. **Single shared `byKind` dataset hoisted to AdminLayout.** Both the tree and the map need the same 1,720-row snapshot. Two fetches would mean two Basic Auth prompts (or a race) and double the network. Lifted state via PoiTree's new `onDataLoaded` callback + `externalByKind` prop. Drag-to-move patches the snapshot in place via `onPoiMoved`, and the tree re-renders off the new state without a re-fetch. This is the same pattern the edit dialog (9P.10) will use for save flows.
+4. **Selection highlight via single-marker recolor, not full cluster rebuild.** `markersByKeyRef` is a `Map<"kind:id", {marker, kind}>` that lets a separate `useEffect` touch only the previously- and currently-selected marker icons on selection change. Full cluster rebuild on every selection click would be ~1,700 marker allocations + cluster reflow per click.
+5. **Confirm modal is an overlay div, not a Leaflet popup.** Z-index 500, plain JSX. Easier to style with the rest of the admin tool's Tailwind palette, easier to show error messages inline, easier to manage focus and busy state. Leaflet popups would have fought all three.
+6. **Soft-deleted rows filtered from the map but kept in the tree.** Tree is the operator's hierarchical inventory (tombstones useful for restore decisions); map is the spatial workspace (tombstones add clutter).
+7. **`disableClusteringAtZoom: 18`** so the operator can drag individual POIs at deepest zoom without fighting cluster aggregation. **`maxClusterRadius: 50`** — half the leaflet default (80); at 1,720 POIs in downtown Salem the default produces too-large meta-clusters that hide merchant clumps.
+8. **Did NOT install `react-hook-form` or `@headlessui/react`** despite the master plan listing them — those are 9P.10 dependencies, not 9P.9 dependencies. Keeping the install scoped to what this step actually needs.
+9. **Defer click→edit dialog to 9P.10.** User asked at end of demo whether marker click could open the dialog. Currently the click sets `selectedPoi` but no dialog component exists. Offered a 5-10min read-only `PoiInspector` stub vs full Step 9P.10 work. User chose to defer entirely to next session as proper 9P.10. The selection-lifting hook is already in place — 9P.10 just renders against `selectedPoi`.
+
+### Files Changed
+- `web/src/admin/AdminMap.tsx` — NEW (~370 lines)
+- `web/src/admin/AdminLayout.tsx` — modified (lifted `byKind` + `selectedPoi` state, new `handleDataLoaded` and `handlePoiMoved` callbacks, replaced center-pane placeholder with `<AdminMap />`, header diagram comment block updated)
+- `web/src/admin/PoiTree.tsx` — modified (new optional props `onDataLoaded` + `externalByKind`, internal `effectiveByKind` threaded through render path, no behavior change for standalone usage)
+- `web/src/index.css` — added MarkerCluster CSS imports + `.admin-poi-marker` reset
+- `web/package.json` + `web/package-lock.json` — `leaflet.markercluster@^1.5.3` + types added
+- `WickedSalemWitchCityTour_MASTER_PLAN.md` — Step 9P.9 marked DONE with full notes; Stack additions section refreshed
+- `STATE.md` — Last Updated → S104; Phase 9P.B status row for 9P.9; TOP PRIORITY → Step 9P.10
+- `CLAUDE.md` — Project Status section refreshed: session count 76 → 104, "Phase 10 next" replaced with current 9P/9Q/9R structure
+- `SESSION-LOG.md` — this entry
+- `docs/session-logs/session-104-2026-04-08.md` — live conversation log
+- `~/.claude/.../memory/project_next_session_priority.md` — refreshed to point at Step 9P.10
+
+### Verification
+- `cd web && npx tsc --noEmit` → exit 0, zero diagnostics
+- Live demo confirmed end-to-end: counts = 45 + 861 + 814 = 1,720 (matches PG canonical from S101 9P.A.3); 401 challenge confirmed with `WWW-Authenticate: Basic realm="LocationMapApp Admin"`; user opened the page in browser
+- NOT browser-tested by Claude — drag-to-move and fly-to flows are unverified end-to-end. Type system says they're correct; first user smoke test of those flows happens next session
+
+### Side-task — OMEN assessment delta review
+User requested a review of all old OMEN assessments since "a lot has changed". Findings (full table in live log):
+- **Notes:** L001 done; L002 ⚠️ partial (history rotation pending); L003 deprioritized; **L004 ⚠️ unmet (deadline 2026-04-30)**; L005 stale premise (Phase 10 deferred behind 9P/9Q/9R); L006 evolving (PG canonical for POIs, Salem path stable); L007/L008/L010/L011 unchanged; L009 mostly met; L012 done; **L013 scope expanded** (VoiceTestActivity.kt also tracked now); L014 still owed
+- **Directives:** OMEN-002 partial; **OMEN-004 unmet (deadline 2026-04-30)**; OMEN-006/007 done; OMEN-008 Privacy Policy still owed; **OMEN-011 confirmed Salem stayed in `~/Development/Salem/`** so cross-project path is unchanged
+- Memory file `project_next_session_priority.md` was stale (still 9P.8); refreshed mid-session to 9P.10
+
+### What's next
+Phase 9P.B Step 9P.10 — POI edit dialog (tabbed modal). `react-hook-form` + `@headlessui/react` install, six tabs (General · Location · Hours & Contact · Narration · Provenance · Danger Zone), per-kind field whitelists copied from `cache-proxy/lib/admin-pois.js`, JSONB editors, PUT to `/admin/salem/pois/:kind/:id`, optimistic update via the same `byKind` patch pattern AdminLayout's `handlePoiMoved` already uses, dirty-tracking with warn-before-close. Memory pointer is current; AdminLayout's `selectedPoi` state is the open trigger.
+
+---
 
 ## Session 103: 2026-04-08 — Phase 9P.B Step 9P.8 (POI tree via react-arborist)
 

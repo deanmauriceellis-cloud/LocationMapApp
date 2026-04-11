@@ -2,27 +2,41 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-09 — Session 113 (POI Detail Sheet — full-screen dialog with hero + descriptions + tagged TTS read-through; hero regen deferred pending new SalemIntelligence sibling project)
+**Last updated:** 2026-04-10 — Session 114 (OMEN NOTE backlog cleared + POI taxonomy foundation Step 1 of 4-step arc — lookup tables seeded, FK scaffolding in place, plan doc written)
 
 ---
 
-## TOP PRIORITY — Next Session (S114)
+## TOP PRIORITY — Next Session (S115)
 
-**Admin tool hero image override chain.** Operator said in S113 Q2: next session priority, above the old 9P.11/9Q/9R plan. Concrete scope:
+**Operator queued at S114 close:** "go back to the android app and capture the latest logs and review a few issues I saw in testing." So S115 starts with an **Android debugging pass** before any taxonomy arc work resumes. Latest issues seen in field testing have not been captured yet — the first thing S115 does is `adb pull` the latest persistent log and have the operator walk through what they saw.
 
-1. **PG column:** add `hero_image_asset TEXT` to `salem_narration_points`, `salem_tour_pois`, and `salem_businesses`. Default NULL.
-2. **Admin tool UI:** file-upload + preview + assign widget in `web/src/admin/PoiEditDialog.tsx`. Two layers — merchant paid asset (top priority) and admin-assigned asset (fallback to hash-pinned pool, then to red placeholder).
-3. **Publish loop (mini):** a dedicated sync path that copies admin-assigned hero assets from PG-referenced storage into `app-salem/src/main/assets/poi-icons/_heroes/{poi_id}.png` at build time (or pre-build script). Room DB stays on the hash-pinned fallback until Phase 9P.C lands the full publish pipeline.
-4. **Android side:** `PoiHeroResolver.resolve()` now checks the new `heroImageAsset` column FIRST, then falls back to the existing category-folder hash-pinned pick, then to red. (Currently only the latter two.)
-5. **Red worklist query:** admin tool gets a "POIs missing hero" filter backed by the new column so operator can walk the list and assign.
+**After the Android debug pass, the taxonomy arc resumes — Step 2 of 4 (backfill + admin worklist).** Concrete scope from `docs/poi-taxonomy-plan.md`:
 
-**SalemIntelligence dependency:** the S113 plan to regenerate the 1,416-image character pool with a refined SD prompt is DEFERRED. Operator is building `~/Development/SalemIntelligence` as a separate product — a knowledgebase + LLM that generates per-business descriptions AND hero prompts. The regen pass is blocked until SalemIntelligence ships (~1 day of operator work). Until then, the hash-pinned pool + red placeholder is the correct intermediate state.
+1. **Normalization migration for `salem_narration_points.category`** — 814 rows, 29 lowercase legacy values (`shop` 119, `restaurant` 104, `services` 101, `attraction` 69, `venue` 62, `other` 60, etc.) need to be mapped to PoiLayerId form (`SHOPPING`, `FOOD_DRINK`, etc.). Straightforward mappings (`restaurant`/`cafe`/`bar`/`brewery` → `FOOD_DRINK`) are easy; the hard cases are the generic buckets (`services`, `venue`, `other`) which need per-row name/tag inspection. Dry-run to CSV first, then execute.
+2. **Heuristic subcategory assignment** from POI name/tags/description → `subcategory` FK to `salem_poi_subcategories`. High-confidence assignments go through; ambiguous rows stay NULL and surface in the admin worklist.
+3. **Same backfill for `salem_businesses`** — use `business_type` + `cuisine_type` + `name` + `tags` to seed `category` and `subcategory`.
+4. **"Needs Subcategory" admin worklist** in `web/src/admin/AdminLayout.tsx` + `PoiTree.tsx`. Filter backed by `WHERE subcategory IS NULL`.
+5. **Subcategory dropdown in `PoiEditDialog.tsx`** — reads from `salem_poi_subcategories` via new endpoint `GET /api/admin/salem/poi-subcategories?category_id=XXX`.
+6. **Add the deferred FK constraint** on `salem_narration_points.category` once the normalization is complete. This is S115's acceptance checkpoint — if the FK fails to add, backfill is not done.
 
-**After admin hero chain:** background research task to fill missing POI fields (phone/website/hours/booking URL). Operator S113: "run a background task locally to research all the new (and old POI's) that don't have advanced information."
+**Then S116: Phase 9P.C publish loop + Room schema migration + `PoiHeroResolver` rewrite.** See `docs/poi-taxonomy-plan.md` for full scope.
 
-**Phase 9P.B Step 9P.11 Highlight Duplicates** — still stated but DEMOTED per S113 operator direction "refinement loop supersedes." Carried S107 → S108 → S109 → S110 → S111 → S112 → S113 (7 sessions). Concrete scope still the same: wire `web/src/admin/AdminLayout.tsx:69-73` stub to `GET /api/admin/salem/pois/duplicates?radius=15`, red rings on AdminMap, click → side panel.
+**S114 shipped (foundation):**
+- `salem_poi_categories` (22 rows) + `salem_poi_subcategories` (175 rows) PG lookup tables, seeded from `poiCategories.ts` via `cache-proxy/scripts/sync-poi-taxonomy.js` (idempotent)
+- New nullable `category`/`subcategory` columns on `salem_businesses`
+- 3 FK constraints: `fk_salem_narration_subcategory`, `fk_salem_business_category`, `fk_salem_business_subcategory`
+- `docs/poi-taxonomy-plan.md` — multi-session plan doc with explicit scope decisions and S115/S116 handoff notes
 
-**Skip 9P.10a** (Linked Historical Content tab) until Phase 9Q has run.
+**Scope decisions locked in S114:**
+- `PoiCategories.kt` is THE canonical POI taxonomy; everything else must FK or mirror it.
+- `salem_businesses` and `salem_narration_points` stay as separate tables — operator direction "two distinct things." They share the category/subcategory spine only.
+- `salem_tour_pois` is OUT of the taxonomy arc entirely — its `category` column holds tour-chapter themes (`witch_trials`, `maritime`, `literary`, etc.), a different concept. Tour POIs stay on their own path.
+- FK-to-lookup-tables over CHECK constraints — more flexible, also serves as the admin tool's subcategory dropdown source.
+- Hero image regeneration **stays deferred behind SalemIntelligence.** The data plumbing arc proceeds independently.
+
+**Admin tool hero override chain (S113 TOP PRIORITY) — DEMOTED.** The taxonomy arc supersedes it. Once S116 lands (publish loop + `PoiHeroResolver` rewrite), the "admin overrides hero per POI" work becomes a simple additional column on `salem_narration_points`/`salem_businesses` that the new resolver checks first. It is no longer a separate TOP PRIORITY item — it's downstream of the taxonomy arc.
+
+**Phase 9P.B Step 9P.11 Highlight Duplicates** — still demoted, still the same concrete scope. 8 sessions carried.
 
 ---
 
@@ -33,21 +47,19 @@
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6 taxonomy, 9P.7 shell, 9P.8 tree, 9P.9 map, 9P.10 edit dialog, 9P.10b Salem Oracle. Pending: 9P.11 (demoted), 9P.13 publish wiring. 9P.10a blocked on 9Q. |
-| **9P.B+** Hero override chain | **NEXT (S114)** | PG `hero_image_asset` column, admin upload/assign UI, mini publish loop for hero assets, PoiHeroResolver priority check. Supersedes 9P.11 per S113 operator direction. |
-| **9P.C** Publish loop | not started | 9P.12-9P.14 |
+| **9P.B+** POI taxonomy alignment (1→4 arc) | **Step 1/4 COMPLETE (S114)** | S114: lookup tables + seed script + plan doc. S115: backfill + admin worklist. S116: publish loop + Room migration + PoiHeroResolver rewrite. Hero regen still deferred behind SalemIntelligence. |
+| **9P.C** Publish loop | not started | Folds into 9P.B+ Step 3 (S116). |
 | **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers |
 | **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9P+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | not started (operator building) | New sibling project at `~/Development/SalemIntelligence` — knowledgebase + LLM for per-business descriptions and hero SD prompts. Blocks the hero asset regen pass until it ships. |
 
-**Sessions completed:** 113 (last entries in `SESSION-LOG.md`). Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 114 (last entries in `SESSION-LOG.md`). Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
-## Carry-forward Items (NOT blocking the hero override chain)
-
-**S113 POI Detail Sheet recap:** S113 shipped a full-screen `DialogFragment` that opens on dock tap, map marker tap, OR narration banner tap. Hero strip (20% of screen, `fitXY` stretch, deterministic hash-pinned from `poi-icons/{category}/` pool or red `ASSIGN HERO` placeholder), overview row, Visit Website through existing in-app WebView, short/about/story sections from `shortNarration`/`description`/`longNarration`, synthesized action list (Call/Directions/Hours — not narrated). Tagged TTS read-through via new `speakTaggedHint` + `cancelSegmentsWithTag` on NarrationManager — reads only `name+type+address+phone+website-ack` + descriptions, drops stale segments at open AND close via prefix match, doesn't touch ambient queue. Three iterations in one session: initial Bottom sheet build → full-screen conversion + TTS trim → S112 highlight-ring tap-interception fix (polygons moved to overlay index 0 with null titles and non-consuming click listeners) + narration banner click wiring + verbose click logging at every entry point. 1 commit: `2826145`.
+## Carry-forward Items (NOT blocking the taxonomy arc)
 
 **Still pending (carry into S114+):**
 - **`DWELL_MS = 3_000L` dead code** in `NarrationGeofenceManager` — declared, never wired. Single jittery fixes can fire false-positive narration in dense areas. ~10 lines to fix with a per-POI fix-count gate.
@@ -67,11 +79,11 @@
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy drafting** (BLOCKING RadioIntelligence Salem ingest). Async writing work; can be drafted between admin-tool sessions.
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed** on this workstation. Surface in every session report until OMEN executes or retracts. **Seven sessions running.**
-3. **NOTE-L013 — debug `VoiceAuditionActivity.kt` cleanup** still pending (low priority).
+1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review before Salem radio-environment ingest goes live. No longer blocking from LocationMapApp's side — the ball is in OMEN's court.
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed** on this workstation. Surfaced again in S114. **Nine sessions running.** LocationMapApp has no unilateral remediation path that would not break valid references — needs OMEN to execute or retract.
+3. **NOTE-L013 — debug `VoiceAuditionActivity.kt` cleanup** — **CLEARED S114**. Untracked file deleted, empty parent dir removed. `VoiceTestActivity.kt` stays — it is actively wired to the Salem debug FAB.
 4. **OMEN-002 history rotation** — operator action only: `ALTER USER witchdoctor WITH PASSWORD '<new>';` + regenerate `OPENSKY_CLIENT_SECRET` via portal + replace test `ADMIN_PASS=salem-tour-9P3-test` in `cache-proxy/.env` with a real strong value before relying on admin auth in any non-test context.
-5. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, ~3 weeks).
+5. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, 20 days out).
 6. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
 7. **Cross-project dependency: SalemIntelligence** — new sibling project at `~/Development/SalemIntelligence` (operator building). Knowledgebase + LLM that generates per-business descriptions and custom SD prompts for POI and hero imagery. Blocks the LocationMapApp hero asset regen pass until it ships. Flag for OMEN's Shared Engine Registry.
 
