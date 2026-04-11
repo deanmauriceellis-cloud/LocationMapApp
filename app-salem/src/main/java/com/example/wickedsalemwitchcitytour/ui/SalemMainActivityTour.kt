@@ -1321,6 +1321,13 @@ internal fun SalemMainActivity.updateTourLocation(point: GeoPoint) {
     // gone — that view of the world is replaced by the queue snapshot view.
     updateNarrationUserPosition(point.latitude, point.longitude)
 
+    // S115: If heading-up rotation is enabled, apply the smoothed bearing to
+    // the map canvas. Must run AFTER updateNarrationUserPosition so that
+    // getLastMovementBearing() reflects this fix.
+    if (isHeadingUpMode()) {
+        applyHeadingUpRotation()
+    }
+
     // S110: Feed the same nearby list to the POI encounter tracker, which opens /
     // updates / closes "I got close to this POI" rows in user_data.db. The tracker
     // applies its own 100m proximity filter (narrower than the manager's 300m
@@ -1331,6 +1338,303 @@ internal fun SalemMainActivity.updateTourLocation(point: GeoPoint) {
     corridorManager?.checkPosition(point.latitude, point.longitude)?.forEach { trigger ->
         DebugLogger.i("SalemMainActivity", "Corridor triggered: ${trigger.corridor.name} (${trigger.distanceM.toInt()}m)")
     }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// S115: HEADING-UP MAP ROTATION
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// When enabled, the map canvas rotates so the user's direction of travel
+// points up on the screen. Source of truth is `lastMovementBearing` computed
+// in updateNarrationUserPosition from consecutive GPS fixes (≥ 1m moves).
+//
+// Three pieces of polish prevent visual swimming:
+//
+//   1. EMA smoothing. Each new bearing is blended with the previous smoothed
+//      value (weight SMOOTHING_ALPHA on the new sample). Handles angle wrap
+//      correctly — we blend unit vectors on the compass, not raw degrees, so
+//      a north-ish bearing jumping between 358° and 2° stays near 0°.
+//
+//   2. 5° hysteresis. Small changes under HYSTERESIS_DEG don't trigger a
+//      setMapOrientation call. The on-screen result is "rotation updates in
+//      perceptible steps, not every fix".
+//
+//   3. Stationary freeze. `lastMovementBearing` only updates when the user
+//      has moved ≥ 1m (BEARING_UPDATE_MIN_MOVE_M in the narration file). If
+//      the user is standing still, lastMovementBearing stays put and we
+//      re-apply the same rotation — no jitter while dwelling at the Witch
+//      House. The `isHeadingUpMode()` check gates the whole thing so North-up
+//      mode costs nothing per fix.
+
+/** S115: File-scope smoothed bearing in degrees. Null = no bearing applied yet. */
+private var smoothedHeadingDeg: Double? = null
+
+/** S115: Last rotation we actually called setMapOrientation with (for hysteresis).
+ *  Null until the first apply, or after a reset — the first apply after a reset
+ *  always lands regardless of delta. */
+private var lastAppliedRotationDeg: Float? = null
+
+/** S115: EMA weight on the newest bearing sample. Lower = smoother, slower to react.
+ *  This is the "walking" value — GPS bearing updates every few seconds and we
+ *  want to filter out individual fix noise without lagging real direction changes. */
+private const val HEADING_SMOOTHING_ALPHA = 0.25
+
+/** S115: EMA weight used when the device orientation tracker reports static mode.
+ *  Much heavier smoothing (~5x) absorbs magnetometer noise without sacrificing
+ *  responsiveness, because in static mode the tablet isn't rotating anyway —
+ *  every sample we get is either a real no-change or HAL noise, and we'd rather
+ *  average out the noise than track it. Used when tablet is sitting still
+ *  (on desk OR held perfectly motionless). */
+private const val HEADING_SMOOTHING_ALPHA_STATIC = 0.05
+
+/** S115: Reactive EMA weight used when the sensor is the source AND the
+ *  tracker is NOT in static mode (user is actively turning the tablet).
+ *  Each sample is intentional movement that deserves near-immediate response.
+ *  At 0.85 a single sample covers 85% of the gap, so a 90° flick closes in
+ *  one sample from 90° → ~14° — and the SNAP-on-static-entry transition
+ *  (see applyHeadingUpRotation) closes the remaining ~14° on the very next
+ *  sample once rotation stops. */
+private const val HEADING_SMOOTHING_ALPHA_REACTIVE = 0.85
+
+/** S115: Rotation changes under this many degrees are ignored (anti-jitter).
+ *  Walking / normal default. */
+private const val HEADING_HYSTERESIS_DEG = 5.0
+
+/** S115: Tighter hysteresis when the person is stationary and actively turning
+ *  the tablet. We want small deliberate rotations to land immediately, not get
+ *  held back by a 5° gate. */
+private const val HEADING_HYSTERESIS_DEG_REACTIVE = 2.0
+
+/**
+ * S115: Maximum age of the GPS-derived movement bearing before we fall back
+ * to the device orientation sensor. Below this the user is considered to be
+ * "actively walking" and their direction of travel is the source of truth.
+ * Above it the walker has stopped (or slowed enough that bearing is stale),
+ * and the tablet's physical orientation takes over so the map rotates as the
+ * user pans around to look at buildings.
+ *
+ * 3 seconds is chosen to be longer than a single GPS interval (5s worst case
+ * at walking speed) with a safety margin — we don't want to flap between
+ * sources on every fix.
+ */
+private const val STATIONARY_FALLBACK_MS: Long = 3_000L
+
+/**
+ * S115: Called from updateTourLocation on every GPS fix, AND from the
+ * DeviceOrientationTracker callback on every sensor update (rate-limited to
+ * ~4 Hz) when heading-up mode is on.
+ *
+ * ## Hybrid heading source
+ *
+ * Selects the best source each call:
+ *
+ *   - **GPS movement bearing** when it was updated within
+ *     [STATIONARY_FALLBACK_MS]. This is the "user is walking" branch —
+ *     direction of travel is the source of truth and is immune to magnetic
+ *     interference in downtown Salem's brick + wrought iron.
+ *
+ *   - **Device azimuth from the orientation sensor** when the GPS bearing
+ *     is stale. This is the "user has stopped at a POI and is turning to
+ *     look around" branch — the map rotates with the tablet so the
+ *     buildings on screen match the buildings in the user's sightline.
+ *
+ *   - **Stale GPS bearing as last-resort fallback** if the sensor path
+ *     has no reading yet (cold start, no sensor, etc.). Better than nothing.
+ *
+ * The chosen target is fed through the same EMA smoothing + 5° hysteresis
+ * that walk-only mode used. The crossfade between sources happens
+ * automatically — when we switch from GPS bearing to sensor, the EMA blends
+ * from the old smoothed value toward the new sensor value over ~5 samples
+ * (~1.25 seconds at the 250ms sensor apply rate). No explicit transition
+ * logic needed.
+ */
+internal fun SalemMainActivity.applyHeadingUpRotation() {
+    val moveBearing = getLastMovementBearing()
+    val moveBearingAgeMs = getLastMovementBearingAgeMs()
+    val sensorAzimuth = deviceOrientationTracker?.currentAzimuthDeg
+
+    // Source selection — fresh GPS > sensor > stale GPS > nothing.
+    val targetBearing: Double
+    val source: String
+    when {
+        moveBearing != null && moveBearingAgeMs < STATIONARY_FALLBACK_MS -> {
+            targetBearing = moveBearing
+            source = "GPS-moving"
+        }
+        sensorAzimuth != null -> {
+            targetBearing = sensorAzimuth
+            source = "SENSOR"
+        }
+        moveBearing != null -> {
+            targetBearing = moveBearing
+            source = "GPS-stale-fallback"
+        }
+        else -> {
+            DebugLogger.d(
+                "HEADING-UP",
+                "skip — no source (moveBearing=null, sensorAzimuth=null, " +
+                    "sensorAvailable=${deviceOrientationTracker?.hasSensor() == true})"
+            )
+            return
+        }
+    }
+
+    // S115: Adaptive smoothing. Three regimes, decided purely from the
+    // source and the sensor tracker's own "is the tablet rotating?" signal.
+    // The motion tracker (significant motion / walking detection) is NOT
+    // consulted here — it would incorrectly kick us out of the responsive
+    // regime every time the user picks the tablet up.
+    //
+    //   1. WALKING (source != SENSOR — GPS bearing is fresh)
+    //      → HEADING_SMOOTHING_ALPHA (0.25). Standard walking filter.
+    //
+    //   2. TABLET PHYSICALLY STILL (sensor source, 3+ consecutive samples
+    //      within 1.5°)
+    //      → HEADING_SMOOTHING_ALPHA_STATIC (0.05). Heavy smoothing
+    //        absorbs HAL noise on a static device. The tablet is sitting
+    //        on a desk or being held perfectly still.
+    //
+    //   3. TABLET ROTATING IN HAND (sensor source, static mode OFF —
+    //      sample deltas > 1.5° indicate real rotation)
+    //      → HEADING_SMOOTHING_ALPHA_REACTIVE (0.6). ~1-frame response.
+    //        The user is deliberately turning the tablet; every sample is
+    //        intentional motion and the map should catch up immediately.
+    //        Hysteresis also drops to 2° so small deliberate rotations
+    //        land instead of being gated.
+    val staticMode = deviceOrientationTracker?.isInStaticMode == true
+    val reactiveSensorMode = source == "SENSOR" && !staticMode
+
+    // S115: Smoothing regime. REACTIVE mode uses raw passthrough (no EMA)
+    // because at the 16 Hz sensor rate the map visibly tracks every sample,
+    // and the 2° hysteresis gate catches sub-noise wobble. Any EMA in this
+    // regime would just add latency. STATIC mode keeps the heavy α=0.05 to
+    // absorb HAL noise when the tablet is still. Walking stays at α=0.25.
+    val alpha = when {
+        source != "SENSOR" -> HEADING_SMOOTHING_ALPHA  // walking
+        staticMode -> HEADING_SMOOTHING_ALPHA_STATIC    // tablet still
+        else -> 1.0                                     // tablet rotating — passthrough
+    }
+    val effectiveHysteresis = if (reactiveSensorMode) {
+        HEADING_HYSTERESIS_DEG_REACTIVE
+    } else {
+        HEADING_HYSTERESIS_DEG
+    }
+
+    // S115: SNAP on static-mode entry. Less critical now that REACTIVE uses
+    // α=1.0 passthrough (smoothed is already at raw), but we still consume
+    // the flag so it doesn't leak to the next static transition.
+    val snapped = source == "SENSOR" && deviceOrientationTracker?.consumeJustEnteredStaticMode() == true
+    val smoothed = when {
+        snapped -> {
+            DebugLogger.i(
+                "HEADING-UP",
+                "SNAP on static entry — smoothed ${smoothedHeadingDeg?.toInt() ?: "null"}° → ${targetBearing.toInt()}°"
+            )
+            targetBearing
+        }
+        alpha >= 1.0 -> targetBearing  // passthrough, skip the blend math
+        else -> blendBearingDeg(smoothedHeadingDeg, targetBearing, alpha)
+    }
+    smoothedHeadingDeg = smoothed
+
+    val regimeTag = when {
+        source == "SENSOR" && staticMode -> "STATIC"
+        reactiveSensorMode -> "REACTIVE"
+        else -> ""
+    }
+    val targetRotation = (-smoothed).toFloat()
+    val previouslyApplied = lastAppliedRotationDeg
+    if (previouslyApplied != null) {
+        val delta = shortestAngleDeltaDeg(
+            previouslyApplied.toDouble(),
+            targetRotation.toDouble()
+        )
+        if (delta < effectiveHysteresis) {
+            DebugLogger.d(
+                "HEADING-UP",
+                "skip hysteresis — src=$source target=${targetRotation.toInt()}° " +
+                    "applied=${previouslyApplied.toInt()}° Δ=${"%.1f".format(delta)}° " +
+                    "(raw=${targetBearing.toInt()}°, smoothed=${smoothed.toInt()}°, gate=${effectiveHysteresis}°)"
+            )
+            return
+        }
+        DebugLogger.i(
+            "HEADING-UP",
+            "apply — src=$source rotation=${targetRotation.toInt()}° " +
+                "(raw=${targetBearing.toInt()}°, smoothed=${smoothed.toInt()}°, " +
+                "α=$alpha${if (regimeTag.isNotEmpty()) " $regimeTag" else ""}, " +
+                "Δ=${"%.1f".format(delta)}°, gate=${effectiveHysteresis}°, " +
+                "bearingAge=${if (moveBearingAgeMs == Long.MAX_VALUE) "never" else "${moveBearingAgeMs}ms"})"
+        )
+    } else {
+        DebugLogger.i(
+            "HEADING-UP",
+            "apply — src=$source rotation=${targetRotation.toInt()}° " +
+                "(raw=${targetBearing.toInt()}°, smoothed=${smoothed.toInt()}°, " +
+                "α=$alpha${if (regimeTag.isNotEmpty()) " $regimeTag" else ""}, FIRST APPLY, " +
+                "bearingAge=${if (moveBearingAgeMs == Long.MAX_VALUE) "never" else "${moveBearingAgeMs}ms"})"
+        )
+    }
+    lastAppliedRotationDeg = targetRotation
+    // S115: setMapOrientation already calls invalidate() internally — no
+    // need for a redundant second invalidate that doubles the redraw cost
+    // at 16 Hz sensor apply rate.
+    binding.mapView.setMapOrientation(targetRotation)
+}
+
+/**
+ * S115: Called from the heading-up toggle click handler to apply the current
+ * best-available heading immediately, so the user doesn't have to wait for
+ * the next GPS fix or sensor tick to see the map rotate. Delegates to the
+ * full hybrid source selector in [applyHeadingUpRotation] but bypasses
+ * hysteresis so the first rotation always lands.
+ */
+internal fun SalemMainActivity.applyHeadingUpRotationImmediate() {
+    // Reset the hysteresis reference so the first apply after toggle-on
+    // always commits, even if the target is within 5° of the previous
+    // (stale) value.
+    lastAppliedRotationDeg = null
+    applyHeadingUpRotation()
+}
+
+/**
+ * S115: Called from the heading-up toggle when the user turns it off. Snaps the
+ * map back to north-up and clears the smoothed state so the next ON press
+ * starts from a clean slate.
+ */
+internal fun SalemMainActivity.resetHeadingUpRotation() {
+    smoothedHeadingDeg = null
+    lastAppliedRotationDeg = null
+    binding.mapView.setMapOrientation(0f)
+    binding.mapView.invalidate()
+}
+
+/**
+ * Blend two compass bearings with exponential moving average, correctly
+ * handling angle wrap. Both inputs and the return are in degrees [0, 360).
+ *
+ * Implemented by averaging unit vectors on the (sin, cos) compass rather than
+ * raw degrees, which avoids the bug where a 358° → 2° transition averages to
+ * 180° if you do it naively.
+ */
+private fun blendBearingDeg(prev: Double?, new: Double, alpha: Double): Double {
+    if (prev == null) return new
+    val prevRad = Math.toRadians(prev)
+    val newRad = Math.toRadians(new)
+    val x = (1.0 - alpha) * kotlin.math.cos(prevRad) + alpha * kotlin.math.cos(newRad)
+    val y = (1.0 - alpha) * kotlin.math.sin(prevRad) + alpha * kotlin.math.sin(newRad)
+    val blended = Math.toDegrees(kotlin.math.atan2(y, x))
+    return (blended + 360.0) % 360.0
+}
+
+/**
+ * Smallest signed angular distance between two bearings in degrees, returned
+ * as an absolute value in [0, 180]. Used for the hysteresis check.
+ */
+private fun shortestAngleDeltaDeg(a: Double, b: Double): Double {
+    var diff = ((b - a + 540.0) % 360.0) - 180.0
+    if (diff < 0) diff = -diff
+    return diff
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

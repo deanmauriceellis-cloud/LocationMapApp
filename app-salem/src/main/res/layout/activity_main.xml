@@ -179,6 +179,22 @@
             android:clickable="true"
             android:focusable="true" />
 
+        <!-- S115: Heading-up / North-up map rotation toggle -->
+        <TextView
+            android:id="@+id/btnHeadingUp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/zoom_toggle_bg"
+            android:text="N\u2191"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Toggle heading-up map rotation" />
+
         <!-- Magnify toggle -->
         <FrameLayout
             android:id="@+id/zoomToggleBtn"

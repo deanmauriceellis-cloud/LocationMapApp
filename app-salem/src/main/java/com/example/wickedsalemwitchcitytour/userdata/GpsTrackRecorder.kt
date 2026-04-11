@@ -147,7 +147,18 @@ class GpsTrackRecorder @Inject constructor(
         /** Rolling retention window for the journey log. */
         private const val RETENTION_MS = 24 * 60 * 60 * 1000L
 
-        /** How often we attempt the rolling prune (one hour). */
-        private const val PRUNE_INTERVAL_MS = 60 * 60 * 1000L
+        /**
+         * How often we attempt the rolling prune.
+         *
+         * S115: Tightened from 1 hour → 5 minutes. The previous cadence meant
+         * the DB constantly held up to 60 minutes of aged-out rows, which
+         * surfaced in field testing as "GPS not being deleted after 24 hours"
+         * when the operator queried user_data.db directly and saw 500+ stale
+         * rows. The drawn polyline was always correct (getRecent24h uses a
+         * strict now-24h cutoff at query time), but the DB ground truth drifted.
+         * 5-minute cadence drops the drift to ~5 minutes. Prune is a single
+         * indexed DELETE; the overhead is negligible.
+         */
+        private const val PRUNE_INTERVAL_MS = 5 * 60 * 1000L
     }
 }

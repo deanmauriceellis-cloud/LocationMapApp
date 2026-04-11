@@ -305,6 +305,29 @@ class SalemMainActivity : AppCompatActivity() {
     internal var currentGpsIntervalMs: Long = 60_000L
     internal var lastGpsSpeedMph: Double? = null
 
+    /**
+     * S115: Device orientation tracker. Drives the heading-up map rotation
+     * fallback when GPS movement bearing is stale (user standing at a POI).
+     * Lazy-constructed in onCreate, started/stopped with the heading-up
+     * toggle and the activity lifecycle. See [DeviceOrientationTracker] for
+     * sensor selection details.
+     */
+    internal var deviceOrientationTracker:
+        com.example.wickedsalemwitchcitytour.util.DeviceOrientationTracker? = null
+
+    /** S115: Rate-limit the sensor-driven rotation applies to ~4 per second. */
+    internal var lastSensorRotationApplyMs: Long = 0L
+
+    /**
+     * S115: Motion tracker for GPS-jitter freeze. When the device hasn't
+     * seen significant motion for 5+ seconds (after a 10s warmup), the GPS
+     * observer suppresses visible-layer updates (marker position, trigger
+     * rings, journey polyline, bearing) so the tablet-on-desk case stops
+     * wiggling. See [MotionTracker] for details.
+     */
+    internal var motionTracker:
+        com.example.wickedsalemwitchcitytour.util.MotionTracker? = null
+
     /** Load METARs for the current visible map bounding box. */
     internal fun loadMetarsForVisibleArea() {
         val bb = binding.mapView.boundingBox
@@ -454,10 +477,74 @@ class SalemMainActivity : AppCompatActivity() {
             DebugLogger.i("SalemMainActivity", "Fresh start — narration history cleared (1h wait reset to 0)")
         }
 
+        // ── S115: Sensor inventory log — run once per process so we can see
+        //         what rotation / step / motion sensors the hardware reports. ──
+        logSensorInventory()
+
+        // ── S115: Device orientation tracker for heading-up fallback. ──
+        //   Uses TYPE_ROTATION_VECTOR (9-axis fused gyro+accel+mag) when
+        //   present, falls back to TYPE_GEOMAGNETIC_ROTATION_VECTOR.
+        //   Started/stopped below with the heading-up toggle and lifecycle.
+        deviceOrientationTracker = com.example.wickedsalemwitchcitytour.util.DeviceOrientationTracker(
+            context = applicationContext,
+            getDisplayRotation = {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay?.rotation ?: android.view.Surface.ROTATION_0
+            },
+            onUpdate = {
+                // S115: No rate limit on the sensor → rotation path. The
+                // 60ms rate limit was eating the intermediate samples
+                // during fast rotations (sensor fires every ~60ms, rate
+                // limit is also ~60ms, so exactly the samples that
+                // capture the mid-rotation arc were blocked). The result
+                // was a one-frame teleport at the end of each rotation.
+                // osmdroid's setMapOrientation handles 50+ Hz fine and
+                // coalesces redraws internally.
+                if (!isHeadingUpMode()) return@DeviceOrientationTracker
+                applyHeadingUpRotation()
+            },
+            getUserLocation = {
+                // S115: Return the current GPS fix (or null) so the tracker
+                // can apply magnetic declination correction for TRUE north.
+                val pt = lastGpsPoint
+                if (pt != null) Pair(pt.latitude, pt.longitude) else null
+            },
+            onAccuracyChanged = { accuracy ->
+                // S115: Surface calibration problems to the user. Only
+                // toast on the transition into LOW/UNRELIABLE, not on every
+                // event — `onAccuracyChanged` already dedupes repeated values.
+                when (accuracy) {
+                    android.hardware.SensorManager.SENSOR_STATUS_UNRELIABLE -> {
+                        Toast.makeText(
+                            this,
+                            "Compass unreliable — wave tablet in a figure-8 to calibrate",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    android.hardware.SensorManager.SENSOR_STATUS_ACCURACY_LOW -> {
+                        Toast.makeText(
+                            this,
+                            "Compass accuracy low — consider figure-8 calibration",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    // MEDIUM and HIGH are fine — no toast.
+                }
+            }
+        )
+
+        // ── S115: Motion tracker for GPS jitter freeze. Always on while
+        //         the activity is visible — lightweight trigger sensor,
+        //         effectively zero battery. ──
+        motionTracker = com.example.wickedsalemwitchcitytour.util.MotionTracker(
+            context = applicationContext
+        )
+
         // ── GPS Journey: prune stale data, init the polyline overlay, wire toggle ──
         gpsTrackRecorder.pruneStaleAtStartup()
         initGpsTrackOverlay()
         setupGpsToggleButton()
+        setupHeadingUpButton()
         // ── POI proximity tracker (S110): prune old encounters at startup ──
         poiEncounterTracker.pruneStaleAtStartup()
         observeViewModel()
@@ -572,11 +659,24 @@ class SalemMainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume(); binding.mapView.onResume()
         DebugHttpServer.endpoints = DebugEndpoints(this, viewModel, transitViewModel, aircraftViewModel, weatherViewModel, geofenceViewModel)
+        // S115: Resume the orientation tracker only if heading-up is currently
+        // ON. Otherwise leave it idle to save battery — the toggle handler
+        // will start it if the user flips the FAB while the activity is running.
+        if (isHeadingUpMode()) {
+            deviceOrientationTracker?.start()
+        }
+        // S115: Motion tracker always on while visible — it's a trigger
+        // sensor so it costs nothing until an event actually fires.
+        motionTracker?.start()
         DebugLogger.i("SalemMainActivity","onResume()")
     }
     override fun onPause() {
         super.onPause(); binding.mapView.onPause()
         DebugHttpServer.endpoints = null
+        // S115: Always stop sensor listeners when the activity is not
+        // visible. No cost to restart on the next onResume.
+        deviceOrientationTracker?.stop()
+        motionTracker?.stop()
         DebugLogger.i("SalemMainActivity","onPause()")
     }
     override fun onDestroy() {
@@ -594,6 +694,36 @@ class SalemMainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleDebugIntent(intent)
+    }
+
+    /**
+     * S115: With `configChanges="orientation|screenSize|..."` in the manifest,
+     * the Android system now routes rotation events to THIS method instead of
+     * destroying and recreating the activity. The activity instance survives,
+     * so the walk-sim coroutine keeps running, the FAB state stays in memory,
+     * and the viewModel's currentLocation stream keeps flowing into the map.
+     *
+     * As a side effect this also kills the S110 "10 activity recreates in 6
+     * minutes" lifecycle churn — the churn was almost certainly undeclared
+     * config changes bouncing the activity.
+     *
+     * All we need to do here is let the MapView know the window geometry has
+     * changed so it can re-layout. osmdroid's ConstraintLayout host already
+     * handles the measure/layout pass; this invalidate() is belt-and-braces.
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        DebugLogger.i(
+            "LIFECYCLE",
+            "onConfigurationChanged orientation=${
+                when (newConfig.orientation) {
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE -> "landscape"
+                    android.content.res.Configuration.ORIENTATION_PORTRAIT -> "portrait"
+                    else -> "other(${newConfig.orientation})"
+                }
+            } walkSimRunning=$walkSimRunning"
+        )
+        binding.mapView.invalidate()
     }
 
     /**
@@ -1038,6 +1168,30 @@ class SalemMainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * S115: Walk sim auto-dwell trigger radius. When the simulated walker
+     * comes within this distance of an un-dwelled narration POI, it pauses
+     * briefly and "faces" the POI (sets the movement bearing toward it) so
+     * the ENTRY narration has a moment to begin and heading-up rotates the
+     * map to show the POI ahead.
+     *
+     * 15m matches NEAR_ZONE_OVERRIDE_M in the narration file, so any POI
+     * triggering an auto-dwell has also bypassed the behind-user filter.
+     * Per-POI entry radii are 25-40m, so the walker always crosses INTO the
+     * entry zone (triggering the normal ENTRY narration) before hitting the
+     * 15m dwell trigger.
+     */
+    private val WALK_SIM_DWELL_TRIGGER_M: Double = 15.0
+
+    /**
+     * S115: Walk sim "look at the POI" pause duration. Short by design —
+     * just enough for the ENTRY narration to begin and the visual rotation
+     * to register before the walker continues. The room-test is about
+     * verifying coverage, not forcing dwell expansion — that's exercised
+     * by stopping in the field at a real POI.
+     */
+    private val WALK_SIM_DWELL_DURATION_MS: Long = 3_000L
+
     private fun startWalkSim() {
         // Walk sim follows downtown Salem street route (PEM → Essex → Common → Derby → back)
         val routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
@@ -1058,16 +1212,98 @@ class SalemMainActivity : AppCompatActivity() {
         walkSimJob = lifecycleScope.launch {
             val interpolated = interpolateWalkRoute(routePoints, 1.4f)
             DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
+
+            // S115: Auto-dwell setup. Load the full narration point set once
+            // at the start of the run so the per-step proximity check is a
+            // pure in-memory scan. Each POI can only trigger a dwell ONCE per
+            // walk sim session — `dwelledIds` tracks the set of already-used
+            // anchors so the simulator doesn't freeze at the same spot twice
+            // as it passes through the same cluster a second time.
+            val narrationPoints = try {
+                tourViewModel.loadNarrationPoints()
+            } catch (e: Exception) {
+                DebugLogger.e("WALK-SIM", "Failed to load narration points for auto-dwell", e)
+                emptyList()
+            }
+            val dwelledIds = HashSet<String>()
+            DebugLogger.i("WALK-SIM",
+                "Auto-dwell armed: ${narrationPoints.size} candidate POIs, " +
+                "trigger=${WALK_SIM_DWELL_TRIGGER_M.toInt()}m, " +
+                "hold=${WALK_SIM_DWELL_DURATION_MS / 1000}s")
+
+            var stepIdx = 0
             for (point in interpolated) {
                 if (walkSimJob?.isCancelled == true) break
                 viewModel.setManualLocation(point)
+                stepIdx++
+                if (stepIdx % 20 == 0) {
+                    DebugLogger.i(
+                        "WALK-SIM",
+                        "step $stepIdx/${interpolated.size} at ${"%.5f".format(point.latitude)},${"%.5f".format(point.longitude)}"
+                    )
+                }
                 kotlinx.coroutines.delay(1000L)
+
+                // S115: Check if this step crossed into a fresh POI's trigger
+                // zone. Pick the single closest un-dwelled candidate so we
+                // anchor at the most relevant one when a step crosses several
+                // overlapping radii at once.
+                var bestTrigger: com.example.wickedsalemwitchcitytour.content.model.NarrationPoint? = null
+                var bestDist: Double = WALK_SIM_DWELL_TRIGGER_M
+                for (np in narrationPoints) {
+                    if (np.id in dwelledIds) continue
+                    val d = com.example.wickedsalemwitchcitytour.tour.TourEngine.haversineM(
+                        point.latitude, point.longitude, np.lat, np.lng
+                    )
+                    if (d <= bestDist) {
+                        bestDist = d
+                        bestTrigger = np
+                    }
+                }
+                val trigger = bestTrigger
+                if (trigger != null) {
+                    dwelledIds.add(trigger.id)
+
+                    // S115: Compute bearing from the walker toward the POI
+                    // and install it as the movement bearing for the duration
+                    // of the pause. Heading-up rotation will rotate the map
+                    // so the POI is directly ahead; the near-zone escape
+                    // hatch is already past at <15m. After the pause, the
+                    // next real step re-establishes a natural bearing.
+                    val faceBearing = bearingToPoi(
+                        point.latitude, point.longitude,
+                        trigger.lat, trigger.lng
+                    )
+                    setMovementBearing(faceBearing)
+
+                    DebugLogger.i("WALK-SIM",
+                        "LOOK AT ${trigger.name} " +
+                        "(dist=${bestDist.toInt()}m bearing=${faceBearing.toInt()}°) — " +
+                        "pausing ${WALK_SIM_DWELL_DURATION_MS / 1000}s"
+                    )
+                    val dwellStart = System.currentTimeMillis()
+                    // Re-send the same fix during the short pause so
+                    // lastFixAtMs stays fresh (the S110 staleness gate has a
+                    // 30s threshold, so a 3s pause is safely under it).
+                    while (System.currentTimeMillis() - dwellStart < WALK_SIM_DWELL_DURATION_MS) {
+                        if (walkSimJob?.isCancelled == true) break
+                        viewModel.setManualLocation(point)
+                        kotlinx.coroutines.delay(1000L)
+                    }
+                    if (walkSimJob?.isCancelled != true) {
+                        DebugLogger.i("WALK-SIM",
+                            "RESUMING from ${trigger.name} (paused ${WALK_SIM_DWELL_DURATION_MS / 1000}s)"
+                        )
+                    }
+                }
             }
             // Walk complete
             if (walkSimJob?.isCancelled != true) {
                 walkSimRunning = false
                 binding.btnWalkSim.text = "Walk"
                 binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
+                DebugLogger.i("WALK-SIM",
+                    "Walk complete — ${dwelledIds.size} auto-dwell anchors triggered")
                 toast("Walk simulation complete")
             }
         }
@@ -1082,6 +1318,22 @@ class SalemMainActivity : AppCompatActivity() {
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
         DebugLogger.i("SalemMainActivity", "Walk sim stopped")
         toast("Walk stopped")
+    }
+
+    /**
+     * S115: Compute the forward bearing from (lat1, lng1) → (lat2, lng2) in
+     * degrees (0=N, 90=E). Used by the walk sim's auto-dwell to face the POI
+     * during its brief pause. Standard great-circle formula — no dependency
+     * on [com.example.wickedsalemwitchcitytour.tour.TourEngine].
+     */
+    private fun bearingToPoi(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val phi1 = Math.toRadians(lat1)
+        val phi2 = Math.toRadians(lat2)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val y = kotlin.math.sin(dLng) * kotlin.math.cos(phi2)
+        val x = kotlin.math.cos(phi1) * kotlin.math.sin(phi2) -
+                kotlin.math.sin(phi1) * kotlin.math.cos(phi2) * kotlin.math.cos(dLng)
+        return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
     }
 
     // =========================================================================
@@ -1444,6 +1696,72 @@ class SalemMainActivity : AppCompatActivity() {
     private val GPS_TRACK_TINT_ON  = Color.parseColor("#80FF80")  // soft green when visible
     private val GPS_TRACK_TINT_OFF = Color.parseColor("#888888")  // gray when hidden
 
+    /** S115: Heading-up (map-rotation) preference key. Lives in the same prefs file. */
+    private val HEADING_UP_PREF_KEY = "heading_up_enabled"
+
+    /**
+     * S115: Minimum gap between sensor-driven rotation applies, in ms. The
+     * rotation vector fires at ~16 Hz on this tablet (SENSOR_DELAY_UI).
+     *
+     * Originally 250ms (4 Hz) — felt chunky because a 1-second rotation
+     * only produced 4 discrete map updates. Dropped to 60ms (~16 Hz) to
+     * match the sensor rate: every sensor sample now drives a map update,
+     * so rotation tracking is frame-perfect smooth. osmdroid's
+     * setMapOrientation + internal invalidate handles 16 Hz easily.
+     */
+    private val SENSOR_ROTATION_APPLY_INTERVAL_MS: Long = 60L
+
+    /**
+     * S115: When the motion tracker says the device is stationary, GPS fixes
+     * within this radius of the last accepted point are treated as jitter and
+     * the visible layer is frozen. Fixes farther than this unfreeze — the
+     * motion tracker missed something or GPS actually drifted.
+     */
+    private val STATIONARY_FREEZE_RADIUS_M: Double = 25.0
+
+    /**
+     * S115: One-shot sensor inventory log. Runs once per process during
+     * onCreate so the field-test log leaves a record of exactly what the
+     * hardware exposes. Verified present on the Lenovo TB305FU via
+     * `adb shell dumpsys sensorservice`, but we also want this visible in
+     * the in-app log for future devices.
+     */
+    private fun logSensorInventory() {
+        try {
+            val sm = getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+                ?: run {
+                    DebugLogger.w("SENSORS", "SensorManager unavailable")
+                    return
+                }
+            val all = sm.getSensorList(android.hardware.Sensor.TYPE_ALL)
+            DebugLogger.i("SENSORS", "inventory — ${all.size} sensors")
+            // Focus the log on the sensors we care about for heading + motion.
+            val interesting = intArrayOf(
+                android.hardware.Sensor.TYPE_ROTATION_VECTOR,              // 11
+                android.hardware.Sensor.TYPE_GAME_ROTATION_VECTOR,         // 15
+                android.hardware.Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR,  // 20
+                android.hardware.Sensor.TYPE_GYROSCOPE,                    // 4
+                android.hardware.Sensor.TYPE_MAGNETIC_FIELD,               // 2
+                android.hardware.Sensor.TYPE_ACCELEROMETER,                // 1
+                android.hardware.Sensor.TYPE_STEP_DETECTOR,                // 18
+                android.hardware.Sensor.TYPE_STEP_COUNTER                  // 19
+            )
+            for (type in interesting) {
+                val sensor = sm.getDefaultSensor(type)
+                if (sensor != null) {
+                    DebugLogger.i(
+                        "SENSORS",
+                        "  ✓ type=$type (${sensor.stringType}) name='${sensor.name}' vendor='${sensor.vendor}'"
+                    )
+                } else {
+                    DebugLogger.i("SENSORS", "  ✗ type=$type — NOT PRESENT")
+                }
+            }
+        } catch (e: Exception) {
+            DebugLogger.e("SENSORS", "inventory failed: ${e.message}")
+        }
+    }
+
     /**
      * Creates the magenta journey polyline immediately (empty), adds it to the map
      * if the user preference says visible, then asynchronously seeds it with the
@@ -1530,6 +1848,64 @@ class SalemMainActivity : AppCompatActivity() {
             .edit()
             .putBoolean(GPS_TRACK_PREF_KEY, visible)
             .apply()
+    }
+
+    // ── S115: Heading-up map rotation ─────────────────────────────────────
+
+    internal fun isHeadingUpMode(): Boolean =
+        getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
+            .getBoolean(HEADING_UP_PREF_KEY, false)
+
+    private fun setHeadingUpMode(enabled: Boolean) {
+        getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(HEADING_UP_PREF_KEY, enabled)
+            .apply()
+    }
+
+    /**
+     * S115: Wire the "N↑" FAB that toggles heading-up map rotation. When
+     * enabled, the map canvas rotates so the user's current movement bearing
+     * points up; when disabled, the map snaps back to north-up. The rotation
+     * updates happen in [updateTourLocation] → [applyHeadingUpRotation] on
+     * every GPS fix with an EMA + 5° hysteresis to avoid jitter.
+     */
+    private fun setupHeadingUpButton() {
+        val btn = binding.btnHeadingUp
+        val refreshTint = {
+            btn.setTextColor(if (isHeadingUpMode()) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF)
+        }
+        refreshTint()
+        // S115: If heading-up is already ON from a previous session, start
+        // the sensor tracker now so the map can rotate on sensor updates as
+        // soon as the activity is visible, not only after the next GPS fix.
+        if (isHeadingUpMode()) {
+            deviceOrientationTracker?.start()
+        }
+        btn.setOnClickListener {
+            val newEnabled = !isHeadingUpMode()
+            setHeadingUpMode(newEnabled)
+            refreshTint()
+            if (!newEnabled) {
+                // Immediate snap back to north — don't make the user wait for the next fix.
+                resetHeadingUpRotation()
+                deviceOrientationTracker?.stop()  // S115: save battery when off
+            } else {
+                deviceOrientationTracker?.start()  // S115: start sensor fallback
+                // Apply current smoothed bearing immediately if we have one.
+                applyHeadingUpRotationImmediate()
+            }
+            Toast.makeText(
+                this,
+                if (newEnabled) "Heading up: ON" else "Heading up: OFF (north up)",
+                Toast.LENGTH_SHORT
+            ).show()
+            DebugLogger.i(
+                "SalemMainActivity",
+                "Heading-up toggled → ${if (newEnabled) "ON" else "OFF"} " +
+                    "(sensor available=${deviceOrientationTracker?.hasSensor() == true})"
+            )
+        }
     }
 
     // =========================================================================
@@ -1630,6 +2006,8 @@ class SalemMainActivity : AppCompatActivity() {
             //    Recording is independent of the dead-zone gate AND of the visibility
             //    toggle — we capture every fix the activity sees so the journey log
             //    has continuous data even when the visual marker is parked.
+            //    S115: DB recording happens unconditionally — ground truth stays
+            //    complete even when the stationary freeze suppresses visible updates.
             gpsTrackRecorder.recordFix(
                 lat = point.latitude,
                 lng = point.longitude,
@@ -1637,6 +2015,54 @@ class SalemMainActivity : AppCompatActivity() {
                 speedMps = update.speedMps,
                 bearingDeg = update.bearing
             )
+
+            // ── S115: Stationary freeze gate ──
+            //   When the motion tracker reports the device is physically still
+            //   (no significant-motion event for 5+ seconds after 10s warmup)
+            //   AND the new fix is within STATIONARY_FREEZE_RADIUS_M of the
+            //   last accepted point, freeze the visible layer:
+            //     - journey polyline: skip the point append
+            //     - user trigger rings: skip the position update
+            //     - marker position: skip (below, via the dead-zone path)
+            //     - bearing: skip (below, in updateNarrationUserPosition)
+            //
+            //   GPS data still flows to the DB (above) and to
+            //   updateTourLocation → narration geofences (below), so the
+            //   narration system keeps working. Only the visible-layer jitter
+            //   is suppressed.
+            //
+            //   Escape hatch: if the fix is > STATIONARY_FREEZE_RADIUS_M from
+            //   the last accepted point, we UNFREEZE regardless of motion
+            //   tracker state. Catches real GPS drift, teleport-after-pocket,
+            //   or any case where the motion sensor missed an event.
+            val stationaryFrozen = run {
+                val mt = motionTracker ?: return@run false
+                if (!mt.isStationary()) return@run false
+                val lastPt = lastGpsPoint ?: return@run false
+                val distFromLast = distanceBetween(lastPt, point)
+                if (distFromLast > STATIONARY_FREEZE_RADIUS_M) {
+                    DebugLogger.i(
+                        "STATIONARY",
+                        "escape hatch — fix ${"%.1f".format(distFromLast)}m from last " +
+                            "exceeds ${STATIONARY_FREEZE_RADIUS_M.toInt()}m, unfreezing"
+                    )
+                    return@run false
+                }
+                true
+            }
+
+            if (stationaryFrozen) {
+                DebugLogger.d(
+                    "STATIONARY",
+                    "freeze — ${motionTracker?.statusString()} — skipping visible updates"
+                )
+                // Status line still updates so the user sees fresh coords.
+                updateIdleStatusLine(point.latitude, point.longitude, speedMph)
+                // Narration still runs — geofences may still trigger if we're wrong.
+                updateTourLocation(point)
+                return@observe
+            }
+
             gpsTrackOverlay?.let { polyline ->
                 polyline.actualPoints.add(GeoPoint(point.latitude, point.longitude))
                 if (binding.mapView.overlays.contains(polyline)) {

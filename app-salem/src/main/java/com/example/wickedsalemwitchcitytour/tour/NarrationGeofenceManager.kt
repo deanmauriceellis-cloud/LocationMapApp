@@ -269,11 +269,17 @@ class NarrationGeofenceManager @Inject constructor(
      * S110: radius tightened to 15m (real GPS) / 25m (walk sim). See REACH_RADIUS_M
      * documentation. Caller must additionally gate this on GPS-fix freshness — the
      * manager has no notion of how stale `lastLat / lastLng` are.
+     *
+     * S115: Accepts an optional radius override from the caller. The dwell
+     * expansion logic in SalemMainActivityNarration passes progressively wider
+     * radii when the user is stationary and the tight-radius reach-out has
+     * been exhausted. When `overrideRadiusM` is null the original S110
+     * 15m/25m behavior applies.
      */
-    fun findNearestUnnarrated(): NearbyPoint? {
+    fun findNearestUnnarrated(overrideRadiusM: Double? = null): NearbyPoint? {
         if (lastLat == 0.0 && lastLng == 0.0) return null
 
-        val radius = if (walkSimMode) REACH_RADIUS_WALKSIM_M else REACH_RADIUS_M
+        val radius = overrideRadiusM ?: if (walkSimMode) REACH_RADIUS_WALKSIM_M else REACH_RADIUS_M
         val now = System.currentTimeMillis()
 
         val candidates = mutableListOf<NearbyPoint>()

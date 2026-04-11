@@ -75,6 +75,15 @@ private const val SUPER_HIGH_DENSITY_THRESHOLD = 3
  */
 private const val AHEAD_CONE_HALF_ANGLE_DEG = 90.0
 
+/**
+ * S115: Below this distance, the "ahead" filter is bypassed. At short range
+ * the user is essentially AT the POI and directional gating driven by noisy
+ * GPS bearings silently drops POIs the user is standing next to. See
+ * isPoiAhead for the failure mode and the field-test evidence that motivated
+ * this constant (Session 115 live log).
+ */
+private const val NEAR_ZONE_OVERRIDE_M = 15.0
+
 /** S112+: Minimum movement (meters) before we update the bearing. Below this
  *  the GPS jitter is too large to compute a reliable direction. */
 private const val BEARING_UPDATE_MIN_MOVE_M = 1.0
@@ -83,9 +92,93 @@ private const val BEARING_UPDATE_MIN_MOVE_M = 1.0
  *  Null until the first meaningful movement is observed. */
 private var lastMovementBearing: Double? = null
 
+/** S115: Wall-clock timestamp of the last [lastMovementBearing] update.
+ *  Used by the heading-up rotation to decide when to fall back from GPS
+ *  movement bearing to device azimuth (stationary → stale → sensor). */
+private var lastMovementBearingUpdateMs: Long = 0L
+
+/**
+ * S115: Cross-file accessor for [lastMovementBearing]. The heading-up map
+ * rotation in SalemMainActivityTour.kt reads this on every fix. Kept as a
+ * function (not a public var) so the narration file retains ownership of the
+ * write path — only updateNarrationUserPosition mutates the bearing.
+ */
+internal fun SalemMainActivity.getLastMovementBearing(): Double? = lastMovementBearing
+
+/**
+ * S115: Milliseconds since the last meaningful movement bearing update.
+ * Used by the hybrid heading source to fall back on the device orientation
+ * sensor when the GPS-derived bearing has gone stale (user is stationary).
+ * Returns Long.MAX_VALUE if no bearing has ever been set.
+ */
+internal fun SalemMainActivity.getLastMovementBearingAgeMs(): Long {
+    if (lastMovementBearingUpdateMs == 0L) return Long.MAX_VALUE
+    return System.currentTimeMillis() - lastMovementBearingUpdateMs
+}
+
+/**
+ * S115: Explicit bearing override, used by the walk sim to "face" a POI
+ * during its short dwell at each anchor. Without this, heading-up locks on
+ * the last real movement bearing (walker's direction of travel) and the
+ * POI the sim is pausing at may be sideways or behind. Setting the bearing
+ * to (walker → POI) lets the map rotate so the POI is directly ahead for
+ * the duration of the pause. Pass null to clear the override — normally
+ * the next real step through updateNarrationUserPosition re-establishes a
+ * natural bearing on its own.
+ */
+internal fun SalemMainActivity.setMovementBearing(degrees: Double?) {
+    lastMovementBearing = degrees
+}
+
 /** S112+: Previous user position used to compute movement bearing. */
 private var prevUserLat: Double = 0.0
 private var prevUserLng: Double = 0.0
+
+// ── S115: Dwell expansion for graduated reach-out at destinations ─────────
+//
+// Problem the operator saw at the Witch House: 112 POIs nearby, only the
+// handful within per-POI entry radii fired, then silence. The HD density
+// squeeze actively TIGHTENS the radius in dense clusters, which is wrong for
+// dwell scenarios (stand still at a destination → should hear the block).
+//
+// Fix: when the user stops and the reach-out at DWELL_RADIUS_TIGHT_M returns
+// nothing, progressively expand the reach-out radius up to DWELL_RADIUS_MAX_M.
+// Reset on meaningful movement away from the dwell anchor. Cap the number of
+// expanded reach-outs per dwell session so a dense-cluster stop doesn't run on
+// forever.
+//
+// This affects ONLY the silence reach-out path. Normal ENTRY events still
+// fire on their per-POI geofence radius — dwell expansion never replaces
+// the walk-through narration; it only fills the silence when the user
+// stops inside a cluster.
+
+/** S115: Starting reach-out radius for a fresh dwell (tighter than S110's 15m baseline). */
+private const val DWELL_RADIUS_TIGHT_M = 20.0
+
+/** S115: First expansion step. Triggered when tight returns nothing. */
+private const val DWELL_RADIUS_MEDIUM_M = 35.0
+
+/** S115: Second expansion step. Triggered when medium returns nothing. */
+private const val DWELL_RADIUS_WIDE_M = 60.0
+
+/** S115: Final expansion ceiling. Beyond this the system goes silent until the user moves. */
+private const val DWELL_RADIUS_MAX_M = 100.0
+
+/** S115: Distance from the dwell anchor that resets the expansion ladder. */
+private const val DWELL_RESET_DISTANCE_M = 15.0
+
+/** S115: Max POIs narrated via dwell expansion per single dwell session. */
+private const val DWELL_MAX_POIS_PER_SESSION = 6
+
+/** S115: Lat/lng of the anchor point where the current dwell session began. 0.0 = no active dwell. */
+private var dwellAnchorLat: Double = 0.0
+private var dwellAnchorLng: Double = 0.0
+
+/** S115: Current reach-out radius for the active dwell session. Starts tight, steps up. */
+private var dwellCurrentRadiusM: Double = DWELL_RADIUS_TIGHT_M
+
+/** S115: POIs narrated via dwell expansion in the current session. Resets on movement. */
+private var dwellPoisPlayed: Int = 0
 
 /**
  * S112: Glowing highlight ring drawn around the currently-narrated POI on the
@@ -215,15 +308,57 @@ internal fun SalemMainActivity.initNarrationSystem() {
                             return@collectLatest
                         }
 
-                        // Still empty — reach out to nearest un-narrated POI
-                        val nearest = narrationGeofenceManager.findNearestUnnarrated()
+                        // S115: Dwell expansion — if the dwell cap for this
+                        // session is reached, stop expanding and go quiet
+                        // until the user walks out of the anchor zone.
+                        if (dwellPoisPlayed >= DWELL_MAX_POIS_PER_SESSION) {
+                            DebugLogger.i(
+                                "NARR-STATE",
+                                "  REACH-OUT HELD: dwell cap reached " +
+                                    "($dwellPoisPlayed/$DWELL_MAX_POIS_PER_SESSION POIs this stop) — " +
+                                    "waiting for user to move"
+                            )
+                            clearNarrationHighlight()
+                            return@collectLatest
+                        }
+
+                        // S115: Try the current dwell radius first; if nothing,
+                        // step the radius up the DWELL ladder and retry until
+                        // we either find a POI or hit DWELL_RADIUS_MAX_M.
+                        var attemptRadius = dwellCurrentRadiusM
+                        var nearest = narrationGeofenceManager.findNearestUnnarrated(attemptRadius)
+                        while (nearest == null && attemptRadius < DWELL_RADIUS_MAX_M) {
+                            val nextRadius = when {
+                                attemptRadius < DWELL_RADIUS_MEDIUM_M -> DWELL_RADIUS_MEDIUM_M
+                                attemptRadius < DWELL_RADIUS_WIDE_M -> DWELL_RADIUS_WIDE_M
+                                else -> DWELL_RADIUS_MAX_M
+                            }
+                            DebugLogger.i(
+                                "NARR-DWELL",
+                                "EXPAND: ${attemptRadius.toInt()}m empty → trying ${nextRadius.toInt()}m"
+                            )
+                            attemptRadius = nextRadius
+                            nearest = narrationGeofenceManager.findNearestUnnarrated(attemptRadius)
+                        }
+
                         if (nearest != null) {
-                            DebugLogger.i("NARR-STATE",
-                                "  REACH-OUT: ${nearest.point.name} (${nearest.distanceM.toInt()}m) gpsAge=${ageMs}ms")
+                            dwellCurrentRadiusM = attemptRadius
+                            dwellPoisPlayed++
+                            DebugLogger.i(
+                                "NARR-STATE",
+                                "  REACH-OUT: ${nearest.point.name} " +
+                                    "(${nearest.distanceM.toInt()}m) " +
+                                    "dwellRadius=${attemptRadius.toInt()}m " +
+                                    "dwellPlayed=$dwellPoisPlayed/$DWELL_MAX_POIS_PER_SESSION " +
+                                    "gpsAge=${ageMs}ms"
+                            )
                             narrationGeofenceManager.triggerReachOut(nearest)
                         } else {
-                            DebugLogger.i("NARR-STATE",
-                                "  Nothing within 15m reach-out radius (gpsAge=${ageMs}ms)")
+                            DebugLogger.i(
+                                "NARR-STATE",
+                                "  Nothing within ${DWELL_RADIUS_MAX_M.toInt()}m reach-out radius " +
+                                    "(gpsAge=${ageMs}ms, dwellPlayed=$dwellPoisPlayed)"
+                            )
                             clearNarrationHighlight()  // S112+: nothing more coming → no ring
                         }
                     }
@@ -242,17 +377,85 @@ internal fun SalemMainActivity.initNarrationSystem() {
  * S112+: Also computes the movement bearing from the prev → current
  * positions when the move is large enough to be meaningful (>= 1m). The
  * bearing drives the "ahead-only" filter at dequeue time.
+ *
+ * S115: Also maintains the dwell expansion anchor. If the user moves further
+ * than DWELL_RESET_DISTANCE_M from the current anchor, the anchor is reset
+ * to the new position and the reach-out radius / POI counter drop back to
+ * their tight defaults. A cold start (lastUserLat == 0.0) seeds the anchor
+ * at the first fix.
  */
 internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Double) {
-    // Update movement bearing if we have a meaningful step
-    if (lastUserLat != 0.0 || lastUserLng != 0.0) {
+    // S115: Stationary freeze — if the motion tracker says the device is
+    // physically still, skip the bearing update entirely. GPS jitter that
+    // moves the reading 1-5m would otherwise thrash lastMovementBearing
+    // between random values and make heading-up rotation spin while the
+    // tablet sits on a desk. By not updating here, the bearing goes stale
+    // (age > 3s), and the heading-up logic's hybrid source selector falls
+    // back to the device orientation sensor — which DOES know the tablet
+    // is still and reports a constant azimuth.
+    val stationary = motionTracker?.isStationary() == true
+
+    // Update movement bearing if we have a meaningful step AND we're not
+    // in stationary freeze mode.
+    if (!stationary && (lastUserLat != 0.0 || lastUserLng != 0.0)) {
         val moved = haversineM(lastUserLat, lastUserLng, lat, lng)
         if (moved >= BEARING_UPDATE_MIN_MOVE_M) {
-            lastMovementBearing = bearingDeg(lastUserLat, lastUserLng, lat, lng)
+            val prevBearing = lastMovementBearing
+            val newBearing = bearingDeg(lastUserLat, lastUserLng, lat, lng)
+            lastMovementBearing = newBearing
+            lastMovementBearingUpdateMs = System.currentTimeMillis()
             prevUserLat = lastUserLat
             prevUserLng = lastUserLng
+            DebugLogger.d(
+                "BEARING",
+                "moved=${"%.1f".format(moved)}m " +
+                    "bearing=${newBearing.toInt()}° " +
+                    (if (prevBearing != null) "(prev=${prevBearing.toInt()}°, Δ=${((newBearing - prevBearing + 540) % 360 - 180).toInt()}°)" else "(first)")
+            )
+        } else {
+            DebugLogger.d("BEARING", "still — moved=${"%.2f".format(moved)}m (under ${BEARING_UPDATE_MIN_MOVE_M}m threshold)")
+        }
+    } else if (stationary) {
+        DebugLogger.d(
+            "BEARING",
+            "frozen — motion tracker says stationary, bearing update suppressed"
+        )
+    }
+
+    // S115: Dwell anchor maintenance. First fix seeds the anchor. Subsequent
+    // fixes reset it if the user has walked beyond DWELL_RESET_DISTANCE_M.
+    if (dwellAnchorLat == 0.0 && dwellAnchorLng == 0.0) {
+        dwellAnchorLat = lat
+        dwellAnchorLng = lng
+        dwellCurrentRadiusM = DWELL_RADIUS_TIGHT_M
+        dwellPoisPlayed = 0
+        DebugLogger.i(
+            "NARR-DWELL",
+            "ANCHOR SEED — first fix at ${"%.5f".format(lat)},${"%.5f".format(lng)}"
+        )
+    } else {
+        val distFromAnchor = haversineM(dwellAnchorLat, dwellAnchorLng, lat, lng)
+        if (distFromAnchor >= DWELL_RESET_DISTANCE_M) {
+            if (dwellPoisPlayed > 0 || dwellCurrentRadiusM > DWELL_RADIUS_TIGHT_M) {
+                DebugLogger.i(
+                    "NARR-DWELL",
+                    "RESET: user moved ${distFromAnchor.toInt()}m from anchor — " +
+                        "reset radius ${dwellCurrentRadiusM.toInt()}m → ${DWELL_RADIUS_TIGHT_M.toInt()}m, " +
+                        "played=$dwellPoisPlayed → 0"
+                )
+            } else {
+                DebugLogger.d(
+                    "NARR-DWELL",
+                    "anchor advance — moved ${distFromAnchor.toInt()}m, no state to reset"
+                )
+            }
+            dwellAnchorLat = lat
+            dwellAnchorLng = lng
+            dwellCurrentRadiusM = DWELL_RADIUS_TIGHT_M
+            dwellPoisPlayed = 0
         }
     }
+
     lastUserLat = lat
     lastUserLng = lng
     refreshProximityDockFromQueue()
@@ -289,8 +492,17 @@ private fun angleDiffDeg(a: Double, b: Double): Double {
  * from user → POI is within the AHEAD_CONE_HALF_ANGLE_DEG cone of the user's
  * current movement direction. If we don't have a movement bearing yet (cold
  * start, stationary forever), all POIs pass.
+ *
+ * S115: Near-zone escape hatch. If the POI is within NEAR_ZONE_OVERRIDE_M of
+ * the user, the ahead filter is skipped. At short distance the user is
+ * effectively AT the POI and directional gating becomes noise driven by GPS
+ * jitter when the user slows or stops. Field testing showed ChezCasa at 9m,
+ * Historic Salem, Inc. at 18m, and several others dropped as "behind user"
+ * when the user was standing right next to them.
  */
 private fun isPoiAhead(poiLat: Double, poiLng: Double): Boolean {
+    val distM = haversineM(lastUserLat, lastUserLng, poiLat, poiLng)
+    if (distM <= NEAR_ZONE_OVERRIDE_M) return true
     val moveBearing = lastMovementBearing ?: return true
     val poiBearing = bearingDeg(lastUserLat, lastUserLng, poiLat, poiLng)
     return angleDiffDeg(poiBearing, moveBearing) <= AHEAD_CONE_HALF_ANGLE_DEG

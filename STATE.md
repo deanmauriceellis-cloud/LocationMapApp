@@ -2,13 +2,27 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-10 — Session 114 (OMEN NOTE backlog cleared + POI taxonomy foundation Step 1 of 4-step arc — lookup tables seeded, FK scaffolding in place, plan doc written)
+**Last updated:** 2026-04-10 — Session 115 (Android debug + tour polish — 18 fixes shipped, heading-up rotation smoothness not yet solved, root cause identified for S116)
 
 ---
 
-## TOP PRIORITY — Next Session (S115)
+## TOP PRIORITY — Next Session (S116)
 
-**Operator queued at S114 close:** "go back to the android app and capture the latest logs and review a few issues I saw in testing." So S115 starts with an **Android debugging pass** before any taxonomy arc work resumes. Latest issues seen in field testing have not been captured yet — the first thing S115 does is `adb pull` the latest persistent log and have the operator walk through what they saw.
+**Finish the heading-up rotation smoothness work from S115.** All other S115 fixes shipped and validated. The one remaining problem: heading-up rotation feels unsmooth and latent when the user physically turns the tablet.
+
+**Root cause identified in S115:** the Lenovo TB305FU's MTK HAL delivers `TYPE_ROTATION_VECTOR` at **~100 Hz** via `SENSOR_DELAY_UI` (not the documented 60ms / 16 Hz). My apply-loop runs on the main thread and does — per sample — sensor math, `GeomagneticField` lookup, static-mode detection, two DEBUG log writes (ring buffer + logcat + file sink), source selection, EMA blend, hysteresis check, and `setMapOrientation` + internal invalidate. **At 100 Hz on the main thread, it saturates the UI thread** and the HAL starts coalescing sensor samples, which drains the very data stream we need for smooth tracking.
+
+**S116 plan (ordered, try in sequence):**
+
+1. **Cut log chatter at the hot path.** Remove `ORIENT-RAW` DEBUG trace. Remove `HEADING-UP: skip hysteresis` DEBUG trace. Only log at INFO on real state transitions. This alone drops ~200 log writes per second from the main thread and may solve it.
+2. **Rate limit the apply path to ~33ms (30 Hz).** Rate-limit ONLY the apply, not the tracker's receive path — static mode detection needs all 100 samples.
+3. **Move sensor processing to a background `HandlerThread`.** `registerListener(handler)` can point at a background looper. Only the `setMapOrientation` hop goes back to the main thread.
+4. **Switch static-mode detection from sample count to wall-clock.** 3 samples at 10ms = 30ms is way too fast. Use "no movement for 100-200ms" instead.
+5. **Optional: request `SENSOR_DELAY_GAME` (20ms)** explicitly to get a known rate across devices.
+
+**DO NOT remove in the next pass:** the SNAP, hybrid source, declination correction, configChanges fix, MotionTracker stationary freeze, dwell expansion, walk sim auto-dwell — all of those are correct. Only the apply-loop hot path needs rework.
+
+After heading-up is smooth, return to the **POI taxonomy arc Step 2 of 4** (backfill + admin worklist) — still the TOP PRIORITY from a roadmap perspective. See `docs/poi-taxonomy-plan.md` for scope. Then S117: publish loop + Room migration + `PoiHeroResolver` rewrite.
 
 **After the Android debug pass, the taxonomy arc resumes — Step 2 of 4 (backfill + admin worklist).** Concrete scope from `docs/poi-taxonomy-plan.md`:
 
@@ -21,7 +35,23 @@
 
 **Then S116: Phase 9P.C publish loop + Room schema migration + `PoiHeroResolver` rewrite.** See `docs/poi-taxonomy-plan.md` for full scope.
 
-**S114 shipped (foundation):**
+**S115 shipped (Android debug + tour polish — 18 fixes):**
+- **GPS hygiene:** `PRUNE_INTERVAL_MS` 1h → 5min in `GpsTrackRecorder.kt`
+- **Narration:** `isPoiAhead` near-zone escape hatch (≤15m bypasses behind-user filter); dwell expansion ladder (20→35→60→100m, cap 6) for "standing at Witch House" case
+- **Heading-up FAB (`N↑`):** new button in `activity_main.xml`, pref-backed, with map rotation via `setMapOrientation`
+- **Walk sim auto-dwell:** 15m trigger, 3s "face POI" pause (new `setMovementBearing` cross-file setter + `bearingToPoi` helper)
+- **Lifecycle fix:** `android:configChanges` on Salem activity + `onConfigurationChanged` override. Survives rotation without destroying the activity. **Also kills the S110 lifecycle churn** that was on the carry-forward list for 6+ sessions.
+- **Hybrid heading source:** new `DeviceOrientationTracker` class (~190 lines) listening to `TYPE_ROTATION_VECTOR` with display-rotation remap, GeomagneticField declination correction (true north), static-mode detection, accuracy toasts on LOW/UNRELIABLE
+- **Stationary freeze:** new `MotionTracker` class (~180 lines) using `TYPE_SIGNIFICANT_MOTION` to freeze GPS jitter (polyline/rings/marker/bearing) when tablet is physically still; 25m escape hatch for real drift
+- **Sensor inventory log:** runs once at `onCreate`, enumerates 8 heading-relevant sensors as `✓`/`✗` with vendor
+- **Verbose logging:** `HEADING-UP`, `BEARING`, `NARR-DWELL`, `WALK-SIM`, `ORIENT-RAW`, `SENSORS`, `DEVICE-ORIENT`, `MOTION`, `STATIONARY` tags for post-mortem grep
+
+**Lenovo TB305FU sensor inventory confirmed:** rotation vector (MTK, 9-axis fused), game rotation vector, geomagnetic rotation vector, accelerometer, step detector, step counter, significant motion — all present. Raw gyro and magnetometer not exposed as discrete sensors but HAL uses them internally (`gyro-rate=200Hz` in dumpsys).
+
+**What's NOT yet working (S116 priority):**
+- Heading-up rotation smoothness during physical tablet rotation. Root cause: 100 Hz sensor + main-thread saturation from log writes + per-sample apply. Plan documented in TOP PRIORITY section above.
+
+**S114 shipped (foundation — still the roadmap priority after heading-up):**
 - `salem_poi_categories` (22 rows) + `salem_poi_subcategories` (175 rows) PG lookup tables, seeded from `poiCategories.ts` via `cache-proxy/scripts/sync-poi-taxonomy.js` (idempotent)
 - New nullable `category`/`subcategory` columns on `salem_businesses`
 - 3 FK constraints: `fk_salem_narration_subcategory`, `fk_salem_business_category`, `fk_salem_business_subcategory`
@@ -61,10 +91,11 @@
 
 ## Carry-forward Items (NOT blocking the taxonomy arc)
 
-**Still pending (carry into S114+):**
+**Still pending (carry into S116+):**
+- **Heading-up rotation smoothness** — root cause identified in S115 (100 Hz sensor + main-thread saturation). Plan: cut log chatter, rate-limit apply, move sensor processing to background HandlerThread, switch static detection to wall-clock. See TOP PRIORITY.
 - **`DWELL_MS = 3_000L` dead code** in `NarrationGeofenceManager` — declared, never wired. Single jittery fixes can fire false-positive narration in dense areas. ~10 lines to fix with a per-POI fix-count gate.
 - **GPS journey line backgrounding bug** — `viewModel.currentLocation.observe(this)` is bound to the activity's STARTED lifecycle, so the recorder stops receiving fixes when the activity goes to onPause/onStop (screen off, app backgrounded). Diagnosed in S112; fix options proposed: (a) singleton recorder rewire ~30 lines, (b) foreground service ~150 lines. Not chosen, not implemented.
-- **18:09-18:15 lifecycle churn** (S110 known issue) — 10 activity recreates with `changingConfig=true` in 6 minutes. Trigger still unknown.
+- ~~**18:09-18:15 lifecycle churn** (S110 known issue)~~ — **FIXED in S115 via `android:configChanges`** on the Salem activity. Rotation no longer destroys the activity, and with it the mysterious 10-recreates-in-6-min churn should stop.
 - **DB wipe across APK reinstalls** — `fallbackToDestructiveMigration` on `UserDataDatabase` wipes user_data.db on schema upgrade. Pre-existing S110 design choice; should be replaced with real Room migrations before Play Store.
 - **walkSimMode flag still has gap-timing differences** — `gapMs = if (walkSimRunning) 500L else 2000L` and `silenceMs = if (walkSimRunning) 500L else 5000L` in `SalemMainActivityNarration.kt`. S112 removed the 3× radius inflation but left these gap timings alone. Revisit if walk-sim should be 100% indistinguishable from real GPS.
 - **Bearing filter cone is 90°** (front half-circle) — operator may want to tighten to 60° or 45° if "ahead" is too loose. `AHEAD_CONE_HALF_ANGLE_DEG` constant in `SalemMainActivityNarration.kt`.
@@ -80,7 +111,7 @@
 ## OMEN Open Items
 
 1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review before Salem radio-environment ingest goes live. No longer blocking from LocationMapApp's side — the ball is in OMEN's court.
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed** on this workstation. Surfaced again in S114. **Nine sessions running.** LocationMapApp has no unilateral remediation path that would not break valid references — needs OMEN to execute or retract.
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed** on this workstation. Surfaced again in S115. **Ten sessions running.** LocationMapApp has no unilateral remediation path that would not break valid references — needs OMEN to execute or retract.
 3. **NOTE-L013 — debug `VoiceAuditionActivity.kt` cleanup** — **CLEARED S114**. Untracked file deleted, empty parent dir removed. `VoiceTestActivity.kt` stays — it is actively wired to the Salem debug FAB.
 4. **OMEN-002 history rotation** — operator action only: `ALTER USER witchdoctor WITH PASSWORD '<new>';` + regenerate `OPENSKY_CLIENT_SECRET` via portal + replace test `ADMIN_PASS=salem-tour-9P3-test` in `cache-proxy/.env` with a real strong value before relying on admin auth in any non-test context.
 5. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, 20 days out).
