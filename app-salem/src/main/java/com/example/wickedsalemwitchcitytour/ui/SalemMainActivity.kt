@@ -230,6 +230,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     // Silent background POI fill — single center search on startup / position change
     internal var silentFillJob: Job? = null
+    internal var narrationMarkerJob: Job? = null
     internal var silentFillRunnable: Runnable? = null
 
     // Idle auto-populate — full scanner triggered after 10 min of GPS stationarity
@@ -1034,6 +1035,10 @@ class SalemMainActivity : AppCompatActivity() {
                     if (populateJob == null) scheduleWebcamReload()
                     scheduleGeofenceReload()
                 }
+                // S118: Also refresh narration icons on scroll — the zoom might
+                // not have changed but we may have panned into Salem where
+                // markers with stale 8px icons need upgrading to labeled dots.
+                refreshNarrationIcons()
                 // Debounce: load cached POIs for visible bbox 500ms after scrolling stops
                 cachePoiJob?.cancel()
                 cachePoiJob = lifecycleScope.launch {
@@ -1186,11 +1191,17 @@ class SalemMainActivity : AppCompatActivity() {
     /**
      * S115: Walk sim "look at the POI" pause duration. Short by design —
      * just enough for the ENTRY narration to begin and the visual rotation
-     * to register before the walker continues. The room-test is about
-     * verifying coverage, not forcing dwell expansion — that's exercised
-     * by stopping in the field at a real POI.
+     * to register before the walker continues.
      */
     private val WALK_SIM_DWELL_DURATION_MS: Long = 3_000L
+
+    /**
+     * S118: Minimum time between walk-sim dwell pauses. In dense downtown
+     * Salem the walker passes a POI every few seconds — pausing 3s at each
+     * one makes the walk grind to a halt. Rate-limit to one pause per 30s
+     * so the walker flows smoothly with occasional "look at" moments.
+     */
+    private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 30_000L
 
     private fun startWalkSim() {
         // Walk sim follows downtown Salem street route (PEM → Essex → Common → Derby → back)
@@ -1226,16 +1237,25 @@ class SalemMainActivity : AppCompatActivity() {
                 emptyList()
             }
             val dwelledIds = HashSet<String>()
+            var lastDwellTime = 0L  // S118: rate-limit dwells to one per 30s
             DebugLogger.i("WALK-SIM",
                 "Auto-dwell armed: ${narrationPoints.size} candidate POIs, " +
                 "trigger=${WALK_SIM_DWELL_TRIGGER_M.toInt()}m, " +
-                "hold=${WALK_SIM_DWELL_DURATION_MS / 1000}s")
+                "hold=${WALK_SIM_DWELL_DURATION_MS / 1000}s, " +
+                "cooldown=${WALK_SIM_DWELL_COOLDOWN_MS / 1000}s")
 
             var stepIdx = 0
             for (point in interpolated) {
                 if (walkSimJob?.isCancelled == true) break
                 viewModel.setManualLocation(point)
                 stepIdx++
+                // S118: After the first step positions the map in Salem,
+                // reload narration markers so icons match the current zoom
+                // (they were generated at startup zoom which may differ).
+                if (stepIdx == 1) {
+                    kotlinx.coroutines.delay(200)  // let map settle
+                    loadNarrationPointMarkers()
+                }
                 if (stepIdx % 20 == 0) {
                     DebugLogger.i(
                         "WALK-SIM",
@@ -1244,16 +1264,20 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 kotlinx.coroutines.delay(1000L)
 
-                // S115: Check if this step crossed into a fresh POI's trigger
-                // zone. Pick the single closest un-dwelled candidate so we
-                // anchor at the most relevant one when a step crosses several
-                // overlapping radii at once.
+                // S118: Fast proximity check — degree-based bounding box pre-filter
+                // avoids 817 haversine calls per step. ~0.00015° ≈ 15m at Salem's latitude.
+                val degThreshold = 0.00018 // slightly generous to catch edge cases
+                val pLat = point.latitude
+                val pLng = point.longitude
                 var bestTrigger: com.example.wickedsalemwitchcitytour.content.model.NarrationPoint? = null
                 var bestDist: Double = WALK_SIM_DWELL_TRIGGER_M
                 for (np in narrationPoints) {
                     if (np.id in dwelledIds) continue
+                    // Cheap degree check first — skip POIs clearly out of range
+                    if (kotlin.math.abs(np.lat - pLat) > degThreshold ||
+                        kotlin.math.abs(np.lng - pLng) > degThreshold) continue
                     val d = com.example.wickedsalemwitchcitytour.tour.TourEngine.haversineM(
-                        point.latitude, point.longitude, np.lat, np.lng
+                        pLat, pLng, np.lat, np.lng
                     )
                     if (d <= bestDist) {
                         bestDist = d
@@ -1263,37 +1287,40 @@ class SalemMainActivity : AppCompatActivity() {
                 val trigger = bestTrigger
                 if (trigger != null) {
                     dwelledIds.add(trigger.id)
+                    val now = System.currentTimeMillis()
 
-                    // S115: Compute bearing from the walker toward the POI
-                    // and install it as the movement bearing for the duration
-                    // of the pause. Heading-up rotation will rotate the map
-                    // so the POI is directly ahead; the near-zone escape
-                    // hatch is already past at <15m. After the pause, the
-                    // next real step re-establishes a natural bearing.
-                    val faceBearing = bearingToPoi(
-                        point.latitude, point.longitude,
-                        trigger.lat, trigger.lng
-                    )
-                    setMovementBearing(faceBearing)
-
-                    DebugLogger.i("WALK-SIM",
-                        "LOOK AT ${trigger.name} " +
-                        "(dist=${bestDist.toInt()}m bearing=${faceBearing.toInt()}°) — " +
-                        "pausing ${WALK_SIM_DWELL_DURATION_MS / 1000}s"
-                    )
-                    val dwellStart = System.currentTimeMillis()
-                    // Re-send the same fix during the short pause so
-                    // lastFixAtMs stays fresh (the S110 staleness gate has a
-                    // 30s threshold, so a 3s pause is safely under it).
-                    while (System.currentTimeMillis() - dwellStart < WALK_SIM_DWELL_DURATION_MS) {
-                        if (walkSimJob?.isCancelled == true) break
-                        viewModel.setManualLocation(point)
-                        kotlinx.coroutines.delay(1000L)
-                    }
-                    if (walkSimJob?.isCancelled != true) {
+                    // S118: Rate-limit dwells — only pause once per 30s.
+                    // Still mark the POI as dwelled (so it won't retrigger)
+                    // but skip the physical pause if we paused recently.
+                    if (now - lastDwellTime < WALK_SIM_DWELL_COOLDOWN_MS) {
                         DebugLogger.i("WALK-SIM",
-                            "RESUMING from ${trigger.name} (paused ${WALK_SIM_DWELL_DURATION_MS / 1000}s)"
+                            "SKIP DWELL ${trigger.name} (${bestDist.toInt()}m) — " +
+                            "cooldown ${(now - lastDwellTime) / 1000}s/${WALK_SIM_DWELL_COOLDOWN_MS / 1000}s")
+                    } else {
+                        lastDwellTime = now
+
+                        val faceBearing = bearingToPoi(
+                            point.latitude, point.longitude,
+                            trigger.lat, trigger.lng
                         )
+                        setMovementBearing(faceBearing)
+
+                        DebugLogger.i("WALK-SIM",
+                            "LOOK AT ${trigger.name} " +
+                            "(dist=${bestDist.toInt()}m bearing=${faceBearing.toInt()}°) — " +
+                            "pausing ${WALK_SIM_DWELL_DURATION_MS / 1000}s"
+                        )
+                        val dwellStart = System.currentTimeMillis()
+                        while (System.currentTimeMillis() - dwellStart < WALK_SIM_DWELL_DURATION_MS) {
+                            if (walkSimJob?.isCancelled == true) break
+                            viewModel.setManualLocation(point)
+                            kotlinx.coroutines.delay(1000L)
+                        }
+                        if (walkSimJob?.isCancelled != true) {
+                            DebugLogger.i("WALK-SIM",
+                                "RESUMING from ${trigger.name} (paused ${WALK_SIM_DWELL_DURATION_MS / 1000}s)"
+                            )
+                        }
                     }
                 }
             }
@@ -1449,6 +1476,11 @@ class SalemMainActivity : AppCompatActivity() {
     /**
      * Load narration points as markers on the map.
      *
+     * S118: Icon bitmaps are pre-generated on Dispatchers.Default to keep
+     * the main thread free for FAB and touch input. All 817 narration points
+     * are loaded once — the icon refresh on zoom change (refreshNarrationIcons)
+     * only updates markers within the visible viewport.
+     *
      * S112: Honors the POI button (`showAllPoisActive`):
      *   - ON  → all narration points are loaded (full set)
      *   - OFF → only points classified as PAID, HISTORIC, or ATTRACTION
@@ -1457,10 +1489,10 @@ class SalemMainActivity : AppCompatActivity() {
      * before loading the new set, so toggling the button is fully reversible.
      */
     internal fun loadNarrationPointMarkers() {
-        lifecycleScope.launch {
+        narrationMarkerJob?.cancel()
+        narrationMarkerJob = lifecycleScope.launch {
             try {
-                // Remove any previously loaded narration markers (they may be a
-                // different filtered subset from a prior toggle state)
+                // Remove any previously loaded narration markers
                 for ((marker, _) in narrationMarkers) {
                     binding.mapView.overlays.remove(marker)
                 }
@@ -1470,7 +1502,6 @@ class SalemMainActivity : AppCompatActivity() {
                 val points = if (showAllPoisActive) {
                     allPoints
                 } else {
-                    // OFF: only show paid + historic + attraction tiers
                     allPoints.filter { p ->
                         val tier = com.example.wickedsalemwitchcitytour.tour.NarrationTierClassifier.classify(p)
                         tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.PAID ||
@@ -1479,20 +1510,23 @@ class SalemMainActivity : AppCompatActivity() {
                     }
                 }
                 DebugLogger.i("SalemMainActivity",
-                    "Loading ${points.size} narration points as markers (showAll=$showAllPoisActive, total=${allPoints.size})")
+                    "Loading ${points.size} narration markers (showAll=$showAllPoisActive, total=${allPoints.size})")
+
+                // S118: Pre-generate icons on background thread to avoid ANR
                 val zoom = binding.mapView.zoomLevelDouble
-                for (p in points) {
+                val iconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    points.map { p -> p to narrationIconForZoom(p.type, p.name, zoom) }
+                }
+
+                // Now on main thread — fast marker creation
+                for ((p, icon) in iconData) {
                     val marker = Marker(binding.mapView)
                     marker.position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
                     marker.title = p.name
                     marker.snippet = p.type.replace('_', ' ')
-                    marker.icon = narrationIconForZoom(p.type, p.name, zoom)
+                    marker.icon = icon
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     marker.setOnMarkerClickListener { _, _ ->
-                        // S113: Map marker tap opens the POI Detail Sheet
-                        // instead of enqueuing narration directly. Ambient
-                        // narration keeps playing; the sheet queues its own
-                        // tagged TTS read-through on open.
                         DebugLogger.i(
                             "SalemMainActivity",
                             "MARKER TAP id=${p.id} name=${p.name} type=${p.type} → showing PoiDetailSheet"
@@ -1504,7 +1538,10 @@ class SalemMainActivity : AppCompatActivity() {
                     narrationMarkers.add(marker to p)
                 }
                 lastNarrationIconZoom = zoomBucket(zoom)
+                bringStationMarkersToFront()
                 binding.mapView.invalidate()
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // Normal: cancelled by a newer load
             } catch (e: Exception) {
                 DebugLogger.e("SalemMainActivity", "Failed to load narration markers", e)
             }
@@ -1535,7 +1572,6 @@ class SalemMainActivity : AppCompatActivity() {
         val zoom = binding.mapView.zoomLevelDouble
         val bucket = zoomBucket(zoom)
         if (bucket == lastNarrationIconZoom) return
-        lastNarrationIconZoom = bucket
         // Only refresh markers in the current viewport — avoids ANR from iterating
         // 800+ markers at every zoom-bucket transition
         val visible = binding.mapView.boundingBox
@@ -1545,7 +1581,14 @@ class SalemMainActivity : AppCompatActivity() {
             marker.icon = narrationIconForZoom(point.type, point.name, zoom)
             refreshed++
         }
-        DebugLogger.i("SalemMainActivity", "refreshNarrationIcons: bucket=$bucket refreshed=$refreshed/${narrationMarkers.size}")
+        // S118: Only mark bucket as done if we actually refreshed some markers.
+        // If 0 visible, the icons are still stale from the old bucket and we
+        // need to retry when the user pans to where markers exist.
+        if (refreshed > 0) {
+            lastNarrationIconZoom = bucket
+        }
+        DebugLogger.i("SalemMainActivity", "refreshNarrationIcons: bucket=$bucket refreshed=$refreshed/${narrationMarkers.size}" +
+            if (refreshed == 0) " (bucket NOT committed — will retry)" else "")
         binding.mapView.invalidate()
     }
 

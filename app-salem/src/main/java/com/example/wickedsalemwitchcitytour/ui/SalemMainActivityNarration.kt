@@ -170,6 +170,16 @@ private const val DWELL_RESET_DISTANCE_M = 15.0
 /** S115: Max POIs narrated via dwell expansion per single dwell session. */
 private const val DWELL_MAX_POIS_PER_SESSION = 6
 
+/**
+ * S118: Consecutive narration pacing. After every PACING_BURST_SIZE narrations
+ * played back-to-back, impose a PACING_COOLDOWN_MS breather before the next one.
+ * Prevents the "machine gun" effect in dense downtown clusters where the system
+ * would narrate non-stop with only 500ms gaps. Reset on user movement (dwell reset).
+ */
+private const val PACING_BURST_SIZE = 3
+private const val PACING_COOLDOWN_MS = 30_000L
+private var consecutiveNarrations: Int = 0
+
 /** S115: Lat/lng of the anchor point where the current dwell session began. 0.0 = no active dwell. */
 private var dwellAnchorLat: Double = 0.0
 private var dwellAnchorLng: Double = 0.0
@@ -275,7 +285,24 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 currentNarration = null
                 DebugLogger.i("NARR-STATE", "  Idle → currentNarration cleared, queueSize=${narrationQueue.size}")
 
-                if (narrationQueue.isNotEmpty()) {
+                // S118: Pacing — after every 3rd consecutive narration, cool down 30s
+                consecutiveNarrations++
+                if (consecutiveNarrations >= PACING_BURST_SIZE) {
+                    DebugLogger.i("NARR-STATE",
+                        "  PACING COOLDOWN: $consecutiveNarrations consecutive narrations → " +
+                        "breathing ${PACING_COOLDOWN_MS / 1000}s before next")
+                    consecutiveNarrations = 0
+                    clearNarrationHighlight()
+                    kotlinx.coroutines.delay(PACING_COOLDOWN_MS)
+                    // After cooldown, check if anything queued during the break
+                    if (narrationQueue.isNotEmpty()) {
+                        playNextNarration()
+                    }
+                    // Otherwise fall through to silence/reach-out below
+                    if (narrationQueue.isEmpty()) {
+                        return@collectLatest
+                    }
+                } else if (narrationQueue.isNotEmpty()) {
                     // TTS finished — play next in queue after brief pause
                     val gapMs = if (walkSimRunning) 500L else 2000L
                     DebugLogger.i("NARR-STATE", "  Queue has ${narrationQueue.size} → advancing after ${gapMs}ms")
@@ -453,6 +480,7 @@ internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Dou
             dwellAnchorLng = lng
             dwellCurrentRadiusM = DWELL_RADIUS_TIGHT_M
             dwellPoisPlayed = 0
+            consecutiveNarrations = 0  // S118: reset pacing on movement
         }
     }
 
@@ -536,10 +564,29 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
 
     if (jumpToFront || currentNarration == null) {
         // Play immediately (user tapped or nothing playing).
-        // jumpToFront bypasses the tier sort — user tap is explicit intent.
-        DebugLogger.i("NARR-QUEUE", "PLAY NOW: ${point.name} (jumpToFront=$jumpToFront, currentNull=${currentNarration == null})")
-        narrationQueue.addFirst(point)
-        playNextNarration()
+        // S118: Play the point DIRECTLY — do not route through
+        // pickNextFromQueue() which applies bearing/distance filters
+        // that can drop a just-triggered ENTRY POI the walk-sim has
+        // already moved past. The queue filter is for competitive
+        // selection among multiple candidates, not for blocking the
+        // only candidate that just fired a geofence event.
+        DebugLogger.i("NARR-QUEUE", "PLAY DIRECT: ${point.name} (jumpToFront=$jumpToFront, currentNull=${currentNarration == null})")
+        currentNarration = point
+        showNarrationSheet(point)
+        showNarrationHighlight(point)
+        val text = narrationGeofenceManager.getNarrationForPass(point)
+            ?: point.shortNarration ?: point.description
+        val voiceId = point.voiceOverride
+            ?: com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.type)
+        if (text != null) {
+            narrationGeofenceManager.recordVisit(point.id)
+            DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId")
+            tourViewModel.speakNarration(text, point.name, voiceId)
+        } else {
+            DebugLogger.w("NARR-PLAY", "DIRECT PLAY: ${point.name} — no narration text, skipping")
+        }
+        updateQueueIndicator()
+        refreshProximityDockFromQueue()
     } else {
         // Just append. The dequeue logic will pick the correct order at play time.
         narrationQueue.addLast(point)
@@ -802,13 +849,14 @@ internal fun SalemMainActivity.showNarrationSheet(point: NarrationPoint) {
 
     // Action buttons
     sheet.findViewById<View>(R.id.btnSkip)?.setOnClickListener {
-        tourViewModel.speakNarration("", "")  // stop current TTS
-        if (narrationQueue.isNotEmpty()) {
-            playNextNarration()
-        } else {
-            sheet.visibility = View.GONE
-            currentNarration = null
-        }
+        DebugLogger.i("NARR-SKIP", "Skip tapped — stopping TTS, clearing current narration")
+        tourViewModel.stopNarration()
+        currentNarration = null
+        consecutiveNarrations = 0  // reset pacing so next POI plays promptly
+        clearNarrationHighlight()
+        sheet.visibility = View.GONE
+        // Force map redraw after sheet hides — the layout change can confuse overlay positions
+        binding.mapView.postDelayed({ binding.mapView.invalidate() }, 100)
     }
     sheet.findViewById<View>(R.id.btnPlayPause)?.setOnClickListener {
         val text = point.longNarration ?: point.shortNarration ?: point.description

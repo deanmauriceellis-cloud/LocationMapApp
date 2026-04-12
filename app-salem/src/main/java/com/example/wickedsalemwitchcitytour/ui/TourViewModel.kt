@@ -237,6 +237,13 @@ class TourViewModel @Inject constructor(
         return repository.getAllNarrationPoints()
     }
 
+    /** S118: Load narration points within a bounding box (viewport-filtered) */
+    suspend fun loadNarrationPointsInBbox(
+        latMin: Double, latMax: Double, lngMin: Double, lngMax: Double
+    ): List<com.example.wickedsalemwitchcitytour.content.model.NarrationPoint> {
+        return repository.getNarrationPointsInBbox(latMin, latMax, lngMin, lngMax)
+    }
+
     /** Speak arbitrary text via the narration TTS engine */
     fun speakNarration(text: String, label: String, voiceId: String? = null) {
         narrationManager.speakHint(text, label, voiceId)

@@ -29,7 +29,8 @@ class SalemContentRepository @Inject constructor(
     private val tourDao: TourDao,
     private val tourStopDao: TourStopDao,
     private val eventsCalendarDao: EventsCalendarDao,
-    private val narrationPointDao: NarrationPointDao
+    private val narrationPointDao: NarrationPointDao,
+    private val salemPoiDao: SalemPoiDao
 ) {
 
     // ── Tours ────────────────────────────────────────────────────────────
@@ -191,6 +192,57 @@ class SalemContentRepository @Inject constructor(
 
     suspend fun insertNarrationPoints(points: List<NarrationPoint>) =
         narrationPointDao.insertAll(points)
+
+    // ── Unified POIs (Phase 9U — salem_pois table) ───────────────────────
+
+    suspend fun getAllPois(): List<SalemPoi> = salemPoiDao.findAll()
+
+    suspend fun getVisiblePois(): List<SalemPoi> = salemPoiDao.findAllVisible()
+
+    suspend fun getPoiById(id: String): SalemPoi? = salemPoiDao.findById(id)
+
+    suspend fun getPoisByCategory(category: String): List<SalemPoi> =
+        salemPoiDao.findByCategory(category)
+
+    suspend fun getPoisBySubcategory(subcategory: String): List<SalemPoi> =
+        salemPoiDao.findBySubcategory(subcategory)
+
+    suspend fun getNarratedPois(): List<SalemPoi> = salemPoiDao.findNarrated()
+
+    suspend fun getNarratedPoisByWave(wave: Int): List<SalemPoi> =
+        salemPoiDao.findNarratedByWave(wave)
+
+    suspend fun getNarratedPoisInBbox(
+        latMin: Double, latMax: Double, lngMin: Double, lngMax: Double
+    ): List<SalemPoi> = salemPoiDao.findNarratedInBbox(latMin, latMax, lngMin, lngMax)
+
+    suspend fun getPoisNearby(lat: Double, lng: Double, radiusM: Double): List<SalemPoi> {
+        val radiusDeg = radiusM / 111_000.0
+        return salemPoiDao.findNearby(lat, lng, radiusDeg)
+    }
+
+    suspend fun getNarratedPoisNearby(lat: Double, lng: Double, radiusM: Double): List<SalemPoi> {
+        val radiusDeg = radiusM / 111_000.0
+        return salemPoiDao.findNarratedNearby(lat, lng, radiusDeg)
+    }
+
+    suspend fun getVisiblePoisNearby(lat: Double, lng: Double, radiusM: Double): List<SalemPoi> {
+        val radiusDeg = radiusM / 111_000.0
+        return salemPoiDao.findVisibleNearby(lat, lng, radiusDeg)
+    }
+
+    suspend fun searchPois(query: String): List<SalemPoi> = salemPoiDao.search(query)
+
+    suspend fun getPoisByDistrict(district: String): List<SalemPoi> =
+        salemPoiDao.findByDistrict(district)
+
+    suspend fun getDistricts(): List<String> = salemPoiDao.getDistricts()
+
+    suspend fun getPoiCount(): Int = salemPoiDao.count()
+
+    suspend fun getVisiblePoiCount(): Int = salemPoiDao.countVisible()
+
+    suspend fun insertPois(pois: List<SalemPoi>) = salemPoiDao.insertAll(pois)
 
     // ── Bulk Insert (for content pipeline) ───────────────────────────────
 

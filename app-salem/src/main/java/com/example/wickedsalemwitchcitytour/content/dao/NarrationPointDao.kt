@@ -42,6 +42,7 @@ interface NarrationPointDao {
     suspend fun findInBbox(latMin: Double, latMax: Double, lngMin: Double, lngMax: Double): List<NarrationPoint>
 
     /** Proximity search — find points within approximate radius (degree-based) */
+    @RewriteQueriesToDropUnusedColumns
     @Query("""
         SELECT *,
         ((lat - :lat) * (lat - :lat) + (lng - :lng) * (lng - :lng)) AS dist_sq

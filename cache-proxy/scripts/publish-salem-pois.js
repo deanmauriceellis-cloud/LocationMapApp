@@ -1,0 +1,326 @@
+#!/usr/bin/env node
+/*
+ * publish-salem-pois.js — Phase 9U (Session 118)
+ *
+ * Exports unified salem_pois from PostgreSQL into the bundled Room SQLite
+ * database (salem_content.db). This is the publish loop: PG is canonical,
+ * SQLite is the offline bundle shipped in the APK.
+ *
+ * What this script does:
+ *   1. Opens the existing salem_content.db (preserves all other tables)
+ *   2. Creates the salem_pois table if it doesn't exist
+ *   3. Deletes all existing rows in salem_pois (full replace)
+ *   4. Reads all non-deleted rows from PG salem_pois
+ *   5. Inserts them into SQLite with type conversions:
+ *      - JSONB → TEXT (JSON string)
+ *      - BOOLEAN → INTEGER (0/1)
+ *      - TIMESTAMPTZ → dropped (not needed offline)
+ *      - NULL address → empty string (Room entity has non-null address in some entities)
+ *   6. Copies the updated .db to app-salem/src/main/assets/
+ *
+ * Usage:
+ *   node scripts/publish-salem-pois.js                    # live run
+ *   node scripts/publish-salem-pois.js --dry-run          # count only
+ *   node scripts/publish-salem-pois.js --db path/to/db    # use specific .db
+ *
+ * Requires: DATABASE_URL, better-sqlite3 (npm install better-sqlite3)
+ */
+
+const { Pool } = require('pg');
+const path = require('path');
+const fs = require('fs');
+
+let Database;
+try {
+  Database = require('better-sqlite3');
+} catch (_) {
+  console.error('Error: better-sqlite3 not installed. Run: cd cache-proxy && npm install better-sqlite3');
+  process.exit(1);
+}
+
+const DRY_RUN = process.argv.includes('--dry-run');
+const dbIdx = process.argv.indexOf('--db');
+const SQLITE_PATH = dbIdx !== -1
+  ? process.argv[dbIdx + 1]
+  : path.resolve(__dirname, '../../salem-content/salem_content.db');
+const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+
+if (!process.env.DATABASE_URL) {
+  try { require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); } catch (_) {}
+}
+if (!process.env.DATABASE_URL) {
+  console.error('Error: DATABASE_URL environment variable is required');
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Room-compatible CREATE TABLE for salem_pois (must match SalemPoi.kt exactly)
+const CREATE_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS salem_pois (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  address TEXT,
+  status TEXT DEFAULT 'open',
+  category TEXT NOT NULL,
+  subcategory TEXT,
+  short_narration TEXT,
+  long_narration TEXT,
+  narration_pass_2 TEXT,
+  narration_pass_3 TEXT,
+  geofence_radius_m INTEGER NOT NULL DEFAULT 40,
+  geofence_shape TEXT NOT NULL DEFAULT 'circle',
+  corridor_points TEXT,
+  priority INTEGER NOT NULL DEFAULT 3,
+  wave INTEGER,
+  voice_clip_asset TEXT,
+  custom_voice_asset TEXT,
+  cuisine_type TEXT,
+  price_range TEXT,
+  rating REAL,
+  merchant_tier INTEGER NOT NULL DEFAULT 0,
+  ad_priority INTEGER NOT NULL DEFAULT 0,
+  historical_period TEXT,
+  historical_note TEXT,
+  admission_info TEXT,
+  requires_transportation INTEGER NOT NULL DEFAULT 0,
+  wheelchair_accessible INTEGER NOT NULL DEFAULT 1,
+  seasonal INTEGER NOT NULL DEFAULT 0,
+  phone TEXT,
+  email TEXT,
+  website TEXT,
+  hours TEXT,
+  hours_text TEXT,
+  menu_url TEXT,
+  reservations_url TEXT,
+  order_url TEXT,
+  description TEXT,
+  short_description TEXT,
+  custom_description TEXT,
+  origin_story TEXT,
+  image_asset TEXT,
+  custom_icon_asset TEXT,
+  action_buttons TEXT,
+  secondary_categories TEXT,
+  specialties TEXT,
+  owners TEXT,
+  year_established INTEGER,
+  amenities TEXT,
+  district TEXT,
+  related_figure_ids TEXT,
+  related_fact_ids TEXT,
+  related_source_ids TEXT,
+  data_source TEXT NOT NULL DEFAULT 'manual_curated',
+  confidence REAL NOT NULL DEFAULT 0.8,
+  is_tour_poi INTEGER NOT NULL DEFAULT 0,
+  is_narrated INTEGER NOT NULL DEFAULT 0,
+  default_visible INTEGER NOT NULL DEFAULT 1
+)`;
+
+// Update Room version hash table
+const ROOM_MASTER_SQL = `
+CREATE TABLE IF NOT EXISTS room_master_table (
+  id INTEGER PRIMARY KEY,
+  identity_hash TEXT
+)`;
+
+async function main() {
+  console.log(`\n=== Publish Salem POIs (PG → SQLite) ===`);
+  console.log(`Mode: ${DRY_RUN ? 'DRY RUN' : 'LIVE'}`);
+  console.log(`SQLite: ${SQLITE_PATH}`);
+  console.log(`Assets: ${ASSETS_PATH}\n`);
+
+  // Read all non-deleted POIs from PG
+  const pgClient = await pool.connect();
+  let pgRows;
+  try {
+    const { rows } = await pgClient.query(`
+      SELECT
+        id, name, lat, lng, address, status, category, subcategory,
+        short_narration, long_narration, narration_pass_2, narration_pass_3,
+        geofence_radius_m, geofence_shape, corridor_points,
+        priority, wave, voice_clip_asset, custom_voice_asset,
+        cuisine_type, price_range, rating, merchant_tier, ad_priority,
+        historical_period, historical_note, admission_info,
+        requires_transportation, wheelchair_accessible, seasonal,
+        phone, email, website, hours, hours_text,
+        menu_url, reservations_url, order_url,
+        description, short_description, custom_description, origin_story,
+        image_asset, custom_icon_asset, action_buttons,
+        secondary_categories, specialties, owners,
+        year_established, amenities, district,
+        related_figure_ids, related_fact_ids, related_source_ids,
+        data_source, confidence,
+        is_tour_poi, is_narrated, default_visible
+      FROM salem_pois
+      WHERE deleted_at IS NULL
+      ORDER BY category, priority, name
+    `);
+    pgRows = rows;
+    console.log(`PG rows: ${pgRows.length}`);
+  } finally {
+    pgClient.release();
+  }
+
+  if (DRY_RUN) {
+    const cats = {};
+    for (const r of pgRows) {
+      cats[r.category] = (cats[r.category] || 0) + 1;
+    }
+    console.log('\nCategory distribution:');
+    for (const [c, n] of Object.entries(cats).sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${c}: ${n}`);
+    }
+    console.log(`\nDRY RUN COMPLETE — would publish ${pgRows.length} rows`);
+    await pool.end();
+    return;
+  }
+
+  // Open SQLite
+  if (!fs.existsSync(SQLITE_PATH)) {
+    console.error(`SQLite file not found: ${SQLITE_PATH}`);
+    process.exit(1);
+  }
+  const db = new Database(SQLITE_PATH);
+
+  // Create table + clear
+  db.exec(CREATE_TABLE_SQL);
+  const deleted = db.prepare('DELETE FROM salem_pois').run();
+  console.log(`Cleared ${deleted.changes} existing salem_pois rows from SQLite`);
+
+  // Prepare insert
+  const insertStmt = db.prepare(`
+    INSERT INTO salem_pois (
+      id, name, lat, lng, address, status, category, subcategory,
+      short_narration, long_narration, narration_pass_2, narration_pass_3,
+      geofence_radius_m, geofence_shape, corridor_points,
+      priority, wave, voice_clip_asset, custom_voice_asset,
+      cuisine_type, price_range, rating, merchant_tier, ad_priority,
+      historical_period, historical_note, admission_info,
+      requires_transportation, wheelchair_accessible, seasonal,
+      phone, email, website, hours, hours_text,
+      menu_url, reservations_url, order_url,
+      description, short_description, custom_description, origin_story,
+      image_asset, custom_icon_asset, action_buttons,
+      secondary_categories, specialties, owners,
+      year_established, amenities, district,
+      related_figure_ids, related_fact_ids, related_source_ids,
+      data_source, confidence,
+      is_tour_poi, is_narrated, default_visible
+    ) VALUES (
+      @id, @name, @lat, @lng, @address, @status, @category, @subcategory,
+      @short_narration, @long_narration, @narration_pass_2, @narration_pass_3,
+      @geofence_radius_m, @geofence_shape, @corridor_points,
+      @priority, @wave, @voice_clip_asset, @custom_voice_asset,
+      @cuisine_type, @price_range, @rating, @merchant_tier, @ad_priority,
+      @historical_period, @historical_note, @admission_info,
+      @requires_transportation, @wheelchair_accessible, @seasonal,
+      @phone, @email, @website, @hours, @hours_text,
+      @menu_url, @reservations_url, @order_url,
+      @description, @short_description, @custom_description, @origin_story,
+      @image_asset, @custom_icon_asset, @action_buttons,
+      @secondary_categories, @specialties, @owners,
+      @year_established, @amenities, @district,
+      @related_figure_ids, @related_fact_ids, @related_source_ids,
+      @data_source, @confidence,
+      @is_tour_poi, @is_narrated, @default_visible
+    )
+  `);
+
+  // Batch insert in a transaction
+  const insertMany = db.transaction((rows) => {
+    for (const r of rows) {
+      insertStmt.run({
+        id: r.id,
+        name: r.name,
+        lat: r.lat,
+        lng: r.lng,
+        address: r.address || null,
+        status: r.status || 'open',
+        category: r.category,
+        subcategory: r.subcategory || null,
+        short_narration: r.short_narration || null,
+        long_narration: r.long_narration || null,
+        narration_pass_2: r.narration_pass_2 || null,
+        narration_pass_3: r.narration_pass_3 || null,
+        geofence_radius_m: r.geofence_radius_m || 40,
+        geofence_shape: r.geofence_shape || 'circle',
+        corridor_points: r.corridor_points || null,
+        priority: r.priority || 3,
+        wave: r.wave || null,
+        voice_clip_asset: r.voice_clip_asset || null,
+        custom_voice_asset: r.custom_voice_asset || null,
+        cuisine_type: r.cuisine_type || null,
+        price_range: r.price_range || null,
+        rating: r.rating || null,
+        merchant_tier: r.merchant_tier || 0,
+        ad_priority: r.ad_priority || 0,
+        historical_period: r.historical_period || null,
+        historical_note: r.historical_note || null,
+        admission_info: r.admission_info || null,
+        requires_transportation: r.requires_transportation ? 1 : 0,
+        wheelchair_accessible: r.wheelchair_accessible !== false ? 1 : 0,
+        seasonal: r.seasonal ? 1 : 0,
+        phone: r.phone || null,
+        email: r.email || null,
+        website: r.website || null,
+        hours: typeof r.hours === 'object' ? JSON.stringify(r.hours) : (r.hours || null),
+        hours_text: r.hours_text || null,
+        menu_url: r.menu_url || null,
+        reservations_url: r.reservations_url || null,
+        order_url: r.order_url || null,
+        description: r.description || null,
+        short_description: r.short_description || null,
+        custom_description: r.custom_description || null,
+        origin_story: r.origin_story || null,
+        image_asset: r.image_asset || null,
+        custom_icon_asset: r.custom_icon_asset || null,
+        action_buttons: typeof r.action_buttons === 'object' ? JSON.stringify(r.action_buttons) : (r.action_buttons || null),
+        secondary_categories: typeof r.secondary_categories === 'object' ? JSON.stringify(r.secondary_categories) : (r.secondary_categories || null),
+        specialties: typeof r.specialties === 'object' ? JSON.stringify(r.specialties) : (r.specialties || null),
+        owners: typeof r.owners === 'object' ? JSON.stringify(r.owners) : (r.owners || null),
+        year_established: r.year_established || null,
+        amenities: typeof r.amenities === 'object' ? JSON.stringify(r.amenities) : (r.amenities || null),
+        district: r.district || null,
+        related_figure_ids: typeof r.related_figure_ids === 'object' ? JSON.stringify(r.related_figure_ids) : (r.related_figure_ids || null),
+        related_fact_ids: typeof r.related_fact_ids === 'object' ? JSON.stringify(r.related_fact_ids) : (r.related_fact_ids || null),
+        related_source_ids: typeof r.related_source_ids === 'object' ? JSON.stringify(r.related_source_ids) : (r.related_source_ids || null),
+        data_source: r.data_source || 'manual_curated',
+        confidence: r.confidence != null ? r.confidence : 0.8,
+        is_tour_poi: r.is_tour_poi ? 1 : 0,
+        is_narrated: r.is_narrated ? 1 : 0,
+        default_visible: r.default_visible !== false ? 1 : 0,
+      });
+    }
+  });
+
+  insertMany(pgRows);
+  console.log(`Inserted ${pgRows.length} rows into SQLite salem_pois`);
+
+  // Verify
+  const countResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois').get();
+  const visibleResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois WHERE default_visible = 1').get();
+  const narratedResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois WHERE is_narrated = 1').get();
+  console.log(`\nSQLite verification:`);
+  console.log(`  Total: ${countResult.cnt}`);
+  console.log(`  Visible: ${visibleResult.cnt}`);
+  console.log(`  Narrated: ${narratedResult.cnt}`);
+
+  db.close();
+
+  // Copy to assets
+  fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
+  const size = fs.statSync(ASSETS_PATH).size;
+  console.log(`\nCopied to assets: ${ASSETS_PATH} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+
+  console.log('\nPUBLISH COMPLETE');
+  await pool.end();
+}
+
+main().catch(err => {
+  console.error('Publish failed:', err.message);
+  console.error(err.stack);
+  process.exit(1);
+});

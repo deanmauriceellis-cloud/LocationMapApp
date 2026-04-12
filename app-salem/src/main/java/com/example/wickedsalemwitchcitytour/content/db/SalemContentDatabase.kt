@@ -25,9 +25,10 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         Tour::class,
         TourStop::class,
         EventsCalendar::class,
-        NarrationPoint::class
+        NarrationPoint::class,
+        SalemPoi::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class SalemContentDatabase : RoomDatabase() {
@@ -41,4 +42,5 @@ abstract class SalemContentDatabase : RoomDatabase() {
     abstract fun tourStopDao(): TourStopDao
     abstract fun eventsCalendarDao(): EventsCalendarDao
     abstract fun narrationPointDao(): NarrationPointDao
+    abstract fun salemPoiDao(): SalemPoiDao
 }
