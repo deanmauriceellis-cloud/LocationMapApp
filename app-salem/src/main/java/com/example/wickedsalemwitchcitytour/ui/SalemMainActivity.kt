@@ -1204,11 +1204,47 @@ class SalemMainActivity : AppCompatActivity() {
     private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 30_000L
 
     private fun startWalkSim() {
-        // Walk sim follows downtown Salem street route (PEM → Essex → Common → Derby → back)
-        val routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-            .loadDowntownRoute(this)
+        // S118: If a tour is active/paused, walk that tour's route instead
+        // of the default downtown loop. Falls back to downtown if the tour
+        // has no route data or no tour is selected.
+        val activeTour = when (val ts = tourViewModel.tourState.value) {
+            is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> ts.activeTour
+            is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> ts.activeTour
+            else -> null
+        }
+        val routePoints: List<org.osmdroid.util.GeoPoint>
+        val routeLabel: String
+        if (activeTour != null) {
+            val tourRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                .loadAllRoutePoints(this, activeTour.tour.id)
+            if (tourRoute.isNotEmpty()) {
+                routePoints = tourRoute
+                routeLabel = activeTour.tour.name
+                DebugLogger.i("SalemMainActivity",
+                    "Walk sim using tour route: '${activeTour.tour.name}' (${tourRoute.size} points)")
+            } else {
+                // Tour has no route geometry — build from stop coordinates
+                val stopPoints = activeTour.pois.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
+                if (stopPoints.size >= 2) {
+                    routePoints = stopPoints
+                    routeLabel = activeTour.tour.name
+                    DebugLogger.i("SalemMainActivity",
+                        "Walk sim using tour stop coordinates: '${activeTour.tour.name}' (${stopPoints.size} stops)")
+                } else {
+                    routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                        .loadDowntownRoute(this)
+                    routeLabel = "Downtown Salem"
+                    DebugLogger.w("SalemMainActivity",
+                        "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
+                }
+            }
+        } else {
+            routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                .loadDowntownRoute(this)
+            routeLabel = "Downtown Salem"
+        }
         if (routePoints.isEmpty()) {
-            toast("No downtown Salem route data")
+            toast("No route data available")
             return
         }
         // Reset narration session so all POIs can trigger fresh (clears narratedToday + cooldowns)
@@ -1218,7 +1254,7 @@ class SalemMainActivity : AppCompatActivity() {
         walkSimRunning = true
         binding.btnWalkSim.text = "Stop"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
-        DebugLogger.i("SalemMainActivity", "Walk sim started: ${routePoints.size} route points (narration session reset)")
+        DebugLogger.i("SalemMainActivity", "Walk sim started: '$routeLabel' — ${routePoints.size} route points (narration session reset)")
 
         walkSimJob = lifecycleScope.launch {
             val interpolated = interpolateWalkRoute(routePoints, 1.4f)
