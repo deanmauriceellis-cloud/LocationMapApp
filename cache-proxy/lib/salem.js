@@ -5,6 +5,11 @@
  * Salem-specific content endpoints. Backward compatible — all routes
  * are under /salem/* prefix and do not affect existing LocationMapApp
  * endpoints.
+ *
+ * Phase 9U: All POI reads now use the unified `salem_pois` table.
+ * The old /salem/businesses endpoint still works (filters by non-tour,
+ * non-narrated POIs with business-specific columns) for backward
+ * compatibility.
  */
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module salem.js';
 
@@ -12,8 +17,6 @@ module.exports = function (app, deps) {
   const { pgPool, requirePg } = deps;
 
   // ── Helper: staleness-aware wrapper ──────────────────────────────────────
-  // Adds stale_after check and touched updated_at on write operations
-
   function provenanceDefaults(row) {
     const now = new Date().toISOString();
     return {
@@ -26,20 +29,22 @@ module.exports = function (app, deps) {
     };
   }
 
-  // ── Tour POIs ─────────────────────────────────────────────────────────────
+  // ── POIs (unified) ───────────────────────────────────────────────────────
 
   app.get('/salem/pois', requirePg, async (req, res) => {
     try {
-      const { category, source, stale, lat, lng, radius, q, limit = 200 } = req.query;
-      // Phase 9P.4: filter soft-deleted rows from public reads. Admin endpoints
-      // (/admin/salem/pois/*) can opt in to seeing deleted rows via ?include_deleted=true.
-      let sql = 'SELECT * FROM salem_tour_pois WHERE deleted_at IS NULL';
+      const { category, source, stale, lat, lng, radius, q, is_tour_poi, is_narrated, limit = 500 } = req.query;
+      let sql = 'SELECT * FROM salem_pois WHERE deleted_at IS NULL';
       const params = [];
       let idx = 1;
 
       if (category) { sql += ` AND category = $${idx++}`; params.push(category); }
       if (source) { sql += ` AND data_source = $${idx++}`; params.push(source); }
       if (stale === 'true') { sql += ` AND stale_after IS NOT NULL AND stale_after < NOW()`; }
+      if (is_tour_poi === 'true') sql += ` AND is_tour_poi = true`;
+      if (is_tour_poi === 'false') sql += ` AND is_tour_poi = false`;
+      if (is_narrated === 'true') sql += ` AND is_narrated = true`;
+      if (is_narrated === 'false') sql += ` AND is_narrated = false`;
       if (lat && lng && radius) {
         sql += ` AND lat BETWEEN $${idx} - $${idx + 2} / 111000.0 AND $${idx} + $${idx + 2} / 111000.0`;
         sql += ` AND lng BETWEEN $${idx + 1} - $${idx + 2} / 111000.0 AND $${idx + 1} + $${idx + 2} / 111000.0`;
@@ -61,8 +66,7 @@ module.exports = function (app, deps) {
 
   app.get('/salem/pois/:id', requirePg, async (req, res) => {
     try {
-      // Phase 9P.4: public read excludes soft-deleted rows
-      const { rows } = await pgPool.query('SELECT * FROM salem_tour_pois WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
+      const { rows } = await pgPool.query('SELECT * FROM salem_pois WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
       if (!rows.length) return res.status(404).json({ error: 'Not found' });
       res.json(rows[0]);
     } catch (err) {
@@ -70,17 +74,18 @@ module.exports = function (app, deps) {
     }
   });
 
-  // ── Businesses ────────────────────────────────────────────────────────────
+  // ── Businesses (backward compat — filters unified table) ─────────────────
 
   app.get('/salem/businesses', requirePg, async (req, res) => {
     try {
-      const { type, source, stale, q, limit = 500 } = req.query;
-      // Phase 9P.4: filter soft-deleted rows from public reads
-      let sql = 'SELECT * FROM salem_businesses WHERE deleted_at IS NULL';
+      const { type, category, source, stale, q, limit = 500 } = req.query;
+      let sql = 'SELECT * FROM salem_pois WHERE deleted_at IS NULL';
       const params = [];
       let idx = 1;
 
-      if (type) { sql += ` AND business_type = $${idx++}`; params.push(type); }
+      // Legacy business_type filter maps to category
+      if (type) { sql += ` AND category = $${idx++}`; params.push(type); }
+      if (category) { sql += ` AND category = $${idx++}`; params.push(category); }
       if (source) { sql += ` AND data_source = $${idx++}`; params.push(source); }
       if (stale === 'true') { sql += ` AND stale_after IS NOT NULL AND stale_after < NOW()`; }
       if (q) { sql += ` AND (name ILIKE $${idx} OR description ILIKE $${idx})`; params.push(`%${q}%`); idx++; }
@@ -122,7 +127,6 @@ module.exports = function (app, deps) {
     try {
       const { rows } = await pgPool.query('SELECT * FROM salem_historical_figures WHERE id = $1', [req.params.id]);
       if (!rows.length) return res.status(404).json({ error: 'Not found' });
-      // Include related facts and sources
       const facts = await pgPool.query('SELECT * FROM salem_historical_facts WHERE figure_id = $1 ORDER BY date ASC', [req.params.id]);
       const sources = await pgPool.query('SELECT * FROM salem_primary_sources WHERE figure_id = $1 ORDER BY date ASC', [req.params.id]);
       res.json({ ...rows[0], facts: facts.rows, sources: sources.rows });
@@ -192,7 +196,7 @@ module.exports = function (app, deps) {
       const stops = await pgPool.query(
         `SELECT s.*, p.name, p.lat, p.lng, p.category, p.short_narration
          FROM salem_tour_stops s
-         JOIN salem_tour_pois p ON s.poi_id = p.id
+         JOIN salem_pois p ON s.poi_id = p.id
          WHERE s.tour_id = $1
          ORDER BY s.stop_order ASC`,
         [req.params.id]
@@ -233,14 +237,12 @@ module.exports = function (app, deps) {
   });
 
   // ── Sync Endpoint ─────────────────────────────────────────────────────────
-  // Mobile app calls this with last_sync timestamp to get incremental updates
 
   app.get('/salem/sync', requirePg, async (req, res) => {
     try {
       const since = req.query.since || '1970-01-01T00:00:00Z';
       const tables = [
-        { key: 'pois', table: 'salem_tour_pois' },
-        { key: 'businesses', table: 'salem_businesses' },
+        { key: 'pois', table: 'salem_pois' },
         { key: 'figures', table: 'salem_historical_figures' },
         { key: 'facts', table: 'salem_historical_facts' },
         { key: 'timeline', table: 'salem_timeline_events' },
@@ -271,7 +273,7 @@ module.exports = function (app, deps) {
   app.get('/salem/stats', requirePg, async (req, res) => {
     try {
       const tables = [
-        'salem_tour_pois', 'salem_businesses', 'salem_historical_figures',
+        'salem_pois', 'salem_historical_figures',
         'salem_historical_facts', 'salem_timeline_events', 'salem_primary_sources',
         'salem_tours', 'salem_tour_stops', 'salem_events_calendar'
       ];
@@ -281,14 +283,11 @@ module.exports = function (app, deps) {
         counts[t] = parseInt(rows[0].c);
       }
 
-      // Stale record counts
       const stale = {};
-      for (const t of ['salem_tour_pois', 'salem_businesses', 'salem_events_calendar']) {
-        const { rows } = await pgPool.query(
-          `SELECT COUNT(*) AS c FROM ${t} WHERE stale_after IS NOT NULL AND stale_after < NOW()`
-        );
-        stale[t] = parseInt(rows[0].c);
-      }
+      const { rows } = await pgPool.query(
+        `SELECT COUNT(*) AS c FROM salem_pois WHERE stale_after IS NOT NULL AND stale_after < NOW()`
+      );
+      stale['salem_pois'] = parseInt(rows[0].c);
 
       res.json({ counts, stale });
     } catch (err) {

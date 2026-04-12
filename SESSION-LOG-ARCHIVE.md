@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S106 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S107 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 107: 2026-04-09 — Phase 9P.B Step 9P.10b finalization (recovery + commit)
+
+Crash-recovery + commit session for the cross-midnight S106 work. Verified S106's Salem Oracle integration implementation was complete and clean (tsc + build, Oracle still live), committed as `a498562`. No code changes — purely recovery, verification, and commit.
+
+Full session detail: `docs/session-logs/session-107-2026-04-09.md`. Commit: `a498562`.
+
+---
 
 ## Session 106: 2026-04-09 — Phase 9P.B Step 9P.10b (Salem Oracle "Generate with AI" integration)
 

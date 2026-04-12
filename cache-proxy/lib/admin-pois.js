@@ -2,107 +2,85 @@
  * LocationMapApp v1.5
  * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
  *
- * Admin POI write endpoints (Phase 9P.4).
+ * Admin POI write endpoints (Phase 9U — unified salem_pois table).
  *
  * All routes are mounted under /admin/salem/pois/* and gated by the
  * /admin Basic Auth middleware (see lib/admin-auth.js, Phase 9P.3).
  *
- * Three POI kinds, three tables:
- *   tour       → salem_tour_pois
- *   business   → salem_businesses
- *   narration  → salem_narration_points
+ * Single unified table: salem_pois
+ *   Replaces the three-kind dispatch (tour/business/narration) from
+ *   Phase 9P.4. Filters by category, is_tour_poi, is_narrated, and
+ *   default_visible instead of kind.
  *
- * Soft delete model: every table has a deleted_at column. Public reads in
- * lib/salem.js filter `deleted_at IS NULL`. Admin reads can opt in to
- * including deleted rows via ?include_deleted=true.
+ * Soft delete model: deleted_at column. Public reads in lib/salem.js
+ * filter `deleted_at IS NULL`. Admin reads can opt in to including
+ * deleted rows via ?include_deleted=true.
  *
  * Routes:
- *   GET    /admin/salem/pois?kind=&category=&s=&w=&n=&e=&include_deleted=
- *          (kind required; category and bbox optional)
+ *   GET    /admin/salem/pois?category=&is_tour_poi=&is_narrated=&s=&w=&n=&e=&include_deleted=&q=&limit=
  *   GET    /admin/salem/pois/duplicates?radius=15  (Phase 9P.5)
- *          (cross-kind clusters of POIs within N meters of each other)
- *   GET    /admin/salem/pois/:kind/:id
- *   PUT    /admin/salem/pois/:kind/:id          — partial update
- *   POST   /admin/salem/pois/:kind/:id/move     — lat/lng-only update
- *   DELETE /admin/salem/pois/:kind/:id          — soft delete
- *   POST   /admin/salem/pois/:kind/:id/restore  — undo soft delete
+ *   GET    /admin/salem/pois/:id
+ *   PUT    /admin/salem/pois/:id          — partial update
+ *   POST   /admin/salem/pois/:id/move     — lat/lng-only update
+ *   DELETE /admin/salem/pois/:id          — soft delete
+ *   POST   /admin/salem/pois/:id/restore  — undo soft delete
  *
  * Validation:
  *   - lat ∈ [-90, 90], lng ∈ [-180, 180]
  *   - id is non-empty string
- *   - update fields are whitelisted per kind (no arbitrary column writes)
+ *   - update fields are whitelisted (no arbitrary column writes)
  *   - JSONB fields are coerced via JSON.stringify before parameterization
- *   - category is non-empty when provided. Full taxonomy validation deferred
- *     to Phase 9P.6 (TypeScript port of PoiCategories.kt).
+ *   - category is non-empty when provided
  *
  * All write endpoints set updated_at = NOW() automatically.
  */
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-pois.js';
 
-// ─── Per-kind config ─────────────────────────────────────────────────────────
+// ─── Unified field whitelist ────────────────────────────────────────────────
 
-// Whitelisted update fields per kind. Provenance fields (data_source,
-// confidence, verified_date, stale_after) are intentionally writable so the
-// admin tool can mark a POI as freshly verified or override a low confidence.
-// Timestamps (created_at, updated_at, deleted_at) are NOT in the whitelist —
-// they are managed by the endpoints themselves.
-const TOUR_FIELDS = [
-  'name', 'lat', 'lng', 'address', 'category', 'subcategories',
-  'short_narration', 'long_narration', 'description', 'historical_period',
-  'admission_info', 'hours', 'phone', 'website', 'image_asset',
-  'geofence_radius_m', 'requires_transportation', 'wheelchair_accessible',
-  'seasonal', 'priority',
-  'data_source', 'confidence', 'verified_date', 'stale_after',
-];
-
-const BUSINESS_FIELDS = [
-  'name', 'lat', 'lng', 'address', 'business_type', 'cuisine_type',
-  'price_range', 'hours', 'phone', 'website', 'description',
-  'historical_note', 'tags', 'rating', 'image_asset',
-  'data_source', 'confidence', 'verified_date', 'stale_after',
-];
-
-const NARRATION_FIELDS = [
-  'name', 'lat', 'lng', 'address', 'category', 'subcategory',
-  'short_narration', 'long_narration', 'description',
-  'narration_pass_2', 'narration_pass_3',
+const UPDATABLE_FIELDS = [
+  // Core identity
+  'name', 'lat', 'lng', 'address', 'status',
+  // Taxonomy
+  'category', 'subcategory',
+  // Narration
+  'short_narration', 'long_narration', 'narration_pass_2', 'narration_pass_3',
   'geofence_radius_m', 'geofence_shape', 'corridor_points',
-  'priority', 'wave', 'phone', 'website', 'hours',
-  'image_asset', 'voice_clip_asset',
-  'related_figure_ids', 'related_fact_ids', 'related_source_ids',
-  'action_buttons',
+  'priority', 'wave',
+  'voice_clip_asset', 'custom_voice_asset',
+  // Business
+  'cuisine_type', 'price_range', 'rating',
   'merchant_tier', 'ad_priority',
-  'custom_icon_asset', 'custom_voice_asset', 'custom_description',
+  // Historical/tour
+  'historical_period', 'historical_note', 'admission_info',
+  'requires_transportation', 'wheelchair_accessible', 'seasonal',
+  // Contact/hours
+  'phone', 'email', 'website',
+  'hours', 'hours_text',
+  'menu_url', 'reservations_url', 'order_url',
+  // Content
+  'description', 'short_description', 'custom_description', 'origin_story',
+  'image_asset', 'custom_icon_asset',
+  'action_buttons',
+  // SalemIntelligence enrichment
+  'intel_entity_id', 'secondary_categories', 'specialties',
+  'owners', 'year_established', 'amenities', 'district',
+  // Relations
+  'related_figure_ids', 'related_fact_ids', 'related_source_ids',
   'source_id', 'source_categories', 'tags',
+  // Provenance
   'data_source', 'confidence', 'verified_date', 'stale_after',
+  // Flags
+  'is_tour_poi', 'is_narrated', 'default_visible',
 ];
 
 // Columns that hold JSONB and must be JSON.stringify'd before binding.
 const JSONB_FIELDS = new Set([
-  'subcategories', 'tags', 'related_figure_ids', 'related_fact_ids',
-  'related_source_ids', 'action_buttons', 'source_categories',
+  'hours', 'action_buttons',
+  'secondary_categories', 'specialties', 'owners', 'amenities',
+  'related_figure_ids', 'related_fact_ids', 'related_source_ids',
+  'source_categories', 'tags',
 ]);
-
-const KINDS = {
-  tour: {
-    table: 'salem_tour_pois',
-    categoryColumn: 'category',
-    updatableFields: TOUR_FIELDS,
-    listOrderBy: 'priority ASC, name ASC',
-  },
-  business: {
-    table: 'salem_businesses',
-    categoryColumn: 'business_type',
-    updatableFields: BUSINESS_FIELDS,
-    listOrderBy: 'name ASC',
-  },
-  narration: {
-    table: 'salem_narration_points',
-    categoryColumn: 'category',
-    updatableFields: NARRATION_FIELDS,
-    listOrderBy: 'wave ASC NULLS LAST, priority ASC, name ASC',
-  },
-};
 
 // ─── Validation helpers ──────────────────────────────────────────────────────
 
@@ -124,15 +102,6 @@ function validateLatLng(lat, lng) {
   return null;
 }
 
-function getKindConfig(req, res) {
-  const cfg = KINDS[req.params.kind];
-  if (!cfg) {
-    res.status(400).json({ error: `kind must be one of: ${Object.keys(KINDS).join(', ')}` });
-    return null;
-  }
-  return cfg;
-}
-
 function getId(req, res) {
   const id = req.params.id;
   if (typeof id !== 'string' || !id.trim()) {
@@ -143,11 +112,11 @@ function getId(req, res) {
 }
 
 /**
- * Build a parameterized SET clause from a body object, restricted to a
+ * Build a parameterized SET clause from a body object, restricted to the
  * field whitelist. Returns { setSql, values, error }. JSONB fields are
  * stringified. Always appends `updated_at = NOW()` to the SET clause.
  */
-function buildUpdateClause(body, whitelist) {
+function buildUpdateClause(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { error: 'request body must be a JSON object' };
   }
@@ -156,28 +125,26 @@ function buildUpdateClause(body, whitelist) {
   const values = [];
   let idx = 1;
 
-  for (const field of whitelist) {
+  for (const field of UPDATABLE_FIELDS) {
     if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
     let value = body[field];
 
-    // Lat/lng range check on update
+    // Lat/lng range check
     if (field === 'lat' || field === 'lng') {
       const err = validateLatLng(field === 'lat' ? value : undefined,
                                  field === 'lng' ? value : undefined);
       if (err) return { error: err };
     }
 
-    // Category presence check (admin tool can clear other strings, but not
-    // category — leave a POI without a category and the app filtering breaks)
-    if ((field === 'category' || field === 'business_type') &&
-        (value === '' || value === null)) {
-      return { error: `${field} cannot be empty` };
+    // Category presence check
+    if (field === 'category' && (value === '' || value === null)) {
+      return { error: 'category cannot be empty' };
     }
 
     // JSONB serialization
     if (JSONB_FIELDS.has(field)) {
       try {
-        value = JSON.stringify(value ?? []);
+        value = JSON.stringify(value ?? (field === 'amenities' ? {} : []));
       } catch (e) {
         return { error: `${field}: invalid JSON value (${e.message})` };
       }
@@ -203,23 +170,16 @@ function buildUpdateClause(body, whitelist) {
 module.exports = function(app, deps) {
   const { pgPool, requirePg } = deps;
 
-  // Note: /admin/* is already gated by requireBasicAuth (mounted in server.js
-  // BEFORE this module loads). No need to apply per-route here.
-
   // ─── GET /admin/salem/pois — list with filters ─────────────────────────────
   app.get('/admin/salem/pois', requirePg, async (req, res) => {
     try {
-      const { kind, category, s, w, n, e, include_deleted, q, limit = 500 } = req.query;
+      const {
+        category, is_tour_poi, is_narrated, default_visible,
+        s, w, n, e,
+        include_deleted, q, limit = 2000,
+      } = req.query;
 
-      if (!kind) {
-        return res.status(400).json({ error: 'kind query param is required' });
-      }
-      const cfg = KINDS[kind];
-      if (!cfg) {
-        return res.status(400).json({ error: `kind must be one of: ${Object.keys(KINDS).join(', ')}` });
-      }
-
-      let sql = `SELECT * FROM ${cfg.table} WHERE 1=1`;
+      let sql = `SELECT * FROM salem_pois WHERE 1=1`;
       const params = [];
       let idx = 1;
 
@@ -228,9 +188,16 @@ module.exports = function(app, deps) {
       }
 
       if (category) {
-        sql += ` AND ${cfg.categoryColumn} = $${idx++}`;
+        sql += ` AND category = $${idx++}`;
         params.push(category);
       }
+
+      if (is_tour_poi === 'true') sql += ` AND is_tour_poi = true`;
+      if (is_tour_poi === 'false') sql += ` AND is_tour_poi = false`;
+      if (is_narrated === 'true') sql += ` AND is_narrated = true`;
+      if (is_narrated === 'false') sql += ` AND is_narrated = false`;
+      if (default_visible === 'true') sql += ` AND default_visible = true`;
+      if (default_visible === 'false') sql += ` AND default_visible = false`;
 
       if (s && w && n && e) {
         const sF = parseFloat(s), nF = parseFloat(n), wF = parseFloat(w), eF = parseFloat(e);
@@ -248,26 +215,19 @@ module.exports = function(app, deps) {
         idx++;
       }
 
-      sql += ` ORDER BY ${cfg.listOrderBy} LIMIT $${idx}`;
-      const lim = Math.min(parseInt(limit) || 500, 5000);
+      sql += ` ORDER BY category ASC, priority ASC, name ASC LIMIT $${idx}`;
+      const lim = Math.min(parseInt(limit) || 2000, 5000);
       params.push(lim);
 
       const { rows } = await pgPool.query(sql, params);
-      res.json({ kind, count: rows.length, pois: rows });
+      res.json({ count: rows.length, pois: rows });
     } catch (err) {
       console.error('[AdminPois] list error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  // ─── GET /admin/salem/pois/duplicates — cross-kind duplicate detection ─────
-  // Phase 9P.5. Returns clusters of POIs within `radius` meters of each other,
-  // across all three tables. Excludes soft-deleted rows. Default radius 15m,
-  // max 100m. Implementation: bbox-prefiltered self-join with Haversine in SQL,
-  // then JS-side union-find clustering.
-  //
-  // Response shape:
-  //   { radius_m, count, clusters: [{ centroid: {lat, lng}, members: [{kind, id, name, lat, lng, distance_m_from_centroid}] }] }
+  // ─── GET /admin/salem/pois/duplicates — duplicate detection ────────────────
   app.get('/admin/salem/pois/duplicates', requirePg, async (req, res) => {
     try {
       const radiusRaw = parseFloat(req.query.radius || '15');
@@ -276,43 +236,25 @@ module.exports = function(app, deps) {
       }
       const radius = Math.min(radiusRaw, 100);
 
-      // Bounding-box prefilter constants. Latitude is ~111000 m/degree
-      // everywhere; longitude is ~111000 * cos(lat). Salem is ~42.5°N where
-      // cos ≈ 0.737, so we use a conservative 60000 m/degree lower bound to
-      // avoid pruning real candidates near the poles.
       const latBoxDegrees = radius / 111000.0;
       const lngBoxDegrees = radius / 60000.0;
 
-      // CTE unions all three POI tables, projecting only the columns we need.
-      // Self-join uses (kind, id) ordering to ensure each pair appears once.
-      // Haversine distance computed twice — once in WHERE for filtering, once
-      // in SELECT for the response. PostgreSQL's planner is smart enough that
-      // this doesn't measurably hurt; rewriting via LATERAL is overkill here.
       const sql = `
-        WITH all_pois AS (
-          SELECT 'tour'::text AS kind, id, name, lat, lng
-            FROM salem_tour_pois WHERE deleted_at IS NULL
-          UNION ALL
-          SELECT 'business'::text AS kind, id, name, lat, lng
-            FROM salem_businesses WHERE deleted_at IS NULL
-          UNION ALL
-          SELECT 'narration'::text AS kind, id, name, lat, lng
-            FROM salem_narration_points WHERE deleted_at IS NULL
-        )
         SELECT
-          a.kind AS a_kind, a.id AS a_id, a.name AS a_name, a.lat AS a_lat, a.lng AS a_lng,
-          b.kind AS b_kind, b.id AS b_id, b.name AS b_name, b.lat AS b_lat, b.lng AS b_lng,
+          a.id AS a_id, a.name AS a_name, a.lat AS a_lat, a.lng AS a_lng,
+          b.id AS b_id, b.name AS b_name, b.lat AS b_lat, b.lng AS b_lng,
           6371000.0 * 2.0 * ASIN(SQRT(
             POWER(SIN(RADIANS(b.lat - a.lat) / 2.0), 2) +
             COS(RADIANS(a.lat)) * COS(RADIANS(b.lat)) *
             POWER(SIN(RADIANS(b.lng - a.lng) / 2.0), 2)
           )) AS distance_m
-        FROM all_pois a
-        JOIN all_pois b
-          ON (a.kind, a.id) < (b.kind, b.id)
+        FROM salem_pois a
+        JOIN salem_pois b
+          ON a.id < b.id
          AND ABS(a.lat - b.lat) <= $2
          AND ABS(a.lng - b.lng) <= $3
-        WHERE 6371000.0 * 2.0 * ASIN(SQRT(
+        WHERE a.deleted_at IS NULL AND b.deleted_at IS NULL
+          AND 6371000.0 * 2.0 * ASIN(SQRT(
                 POWER(SIN(RADIANS(b.lat - a.lat) / 2.0), 2) +
                 COS(RADIANS(a.lat)) * COS(RADIANS(b.lat)) *
                 POWER(SIN(RADIANS(b.lng - a.lng) / 2.0), 2)
@@ -326,18 +268,13 @@ module.exports = function(app, deps) {
         return res.json({ radius_m: radius, count: 0, clusters: [] });
       }
 
-      // ── JS-side cluster grouping via union-find ─────────────────────────────
-      // Each POI is keyed by `${kind}:${id}`. Walk every pair, union the two
-      // endpoints. After all unions, group nodes by their root and produce
-      // one cluster per group.
-
+      // Union-find clustering
       const parent = new Map();
-      const nodeData = new Map(); // key → { kind, id, name, lat, lng }
+      const nodeData = new Map();
 
       function find(x) {
         let root = x;
         while (parent.get(root) !== root) root = parent.get(root);
-        // Path compression
         let cur = x;
         while (parent.get(cur) !== root) {
           const next = parent.get(cur);
@@ -353,37 +290,27 @@ module.exports = function(app, deps) {
         if (rx !== ry) parent.set(rx, ry);
       }
 
-      function ensureNode(kind, id, name, lat, lng) {
-        const key = `${kind}:${id}`;
-        if (!parent.has(key)) {
-          parent.set(key, key);
-          nodeData.set(key, {
-            kind,
-            id,
-            name,
-            lat: parseFloat(lat),
-            lng: parseFloat(lng),
-          });
+      function ensureNode(id, name, lat, lng) {
+        if (!parent.has(id)) {
+          parent.set(id, id);
+          nodeData.set(id, { id, name, lat: parseFloat(lat), lng: parseFloat(lng) });
         }
-        return key;
+        return id;
       }
 
       for (const p of pairs) {
-        const a = ensureNode(p.a_kind, p.a_id, p.a_name, p.a_lat, p.a_lng);
-        const b = ensureNode(p.b_kind, p.b_id, p.b_name, p.b_lat, p.b_lng);
-        union(a, b);
+        ensureNode(p.a_id, p.a_name, p.a_lat, p.a_lng);
+        ensureNode(p.b_id, p.b_name, p.b_lat, p.b_lng);
+        union(p.a_id, p.b_id);
       }
 
-      // Group by root
-      const clusters = new Map(); // root → array of node data
+      const clusters = new Map();
       for (const key of parent.keys()) {
         const root = find(key);
         if (!clusters.has(root)) clusters.set(root, []);
         clusters.get(root).push(nodeData.get(key));
       }
 
-      // Build response: only clusters with ≥2 members (singletons can't exist
-      // here anyway since every node came from a pair, but defensive)
       function haversineMeters(lat1, lng1, lat2, lng2) {
         const toRad = (d) => d * Math.PI / 180;
         const R = 6371000;
@@ -406,7 +333,6 @@ module.exports = function(app, deps) {
             haversineMeters(centroidLat, centroidLng, m.lat, m.lng) * 100
           ) / 100,
         }));
-        // Sort members by distance from centroid (closest first)
         enriched.sort((a, b) => a.distance_m_from_centroid - b.distance_m_from_centroid);
         result.push({
           centroid: { lat: centroidLat, lng: centroidLng },
@@ -415,9 +341,7 @@ module.exports = function(app, deps) {
         });
       }
 
-      // Sort clusters by member count descending (biggest duplicates first)
       result.sort((a, b) => b.member_count - a.member_count);
-
       res.json({ radius_m: radius, count: result.length, clusters: result });
     } catch (err) {
       console.error('[AdminPois] duplicates error:', err.message);
@@ -425,18 +349,14 @@ module.exports = function(app, deps) {
     }
   });
 
-  // ─── GET /admin/salem/pois/:kind/:id — single ──────────────────────────────
-  app.get('/admin/salem/pois/:kind/:id', requirePg, async (req, res) => {
+  // ─── GET /admin/salem/pois/:id — single ──────────────────────────────────
+  app.get('/admin/salem/pois/:id', requirePg, async (req, res) => {
     try {
-      const cfg = getKindConfig(req, res);
-      if (!cfg) return;
       const id = getId(req, res);
       if (!id) return;
 
-      // Admin can see deleted rows via this endpoint by default — admin
-      // workflows often need to inspect a tombstoned POI before restoring.
       const { rows } = await pgPool.query(
-        `SELECT * FROM ${cfg.table} WHERE id = $1`,
+        `SELECT * FROM salem_pois WHERE id = $1`,
         [id]
       );
       if (!rows.length) return res.status(404).json({ error: 'Not found' });
@@ -447,20 +367,17 @@ module.exports = function(app, deps) {
     }
   });
 
-  // ─── PUT /admin/salem/pois/:kind/:id — partial update ──────────────────────
-  app.put('/admin/salem/pois/:kind/:id', requirePg, async (req, res) => {
+  // ─── PUT /admin/salem/pois/:id — partial update ──────────────────────────
+  app.put('/admin/salem/pois/:id', requirePg, async (req, res) => {
     try {
-      const cfg = getKindConfig(req, res);
-      if (!cfg) return;
       const id = getId(req, res);
       if (!id) return;
 
-      const { setSql, values, error } = buildUpdateClause(req.body, cfg.updatableFields);
+      const { setSql, values, error } = buildUpdateClause(req.body);
       if (error) return res.status(400).json({ error });
 
-      // Refuse to update a soft-deleted row — must restore first
       const existing = await pgPool.query(
-        `SELECT id, deleted_at FROM ${cfg.table} WHERE id = $1`,
+        `SELECT id, deleted_at FROM salem_pois WHERE id = $1`,
         [id]
       );
       if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
@@ -470,7 +387,7 @@ module.exports = function(app, deps) {
 
       values.push(id);
       const { rows } = await pgPool.query(
-        `UPDATE ${cfg.table} SET ${setSql} WHERE id = $${values.length} RETURNING *`,
+        `UPDATE salem_pois SET ${setSql} WHERE id = $${values.length} RETURNING *`,
         values
       );
       res.json(rows[0]);
@@ -480,11 +397,9 @@ module.exports = function(app, deps) {
     }
   });
 
-  // ─── POST /admin/salem/pois/:kind/:id/move — lat/lng only ──────────────────
-  app.post('/admin/salem/pois/:kind/:id/move', requirePg, async (req, res) => {
+  // ─── POST /admin/salem/pois/:id/move — lat/lng only ──────────────────────
+  app.post('/admin/salem/pois/:id/move', requirePg, async (req, res) => {
     try {
-      const cfg = getKindConfig(req, res);
-      if (!cfg) return;
       const id = getId(req, res);
       if (!id) return;
 
@@ -496,7 +411,7 @@ module.exports = function(app, deps) {
       if (err) return res.status(400).json({ error: err });
 
       const existing = await pgPool.query(
-        `SELECT id, lat, lng, deleted_at FROM ${cfg.table} WHERE id = $1`,
+        `SELECT id, lat, lng, deleted_at FROM salem_pois WHERE id = $1`,
         [id]
       );
       if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
@@ -508,13 +423,12 @@ module.exports = function(app, deps) {
       const oldLng = parseFloat(existing.rows[0].lng);
 
       const { rows } = await pgPool.query(
-        `UPDATE ${cfg.table} SET lat = $1, lng = $2, updated_at = NOW() WHERE id = $3 RETURNING lat, lng`,
+        `UPDATE salem_pois SET lat = $1, lng = $2, updated_at = NOW() WHERE id = $3 RETURNING lat, lng`,
         [lat, lng, id]
       );
 
       res.json({
         id,
-        kind: req.params.kind,
         from: { lat: oldLat, lng: oldLng },
         to: { lat: parseFloat(rows[0].lat), lng: parseFloat(rows[0].lng) },
       });
@@ -524,25 +438,22 @@ module.exports = function(app, deps) {
     }
   });
 
-  // ─── DELETE /admin/salem/pois/:kind/:id — soft delete ──────────────────────
-  app.delete('/admin/salem/pois/:kind/:id', requirePg, async (req, res) => {
+  // ─── DELETE /admin/salem/pois/:id — soft delete ──────────────────────────
+  app.delete('/admin/salem/pois/:id', requirePg, async (req, res) => {
     try {
-      const cfg = getKindConfig(req, res);
-      if (!cfg) return;
       const id = getId(req, res);
       if (!id) return;
 
       const { rows } = await pgPool.query(
-        `UPDATE ${cfg.table}
+        `UPDATE salem_pois
             SET deleted_at = NOW(), updated_at = NOW()
           WHERE id = $1 AND deleted_at IS NULL
           RETURNING id, deleted_at`,
         [id]
       );
       if (!rows.length) {
-        // Either the row doesn't exist, or it was already deleted. Distinguish.
         const check = await pgPool.query(
-          `SELECT id, deleted_at FROM ${cfg.table} WHERE id = $1`,
+          `SELECT id, deleted_at FROM salem_pois WHERE id = $1`,
           [id]
         );
         if (!check.rows.length) return res.status(404).json({ error: 'Not found' });
@@ -555,16 +466,14 @@ module.exports = function(app, deps) {
     }
   });
 
-  // ─── POST /admin/salem/pois/:kind/:id/restore — undo soft delete ───────────
-  app.post('/admin/salem/pois/:kind/:id/restore', requirePg, async (req, res) => {
+  // ─── POST /admin/salem/pois/:id/restore — undo soft delete ───────────────
+  app.post('/admin/salem/pois/:id/restore', requirePg, async (req, res) => {
     try {
-      const cfg = getKindConfig(req, res);
-      if (!cfg) return;
       const id = getId(req, res);
       if (!id) return;
 
       const { rows } = await pgPool.query(
-        `UPDATE ${cfg.table}
+        `UPDATE salem_pois
             SET deleted_at = NULL, updated_at = NOW()
           WHERE id = $1 AND deleted_at IS NOT NULL
           RETURNING id`,
@@ -572,7 +481,7 @@ module.exports = function(app, deps) {
       );
       if (!rows.length) {
         const check = await pgPool.query(
-          `SELECT id, deleted_at FROM ${cfg.table} WHERE id = $1`,
+          `SELECT id, deleted_at FROM salem_pois WHERE id = $1`,
           [id]
         );
         if (!check.rows.length) return res.status(404).json({ error: 'Not found' });
@@ -587,5 +496,5 @@ module.exports = function(app, deps) {
 };
 
 // Exposed for unit tests / introspection
-module.exports.KINDS = KINDS;
+module.exports.UPDATABLE_FIELDS = UPDATABLE_FIELDS;
 module.exports.JSONB_FIELDS = JSONB_FIELDS;

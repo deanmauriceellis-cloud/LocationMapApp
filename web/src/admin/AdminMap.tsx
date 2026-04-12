@@ -1,89 +1,67 @@
-// AdminMap — Phase 9P.B Step 9P.9
+// AdminMap — Phase 9U (unified salem_pois table)
 //
-// Center-pane Leaflet map for the Salem POI admin tool. Renders all 1,720
-// POIs across the three kinds (tour, business, narration) as a single
-// clustered layer with kind-specific colors. Click a marker → emits a
-// selection back to AdminLayout (which will open the edit dialog in 9P.10);
-// drag a marker → confirm modal → POSTs to /admin/salem/pois/:kind/:id/move.
-// Externally driven pan/zoom: when the parent mutates `selectedPoi`, the map
-// flies to its position. The tree click is the primary driver of this.
-//
-// ─── Why imperative cluster layer instead of react-leaflet-markercluster ────
-// react-leaflet-markercluster v3+ is built for react-leaflet v4. We're on
-// react-leaflet v5 which introduced internal API changes the wrapper hasn't
-// caught up to. The official escape hatch is to grab the leaflet map via
-// useMap() and drive the cluster group imperatively. That's also strictly
-// fewer dependencies (3 high-severity audit warnings already in the tree —
-// not adding a fourth wrapper just for an effect we can write in 30 lines).
-//
-// ─── Selection model ───────────────────────────────────────────────────────
-// Two way: tree-click sets `selectedPoi` in AdminLayout, AdminMap reacts by
-// flying to it; map-click on a marker fires `onPoiSelect` which AdminLayout
-// also routes into `selectedPoi`. The selected marker is highlighted with a
-// gold ring so the user can find it after a fly-to.
-//
-// ─── Drag-to-move flow ─────────────────────────────────────────────────────
-// 1. User starts dragging a marker (each marker has dragging.enable())
-// 2. dragend fires; AdminMap captures (kind, id, oldLat/Lng, newLat/Lng)
-// 3. A confirm modal renders over the map showing distance + before/after
-// 4. Confirm: POST /admin/salem/pois/:kind/:id/move; on success the parent's
-//    `onPoiMoved` callback updates the shared byKind so the marker stays put
-//    Cancel: marker is reverted to its original position via marker.setLatLng
+// Center-pane Leaflet map for the Salem POI admin tool. Renders all POIs from
+// the unified salem_pois table as a single clustered layer with category-based
+// colors. Click a marker → emits a selection; drag a marker → confirm modal →
+// POSTs to /admin/salem/pois/:id/move.
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.markercluster'
-import type { PoiKind, PoiRow, PoiSelection } from './PoiTree'
+import type { PoiRow, PoiSelection } from './PoiTree'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Salem center — Old Town Hall area, ~equidistant from PEM, Common, Witch
-// House. Initial zoom 14 fits the downtown POI footprint comfortably.
 const SALEM_CENTER: [number, number] = [42.5197, -70.8967]
 const INITIAL_ZOOM = 14
 
-// Kind → color. These also serve as the cluster legend.
-const KIND_COLORS: Record<PoiKind, string> = {
-  tour: '#dc2626',       // red-600 — historical/curated, fewest, most prominent
-  business: '#2563eb',   // blue-600 — merchants
-  narration: '#059669',  // emerald-600 — ambient narration points
+// Category → color. The top categories get distinct colors; everything else
+// falls back to a neutral grey. This replaces the old kind-based coloring.
+const CATEGORY_COLORS: Record<string, string> = {
+  FOOD_DRINK:          '#BF360C',
+  SHOPPING:            '#2563eb',
+  TOURISM_HISTORY:     '#dc2626',
+  ENTERTAINMENT:       '#7c3aed',
+  PARKS_REC:           '#059669',
+  WITCH_SHOP:          '#9333ea',
+  CIVIC:               '#64748b',
+  LODGING:             '#0891b2',
+  PSYCHIC:             '#a855f7',
+  GHOST_TOUR:          '#991b1b',
+  HAUNTED_ATTRACTION:  '#be123c',
+  HEALTHCARE:          '#0d9488',
+  WORSHIP:             '#78716c',
+  EDUCATION:           '#ca8a04',
+}
+const DEFAULT_COLOR = '#94a3b8' // slate-400
+
+function categoryColor(category: string | undefined): string {
+  return (category && CATEGORY_COLORS[category]) || DEFAULT_COLOR
 }
 
-const KIND_LABELS: Record<PoiKind, string> = {
-  tour: 'Tour',
-  business: 'Business',
-  narration: 'Narration',
-}
-
-// Tile sources mirror the main app's MapView so the admin operator sees
-// roughly the same basemap they're used to.
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 // ─── Marker icon factory ─────────────────────────────────────────────────────
-// L.divIcon with an inline SVG dot — fast, no asset loading, easy to recolor.
-// Selected markers get a gold halo. We cache by (kind, selected) to avoid
-// allocating a fresh DivIcon for every marker.
 
 const iconCache = new Map<string, L.DivIcon>()
 
-function poiIcon(kind: PoiKind, selected: boolean): L.DivIcon {
-  const key = `${kind}|${selected ? 'sel' : 'norm'}`
+function poiIcon(color: string, selected: boolean): L.DivIcon {
+  const key = `${color}|${selected ? 'sel' : 'norm'}`
   let icon = iconCache.get(key)
   if (icon) return icon
-  const fill = KIND_COLORS[kind]
   const size = selected ? 18 : 12
   const stroke = selected ? '#facc15' : '#ffffff'
   const strokeW = selected ? 3 : 1.5
   const html = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
       <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - strokeW / 2}"
-              fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"/>
+              fill="${color}" stroke="${stroke}" stroke-width="${strokeW}"/>
     </svg>`
   icon = L.divIcon({
     html,
-    className: 'admin-poi-marker', // unset background/border via global CSS reset below
+    className: 'admin-poi-marker',
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
@@ -94,60 +72,45 @@ function poiIcon(kind: PoiKind, selected: boolean): L.DivIcon {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface PendingMove {
-  kind: PoiKind
   poi: PoiRow
   from: { lat: number; lng: number }
   to: { lat: number; lng: number }
-  /** Reference to the leaflet marker so we can revert it on cancel. */
   marker: L.Marker
 }
 
 interface AdminMapProps {
-  /** Full POI dataset (loaded once by PoiTree, shared via AdminLayout). */
-  byKind: Record<PoiKind, PoiRow[]> | null
-  /** Currently selected POI (for fly-to + highlight). */
+  pois: PoiRow[] | null
   selectedPoi: PoiSelection | null
-  /** Fired when the user clicks a marker. */
   onPoiSelect: (selection: PoiSelection) => void
-  /** Fired when a drag-to-move is confirmed and the API call succeeds. */
-  onPoiMoved: (kind: PoiKind, id: string, lat: number, lng: number) => void
+  onPoiMoved: (id: string, lat: number, lng: number) => void
 }
 
-// ─── Marker layer (imperative, child of MapContainer) ────────────────────────
-// This component lives inside the <MapContainer>. It uses useMap() to grab
-// the leaflet map, then imperatively builds and updates the cluster group.
+// ─── Marker layer ────────────────────────────────────────────────────────────
 
 interface MarkerLayerProps {
-  byKind: Record<PoiKind, PoiRow[]>
+  pois: PoiRow[]
   selectedKey: string | null
   onPoiSelect: (selection: PoiSelection) => void
   onDragEnd: (move: PendingMove) => void
 }
 
 function MarkerLayer({
-  byKind,
+  pois,
   selectedKey,
   onPoiSelect,
   onDragEnd,
 }: MarkerLayerProps) {
   const map = useMap()
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
-  // markersByKey lets us recolor a single marker on selection change without
-  // rebuilding the whole cluster (rebuild = ~1,700 marker allocs + reflow).
-  const markersByKeyRef = useRef<Map<string, { marker: L.Marker; kind: PoiKind }>>(new Map())
+  const markersByKeyRef = useRef<Map<string, { marker: L.Marker; color: string }>>(new Map())
 
-  // Build (or rebuild) the cluster group when the dataset changes.
   useEffect(() => {
-    // Tear down any prior layer first
     if (clusterGroupRef.current) {
       map.removeLayer(clusterGroupRef.current)
       clusterGroupRef.current = null
       markersByKeyRef.current.clear()
     }
 
-    // disableClusteringAtZoom: 18 → at the deepest zooms the operator wants
-    // every individual POI visible (not folded into a cluster) so they can
-    // pick the exact one to drag. spiderfyOnMaxZoom handles overlap below.
     const cluster = L.markerClusterGroup({
       showCoverageOnHover: false,
       spiderfyOnMaxZoom: true,
@@ -157,54 +120,44 @@ function MarkerLayer({
 
     const allMarkers: L.Marker[] = []
 
-    for (const kind of ['tour', 'business', 'narration'] as PoiKind[]) {
-      const rows = byKind[kind] ?? []
-      for (const poi of rows) {
-        // Skip soft-deleted from the map (we still keep them in the tree
-        // behind the toggle, but the map is the operator's spatial workspace
-        // and clutter from tombstones is unhelpful here)
-        if (poi.deleted_at) continue
-        if (typeof poi.lat !== 'number' || typeof poi.lng !== 'number') continue
-        if (!Number.isFinite(poi.lat) || !Number.isFinite(poi.lng)) continue
+    for (const poi of pois) {
+      if (poi.deleted_at) continue
+      if (typeof poi.lat !== 'number' || typeof poi.lng !== 'number') continue
+      if (!Number.isFinite(poi.lat) || !Number.isFinite(poi.lng)) continue
 
-        const key = `${kind}:${poi.id}`
-        const isSelected = key === selectedKey
+      const key = poi.id
+      const isSelected = key === selectedKey
+      const color = categoryColor(poi.category as string)
 
-        const marker = L.marker([poi.lat, poi.lng], {
-          icon: poiIcon(kind, isSelected),
-          draggable: true,
-          autoPan: true,
-          title: `${KIND_LABELS[kind]}: ${poi.name}`,
+      const marker = L.marker([poi.lat, poi.lng], {
+        icon: poiIcon(color, isSelected),
+        draggable: true,
+        autoPan: true,
+        title: `${poi.category || '—'}: ${poi.name}`,
+      })
+
+      marker.on('click', () => {
+        onPoiSelect({ poi })
+      })
+
+      let dragOrigin = { lat: poi.lat, lng: poi.lng }
+      marker.on('dragstart', () => {
+        const ll = marker.getLatLng()
+        dragOrigin = { lat: ll.lat, lng: ll.lng }
+      })
+      marker.on('dragend', () => {
+        const ll = marker.getLatLng()
+        if (ll.lat === dragOrigin.lat && ll.lng === dragOrigin.lng) return
+        onDragEnd({
+          poi,
+          from: dragOrigin,
+          to: { lat: ll.lat, lng: ll.lng },
+          marker,
         })
+      })
 
-        marker.on('click', () => {
-          onPoiSelect({ kind, poi })
-        })
-
-        // Capture the original position at dragstart so we can revert on
-        // cancel without re-querying the row (which the map state may have
-        // already mutated)
-        let dragOrigin = { lat: poi.lat, lng: poi.lng }
-        marker.on('dragstart', () => {
-          const ll = marker.getLatLng()
-          dragOrigin = { lat: ll.lat, lng: ll.lng }
-        })
-        marker.on('dragend', () => {
-          const ll = marker.getLatLng()
-          // No-op move (user grabbed and released without moving)
-          if (ll.lat === dragOrigin.lat && ll.lng === dragOrigin.lng) return
-          onDragEnd({
-            kind,
-            poi,
-            from: dragOrigin,
-            to: { lat: ll.lat, lng: ll.lng },
-            marker,
-          })
-        })
-
-        allMarkers.push(marker)
-        markersByKeyRef.current.set(key, { marker, kind })
-      }
+      allMarkers.push(marker)
+      markersByKeyRef.current.set(key, { marker, color })
     }
 
     cluster.addLayers(allMarkers)
@@ -218,22 +171,19 @@ function MarkerLayer({
         markersByKeyRef.current.clear()
       }
     }
-    // Rebuild on dataset change. selectedKey is handled in a separate effect
-    // below to avoid full rebuilds on every selection click.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byKind, map])
+  }, [pois, map])
 
-  // Recolor only the (de)selected markers when selection changes.
   const previousSelectedKeyRef = useRef<string | null>(null)
   useEffect(() => {
     const prev = previousSelectedKeyRef.current
     if (prev && prev !== selectedKey) {
       const entry = markersByKeyRef.current.get(prev)
-      if (entry) entry.marker.setIcon(poiIcon(entry.kind, false))
+      if (entry) entry.marker.setIcon(poiIcon(entry.color, false))
     }
     if (selectedKey) {
       const entry = markersByKeyRef.current.get(selectedKey)
-      if (entry) entry.marker.setIcon(poiIcon(entry.kind, true))
+      if (entry) entry.marker.setIcon(poiIcon(entry.color, true))
     }
     previousSelectedKeyRef.current = selectedKey
   }, [selectedKey])
@@ -241,10 +191,7 @@ function MarkerLayer({
   return null
 }
 
-// ─── Pan/zoom controller (also a MapContainer child) ─────────────────────────
-// Watches selectedPoi and flies to it when the parent updates it. Uses
-// flyTo at zoom ≥17 so the operator can see the marker plainly. Skips the
-// fly when the change came from a marker click (the map is already there).
+// ─── Fly-to controller ──────────────────────────────────────────────────────
 
 interface FlyToProps {
   selectedPoi: PoiSelection | null
@@ -255,7 +202,7 @@ function FlyToSelected({ selectedPoi }: FlyToProps) {
   const lastIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (!selectedPoi) return
-    const key = `${selectedPoi.kind}:${selectedPoi.poi.id}`
+    const key = selectedPoi.poi.id
     if (key === lastIdRef.current) return
     lastIdRef.current = key
     const { lat, lng } = selectedPoi.poi
@@ -267,7 +214,7 @@ function FlyToSelected({ selectedPoi }: FlyToProps) {
   return null
 }
 
-// ─── Move-confirm modal ──────────────────────────────────────────────────────
+// ─── Move-confirm modal ─────────────────────────────────────────────────────
 
 function metersBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const R = 6371000
@@ -295,7 +242,6 @@ function MoveConfirm({ pending, onConfirm, onCancel, busy, error }: MoveConfirmP
       <div className="bg-white rounded shadow-lg w-96 max-w-[90vw] p-4 text-sm text-slate-800">
         <h2 className="text-base font-semibold mb-2">Confirm POI move</h2>
         <p className="text-xs text-slate-600 mb-3">
-          {KIND_LABELS[pending.kind]} POI{' '}
           <span className="font-medium text-slate-800">{pending.poi.name}</span>{' '}
           (<span className="font-mono text-[10px]">{pending.poi.id}</span>)
         </p>
@@ -345,30 +291,30 @@ function MoveConfirm({ pending, onConfirm, onCancel, busy, error }: MoveConfirmP
   )
 }
 
-// ─── Legend (top-right corner) ───────────────────────────────────────────────
+// ─── Legend ──────────────────────────────────────────────────────────────────
 
-function Legend({ counts }: { counts: { tour: number; business: number; narration: number } }) {
+function Legend({ categoryCounts }: { categoryCounts: [string, number][] }) {
   return (
-    <div className="absolute top-2 right-2 z-[100] bg-white/95 border border-slate-300 rounded shadow px-3 py-2 text-xs">
+    <div className="absolute top-2 right-2 z-[100] bg-white/95 border border-slate-300 rounded shadow px-3 py-2 text-xs max-h-80 overflow-y-auto">
       <div className="font-semibold text-slate-700 mb-1">Legend</div>
-      {(['tour', 'business', 'narration'] as PoiKind[]).map((k) => (
-        <div key={k} className="flex items-center gap-2">
+      {categoryCounts.map(([cat, count]) => (
+        <div key={cat} className="flex items-center gap-2">
           <span
-            className="inline-block w-3 h-3 rounded-full border border-white"
-            style={{ background: KIND_COLORS[k] }}
+            className="inline-block w-3 h-3 rounded-full border border-white flex-shrink-0"
+            style={{ background: categoryColor(cat) }}
           />
-          <span className="text-slate-700">{KIND_LABELS[k]}</span>
-          <span className="ml-auto tabular-nums text-slate-500">{counts[k]}</span>
+          <span className="text-slate-700 truncate">{cat}</span>
+          <span className="ml-auto tabular-nums text-slate-500">{count}</span>
         </div>
       ))}
     </div>
   )
 }
 
-// ─── Top-level component ─────────────────────────────────────────────────────
+// ─── Top-level component ────────────────────────────────────────────────────
 
 export function AdminMap({
-  byKind,
+  pois,
   selectedPoi,
   onPoiSelect,
   onPoiMoved,
@@ -377,19 +323,18 @@ export function AdminMap({
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
 
-  const selectedKey = selectedPoi
-    ? `${selectedPoi.kind}:${selectedPoi.poi.id}`
-    : null
+  const selectedKey = selectedPoi?.poi.id ?? null
 
-  const counts = useMemo(() => {
-    if (!byKind) return { tour: 0, business: 0, narration: 0 }
-    const visible = (rows: PoiRow[]) => rows.filter((r) => !r.deleted_at).length
-    return {
-      tour: visible(byKind.tour),
-      business: visible(byKind.business),
-      narration: visible(byKind.narration),
+  const categoryCounts = useMemo(() => {
+    if (!pois) return []
+    const counts = new Map<string, number>()
+    for (const p of pois) {
+      if (p.deleted_at) continue
+      const cat = (p.category as string) || '(uncategorized)'
+      counts.set(cat, (counts.get(cat) || 0) + 1)
     }
-  }, [byKind])
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])
+  }, [pois])
 
   const handleDragEnd = useCallback((move: PendingMove) => {
     setPending(move)
@@ -398,7 +343,6 @@ export function AdminMap({
 
   const handleCancel = useCallback(() => {
     if (pending) {
-      // Snap the marker back to its origin
       pending.marker.setLatLng([pending.from.lat, pending.from.lng])
     }
     setPending(null)
@@ -411,7 +355,7 @@ export function AdminMap({
     setMoveError(null)
     try {
       const res = await fetch(
-        `/api/admin/salem/pois/${encodeURIComponent(pending.kind)}/${encodeURIComponent(pending.poi.id)}/move`,
+        `/api/admin/salem/pois/${encodeURIComponent(pending.poi.id)}/move`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -425,15 +369,13 @@ export function AdminMap({
           const body = await res.json()
           if (body?.error) msg = `${res.status} ${body.error}`
         } catch {
-          // body wasn't JSON; keep status text
+          // body wasn't JSON
         }
         throw new Error(msg)
       }
-      // Success: notify parent so the shared byKind reflects the new lat/lng
-      onPoiMoved(pending.kind, pending.poi.id, pending.to.lat, pending.to.lng)
+      onPoiMoved(pending.poi.id, pending.to.lat, pending.to.lng)
       setPending(null)
     } catch (e) {
-      // On failure, also revert the marker so the map stays consistent with PG
       pending.marker.setLatLng([pending.from.lat, pending.from.lng])
       setMoveError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -441,7 +383,7 @@ export function AdminMap({
     }
   }, [pending, onPoiMoved])
 
-  if (!byKind) {
+  if (!pois) {
     return (
       <div className="absolute inset-0 flex items-center justify-center text-slate-500">
         <p className="text-sm italic">Loading POI map…</p>
@@ -459,14 +401,14 @@ export function AdminMap({
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={19} />
         <MarkerLayer
-          byKind={byKind}
+          pois={pois}
           selectedKey={selectedKey}
           onPoiSelect={onPoiSelect}
           onDragEnd={handleDragEnd}
         />
         <FlyToSelected selectedPoi={selectedPoi} />
       </MapContainer>
-      <Legend counts={counts} />
+      <Legend categoryCounts={categoryCounts} />
       {pending && (
         <MoveConfirm
           pending={pending}

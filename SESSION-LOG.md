@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 106-116. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 108-117. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 117: 2026-04-12 — Phase 9U Session 117: unified salem_pois table — three-table merge complete
+
+Merged `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_pois` (45) into a single `salem_pois` table (71 columns, 976 rows, 14 categories). Steps 9U.1-9U.6 shipped: unified DDL, migration script, FK repointing, admin backend + frontend rewritten for single-table queries, old tables renamed to `_legacy`. `PoiKind` type removed entirely from frontend. Zero TypeScript errors.
+
+Full session detail: `docs/session-logs/session-117-2026-04-12.md`.
+
+---
 
 ## Session 116: 2026-04-12 — Phase 9U planning: Unified POI table + SalemIntelligence import
 
@@ -226,33 +234,5 @@ Short polish session sandwiched between S107's 9P.10b finalization commit and th
 
 ---
 
-## Session 107: 2026-04-09 — Phase 9P.B Step 9P.10b finalization (recovery + commit)
-
-### Summary
-Crash-recovery + commit session for the cross-midnight S106 work. S106 ran 2026-04-08 → 2026-04-09 and implemented Phase 9P.B Step 9P.10b (Salem Oracle integration) end-to-end including the live smoke test, but the session ended without committing — three artifacts were left dirty on disk: untracked `web/src/admin/oracleClient.ts` (~248 lines), modified `web/src/admin/AdminLayout.tsx` (+137/-8 with the Oracle status pill polling), and modified `web/src/admin/PoiEditDialog.tsx` (+440/-1 with the Generate sub-dialog modal). S107 verified the work was complete and clean: re-ran `cd web && npx tsc --noEmit` (exit 0), re-ran `npm run build` (clean, 539 modules, 802.45 kB / 234.29 kB gzip — identical to S106 final numbers, no drift), confirmed the live Salem Oracle was still up at `http://localhost:8088` (PID 8167, `available:true`, 3891 facts / 4950 primary sources / 63 POIs / 202 newspapers loaded, same Oracle session S106 hit), and committed the work as `a498562` titled "Session 106 → 107: Phase 9P.B Step 9P.10b — Salem Oracle integration". The commit included `STATE.md` and `WickedSalemWitchCityTour_MASTER_PLAN.md` (both already updated by S106), the new `oracleClient.ts`, the modified `AdminLayout.tsx` and `PoiEditDialog.tsx`, both session-106 live log files (the 04-08 stub and the 04-09 cross-midnight finalization log), and the new S107 live log. Master plan and STATE.md left as-is from S106 (no further changes needed). Updated `~/.claude/projects/.../memory/project_next_session_priority.md` to point at Phase 9P.B Step 9P.11 (Highlight Duplicates wiring) as the new top priority. **NOTE-L015 confirmed stale a second time** in S107: `~/Development/SalemCommercial/` still does not exist on this workstation; the OMEN-016d "grand cutover" has not landed here; the `salem-content/` hardcoded paths are still valid. Both S106 and S107 OMEN reports surface this for retraction or re-attempt. After S107 commit, this session-end follow-up updates `CLAUDE.md` (107 sessions, v1.5.69) and prepends this entry to `SESSION-LOG.md`.
-
-### Decisions
-1. **Treat the dirty disk state as recovery, not as parallel branching.** S106's work was substantively complete and matched the master plan §1332-1387 build task list exactly; the right move was to verify + commit, not rewrite or rebase.
-2. **Re-ran tsc + build to confirm no drift** between S106's final state and the current disk. Identical outputs → green to commit.
-3. **Skipped a redundant `/api/oracle/ask` smoke test** because S106 already did two real ones and the typed client matches the live API exactly.
-4. **Did not touch master plan or STATE.md** — both were already correctly updated by S106.
-5. **Did not touch `session-106-*.md` live logs** — both files (the 04-08 stub and the 04-09 cross-midnight finalization log) are S106's work product and should remain as-written for traceability.
-6. **Bumped session count to 107 in CLAUDE.md** because S107 is the canonical "completion" session per the commit hash, even though S106 did the implementation work. The OMEN reports for both sessions remain separate to preserve accountability.
-
-### Files Changed
-- (committed by S107) `web/src/admin/oracleClient.ts`, `web/src/admin/AdminLayout.tsx`, `web/src/admin/PoiEditDialog.tsx`, `STATE.md`, `WickedSalemWitchCityTour_MASTER_PLAN.md`, `docs/session-logs/session-106-2026-04-09.md`, `docs/session-logs/session-107-2026-04-09.md` — all part of commit `a498562`
-- `~/.claude/projects/.../memory/project_next_session_priority.md` — rewritten by S107 to point at 9P.11
-- `CLAUDE.md` — modified (this session, post-commit follow-up: bumped session count 106 → 107)
-- `SESSION-LOG.md` — modified (this session, this entry)
-- `~/Development/OMEN/reports/locationmapapp/session-106-2026-04-09.md` — S106 OMEN report
-- `~/Development/OMEN/reports/locationmapapp/session-107-2026-04-09.md` — S107 OMEN report (this session)
-
-### Status
-- Phase 9P.B: **6/8 done** (9P.6, 9P.7, 9P.8, 9P.9, 9P.10, 9P.10b)
-- Next step: **Phase 9P.B Step 9P.11 — Highlight Duplicates wiring**
-- 9P.10a still deferred (stub in dialog, blocked on Phase 9Q)
-- Commit `a498562` lands the implementation; this session-end follow-up adds the doc-level wrap-up
-
----
 
 

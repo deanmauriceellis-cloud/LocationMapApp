@@ -2,19 +2,17 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-12 — Session 116 (planning session — Phase 9U Unified POI Table added to master plan, SalemIntelligence integration guide reviewed, V1 offline-only constraint established)
+**Last updated:** 2026-04-12 — Session 117 (Phase 9U Steps 9U.1-9U.6 shipped — unified salem_pois table, three-table merge, admin tool rewrite)
 
 ---
 
 ## TOP PRIORITY — Next Session (S117)
 
-**Phase 9U: Unified POI Table & SalemIntelligence Import — Session 117 (Step 9U.1-9U.6)**
+**Phase 9U: Unified POI Table & SalemIntelligence Import — Session 118 (Steps 9U.7-9U.11)**
 
-Merge `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_pois` (45) into a single `salem_pois` table. S116 analysis confirmed 817/817 narration points match businesses by name+coordinates — they're the same entities stored twice. Full plan in `WickedSalemWitchCityTour_MASTER_PLAN.md` Phase 9U.
+S117 completed Steps 9U.1-9U.6: unified `salem_pois` table live with 976 rows (817 narration + 133 businesses + 26 tour-only), 14 categories, 71 columns, 6 FK constraints repointed, admin tool fully rewritten. Old tables renamed to `_legacy`.
 
-**Session 117 scope:** Create `salem_pois` schema, migrate three tables into one, repoint 5 FK references, update admin tool backend + frontend, rename old tables to `_legacy`, verify.
-
-**Session 118:** Pull SalemIntelligence BCS snapshot (1,724 entities), build category mapping (BCS→LMA), add 4 new subcategories, import ~900 new entities, set default visibility.
+**Session 118 scope:** Pull SalemIntelligence BCS snapshot (1,724 entities), build category mapping (BCS→LMA), add 4 new subcategories, import ~900 new entities, set default visibility.
 
 **Session 119:** Admin tool tree rework for unified table, publish loop (PG→Room DB), Room migration, Android DAO updates.
 
@@ -36,14 +34,14 @@ Merge `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
-| **9U** Unified POI Table | **PLANNING COMPLETE (S116)** | 4 sessions (S117-S120). Merge 3 tables + BCS import + admin tool + publish loop + Room migration. Supersedes 9P.B+ taxonomy arc. |
+| **9U** Unified POI Table | **S117 DONE (schema + merge + admin rewrite)** | 3 sessions left (S118-S120). BCS import + publish loop + Room migration. |
 | **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9U+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 116. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 117. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -95,8 +93,8 @@ Merge `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_
 
 ## POI Inventory
 
-- **Current PG:** 45 tour POIs + 861 businesses + 817 narration points = **1,723 active POIs** (split across 3 tables)
-- **After Phase 9U:** ~2,600 unified POIs in single `salem_pois` table (~862 migrated from existing + ~900 new from BCS + enrichment)
+- **Current PG:** **976 unified POIs** in `salem_pois` (817 narrated + 133 business-only + 26 tour-only). Old 3-table split renamed to `_legacy`.
+- **After Phase 9U S118:** ~2,600 unified POIs (976 current + ~900 new from BCS import + enrichment)
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
 
 ---

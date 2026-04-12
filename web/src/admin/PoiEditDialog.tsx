@@ -2,7 +2,7 @@
 //
 // Tabbed modal for editing a single POI across all three kinds. Opens when
 // the operator clicks a marker on AdminMap; closes on Save (success) or Cancel.
-// Mirrors the PUT /admin/salem/pois/:kind/:id endpoint's whitelist exactly
+// Mirrors the PUT /admin/salem/pois/:id endpoint's whitelist exactly
 // (see poiAdminFields.ts and cache-proxy/lib/admin-pois.js).
 //
 // ─── Tab structure (per master plan §1296) ────────────────────────────────
@@ -30,7 +30,7 @@
 //   3. Marking the row updated_at when nothing changed
 //
 // ─── Soft-delete (Danger Zone) ─────────────────────────────────────────────
-// DELETE /admin/salem/pois/:kind/:id sets deleted_at = NOW(). On success the
+// DELETE /admin/salem/pois/:id sets deleted_at = NOW(). On success the
 // dialog closes and AdminLayout's onPoiDeleted patches the row in shared
 // byKind so the tree immediately ghosts it.
 //
@@ -52,9 +52,9 @@ import {
   TransitionChild,
 } from '@headlessui/react'
 import { useForm, type FieldValues, type SubmitHandler } from 'react-hook-form'
-import type { PoiKind, PoiRow } from './PoiTree'
+import type { PoiRow } from './PoiTree'
 import {
-  FIELDS_BY_KIND,
+  UPDATABLE_FIELDS,
   JSONB_FIELDS,
   BOOLEAN_FIELDS,
   NUMERIC_FIELDS,
@@ -84,7 +84,7 @@ const ORACLE_AUDIT_MAX = 500 // cap to keep localStorage manageable
 interface OracleAuditEntry {
   ts: string
   poi_id: string
-  poi_kind: PoiKind
+  poi_category: string
   field: string
   question: string
   text: string
@@ -112,8 +112,7 @@ export interface PoiEditDialogProps {
   open: boolean
   /** The POI being edited (or null when the dialog is closed). */
   poi: PoiRow | null
-  /** Which kind the POI belongs to — drives field visibility. */
-  kind: PoiKind | null
+  /** @deprecated kind removed in Phase 9U — unified table */
   /**
    * Observed category / business_type values from the loaded dataset.
    * Used to populate the <datalist> autocomplete on the category field.
@@ -133,9 +132,9 @@ export interface PoiEditDialogProps {
    */
   onOracleRefresh: () => void | Promise<void>
   /** Called after a successful PUT, with the full updated row from the API. */
-  onSaved: (kind: PoiKind, updated: PoiRow) => void
+  onSaved: (updated: PoiRow) => void
   /** Called after a successful soft-delete, so AdminLayout can patch the row. */
-  onDeleted: (kind: PoiKind, id: string, deletedAt: string) => void
+  onDeleted: (id: string, deletedAt: string) => void
   /** Called when the dialog should close (Cancel, ESC, backdrop, post-save). */
   onClose: () => void
 }
@@ -153,8 +152,8 @@ function notNullish(v: unknown): boolean {
  * passes through, with `null`/`undefined` collapsed to '' so inputs stay
  * controlled.
  */
-function buildDefaults(poi: PoiRow, kind: PoiKind): Record<string, unknown> {
-  const fields = FIELDS_BY_KIND[kind]
+function buildDefaults(poi: PoiRow): Record<string, unknown> {
+  const fields = UPDATABLE_FIELDS
   const out: Record<string, unknown> = {}
   for (const field of fields) {
     const raw = poi[field]
@@ -272,7 +271,6 @@ function FieldRow({ label, htmlFor, hint, children }: FieldRowProps) {
 export function PoiEditDialog({
   open,
   poi,
-  kind,
   knownCategories,
   oracleAvailable,
   onOracleRefresh,
@@ -285,9 +283,9 @@ export function PoiEditDialog({
   // POI. The `key` on Dialog forces a fresh form mount per POI; that combined
   // with `defaultValues` is the simplest way to keep state isolated per POI.
   const defaultValues = useMemo(() => {
-    if (!poi || !kind) return {}
-    return buildDefaults(poi, kind)
-  }, [poi, kind])
+    if (!poi) return {}
+    return buildDefaults(poi)
+  }, [poi])
 
   const {
     register,
@@ -345,7 +343,7 @@ export function PoiEditDialog({
   // Iterate always passes false to keep history rolling.
   const runOracleAsk = useCallback(
     async (forceReset: boolean | null) => {
-      if (!poi || !kind) return
+      if (!poi) return
       const question = oraclePrompt.trim()
       if (!question) {
         setOracleError('Prompt is empty')
@@ -376,7 +374,7 @@ export function PoiEditDialog({
         setOracleBusy(false)
       }
     },
-    [poi, kind, oraclePrompt, oracleReset, oracleBusy],
+    [poi, oraclePrompt, oracleReset, oracleBusy],
   )
 
   // Paste the latest Oracle text into a form field, mark it dirty so the
@@ -385,7 +383,7 @@ export function PoiEditDialog({
   // second field if they want — they close it manually when done.
   const insertOracleInto = useCallback(
     (field: string) => {
-      if (!oracleResult || !poi || !kind) return
+      if (!oracleResult || !poi) return
       setValue(field, oracleResult.text, {
         shouldDirty: true,
         shouldValidate: false,
@@ -394,7 +392,7 @@ export function PoiEditDialog({
       appendOracleAudit({
         ts: new Date().toISOString(),
         poi_id: poi.id,
-        poi_kind: kind,
+        poi_category: (poi.category as string) || '',
         field,
         question: oracleResultQuestion,
         text: oracleResult.text,
@@ -402,14 +400,14 @@ export function PoiEditDialog({
         history_turn_count: oracleResult.history_turn_count,
       })
     },
-    [oracleResult, oracleResultQuestion, poi, kind, setValue],
+    [oracleResult, oracleResultQuestion, poi, setValue],
   )
 
   // ─── Save flow ─────────────────────────────────────────────────────────────
 
   const onSubmit: SubmitHandler<FieldValues> = useCallback(
     async (values) => {
-      if (!poi || !kind) return
+      if (!poi) return
       setSaveError(null)
       const built = buildPayload(values, dirtyFields)
       if ('error' in built) {
@@ -423,7 +421,7 @@ export function PoiEditDialog({
       }
       try {
         const res = await fetch(
-          `/api/admin/salem/pois/${encodeURIComponent(kind)}/${encodeURIComponent(poi.id)}`,
+          `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -442,17 +440,17 @@ export function PoiEditDialog({
           throw new Error(msg)
         }
         const updated = (await res.json()) as PoiRow
-        onSaved(kind, updated)
+        onSaved(updated)
         // Reset the form to the new server state so dirty tracking restarts
         // from the freshly-saved baseline (only matters if we re-open without
         // unmounting; harmless either way).
-        reset(buildDefaults(updated, kind))
+        reset(buildDefaults(updated))
         onClose()
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : String(e))
       }
     },
-    [poi, kind, dirtyFields, onSaved, onClose, reset],
+    [poi, dirtyFields, onSaved, onClose, reset],
   )
 
   // ─── Cancel / close flow ───────────────────────────────────────────────────
@@ -473,12 +471,12 @@ export function PoiEditDialog({
   // ─── Delete flow ───────────────────────────────────────────────────────────
 
   const handleDelete = useCallback(async () => {
-    if (!poi || !kind) return
+    if (!poi) return
     setDeleteBusy(true)
     setDeleteError(null)
     try {
       const res = await fetch(
-        `/api/admin/salem/pois/${encodeURIComponent(kind)}/${encodeURIComponent(poi.id)}`,
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
         { method: 'DELETE', credentials: 'same-origin' },
       )
       if (!res.ok) {
@@ -492,7 +490,7 @@ export function PoiEditDialog({
         throw new Error(msg)
       }
       const body = (await res.json()) as { id: string; deleted_at: string }
-      onDeleted(kind, poi.id, body.deleted_at)
+      onDeleted(poi.id, body.deleted_at)
       setConfirmDelete(false)
       onClose()
     } catch (e) {
@@ -500,13 +498,13 @@ export function PoiEditDialog({
     } finally {
       setDeleteBusy(false)
     }
-  }, [poi, kind, onDeleted, onClose])
+  }, [poi, onDeleted, onClose])
 
   // ─── Render guards ─────────────────────────────────────────────────────────
-  if (!poi || !kind) return null
+  if (!poi) return null
 
-  // Convenience: which fields are valid for this kind
-  const allowed = new Set(FIELDS_BY_KIND[kind])
+  // Convenience: unified field whitelist
+  const allowed = new Set<string>(UPDATABLE_FIELDS)
   const has = (f: string) => allowed.has(f)
   const reg = (f: string) => register(f)
 
@@ -556,7 +554,7 @@ export function PoiEditDialog({
                     {poi.name || '(unnamed)'}
                   </DialogTitle>
                   <p className="text-xs text-slate-500 font-mono truncate">
-                    {kind} · {poi.id}
+                    {poi.category || '—'} · {poi.id}
                     {poi.deleted_at && (
                       <span className="ml-2 text-rose-600">
                         soft-deleted at {String(poi.deleted_at).slice(0, 19)}
@@ -1390,7 +1388,7 @@ export function PoiEditDialog({
                   </DialogTitle>
                   <p className="text-xs text-slate-500 truncate">
                     Editing <span className="font-mono">{poi.id}</span> · context
-                    pinned to this POI ({kind})
+                    pinned to this POI ({poi.category || '—'})
                   </p>
                 </div>
                 <button
