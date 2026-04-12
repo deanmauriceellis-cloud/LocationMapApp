@@ -1,11 +1,19 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 105, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 106, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 105, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 106, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
 
 ---
 
-# Sessions S001-S105 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S106 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 106: 2026-04-09 — Phase 9P.B Step 9P.10b (Salem Oracle "Generate with AI" integration)
+
+Built the Salem Oracle integration end-to-end: `oracleClient.ts` typed wrapper, `OraclePill` status indicator in admin header (polled, 3-state), nested "Generate with AI" sub-dialog in both Narration and General tabs of `PoiEditDialog`, Insert buttons that flow through react-hook-form dirty tracking, localStorage audit log capped at 500 entries. Smoke-tested against live Oracle.
+
+Full session detail: `docs/session-logs/session-106-2026-04-09.md`.
+
+---
 
 
 ## Session 105: 2026-04-08 — Phase 9P.B Step 9P.10 (POI edit dialog — tabbed Headless UI modal)

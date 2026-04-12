@@ -28,8 +28,9 @@
 12. [Phase 9A — Splash Screen & Satellite Map Entry](#phase-9a--splash-screen--satellite-map-entry)
 13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation)
 14. [Phase 9T — Salem Walking Tour Restructure](#phase-9t--salem-walking-tour-restructure)
-15. [Phase 9P — POI Admin Tool (Developer Infrastructure)](#phase-9p--poi-admin-tool-developer-infrastructure) **← PRIORITY**
-16. [Phase 9Q — Salem Domain Content Bridge](#phase-9q--salem-domain-content-bridge)
+15. [Phase 9P — POI Admin Tool (Developer Infrastructure)](#phase-9p--poi-admin-tool-developer-infrastructure)
+16. [Phase 9U — Unified POI Table & SalemIntelligence Import](#phase-9u--unified-poi-table--salemintelligence-import) **← PRIORITY**
+17. [Phase 9Q — Salem Domain Content Bridge](#phase-9q--salem-domain-content-bridge)
 17. [Phase 9R — Historic Tour Mode (App-Side)](#phase-9r--historic-tour-mode-app-side)
 18. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
 16. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
@@ -1443,6 +1444,368 @@ The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that 
 
 ---
 
+## Phase 9U — Unified POI Table & SalemIntelligence Import
+
+**Goal:** Merge `salem_narration_points` (817 rows), `salem_businesses` (861 rows), and `salem_tour_pois` (45 rows) into a single canonical `salem_pois` table. Then import ~900 new entities from SalemIntelligence's BCS (Business Current State) export to bring the total to ~2,600 enriched Salem POIs. Every POI — restaurant, witch shop, dentist, park, historic house — lives in one row with one schema, one category FK, and one admin interface. Non-tourist POIs (healthcare, auto services, offices, etc.) exist in the table with `default_visible = false`, available via layer toggles.
+
+**Motivation (Session 116 analysis):** The current three-table split is an artifact of the original import pipeline, not a meaningful data distinction. 817 out of 817 narration points have matching businesses with identical names, coordinates, phone numbers, and descriptions. They're the same entities stored twice with different column sets. SalemIntelligence adds 1,724 BCS entities (many overlapping, ~900 genuinely new) with much richer metadata (hours, amenities, owners, origin stories). Importing into the split structure would mean deciding "is this a business or a narration point?" for every new entity. A unified table eliminates that question permanently.
+
+**Key architectural decision (Session 116):** V1 commercial release is fully offline. SalemIntelligence is a build-time data source only — we call `GET /api/intel/poi-export` once at dev time, import into PG, run through the publish pipeline into Room DB, and ship in the APK. No runtime API calls. The `intel_entity_id` column stores the SalemIntelligence FK for future v2 online features at zero cost.
+
+**Target:** 4 sessions (S117-S120) | **Status:** PLANNING COMPLETE (Session 116) | **Added:** Session 116 | **Priority:** HIGHEST — blocks 9P.C (publish loop), 9Q (content bridge), and 9R (historic tour mode)
+
+**Supersedes:** The Phase 9P.B+ taxonomy alignment arc (Steps 1-4 from `docs/poi-taxonomy-plan.md`). The unified table absorbs the category backfill, FK enforcement, publish loop, and Room migration that were planned as separate steps. `docs/poi-taxonomy-plan.md` remains as historical reference but is no longer the active plan.
+
+---
+
+### Session 117 — Schema Migration & Three-Table Merge
+
+#### Step 9U.1: Create `salem_pois` unified table
+
+- [ ] Add `CREATE TABLE salem_pois` to `cache-proxy/salem-schema.sql` with the superset schema:
+
+  **Core identity:**
+  - `id TEXT PRIMARY KEY`
+  - `name TEXT NOT NULL`, `lat DOUBLE PRECISION NOT NULL`, `lng DOUBLE PRECISION NOT NULL`
+  - `address TEXT`
+  - `status TEXT DEFAULT 'open'` — open / temporarily_closed / seasonal / unknown
+
+  **Taxonomy (FK-enforced):**
+  - `category TEXT REFERENCES salem_poi_categories(id)` — NOT NULL after backfill
+  - `subcategory TEXT REFERENCES salem_poi_subcategories(id)`
+
+  **Narration layer (null for non-narrated POIs):**
+  - `short_narration TEXT`, `long_narration TEXT`, `narration_pass_2 TEXT`, `narration_pass_3 TEXT`
+  - `geofence_radius_m INTEGER DEFAULT 40`, `geofence_shape TEXT DEFAULT 'circle'`, `corridor_points TEXT`
+  - `priority INTEGER DEFAULT 3`, `wave INTEGER`
+  - `voice_clip_asset TEXT`, `custom_voice_asset TEXT`
+
+  **Business layer (null for parks/public art/etc):**
+  - `cuisine_type TEXT`, `price_range TEXT`, `rating REAL`
+  - `merchant_tier INTEGER DEFAULT 0`, `ad_priority INTEGER DEFAULT 0`
+
+  **Historical/tour layer (null for non-historic POIs):**
+  - `historical_period TEXT`, `historical_note TEXT`
+  - `admission_info TEXT`
+  - `requires_transportation BOOLEAN DEFAULT false`
+  - `wheelchair_accessible BOOLEAN DEFAULT true`
+  - `seasonal BOOLEAN DEFAULT false`
+
+  **Contact/hours:**
+  - `phone TEXT`, `email TEXT`, `website TEXT`
+  - `hours JSONB` — structured JSON (upgrade from text)
+  - `hours_text TEXT` — preserve legacy freeform hours strings
+  - `menu_url TEXT`, `reservations_url TEXT`, `order_url TEXT`
+
+  **Content:**
+  - `description TEXT`, `short_description TEXT`, `custom_description TEXT`
+  - `origin_story TEXT`
+  - `image_asset TEXT`, `custom_icon_asset TEXT`
+  - `action_buttons JSONB DEFAULT '[]'`
+
+  **SalemIntelligence enrichment:**
+  - `intel_entity_id TEXT` — SalemIntelligence BCS entity_id (FK for v2 online features)
+  - `secondary_categories JSONB DEFAULT '[]'`
+  - `specialties JSONB DEFAULT '[]'`
+  - `owners JSONB DEFAULT '[]'`
+  - `year_established INTEGER`
+  - `amenities JSONB DEFAULT '{}'`
+  - `district TEXT`
+
+  **Relations:**
+  - `related_figure_ids JSONB DEFAULT '[]'`
+  - `related_fact_ids JSONB DEFAULT '[]'`
+  - `related_source_ids JSONB DEFAULT '[]'`
+  - `source_id TEXT`, `source_categories JSONB DEFAULT '[]'`
+  - `tags JSONB DEFAULT '[]'`
+
+  **Provenance:**
+  - `data_source TEXT NOT NULL DEFAULT 'unified_migration'`
+  - `confidence REAL NOT NULL DEFAULT 0.8`
+  - `verified_date TIMESTAMPTZ`, `stale_after TIMESTAMPTZ`
+  - `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+  - `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+  - `deleted_at TIMESTAMPTZ`
+
+  **Flags:**
+  - `is_tour_poi BOOLEAN DEFAULT false` — the 45 curated 1692 stops
+  - `is_narrated BOOLEAN DEFAULT false` — has narration content
+  - `default_visible BOOLEAN DEFAULT true` — overridable per-POI visibility
+
+  **Legacy audit (dropped after verification):**
+  - `legacy_narration_category TEXT` — original `salem_narration_points.category` value
+  - `legacy_business_type TEXT` — original `salem_businesses.business_type` value
+  - `legacy_tour_category TEXT` — original `salem_tour_pois.category` value
+
+- [ ] Indexes: `(category)`, `(lat, lng)`, `(data_source)`, `(deleted_at) WHERE deleted_at IS NULL`, `(merchant_tier) WHERE merchant_tier > 0`, `(stale_after) WHERE stale_after IS NOT NULL`, `(wave) WHERE wave IS NOT NULL`, `(intel_entity_id) WHERE intel_entity_id IS NOT NULL`, `(is_tour_poi) WHERE is_tour_poi = true`, `(district) WHERE district IS NOT NULL`
+- [ ] Run schema migration
+
+#### Step 9U.2: Migration script — three tables into one
+
+- [ ] Create `cache-proxy/scripts/migrate-to-unified-pois.js`
+- [ ] **Phase A: Narration points (817 rows).** These have the richest data. INSERT into `salem_pois` with:
+  - All narration-specific columns mapped directly
+  - `is_narrated = true`
+  - `legacy_narration_category` preserves the original category value
+  - `category` assigned by mapping the 29 legacy values to `PoiLayerId` form (the mapping from `docs/poi-taxonomy-plan.md` Step 2)
+- [ ] **Phase B: Business enrichment (817 matched + 44 new).** For each business:
+  - Match to existing `salem_pois` row by `id` (IDs are identical across tables, confirmed S116)
+  - If matched: UPDATE to add `cuisine_type`, `price_range`, `rating`, `historical_note`, `legacy_business_type`
+  - If unmatched (the 44 unique businesses): INSERT as new rows with `is_narrated = false`
+- [ ] **Phase C: Tour POIs (45 rows).** For each tour POI:
+  - Match to existing `salem_pois` row by name + coordinate proximity (tour POI IDs may differ)
+  - If matched: UPDATE to set `is_tour_poi = true`, add `historical_period`, `admission_info`, `requires_transportation`, `wheelchair_accessible`, `seasonal`, `legacy_tour_category`
+  - If unmatched: INSERT as new row with `is_tour_poi = true`
+- [ ] Transaction-safe (BEGIN/COMMIT/ROLLBACK)
+- [ ] Dry-run mode (log what would happen without writing)
+- [ ] Post-migration counts: expect ~862 rows (817 narration + ~45 unique from businesses/tour after dedup)
+
+#### Step 9U.3: Repoint FK references from `salem_tour_pois` to `salem_pois`
+
+- [ ] 5 tables currently FK to `salem_tour_pois(id)`:
+  - `salem_events_calendar.venue_poi_id`
+  - `salem_historical_facts.poi_id`
+  - `salem_historical_figures.primary_poi_id`
+  - `salem_primary_sources.poi_id`
+  - `salem_timeline_events.poi_id`
+  - `salem_tour_stops.poi_id`
+- [ ] For each: `ALTER TABLE ... DROP CONSTRAINT ..., ADD CONSTRAINT ... REFERENCES salem_pois(id)`
+- [ ] Verify all existing FK values resolve in `salem_pois`
+- [ ] Verify queries against these tables still return correct results
+
+#### Step 9U.4: Update admin tool backend (`cache-proxy/lib/admin-pois.js`)
+
+- [ ] Replace the three-kind dispatch (`tour` / `business` / `narration`) with single-table queries against `salem_pois`
+- [ ] Preserve backward-compatible URL structure during transition if needed, or simplify to:
+  - `GET /admin/salem/pois` — list with filters (category, district, is_tour_poi, is_narrated, bbox, q, include_deleted)
+  - `GET /admin/salem/pois/:id` — single POI
+  - `PUT /admin/salem/pois/:id` — partial update (unified whitelist)
+  - `POST /admin/salem/pois/:id/move` — lat/lng only
+  - `DELETE /admin/salem/pois/:id` — soft delete
+  - `POST /admin/salem/pois/:id/restore` — undo soft delete
+  - `GET /admin/salem/pois/duplicates` — unchanged
+- [ ] Update field whitelist to cover the unified schema
+- [ ] Update public read endpoints (`/salem/pois`, `/salem/businesses`) to query `salem_pois` with appropriate filters
+- [ ] Smoke test all endpoints
+
+#### Step 9U.5: Update admin tool frontend
+
+- [ ] **PoiTree.tsx:** Replace three-kind fetch with single `GET /admin/salem/pois`. Tree grouping becomes: category → subcategory → POI (the subcategory level that was missing when subcategory was all NULL — now it can be populated). Retain ability to filter by `is_tour_poi` / `is_narrated` as tree-level toggles.
+- [ ] **AdminMap.tsx:** Color markers by category instead of kind (22 colors from `salem_poi_categories.color`). Or keep kind-based coloring as a toggle.
+- [ ] **PoiEditDialog.tsx:** Show fields contextually based on category + flags. A restaurant shows cuisine_type, price_range, menu_url. A park shows wheelchair_accessible. A witch shop shows neither. Use category metadata to drive field visibility.
+- [ ] **poiAdminFields.ts:** Replace the three per-kind whitelists with one unified whitelist + category-conditional display rules.
+- [ ] Verify tree, map, edit, save, delete, move all work against the unified table
+
+#### Step 9U.6: Rename old tables + verification
+
+- [ ] Rename `salem_narration_points` → `salem_narration_points_legacy`
+- [ ] Rename `salem_businesses` → `salem_businesses_legacy`
+- [ ] Rename `salem_tour_pois` → `salem_tour_pois_legacy`
+- [ ] Run full admin tool smoke test against `salem_pois`
+- [ ] Verify POI counts match: unified total should equal (narration + unique businesses + unique tour pois)
+- [ ] Spot-check 10 POIs: The Witch House, Hex, Finz, Pioneer Village, CVS Pharmacy, Salem Common, etc.
+- [ ] Git commit: "Phase 9U Session 117: unified salem_pois table — three-table merge complete"
+
+---
+
+### Session 118 — SalemIntelligence BCS Import & Category Assignment
+
+#### Step 9U.7: Pull BCS data snapshot
+
+- [ ] Call `GET http://localhost:8089/api/intel/poi-export` (SalemIntelligence Phase 1 KB, 1,724 BCS entities)
+- [ ] Save response as `tools/salem-data/bcs-export-YYYY-MM-DD.json` (versioned in repo — this is the build-time data source, not a runtime dependency)
+- [ ] Document the snapshot date and BCS entity count in the file header
+
+#### Step 9U.8: BCS → LMA category mapping table
+
+- [ ] Create `cache-proxy/scripts/bcs-category-mapping.js` with the mapping from S116 analysis:
+
+  **Direct mappings (no decomposition needed):**
+  | BCS `primary_category` | → LMA `category` (PoiLayerId) |
+  |---|---|
+  | `restaurant` | `FOOD_DRINK` |
+  | `cafe` | `FOOD_DRINK` |
+  | `bar` | `FOOD_DRINK` |
+  | `shop_occult` | `WITCH_SHOP` |
+  | `museum` | `TOURISM_HISTORY` |
+  | `attraction` | `TOURISM_HISTORY` |
+  | `hotel_lodging` | `LODGING` |
+  | `gallery_art` | `TOURISM_HISTORY` |
+  | `shop_bookstore` | `SHOPPING` |
+  | `shop_antiques` | `SHOPPING` |
+  | `performance_venue` | `ENTERTAINMENT` |
+  | `education` | `EDUCATION` |
+  | `religious` | `WORSHIP` |
+  | `fitness` | `ENTERTAINMENT` |
+  | `service_health` | `HEALTHCARE` |
+  | `spa_beauty` | `SHOPPING` |
+
+  **Decomposition mappings (require secondary_categories/specialties/name heuristics):**
+  | BCS `primary_category` | Heuristic | → LMA `category` |
+  |---|---|---|
+  | `service_professional` | auto/garage/tire/motor keywords | `AUTO_SERVICES` |
+  | `service_professional` | bank/credit/financial/mortgage | `FINANCE` |
+  | `service_professional` | law/attorney/real estate/insurance | `OFFICES` |
+  | `service_professional` | health/dental/therapy | `HEALTHCARE` |
+  | `service_professional` | school/tutor/childcare | `EDUCATION` |
+  | `service_professional` | post office/government/court | `CIVIC` |
+  | `service_professional` | fuel/gas station/energy | `FUEL_CHARGING` |
+  | `service_professional` | market/deli/bakery/food | `FOOD_DRINK` |
+  | `service_professional` | apartment/condo/housing | `LODGING` |
+  | `service_professional` | cleaner/laundry/print/sign | `SHOPPING` |
+  | `service_professional` | photo/video/studio/media | `ENTERTAINMENT` |
+  | `service_professional` | taxi/limo/ferry/moving | `TRANSIT` |
+  | `service_professional` | (default fallback) | `OFFICES` |
+  | `shop_retail` | witch/occult/crystal/pagan keywords | `WITCH_SHOP` |
+  | `shop_retail` | (all others) | `SHOPPING` |
+  | `tour_operator` | ghost/haunted/vampire keywords | `GHOST_TOUR` |
+  | `tour_operator` | (all others — food, sailing, walking) | `TOURISM_HISTORY` |
+  | `other` | per-entity manual triage | various |
+
+- [ ] Output: a JSON mapping `{ bcs_entity_id → { lma_category, lma_subcategory, confidence } }` for every BCS entity
+- [ ] Dry-run report: count per LMA category, flag unmapped entities for manual review
+
+#### Step 9U.9: Add new subcategories to taxonomy
+
+- [ ] Add to `PoiCategories.kt` (Salem app) and `poiCategories.ts`:
+  - TOURISM_HISTORY: `tour_operator` subtag (harbor cruises, whale watches, walking tours)
+  - SHOPPING: `antiques` subtag
+  - SHOPPING: `cannabis` subtag (4 dispensaries, legal in MA)
+  - SHOPPING: `souvenir` subtag (32 gift/souvenir shops)
+- [ ] Run `sync-poi-taxonomy.js` to update `salem_poi_categories` and `salem_poi_subcategories`
+- [ ] Verify new subcategories appear in PG
+
+#### Step 9U.10: BCS import script
+
+- [ ] Create `cache-proxy/scripts/import-bcs-pois.js`
+- [ ] Read `tools/salem-data/bcs-export-YYYY-MM-DD.json` + the category mapping from 9U.8
+- [ ] **Match phase:** For each BCS entity, attempt match to existing `salem_pois` by:
+  - Exact name match + coordinate proximity (< 50m)
+  - Fuzzy name match (case-insensitive, strip punctuation) + coordinate proximity (< 100m)
+  - Coordinate proximity only (< 20m) as fallback
+- [ ] **Enrich phase:** For matched entities, UPDATE existing rows to add BCS metadata:
+  - `intel_entity_id`, `phone` (if null), `website` (if null), `email`
+  - `hours` (JSONB from BCS, replacing or supplementing text), `hours_text` (preserve original)
+  - `short_description` (if null), `origin_story`, `secondary_categories`, `specialties`, `owners`, `year_established`, `amenities`, `district`, `status`
+  - `menu_url`, `reservations_url`, `order_url`
+  - Do NOT overwrite existing `description`, `short_narration`, `long_narration` — BCS descriptions are less curated
+  - Update `confidence` to `max(existing, bcs)` — take the higher confidence
+- [ ] **Insert phase:** For unmatched BCS entities (~900 new), INSERT as new rows with:
+  - `id` = BCS `entity_id` (UUID format)
+  - `category` from the mapping, `subcategory` where assignable
+  - `is_narrated = false`, `is_tour_poi = false`
+  - `default_visible` based on category's `defaultEnabled` flag
+  - `data_source = 'salemintelligence_bcs'`
+- [ ] Transaction-safe, dry-run mode
+- [ ] Post-import report: matched count, enriched count, new insert count, total
+
+#### Step 9U.11: Set default visibility per category
+
+- [ ] After import, run an UPDATE to set `default_visible` on all rows based on their category:
+  - `default_visible = true` for: FOOD_DRINK, WITCH_SHOP, PSYCHIC, GHOST_TOUR, HAUNTED_ATTRACTION, HISTORIC_HOUSE, TOURISM_HISTORY, LODGING, ENTERTAINMENT, PARKS_REC
+  - `default_visible = false` for: HEALTHCARE, SHOPPING (non-tourist subcategories), OFFICES, FINANCE, AUTO_SERVICES, EDUCATION, WORSHIP, FUEL_CHARGING, TRANSIT, CIVIC, PARKING, EMERGENCY
+- [ ] Per-POI overrides remain possible (a particularly notable dentist near the tour route could be set visible manually)
+- [ ] Verify counts: expect ~750 visible (tourist tier), ~1,850 available on demand (utility tier)
+- [ ] Git commit: "Phase 9U Session 118: SalemIntelligence BCS import — ~2,600 unified POIs with category assignment"
+
+---
+
+### Session 119 — Admin Tool Adaptation & Publish Loop
+
+#### Step 9U.12: Admin tool tree rework for unified table
+
+- [ ] Update `PoiTree.tsx` for unified `salem_pois`:
+  - Single fetch: `GET /admin/salem/pois?limit=3000&include_deleted=true`
+  - Tree grouping: category → subcategory → POI (the fourth level that was impossible before)
+  - Category nodes show the canonical label + color from `salem_poi_categories`
+  - Top-level filter toggles: "Tour POIs only", "Narrated only", "Visible by default", "All"
+  - Count strip updates to reflect unified total
+- [ ] Update `AdminMap.tsx`:
+  - Color by category (22 colors from taxonomy) with kind as secondary indicator (icon shape or badge)
+  - `default_visible = false` POIs render at reduced opacity or with a distinct marker style
+  - Legend updates
+- [ ] Update `PoiEditDialog.tsx`:
+  - Contextual field display: category determines which field groups appear
+  - FOOD_DRINK shows: cuisine_type, price_range, menu_url, hours
+  - TOURISM_HISTORY shows: historical_period, admission_info, wheelchair_accessible
+  - HEALTHCARE shows: phone, hours, website (prominently)
+  - WITCH_SHOP shows: specialties, origin_story
+  - Universal fields (name, address, lat/lng, description, category, tags, provenance) always show
+  - Boolean flags section: is_tour_poi, is_narrated, default_visible — always editable
+- [ ] Verify the full loop: browse tree → select POI → see on map → edit → save → tree/map update
+
+#### Step 9U.13: Publish loop (PG → Room DB)
+
+- [ ] Create `cache-proxy/scripts/publish-to-sqlite.js`:
+  - Reads all active (non-deleted) rows from `salem_pois` + related tables
+  - Generates `salem-content/salem_content.db` (SQLite, the Room DB source)
+  - Maps the unified `salem_pois` schema to the Room entity schema
+  - Also generates `salem-content/salem_content.sql` for the Gradle pipeline
+- [ ] Wire to admin UI: "Publish" button calls `POST /admin/publish` → runs the script
+- [ ] Verify the generated SQLite has correct row counts and schema
+
+#### Step 9U.14: Room DB migration
+
+- [ ] Update Room entity in `app-salem/` to match the unified `salem_pois` schema
+- [ ] Bump Room schema version
+- [ ] Write Room migration (or use `fallbackToDestructiveMigration` for pre-release — real migration before Play Store per STATE.md carry-forward)
+- [ ] Update all Android DAOs that query narration points or businesses to query the unified table
+- [ ] Update `NarrationGeofenceManager` — it currently queries narration points; now queries `salem_pois WHERE is_narrated = true`
+- [ ] Update POI layer rendering — filter by `default_visible` and per-category user preferences
+- [ ] Build + install on Lenovo TB305FU
+- [ ] Walk simulator validation: narration still fires, POIs render correctly, layer toggles work
+- [ ] Git commit: "Phase 9U Session 119: admin tool unified + publish loop + Room migration"
+
+---
+
+### Session 120 — Verification, Cleanup & Heading-Up Finish
+
+#### Step 9U.15: End-to-end verification
+
+- [ ] Run admin tool — browse the full tree (expect ~2,600 POIs in 22 categories)
+- [ ] Edit a POI in each major category: FOOD_DRINK, WITCH_SHOP, HEALTHCARE, TOURISM_HISTORY, OFFICES
+- [ ] Move a marker on the map, save, verify
+- [ ] Soft delete a duplicate, verify it disappears from map
+- [ ] Click Publish, verify `salem_content.db` regenerates
+- [ ] Build APK, install on tablet
+- [ ] Walk simulator: narration fires for narrated POIs, non-narrated utility POIs appear when layer toggled
+- [ ] Toggle HEALTHCARE layer on — verify dentists/pharmacies/hospitals appear with phone numbers
+- [ ] Toggle off — verify they disappear
+- [ ] Spot-check BCS-enriched POIs: do they have hours, phone, amenities that weren't there before?
+
+#### Step 9U.16: Drop legacy tables
+
+- [ ] After verification, drop (or archive to `_legacy` suffix):
+  - `salem_narration_points_legacy`
+  - `salem_businesses_legacy`
+  - `salem_tour_pois_legacy`
+- [ ] Remove legacy code paths from cache-proxy
+- [ ] Remove old import scripts that target the split tables
+- [ ] Archive `docs/poi-taxonomy-plan.md` to `docs/archive/` (superseded by Phase 9U)
+
+#### Step 9U.17: Heading-up rotation smoothness (deferred from S116)
+
+- [ ] Complete the S115 heading-up fix plan:
+  1. Cut `ORIENT-RAW` and `HEADING-UP: skip hysteresis` DEBUG traces from the hot path
+  2. Rate limit apply path to ~33ms (30 Hz)
+  3. Move sensor processing to background HandlerThread if still needed
+  4. Switch static-mode detection from sample count to wall-clock
+- [ ] Build + test on Lenovo TB305FU
+- [ ] Git commit: "Phase 9U Session 120: verification complete + heading-up rotation fix"
+
+---
+
+### Out of scope for Phase 9U (deferred)
+
+- Subcategory backfill for the full 2,600 POIs (category is assigned; subcategory is best-effort from BCS `secondary_categories` but many will stay NULL — admin worklist for operator curation)
+- Duplicate merge UI (Phase 9P.11 highlight duplicates still pending; unified table makes dedup easier)
+- Hero image regeneration (blocked on SalemIntelligence Phase 2 gate)
+- Building → POI bridge construction (Phase 9Q — now simpler with unified table: `salem_building_poi_map.poi_id` references `salem_pois.id` directly, no `poi_kind` column needed)
+- Live OTA sync (Phase 10)
+- `hours` text → JSONB parsing for existing freeform strings (BCS imports get structured JSONB; legacy rows keep `hours_text`)
+
+---
+
 ## Phase 9Q — Salem Domain Content Bridge
 
 **Goal:** Build the translation layer between Salem's historical-domain ontology (`building_id`, the Salem Village/Town historical buildings) and LocationMapApp's POI ontology (modern coordinates on a map). Once the building→POI bridge exists, every Salem historical entity (figures, facts, events, primary sources, newspapers via `events_referenced`) becomes queryable by POI through graph traversal — and the schema's currently-NULL FK columns finally get populated.
@@ -1471,21 +1834,20 @@ Salem session 044 (2026-04-07) added the newspaper corpus per OMEN-S004. Schema 
 ### Step 9Q.2: salem_building_poi_map join table
 - [ ] Add `CREATE TABLE salem_building_poi_map` to `cache-proxy/salem-schema.sql`:
   - `building_id TEXT REFERENCES salem_buildings(id)`
-  - `poi_kind TEXT NOT NULL` — `'tour_poi'` | `'business'` | `'narration'`
-  - `poi_id TEXT NOT NULL`
+  - `poi_id TEXT REFERENCES salem_pois(id)` — **simplified by Phase 9U unified table (no `poi_kind` column needed)**
   - `link_type TEXT NOT NULL` — `'exact'` | `'memorial'` | `'representative'` | `'nearby'`
   - `confidence REAL DEFAULT 1.0`
   - `notes TEXT`
   - Provenance fields
-  - `PRIMARY KEY (building_id, poi_kind, poi_id)`
+  - `PRIMARY KEY (building_id, poi_id)`
 - [ ] Many-to-many by design: a single building may map to multiple POIs (e.g., a destroyed building's two surviving foundations); a single POI may represent multiple historical buildings (e.g., a museum complex)
-- [ ] Indexes: `(building_id)`, `(poi_kind, poi_id)`, `(link_type)`
+- [ ] Indexes: `(building_id)`, `(poi_id)`, `(link_type)`
 
 ### Step 9Q.3: Draft auto-mapping + manual curation
 - [ ] Write `cache-proxy/scripts/draft-building-poi-map.js`:
-  - For each building in `salem_buildings`, attempt name-match against `salem_tour_pois`, `salem_businesses`, and `salem_narration_points` (case-insensitive substring + trigram similarity)
+  - For each building in `salem_buildings`, attempt name-match against unified `salem_pois` (case-insensitive substring + trigram similarity)
   - If a building has `lat_modern`/`lng_modern`, also try geo-proximity match (POIs within 50m)
-  - Output a draft CSV at `tools/salem-data/draft-building-poi-map.csv` with columns: building_id, building_name, suggested_poi_kind, suggested_poi_id, suggested_poi_name, distance_m, name_similarity, link_type_guess, confidence_guess
+  - Output a draft CSV at `tools/salem-data/draft-building-poi-map.csv` with columns: building_id, building_name, suggested_poi_id, suggested_poi_name, distance_m, name_similarity, link_type_guess, confidence_guess
   - **Does NOT write to PostgreSQL.** Operator reviews the CSV.
 - [ ] Operator manually curates the CSV (likely 2-4 hours of review for ~425 buildings, of which probably only 50-80 will have actual POI mappings)
 - [ ] Curated CSV → `cache-proxy/scripts/import-building-poi-map.js` writes to `salem_building_poi_map`
