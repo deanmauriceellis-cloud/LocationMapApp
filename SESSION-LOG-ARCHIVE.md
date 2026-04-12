@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S107 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S108 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 108: 2026-04-09 — Admin UI polish (tab wrap + backdrop opacity + legend z-index)
+
+Short polish session. Three single-line edits: TabList flex-wrap, backdrop 40→65% opacity, legend z-index 400→100. No 9P.11 progress.
+
+Full session detail: `docs/session-logs/session-108-2026-04-09.md`.
+
+---
 
 ## Session 107: 2026-04-09 — Phase 9P.B Step 9P.10b finalization (recovery + commit)
 

@@ -2,28 +2,26 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-12 — Session 117 (Phase 9U Steps 9U.1-9U.6 shipped — unified salem_pois table, three-table merge, admin tool rewrite)
+**Last updated:** 2026-04-12 — Session 118 (Phase 9U Steps 9U.7-9U.10 shipped — BCS import, SalemPoi Room entity, publish pipeline, walk sim overhaul)
 
 ---
 
-## TOP PRIORITY — Next Session (S117)
+## TOP PRIORITY — Next Session (S119)
 
-**Phase 9U: Unified POI Table & SalemIntelligence Import — Session 118 (Steps 9U.7-9U.11)**
+**Phase 9U: Unified POI Table — Session 119 (Steps 9U.11-9U.13)**
 
-S117 completed Steps 9U.1-9U.6: unified `salem_pois` table live with 976 rows (817 narration + 133 businesses + 26 tour-only), 14 categories, 71 columns, 6 FK constraints repointed, admin tool fully rewritten. Old tables renamed to `_legacy`.
+S118 completed Steps 9U.7-9U.10: BCS import (976→2,190 POIs), SalemPoi Room entity + DAO, PG→SQLite publish pipeline, walk sim narration pacing + tour-aware routing.
 
-**Session 118 scope:** Pull SalemIntelligence BCS snapshot (1,724 entities), build category mapping (BCS→LMA), add 4 new subcategories, import ~900 new entities, set default visibility.
+**Session 119 scope:** Admin tool tree rework for 2,190 POI dataset, consumer migration (NarrationPoint→SalemPoi in app code).
 
-**Session 119:** Admin tool tree rework for unified table, publish loop (PG→Room DB), Room migration, Android DAO updates.
+**Session 120:** End-to-end verification, drop legacy tables, heading-up rotation smoothness fix (deferred from S115/S116), POI icon scaling at high zoom.
 
-**Session 120:** End-to-end verification, drop legacy tables, heading-up rotation smoothness fix (deferred from S115/S116).
-
-**Key decisions made in S116:**
-- V1 commercial release is fully offline — no hosted LLM/KB. SalemIntelligence is build-time data source only.
-- No new top-level categories needed. All 19 BCS types map to existing 22 LMA categories. 4 new subcategories: `tour_operator`, `antiques`, `cannabis`, `souvenir`.
-- `service_professional` (429 BCS entities) decomposes into AUTO_SERVICES (83), FINANCE (66), OFFICES (56+132 fallback), SHOPPING (43), and smaller buckets via keyword heuristics.
-- Tourist-relevant POIs (~750) `default_visible=true`, utility POIs (~1,850) `default_visible=false` but available via layer toggles.
-- Supersedes the old taxonomy arc (Steps 2-4 of `docs/poi-taxonomy-plan.md`).
+**Key facts from S118:**
+- 2,190 unified POIs: 817 narrated + 133 business-only + 26 tour-only + 1,214 BCS imports.
+- 1,618 POIs linked via intel_entity_id to SalemIntelligence.
+- 1,601 default_visible=true / 589 default_visible=false.
+- Room DB version 5, bundled DB 4.6 MB. Old entities preserved for backward compat.
+- Walk sim: tour-aware routing, 3-then-30s narration pacing, 30s dwell cooldown, direct-play bypass, skip button working.
 
 ---
 
@@ -34,14 +32,14 @@ S117 completed Steps 9U.1-9U.6: unified `salem_pois` table live with 976 rows (8
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
-| **9U** Unified POI Table | **S117 DONE (schema + merge + admin rewrite)** | 3 sessions left (S118-S120). BCS import + publish loop + Room migration. |
+| **9U** Unified POI Table | **S118 DONE (BCS import + Room entity + publish)** | 2 sessions left (S119-S120). Admin tree + consumer migration + verification. |
 | **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9U+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 117. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 118. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -82,8 +80,8 @@ S117 completed Steps 9U.1-9U.6: unified `salem_pois` table live with 976 rows (8
 
 ## Expanded vision (updated S116)
 
-- **Phase 9U** — Unified POI Table + BCS Import. 4 sessions (S117-S120). Merge 3 tables, import ~900 new BCS entities, ~2,600 total unified POIs. **NEXT.**
-- **Phase 9P.C** — Publish loop. Folded into 9U Session 119 (Step 9U.13).
+- **Phase 9U** — Unified POI Table + BCS Import. 2 sessions left (S119-S120). Admin tree + consumer migration + verification. **NEXT.**
+- **Phase 9P.C** — Publish loop. Operational (publish-salem-pois.js shipped S118).
 - **Phase 9Q** — Salem Domain Content Bridge. 2-3 sessions. Simplified by 9U unified table.
 - **Phase 9R** — Historic Tour Mode. 4-6 sessions.
 
@@ -93,8 +91,8 @@ S117 completed Steps 9U.1-9U.6: unified `salem_pois` table live with 976 rows (8
 
 ## POI Inventory
 
-- **Current PG:** **976 unified POIs** in `salem_pois` (817 narrated + 133 business-only + 26 tour-only). Old 3-table split renamed to `_legacy`.
-- **After Phase 9U S118:** ~2,600 unified POIs (976 current + ~900 new from BCS import + enrichment)
+- **Current PG:** **2,190 unified POIs** in `salem_pois` (817 narrated + 133 business-only + 26 tour-only + 1,214 BCS imports). Old 3-table split renamed to `_legacy`.
+- **Room DB:** 2,190 POIs in `salem_pois` table (version 5, 4.6 MB bundled). SalemPoi entity + SalemPoiDao operational.
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
 
 ---

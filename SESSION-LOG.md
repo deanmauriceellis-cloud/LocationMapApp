@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 108-117. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 109-118. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 118: 2026-04-12 — Phase 9U BCS import (976→2190 POIs), SalemPoi Room entity, walk sim overhaul
+
+Imported 1,766 BCS POIs from SalemIntelligence — 404 existing enriched, 1,214 new inserted, total 2,190. Built PG→SQLite publish pipeline, new unified SalemPoi Room entity + DAO (version 5). Walk sim fixes: 3-then-30s narration pacing, dwell rate-limiting, direct-play bypass, skip button, icon refresh. Tour-aware walk sim: Walk button follows selected tour route.
+
+Full session detail: `docs/session-logs/session-118-2026-04-12.md`. Commits: `5213be7`, `a4ac369`.
+
+---
 
 ## Session 117: 2026-04-12 — Phase 9U Session 117: unified salem_pois table — three-table merge complete
 
@@ -198,39 +206,6 @@ Side-quest session triggered by two operator pivots away from the carry-over 9P.
 - New tech debt: `DWELL_MS` dead code in `NarrationGeofenceManager`, narration queue has no stale-pop check
 - APK built and installed on Lenovo TB305FU (HNY0CY0W) for operator's next Salem test walk
 - Working tree expected to be clean at S110 start
-
----
-
-## Session 108: 2026-04-09 — Admin UI polish (tab wrap + backdrop opacity + legend z-index)
-
-### Summary
-Short polish session sandwiched between S107's 9P.10b finalization commit and the still-pending 9P.11 work. Operator pivoted from 9P.11 to ask for a live demo of the admin interface and a graphics-overlap check on the latest screenshot. Started cache-proxy on `:4300` (PID 49332) via `bash bin/restart-proxy.sh` and Vite on `:4302` (PID 49368) via `cd web && npm run dev` in background; delivered the URL `http://localhost:4302/admin` and Basic Auth creds (`admin` / `salem-tour-9P3-test`) to the operator. Read the latest screenshot (`~/Pictures/Screenshots/Screenshot from 2026-04-09 02-57-28.png`, 1360×670, POI edit dialog open on a "Custom House" tour POI). Identified two real graphics issues at max browser zoom and one out-of-scope crowding issue (Mullvad VPN browser-extension badge bumping into the header right-side cluster). Made three single-line edits across two files: `PoiEditDialog.tsx` `TabList` `flex gap-1 overflow-x-auto` → `flex flex-wrap gap-1` (so all 7 tabs wrap to a second row instead of clipping behind a horizontal scroll at narrow viewports), `PoiEditDialog.tsx` backdrop `bg-black/40` → `bg-black/65` (so the legend / map content is properly suppressed when the modal is open instead of bleeding through at 60% opacity), and `AdminMap.tsx` Legend `z-[400]` → `z-[100]` (so any modal stacking context cleanly stacks above it; side benefit: the move-confirm modal at `AdminMap.tsx:294` `z-[500]` now correctly suppresses the legend too). `cd web && npx tsc --noEmit` clean (exit 0). Vite HMR fired three updates and the operator confirmed visually after refresh. NO progress on 9P.11 this session — Phase 9P.B is still 6/8 done. NOTE-L015 still stale (surfaced again in this session's OMEN report).
-
-### Decisions
-1. **Treat the polish as a standalone commit, not as part of the upcoming 9P.11 commit.** The fixes are independent of the duplicates wiring; folding them into a 9P.11 commit would muddy the diff and make bisecting harder. A standalone "admin UI polish" commit on top of S107 is the cleanest "save context" action when the user calls session end mid-task.
-2. **Tab row wrap (`flex flex-wrap`) instead of shrink-to-fit or horizontal scroll.** Wrap is the simplest CSS change, doesn't require touching `tabClass`, and works at any viewport width. Trade-off: when there's space for one row, the tabs still take one row; when there isn't, they wrap to two. No conditional layout logic.
-3. **Backdrop opacity bump 40% → 65%, not 100%.** 65% still shows enough context for the operator to know what POI they're editing without the underlying map / legend competing for attention. 100% would be a hard cut and feel modal-disruptive.
-4. **Lowered legend z-index, did NOT add a "hide when dialog open" context flag.** Lower z-index is one character; passing an `editOpen` flag down to AdminMap would have required threading state through props. Same end result.
-5. **Did NOT bump the move-confirm modal's `bg-black/30` backdrop.** Flagged it for the operator as a "say the word" follow-up. They didn't ask for it.
-6. **Did NOT fix the header right-side cluster crowding.** That's the Mullvad VPN browser extension badge bumping into the admin tool's header; not fixable in app code without artificial right-padding. Logged in the live log as out-of-scope.
-7. **Stopped both background servers at session end.** Salem Oracle on `:8088` left running (not owned by this project). The cache-proxy and Vite restart commands are documented in the memory file so S109 can bring them back up cheaply.
-
-### Files Changed
-- `web/src/admin/PoiEditDialog.tsx` — modified (2 lines: TabList wrap class, backdrop opacity)
-- `web/src/admin/AdminMap.tsx` — modified (1 line: Legend z-index)
-- `STATE.md` — modified (header bumped to S108, top-priority blurb extended with the polish summary)
-- `CLAUDE.md` — modified (session count 107 → 108)
-- `SESSION-LOG.md` — modified (this entry)
-- `docs/session-logs/session-108-2026-04-09.md` — NEW (live conversation log)
-- `~/.claude/projects/.../memory/project_next_session_priority.md` — modified (dependency-state section bumped to "after Session 108", added a polish-landed bullet, added a server-restart hint, added the S108 live log to the reference list)
-- `~/Development/OMEN/reports/locationmapapp/session-108-2026-04-09.md` — NEW (OMEN session report)
-
-### Status
-- Phase 9P.B: still **6/8 done** (9P.6, 9P.7, 9P.8, 9P.9, 9P.10, 9P.10b) — no progress on 9P.11 this session, polish only
-- Next step: **Phase 9P.B Step 9P.11 — Highlight Duplicates wiring** (carried over from S107 → S109)
-- 9P.10a still deferred (blocked on Phase 9Q)
-- All open OMEN items still tracked
-- Working tree expected to be clean at S109 start
 
 ---
 
