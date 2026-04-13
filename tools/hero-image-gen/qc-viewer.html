@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hero Image QC Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0d0d;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%);
+    border-bottom: 2px solid #ff6600;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 {
+    font-size: 20px;
+    color: #ff9933;
+    letter-spacing: 1px;
+  }
+  .header .stats {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+  }
+  .stat-val { color: #ff9933; font-weight: bold; font-size: 18px; }
+  .stat-label { color: #999; font-size: 11px; text-transform: uppercase; }
+
+  .progress-bar {
+    height: 4px;
+    background: #1a1a1a;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff6600, #ff9933);
+    transition: width 0.5s ease;
+  }
+
+  .current-section {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .hero-display {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .hero-display img {
+    width: 100%;
+    height: auto;
+    display: block;
+    min-height: 120px;
+    object-fit: contain;
+    background: #0a0a0a;
+  }
+  .hero-display .overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 16px 20px 12px;
+  }
+  .hero-display .entity-name {
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+  }
+  .hero-display .entity-meta {
+    font-size: 13px;
+    color: #ff9933;
+    margin-top: 4px;
+  }
+
+  .prompt-box {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .prompt-box .label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .prompt-box .text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #ccc;
+    font-style: italic;
+  }
+  .vibe-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .vibe-tag {
+    background: #2d1b4e;
+    color: #cc88ff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+  }
+
+  .gallery-section {
+    padding: 0 24px 24px;
+  }
+  .gallery-section h2 {
+    font-size: 14px;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 16px;
+  }
+  .gallery-item {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .gallery-item:hover { border-color: #ff6600; }
+  .gallery-item img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .gallery-item .details {
+    padding: 10px 12px;
+  }
+  .gallery-item .poi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+  }
+  .gallery-item .poi-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    max-width: 280px;
+  }
+  .gallery-item .poi-category {
+    font-size: 11px;
+    color: #ff9933;
+    background: #1a0a2e;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .gallery-item .poi-prompt {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #888;
+    font-style: italic;
+    max-height: 100px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+  .gallery-item .poi-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #1a1a1a;
+  }
+  .gallery-item .poi-id {
+    font-size: 10px;
+    color: #444;
+    font-family: monospace;
+  }
+  .gallery-item .poi-sizes {
+    font-size: 10px;
+    color: #555;
+  }
+
+  .complete-banner {
+    background: #0a2e0a;
+    border: 1px solid #2e8b2e;
+    color: #4caf50;
+    text-align: center;
+    padding: 20px;
+    font-size: 18px;
+    margin: 24px;
+    border-radius: 8px;
+    display: none;
+  }
+
+  .waiting {
+    text-align: center;
+    padding: 80px 20px;
+    color: #555;
+  }
+  .waiting .spinner {
+    font-size: 40px;
+    animation: spin 2s linear infinite;
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>HERO IMAGE QC</h1>
+  <div class="stats">
+    <div><div class="stat-val" id="s-count">--</div><div class="stat-label">Generated</div></div>
+    <div><div class="stat-val" id="s-pct">--</div><div class="stat-label">Progress</div></div>
+    <div><div class="stat-val" id="s-rate">--</div><div class="stat-label">Images/min</div></div>
+    <div><div class="stat-val" id="s-eta">--</div><div class="stat-label">ETA (min)</div></div>
+    <div><div class="stat-val" id="s-fail">--</div><div class="stat-label">Failed</div></div>
+  </div>
+</div>
+
+<div class="progress-bar">
+  <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+</div>
+
+<div id="waiting" class="waiting">
+  <div class="spinner">&#9776;</div>
+  <div>Waiting for generation to start...</div>
+  <div style="margin-top: 8px; font-size: 13px; color: #444;">
+    Polling /status.json every 2 seconds
+  </div>
+</div>
+
+<div id="current-section" class="current-section" style="display:none;">
+  <div class="hero-display">
+    <img id="hero-img" src="" alt="Current hero image">
+    <div class="overlay">
+      <div class="entity-name" id="entity-name">--</div>
+      <div class="entity-meta" id="entity-meta">--</div>
+    </div>
+  </div>
+  <div class="prompt-box">
+    <div class="label">Prompt</div>
+    <div class="text" id="prompt-text">--</div>
+    <div class="vibe-tags" id="vibe-tags"></div>
+  </div>
+</div>
+
+<div class="complete-banner" id="complete-banner">
+  Generation Complete
+</div>
+
+<div class="gallery-section">
+  <h2>Recent Gallery</h2>
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<script>
+let lastEntityId = null;
+let pollInterval = 2000;
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+async function poll() {
+  try {
+    const resp = await fetch('/status.json?t=' + Date.now());
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.progress) return;
+
+    const p = data.progress;
+    document.getElementById('s-count').textContent = p.generated + '/' + p.total;
+    document.getElementById('s-pct').textContent = p.percent + '%';
+    document.getElementById('s-rate').textContent = p.rate_per_min || '--';
+    document.getElementById('s-eta').textContent = p.eta_minutes || '--';
+    document.getElementById('s-fail').textContent = p.failures;
+    document.getElementById('progress-fill').style.width = p.percent + '%';
+
+    if (data.complete) {
+      document.getElementById('complete-banner').style.display = 'block';
+      document.getElementById('waiting').style.display = 'none';
+    }
+
+    if (data.current) {
+      document.getElementById('waiting').style.display = 'none';
+      document.getElementById('current-section').style.display = 'flex';
+
+      const c = data.current;
+      document.getElementById('entity-name').textContent = c.name;
+      document.getElementById('entity-meta').textContent =
+        (c.category || c.entity_type || '') + '  |  ' + c.entity_id.substring(0, 8) + '...';
+      document.getElementById('prompt-text').textContent = c.prompt;
+
+      const tagsEl = document.getElementById('vibe-tags');
+      tagsEl.innerHTML = '';
+      if (c.vibe_keywords) {
+        const tags = typeof c.vibe_keywords === 'string'
+          ? c.vibe_keywords.split(',').map(s => s.trim())
+          : c.vibe_keywords;
+        tags.forEach(t => {
+          const span = document.createElement('span');
+          span.className = 'vibe-tag';
+          span.textContent = t;
+          tagsEl.appendChild(span);
+        });
+      }
+    }
+
+    // Update hero image if entity changed
+    if (data.recent && data.recent.length > 0) {
+      const latest = data.recent[data.recent.length - 1];
+      if (latest.entity_id !== lastEntityId) {
+        lastEntityId = latest.entity_id;
+        const img = document.getElementById('hero-img');
+        img.src = '/images/' + latest.filename + '?t=' + Date.now();
+      }
+    }
+
+    // Rebuild gallery with details
+    if (data.recent) {
+      const gallery = document.getElementById('gallery');
+      const items = [...data.recent].reverse();
+      gallery.innerHTML = items.map(r => `
+        <div class="gallery-item">
+          <img src="/images/${escHtml(r.filename)}?t=${Date.now()}" alt="${escHtml(r.name)}" loading="lazy">
+          <div class="details">
+            <div class="poi-header">
+              <span class="poi-name">${escHtml(r.name)}</span>
+              <span class="poi-category">${escHtml(r.category || r.entity_type || '')}</span>
+            </div>
+            <div class="poi-prompt">${escHtml(r.prompt || '')}</div>
+            <div class="poi-footer">
+              <span class="poi-id">${escHtml(r.entity_id ? r.entity_id.substring(0, 12) + '...' : '')}</span>
+              <span class="poi-sizes">${r.full_kb}KB full / ${r.app_kb}KB app</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (e) {
+    // Silent — generator may not have started yet
+  }
+}
+
+setInterval(poll, pollInterval);
+poll();
+</script>
+</body>
+</html>
