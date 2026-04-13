@@ -510,7 +510,7 @@ export function PoiEditDialog({
 
   // List of insertable target fields the current POI kind actually has, in
   // the order the operator most likely wants them. Filtered through `has()`
-  // so a tour POI doesn't see "Insert into narration_pass_3".
+  // so a tour POI doesn't see fields it doesn't have.
   const insertableFields = [
     { field: 'short_narration', label: 'Insert into short_narration' },
     { field: 'long_narration', label: 'Insert into long_narration' },
@@ -979,34 +979,6 @@ export function PoiEditDialog({
                             id="long_narration"
                             rows={6}
                             {...reg('long_narration')}
-                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
-                          />
-                        </FieldRow>
-                      )}
-                      {has('narration_pass_2') && (
-                        <FieldRow
-                          label="Pass 2 — historical deep-dive"
-                          htmlFor="narration_pass_2"
-                          hint="Second-visit rotation (Pass 1 is short_narration above)"
-                        >
-                          <textarea
-                            id="narration_pass_2"
-                            rows={4}
-                            {...reg('narration_pass_2')}
-                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
-                          />
-                        </FieldRow>
-                      )}
-                      {has('narration_pass_3') && (
-                        <FieldRow
-                          label="Pass 3 — primary sources"
-                          htmlFor="narration_pass_3"
-                          hint="Third-visit rotation (court records, depositions, period quotes)"
-                        >
-                          <textarea
-                            id="narration_pass_3"
-                            rows={4}
-                            {...reg('narration_pass_3')}
                             className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
                           />
                         </FieldRow>

@@ -39,11 +39,6 @@ data class NarrationPoint(
     /** Long narration for ENTRY trigger (~200-400 words, 60-120 sec TTS) */
     @ColumnInfo(name = "long_narration") val longNarration: String? = null,
 
-    /** Pass 2 narration: historical deep-dive (figures, events, what happened here) */
-    @ColumnInfo(name = "narration_pass_2") val narrationPass2: String? = null,
-
-    /** Pass 3 narration: primary source voice (court records, depositions, period quotes) */
-    @ColumnInfo(name = "narration_pass_3") val narrationPass3: String? = null,
 
     /** Description for display (may differ from TTS-optimized narration) */
     val description: String? = null,

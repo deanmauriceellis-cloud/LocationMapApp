@@ -46,7 +46,23 @@ const SQLITE_PATH = dbIdx !== -1
 const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
 
 if (!process.env.DATABASE_URL) {
-  try { require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); } catch (_) {}
+  // Parse .env manually (no dotenv dependency)
+  const envPath = path.resolve(__dirname, '../.env');
+  try {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    for (const line of envContent.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) process.env[key] = val;
+    }
+  } catch (_) {}
 }
 if (!process.env.DATABASE_URL) {
   console.error('Error: DATABASE_URL environment variable is required');
@@ -68,8 +84,6 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   subcategory TEXT,
   short_narration TEXT,
   long_narration TEXT,
-  narration_pass_2 TEXT,
-  narration_pass_3 TEXT,
   geofence_radius_m INTEGER NOT NULL DEFAULT 40,
   geofence_shape TEXT NOT NULL DEFAULT 'circle',
   corridor_points TEXT,
@@ -139,7 +153,7 @@ async function main() {
     const { rows } = await pgClient.query(`
       SELECT
         id, name, lat, lng, address, status, category, subcategory,
-        short_narration, long_narration, narration_pass_2, narration_pass_3,
+        short_narration, long_narration,
         geofence_radius_m, geofence_shape, corridor_points,
         priority, wave, voice_clip_asset, custom_voice_asset,
         cuisine_type, price_range, rating, merchant_tier, ad_priority,
@@ -194,7 +208,7 @@ async function main() {
   const insertStmt = db.prepare(`
     INSERT INTO salem_pois (
       id, name, lat, lng, address, status, category, subcategory,
-      short_narration, long_narration, narration_pass_2, narration_pass_3,
+      short_narration, long_narration,
       geofence_radius_m, geofence_shape, corridor_points,
       priority, wave, voice_clip_asset, custom_voice_asset,
       cuisine_type, price_range, rating, merchant_tier, ad_priority,
@@ -211,7 +225,7 @@ async function main() {
       is_tour_poi, is_narrated, default_visible
     ) VALUES (
       @id, @name, @lat, @lng, @address, @status, @category, @subcategory,
-      @short_narration, @long_narration, @narration_pass_2, @narration_pass_3,
+      @short_narration, @long_narration,
       @geofence_radius_m, @geofence_shape, @corridor_points,
       @priority, @wave, @voice_clip_asset, @custom_voice_asset,
       @cuisine_type, @price_range, @rating, @merchant_tier, @ad_priority,
@@ -243,8 +257,6 @@ async function main() {
         subcategory: r.subcategory || null,
         short_narration: r.short_narration || null,
         long_narration: r.long_narration || null,
-        narration_pass_2: r.narration_pass_2 || null,
-        narration_pass_3: r.narration_pass_3 || null,
         geofence_radius_m: r.geofence_radius_m || 40,
         geofence_shape: r.geofence_shape || 'circle',
         corridor_points: r.corridor_points || null,

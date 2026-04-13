@@ -125,25 +125,11 @@ class NarrationGeofenceManager @Inject constructor(
     }
 
     /**
-     * Get the narration text for a point based on how many times
-     * the user has visited it on previous days.
-     *
-     * Pass 1 (first visit): short_narration — basic intro
-     * Pass 2 (second visit): narration_pass_2 — historical deep-dive
-     * Pass 3 (third visit): narration_pass_3 — primary source quotes
-     * Pass 4+: cycles back to pass 1
-     *
-     * Falls through: if a pass has no content, uses the previous pass.
+     * Get the narration text for a POI.
+     * Returns short_narration (the geofence walk-by announcement).
      */
     fun getNarrationForPass(point: SalemPoi): String? {
-        val visits = getVisitCount(point.id)
-        val pass = (visits % 3) + 1  // 0→1, 1→2, 2→3, 3→1, ...
-
-        return when (pass) {
-            3 -> point.narrationPass3 ?: point.narrationPass2 ?: point.shortNarration
-            2 -> point.narrationPass2 ?: point.shortNarration
-            else -> point.shortNarration
-        }
+        return point.shortNarration
     }
 
     /** Record that this POI was narrated today (increments persistent visit count) */

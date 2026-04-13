@@ -2,34 +2,32 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-13 — Session 120 (Consumer migration NarrationPoint→SalemPoi, admin tree rework, parking lot triage)
+**Last updated:** 2026-04-13 — Session 121 (SalemIntelligence narration sync, drop multipass, tap-to-speak, icon+dwell fixes)
 
 ---
 
 ## TOP PRIORITY — Next Session (S121)
 
-**Phase 9U: Unified POI Table — Session 121 (Verification & Cleanup)**
+**Phase 9U: Unified POI Table — Session 122 (Legacy Cleanup)**
 
-S120 completed the consumer migration (NarrationPoint→SalemPoi in 13 files), admin tree rework (3-level tree, visible filter, hidden POI opacity), and triaged 29 parking lot items into master plan.
+S121 synced narrations from SalemIntelligence (1,211 POIs updated), dropped multipass narration (pass_2/pass_3), added tap-to-speak detail sheet, fixed missing POI icons, zoom-out marker sticking, and tightened dwell expansion to 50m max.
 
-**Session 121 scope:**
-1. End-to-end device verification — launch app, test narration triggers, POI detail sheets, proximity dock with SalemPoi data
-2. Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB
-3. Remove NarrationPoint entity/DAO and legacy repository methods
-4. Heading-up rotation smoothness fix (deferred from S115)
-5. POI icon scaling at high zoom
+**Session 122 scope:**
+1. Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB
+2. Remove NarrationPoint entity/DAO and legacy repository methods
+3. Heading-up rotation smoothness fix (deferred from S115)
+4. End-to-end device verification with new narrations
 
-**Key facts from S120:**
-- Consumer migration: 13 files changed, NarrationPoint→SalemPoi throughout
-- PoiHeroResolver now uses poi.imageAsset (1,013 hero images) before fallback icons
-- NarrationTierClassifier uses SalemPoi.category (uppercase) for tier assignment
-- CategoryVoiceMap supports both uppercase (SalemPoi) and lowercase (OSM) categories
-- MarkerIconHelper has SalemPoi category entries for map marker colors
-- Admin tree: 3-level (category→subcategory→POI), "Visible only" filter, hidden POI opacity
-- Default visibility fixed: 210 POIs corrected (CIVIC, EDUCATION, HEALTHCARE, WORSHIP, non-tourist SHOPPING subcats)
-- SQLite republished: 2,190 POIs, 1,391 visible, 817 narrated, 4.7 MB
-- APK built (659 MB debug), installed on Lenovo tablet
-- 29 parking lot items triaged into master plan backlog section
+**Key facts from S121:**
+- SalemIntelligence narration sync: `sync-narrations-from-intel.js` created, 1,211 POIs updated
+- Narration model simplified: short_narration (853 POIs) + long_narration (1,556 POIs). No multipass.
+- pass_2/pass_3 columns dropped from PG, SQLite, Kotlin entities, web admin, schema
+- POI detail sheet: tap-to-speak on Overview/About/Story/address sections
+- Circle icons added for all 19 SalemPoi categories (were falling back to 5dp dots)
+- Zoom-out marker refresh now updates ALL markers, not just viewport-visible
+- Dwell expansion: 20m → 35m → 50m max (was 100m)
+- 572 unlinked POIs exported + handoff doc for SalemIntelligence
+- SQLite: 2,190 POIs, 1,391 visible, 827 narrated, 4.9 MB
 
 ---
 
@@ -40,14 +38,14 @@ S120 completed the consumer migration (NarrationPoint→SalemPoi in 13 files), a
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
-| **9U** Unified POI Table | **S120 DONE (consumer migration + admin tree)** | 1 session left (S121). Verification, legacy cleanup, heading-up fix. |
+| **9U** Unified POI Table | **S121 DONE (narration sync + simplification)** | 1 session left (S122). Legacy table drop, NarrationPoint removal, heading-up fix. |
 | **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9U+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 120. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 121. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -88,7 +86,7 @@ S120 completed the consumer migration (NarrationPoint→SalemPoi in 13 files), a
 
 ## Expanded vision (updated S116)
 
-- **Phase 9U** — Unified POI Table + BCS Import. 1 session left (S121). Verification + legacy cleanup. **NEXT.**
+- **Phase 9U** — Unified POI Table + BCS Import. 1 session left (S122). Legacy cleanup + heading-up fix. **NEXT.**
 - **Phase 9P.C** — Publish loop. Operational (publish-salem-pois.js shipped S118).
 - **Phase 9Q** — Salem Domain Content Bridge. 2-3 sessions. Simplified by 9U unified table.
 - **Phase 9R** — Historic Tour Mode. 4-6 sessions.
@@ -100,8 +98,8 @@ S120 completed the consumer migration (NarrationPoint→SalemPoi in 13 files), a
 
 ## POI Inventory
 
-- **Current PG:** **2,190 unified POIs** in `salem_pois` (817 narrated + 133 business-only + 26 tour-only + 1,214 BCS imports). Old 3-table split renamed to `_legacy`.
-- **Room DB:** 2,190 POIs in `salem_pois` table (version 5, 4.6 MB bundled). SalemPoi entity + SalemPoiDao operational.
+- **Current PG:** **2,190 unified POIs** in `salem_pois` (827 narrated, 1,556 with long_narration, 853 with short_narration). Multipass columns dropped.
+- **Room DB:** 2,190 POIs in `salem_pois` table (4.9 MB bundled). SalemPoi entity + SalemPoiDao operational.
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
 
 ---

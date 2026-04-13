@@ -125,19 +125,11 @@ CREATE TABLE IF NOT EXISTS salem_narration_points (
   subcategory        TEXT,
   -- Narration content
   -- Tier system (geofence trigger duration):
-  --   short_narration = walk-by trigger (~50-100 words, 15-30s TTS) — also doubles as Pass 1
-  --   long_narration  = linger trigger  (~200-400 words, 60-120s TTS)
-  -- Multipass system (visit-count rotation, daily no-repeat — see project_multipass_narration memory):
-  --   Pass 1 = short_narration (basic intro, no separate column)
-  --   Pass 2 = narration_pass_2 (historical deep-dive)
-  --   Pass 3 = narration_pass_3 (primary source quotes)
-  -- Column names match the bundled DB / Room entity (NarrationPoint.kt) so the
-  -- 9P.C publish loop is a 1:1 dump-and-load.
+  --   short_narration = walk-by geofence trigger (~20-50 words, TTS announcement)
+  --   long_narration  = detail view / linger (~200-500 words)
   short_narration    TEXT,
   long_narration     TEXT,
   description        TEXT,
-  narration_pass_2   TEXT,
-  narration_pass_3   TEXT,
   -- Geofence + tour metadata
   geofence_radius_m  INTEGER NOT NULL DEFAULT 40,
   geofence_shape     TEXT NOT NULL DEFAULT 'circle',  -- 'circle' | 'corridor'
@@ -454,8 +446,6 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   -- ── Narration layer (null for non-narrated POIs) ────────────────
   short_narration        TEXT,
   long_narration         TEXT,
-  narration_pass_2       TEXT,
-  narration_pass_3       TEXT,
   geofence_radius_m      INTEGER DEFAULT 40,
   geofence_shape         TEXT DEFAULT 'circle',         -- 'circle' | 'corridor'
   corridor_points        TEXT,                           -- serialized polyline for corridor shape

@@ -152,17 +152,14 @@ private var prevUserLng: Double = 0.0
 // the walk-through narration; it only fills the silence when the user
 // stops inside a cluster.
 
-/** S115: Starting reach-out radius for a fresh dwell (tighter than S110's 15m baseline). */
+/** S115/S121: Starting reach-out radius for a fresh dwell. */
 private const val DWELL_RADIUS_TIGHT_M = 20.0
 
-/** S115: First expansion step. Triggered when tight returns nothing. */
+/** S121: First expansion step. Triggered when tight returns nothing. */
 private const val DWELL_RADIUS_MEDIUM_M = 35.0
 
-/** S115: Second expansion step. Triggered when medium returns nothing. */
-private const val DWELL_RADIUS_WIDE_M = 60.0
-
-/** S115: Final expansion ceiling. Beyond this the system goes silent until the user moves. */
-private const val DWELL_RADIUS_MAX_M = 100.0
+/** S121: Final expansion ceiling (was 100m, tightened to 50m). Beyond this the system goes silent until the user moves. */
+private const val DWELL_RADIUS_MAX_M = 50.0
 
 /** S115: Distance from the dwell anchor that resets the expansion ladder. */
 private const val DWELL_RESET_DISTANCE_M = 15.0
@@ -357,7 +354,6 @@ internal fun SalemMainActivity.initNarrationSystem() {
                         while (nearest == null && attemptRadius < DWELL_RADIUS_MAX_M) {
                             val nextRadius = when {
                                 attemptRadius < DWELL_RADIUS_MEDIUM_M -> DWELL_RADIUS_MEDIUM_M
-                                attemptRadius < DWELL_RADIUS_WIDE_M -> DWELL_RADIUS_WIDE_M
                                 else -> DWELL_RADIUS_MAX_M
                             }
                             DebugLogger.i(

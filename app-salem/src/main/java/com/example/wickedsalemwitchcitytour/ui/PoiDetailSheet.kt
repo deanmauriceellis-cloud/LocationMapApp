@@ -239,6 +239,10 @@ class PoiDetailSheet : DialogFragment() {
             if (!addr.isNullOrBlank()) {
                 text = addr
                 visibility = View.VISIBLE
+                setOnClickListener {
+                    DebugLogger.i(TAG, "tap-to-speak ADDRESS id=${poi.id}")
+                    interruptAndSpeak("Located at $addr")
+                }
             }
         }
         view.findViewById<TextView>(R.id.overviewPhone).apply {
@@ -284,12 +288,17 @@ class PoiDetailSheet : DialogFragment() {
 
         val shortText = poi.shortNarration?.takeIf { it.isNotBlank() }
         val aboutText = poi.description?.takeIf { it.isNotBlank() && it != shortText }
-        val storyText = (poi.longNarration?.takeIf { it.isNotBlank() }
-            ?: poi.narrationPass2?.takeIf { it.isNotBlank() })
+        val storyText = poi.longNarration?.takeIf { it.isNotBlank() }
             ?.takeIf { it != shortText && it != aboutText }
 
         if (shortText != null) {
             bodyShort.text = shortText
+            val tapToSpeak = View.OnClickListener {
+                DebugLogger.i(TAG, "tap-to-speak OVERVIEW id=${poi.id}")
+                interruptAndSpeak(shortText)
+            }
+            labelShort.setOnClickListener(tapToSpeak)
+            bodyShort.setOnClickListener(tapToSpeak)
         } else {
             labelShort.visibility = View.GONE
             bodyShort.visibility = View.GONE
@@ -299,15 +308,33 @@ class PoiDetailSheet : DialogFragment() {
             labelAbout.visibility = View.VISIBLE
             bodyAbout.visibility = View.VISIBLE
             bodyAbout.text = aboutText
+            val tapToSpeak = View.OnClickListener {
+                DebugLogger.i(TAG, "tap-to-speak ABOUT id=${poi.id}")
+                interruptAndSpeak(aboutText)
+            }
+            labelAbout.setOnClickListener(tapToSpeak)
+            bodyAbout.setOnClickListener(tapToSpeak)
         }
 
         if (storyText != null) {
             labelStory.visibility = View.VISIBLE
             bodyStory.visibility = View.VISIBLE
             bodyStory.text = storyText
+            val tapToSpeak = View.OnClickListener {
+                DebugLogger.i(TAG, "tap-to-speak STORY id=${poi.id}")
+                interruptAndSpeak(storyText)
+            }
+            labelStory.setOnClickListener(tapToSpeak)
+            bodyStory.setOnClickListener(tapToSpeak)
         }
 
         return Triple(shortText, aboutText, storyText)
+    }
+
+    /** Interrupt all current TTS (ambient + sheet) and speak this text immediately. */
+    private fun interruptAndSpeak(text: String) {
+        tourViewModel.stopNarration()
+        tourViewModel.speakSheetSection(ttsTag, text, poi.name)
     }
 
     // ── Action buttons (rendered only — NOT narrated) ───────────────────
@@ -416,25 +443,17 @@ class PoiDetailSheet : DialogFragment() {
 
         val name = poi.name
 
-        // Segment 1: name + top identifying info (address, phone,
-        // website acknowledgement) as one readable sentence. Deliberately
-        // conversational — does NOT read the UI labels, does NOT read the
-        // URL aloud, does NOT enumerate the action buttons.
-        val intro = buildString {
-            append(name).append(". ")
-            append(displayCategory(poi.category)).append(". ")
-            poi.address?.takeIf { it.isNotBlank() }?.let { append("Located at $it. ") }
-            poi.phone?.takeIf { it.isNotBlank() }?.let { append("Phone ${it}. ") }
-            if (!poi.website.isNullOrBlank()) append("They have a website. ")
-        }
-        tourViewModel.speakSheetSection(ttsTag, intro.trim(), name)
+        // Segment 1: name + category (brief intro, no address/phone — those
+        // are tappable in the UI for on-demand reading).
+        val intro = "${name}. ${displayCategory(poi.category)}."
+        tourViewModel.speakSheetSection(ttsTag, intro, name)
         DebugLogger.i(TAG, "tts enqueue intro id=${poi.id} len=${intro.length}")
 
-        // Segments 2..N: just the narratives. One segment per populated
-        // description field. No headers, no UI labels, no action summary.
+        // Segment 2+: narrative sections in visual order.
+        // Overview first (matches what the user sees on screen).
         shortText?.let {
             tourViewModel.speakSheetSection(ttsTag, it, name)
-            DebugLogger.i(TAG, "tts enqueue short id=${poi.id} len=${it.length}")
+            DebugLogger.i(TAG, "tts enqueue overview id=${poi.id} len=${it.length}")
         }
         aboutText?.let {
             tourViewModel.speakSheetSection(ttsTag, it, name)
@@ -492,7 +511,6 @@ private fun salemPoiToJson(poi: SalemPoi): String = JSONObject().apply {
     put("category", poi.category)
     putOpt("short_narration", poi.shortNarration)
     putOpt("long_narration", poi.longNarration)
-    putOpt("narration_pass_2", poi.narrationPass2)
     putOpt("description", poi.description)
     putOpt("image_asset", poi.imageAsset)
     putOpt("phone", poi.phone)
@@ -515,7 +533,6 @@ private fun parseSalemPoi(s: String): SalemPoi? {
             category = o.getString("category"),
             shortNarration = o.optString("short_narration", "").takeIf { it.isNotEmpty() },
             longNarration = o.optString("long_narration", "").takeIf { it.isNotEmpty() },
-            narrationPass2 = o.optString("narration_pass_2", "").takeIf { it.isNotEmpty() },
             description = o.optString("description", "").takeIf { it.isNotEmpty() },
             imageAsset = o.optString("image_asset", "").takeIf { it.isNotEmpty() },
             phone = o.optString("phone", "").takeIf { it.isNotEmpty() },

@@ -1609,23 +1609,15 @@ class SalemMainActivity : AppCompatActivity() {
         val zoom = binding.mapView.zoomLevelDouble
         val bucket = zoomBucket(zoom)
         if (bucket == lastNarrationIconZoom) return
-        // Only refresh markers in the current viewport — avoids ANR from iterating
-        // 800+ markers at every zoom-bucket transition
-        val visible = binding.mapView.boundingBox
-        var refreshed = 0
+        // Refresh ALL markers on zoom bucket change. Icons are cached so
+        // the per-marker cost is just an assignment — no bitmap allocation.
+        // Previously only visible markers were refreshed, leaving edge-of-screen
+        // markers stuck at the wrong size when zooming out.
         for ((marker, point) in narrationMarkers) {
-            if (!visible.contains(marker.position)) continue
             marker.icon = narrationIconForZoom(point.category.lowercase(), point.name, zoom)
-            refreshed++
         }
-        // S118: Only mark bucket as done if we actually refreshed some markers.
-        // If 0 visible, the icons are still stale from the old bucket and we
-        // need to retry when the user pans to where markers exist.
-        if (refreshed > 0) {
-            lastNarrationIconZoom = bucket
-        }
-        DebugLogger.i("SalemMainActivity", "refreshNarrationIcons: bucket=$bucket refreshed=$refreshed/${narrationMarkers.size}" +
-            if (refreshed == 0) " (bucket NOT committed — will retry)" else "")
+        lastNarrationIconZoom = bucket
+        DebugLogger.i("SalemMainActivity", "refreshNarrationIcons: bucket=$bucket refreshed=${narrationMarkers.size}")
         binding.mapView.invalidate()
     }
 

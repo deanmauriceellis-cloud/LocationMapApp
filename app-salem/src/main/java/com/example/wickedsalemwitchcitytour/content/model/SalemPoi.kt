@@ -37,8 +37,6 @@ data class SalemPoi(
     // ── Narration (geofence-triggered TTS content) ──
     @ColumnInfo(name = "short_narration") val shortNarration: String? = null,
     @ColumnInfo(name = "long_narration") val longNarration: String? = null,
-    @ColumnInfo(name = "narration_pass_2") val narrationPass2: String? = null,
-    @ColumnInfo(name = "narration_pass_3") val narrationPass3: String? = null,
 
     // ── Geofence ──
     @ColumnInfo(name = "geofence_radius_m") val geofenceRadiusM: Int = 40,

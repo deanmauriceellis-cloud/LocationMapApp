@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S110 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S111 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 111: 2026-04-09 — Protocol optimization (compress STATE.md, archive S001-S101, rewrite session protocols, thin OMEN report template)
+
+Compressed STATE.md from 784 → 112 lines (snapshot-only), archived sessions S001-S101 to SESSION-LOG-ARCHIVE.md (rolling-window protocol now active), and rewrote CLAUDE.md session-start protocol for parallel + head-only reads and session-end protocol for write-once-in-live-log with a new ~80-line thin OMEN report template. Operator-queued from S110 wrap-up; net per-session read cost drops ~70% at session start.
+
+Full session detail: `docs/session-logs/session-111-2026-04-09.md`.
+
+---
 
 ## Session 110: 2026-04-09 — Five-pivot side quest: layout fix + runaway-loop fix + verbose persistent logging + cache-proxy circuit breaker + POI proximity encounter tracker
 
