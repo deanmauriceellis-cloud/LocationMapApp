@@ -1305,7 +1305,7 @@ class SalemMainActivity : AppCompatActivity() {
                 val degThreshold = 0.00018 // slightly generous to catch edge cases
                 val pLat = point.latitude
                 val pLng = point.longitude
-                var bestTrigger: com.example.wickedsalemwitchcitytour.content.model.NarrationPoint? = null
+                var bestTrigger: com.example.wickedsalemwitchcitytour.content.model.SalemPoi? = null
                 var bestDist: Double = WALK_SIM_DWELL_TRIGGER_M
                 for (np in narrationPoints) {
                     if (np.id in dwelledIds) continue
@@ -1506,7 +1506,7 @@ class SalemMainActivity : AppCompatActivity() {
     }
 
     /** Narration point markers — stored for zoom-based icon refresh */
-    internal val narrationMarkers = mutableListOf<Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.NarrationPoint>>()
+    internal val narrationMarkers = mutableListOf<Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.SalemPoi>>()
     private var lastNarrationIconZoom = -1
 
     /**
@@ -1551,7 +1551,7 @@ class SalemMainActivity : AppCompatActivity() {
                 // S118: Pre-generate icons on background thread to avoid ANR
                 val zoom = binding.mapView.zoomLevelDouble
                 val iconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    points.map { p -> p to narrationIconForZoom(p.type, p.name, zoom) }
+                    points.map { p -> p to narrationIconForZoom(p.category.lowercase(), p.name, zoom) }
                 }
 
                 // Now on main thread — fast marker creation
@@ -1559,13 +1559,14 @@ class SalemMainActivity : AppCompatActivity() {
                     val marker = Marker(binding.mapView)
                     marker.position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
                     marker.title = p.name
-                    marker.snippet = p.type.replace('_', ' ')
+                    marker.snippet = p.category.replace('_', ' ').lowercase()
+                        .split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                     marker.icon = icon
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     marker.setOnMarkerClickListener { _, _ ->
                         DebugLogger.i(
                             "SalemMainActivity",
-                            "MARKER TAP id=${p.id} name=${p.name} type=${p.type} → showing PoiDetailSheet"
+                            "MARKER TAP id=${p.id} name=${p.name} category=${p.category} → showing PoiDetailSheet"
                         )
                         PoiDetailSheet.show(p, supportFragmentManager)
                         true
@@ -1614,7 +1615,7 @@ class SalemMainActivity : AppCompatActivity() {
         var refreshed = 0
         for ((marker, point) in narrationMarkers) {
             if (!visible.contains(marker.position)) continue
-            marker.icon = narrationIconForZoom(point.type, point.name, zoom)
+            marker.icon = narrationIconForZoom(point.category.lowercase(), point.name, zoom)
             refreshed++
         }
         // S118: Only mark bucket as done if we actually refreshed some markers.

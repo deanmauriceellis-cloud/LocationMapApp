@@ -2815,6 +2815,76 @@ The hybrid tour model preserves walking agency while locking narrative coherence
 
 ---
 
+## Backlog — S119 Parking Lot Triage (2026-04-13)
+
+> Items captured during S119 (hero image generation session). Full descriptions in `docs/session-logs/session-119-2026-04-12.md` → "Parking Lot" section. Categorized below by target phase.
+
+### Bugs (Phase 10 — Production Readiness)
+
+| ID | Item | Priority |
+|----|------|----------|
+| P7 | Narration geofence boundary enforcement — triggers outside downtown bbox | HIGH |
+| P8 | Orientation change destroys state (classic lifecycle, needs ViewModel/SavedState) | HIGH |
+| P13 | Tour resume / session persistence — cold-start recovery | HIGH |
+
+### Core UX (Phase 10–11)
+
+| ID | Item | Priority |
+|----|------|----------|
+| P1 | Four app modes (Main Tours / Generated Tours / Explore Salem / Salem 1692) | HIGH |
+| P2 | Overlapping POI spiderfy (critical with 2,190 POIs) | HIGH |
+| P5 | Intelligent POI visibility & narration control (group toggles, smart defaults) | HIGH |
+| P9 | User map rotation / bearing control (two-finger twist, compass) | MEDIUM |
+| P10 | Onboarding / first-run experience (interest picker, GPS permission flow) | HIGH |
+| P11 | Search UI (2,190 POIs need a search bar — SalemPoiDao.search() ready) | HIGH |
+| P12 | POI detail view redesign (hero banner, narration tiers, hours/phone/website) | HIGH |
+| P14 | Favorites / "Want to Visit" list | MEDIUM |
+| P15 | Battery awareness (GPS duty cycling, low-power mode) | MEDIUM |
+| P17 | "Walk Me There" point-to-point navigation (OSRM infrastructure exists) | MEDIUM |
+| P21 | Wire hero images into app UI (imageAsset field populated but not displayed) | HIGH |
+
+### Branding & UX Polish (Phase 11)
+
+| ID | Item | Priority |
+|----|------|----------|
+| P3 | Complete menu/navigation overhaul (Salem-branded, 4-mode structure) | HIGH |
+| P4 | Top-layer UI contextualization (cloud/home/utility buttons for tourism) | MEDIUM |
+| P6 | Top ribbon as contextual information bar (district, progress, nearby count) | MEDIUM |
+| P19 | Night mode / dark map theme (October evening use case) | MEDIUM |
+
+### Social & Growth (Phase 12)
+
+| ID | Item | Priority |
+|----|------|----------|
+| P16 | POI sharing (hero image + name + description → share sheet) | MEDIUM |
+
+### Content (Phase 9Q–9R)
+
+| ID | Item | Priority |
+|----|------|----------|
+| P18 | Events / "Happening Now" (744 event pages in SalemIntelligence) | MEDIUM |
+| P22 | Salem 1692 newspaper illustrations (203 pen-and-ink sketches) | LOW |
+
+### Hero Image Refinement (Cross-project with SalemIntelligence)
+
+| ID | Item | Description |
+|----|------|-------------|
+| P20 | Hero image refinement pass (re-run prompts for ~20% exterior-biased) |
+| P24 | Hero image prompt architecture overhaul (interior/exterior classification) |
+| P25 | SalemIntelligence API feedback loop for hero images |
+| P26 | Entity-bonded hero images via SalemIntelligence (product-specific, not generic) |
+| P27 | Category/subcategory drives image tone and authority |
+| P28 | Every hero image must be visually unique (composition/color variety) |
+| P29 | Image-to-context quality review (QC tool, flag/regenerate loop) |
+
+### Infrastructure
+
+| ID | Item | Priority |
+|----|------|----------|
+| P23 | Dynamic content update pipeline (2-4 week Google Play cycle) | MEDIUM |
+
+---
+
 ## Competitive Landscape
 
 ### Direct Competitors

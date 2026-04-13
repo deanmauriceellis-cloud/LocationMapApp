@@ -16,7 +16,7 @@ import org.osmdroid.views.overlay.Polygon
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
-import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.tour.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,8 +33,8 @@ import java.util.ArrayDeque
  *  current user position (>50m → discarded) and sorted by tier (paid → historic
  *  → attraction → rest), then closest within tier wins. The dock renders the
  *  same filtered+sorted snapshot so dock order = play order. */
-private val narrationQueue = ArrayDeque<NarrationPoint>()
-private var currentNarration: NarrationPoint? = null
+private val narrationQueue = ArrayDeque<SalemPoi>()
+private var currentNarration: SalemPoi? = null
 private var narrationAutoPlay = true
 
 /**
@@ -549,7 +549,7 @@ private fun isPoiAhead(poiLat: Double, poiLng: Double): Boolean {
  * jumpToFront still works: user tap on the dock plays immediately, bypassing
  * the tier filter (explicit user intent overrides auto-prioritization).
  */
-internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFront: Boolean) {
+internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Boolean) {
     val tier = NarrationTierClassifier.classify(point)
     DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} tier=$tier ad=${point.adPriority} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
@@ -576,8 +576,7 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
         showNarrationHighlight(point)
         val text = narrationGeofenceManager.getNarrationForPass(point)
             ?: point.shortNarration ?: point.description
-        val voiceId = point.voiceOverride
-            ?: com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.type)
+        val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
         if (text != null) {
             narrationGeofenceManager.recordVisit(point.id)
             DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId")
@@ -597,7 +596,7 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
 }
 
 /**
- * S112: Pick the next NarrationPoint to play, applying the dequeue rules:
+ * S112: Pick the next SalemPoi to play, applying the dequeue rules:
  *   1. Drop everything farther than 50m from the current user position.
  *   2. Find the highest non-empty tier (PAID → HISTORIC → ATTRACTION → REST).
  *   3. Within that tier, return the closest POI to the user.
@@ -609,7 +608,7 @@ internal fun SalemMainActivity.enqueueNarration(point: NarrationPoint, jumpToFro
  * preserves cold-start behavior where the queue might receive a jumpToFront
  * tap before any GPS is available.
  */
-private fun SalemMainActivity.pickNextFromQueue(): NarrationPoint? {
+private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
     if (narrationQueue.isEmpty()) return null
 
     // Cold start fallback — no GPS yet, return FIFO order
@@ -641,7 +640,7 @@ private fun SalemMainActivity.pickNextFromQueue(): NarrationPoint? {
     }
 
     // Step 1: drop anything > discardRadius (out of range) OR behind the user
-    val survivors = mutableListOf<NarrationPoint>()
+    val survivors = mutableListOf<SalemPoi>()
     val droppedNames = mutableListOf<String>()
     val droppedBehind = mutableListOf<String>()
     for (point in narrationQueue) {
@@ -711,8 +710,7 @@ internal fun SalemMainActivity.playNextNarration() {
         ?: point.shortNarration ?: point.description
 
     // Resolve voice: POI override > category default
-    val voiceId = point.voiceOverride
-        ?: com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.type)
+    val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
     DebugLogger.i("NARR-PLAY", "  text=${if (text != null) "${text.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay")
     if (text != null && narrationAutoPlay) {
         DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakNarration() voice=$voiceId")
@@ -776,13 +774,13 @@ internal fun SalemMainActivity.refreshProximityDockFromQueue() {
 /**
  * Show the narration bottom sheet for a narration point.
  */
-internal fun SalemMainActivity.showNarrationSheet(point: NarrationPoint) {
+internal fun SalemMainActivity.showNarrationSheet(point: SalemPoi) {
     val sheet = binding.root.findViewById<View>(R.id.narrationSheet) ?: return
 
     // Populate content
     sheet.findViewById<TextView>(R.id.narrationTitle)?.text = point.name
     sheet.findViewById<TextView>(R.id.categoryLabel)?.text =
-        point.type.replace('_', ' ').split(' ')
+        point.category.replace('_', ' ').split(' ')
             .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
     val narrationText = narrationGeofenceManager.getNarrationForPass(point)
@@ -914,7 +912,7 @@ private var geofenceOverlayPointId: String? = null
  * Shows entry radius (solid) and approach radius (dashed outline).
  * Tapping again or tapping for a different POI replaces it.
  */
-internal fun SalemMainActivity.toggleGeofenceOverlay(point: NarrationPoint) {
+internal fun SalemMainActivity.toggleGeofenceOverlay(point: SalemPoi) {
     // Remove existing overlay
     geofenceOverlay?.let { binding.mapView.overlays.remove(it) }
 
@@ -990,7 +988,7 @@ internal fun SalemMainActivity.clearGeofenceOverlay() {
  * Auto-replaces any prior highlight (so successive narrations move the ring
  * cleanly from one POI to the next without manual cleanup at the call site).
  */
-internal fun SalemMainActivity.showNarrationHighlight(point: NarrationPoint) {
+internal fun SalemMainActivity.showNarrationHighlight(point: SalemPoi) {
     // Tear down any existing highlight first
     clearNarrationHighlight()
 

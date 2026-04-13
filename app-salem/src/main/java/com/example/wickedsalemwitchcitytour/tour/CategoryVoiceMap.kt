@@ -42,49 +42,60 @@ object CategoryVoiceMap {
     /**
      * Category → default voice mapping.
      *
+     * Covers both SalemPoi.category values (uppercase, e.g. "WITCH_SHOP") and
+     * legacy NarrationPoint.type / OSM tag values (lowercase, e.g. "witch_shop").
      * Categories without an explicit mapping fall back to [defaultVoice].
      */
     private val categoryVoice: Map<String, String> = mapOf(
-        // ── Salem Spooky (UK voices — old-world gothic) ──────────────
-        "witch_shop"          to UK_1,  // Female — mysterious shopkeeper
-        "witch_museum"        to UK_4,  // Male formal — museum authority
-        "ghost_tour"          to UK_2,  // Male — dramatic storyteller
-        "haunted_attraction"  to UK_2,  // Male — dramatic storyteller
-        "psychic"             to UK_3,  // Female soft — ethereal, mystical
-        "cemetery"            to UK_6,  // Male warm — respectful, reverent
+        // ── SalemPoi.category (uppercase — Phase 9U unified table) ──
+        "WITCH_SHOP"          to UK_1,  // Female — mysterious shopkeeper
+        "GHOST_TOUR"          to UK_2,  // Male — dramatic storyteller
+        "HAUNTED_ATTRACTION"  to UK_2,  // Male — dramatic storyteller
+        "PSYCHIC"             to UK_3,  // Female soft — ethereal, mystical
+        "TOURISM_HISTORY"     to US_7,  // Male narrator — documentary voice
+        "FOOD_DRINK"          to US_1,  // Female warm — welcoming
+        "LODGING"             to US_8,  // Female crisp — professional hospitality
+        "SHOPPING"            to US_3,  // Female bright — retail energy
+        "ENTERTAINMENT"       to US_6,  // Female narrator — engaging guide
+        "PARKS_REC"           to AU_1,  // AU Female — fresh, outdoorsy
+        "CIVIC"               to US_4,  // Male clear — civic authority
+        "EDUCATION"           to UK_3,  // UK Female soft — quiet, bookish
+        "WORSHIP"             to UK_5,  // UK Female bright — reverent but warm
+        "HEALTHCARE"          to US_4,  // Male clear — clinical trust
+        "OFFICES"             to US_4,  // Male clear — business professional
+        "FINANCE"             to US_4,  // Male clear — professional
+        "AUTO_SERVICES"       to US_4,  // Male clear — professional
 
-        // ── Historic & Cultural (US narrators — authoritative) ──────
-        "historic_site"       to US_7,  // Male narrator — documentary voice
-        "museum"              to US_5,  // Female smooth — gallery guide
-        "public_art"          to US_5,  // Female smooth — art appreciation
-        "place_of_worship"    to UK_5,  // UK Female bright — reverent but warm
-
-        // ── Food & Drink (warm, inviting) ───────────────────────────
-        "restaurant"          to US_1,  // Female warm — welcoming hostess
-        "cafe"                to US_1,  // Female warm — cozy coffeehouse
-        "bar"                 to AU_2,  // AU Male — casual, friendly
-        "brewery"             to AU_2,  // AU Male — casual, friendly
-        "hotel"               to US_8,  // Female crisp — professional hospitality
-        "lodging"             to US_8,  // Female crisp — professional hospitality
-
-        // ── Shopping & Services (clear, professional) ───────────────
-        "shop"                to US_3,  // Female bright — retail energy
-        "services"            to US_4,  // Male clear — business professional
-        "medical"             to US_4,  // Male clear — clinical trust
-        "government"          to US_4,  // Male clear — civic authority
-
-        // ── Tourism & Outdoor (distinctive, friendly) ───────────────
-        "tour"                to US_6,  // Female narrator — tour guide voice
-        "attraction"          to US_6,  // Female narrator — engaging guide
-        "visitor_info"        to US_7,  // Male narrator — informative
-        "park"                to AU_1,  // AU Female — fresh, outdoorsy
-        "community_center"    to UK_6,  // UK Male warm — neighborly
-
-        // ── Venue & Other ───────────────────────────────────────────
-        "venue"               to US_2,  // Male deep — event announcer
-        "public"              to US_3,  // Female bright — general info
-        "library"             to UK_3,  // UK Female soft — quiet, bookish
-        "other"               to US_7,  // Male narrator — fallback narrator
+        // ── Legacy lowercase types / OSM tags (backward compatibility) ──
+        "witch_shop"          to UK_1,
+        "witch_museum"        to UK_4,
+        "ghost_tour"          to UK_2,
+        "haunted_attraction"  to UK_2,
+        "psychic"             to UK_3,
+        "cemetery"            to UK_6,
+        "historic_site"       to US_7,
+        "museum"              to US_5,
+        "public_art"          to US_5,
+        "place_of_worship"    to UK_5,
+        "restaurant"          to US_1,
+        "cafe"                to US_1,
+        "bar"                 to AU_2,
+        "brewery"             to AU_2,
+        "hotel"               to US_8,
+        "lodging"             to US_8,
+        "shop"                to US_3,
+        "services"            to US_4,
+        "medical"             to US_4,
+        "government"          to US_4,
+        "tour"                to US_6,
+        "attraction"          to US_6,
+        "visitor_info"        to US_7,
+        "park"                to AU_1,
+        "community_center"    to UK_6,
+        "venue"               to US_2,
+        "public"              to US_3,
+        "library"             to UK_3,
+        "other"               to US_7,
     )
 
     /** Default voice when category is unknown */

@@ -1,11 +1,27 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 106, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 106, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 110, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
 
 ---
 
-# Sessions S001-S108 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S110 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 110: 2026-04-09 — Five-pivot side quest: layout fix + runaway-loop fix + verbose persistent logging + cache-proxy circuit breaker + POI proximity encounter tracker
+
+Five operator pivots, all unplanned, all driven by real bug reports from a field test on the Lenovo TB305FU. Major fixes: (1) NarrationGeofenceManager promoted to Hilt @Singleton — survives orientation change; (2) reach-out radius tightened to 15m/25m; (3) GPS staleness gate (30s threshold); (4) verbose persistent file logging with PID prefix; (5) OkHttp circuit breaker for local server; (6) PoiEncounter Room entity for proximity analytics. Zero progress on carry-over 9P.11.
+
+Full session detail: `docs/session-logs/session-110-2026-04-09.md`.
+
+---
+
+## Session 109: 2026-04-09 — Side quest: column drift + GPS observer + GPS Journey recorder
+
+Column drift fix (PG narration_points now has 817 fully populated rows — switched importer from .sql to .db), GPS proportional dead zone (accuracy*2 instead of fixed 100m), idlePopulate gated to tour mode, GPS Journey always-on recorder with 24h rolling retention and toggle FAB. No progress on 9P.11.
+
+Full session detail: `docs/session-logs/session-109-2026-04-09.md`.
+
+---
 
 ## Session 108: 2026-04-09 — Admin UI polish (tab wrap + backdrop opacity + legend z-index)
 

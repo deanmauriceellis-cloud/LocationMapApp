@@ -9,7 +9,7 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
-import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import org.json.JSONArray
 import org.json.JSONException
 
@@ -19,11 +19,11 @@ import org.json.JSONException
  *
  * Resolution order:
  *
- *   1. **[NarrationPoint.actionButtons] JSON override** — if populated, parse
+ *   1. **[SalemPoi.actionButtons] JSON override** — if populated, parse
  *      and return the explicit action list. This is the admin tool hook for
  *      custom buttons (book tour, Instagram, menu, etc.) that land in a
  *      future session. As of Session 113 this field is populated on **0 of
- *      817** NarrationPoints, so the override path is effectively dormant.
+ *      817** SalemPois, so the override path is effectively dormant.
  *   2. **Render-time synthesis** — builds actions from fields that already
  *      exist on the POI: `website` → Visit Website, `phone` → Call,
  *      `lat/lng` → Directions, `hours` → Hours chip. No schema migration.
@@ -54,7 +54,7 @@ object PoiActionSynthesizer {
         data class Unknown(val label: String) : Action()
     }
 
-    fun buildActions(poi: NarrationPoint): List<Action> {
+    fun buildActions(poi: SalemPoi): List<Action> {
         parseOverride(poi.actionButtons)?.let { return it }
         return buildList {
             poi.website?.takeIf { it.isNotBlank() }?.let { add(Action.VisitWebsite(it)) }

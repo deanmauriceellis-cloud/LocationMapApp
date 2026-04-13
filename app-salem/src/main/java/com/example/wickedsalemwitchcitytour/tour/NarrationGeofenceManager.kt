@@ -7,7 +7,7 @@ package com.example.wickedsalemwitchcitytour.tour
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,7 +37,7 @@ class NarrationGeofenceManager @Inject constructor(
     @ApplicationContext context: Context
 ) {
 
-    private var points: List<NarrationPoint> = emptyList()
+    private var points: List<SalemPoi> = emptyList()
 
     /** Walk sim mode: expands entry radius and tightens reach-out for continuous narration */
     var walkSimMode: Boolean = false
@@ -119,7 +119,7 @@ class NarrationGeofenceManager @Inject constructor(
      *  defeat the purpose of the singleton lift, which is to prevent repeat
      *  triggers after orientation changes. Cooldowns now survive recreate
      *  along with `narratedAt`. */
-    fun loadPoints(narrationPoints: List<NarrationPoint>) {
+    fun loadPoints(narrationPoints: List<SalemPoi>) {
         points = narrationPoints
         purgeExpired()
     }
@@ -135,7 +135,7 @@ class NarrationGeofenceManager @Inject constructor(
      *
      * Falls through: if a pass has no content, uses the previous pass.
      */
-    fun getNarrationForPass(point: NarrationPoint): String? {
+    fun getNarrationForPass(point: SalemPoi): String? {
         val visits = getVisitCount(point.id)
         val pass = (visits % 3) + 1  // 0→1, 1→2, 2→3, 3→1, ...
 
@@ -380,12 +380,12 @@ enum class NarrationEventType {
 /** Geofence event emitted when user is near a narration point */
 data class NarrationGeofenceEvent(
     val type: NarrationEventType,
-    val point: NarrationPoint,
+    val point: SalemPoi,
     val distanceM: Double
 )
 
 /** A narration point with its current distance from the user (for proximity dock) */
 data class NearbyPoint(
-    val point: NarrationPoint,
+    val point: SalemPoi,
     val distanceM: Double
 )

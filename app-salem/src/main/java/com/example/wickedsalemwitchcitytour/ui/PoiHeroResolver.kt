@@ -1,5 +1,5 @@
 /*
- * WickedSalemWitchCityTour v1.0
+ * WickedSalemWitchCityTour v1.5 — Phase 9U (Session 120)
  * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
  *
  * This source code is proprietary and confidential.
@@ -13,60 +13,44 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.widget.ImageView
 import com.example.wickedsalemwitchcitytour.R
-import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import java.io.IOException
 import kotlin.math.abs
 
 /**
- * Resolves the hero image for a POI displayed in [PoiDetailSheet] (Session 113).
+ * Resolves the hero image for a POI displayed in [PoiDetailSheet].
  *
- * Resolution order (stopgap — merchant / admin overrides land in a future
- * session once the admin-tool image assignment chain is wired):
- *
- *   1. **Future merchant paid asset** — NOT yet implemented (placeholder).
- *   2. **Future admin-assigned asset** — NOT yet implemented (placeholder).
- *   3. **Hash-pinned fallback** — deterministic pick from
- *      `assets/poi-icons/{folder}/` based on POI type → folder mapping, keyed
- *      on `abs(poi.id.hashCode()) % pool.size`. Same POI → same image across
- *      process restarts and rebuilds as long as the asset pool is unchanged.
- *   4. **Red placeholder** — [R.drawable.poi_hero_placeholder_red] shown when
- *      the POI's category does not map to any poi-icons folder or the folder
- *      is empty. This is a visible worklist flag — operator will replace
- *      these via the admin tool.
+ * Resolution order:
+ *   1. **poi.imageAsset** — S119 hero image in `assets/hero/{entity_id}.webp`
+ *      (1,013 POIs have this populated as of S119).
+ *   2. **Category-based fallback** — hash-pinned pick from
+ *      `assets/poi-icons/{category.lowercase()}/` based on POI category → folder
+ *      mapping, keyed on `abs(poi.id.hashCode()) % pool.size`.
+ *   3. **Red placeholder** — [R.drawable.poi_hero_placeholder_red] shown when
+ *      no hero image and no category icons exist.
  */
 object PoiHeroResolver {
 
     /**
-     * POI type → poi-icons folder mapping. Mirrors ProximityDock.typeToFolder
-     * but is maintained independently so evolving the dock does not break
-     * detail-sheet imagery.
+     * SalemPoi.category (uppercase) → poi-icons folder mapping.
+     * Used when the POI has no imageAsset (hero image).
      */
-    private val typeToFolder = mapOf(
-        "witch_museum" to "witch_shop",
-        "witch_shop" to "witch_shop",
-        "psychic" to "psychic",
-        "ghost_tour" to "ghost_tour",
-        "haunted_attraction" to "haunted_attraction",
-        "historic_site" to "historic_house",
-        "historic_house" to "historic_house",
-        "museum" to "tourism_history",
-        "public_art" to "tourism_history",
-        "cemetery" to "tourism_history",
-        "tour" to "ghost_tour",
-        "attraction" to "entertainment",
-        "park" to "parks_rec",
-        "place_of_worship" to "worship",
-        "visitor_info" to "civic",
-        "lodging" to "lodging",
-        "hotel" to "lodging",
-        "brewery" to "food_drink",
-        "bar" to "food_drink",
-        "restaurant" to "food_drink",
-        "cafe" to "food_drink",
-        "community_center" to "civic",
-        "government" to "civic",
-        "library" to "education",
-        "shopping" to "shopping"
+    private val categoryToFolder = mapOf(
+        "WITCH_SHOP"          to "witch_shop",
+        "PSYCHIC"             to "psychic",
+        "GHOST_TOUR"          to "ghost_tour",
+        "HAUNTED_ATTRACTION"  to "haunted_attraction",
+        "TOURISM_HISTORY"     to "tourism_history",
+        "FOOD_DRINK"          to "food_drink",
+        "LODGING"             to "lodging",
+        "ENTERTAINMENT"       to "entertainment",
+        "PARKS_REC"           to "parks_rec",
+        "CIVIC"               to "civic",
+        "EDUCATION"           to "education",
+        "SHOPPING"            to "shopping",
+        "WORSHIP"             to "worship",
+        "HEALTHCARE"          to "healthcare",
+        "OFFICES"             to "offices",
     )
 
     /** Cached file listings per folder (filled lazily on first access). */
@@ -80,8 +64,15 @@ object PoiHeroResolver {
     }
 
     /** Resolve the hero for this POI. Never throws. */
-    fun resolve(context: Context, poi: NarrationPoint): HeroResult {
-        val folder = typeToFolder[poi.type] ?: return HeroResult.RedPlaceholder
+    fun resolve(context: Context, poi: SalemPoi): HeroResult {
+        // Priority 1: dedicated hero image from S119 generation pipeline
+        poi.imageAsset?.takeIf { it.isNotBlank() }?.let { asset ->
+            return HeroResult.AssetImage(asset)
+        }
+
+        // Priority 2: category-based fallback from poi-icons
+        val folder = categoryToFolder[poi.category]
+            ?: return HeroResult.RedPlaceholder
         val files = listingFor(context, folder)
         if (files.isEmpty()) return HeroResult.RedPlaceholder
 
@@ -90,7 +81,7 @@ object PoiHeroResolver {
     }
 
     /** Load the resolved hero into an ImageView. Safe on any IO error. */
-    fun applyTo(context: Context, poi: NarrationPoint, imageView: ImageView): HeroResult {
+    fun applyTo(context: Context, poi: SalemPoi, imageView: ImageView): HeroResult {
         val result = resolve(context, poi)
         when (result) {
             is HeroResult.AssetImage -> {
@@ -116,7 +107,7 @@ object PoiHeroResolver {
             try {
                 context.assets.list("poi-icons/$folder")
                     ?.filter { it.endsWith(".png", ignoreCase = true) }
-                    ?.sorted()  // deterministic ordering across devices
+                    ?.sorted()
                     ?: emptyList()
             } catch (_: IOException) {
                 emptyList()

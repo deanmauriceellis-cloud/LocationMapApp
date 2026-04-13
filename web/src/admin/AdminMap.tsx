@@ -47,15 +47,16 @@ const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">Open
 
 const iconCache = new Map<string, L.DivIcon>()
 
-function poiIcon(color: string, selected: boolean): L.DivIcon {
-  const key = `${color}|${selected ? 'sel' : 'norm'}`
+function poiIcon(color: string, selected: boolean, hidden: boolean = false): L.DivIcon {
+  const key = `${color}|${selected ? 'sel' : 'norm'}|${hidden ? 'hid' : 'vis'}`
   let icon = iconCache.get(key)
   if (icon) return icon
   const size = selected ? 18 : 12
   const stroke = selected ? '#facc15' : '#ffffff'
   const strokeW = selected ? 3 : 1.5
+  const opacity = hidden ? 0.35 : 1
   const html = `
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="opacity:${opacity}">
       <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - strokeW / 2}"
               fill="${color}" stroke="${stroke}" stroke-width="${strokeW}"/>
     </svg>`
@@ -102,7 +103,7 @@ function MarkerLayer({
 }: MarkerLayerProps) {
   const map = useMap()
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
-  const markersByKeyRef = useRef<Map<string, { marker: L.Marker; color: string }>>(new Map())
+  const markersByKeyRef = useRef<Map<string, { marker: L.Marker; color: string; hidden: boolean }>>(new Map())
 
   useEffect(() => {
     if (clusterGroupRef.current) {
@@ -128,9 +129,10 @@ function MarkerLayer({
       const key = poi.id
       const isSelected = key === selectedKey
       const color = categoryColor(poi.category as string)
+      const isHidden = poi.default_visible === false
 
       const marker = L.marker([poi.lat, poi.lng], {
-        icon: poiIcon(color, isSelected),
+        icon: poiIcon(color, isSelected, isHidden),
         draggable: true,
         autoPan: true,
         title: `${poi.category || '—'}: ${poi.name}`,
@@ -157,7 +159,7 @@ function MarkerLayer({
       })
 
       allMarkers.push(marker)
-      markersByKeyRef.current.set(key, { marker, color })
+      markersByKeyRef.current.set(key, { marker, color, hidden: isHidden })
     }
 
     cluster.addLayers(allMarkers)
@@ -179,11 +181,11 @@ function MarkerLayer({
     const prev = previousSelectedKeyRef.current
     if (prev && prev !== selectedKey) {
       const entry = markersByKeyRef.current.get(prev)
-      if (entry) entry.marker.setIcon(poiIcon(entry.color, false))
+      if (entry) entry.marker.setIcon(poiIcon(entry.color, false, entry.hidden))
     }
     if (selectedKey) {
       const entry = markersByKeyRef.current.get(selectedKey)
-      if (entry) entry.marker.setIcon(poiIcon(entry.color, true))
+      if (entry) entry.marker.setIcon(poiIcon(entry.color, true, entry.hidden))
     }
     previousSelectedKeyRef.current = selectedKey
   }, [selectedKey])
@@ -303,7 +305,7 @@ function Legend({ categoryCounts }: { categoryCounts: [string, number][] }) {
             className="inline-block w-3 h-3 rounded-full border border-white flex-shrink-0"
             style={{ background: categoryColor(cat) }}
           />
-          <span className="text-slate-700 truncate">{cat}</span>
+          <span className="text-slate-700 truncate">{cat.replace(/_/g, ' ')}</span>
           <span className="ml-auto tabular-nums text-slate-500">{count}</span>
         </div>
       ))}

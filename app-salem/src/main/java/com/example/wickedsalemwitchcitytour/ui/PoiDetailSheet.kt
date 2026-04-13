@@ -32,7 +32,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
-import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONObject
 
@@ -75,7 +75,7 @@ class PoiDetailSheet : DialogFragment() {
 
     private val tourViewModel: TourViewModel by activityViewModels()
 
-    private lateinit var poi: NarrationPoint
+    private lateinit var poi: SalemPoi
 
     /** Stable per-sheet tag used as the utterance-id prefix for this sheet's
      *  TTS segments. Lets [cancelSheetRead] drop only this sheet's queued
@@ -168,11 +168,11 @@ class PoiDetailSheet : DialogFragment() {
     ): View {
         val poiJson = requireArguments().getString(ARG_POI_JSON)
             ?: throw IllegalArgumentException("PoiDetailSheet missing $ARG_POI_JSON")
-        poi = parseNarrationPoint(poiJson)
+        poi = parseSalemPoi(poiJson)
             ?: throw IllegalArgumentException("PoiDetailSheet: invalid POI payload")
         DebugLogger.i(
             TAG,
-            "onCreateView id=${poi.id} name=${poi.name} type=${poi.type} " +
+            "onCreateView id=${poi.id} name=${poi.name} category=${poi.category} " +
                 "hasShort=${!poi.shortNarration.isNullOrBlank()} " +
                 "hasDesc=${!poi.description.isNullOrBlank()} " +
                 "hasLong=${!poi.longNarration.isNullOrBlank()} " +
@@ -232,7 +232,7 @@ class PoiDetailSheet : DialogFragment() {
 
         view.findViewById<TextView>(R.id.overviewName).text = poi.name
         view.findViewById<TextView>(R.id.overviewType).text =
-            poi.type.replace('_', ' ')
+            displayCategory(poi.category)
 
         view.findViewById<TextView>(R.id.overviewAddress).apply {
             val addr = poi.address
@@ -422,7 +422,7 @@ class PoiDetailSheet : DialogFragment() {
         // URL aloud, does NOT enumerate the action buttons.
         val intro = buildString {
             append(name).append(". ")
-            append(poi.type.replace('_', ' ')).append(". ")
+            append(displayCategory(poi.category)).append(". ")
             poi.address?.takeIf { it.isNotBlank() }?.let { append("Located at $it. ") }
             poi.phone?.takeIf { it.isNotBlank() }?.let { append("Phone ${it}. ") }
             if (!poi.website.isNullOrBlank()) append("They have a website. ")
@@ -462,17 +462,12 @@ class PoiDetailSheet : DialogFragment() {
         /** Common prefix for every sheet-initiated TTS utterance. */
         private const val SHEET_TAG_PREFIX = "sheet_"
 
-        fun show(poi: NarrationPoint, fragmentManager: FragmentManager) {
+        fun show(poi: SalemPoi, fragmentManager: FragmentManager) {
             DebugLogger.i(TAG, "show() request id=${poi.id} name=${poi.name}")
-            // Dismiss any currently-showing PoiDetailSheet under the same
-            // tag before showing this one. FragmentManager normally
-            // handles same-tag replacement, but we also want the old
-            // fragment's onDismiss to fire so its TTS cancel runs before
-            // we queue new segments.
             (fragmentManager.findFragmentByTag(TAG_SHOW) as? PoiDetailSheet)?.dismissAllowingStateLoss()
             val sheet = PoiDetailSheet()
             sheet.arguments = Bundle().apply {
-                putString(ARG_POI_JSON, narrationPointToJson(poi))
+                putString(ARG_POI_JSON, salemPoiToJson(poi))
             }
             sheet.show(fragmentManager, TAG_SHOW)
         }
@@ -484,51 +479,59 @@ class PoiDetailSheet : DialogFragment() {
 // ────────────────────────────────────────────────────────────────────────
 // Argument passing helpers
 //
-// NarrationPoint is a Room @Entity data class, not Parcelable, so we
+// SalemPoi is a Room @Entity data class, not Parcelable, so we
 // round-trip just the fields the sheet actually displays through JSON.
-// Small surface area, no plugin dependency, and keeps the coupling
-// localized to this file.
 // ────────────────────────────────────────────────────────────────────────
 
-private fun narrationPointToJson(poi: NarrationPoint): String = JSONObject().apply {
+private fun salemPoiToJson(poi: SalemPoi): String = JSONObject().apply {
     put("id", poi.id)
     put("name", poi.name)
     put("lat", poi.lat)
     put("lng", poi.lng)
     putOpt("address", poi.address)
-    put("type", poi.type)
+    put("category", poi.category)
     putOpt("short_narration", poi.shortNarration)
     putOpt("long_narration", poi.longNarration)
     putOpt("narration_pass_2", poi.narrationPass2)
     putOpt("description", poi.description)
+    putOpt("image_asset", poi.imageAsset)
     putOpt("phone", poi.phone)
     putOpt("website", poi.website)
     putOpt("hours", poi.hours)
     putOpt("action_buttons", poi.actionButtons)
     put("ad_priority", poi.adPriority)
+    put("geofence_radius_m", poi.geofenceRadiusM)
 }.toString()
 
-private fun parseNarrationPoint(s: String): NarrationPoint? {
+private fun parseSalemPoi(s: String): SalemPoi? {
     return try {
         val o = JSONObject(s)
-        NarrationPoint(
+        SalemPoi(
             id = o.getString("id"),
             name = o.getString("name"),
             lat = o.getDouble("lat"),
             lng = o.getDouble("lng"),
             address = o.optString("address", "").takeIf { it.isNotEmpty() },
-            type = o.getString("type"),
+            category = o.getString("category"),
             shortNarration = o.optString("short_narration", "").takeIf { it.isNotEmpty() },
             longNarration = o.optString("long_narration", "").takeIf { it.isNotEmpty() },
             narrationPass2 = o.optString("narration_pass_2", "").takeIf { it.isNotEmpty() },
             description = o.optString("description", "").takeIf { it.isNotEmpty() },
+            imageAsset = o.optString("image_asset", "").takeIf { it.isNotEmpty() },
             phone = o.optString("phone", "").takeIf { it.isNotEmpty() },
             website = o.optString("website", "").takeIf { it.isNotEmpty() },
             hours = o.optString("hours", "").takeIf { it.isNotEmpty() },
             actionButtons = o.optString("action_buttons", "").takeIf { it.isNotEmpty() },
-            adPriority = o.optInt("ad_priority", 0)
+            adPriority = o.optInt("ad_priority", 0),
+            geofenceRadiusM = o.optInt("geofence_radius_m", 40)
         )
     } catch (_: Exception) {
         null
     }
+}
+
+/** Convert SalemPoi.category (e.g. "FOOD_DRINK") to display name (e.g. "Food & Drink") */
+private fun displayCategory(category: String): String {
+    return category.replace('_', ' ').lowercase()
+        .split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 }

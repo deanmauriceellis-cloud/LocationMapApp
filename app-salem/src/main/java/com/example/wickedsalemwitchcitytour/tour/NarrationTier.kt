@@ -25,7 +25,7 @@
 
 package com.example.wickedsalemwitchcitytour.tour
 
-import com.example.wickedsalemwitchcitytour.content.model.NarrationPoint
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 
 /**
  * Narration priority tier for the dequeue selection logic.
@@ -41,17 +41,30 @@ enum class NarrationTier {
 object NarrationTierClassifier {
 
     /**
-     * Explicit type/tag → tier table.
-     *
-     * Covers both NarrationPoint.type values (Salem-specific narration data) and
-     * OSM bare tag values (returned by Overpass via PlaceResult.category). Many
-     * values overlap (e.g. "museum", "library"). The mapping is hand-curated;
-     * unknown values fall through to REST.
+     * SalemPoi.category (uppercase) → tier table.
+     * Used by classify(SalemPoi) for the narration queue priority system.
+     */
+    private val categoryToTier: Map<String, NarrationTier> = mapOf(
+        // ── HISTORIC tier ─────────────────────────────────────────────────
+        "TOURISM_HISTORY"    to NarrationTier.HISTORIC,
+        "CIVIC"              to NarrationTier.HISTORIC,
+        "EDUCATION"          to NarrationTier.HISTORIC,
+
+        // ── ATTRACTION tier ───────────────────────────────────────────────
+        "GHOST_TOUR"          to NarrationTier.ATTRACTION,
+        "HAUNTED_ATTRACTION"  to NarrationTier.ATTRACTION,
+        "WITCH_SHOP"          to NarrationTier.ATTRACTION,
+        "PSYCHIC"             to NarrationTier.ATTRACTION,
+        "ENTERTAINMENT"       to NarrationTier.ATTRACTION,
+    )
+
+    /**
+     * Legacy lowercase type/tag → tier table.
+     * Used by classifyOsmCategory() for OSM bare tag values (PlaceResult.category).
      */
     private val typeToTier: Map<String, NarrationTier> = buildMap {
 
         // ── HISTORIC tier ─────────────────────────────────────────────────
-        // TOURISM_HISTORY equivalents
         put("museum", NarrationTier.HISTORIC)
         put("witch_museum", NarrationTier.HISTORIC)
         put("monument", NarrationTier.HISTORIC)
@@ -66,13 +79,9 @@ object NarrationTierClassifier {
         put("heritage", NarrationTier.HISTORIC)
         put("cemetery", NarrationTier.HISTORIC)
         put("grave_yard", NarrationTier.HISTORIC)
-        put("information", NarrationTier.HISTORIC)  // visitor info / heritage interpretation
+        put("information", NarrationTier.HISTORIC)
         put("visitor_info", NarrationTier.HISTORIC)
-
-        // HISTORIC_HOUSE equivalents
         put("historic_house", NarrationTier.HISTORIC)
-
-        // CIVIC equivalents (1692 courthouses, town halls central to Salem narrative)
         put("townhall", NarrationTier.HISTORIC)
         put("courthouse", NarrationTier.HISTORIC)
         put("post_office", NarrationTier.HISTORIC)
@@ -83,26 +92,17 @@ object NarrationTierClassifier {
         put("public_building", NarrationTier.HISTORIC)
 
         // ── ATTRACTION tier ───────────────────────────────────────────────
-        // GHOST_TOUR equivalents
         put("ghost_tour", NarrationTier.ATTRACTION)
         put("tour", NarrationTier.ATTRACTION)
         put("walking_tour", NarrationTier.ATTRACTION)
-
-        // HAUNTED_ATTRACTION equivalents
         put("haunted_attraction", NarrationTier.ATTRACTION)
         put("haunted_house", NarrationTier.ATTRACTION)
-
-        // WITCH_SHOP equivalents
         put("witch_shop", NarrationTier.ATTRACTION)
         put("witchcraft", NarrationTier.ATTRACTION)
         put("occult", NarrationTier.ATTRACTION)
-
-        // PSYCHIC equivalents
         put("psychic", NarrationTier.ATTRACTION)
         put("tarot", NarrationTier.ATTRACTION)
         put("fortune_teller", NarrationTier.ATTRACTION)
-
-        // ENTERTAINMENT equivalents
         put("attraction", NarrationTier.ATTRACTION)
         put("theme_park", NarrationTier.ATTRACTION)
         put("theatre", NarrationTier.ATTRACTION)
@@ -113,20 +113,15 @@ object NarrationTierClassifier {
         put("comedy_club", NarrationTier.ATTRACTION)
         put("zoo", NarrationTier.ATTRACTION)
         put("aquarium", NarrationTier.ATTRACTION)
-
-        // Note: place_of_worship is intentionally NOT in HISTORIC by operator
-        // direction (Q1). It would have been a tour-mode opt-in but is not
-        // part of the historic + attraction tier set for the queue.
-        // Note: park is intentionally REST — not historic, not attraction.
     }
 
     /**
-     * Classify a NarrationPoint by its (adPriority, type) pair.
+     * Classify a SalemPoi by its (adPriority, category) pair.
      * adPriority > 0 always wins (PAID).
      */
-    fun classify(point: NarrationPoint): NarrationTier {
-        if (point.adPriority > 0) return NarrationTier.PAID
-        return typeToTier[point.type] ?: NarrationTier.REST
+    fun classify(poi: SalemPoi): NarrationTier {
+        if (poi.adPriority > 0) return NarrationTier.PAID
+        return categoryToTier[poi.category] ?: NarrationTier.REST
     }
 
     /**

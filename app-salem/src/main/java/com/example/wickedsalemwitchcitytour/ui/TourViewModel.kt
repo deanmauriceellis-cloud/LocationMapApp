@@ -230,18 +230,18 @@ class TourViewModel @Inject constructor(
         }
     }
 
-    // ── Phase 9T: Narration points ─────────────────────────────────────
+    // ── Phase 9U: Unified POIs ─────────────────────────────────────────
 
-    /** Load all narration points from the database */
-    suspend fun loadNarrationPoints(): List<com.example.wickedsalemwitchcitytour.content.model.NarrationPoint> {
-        return repository.getAllNarrationPoints()
+    /** Load all narrated POIs from the unified salem_pois table */
+    suspend fun loadNarrationPoints(): List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi> {
+        return repository.getNarratedPois()
     }
 
-    /** S118: Load narration points within a bounding box (viewport-filtered) */
+    /** Load narrated POIs within a bounding box (viewport-filtered) */
     suspend fun loadNarrationPointsInBbox(
         latMin: Double, latMax: Double, lngMin: Double, lngMax: Double
-    ): List<com.example.wickedsalemwitchcitytour.content.model.NarrationPoint> {
-        return repository.getNarrationPointsInBbox(latMin, latMax, lngMin, lngMax)
+    ): List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi> {
+        return repository.getNarratedPoisInBbox(latMin, latMax, lngMin, lngMax)
     }
 
     /** Speak arbitrary text via the narration TTS engine */

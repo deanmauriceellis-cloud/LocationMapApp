@@ -73,6 +73,32 @@ interface TreeFilter {
   showDeleted: boolean
   tourOnly: boolean
   narratedOnly: boolean
+  visibleOnly: boolean
+}
+
+/** Category display names for nicer labels */
+const CATEGORY_LABELS: Record<string, string> = {
+  FOOD_DRINK: 'Food & Drink',
+  TOURISM_HISTORY: 'Tourism & History',
+  WITCH_SHOP: 'Witch & Occult',
+  PSYCHIC: 'Psychic & Tarot',
+  GHOST_TOUR: 'Ghost Tours',
+  HAUNTED_ATTRACTION: 'Haunted Attractions',
+  ENTERTAINMENT: 'Entertainment',
+  PARKS_REC: 'Parks & Recreation',
+  LODGING: 'Lodging',
+  CIVIC: 'Civic',
+  EDUCATION: 'Education',
+  SHOPPING: 'Shopping',
+  WORSHIP: 'Places of Worship',
+  HEALTHCARE: 'Healthcare',
+  OFFICES: 'Professional Services',
+  FINANCE: 'Finance',
+  AUTO_SERVICES: 'Auto Services',
+}
+
+function categoryLabel(cat: string): string {
+  return CATEGORY_LABELS[cat] || cat
 }
 
 function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
@@ -80,8 +106,9 @@ function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
   if (!filter.showDeleted) filtered = filtered.filter((r) => !r.deleted_at)
   if (filter.tourOnly) filtered = filtered.filter((r) => r.is_tour_poi)
   if (filter.narratedOnly) filtered = filtered.filter((r) => r.is_narrated)
+  if (filter.visibleOnly) filtered = filtered.filter((r) => r.default_visible)
 
-  // Group by category
+  // Group by category → subcategory
   const byCat = new Map<string, PoiRow[]>()
   for (const row of filtered) {
     const cat = (row.category as string) || '(uncategorized)'
@@ -100,26 +127,85 @@ function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
   })
 
   return catEntries.map(([cat, rowsInCat]) => {
-    const sortedRows = [...rowsInCat].sort((a, b) =>
-      a.name.localeCompare(b.name),
-    )
-    const poiNodes: TreeNode[] = sortedRows.map((row) => ({
-      id: `cat:${cat}|poi:${row.id}`,
-      label: row.deleted_at
-        ? `${row.name} (deleted)`
-        : row.name,
-      type: 'poi',
-      category: cat,
-      poi: row,
-      isDeleted: !!row.deleted_at,
-    }))
+    // Check if this category has subcategories
+    const bySubcat = new Map<string, PoiRow[]>()
+    const noSubcat: PoiRow[] = []
+    for (const row of rowsInCat) {
+      const sub = row.subcategory as string | undefined
+      if (sub) {
+        let bucket = bySubcat.get(sub)
+        if (!bucket) {
+          bucket = []
+          bySubcat.set(sub, bucket)
+        }
+        bucket.push(row)
+      } else {
+        noSubcat.push(row)
+      }
+    }
+
+    let children: TreeNode[]
+
+    if (bySubcat.size === 0) {
+      // No subcategories — flat list of POIs
+      const sortedRows = [...rowsInCat].sort((a, b) => a.name.localeCompare(b.name))
+      children = sortedRows.map((row) => ({
+        id: `cat:${cat}|poi:${row.id}`,
+        label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+        type: 'poi',
+        category: cat,
+        poi: row,
+        isDeleted: !!row.deleted_at,
+      }))
+    } else {
+      // Has subcategories — 3-level tree
+      children = []
+
+      // POIs without subcategory come first
+      if (noSubcat.length > 0) {
+        const sorted = [...noSubcat].sort((a, b) => a.name.localeCompare(b.name))
+        for (const row of sorted) {
+          children.push({
+            id: `cat:${cat}|poi:${row.id}`,
+            label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+            type: 'poi',
+            category: cat,
+            poi: row,
+            isDeleted: !!row.deleted_at,
+          })
+        }
+      }
+
+      // Subcategory nodes
+      const subEntries = [...bySubcat.entries()].sort((a, b) => b[1].length - a[1].length)
+      for (const [sub, subRows] of subEntries) {
+        const sortedSub = [...subRows].sort((a, b) => a.name.localeCompare(b.name))
+        const subLabel = sub.replace(/^[A-Z_]+__/, '').replace(/_/g, ' ')
+        children.push({
+          id: `cat:${cat}|sub:${sub}`,
+          label: subLabel,
+          type: 'category',
+          category: cat,
+          count: sortedSub.length,
+          children: sortedSub.map((row) => ({
+            id: `cat:${cat}|sub:${sub}|poi:${row.id}`,
+            label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+            type: 'poi',
+            category: cat,
+            poi: row,
+            isDeleted: !!row.deleted_at,
+          })),
+        })
+      }
+    }
+
     return {
       id: `cat:${cat}`,
-      label: cat,
+      label: categoryLabel(cat),
       type: 'category',
       category: cat,
-      count: poiNodes.length,
-      children: poiNodes,
+      count: rowsInCat.length,
+      children,
     }
   })
 }
@@ -220,6 +306,7 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
   const [showDeleted, setShowDeleted] = useState(false)
   const [tourOnly, setTourOnly] = useState(false)
   const [narratedOnly, setNarratedOnly] = useState(false)
+  const [visibleOnly, setVisibleOnly] = useState(false)
   const [containerRef, size] = useElementSize()
 
   const effectivePois = externalPois ?? pois
@@ -244,8 +331,8 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
 
   const treeData = useMemo(() => {
     if (!effectivePois) return []
-    return buildTree(effectivePois, { showDeleted, tourOnly, narratedOnly })
-  }, [effectivePois, showDeleted, tourOnly, narratedOnly])
+    return buildTree(effectivePois, { showDeleted, tourOnly, narratedOnly, visibleOnly })
+  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly])
 
   const handleActivate = useCallback(
     (node: NodeApi<TreeNode>) => {
@@ -261,8 +348,9 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
     if (!showDeleted) rows = rows.filter((r) => !r.deleted_at)
     if (tourOnly) rows = rows.filter((r) => r.is_tour_poi)
     if (narratedOnly) rows = rows.filter((r) => r.is_narrated)
+    if (visibleOnly) rows = rows.filter((r) => r.default_visible)
     return rows.length
-  }, [effectivePois, showDeleted, tourOnly, narratedOnly])
+  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly])
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -287,6 +375,10 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
           <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
             <input type="checkbox" checked={narratedOnly} onChange={(e) => setNarratedOnly(e.target.checked)} />
             Narrated only
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" checked={visibleOnly} onChange={(e) => setVisibleOnly(e.target.checked)} />
+            Visible only
           </label>
         </div>
         {visibleCount !== null && (

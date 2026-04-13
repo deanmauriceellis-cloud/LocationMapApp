@@ -335,6 +335,20 @@ object MarkerIconHelper {
         "public"         to Pair(R.drawable.ic_civic,         Color.parseColor("#1A237E")),
         "medical"        to Pair(R.drawable.ic_poi,           Color.parseColor("#D32F2F")),
         "services"       to Pair(R.drawable.ic_poi,           Color.parseColor("#546E7A")),
+
+        // ── SalemPoi unified categories (Phase 9U, lowercase) ──────────────
+        "food_drink"          to Pair(R.drawable.ic_restaurant,    Color.parseColor("#BF360C")),
+        "tourism_history"     to Pair(R.drawable.ic_poi,           Color.parseColor("#FF6F00")),
+        "entertainment"       to Pair(R.drawable.ic_poi,           Color.parseColor("#00838F")),
+        "parks_rec"           to Pair(R.drawable.ic_park,          Color.parseColor("#2E7D32")),
+        "lodging"             to Pair(R.drawable.ic_poi,           Color.parseColor("#7B1FA2")),
+        "shopping"            to Pair(R.drawable.ic_poi,           Color.parseColor("#F57F17")),
+        "education"           to Pair(R.drawable.ic_poi,           Color.parseColor("#5D4037")),
+        "healthcare"          to Pair(R.drawable.ic_poi,           Color.parseColor("#D32F2F")),
+        "offices"             to Pair(R.drawable.ic_poi,           Color.parseColor("#546E7A")),
+        "finance"             to Pair(R.drawable.ic_poi,           Color.parseColor("#00695C")),
+        "auto_services"       to Pair(R.drawable.ic_poi,           Color.parseColor("#37474F")),
+        "worship"             to Pair(R.drawable.ic_poi,           Color.parseColor("#4E342E")),
     )
 
     // Default fallback
