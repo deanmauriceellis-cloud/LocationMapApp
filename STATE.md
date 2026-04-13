@@ -2,26 +2,27 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-12 — Session 118 (Phase 9U Steps 9U.7-9U.10 shipped — BCS import, SalemPoi Room entity, publish pipeline, walk sim overhaul)
+**Last updated:** 2026-04-13 — Session 119 (Hero image generation pipeline — 1,295 images, 29 parking lot items)
 
 ---
 
-## TOP PRIORITY — Next Session (S119)
+## TOP PRIORITY — Next Session (S120)
 
-**Phase 9U: Unified POI Table — Session 119 (Steps 9U.11-9U.13)**
+**Phase 9U: Unified POI Table — Session 120 (Steps 9U.11-9U.13)**
 
-S118 completed Steps 9U.7-9U.10: BCS import (976→2,190 POIs), SalemPoi Room entity + DAO, PG→SQLite publish pipeline, walk sim narration pacing + tour-aware routing.
+S119 built the hero image generation pipeline and generated 1,295 cartoon Halloween images. Phase 9U admin/consumer work deferred to S120.
 
-**Session 119 scope:** Admin tool tree rework for 2,190 POI dataset, consumer migration (NarrationPoint→SalemPoi in app code).
+**Session 120 scope:** Admin tool tree rework for 2,190 POI dataset, consumer migration (NarrationPoint→SalemPoi in app code). Triage S119 parking lot (29 items) into master plan.
 
-**Session 120:** End-to-end verification, drop legacy tables, heading-up rotation smoothness fix (deferred from S115/S116), POI icon scaling at high zoom.
+**Session 121:** End-to-end verification, drop legacy tables, heading-up rotation smoothness fix, POI icon scaling at high zoom.
 
-**Key facts from S118:**
-- 2,190 unified POIs: 817 narrated + 133 business-only + 26 tour-only + 1,214 BCS imports.
-- 1,618 POIs linked via intel_entity_id to SalemIntelligence.
-- 1,601 default_visible=true / 589 default_visible=false.
-- Room DB version 5, bundled DB 4.6 MB. Old entities preserved for backward compat.
-- Walk sim: tour-aware routing, 3-then-30s narration pacing, 30s dwell cooldown, direct-play bypass, skip button working.
+**Key facts from S119:**
+- 1,295 hero images generated (DreamShaper 8, cartoon Halloween style, zero failures)
+- 1,013 POIs have hero images (image_asset paths set in PG + SQLite)
+- Hero images bundled in app-salem/src/main/assets/hero/ (35 MB)
+- Bundled DB 4.7 MB, APK 659 MB (debug w/ offline tiles)
+- 29 parking lot items captured: app modes (P1), spiderfy (P2), menu overhaul (P3-P4), POI visibility (P5), top ribbon (P6), narration boundary bug (P7), orientation bug (P8), map rotation (P9), onboarding (P10), search (P11), POI detail view (P12), tour resume (P13), favorites (P14), battery (P15), sharing (P16), navigation (P17), events (P18), night mode (P19), hero refinement (P20-P29)
+- Pipeline: export-hero-prompts.py → generate.py → qc-viewer.html → populate-db.js
 
 ---
 
@@ -39,7 +40,7 @@ S118 completed Steps 9U.7-9U.10: BCS import (976→2,190 POIs), SalemPoi Room en
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 118. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 119. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
