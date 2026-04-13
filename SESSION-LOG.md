@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 112-121. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 113-122. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 122: 2026-04-13 — AudioCraft (AudioGen) installation for Salem sound effects
+
+Installed AudioCraft 1.4.0a2 with AudioGen medium model at `~/AI-Studio/audiocraft/` for generating custom sound effects (geofence triggers, atmospheric audio, notifications). Resolved Python 3.12 / CUDA 13.0 / torchaudio 2.11 compatibility chain. Built Gradio web UI with Salem preset categories and CLI generation script. Created `~/AI-Studio/USAGE.md` service reference. No changes to LocationMapApp codebase — tooling session only.
+
+Full session detail: `docs/session-logs/session-122-2026-04-13.md`.
+
+---
 
 ## Session 121: 2026-04-13 — SalemIntelligence narration sync, drop multipass, tap-to-speak detail sheet, icon + dwell fixes
 
@@ -76,13 +84,5 @@ Full session detail (3 iterations, 2 operator bug triage rounds, debug log recon
 
 ---
 
-## Session 112: 2026-04-09 — Major narration overhaul: tiered queue, density cascade, ahead-only filter, glowing highlight ring, walk-sim 3x removal, fresh-start reset, POI button tier filter, home-stops-walksim
-
-Operator field test surfaced three distinct narration bugs (APPROACH-cooldown, walk-sim 3x starvation, sequencing) plus the GPS journey line backgrounding issue (diagnosed not fixed). Shipped 5 commits ending with a 3-level density cascade (40m/30m/20m discard tiers) + bearing-based ahead-only filter that picks the closest in-front POI within the highest non-empty tier, plus a glowing pulsing highlight ring on the active POI and a debug overlay showing the discard radii as outline circles around the walking icon. Operator confirmed "working much better. Success!" on the final walk.
-
-Full session detail (all 5 commits, 7 design questions, debug log analysis, tier classifier, bearing math): `docs/session-logs/session-112-2026-04-09.md`. Commits: `7ca0602`, `95f25f2`, `dded0e6`, `1f63113`, `8a94a06`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 111 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 112 and earlier are in SESSION-LOG-ARCHIVE.md -->

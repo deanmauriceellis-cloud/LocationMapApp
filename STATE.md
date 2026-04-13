@@ -2,32 +2,31 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-13 — Session 121 (SalemIntelligence narration sync, drop multipass, tap-to-speak, icon+dwell fixes)
+**Last updated:** 2026-04-13 — Session 122 (AudioCraft installation — tooling session)
 
 ---
 
-## TOP PRIORITY — Next Session (S121)
+## TOP PRIORITY — Next Session (S123)
 
-**Phase 9U: Unified POI Table — Session 122 (Legacy Cleanup)**
+**Phase 9U: Unified POI Table — Session 123 (Legacy Cleanup)**
 
-S121 synced narrations from SalemIntelligence (1,211 POIs updated), dropped multipass narration (pass_2/pass_3), added tap-to-speak detail sheet, fixed missing POI icons, zoom-out marker sticking, and tightened dwell expansion to 50m max.
+S122 was a tooling session — AudioCraft (AudioGen) installed for sound effect generation. Original S122 scope deferred to S123.
 
-**Session 122 scope:**
+**Session 123 scope:**
 1. Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB
 2. Remove NarrationPoint entity/DAO and legacy repository methods
 3. Heading-up rotation smoothness fix (deferred from S115)
 4. End-to-end device verification with new narrations
 
-**Key facts from S121:**
-- SalemIntelligence narration sync: `sync-narrations-from-intel.js` created, 1,211 POIs updated
-- Narration model simplified: short_narration (853 POIs) + long_narration (1,556 POIs). No multipass.
-- pass_2/pass_3 columns dropped from PG, SQLite, Kotlin entities, web admin, schema
-- POI detail sheet: tap-to-speak on Overview/About/Story/address sections
-- Circle icons added for all 19 SalemPoi categories (were falling back to 5dp dots)
-- Zoom-out marker refresh now updates ALL markers, not just viewport-visible
-- Dwell expansion: 20m → 35m → 50m max (was 100m)
-- 572 unlinked POIs exported + handoff doc for SalemIntelligence
+**Key facts (unchanged from S121):**
 - SQLite: 2,190 POIs, 1,391 visible, 827 narrated, 4.9 MB
+- Narration model: short_narration (853 POIs) + long_narration (1,556 POIs). No multipass.
+- 572 unlinked POIs exported to SalemIntelligence for narration generation
+
+**New tooling (S122):**
+- AudioCraft (AudioGen) installed at `~/AI-Studio/audiocraft/` — text-to-sound-effect generation on RTX 3090
+- Web UI (`~/AI-Studio/audiocraft-webui.sh`) + CLI (`~/AI-Studio/audiocraft-generate.sh`)
+- Service reference: `~/AI-Studio/USAGE.md`
 
 ---
 
@@ -45,7 +44,7 @@ S121 synced narrations from SalemIntelligence (1,211 POIs updated), dropped mult
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 121. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 122. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
