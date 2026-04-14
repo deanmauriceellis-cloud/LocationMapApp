@@ -250,6 +250,20 @@ class TourViewModel @Inject constructor(
     }
 
     /**
+     * Speak arbitrary text tagged for later cancellation. Used for 1692
+     * newspaper dispatches (tag "newspaper_1692") so POI narrations can
+     * interrupt them via [cancelSegmentsWithTag].
+     */
+    fun speakTaggedNarration(tag: String, text: String, label: String, voiceId: String? = null) {
+        narrationManager.speakTaggedHint(tag, text, label, voiceId)
+    }
+
+    /** Cancel any queued or currently-playing segment whose id starts with [tag]. */
+    fun cancelSegmentsWithTag(tag: String) {
+        narrationManager.cancelSegmentsWithTag(tag)
+    }
+
+    /**
      * S113 — Enqueue a POI-detail-sheet section for TTS read-through, tagged
      * so the sheet can cancel only its own segments on user click or dismiss.
      * The tag is typically `"sheet_${poi.id}"`.

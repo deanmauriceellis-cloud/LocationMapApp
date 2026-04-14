@@ -1,0 +1,26 @@
+Tue Apr 14 01:11:12 AM EDT 2026
+=== overnight retry after jump-fix force-stop ===
+[2026-04-14 01:12:00] keeper starting — will NEVER interrupt an in-progress walk
+[2026-04-14 01:27:16] app not running — launching com.example.wickedsalemwitchcitytour/.ui.SalemMainActivity
+[2026-04-14 01:27:19] app debug endpoint up (after 3s)
+[2026-04-14 01:27:20] no walk in progress → starting one
+[2026-04-14 01:27:20] walk-tour fired: {   "status": "walking",   "tour": "tour_salem_heritage_trail",   "startTour": true,   "routePoints": 443,   "interpolatedSteps": 2473,   "speedMps": 2.0,   "etaMinutes": "41.2" } 
+[2026-04-14 02:10:15] no walk in progress → starting one
+[2026-04-14 02:10:15] walk-tour fired: {   "status": "walking",   "tour": "tour_salem_heritage_trail",   "startTour": true,   "routePoints": 443,   "interpolatedSteps": 2473,   "speedMps": 2.0,   "etaMinutes": "41.2" } 
+[2026-04-14 03:07:35] no walk in progress → starting one
+[2026-04-14 03:07:35] walk-tour fired: {"error":"Activity not active"} 
+[2026-04-14 03:08:36] no walk in progress → starting one
+[2026-04-14 03:08:36] walk-tour fired: {"error":"Activity not active"} 
+[2026-04-14 03:09:38] no walk in progress → starting one
+[2026-04-14 03:09:38] walk-tour fired: {"error":"Activity not active"} 
+[2026-04-14 03:10:39] no walk in progress → starting one
+[2026-04-14 03:10:39] walk-tour fired: {   "status": "walking",   "tour": "tour_salem_heritage_trail",   "startTour": true,   "routePoints": 443,   "interpolatedSteps": 2473,   "speedMps": 2.0,   "etaMinutes": "41.2" } 
+[2026-04-14 03:14:43] keeper starting — will NEVER interrupt an in-progress walk
+[2026-04-14 03:23:48] keeper starting — will NEVER interrupt an in-progress walk
+[2026-04-14 03:23:50] no walk in progress → starting one
+[2026-04-14 03:23:50] walk-tour fired: {"error":"Activity not active"} 
+[2026-04-14 03:34:15] keeper starting — will NEVER interrupt an in-progress walk
+[2026-04-14 04:43:05] no walk in progress → starting one
+[2026-04-14 04:43:05] walk-tour fired: {   "status": "walking",   "tour": "tour_salem_heritage_trail",   "startTour": true,   "routePoints": 443,   "interpolatedSteps": 2473,   "speedMps": 2.0,   "etaMinutes": "41.2" } 
+[2026-04-14 05:25:22] no walk in progress → starting one
+[2026-04-14 05:25:22] walk-tour fired: {   "status": "walking",   "tour": "tour_salem_heritage_trail",   "startTour": true,   "routePoints": 443,   "interpolatedSteps": 2473,   "speedMps": 2.0,   "etaMinutes": "41.2" } 

@@ -877,25 +877,18 @@ internal fun SalemMainActivity.removeNarrationBar() {
 internal fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
     clearTourOverlays()
 
-    // Tour 1 (tour_essentials) = downtown street walk — always use downtown route
-    val downtownRoute = TourRouteLoader.loadDowntownRoute(this)
-    if (downtownRoute.isNotEmpty()) {
-        val polyline = Polyline().apply {
-            setPoints(downtownRoute)
-            outlinePaint.color = Color.parseColor(COLOR_ROUTE)
-            outlinePaint.strokeWidth = 5f
-            outlinePaint.isAntiAlias = true
-            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
-        }
-        binding.mapView.overlays.add(polyline)
-        tourRoutePolyline = polyline
-        DebugLogger.i("SalemMainActivityTour", "Drew downtown route: ${downtownRoute.size} points")
-        binding.mapView.invalidate()
-        return
-    }
-
-    // Fallback for other tours: load OSRM route segments from tour JSON
+    // S124 Phase 9R.0: prefer the tour's own OSRM-generated geometry so the
+    // drawn yellow-line overlay actually matches where the walk simulator
+    // walks. The prior behavior (unconditional fallback to
+    // `downtown_salem_route.json` whenever that asset existed) left every
+    // tour — Heritage Trail included — drawing an unrelated downtown loop
+    // on the map while the GPS followed a different path. Walker appeared
+    // "off-route" because the visible line wasn't the actual route.
+    //
+    // Order: try the tour's per-leg segments first. Fall back to the legacy
+    // downtown route only for tours that lack their own geometry (e.g.
+    // tour_essentials, which was designed as an ambient walk without a
+    // bundled OSRM route JSON).
     val segments = TourRouteLoader.loadRouteSegments(this, activeTour.tour.id)
     if (segments.isNotEmpty()) {
         val allRoutePoints = mutableListOf<GeoPoint>()
@@ -911,9 +904,33 @@ internal fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
             outlinePaint.color = Color.parseColor(COLOR_ROUTE)
             outlinePaint.strokeWidth = 5f
             outlinePaint.isAntiAlias = true
+            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
         }
         binding.mapView.overlays.add(polyline)
         tourRoutePolyline = polyline
+        DebugLogger.i("SalemMainActivityTour",
+            "Drew tour '${activeTour.tour.id}' route: ${allRoutePoints.size} points from ${segments.size} legs")
+        binding.mapView.invalidate()
+        // Fall through so numbered stop markers get added below.
+    } else {
+        // Legacy fallback for tours shipped without their own route geometry.
+        val downtownRoute = TourRouteLoader.loadDowntownRoute(this)
+        if (downtownRoute.isNotEmpty()) {
+            val polyline = Polyline().apply {
+                setPoints(downtownRoute)
+                outlinePaint.color = Color.parseColor(COLOR_ROUTE)
+                outlinePaint.strokeWidth = 5f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            }
+            binding.mapView.overlays.add(polyline)
+            tourRoutePolyline = polyline
+            DebugLogger.i("SalemMainActivityTour",
+                "Drew fallback downtown route for '${activeTour.tour.id}': ${downtownRoute.size} points")
+            binding.mapView.invalidate()
+        }
     }
 
     // Stop markers — only for tours with OSRM route segments

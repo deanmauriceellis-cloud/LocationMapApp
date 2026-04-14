@@ -45,6 +45,7 @@ class TourEngine @Inject constructor(
     private val repository: SalemContentRepository,
     private val geofenceManager: TourGeofenceManager,
     private val narrationManager: NarrationManager,
+    private val narrationGeofenceManager: NarrationGeofenceManager,
     @ApplicationContext private val context: Context
 ) {
     private val TAG = "TourEngine"
@@ -116,6 +117,16 @@ class TourEngine @Inject constructor(
             _tourState.value = TourState.Active(activeTour)
             persistProgress(activeTour)
             geofenceManager.loadStops(stops, pois)
+
+            // Phase 9R.0: auto-enable Historical Mode for heritage-trail themed
+            // tours. The NarrationGeofenceManager then silences modern POIs and
+            // plays `historical_note` (tour-guide voice) instead of the default
+            // short_narration. Disables cleanly in endTour().
+            if (tour.theme.equals("HERITAGE_TRAIL", ignoreCase = true)) {
+                val allowedIds = stops.map { it.poiId }.toSet()
+                narrationGeofenceManager.setHistoricalMode(true, allowedIds)
+                DebugLogger.i(TAG, "Historical Mode ENABLED for '${tour.name}' — ${allowedIds.size} tour stops whitelisted")
+            }
 
             DebugLogger.i(TAG, "Tour started: ${tour.name} — ${stops.size} stops")
         } catch (e: Exception) {
@@ -292,6 +303,14 @@ class TourEngine @Inject constructor(
         clearPersistedProgress()
         geofenceManager.clear()
         narrationManager.stop()
+
+        // Phase 9R.0: always clear Historical Mode when the tour ends, even if
+        // the tour wasn't a HERITAGE_TRAIL one. Cheap idempotent reset.
+        if (narrationGeofenceManager.isHistoricalMode()) {
+            narrationGeofenceManager.setHistoricalMode(false)
+            DebugLogger.i(TAG, "Historical Mode DISABLED (tour ended)")
+        }
+
         DebugLogger.i(TAG, "Tour ended: ${summary.tourName} — " +
                 "${summary.completedStops}/${summary.totalStops} stops, ${summary.totalTimeMinutes} min")
     }

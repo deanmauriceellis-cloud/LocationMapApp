@@ -33,7 +33,7 @@ import java.util.ArrayDeque
  *  current user position (>50m → discarded) and sorted by tier (paid → historic
  *  → attraction → rest), then closest within tier wins. The dock renders the
  *  same filtered+sorted snapshot so dock order = play order. */
-private val narrationQueue = ArrayDeque<SalemPoi>()
+internal val narrationQueue = ArrayDeque<SalemPoi>()
 private var currentNarration: SalemPoi? = null
 private var narrationAutoPlay = true
 
@@ -335,7 +335,32 @@ internal fun SalemMainActivity.initNarrationSystem() {
                         // S115: Dwell expansion — if the dwell cap for this
                         // session is reached, stop expanding and go quiet
                         // until the user walks out of the anchor zone.
+                        //
+                        // Phase 9R.0: in Historical Mode, use the silence that
+                        // would normally follow the dwell cap as a cue to play
+                        // the next 1692 headline. The cap protects against POI
+                        // reach-out spamming the same cluster — it should NOT
+                        // silence the filler queue.
                         if (dwellPoisPlayed >= DWELL_MAX_POIS_PER_SESSION) {
+                            if (narrationGeofenceManager.isHistoricalMode()) {
+                                val h = historicalHeadlineQueue.pollNext()
+                                if (h != null) {
+                                    DebugLogger.i(
+                                        "NARR-HEADLINE",
+                                        "SILENCE FILL (dwell cap): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                                    )
+                                    // Phase 9R.0: 1692 headline filler uses a consistent narrator voice
+// (AU English female) distinct from the per-POI TTS voices — establishes
+// an auditory "newsreader" identity for the timeline track.
+// Tagged speak — lets POI ENTRY cancel an in-flight newspaper via
+// tourViewModel.cancelSegmentsWithTag("newspaper_1692").
+// Clear the prior POI's map highlight — newspaper is not tied to a POI.
+clearNarrationHighlight()
+tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
+                                    historicalHeadlineQueue.advance()
+                                    return@collectLatest
+                                }
+                            }
                             DebugLogger.i(
                                 "NARR-STATE",
                                 "  REACH-OUT HELD: dwell cap reached " +
@@ -345,6 +370,37 @@ internal fun SalemMainActivity.initNarrationSystem() {
                             clearNarrationHighlight()
                             return@collectLatest
                         }
+
+                        // Phase 9R.0: interleave 1692 headlines with POI
+                        // reach-outs. Salem's downtown is dense enough that
+                        // reach-out almost always finds a nearby historical
+                        // POI — so if we only speak headlines when reach-out
+                        // returns null, headlines never fire in practice.
+                        // Alternate: every OTHER silence slot goes to a
+                        // 1692 headline (if queue not exhausted), the rest
+                        // go to POI reach-out. This keeps both streams alive
+                        // without starving either.
+                        // 2:1 POI-reach-out:newspaper ratio. Fire newspaper
+                        // only every 3rd silence slot; the other two get POI
+                        // reach-out attempts first (fall through below).
+                        val fireNewspaperThisSlot =
+                            narrationGeofenceManager.isHistoricalMode() &&
+                            newspaperSilenceSlotCounter >= 2
+                        if (fireNewspaperThisSlot) {
+                            val h = historicalHeadlineQueue.pollNext()
+                            if (h != null) {
+                                newspaperSilenceSlotCounter = 0
+                                DebugLogger.i(
+                                    "NARR-HEADLINE",
+                                    "SILENCE FILL (2:1 interleave): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                                )
+                                clearNarrationHighlight()
+                                tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
+                                historicalHeadlineQueue.advance()
+                                return@collectLatest
+                            }
+                        }
+                        newspaperSilenceSlotCounter++
 
                         // S115: Try the current dwell radius first; if nothing,
                         // step the radius up the DWELL ladder and retry until
@@ -377,12 +433,59 @@ internal fun SalemMainActivity.initNarrationSystem() {
                             )
                             narrationGeofenceManager.triggerReachOut(nearest)
                         } else {
-                            DebugLogger.i(
-                                "NARR-STATE",
-                                "  Nothing within ${DWELL_RADIUS_MAX_M.toInt()}m reach-out radius " +
-                                    "(gpsAge=${ageMs}ms, dwellPlayed=$dwellPoisPlayed)"
-                            )
-                            clearNarrationHighlight()  // S112+: nothing more coming → no ring
+                            // Phase 9R.0: in Historical Mode, silence becomes
+                            // the cue for 1692 "headline news" — fill the gap
+                            // with the next timeline event in chronological
+                            // order. Runs ONLY when the reach-out above also
+                            // found nothing, so any nearby POI still wins.
+                            // When a POI narration fires mid-headline the TTS
+                            // is interrupted and the queue pointer does NOT
+                            // advance (advance happens only after a clean
+                            // delivery), so we'll replay the same headline at
+                            // the next silence.
+                            val headlineFired = if (narrationGeofenceManager.isHistoricalMode()) {
+                                val h = historicalHeadlineQueue.pollNext()
+                                if (h != null) {
+                                    DebugLogger.i(
+                                        "NARR-HEADLINE",
+                                        "SILENCE FILL: 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                                    )
+                                    // Same cleanup + tagging as the other two
+                                    // headline sites — clear prior POI highlight
+                                    // + use the newspaper_1692 tag so POI ENTRY
+                                    // can cancel-interrupt this dispatch.
+                                    clearNarrationHighlight()
+                                    tourViewModel.speakTaggedNarration(
+                                        "newspaper_1692",
+                                        h.text,
+                                        "Salem 1692 — ${h.date}",
+                                        "en-au-x-auc-local"
+                                    )
+                                    // Optimistic advance — reasonable since
+                                    // the TTS completion observer will not
+                                    // re-enter this branch for this fill. If
+                                    // interrupted mid-speak, the worst case
+                                    // is skipping one headline; if we did
+                                    // NOT advance here and the speak did
+                                    // succeed, we'd replay the same headline
+                                    // forever on back-to-back silences.
+                                    historicalHeadlineQueue.advance()
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+
+                            if (!headlineFired) {
+                                DebugLogger.i(
+                                    "NARR-STATE",
+                                    "  Nothing within ${DWELL_RADIUS_MAX_M.toInt()}m reach-out radius " +
+                                        "(gpsAge=${ageMs}ms, dwellPlayed=$dwellPoisPlayed, histMode=${narrationGeofenceManager.isHistoricalMode()})"
+                                )
+                                clearNarrationHighlight()  // S112+: nothing more coming → no ring
+                            }
                         }
                     }
                 }
@@ -547,6 +650,40 @@ private fun isPoiAhead(poiLat: Double, poiLng: Double): Boolean {
  */
 internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Boolean) {
     val tier = NarrationTierClassifier.classify(point)
+    // Phase 9R.0: A new POI interrupts whatever is currently playing:
+    //   - Newspaper dispatches (tag "newspaper_1692") — ALWAYS interrupt
+    //   - Prior-POI narration (tag "poi_narration") — only interrupt after
+    //     a 10 s MIN HOLD on the current POI. Without this hold, clustered
+    //     ENTRY events at walk start (several POIs within 40m of the first
+    //     GPS fix all fire simultaneously) cascade-cancel each other and
+    //     no audio ever survives long enough to reach the speaker.
+    val now = System.currentTimeMillis()
+    val priorPoiStartedAgoMs = if (lastPoiNarrationStartMs > 0L) now - lastPoiNarrationStartMs else Long.MAX_VALUE
+    val priorPoiMinHoldMs = 10_000L
+    val wasInterruptingPriorPoi = currentNarration != null && currentNarration?.id != point.id
+
+    // Newspapers always yield to POIs.
+    tourViewModel.cancelSegmentsWithTag("newspaper_1692")
+
+    if (wasInterruptingPriorPoi && priorPoiStartedAgoMs < priorPoiMinHoldMs) {
+        DebugLogger.i("NARR-QUEUE",
+            "DROP ENTRY for ${point.name}: prior POI '${currentNarration?.name}' still in min-hold " +
+                "(${priorPoiStartedAgoMs}ms / ${priorPoiMinHoldMs}ms) — queue instead")
+        // Fall through to the append path below — the new POI becomes a
+        // candidate for the next silence/idle cycle but does NOT kill the
+        // just-started current POI.
+    } else {
+        // Either no prior POI playing, or min-hold elapsed — interrupt cleanly.
+        tourViewModel.cancelSegmentsWithTag("poi_narration")
+        if (wasInterruptingPriorPoi) {
+            DebugLogger.i("NARR-QUEUE",
+                "Interrupting prior POI '${currentNarration?.name}' for new POI '${point.name}' " +
+                    "(prior held for ${priorPoiStartedAgoMs}ms)")
+            currentNarration = null
+        }
+    }
+    // Stamp the start so future POIs know when min-hold expires.
+    lastPoiNarrationStartMs = now
     DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} tier=$tier ad=${point.adPriority} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
     if (point.id == currentNarration?.id) {
@@ -570,13 +707,18 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         currentNarration = point
         showNarrationSheet(point)
         showNarrationHighlight(point)
-        val text = narrationGeofenceManager.getNarrationForPass(point)
+        val rawText = narrationGeofenceManager.getNarrationForPass(point)
             ?: point.shortNarration ?: point.description
         val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
-        if (text != null) {
+        if (rawText != null) {
             narrationGeofenceManager.recordVisit(point.id)
             DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId")
-            tourViewModel.speakNarration(text, point.name, voiceId)
+            // Phase 9R.0: chapter break via two separate TTS segments —
+            // "You are at {POI}." plays first, the body plays second. Tagged
+            // "poi_narration" so a subsequent POI ENTRY can interrupt the
+            // prior POI's read once the walker has moved on.
+            tourViewModel.speakTaggedNarration("poi_narration", "You are at ${point.name}.", point.name, voiceId)
+            tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
         } else {
             DebugLogger.w("NARR-PLAY", "DIRECT PLAY: ${point.name} — no narration text, skipping")
         }
@@ -702,17 +844,21 @@ internal fun SalemMainActivity.playNextNarration() {
     showNarrationHighlight(point)  // S112+: glowing ring on the POI being announced
 
     // Auto-play TTS — select narration pass based on lifetime visit count
-    val text = narrationGeofenceManager.getNarrationForPass(point)
+    val rawText = narrationGeofenceManager.getNarrationForPass(point)
         ?: point.shortNarration ?: point.description
 
     // Resolve voice: POI override > category default
     val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
-    DebugLogger.i("NARR-PLAY", "  text=${if (text != null) "${text.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay")
-    if (text != null && narrationAutoPlay) {
+    DebugLogger.i("NARR-PLAY", "  text=${if (rawText != null) "${rawText.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay")
+    if (rawText != null && narrationAutoPlay) {
         DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakNarration() voice=$voiceId")
-        tourViewModel.speakNarration(text, point.name, voiceId)
+        // Phase 9R.0: chapter break via two separate TTS segments. Tagged
+        // "poi_narration" so the next POI ENTRY can cancel-interrupt this
+        // POI's read once the walker has moved past its CPA.
+        tourViewModel.speakTaggedNarration("poi_narration", "You are at ${point.name}.", point.name, voiceId)
+        tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
     } else {
-        DebugLogger.w("NARR-PLAY", "  → NOT speaking: text=${text != null} autoPlay=$narrationAutoPlay")
+        DebugLogger.w("NARR-PLAY", "  → NOT speaking: text=${rawText != null} autoPlay=$narrationAutoPlay")
     }
     // Record this visit for next-pass selection on future days
     narrationGeofenceManager.recordVisit(point.id)

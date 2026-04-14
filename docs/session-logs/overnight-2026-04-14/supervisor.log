@@ -1,0 +1,5 @@
+[2026-04-14 01:18:42] supervisor starting
+[2026-04-14 02:12:55] supervisor starting
+[2026-04-14 04:42:57] logcat.log hit 213662914 bytes (>= 209715200) — rotating to /home/witchdoctor/Development/LocationMapApp_v1.5/docs/session-logs/overnight-2026-04-14/logcat-20260414-044257.log.gz
+[2026-04-14 04:42:58] started logcat tail (pid 139457)
+[2026-04-14 04:42:58] logcat tail restarted on fresh logcat.log

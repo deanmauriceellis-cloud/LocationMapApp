@@ -689,12 +689,32 @@ class DebugEndpoints(
 
     // ── Walk Tour Simulator ──────────────────────────────────────────────────
 
+    /**
+     * S124 Phase 9R.0: public API so the Activity's startWalkSim() can
+     * cancel any DebugEndpoints-initiated walk before starting its own.
+     * Prevents two concurrent walks emitting setManualLocation to the same
+     * ViewModel (the "map bouncing between two positions" bug).
+     */
+    fun cancelAnyWalk() {
+        walkJob?.cancel()
+        walkJob = null
+    }
+
     private fun handleWalkTour(params: Map<String, String>): EndpointResult {
         val tourId = params["tour"] ?: "tour_witch_trials"
         val speedMps = params["speed"]?.toFloatOrNull() ?: 1.4f // avg walking speed
+        // Phase 9R.0: when `start_tour=true` (default), activate the tour in
+        // TourEngine before walking. This is what flips HERITAGE_TRAIL tours
+        // into Historical Mode — without starting the tour the Mode stays
+        // Idle and the narration filter never engages.
+        val startTour = params["start_tour"]?.equals("false", ignoreCase = true) != true
 
-        // Stop any existing walk
+        // Stop any existing walk — BOTH our own walkJob AND the Activity's
+        // walkSimJob. Without the activity-side cancel, a UI walk-button tap
+        // and a /walk-tour call can run concurrently, both emitting
+        // setManualLocation every second and making the map bounce.
         walkJob?.cancel()
+        activity.stopWalkSimExternal()
 
         val routePoints = TourRouteLoader.loadAllRoutePoints(activity, tourId)
         if (routePoints.isEmpty()) {
@@ -704,9 +724,19 @@ class DebugEndpoints(
         // Interpolate the route into evenly-spaced points at 1-second intervals
         val interpolated = interpolateRoute(routePoints, speedMps)
 
-        DebugLogger.i("DebugEndpoints", "Walk simulator: $tourId, ${interpolated.size} steps, speed=${speedMps}m/s, ETA=${interpolated.size}s")
+        DebugLogger.i("DebugEndpoints", "Walk simulator: $tourId, ${interpolated.size} steps, speed=${speedMps}m/s, ETA=${interpolated.size}s, startTour=$startTour")
 
         walkJob = walkScope.launch {
+            // Activate the tour first (enables HISTORICAL mode for themed tours).
+            if (startTour) {
+                try {
+                    withContext(Dispatchers.Main) {
+                        activity.tourViewModel.startTour(tourId)
+                    }
+                } catch (e: Exception) {
+                    DebugLogger.w("DebugEndpoints", "startTour($tourId) failed (continuing walk): ${e.message}")
+                }
+            }
             for ((i, point) in interpolated.withIndex()) {
                 if (!isActive) break
                 withContext(Dispatchers.Main) {
@@ -721,6 +751,7 @@ class DebugEndpoints(
         return EndpointResult(body = gson.toJson(mapOf(
             "status" to "walking",
             "tour" to tourId,
+            "startTour" to startTour,
             "routePoints" to routePoints.size,
             "interpolatedSteps" to interpolated.size,
             "speedMps" to speedMps,

@@ -131,6 +131,43 @@ class SalemMainActivity : AppCompatActivity() {
      */
     @Inject
     internal lateinit var narrationGeofenceManager: com.example.wickedsalemwitchcitytour.tour.NarrationGeofenceManager
+
+    /**
+     * Phase 9R.0: 1692 headline news queue — fills silent gaps during
+     * Historical Mode by reading the next timeline event chronologically.
+     * Pointer survives app restarts (SharedPreferences-backed).
+     */
+    @Inject
+    internal lateinit var historicalHeadlineQueue: com.example.wickedsalemwitchcitytour.tour.HistoricalHeadlineQueue
+
+    /**
+     * Phase 9R.0: state flag for the headline/reach-out interleave in the
+     * silence branch of the narration observer. Flipped each silence slot
+     * so the app alternates between 1692 headlines and POI reach-outs
+     * instead of starving either stream when downtown Salem's dense POI
+     * set has reach-out candidates at every moment.
+     */
+    internal var lastFillWasHeadline: Boolean = false
+
+    /**
+     * Phase 9R.0 (revised ratio): counts consecutive silence slots since the
+     * last 1692 newspaper dispatch. When it reaches 2, the next silence fires
+     * a newspaper and the counter resets. Gives a 2:1 POI-reach-out : newspaper
+     * ratio so the tour surfaces what you can SEE twice as often as ambient
+     * history. Starts at 2 so the first silence gets a newspaper (the tour
+     * opens with a POI narration, so the first silence is already "after a
+     * POI" and ready for a newspaper).
+     */
+    internal var newspaperSilenceSlotCounter: Int = 2
+
+    /**
+     * Phase 9R.0: wall-clock ms of the last POI narration START — used by
+     * [enqueueNarration] to enforce a minimum-hold window so cascaded
+     * ENTRY events (several POIs within a walker's initial geofence cluster)
+     * can't cancel each other before any narration has had a chance to
+     * speak. 0L means "no POI narration has started yet this session".
+     */
+    internal var lastPoiNarrationStartMs: Long = 0L
     internal var corridorManager: com.example.wickedsalemwitchcitytour.tour.CorridorGeofenceManager? = null
     internal var proximityDock: ProximityDock? = null
 
@@ -1189,28 +1226,101 @@ class SalemMainActivity : AppCompatActivity() {
     private val WALK_SIM_DWELL_TRIGGER_M: Double = 15.0
 
     /**
-     * S115: Walk sim "look at the POI" pause duration. Short by design —
-     * just enough for the ENTRY narration to begin and the visual rotation
-     * to register before the walker continues.
+     * S124 Phase 9R.0 (revised): dwell CAP at 60 s. The walker dwells at
+     * CPA until TTS ENDS or 60 s elapses, whichever is sooner. After that
+     * the walker continues on the route while the narration keeps playing
+     * as ambient audio. A new POI entering a geofence interrupts whatever
+     * narration is currently playing (see `cancelSegmentsWithTag("poi_narration")`
+     * in enqueueNarration), so the walker's audio stays in sync with the
+     * visible POI even once they resume walking.
+     *
+     * Rationale: 30-60 s narrations at each of ~20 POIs along the trail
+     * would otherwise freeze the walker for 10-20 min of static time.
+     * A realistic tourist looks at a POI briefly then walks on while
+     * listening. 60 s is the upper bound — most narrations end earlier.
      */
-    private val WALK_SIM_DWELL_DURATION_MS: Long = 3_000L
+    private val WALK_SIM_DWELL_MAX_MS: Long = 60_000L
 
     /**
-     * S118: Minimum time between walk-sim dwell pauses. In dense downtown
-     * Salem the walker passes a POI every few seconds — pausing 3s at each
-     * one makes the walk grind to a halt. Rate-limit to one pause per 30s
-     * so the walker flows smoothly with occasional "look at" moments.
+     * Legacy constant retained for compatibility with the `hold=…s` log
+     * header. The dwell itself is no longer bound by this value (see
+     * [WALK_SIM_DWELL_MAX_MS]); it's the headline length we EXPECT to
+     * wait for at minimum.
      */
-    private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 30_000L
+    private val WALK_SIM_DWELL_DURATION_MS: Long = 20_000L
+
+    /**
+     * S124 Phase 9R.0: cooldown tightened from 30s to 5s. Dwells are now
+     * dynamic (length of the narration) — the cooldown just prevents
+     * back-to-back dwells on the same cluster within the natural gap
+     * between one narration ending and the next POI's geofence triggering.
+     */
+    private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 5_000L
 
     private fun startWalkSim() {
+        // S124 Phase 9R.0: guard against concurrent walks. If the DebugEndpoints
+        // walkJob is running (from /walk-tour), cancel it before starting the
+        // Activity's walkSimJob. Otherwise both call viewModel.setManualLocation
+        // every second with different interpolated points, causing the map to
+        // bounce between two positions — the "stuck in some strange mode" bug.
+        com.example.wickedsalemwitchcitytour.util.DebugHttpServer.endpoints?.cancelAnyWalk()
+        // Also guard against double-tap on the UI button: if walkSimJob is
+        // already running, cancel it first so the new one starts cleanly.
+        walkSimJob?.cancel()
+        walkSimJob = null
+        walkSimRunning = false
+
         // S118: If a tour is active/paused, walk that tour's route instead
         // of the default downtown loop. Falls back to downtown if the tour
         // has no route data or no tour is selected.
-        val activeTour = when (val ts = tourViewModel.tourState.value) {
-            is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> ts.activeTour
-            is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> ts.activeTour
+        //
+        // S124 Phase 9R.0: if NO tour is active, auto-start the Salem
+        // Heritage Trail. This makes the Walk button a one-tap path into
+        // Historical Mode for the demo. TourEngine.startTour handles the
+        // theme check internally — any tour whose theme is HERITAGE_TRAIL
+        // flips NarrationGeofenceManager into Historical Mode with the
+        // tour stops whitelisted, and tour end restores normal ambient
+        // behavior. If Heritage Trail isn't in the DB (unlikely — it's
+        // bundled in salem_content.db), TourState stays Idle and the
+        // walker falls through to the legacy downtown route below.
+        val initialTourState = tourViewModel.tourState.value
+        val activeTour = when (initialTourState) {
+            is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> initialTourState.activeTour
+            is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> initialTourState.activeTour
             else -> null
+        }
+        // S124 Phase 9R.0: the Walk button is a one-tap path into Heritage
+        // Trail / Historical Mode. We force-start (not just check-active)
+        // in all cases except "tour is Active AND it's Heritage Trail"
+        // because:
+        //   - No tour → need to start
+        //   - Paused Heritage Trail → need to start so drawTourRoute fires
+        //     and TourState flips to Active (Paused doesn't draw the route)
+        //   - Wrong tour → need to switch
+        //   - Loading/Error/Completed/Idle → need a clean start
+        // startTour() is idempotent: calling it on an already-active
+        // Heritage Trail tour re-asserts Historical Mode cleanly.
+        val isHeritageActiveRunning = initialTourState is
+            com.example.wickedsalemwitchcitytour.tour.TourState.Active &&
+            initialTourState.activeTour.tour.theme.equals("HERITAGE_TRAIL", ignoreCase = true)
+        val autoStartHeritageTrail = !isHeritageActiveRunning
+        if (autoStartHeritageTrail) {
+            val stateLabel = when (initialTourState) {
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> "Paused"
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> "Active (wrong tour)"
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Loading -> "Loading"
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Completed -> "Completed"
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Error -> "Error"
+                else -> "Idle"
+            }
+            DebugLogger.i("SalemMainActivity",
+                "Walk sim: tour state was $stateLabel → (re)starting tour_salem_heritage_trail")
+            tourViewModel.startTour("tour_salem_heritage_trail")
+        } else {
+            val stopIds = activeTour?.stops?.map { it.poiId }?.toSet() ?: emptySet()
+            narrationGeofenceManager.setHistoricalMode(true, stopIds)
+            DebugLogger.i("SalemMainActivity",
+                "Walk sim: Heritage Trail already Active — re-asserting Historical Mode (${stopIds.size} stops)")
         }
         val routePoints: List<org.osmdroid.util.GeoPoint>
         val routeLabel: String
@@ -1238,6 +1348,23 @@ class SalemMainActivity : AppCompatActivity() {
                         "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
                 }
             }
+        } else if (autoStartHeritageTrail) {
+            // Heritage Trail was just auto-started above; its state hasn't
+            // flipped yet but the bundled route asset is available right now.
+            val trailRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                .loadAllRoutePoints(this, "tour_salem_heritage_trail")
+            if (trailRoute.isNotEmpty()) {
+                routePoints = trailRoute
+                routeLabel = "Salem Heritage Trail"
+                DebugLogger.i("SalemMainActivity",
+                    "Walk sim using auto-started Heritage Trail route (${trailRoute.size} points)")
+            } else {
+                routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                    .loadDowntownRoute(this)
+                routeLabel = "Downtown Salem"
+                DebugLogger.w("SalemMainActivity",
+                    "Heritage Trail asset missing — falling back to downtown route")
+            }
         } else {
             routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
                 .loadDowntownRoute(this)
@@ -1257,7 +1384,14 @@ class SalemMainActivity : AppCompatActivity() {
         DebugLogger.i("SalemMainActivity", "Walk sim started: '$routeLabel' — ${routePoints.size} route points (narration session reset)")
 
         walkSimJob = lifecycleScope.launch {
-            val interpolated = interpolateWalkRoute(routePoints, 1.4f)
+            // S124 Phase 9R.0: default walk-sim speed is 2.0 m/s — a brisk
+            // walking pace, ~33% of the 6.0 m/s demo replay speed used earlier.
+            // For the 3.6-mile Heritage Trail this is ~48 min end-to-end,
+            // which preserves the narration cadence (average ~400m anchor
+            // spacing = 200s = comfortably above the 30s dwell cooldown).
+            // Speed can still be overridden via /walk-tour?speed=N for faster
+            // replay or slower demos.
+            val interpolated = interpolateWalkRoute(routePoints, 2.0f)
             DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
 
             // S115: Auto-dwell setup. Load the full narration point set once
@@ -1267,13 +1401,38 @@ class SalemMainActivity : AppCompatActivity() {
             // anchors so the simulator doesn't freeze at the same spot twice
             // as it passes through the same cluster a second time.
             val narrationPoints = try {
-                tourViewModel.loadNarrationPoints()
+                val all = tourViewModel.loadNarrationPoints()
+                // Phase 9R.0: in Historical Mode, the walk-sim auto-dwell
+                // (the brief "LOOK AT" pause + map rotation the simulator
+                // triggers near each POI) must ALSO respect the immersive
+                // filter. Without this gate, the walker pauses and rotates
+                // toward every modern shop, restaurant, and tourist trap
+                // within 15m — breaking the illusion even if narration
+                // correctly stays silent. Filter the candidate set down to
+                // what is visible on the map in Historical Mode.
+                if (narrationGeofenceManager.isHistoricalMode()) {
+                    val filtered = all.filter { narrationGeofenceManager.isVisibleInHistoricalMode(it) }
+                    DebugLogger.i("WALK-SIM",
+                        "Historical Mode dwell filter: ${filtered.size}/${all.size} POIs eligible for LOOK AT pauses")
+                    filtered
+                } else {
+                    all
+                }
             } catch (e: Exception) {
                 DebugLogger.e("WALK-SIM", "Failed to load narration points for auto-dwell", e)
                 emptyList()
             }
             val dwelledIds = HashSet<String>()
             var lastDwellTime = 0L  // S118: rate-limit dwells to one per 30s
+            // S124 Phase 9R.0: closest-point-of-approach (CPA) detection —
+            // key = POI id, value = distance observed on the previous step.
+            // We dwell at the step where the distance stops decreasing and
+            // starts increasing (the walker is about to walk away from the
+            // POI), not on first proximity.
+            val lastDistToPoi = HashMap<String, Double>()
+            // CPA watch radius — wider than the 15m trigger so we start
+            // tracking distance-trends early enough to detect CPA cleanly.
+            val CPA_WATCH_M = 60.0
             DebugLogger.i("WALK-SIM",
                 "Auto-dwell armed: ${narrationPoints.size} candidate POIs, " +
                 "trigger=${WALK_SIM_DWELL_TRIGGER_M.toInt()}m, " +
@@ -1300,13 +1459,16 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 kotlinx.coroutines.delay(1000L)
 
-                // S118: Fast proximity check — degree-based bounding box pre-filter
-                // avoids 817 haversine calls per step. ~0.00015° ≈ 15m at Salem's latitude.
-                val degThreshold = 0.00018 // slightly generous to catch edge cases
+                // S118: Fast proximity check — degree-based bounding box pre-filter.
+                // S124 Phase 9R.0: widen to CPA watch radius (60m) so we see
+                // POIs approaching before they reach the old 15m trigger and
+                // can properly detect the closest-point-of-approach.
+                // ~0.00068° ≈ 60 m at Salem's latitude.
+                val degThreshold = 0.00070
                 val pLat = point.latitude
                 val pLng = point.longitude
                 var bestTrigger: com.example.wickedsalemwitchcitytour.content.model.SalemPoi? = null
-                var bestDist: Double = WALK_SIM_DWELL_TRIGGER_M
+                var bestDist: Double = Double.MAX_VALUE
                 for (np in narrationPoints) {
                     if (np.id in dwelledIds) continue
                     // Cheap degree check first — skip POIs clearly out of range
@@ -1315,9 +1477,26 @@ class SalemMainActivity : AppCompatActivity() {
                     val d = com.example.wickedsalemwitchcitytour.tour.TourEngine.haversineM(
                         pLat, pLng, np.lat, np.lng
                     )
-                    if (d <= bestDist) {
-                        bestDist = d
-                        bestTrigger = np
+                    if (d > CPA_WATCH_M) {
+                        // Out of watch range — drop any stale tracking
+                        lastDistToPoi.remove(np.id)
+                        continue
+                    }
+                    val prev = lastDistToPoi[np.id]
+                    lastDistToPoi[np.id] = d
+                    // CPA trigger: we were getting closer (prev >= d), but
+                    // on THIS step we just started getting farther. That's
+                    // the moment to dwell. Require a minimum prior-distance
+                    // reading (prev != null) so we don't trigger on the
+                    // very first step a POI enters watch range. Tiny GPS
+                    // jitter tolerance: only trigger if d > prev + 0.5 m.
+                    if (prev != null && d > prev + 0.5) {
+                        // Trigger at CPA (which was `prev`, not `d`).
+                        // Pick the closest CPA among competing POIs.
+                        if (prev < bestDist) {
+                            bestDist = prev
+                            bestTrigger = np
+                        }
                     }
                 }
                 val trigger = bestTrigger
@@ -1344,17 +1523,59 @@ class SalemMainActivity : AppCompatActivity() {
                         DebugLogger.i("WALK-SIM",
                             "LOOK AT ${trigger.name} " +
                             "(dist=${bestDist.toInt()}m bearing=${faceBearing.toInt()}°) — " +
-                            "pausing ${WALK_SIM_DWELL_DURATION_MS / 1000}s"
+                            "dwelling until narration finishes (max ${WALK_SIM_DWELL_MAX_MS / 1000}s)"
                         )
                         val dwellStart = System.currentTimeMillis()
-                        while (System.currentTimeMillis() - dwellStart < WALK_SIM_DWELL_DURATION_MS) {
+                        // S124 Phase 9R.0: dwell until TTS is actually done
+                        // speaking (not a fixed wall-clock duration). Narrations
+                        // vary from ~30 s (short historical_note) to ~3 min
+                        // (full 1692 newspaper dispatch). Fixed dwells clipped
+                        // the long ones mid-sentence; dynamic dwells wait for
+                        // the narration state to return to Idle AND the queue
+                        // to empty. A minimum hold of 4 s gives TTS a chance
+                        // to actually START (enqueue → dequeue → first audio
+                        // chunk) before we start polling for Idle — without
+                        // this the dwell would exit immediately in the gap
+                        // between "request speak" and "speaking".
+                        val minHoldMs = 4_000L
+                        while (true) {
                             if (walkSimJob?.isCancelled == true) break
+                            val elapsed = System.currentTimeMillis() - dwellStart
+                            if (elapsed >= WALK_SIM_DWELL_MAX_MS) {
+                                DebugLogger.w("WALK-SIM",
+                                    "DWELL CAP hit (${WALK_SIM_DWELL_MAX_MS / 1000}s) — resuming walk")
+                                break
+                            }
                             viewModel.setManualLocation(point)
+                            // Only start checking TTS state after minHoldMs
+                            // so we don't exit before speak even starts.
+                            if (elapsed >= minHoldMs) {
+                                val state = tourViewModel.narrationState.value
+                                val speakingSeg = (state as? com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking)?.segment
+                                // S124 Phase 9R.0: newspaper dispatches are
+                                // AMBIENT content — the walker resumes even
+                                // while they're still reading. Only POI-
+                                // specific narration freezes the walker.
+                                val isNewspaperReading = speakingSeg?.poiName?.startsWith("Salem 1692") == true
+                                val ttsIdle = state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle
+                                val queueEmpty = narrationQueue.isEmpty()
+                                if (isNewspaperReading) {
+                                    DebugLogger.i("WALK-SIM",
+                                        "Newspaper dispatch playing — ending dwell, walk resumes (ambient read continues)")
+                                    break
+                                }
+                                if (ttsIdle && queueEmpty) {
+                                    DebugLogger.i("WALK-SIM",
+                                        "TTS idle + queue empty after ${elapsed / 1000}s — ending dwell")
+                                    break
+                                }
+                            }
                             kotlinx.coroutines.delay(1000L)
                         }
                         if (walkSimJob?.isCancelled != true) {
+                            val held = (System.currentTimeMillis() - dwellStart) / 1000
                             DebugLogger.i("WALK-SIM",
-                                "RESUMING from ${trigger.name} (paused ${WALK_SIM_DWELL_DURATION_MS / 1000}s)"
+                                "RESUMING from ${trigger.name} (held ${held}s for narration)"
                             )
                         }
                     }
@@ -1381,6 +1602,19 @@ class SalemMainActivity : AppCompatActivity() {
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
         DebugLogger.i("SalemMainActivity", "Walk sim stopped")
         toast("Walk stopped")
+    }
+
+    /**
+     * S124 Phase 9R.0: public accessor so DebugEndpoints can cancel the
+     * Activity's walkSimJob before starting its own. Same guard direction
+     * as startWalkSim's call into DebugHttpServer.endpoints.cancelAnyWalk().
+     * Silent (no toast) since the caller is the debug endpoint, not the user.
+     */
+    internal fun stopWalkSimExternal() {
+        walkSimJob?.cancel()
+        walkSimJob = null
+        walkSimRunning = false
+        narrationGeofenceManager.walkSimMode = false
     }
 
     /**
@@ -1535,7 +1769,7 @@ class SalemMainActivity : AppCompatActivity() {
                 narrationMarkers.clear()
 
                 val allPoints = tourViewModel.loadNarrationPoints()
-                val points = if (showAllPoisActive) {
+                val tierFiltered = if (showAllPoisActive) {
                     allPoints
                 } else {
                     allPoints.filter { p ->
@@ -1545,8 +1779,18 @@ class SalemMainActivity : AppCompatActivity() {
                         tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.ATTRACTION
                     }
                 }
+                // Phase 9R.0: when Historical Mode is on, strip out modern POIs
+                // that don't qualify (no historical_note, not a tour stop, not
+                // TOURISM_HISTORY). Tourism-history POIs still show even if
+                // their note hasn't been generated yet — they just stay silent.
+                val points = if (narrationGeofenceManager.isHistoricalMode()) {
+                    tierFiltered.filter { narrationGeofenceManager.isVisibleInHistoricalMode(it) }
+                } else {
+                    tierFiltered
+                }
                 DebugLogger.i("SalemMainActivity",
-                    "Loading ${points.size} narration markers (showAll=$showAllPoisActive, total=${allPoints.size})")
+                    "Loading ${points.size} narration markers (showAll=$showAllPoisActive, " +
+                    "total=${allPoints.size}, histMode=${narrationGeofenceManager.isHistoricalMode()})")
 
                 // S118: Pre-generate icons on background thread to avoid ANR
                 val zoom = binding.mapView.zoomLevelDouble

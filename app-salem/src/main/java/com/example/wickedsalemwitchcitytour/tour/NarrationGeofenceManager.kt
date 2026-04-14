@@ -42,6 +42,99 @@ class NarrationGeofenceManager @Inject constructor(
     /** Walk sim mode: expands entry radius and tightens reach-out for continuous narration */
     var walkSimMode: Boolean = false
 
+    /**
+     * Phase 9R.0 — Historical Mode.
+     *
+     * When ON, the manager pretends modern POIs don't exist:
+     *   - `checkPosition()` only considers POIs that either
+     *       (a) have their id in [historicalAllowedIds] (tour stops, always allowed), OR
+     *       (b) have a populated `historicalNote` (SI-generated tour-guide narration), OR
+     *       (c) have a populated `historicalPeriod` field
+     *     Every other POI is skipped entirely — no ENTRY, no APPROACH, no nearby-dock entry.
+     *   - [getNarrationForPass] prefers `historicalNote` over `shortNarration` so the
+     *     tour-guide voice plays instead of the modern map-view blurb.
+     *
+     * Set via [setHistoricalMode]. Safe to flip mid-session; already-narrated POIs
+     * stay in the dedup map so they don't re-trigger.
+     */
+    private var historicalMode: Boolean = false
+    private var historicalAllowedIds: Set<String> = emptySet()
+
+    /**
+     * Enable/disable historical mode. Provide the tour-stop POI IDs so they
+     * always narrate even if their per-POI `historicalNote`/`historicalPeriod`
+     * fields happen to be null.
+     */
+    fun setHistoricalMode(enabled: Boolean, allowedIds: Set<String> = emptySet()) {
+        historicalMode = enabled
+        historicalAllowedIds = if (enabled) allowedIds else emptySet()
+        com.example.locationmapapp.util.DebugLogger.i(
+            "NARR-GEO",
+            "historicalMode=$enabled (allowedIds=${allowedIds.size})"
+        )
+    }
+
+    fun isHistoricalMode(): Boolean = historicalMode
+
+    /**
+     * Is this POI categorically historical? Single source of truth for the
+     * Historical Mode visibility + narration gates — checks ONLY per-POI
+     * category + metadata, never looks at `historical_note` content.
+     *
+     * The reason to ignore `historical_note` here: content is populated by a
+     * bulk sync from SalemIntelligence that pipes SI's general-purpose
+     * `medium_narration` into `historical_note` as a fallback. That means
+     * modern shops, restaurants, and offices end up with `historical_note`
+     * populated too (1,100+ POIs including 315 SHOPPING, 188 OFFICES, 174
+     * FOOD_DRINK, 131 HEALTHCARE). Relying on "has historical_note" as the
+     * filter signal would leak those modern categories straight into the
+     * immersive Historical track — the exact opposite of the intent.
+     *
+     * A POI is categorically historical when ANY of:
+     *   1. category = TOURISM_HISTORY (landmarks, statues, monuments,
+     *      historic houses, museums, cemeteries, memorials)
+     *   2. `historical_period` is populated (curated "this is historic" tag)
+     *   3. category is amusement-like (ENTERTAINMENT / MUSEUM / PARKS_REC /
+     *      WORSHIP / etc.) AND `year_established` is set — gives us
+     *      Hamilton Hall 1805, Ropes Mansion 1727, historic churches, etc.
+     *      Modern BCS shops sit in SHOPPING/FOOD_DRINK so they miss this.
+     */
+    private fun isCategoricallyHistorical(point: SalemPoi): Boolean {
+        val cat = point.category.uppercase()
+        if (cat == "TOURISM_HISTORY") return true
+        if (!point.historicalPeriod.isNullOrBlank()) return true
+        if (cat in AMUSEMENT_LIKE_CATEGORIES && point.yearEstablished != null) return true
+        return false
+    }
+
+    /**
+     * Does this POI qualify for NARRATION under historical mode?
+     *
+     * Strict rule:
+     *   - Tour stops always narrate (whitelisted by TourEngine)
+     *   - Otherwise, must be categorically historical AND have a note to read
+     */
+    private fun isHistoricalQualified(point: SalemPoi): Boolean {
+        if (!historicalMode) return true
+        if (point.id in historicalAllowedIds) return true
+        if (point.historicalNote.isNullOrBlank()) return false
+        return isCategoricallyHistorical(point)
+    }
+
+    /**
+     * Does this POI qualify for MAP VISIBILITY under historical mode?
+     *
+     * Looser than narration — the map shows landmarks even while their
+     * tour-guide content is still being generated. Tour stops always show.
+     * Everything else must be categorically historical. Explicitly does NOT
+     * gate on `historical_note` (see [isCategoricallyHistorical] for why).
+     */
+    fun isVisibleInHistoricalMode(point: SalemPoi): Boolean {
+        if (!historicalMode) return true
+        if (point.id in historicalAllowedIds) return true
+        return isCategoricallyHistorical(point)
+    }
+
     /** POI ID → timestamp when narrated (expires after REPEAT_WINDOW_MS) */
     private val narratedAt = mutableMapOf<String, Long>()
 
@@ -110,6 +203,21 @@ class NarrationGeofenceManager @Inject constructor(
 
         /** Same cap, but expanded under walk sim mode where the route is predictable. */
         private const val REACH_RADIUS_WALKSIM_M = 25.0
+
+        /**
+         * Categories that count as "amusement-like" for Historical Mode map
+         * visibility. A POI in one of these categories shows on the map if it
+         * also has `year_established` populated — a signal that the venue is
+         * genuinely historical (museum, historic hall, old church, preserved
+         * park). Used by [isVisibleInHistoricalMode]. Do NOT add SHOPPING,
+         * FOOD_DRINK, OFFICES, HEALTHCARE, AUTO_SERVICES, or WITCH_SHOP here
+         * — those would drag modern businesses into the immersive tour view.
+         */
+        private val AMUSEMENT_LIKE_CATEGORIES = setOf(
+            "ENTERTAINMENT", "AMUSEMENT", "AMUSEMENTS",
+            "ATTRACTION", "ATTRACTIONS", "MUSEUM",
+            "PARKS_REC", "WORSHIP"
+        )
     }
 
     /** Load narration points to monitor.
@@ -126,9 +234,20 @@ class NarrationGeofenceManager @Inject constructor(
 
     /**
      * Get the narration text for a POI.
-     * Returns short_narration (the geofence walk-by announcement).
+     *
+     * Default: returns `short_narration` (the geofence walk-by announcement).
+     *
+     * Historical Mode (Phase 9R.0): prefers `historical_note` when available so
+     * the tour-guide voice plays. Falls back to `short_narration` if no
+     * historical note has been authored/generated yet. This lets the same
+     * manager serve both the ambient and the immersive narration tracks
+     * without duplicating the per-POI dispatch path.
      */
     fun getNarrationForPass(point: SalemPoi): String? {
+        if (historicalMode) {
+            val hn = point.historicalNote
+            if (!hn.isNullOrBlank()) return hn
+        }
         return point.shortNarration
     }
 
@@ -162,6 +281,12 @@ class NarrationGeofenceManager @Inject constructor(
         var skippedCooldown = 0
 
         for (point in points) {
+            // Phase 9R.0: historical mode strips modern POIs from consideration
+            // entirely — they don't appear in the nearby dock, don't fire
+            // APPROACH, and don't fire ENTRY. The user is walking the
+            // Heritage Trail, not shopping for coffee.
+            if (!isHistoricalQualified(point)) continue
+
             val distanceM = haversine(lat, lng, point.lat, point.lng)
 
             // Build nearby list (for proximity dock)
@@ -271,6 +396,7 @@ class NarrationGeofenceManager @Inject constructor(
         val candidates = mutableListOf<NearbyPoint>()
         for (point in points) {
             if (isNarrated(point.id, now)) continue
+            if (!isHistoricalQualified(point)) continue // 9R.0: silence modern POIs in reach-out too
             val dist = haversine(lastLat, lastLng, point.lat, point.lng)
             if (dist <= radius) {
                 candidates.add(NearbyPoint(point, dist))

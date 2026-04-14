@@ -9,6 +9,7 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+**/build/
 /captures
 .externalNativeBuild
 .cxx
@@ -33,3 +34,11 @@ docs/poi-inventory*.pdf
 app-salem/src/main/assets/hero/
 tools/hero-image-gen/output/
 tools/hero-image-gen/hero-prompts.json
+tools/hero-image-gen/__pycache__/
+
+# Bake test logs — large, regenerable
+docs/bake-tests/
+
+# Overnight test logcats — too large for git (keep small artifacts)
+docs/session-logs/overnight-*/logcat*.log
+docs/session-logs/overnight-*/logcat*.log.gz
