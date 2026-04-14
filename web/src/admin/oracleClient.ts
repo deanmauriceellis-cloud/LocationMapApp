@@ -1,54 +1,79 @@
-// oracleClient — Phase 9P.B Step 9P.10b
+// oracleClient — Phase 9P.B Step 9P.10b, re-targeted S125 (2026-04-14)
 //
-// Typed client for the Salem Oracle API. The Oracle is a dev-side LLM-backed
-// service exposed by Salem's `cmd/testapp` on the operator's workstation. It
-// composes, revises, summarizes, and fact-checks editorial content for the
-// LocationMapApp admin tool against Salem's full historical corpus
-// (3,891 facts, 4,950 primary source chunks, 63 POIs, 202 newspaper articles).
+// The admin tool's editorial-AI bridge. Historically called Salem Oracle on
+// `:8088`; now retargeted to SalemIntelligence on `:8089` per operator
+// direction (S125): "SalemIntelligence has all the KBs from Salem Oracle
+// so it should be used instead". Oracle and SI cannot both run on the
+// workstation at once (shared GPU), so SI is the default.
 //
-// Reference contract: ~/Development/Salem/docs/oracle-api.md (492 lines,
-// owned by Salem). DO NOT modify Salem's data through this client — the
-// corpus is read-only from the API surface; the only "write" verb is `ask`,
-// which mutates the Oracle's in-memory conversation history.
+// This file keeps the Oracle* type names + public function names unchanged
+// so every consumer (AdminLayout, PoiEditDialog) continues to compile
+// without edits. Internally it maps SI's endpoints to the Oracle shapes
+// the admin tool already understands.
 //
-// ─── Architecture decision ────────────────────────────────────────────────
-// The Oracle serves a permissive CORS policy (`Access-Control-Allow-Origin: *`,
-// methods `GET, POST, OPTIONS`), so the admin tool's browser code calls it
-// directly at `http://localhost:8088/api/oracle/*`. We do NOT route through
-// the cache-proxy or the Vite dev proxy — the Oracle is a sibling dev service,
-// not part of LocationMapApp's backend. Per master plan §1341.
+// Endpoint mapping:
+//   getStatus()  → GET  /api/intel/status          (SI)   vs  /api/oracle/status
+//   ask(req)     → POST /api/intel/chat            (SI)   vs  /api/oracle/ask
+//   listPois()   → GET  /api/intel/poi-export      (SI)   vs  /api/oracle/pois
+//
+// ─── Known feature gaps vs Oracle ─────────────────────────────────────────
+// The following Oracle features have no SI equivalent today. They degrade
+// silently — the adapter drops unsupported params or returns empty/sensible
+// defaults. Full list (surfaced as an OMEN cross-project note, S125):
+//
+//   1. Conversation history. Oracle kept a 6-turn rolling history shared
+//      across all callers for deictic prompts ("make that shorter").
+//      SI /chat is stateless.
+//
+//   2. `current_poi_id` context pinning. Oracle would bias retrieval
+//      against the LMA POI currently being edited so "rewrite this"
+//      resolved against the right subject. SI exposes per-entity context
+//      via /api/intel/entity/{id}/context but not as a chat companion.
+//
+//   3. `current_newspaper_date` pinning. Oracle used this to anchor
+//      answers inside the 1692 game timeline. SI /chat has no timeline.
+//
+//   4. `reset` flag. Moot since SI is stateless, but preserved in the
+//      adapter interface so callers don't need to change.
+//
+//   5. Rich `primary_sources` (verbatim + attribution + modern_gloss +
+//      doc_type + relevance + score). SI returns a simpler
+//      `ChatCitationResponse` that this adapter flattens into
+//      OraclePrimarySource with best-effort mapping.
+//
+//   6. Separate 1692 POI catalog (/pois returned 63 Salem-Village 1692
+//      POIs). SI's /poi-export returns 1,597 modern Salem entities —
+//      different corpus. The adapter still maps but the output is not
+//      interchangeable with the old Oracle catalog.
 //
 // ─── Base URL ────────────────────────────────────────────────────────────
-// Default: `http://localhost:8088`. Override at runtime by setting
-// `VITE_SALEM_ORACLE_URL` in `.env.local` (Vite-style env var) before
-// starting the dev server. Example:
-//   echo 'VITE_SALEM_ORACLE_URL=http://10.0.0.229:8088' > web/.env.local
-// Useful when the operator runs the admin tool from a LAN host while the
-// Salem testapp runs on the dev box.
+// Default: `http://localhost:8089`. Override via `VITE_SALEM_INTELLIGENCE_URL`
+// (preferred) or the legacy `VITE_SALEM_ORACLE_URL` env var in `.env.local`.
 //
 // ─── Latency / timeout ────────────────────────────────────────────────────
-// The `ask` endpoint is bottlenecked by Ollama running gemma3:27b on the
-// workstation's RTX 3090. Typical latency is 5-15s per call. Per the contract,
-// clients should plan a minimum 60s timeout. We default to 120s to leave
-// headroom for cold-cache slow turns. Status / catalog endpoints are
-// sub-millisecond and use a much shorter timeout.
+// SI /chat calls gemma3:27b on the workstation's RTX 3090. Typical 5-15s;
+// keep the 120s default to leave headroom for cold-cache turns. Status
+// and catalog calls are sub-millisecond; use 5s.
 
 // ─── Base URL resolution ──────────────────────────────────────────────────
 
-const DEFAULT_ORACLE_BASE = 'http://localhost:8088'
+const DEFAULT_INTEL_BASE = 'http://localhost:8089'
 
 function resolveBase(): string {
-  // Vite injects import.meta.env.VITE_* at build time.
-  const fromEnv = (import.meta.env?.VITE_SALEM_ORACLE_URL as string | undefined)?.trim()
-  if (fromEnv) return fromEnv.replace(/\/$/, '')
-  return DEFAULT_ORACLE_BASE
+  const fromIntel = (import.meta.env?.VITE_SALEM_INTELLIGENCE_URL as string | undefined)?.trim()
+  if (fromIntel) return fromIntel.replace(/\/$/, '')
+  // Legacy compat — operator may still have the Oracle env var set.
+  const fromOracle = (import.meta.env?.VITE_SALEM_ORACLE_URL as string | undefined)?.trim()
+  if (fromOracle) return fromOracle.replace(/\/$/, '')
+  return DEFAULT_INTEL_BASE
 }
 
+/** Kept as `ORACLE_BASE` so existing imports in AdminLayout don't change. */
 export const ORACLE_BASE = resolveBase()
 
-// ─── Response shapes ──────────────────────────────────────────────────────
+// ─── Response shapes (Oracle-compatible public surface) ───────────────────
 
-/** Successful /api/oracle/status response. */
+/** Successful /status response. */
 export interface OracleStatusOk {
   available: true
   fact_count: number
@@ -61,7 +86,7 @@ export interface OracleStatusOk {
   poi_count: number
 }
 
-/** Degraded /api/oracle/status response — LLM down but catalogs may still load. */
+/** Degraded /status response — service up but not ready. */
 export interface OracleStatusDown {
   available: false
   reason: string
@@ -72,7 +97,7 @@ export interface OracleStatusDown {
 
 export type OracleStatus = OracleStatusOk | OracleStatusDown
 
-/** One verbatim primary source citation in an Oracle ask response. */
+/** One primary source citation in an ask response. */
 export interface OraclePrimarySource {
   verbatim_text: string
   attribution: string
@@ -82,7 +107,7 @@ export interface OraclePrimarySource {
   score?: number
 }
 
-/** Successful /api/oracle/ask response. */
+/** Successful /ask response. */
 export interface OracleAskOk {
   question: string
   text: string
@@ -95,14 +120,14 @@ export interface OracleAskOk {
   used_external_context: boolean
 }
 
-/** Error response from /api/oracle/ask (HTTP 200 with `error` key). */
+/** Error envelope (HTTP 200 with `error` key). */
 export interface OracleAskErr {
   error: string
 }
 
 export type OracleAskResponse = OracleAskOk | OracleAskErr
 
-/** Request body for /api/oracle/ask. */
+/** Request body for /ask. */
 export interface OracleAskRequest {
   question: string
   current_poi_id?: string
@@ -110,7 +135,7 @@ export interface OracleAskRequest {
   reset?: boolean
 }
 
-/** Lightweight POI entry from /api/oracle/pois (catalog list). */
+/** Lightweight POI entry in the catalog list. */
 export interface OraclePoiSummary {
   id: string
   name: string
@@ -126,12 +151,60 @@ export interface OraclePoiList {
   entries: OraclePoiSummary[]
 }
 
+// ─── Internal SI response shapes ──────────────────────────────────────────
+
+interface IntelStatusResponse {
+  available: boolean
+  version?: string
+  phase?: string
+  llm_model?: string
+  entity_count?: number
+  relation_count?: number
+  source_count?: number
+  entities_by_type?: Record<string, number>
+}
+
+interface IntelChatCitation {
+  entity_id?: string
+  entity_name?: string
+  snippet?: string
+  source?: string
+  attribution?: string
+  verbatim_text?: string
+  modern_gloss?: string
+  doc_type?: string
+  relevance?: string
+  score?: number
+}
+
+interface IntelChatResponse {
+  answer: string
+  citations: IntelChatCitation[]
+  model?: string
+  prompt_sha?: string
+}
+
+interface IntelPoiExportItem {
+  entity_id: string
+  display_name: string
+  primary_category?: string
+  secondary_categories?: string[]
+  district?: string
+  short_description?: string
+  long_description?: string
+  origin_story?: string
+}
+
+interface IntelPoiExportResponse {
+  count: number
+  pois: IntelPoiExportItem[]
+}
+
 // ─── Errors ───────────────────────────────────────────────────────────────
 
 /**
- * Thrown when the network call itself fails (Oracle down, timeout, CORS,
- * DNS, etc). Distinguishes from a successful HTTP response that contains an
- * `error` key — those come back as the response shape.
+ * Thrown when the network call itself fails (service down, timeout, CORS,
+ * DNS, etc). Kept as `OracleNetworkError` for call-site compatibility.
  */
 export class OracleNetworkError extends Error {
   constructor(message: string, public cause?: unknown) {
@@ -153,10 +226,10 @@ async function fetchWithTimeout(
     return await fetch(url, { ...init, signal: ctrl.signal })
   } catch (e) {
     if ((e as { name?: string })?.name === 'AbortError') {
-      throw new OracleNetworkError(`Oracle request timed out after ${timeoutMs}ms`, e)
+      throw new OracleNetworkError(`SalemIntelligence request timed out after ${timeoutMs}ms`, e)
     }
     throw new OracleNetworkError(
-      `Oracle request failed: ${e instanceof Error ? e.message : String(e)}`,
+      `SalemIntelligence request failed: ${e instanceof Error ? e.message : String(e)}`,
       e,
     )
   } finally {
@@ -167,77 +240,139 @@ async function fetchWithTimeout(
 // ─── Public API ───────────────────────────────────────────────────────────
 
 /**
- * Health check. Call once at admin-tool startup; show "Oracle: ready" or
- * "Oracle: unavailable" in the AdminLayout header. Sub-millisecond on the
- * server side; we use a 5s timeout so the pill flips to "unavailable" fast
- * when the testapp isn't running.
- *
- * Throws `OracleNetworkError` on connection failure (caller renders that as
- * "unavailable" with the Salem startup hint). On success, the response is
- * either `available: true` (LLM up) or `available: false` (catalogs loaded
- * but LLM down — the pill should still render unavailable in this case).
+ * Health check. Sub-millisecond; 5s timeout so the pill flips to
+ * "unavailable" fast when SI isn't running.
  */
 export async function getStatus(): Promise<OracleStatus> {
   const res = await fetchWithTimeout(
-    `${ORACLE_BASE}/api/oracle/status`,
+    `${ORACLE_BASE}/api/intel/status`,
     { method: 'GET' },
     5_000,
   )
   if (!res.ok) {
-    throw new OracleNetworkError(`Oracle /status returned ${res.status}`)
+    throw new OracleNetworkError(`SalemIntelligence /status returned ${res.status}`)
   }
-  return (await res.json()) as OracleStatus
+  const raw = (await res.json()) as IntelStatusResponse
+  if (!raw.available) {
+    return {
+      available: false,
+      reason: `SalemIntelligence not ready (${raw.phase || 'phase unknown'})`,
+    }
+  }
+  const entitiesByType = raw.entities_by_type ?? {}
+  const poiCount =
+    (entitiesByType.attraction ?? 0) +
+    (entitiesByType.business ?? 0) +
+    (entitiesByType.historic_building ?? 0)
+  return {
+    available: true,
+    // Oracle-shape fields below are filled with SI equivalents where they
+    // exist, or 0 / "unknown" where they don't. Consumers only read
+    // `available`, `poi_count`, and (sometimes) `fact_count` in the status
+    // pill today; everything else is surface compatibility.
+    fact_count: raw.source_count ?? 0,
+    primary_source_count: raw.source_count ?? 0,
+    history_len: 0,
+    game_date: 'modern',
+    newspaper_count: 0,
+    first_newspaper: '',
+    last_newspaper: '',
+    poi_count: poiCount,
+  }
 }
 
 /**
- * Main composition endpoint. The Oracle accepts a free-form question and
- * returns prose composed against the full Salem corpus. Optional context
- * pinning via `current_poi_id` (the LocationMapApp POI being edited) lets
- * deictic prompts ("rewrite this", "make him sound less judgmental") resolve
- * against the current edit subject.
+ * Main composition endpoint. Maps Oracle's `question` → SI's `query`. SI
+ * is stateless, so `current_poi_id`, `current_newspaper_date`, and `reset`
+ * are dropped (see "Known feature gaps" at the top of this file).
  *
- * The Oracle keeps a 6-turn rolling conversation history shared across all
- * callers (single-developer dev surface). Pass `reset: true` on the first
- * call of a new editorial session to start fresh; omit it on follow-ups to
- * iterate ("make that two sentences shorter").
- *
- * Latency is 5-15s typical, bounded by Ollama on the operator's GPU. Default
- * timeout is 120s to leave headroom; the spec recommends 60s minimum.
+ * Returns the Oracle-shape `OracleAskOk` so PoiEditDialog's rendering code
+ * stays unchanged. `citations` (SI) are reshaped into `primary_sources`.
  */
 export async function ask(
   req: OracleAskRequest,
   timeoutMs = 120_000,
 ): Promise<OracleAskResponse> {
+  if (req.current_poi_id || req.current_newspaper_date || req.reset) {
+    console.warn(
+      '[oracleClient] SalemIntelligence /chat is stateless — ignoring',
+      'current_poi_id/current_newspaper_date/reset. Surface as OMEN note',
+      'S125 if the admin tool needs these restored.',
+    )
+  }
   const res = await fetchWithTimeout(
-    `${ORACLE_BASE}/api/oracle/ask`,
+    `${ORACLE_BASE}/api/intel/chat`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req),
+      body: JSON.stringify({ query: req.question, top_k: 10 }),
     },
     timeoutMs,
   )
   if (!res.ok) {
-    throw new OracleNetworkError(`Oracle /ask returned ${res.status}`)
+    if (res.status === 503) {
+      return { error: 'SalemIntelligence LLM unavailable (HTTP 503)' }
+    }
+    throw new OracleNetworkError(`SalemIntelligence /chat returned ${res.status}`)
   }
-  return (await res.json()) as OracleAskResponse
+  const raw = (await res.json()) as IntelChatResponse
+  const primary_sources: OraclePrimarySource[] = (raw.citations ?? []).map((c) => ({
+    verbatim_text: c.verbatim_text ?? c.snippet ?? '',
+    attribution: c.attribution ?? c.source ?? c.entity_name ?? '',
+    modern_gloss: c.modern_gloss,
+    doc_type: c.doc_type,
+    relevance: c.relevance,
+    score: c.score,
+  }))
+  return {
+    question: req.question,
+    text: raw.answer,
+    game_date: 'modern',
+    primary_sources,
+    fact_count: 0,
+    primary_source_count: primary_sources.length,
+    route: raw.model ?? 'intel-chat',
+    history_turn_count: 0,
+    used_external_context: false,
+  }
 }
 
 /**
- * Catalog list — Salem's 63 POIs (29 buildings + 34 landmarks). Used by
- * future "browse Salem catalog" features in the admin tool. Not strictly
- * required for the 9P.10b minimum but exported for downstream use.
+ * Catalog list. SI's /poi-export carries 1,597 modern Salem entities with
+ * `entity_id` + `display_name` + `primary_category` + optional
+ * `secondary_categories`. Mapped to the Oracle shape the admin tool
+ * already renders.
  */
 export async function listPois(): Promise<OraclePoiList> {
   const res = await fetchWithTimeout(
-    `${ORACLE_BASE}/api/oracle/pois`,
+    `${ORACLE_BASE}/api/intel/poi-export`,
     { method: 'GET' },
     5_000,
   )
   if (!res.ok) {
-    throw new OracleNetworkError(`Oracle /pois returned ${res.status}`)
+    throw new OracleNetworkError(`SalemIntelligence /poi-export returned ${res.status}`)
   }
-  return (await res.json()) as OraclePoiList
+  const raw = (await res.json()) as IntelPoiExportResponse
+  const entries: OraclePoiSummary[] = (raw.pois ?? []).map((p) => ({
+    id: p.entity_id,
+    name: p.display_name,
+    // SI categories don't cleanly divide into Oracle's 'building' | 'landmark'.
+    // Map historic-family → 'building', everything else → 'landmark'.
+    kind:
+      p.primary_category === 'museum' ||
+      p.primary_category === 'historic' ||
+      (p.secondary_categories ?? []).includes('historic')
+        ? 'building'
+        : 'landmark',
+    type: p.primary_category,
+    subtype: (p.secondary_categories ?? [])[0],
+    zone: p.district,
+    summary: p.short_description,
+  }))
+  return {
+    count: raw.count ?? entries.length,
+    entries,
+  }
 }
 
 /**
