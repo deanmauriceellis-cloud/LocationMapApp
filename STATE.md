@@ -72,6 +72,7 @@ S122 was tooling (AudioCraft install). S123 pivoted to POI dedup + narration res
 4. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, 18 days out).
 5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
 6. **Cross-project: SalemIntelligence** — Phase 1 KB live. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2.
+7. **Cross-project: stale intel_entity_id UUIDs in salem_pois (S125 finding)** — of the 388 linked silent POIs the S125 narration-fill script processed, **194 returned "Entity not found" from SI** (`/api/intel/entity/{uuid}/narration` → 404 → also POST generate → "Entity not found"). These BCS UUIDs are stale — SI has rotated its entity registry at some point and LMA's linkage is from an older version. Not blocking (S125 falls back to local stubs) but the POIs miss out on SI's richer prose. Needs cross-project re-linking work (likely name-fuzzy-match + BCS current-UUID export from SI → update salem_pois.intel_entity_id). Full numbers in commit `f4626bb`. Surface to OMEN for coordination.
 
 ---
 
