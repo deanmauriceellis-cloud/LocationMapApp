@@ -386,8 +386,17 @@ module.exports = function(app, deps) {
       }
 
       values.push(id);
+      // S125: stamp admin_dirty on every admin field edit so bulk rebuild
+      // scripts (re-narrate, re-icon, re-geofence) can find POIs that
+      // changed via the operator tool. Bulk scripts themselves MUST NOT
+      // flip this flag — admin_dirty tracks human edits only.
       const { rows } = await pgPool.query(
-        `UPDATE salem_pois SET ${setSql} WHERE id = $${values.length} RETURNING *`,
+        `UPDATE salem_pois
+            SET ${setSql},
+                admin_dirty = TRUE,
+                admin_dirty_at = NOW()
+          WHERE id = $${values.length}
+          RETURNING *`,
         values
       );
       res.json(rows[0]);
@@ -422,8 +431,17 @@ module.exports = function(app, deps) {
       const oldLat = parseFloat(existing.rows[0].lat);
       const oldLng = parseFloat(existing.rows[0].lng);
 
+      // S125: move is an admin edit — stamp dirty so downstream rebuilds
+      // (geofence corridor recalc, route regeneration, etc.) can find it.
       const { rows } = await pgPool.query(
-        `UPDATE salem_pois SET lat = $1, lng = $2, updated_at = NOW() WHERE id = $3 RETURNING lat, lng`,
+        `UPDATE salem_pois
+            SET lat = $1,
+                lng = $2,
+                admin_dirty = TRUE,
+                admin_dirty_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $3
+          RETURNING lat, lng`,
         [lat, lng, id]
       );
 
@@ -472,9 +490,14 @@ module.exports = function(app, deps) {
       const id = getId(req, res);
       if (!id) return;
 
+      // S125: restoring a soft-delete is an admin action — stamp dirty
+      // so bulk rebuild pipelines reprocess it alongside normal edits.
       const { rows } = await pgPool.query(
         `UPDATE salem_pois
-            SET deleted_at = NULL, updated_at = NOW()
+            SET deleted_at = NULL,
+                admin_dirty = TRUE,
+                admin_dirty_at = NOW(),
+                updated_at = NOW()
           WHERE id = $1 AND deleted_at IS NOT NULL
           RETURNING id`,
         [id]
