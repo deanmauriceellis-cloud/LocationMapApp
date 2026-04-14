@@ -1388,57 +1388,61 @@ class SalemMainActivity : AppCompatActivity() {
         prevWalk?.cancelAndJoin()
         walkSimRunning = false
 
-        // S118: If a tour is active/paused, walk that tour's route instead
-        // of the default downtown loop. Falls back to downtown if the tour
-        // has no route data or no tour is selected.
+        // S125 (2026-04-14): Walk FAB respects whichever tour the user has
+        // already selected. Pre-S125 behavior force-restarted Heritage
+        // Trail whenever a non-Heritage tour was Active, overwriting the
+        // user's choice — which broke testing of the other 4 tours on
+        // the tour-selection screen.
         //
-        // S124 Phase 9R.0: if NO tour is active, auto-start the Salem
-        // Heritage Trail. This makes the Walk button a one-tap path into
-        // Historical Mode for the demo. TourEngine.startTour handles the
-        // theme check internally — any tour whose theme is HERITAGE_TRAIL
-        // flips NarrationGeofenceManager into Historical Mode with the
-        // tour stops whitelisted, and tour end restores normal ambient
-        // behavior. If Heritage Trail isn't in the DB (unlikely — it's
-        // bundled in salem_content.db), TourState stays Idle and the
-        // walker falls through to the legacy downtown route below.
+        // New logic:
+        //   - Active (any tour)   → walk it; don't restart.
+        //   - Paused (any tour)   → resume via startTour (idempotent) so
+        //                          TourState flips back to Active and
+        //                          drawTourRoute fires. Preserves
+        //                          whichever tour the user had paused.
+        //   - Idle/Loading/Completed/Error → no tour selected → default
+        //                          to Heritage Trail as the "one tap
+        //                          into the demo" convenience.
+        //
+        // Historical Mode is only re-asserted when the active tour is a
+        // HERITAGE_TRAIL theme. Other tours run in regular ambient mode.
         val initialTourState = tourViewModel.tourState.value
         val activeTour = when (initialTourState) {
             is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> initialTourState.activeTour
             is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> initialTourState.activeTour
             else -> null
         }
-        // S124 Phase 9R.0: the Walk button is a one-tap path into Heritage
-        // Trail / Historical Mode. We force-start (not just check-active)
-        // in all cases except "tour is Active AND it's Heritage Trail"
-        // because:
-        //   - No tour → need to start
-        //   - Paused Heritage Trail → need to start so drawTourRoute fires
-        //     and TourState flips to Active (Paused doesn't draw the route)
-        //   - Wrong tour → need to switch
-        //   - Loading/Error/Completed/Idle → need a clean start
-        // startTour() is idempotent: calling it on an already-active
-        // Heritage Trail tour re-asserts Historical Mode cleanly.
-        val isHeritageActiveRunning = initialTourState is
-            com.example.wickedsalemwitchcitytour.tour.TourState.Active &&
-            initialTourState.activeTour.tour.theme.equals("HERITAGE_TRAIL", ignoreCase = true)
-        val autoStartHeritageTrail = !isHeritageActiveRunning
-        if (autoStartHeritageTrail) {
-            val stateLabel = when (initialTourState) {
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> "Paused"
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> "Active (wrong tour)"
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Loading -> "Loading"
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Completed -> "Completed"
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Error -> "Error"
-                else -> "Idle"
+        val tourIsActive = initialTourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active
+        val tourIsPaused = initialTourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
+        val isHeritageTheme = activeTour?.tour?.theme?.equals("HERITAGE_TRAIL", ignoreCase = true) == true
+
+        var autoStartedHeritageTrail = false
+        when {
+            tourIsActive -> {
+                DebugLogger.i("SalemMainActivity",
+                    "Walk sim: tour '${activeTour!!.tour.name}' (theme=${activeTour.tour.theme}) already Active — using as-is")
+                if (isHeritageTheme) {
+                    val stopIds = activeTour.stops.map { it.poiId }.toSet()
+                    narrationGeofenceManager.setHistoricalMode(true, stopIds)
+                }
             }
-            DebugLogger.i("SalemMainActivity",
-                "Walk sim: tour state was $stateLabel → (re)starting tour_salem_heritage_trail")
-            tourViewModel.startTour("tour_salem_heritage_trail")
-        } else {
-            val stopIds = activeTour?.stops?.map { it.poiId }?.toSet() ?: emptySet()
-            narrationGeofenceManager.setHistoricalMode(true, stopIds)
-            DebugLogger.i("SalemMainActivity",
-                "Walk sim: Heritage Trail already Active — re-asserting Historical Mode (${stopIds.size} stops)")
+            tourIsPaused -> {
+                DebugLogger.i("SalemMainActivity",
+                    "Walk sim: tour '${activeTour!!.tour.name}' was Paused → resuming via startTour (idempotent)")
+                tourViewModel.startTour(activeTour.tour.id)
+            }
+            else -> {
+                val stateLabel = when (initialTourState) {
+                    is com.example.wickedsalemwitchcitytour.tour.TourState.Loading -> "Loading"
+                    is com.example.wickedsalemwitchcitytour.tour.TourState.Completed -> "Completed"
+                    is com.example.wickedsalemwitchcitytour.tour.TourState.Error -> "Error"
+                    else -> "Idle"
+                }
+                DebugLogger.i("SalemMainActivity",
+                    "Walk sim: no tour selected (state=$stateLabel) → auto-starting tour_salem_heritage_trail")
+                tourViewModel.startTour("tour_salem_heritage_trail")
+                autoStartedHeritageTrail = true
+            }
         }
         val routePoints: List<org.osmdroid.util.GeoPoint>
         val routeLabel: String
@@ -1466,7 +1470,7 @@ class SalemMainActivity : AppCompatActivity() {
                         "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
                 }
             }
-        } else if (autoStartHeritageTrail) {
+        } else if (autoStartedHeritageTrail) {
             // Heritage Trail was just auto-started above; its state hasn't
             // flipped yet but the bundled route asset is available right now.
             val trailRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
