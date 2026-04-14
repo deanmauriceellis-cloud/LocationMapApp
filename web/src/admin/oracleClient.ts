@@ -2,9 +2,19 @@
 //
 // The admin tool's editorial-AI bridge. Historically called Salem Oracle on
 // `:8088`; now retargeted to SalemIntelligence on `:8089` per operator
-// direction (S125): "SalemIntelligence has all the KBs from Salem Oracle
-// so it should be used instead". Oracle and SI cannot both run on the
-// workstation at once (shared GPU), so SI is the default.
+// direction (S125). Oracle is NOT deprecated — it remains in use for
+// Salem's newspaper / 1692 narrative features elsewhere in the portfolio.
+// Only the admin tool's editorial-AI bridge was switched. Oracle and SI
+// cannot both run on the workstation at once (shared GPU), so the
+// operator switches whichever service is needed at the moment; the
+// default stance for admin-tool work is SI up, Oracle down.
+//
+// If the admin tool ever needs to point back at Oracle (e.g. SI is down
+// and Oracle is running), the endpoint paths (/api/oracle/ask etc.) and
+// the request/response adapters in this file would need to be restored.
+// Right now the env var VITE_SALEM_ORACLE_URL changes the BASE URL but
+// not the path prefix, so it's SI-only below. A future backend-selector
+// flag could restore two-way switchability if the operator wants that.
 //
 // This file keeps the Oracle* type names + public function names unchanged
 // so every consumer (AdminLayout, PoiEditDialog) continues to compile
