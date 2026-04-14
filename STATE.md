@@ -2,30 +2,36 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-13 — Session 123 (POI dedup, narration resync, Phase 9R Historical Tour Mode spec)
+**Last updated:** 2026-04-14 — Session 125 (23 commits: overnight-test fixes, 100% narration coverage, stale UUID sweep, legacy tour restoration, admin→SI bridge, walk-sim UX)
 
 ---
 
-## TOP PRIORITY — Next Session (S124)
+## TOP PRIORITY — Next Session (S126)
 
-**Phase 9U: Unified POI Table — Session 124 (Legacy Cleanup, deferred from S122/S123)**
+**Field-test the S125 output + continue Phase 9U cleanup.**
 
-S122 was tooling (AudioCraft install). S123 pivoted to POI dedup + narration resync + Phase 9R requirements spec. The original cleanup scope is now S124.
+Immediate verification (need real-world walk to prove out):
+1. **4 non-Heritage tours** with random-start + Historical Mode + OSRM route backfill. Pick each of tour_essentials / tour_explorer / tour_grand / tour_witch_trials from the selection screen, tap Walk from Beverly, confirm:
+   - Walker spawns near a random tour stop (toast names it).
+   - Walker follows actual streets (OSRM polyline) not straight lines between stops.
+   - Narration fires immediately at the spawn stop, continues at subsequent stops.
+   - Modern POIs (shops / auto-repair / law offices) stay silent — only tour stops + historical_note POIs narrate.
+   - Tap "POI" FAB → all POIs narrate + all markers show; tap again → filter restores.
+2. **Admin tool** at http://localhost:4302/ — verify PoiEditDialog AI-assist button works via SI (`:8089`) adapter.
+3. **admin_dirty flag** — edit a POI via the admin UI, confirm `admin_dirty=TRUE` in PG.
 
-**Session 124 scope:**
-1. Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB
-2. Remove NarrationPoint entity/DAO and legacy repository methods
-3. Heading-up rotation smoothness fix (deferred from S115)
-4. End-to-end device verification with new narrations
-5. **NEW (small UI):** surface `historical_note` field unconditionally in admin POI editor (General tab) so operator can hand-author samples while waiting for SalemIntelligence Tasks 1-5 to ship
+Deferred from Session 124 scope (still open):
+- Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB.
+- Remove NarrationPoint entity/DAO and legacy repository methods.
+- Heading-up rotation smoothness — currently **disabled** via `HEADING_UP_ENABLED=false`; redesign needed (GPS noise + sensor freeze). Code preserved.
+- Admin `historical_note` field surfacing on General tab.
 
-**Post-S123 key facts:**
-- PG: **2,080 active POIs** (down from 2,190 by S123 dedup; 110 soft-deleted, all tagged for pre-Play-Store hard-delete)
-- Narration model: short_narration (1,417 POIs) + long_narration (1,555 POIs). No multipass.
-- is_narrated=true on 1,543 POIs (up from 824 pre-sync)
-- 572 unlinked POIs still missing intel_entity_id; ~510 BCS-linked POIs still pending narration generation in SalemIntelligence Phase 2
-
-**Phase 9R Historical Tour Mode requirements doc:** `docs/salem-intelligence-historical-tour-request.md` (5 tasks for SalemIntelligence; LMA-side work blocked on those + Phase 9Q building bridge)
+**Post-S125 key facts:**
+- PG: **1,868 active POIs** (211 soft-deleted this session by the stale-UUID sweep; tagged `dedup-stale-uuid-2026-04-14-loser` for pre-Play-Store hard-delete).
+- **Narration coverage: 2,079 / 1,868 = 100%** — every live POI has short_narration (12 via SI re-link, 194 from SI cache, 228 local stubs for POIs SI doesn't know, rest pre-existing).
+- **historical_note coverage** on tour-relevant categories: TOURISM_HISTORY 101/131, ENTERTAINMENT-with-year 13/13, PARKS_REC 3/65 (most are unlinked), WORSHIP 6/10.
+- **34 unlinked POIs** still carry local stubs (no SI entity at all — truly SI-unknown, not stale linkage).
+- **5 tours** restored and visible on the tour-selection screen: Heritage Trail (10), Walking Through Salem (14), Salem Explorer (20), Grand Salem Tour (24), Salem Witch Trials Walking Tour (19). All have OSRM walking polylines.
 
 ---
 
