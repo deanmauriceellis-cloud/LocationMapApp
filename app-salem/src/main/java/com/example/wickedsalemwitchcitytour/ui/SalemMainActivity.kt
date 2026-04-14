@@ -313,6 +313,26 @@ class SalemMainActivity : AppCompatActivity() {
     internal var walkSimJob: kotlinx.coroutines.Job? = null
 
     /**
+     * S125: FAB pause/resume state for walk-sim.
+     *
+     * When the user taps the walk FAB a second time mid-walk the old
+     * behaviour cancelled `walkSimJob` and, on the next tap, restarted
+     * from interpolated[0]. The operator expected "pause and pick up
+     * where I left off" — so [stopWalkSim] now simply cancels the job
+     * and these three fields survive it. The next [startWalkSim] checks
+     * whether the freshly-loaded route matches (same label, same
+     * interpolated-step count), and if so, skips directly to the saved
+     * step index. Any of:
+     *   - tour switched (different routeLabel)
+     *   - route geometry changed (different step count)
+     *   - natural walk completion (explicitly reset below)
+     * drops the session back to a fresh start from step 0.
+     */
+    internal var walkSimResumeStepIdx: Int = 0
+    internal var walkSimResumeRouteLabel: String? = null
+    internal var walkSimResumeRouteSize: Int = 0
+
+    /**
      * S125: Walk-sim lifecycle mutex.
      *
      * Shared between the UI-triggered walk ([startWalkSim]) and the HTTP-
@@ -1479,6 +1499,29 @@ class SalemMainActivity : AppCompatActivity() {
             val interpolated = interpolateWalkRoute(routePoints, 2.0f)
             DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
 
+            // S125: FAB pause/resume — if the last paused walk was on the same
+            // route and we have a saved step index in-bounds, skip ahead.
+            // Otherwise treat this as a fresh walk and reset the marker.
+            val resumeFromStep = if (
+                walkSimResumeRouteLabel == routeLabel &&
+                walkSimResumeRouteSize == interpolated.size &&
+                walkSimResumeStepIdx in 1 until interpolated.size
+            ) {
+                DebugLogger.i("WALK-SIM",
+                    "RESUME: continuing '$routeLabel' from step ${walkSimResumeStepIdx}/${interpolated.size}")
+                toast("Resuming walk at step ${walkSimResumeStepIdx}/${interpolated.size}")
+                walkSimResumeStepIdx
+            } else {
+                if (walkSimResumeStepIdx != 0 || walkSimResumeRouteLabel != null) {
+                    DebugLogger.i("WALK-SIM",
+                        "Fresh walk (resume state invalidated): label '${walkSimResumeRouteLabel}' → '$routeLabel', " +
+                        "size ${walkSimResumeRouteSize} → ${interpolated.size}, idx=${walkSimResumeStepIdx}")
+                }
+                0
+            }
+            walkSimResumeRouteLabel = routeLabel
+            walkSimResumeRouteSize = interpolated.size
+
             // S115: Auto-dwell setup. Load the full narration point set once
             // at the start of the run so the per-step proximity check is a
             // pure in-memory scan. Each POI can only trigger a dwell ONCE per
@@ -1524,11 +1567,17 @@ class SalemMainActivity : AppCompatActivity() {
                 "hold=${WALK_SIM_DWELL_DURATION_MS / 1000}s, " +
                 "cooldown=${WALK_SIM_DWELL_COOLDOWN_MS / 1000}s")
 
-            var stepIdx = 0
-            for (point in interpolated) {
+            var stepIdx = resumeFromStep
+            for (point in interpolated.drop(resumeFromStep)) {
                 if (walkSimJob?.isCancelled == true) break
                 viewModel.setManualLocation(point)
                 stepIdx++
+                // S125: save every step so a pause keeps our place. On
+                // cancellation the outer for-loop bails at the top of the
+                // next iteration, so the last value saved here is the
+                // index of the NEXT step to run on resume — exactly what
+                // we want.
+                walkSimResumeStepIdx = stepIdx
                 // S118: After the first step positions the map in Salem,
                 // reload narration markers so icons match the current zoom
                 // (they were generated at startup zoom which may differ).
@@ -1671,6 +1720,11 @@ class SalemMainActivity : AppCompatActivity() {
                 walkSimRunning = false
                 binding.btnWalkSim.text = "Walk"
                 binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
+                // S125: natural completion clears the resume marker so the
+                // next walk starts fresh from step 0.
+                walkSimResumeStepIdx = 0
+                walkSimResumeRouteLabel = null
+                walkSimResumeRouteSize = 0
                 DebugLogger.i("WALK-SIM",
                     "Walk complete — ${dwelledIds.size} auto-dwell anchors triggered")
                 toast("Walk simulation complete")
