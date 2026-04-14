@@ -146,22 +146,24 @@ function stubNarration(row) {
 }
 
 async function fetchFromIntel(uuid) {
-  // 1. Cached narration
+  // 1. Cached narration (GET). 404 here does NOT mean the entity is
+  // missing — it only means SI hasn't cached narration yet. Fall through
+  // to POST /generate below, which synthesizes on demand.
   try {
     const r = await httpRequestJson('GET', `${INTEL_BASE}/api/intel/entity/${uuid}/narration`);
     if (r.status === 200 && r.json) {
       const text = firstNonBlank(r.json.short_narration, r.json.medium_narration, r.json.entity_narration);
       if (text) return { text, source: 'si_cached' };
     }
-    if (r.status === 404) {
-      // Entity unknown to SI
-      return { text: null, source: null, entityUnknown: true };
-    }
+    // 404 → fall through to generate (do NOT mark entityUnknown here)
   } catch (_) {}
 
   if (NO_GENERATE) return { text: null, source: null };
 
-  // 2. On-demand generation (LLM call, slow)
+  // 2. On-demand generation (LLM call, slow). Only POST can distinguish
+  // "entity truly doesn't exist" (404 with "Entity not found") from
+  // "entity exists but has no cached narration" (200 with synthesized
+  // content in the response body).
   try {
     const r = await httpRequestJson('POST', `${INTEL_BASE}/api/intel/generate/narration`, { entity_id: uuid });
     if (r.status === 200 && r.json) {
