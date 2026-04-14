@@ -88,6 +88,16 @@ private const val NEAR_ZONE_OVERRIDE_M = 15.0
  *  the GPS jitter is too large to compute a reliable direction. */
 private const val BEARING_UPDATE_MIN_MOVE_M = 1.0
 
+/**
+ * S125: Minimum GPS-reported speed that counts as "the user is walking".
+ * Below this we treat the fix as stationary and freeze the bearing so GPS
+ * jitter can't fake rotation updates. 0.3 m/s ≈ 1 km/h — slower than a
+ * shuffle, safely below true walking pace but above jitter noise. The fused
+ * provider derives speed from Doppler, so this is robust to position
+ * multipath in urban canyons.
+ */
+private const val MIN_WALKING_SPEED_MPS: Float = 0.3f
+
 /** S112+: Cached movement bearing in degrees (0=N, 90=E, 180=S, 270=W).
  *  Null until the first meaningful movement is observed. */
 private var lastMovementBearing: Double? = null
@@ -558,34 +568,92 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
  * their tight defaults. A cold start (lastUserLat == 0.0) seeds the anchor
  * at the first fix.
  */
-internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Double) {
-    // S125 (field-test 2026-04-14): removed the motionTracker.isStationary()
-    // gate. In the field the TYPE_SIGNIFICANT_MOTION sensor consistently
-    // reported "stationary" while the user was walking (tourist pace doesn't
-    // always trigger "significant" motion). That suppressed EVERY bearing
-    // update — 266 "frozen" events vs 2 "moved" in a 24-minute walk — so
-    // heading-up broke after the first fix. The GPS distance delta
-    // (BEARING_UPDATE_MIN_MOVE_M = 1.0 m) is already a robust signal for
-    // "real step", and if the user genuinely parks the device, the delta
-    // stays below 1 m and the bearing naturally goes stale.
+internal fun SalemMainActivity.updateNarrationUserPosition(
+    lat: Double,
+    lng: Double,
+    speedMps: Float? = null,
+    bearingDeg: Float? = null
+) {
+    // S125 second pass (field test 2026-04-14):
+    //
+    // Prior approach (motionTracker.isStationary()) suppressed updates during
+    // real walking. Next approach (pure 1 m GPS-delta) let jitter fake updates
+    // while genuinely still. Both were wrong.
+    //
+    // The fused location provider already carries speed (Doppler-derived, not
+    // position-delta, so it's the physics-correct signal) AND a GPS bearing
+    // when the fix is moving fast enough. Use those:
+    //
+    //   - speed >= MIN_WALKING_SPEED_MPS  → user is moving; accept the fix.
+    //       - GPS-provided bearing → use it directly (best quality).
+    //       - Else compute from position delta.
+    //   - speed <  MIN_WALKING_SPEED_MPS  → treat as stationary; skip.
+    //   - speed == null (walk-sim / manual injection) → fall back to the
+    //       position-delta check with the original 1 m threshold — these
+    //       sources are deterministic ground truth, no jitter to filter.
 
     if (lastUserLat != 0.0 || lastUserLng != 0.0) {
         val moved = haversineM(lastUserLat, lastUserLng, lat, lng)
-        if (moved >= BEARING_UPDATE_MIN_MOVE_M) {
-            val prevBearing = lastMovementBearing
-            val newBearing = bearingDeg(lastUserLat, lastUserLng, lat, lng)
-            lastMovementBearing = newBearing
-            lastMovementBearingUpdateMs = System.currentTimeMillis()
-            prevUserLat = lastUserLat
-            prevUserLng = lastUserLng
-            DebugLogger.d(
-                "BEARING",
-                "moved=${"%.1f".format(moved)}m " +
-                    "bearing=${newBearing.toInt()}° " +
-                    (if (prevBearing != null) "(prev=${prevBearing.toInt()}°, Δ=${((newBearing - prevBearing + 540) % 360 - 180).toInt()}°)" else "(first)")
-            )
+        val now = System.currentTimeMillis()
+
+        if (speedMps != null) {
+            // Real GPS fix — use the speed gate.
+            if (speedMps < MIN_WALKING_SPEED_MPS) {
+                DebugLogger.d(
+                    "BEARING",
+                    "speed-gated — ${"%.2f".format(speedMps)}mps < ${"%.2f".format(MIN_WALKING_SPEED_MPS)}mps (moved=${"%.1f".format(moved)}m, bearing frozen)"
+                )
+            } else {
+                val prevBearing = lastMovementBearing
+                val acceptedBearing: Double =
+                    if (bearingDeg != null) {
+                        // Prefer GPS-native bearing — Doppler, not position math.
+                        ((bearingDeg.toDouble()) + 360.0) % 360.0
+                    } else if (moved >= BEARING_UPDATE_MIN_MOVE_M) {
+                        bearingDeg(lastUserLat, lastUserLng, lat, lng)
+                    } else {
+                        // Moving per speed but position delta too small to compute
+                        // a reliable bearing (GPS can report speed from Doppler
+                        // without the 2nd fix needed for position-delta bearing).
+                        // Keep the prior bearing; don't stamp a fresh update.
+                        DebugLogger.d(
+                            "BEARING",
+                            "walking but moved=${"%.2f".format(moved)}m < ${BEARING_UPDATE_MIN_MOVE_M}m and no GPS bearing — keep prior"
+                        )
+                        // Fall through to GPS lat/lng update below without updating bearing.
+                        -1.0  // sentinel: skip bearing write
+                    }
+                if (acceptedBearing >= 0.0) {
+                    lastMovementBearing = acceptedBearing
+                    lastMovementBearingUpdateMs = now
+                    prevUserLat = lastUserLat
+                    prevUserLng = lastUserLng
+                    val source = if (bearingDeg != null) "GPS-Doppler" else "position-delta"
+                    DebugLogger.d(
+                        "BEARING",
+                        "moved=${"%.1f".format(moved)}m speed=${"%.2f".format(speedMps)}mps " +
+                            "bearing=${acceptedBearing.toInt()}° ($source) " +
+                            (if (prevBearing != null) "(prev=${prevBearing.toInt()}°, Δ=${((acceptedBearing - prevBearing + 540) % 360 - 180).toInt()}°)" else "(first)")
+                    )
+                }
+            }
         } else {
-            DebugLogger.d("BEARING", "still — moved=${"%.2f".format(moved)}m (under ${BEARING_UPDATE_MIN_MOVE_M}m threshold)")
+            // Walk-sim / manual injection — no speed field. Use position delta.
+            if (moved >= BEARING_UPDATE_MIN_MOVE_M) {
+                val prevBearing = lastMovementBearing
+                val newBearing = bearingDeg(lastUserLat, lastUserLng, lat, lng)
+                lastMovementBearing = newBearing
+                lastMovementBearingUpdateMs = now
+                prevUserLat = lastUserLat
+                prevUserLng = lastUserLng
+                DebugLogger.d(
+                    "BEARING",
+                    "moved=${"%.1f".format(moved)}m bearing=${newBearing.toInt()}° (sim) " +
+                        (if (prevBearing != null) "(prev=${prevBearing.toInt()}°, Δ=${((newBearing - prevBearing + 540) % 360 - 180).toInt()}°)" else "(first)")
+                )
+            } else {
+                DebugLogger.d("BEARING", "still — moved=${"%.2f".format(moved)}m (sim, under ${BEARING_UPDATE_MIN_MOVE_M}m)")
+            }
         }
     }
 

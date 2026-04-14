@@ -2539,7 +2539,7 @@ class SalemMainActivity : AppCompatActivity() {
                 // Status line still updates so the user sees fresh coords.
                 updateIdleStatusLine(point.latitude, point.longitude, speedMph)
                 // Narration still runs — geofences may still trigger if we're wrong.
-                updateTourLocation(point)
+                updateTourLocation(point, update.speedMps, update.bearing)
                 return@observe
             }
 
@@ -2608,7 +2608,7 @@ class SalemMainActivity : AppCompatActivity() {
 
                 // ── NARRATION: feed every GPS update regardless of dead zone ──
                 // Geofence radii are 20-50m; the dead zone is for map/marker only
-                updateTourLocation(point)
+                updateTourLocation(point, update.speedMps, update.bearing)
 
                 // ── Idle auto-populate: start full scanner after 10 min stationary ──
                 //
@@ -2650,7 +2650,7 @@ class SalemMainActivity : AppCompatActivity() {
             lastGpsPoint = point
 
             // ── 3a. Feed location to tour engine ──
-            updateTourLocation(point)
+            updateTourLocation(point, update.speedMps, update.bearing)
 
             // ── 3b. Significant move — reset idle timer and cancel idle populate ──
             lastSignificantMoveTime = System.currentTimeMillis()

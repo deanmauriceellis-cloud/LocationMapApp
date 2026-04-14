@@ -1323,20 +1323,27 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
 // FEED LOCATION TO TOUR ENGINE
 // ═════════════════════════════════════════════════════════════════════════════
 
-/** Call from the GPS update observer to keep the tour engine informed of current location. */
-internal fun SalemMainActivity.updateTourLocation(point: GeoPoint) {
+/**
+ * Call from the GPS update observer to keep the tour engine informed of current location.
+ *
+ * S125: now takes optional speed + bearing from the fix so the narration
+ * extension can speed-gate its movement-bearing update. Walk-sim and manual
+ * injections pass null for both (their positions are ground truth, and the
+ * 1 m position-delta check is sufficient).
+ */
+internal fun SalemMainActivity.updateTourLocation(
+    point: GeoPoint,
+    speedMps: Float? = null,
+    bearingDeg: Float? = null
+) {
     tourViewModel.onLocationUpdate(point)
 
     // Phase 9T: Feed location to narration geofence manager (drives ENTRY/APPROACH events).
     val nearby = narrationGeofenceManager.checkPosition(point.latitude, point.longitude)
 
     // S112: Push the user position into the narration extension's file-scope cache,
-    // and refresh the proximity dock from the current queue snapshot. The dock now
-    // shows the play queue (filtered to <=50m, tier-sorted), not the raw nearby list,
-    // so the dock order matches what the user is about to hear. The previous
-    // proximityDock.update() call (raw distance-only sort over all 817 points) is
-    // gone — that view of the world is replaced by the queue snapshot view.
-    updateNarrationUserPosition(point.latitude, point.longitude)
+    // and refresh the proximity dock from the current queue snapshot.
+    updateNarrationUserPosition(point.latitude, point.longitude, speedMps, bearingDeg)
 
     // S115: If heading-up rotation is enabled, apply the smoothed bearing to
     // the map canvas. Must run AFTER updateNarrationUserPosition so that
