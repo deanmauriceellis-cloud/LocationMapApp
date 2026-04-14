@@ -2376,9 +2376,17 @@ class SalemMainActivity : AppCompatActivity() {
 
     // ── S115: Heading-up map rotation ─────────────────────────────────────
 
-    internal fun isHeadingUpMode(): Boolean =
-        getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
+    internal fun isHeadingUpMode(): Boolean {
+        // S125: force off while HEADING_UP_ENABLED is false, regardless of
+        // what's persisted in SharedPreferences. This short-circuits every
+        // downstream caller — applyHeadingUpRotation, the map-rotation
+        // pass in updateTourLocation, the N↑ FAB tint refresh, etc. The
+        // stored preference is preserved so re-enabling later restores
+        // the user's last setting.
+        if (!HEADING_UP_ENABLED) return false
+        return getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
             .getBoolean(HEADING_UP_PREF_KEY, false)
+    }
 
     private fun setHeadingUpMode(enabled: Boolean) {
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
@@ -2394,8 +2402,31 @@ class SalemMainActivity : AppCompatActivity() {
      * updates happen in [updateTourLocation] → [applyHeadingUpRotation] on
      * every GPS fix with an EMA + 5° hysteresis to avoid jitter.
      */
+    /**
+     * S125 (2026-04-14): Heading-up map rotation is temporarily DISABLED.
+     * The feature fights GPS noise + sensor freeze issues in real-world
+     * field tests (see field-test analysis in docs/session-logs/session-125)
+     * and needs a more careful redesign before re-enabling. All the code —
+     * DeviceOrientationTracker, applyHeadingUpRotation, bearing fusion —
+     * is intentionally PRESERVED so the rework has a starting point; flip
+     * this constant to true (and re-show the FAB in layout if it was
+     * hidden) to bring it back.
+     */
+    private val HEADING_UP_ENABLED: Boolean = false
+
     private fun setupHeadingUpButton() {
         val btn = binding.btnHeadingUp
+        if (!HEADING_UP_ENABLED) {
+            // Hide the FAB; force state off + reset any prior rotation so the
+            // map canvas doesn't stay locked to a stale bearing.
+            btn.visibility = android.view.View.GONE
+            if (isHeadingUpMode()) {
+                setHeadingUpMode(false)
+            }
+            resetHeadingUpRotation()
+            DebugLogger.i("SalemMainActivity", "Heading-up FAB hidden (HEADING_UP_ENABLED=false)")
+            return
+        }
         val refreshTint = {
             btn.setTextColor(if (isHeadingUpMode()) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF)
         }
