@@ -1556,15 +1556,59 @@ class SalemMainActivity : AppCompatActivity() {
                 if (userPt != null && firstPt != null && interpolated.size > 10) {
                     val distFromRouteStartM = distanceBetween(userPt, firstPt)
                     if (distFromRouteStartM > WALK_SIM_RANDOMIZE_THRESHOLD_M) {
-                        val randomIdx = (0 until interpolated.size).random()
-                        DebugLogger.i(
-                            "WALK-SIM",
-                            "OUT OF SALEM (user ${distFromRouteStartM.toInt()}m from route start, " +
-                                "threshold ${WALK_SIM_RANDOMIZE_THRESHOLD_M.toInt()}m) — " +
-                                "starting fresh walk at random step $randomIdx/${interpolated.size}"
-                        )
-                        toast("Not in Salem — starting walk at random point ($randomIdx/${interpolated.size})")
-                        randomIdx
+                        // S125 (2026-04-14 v2): pick a random TOUR STOP, not a
+                        // random interpolated step. Landing on an arbitrary step
+                        // often dropped the walker in a POI desert (or at the
+                        // edge of a geofence it only grazed without entering),
+                        // so narration stayed silent for the first several
+                        // minutes. Anchoring to a stop guarantees immediate
+                        // ENTRY — the stop is whitelisted in Historical Mode
+                        // and its geofence fires as the walker approaches.
+                        //
+                        // Fallback to any-step randomization if the tour has
+                        // fewer than 3 stops (no "middle" to pick from).
+                        val tourPois = activeTour?.pois ?: emptyList()
+                        val startStepIdx = if (tourPois.size >= 3) {
+                            // Random stop index in [1, n-2] — skip first and
+                            // last so we land mid-tour, not at the natural
+                            // start/end points.
+                            val randStopIdx = (1 until tourPois.size - 1).random()
+                            val target = tourPois[randStopIdx]
+                            val targetPt = org.osmdroid.util.GeoPoint(target.lat, target.lng)
+                            // Find the interpolated step whose coord is
+                            // nearest this stop. Back off 15 steps (~30m at
+                            // 2m/s) so the walker approaches rather than
+                            // spawning inside the geofence — this gives the
+                            // narration engine a clean APPROACH → ENTRY arc.
+                            var bestStep = 0
+                            var bestDist = Float.MAX_VALUE
+                            for (i in interpolated.indices) {
+                                val d = distanceBetween(interpolated[i], targetPt)
+                                if (d < bestDist) {
+                                    bestDist = d
+                                    bestStep = i
+                                }
+                            }
+                            val backedOff = (bestStep - 15).coerceAtLeast(0)
+                            DebugLogger.i(
+                                "WALK-SIM",
+                                "OUT OF SALEM — random tour stop ${randStopIdx + 1}/${tourPois.size} " +
+                                    "'${target.name}' maps to step $bestStep (off by ${bestDist.toInt()}m), " +
+                                    "starting at step $backedOff/${interpolated.size}"
+                            )
+                            toast("Not in Salem — starting walk at '${target.name}'")
+                            backedOff
+                        } else {
+                            val randomIdx = (0 until interpolated.size).random()
+                            DebugLogger.i(
+                                "WALK-SIM",
+                                "OUT OF SALEM — fallback random step $randomIdx/${interpolated.size} " +
+                                    "(tour has ${tourPois.size} stops, nothing to anchor to)"
+                            )
+                            toast("Not in Salem — starting walk at random step ($randomIdx/${interpolated.size})")
+                            randomIdx
+                        }
+                        startStepIdx
                     } else {
                         0
                     }
