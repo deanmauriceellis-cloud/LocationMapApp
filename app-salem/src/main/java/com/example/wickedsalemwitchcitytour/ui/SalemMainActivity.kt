@@ -1414,22 +1414,27 @@ class SalemMainActivity : AppCompatActivity() {
         }
         val tourIsActive = initialTourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active
         val tourIsPaused = initialTourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
-        val isHeritageTheme = activeTour?.tour?.theme?.equals("HERITAGE_TRAIL", ignoreCase = true) == true
 
         var autoStartedHeritageTrail = false
         when {
             tourIsActive -> {
                 DebugLogger.i("SalemMainActivity",
                     "Walk sim: tour '${activeTour!!.tour.name}' (theme=${activeTour.tour.theme}) already Active — using as-is")
-                if (isHeritageTheme) {
-                    val stopIds = activeTour.stops.map { it.poiId }.toSet()
-                    narrationGeofenceManager.setHistoricalMode(true, stopIds)
-                }
+                // S125 (2026-04-14): enable Historical Mode for ANY active
+                // tour, not just HERITAGE_TRAIL. Operator direction: "All
+                // the tours need to only have historical information POIs
+                // like The Heritage trail." The tour's stops are
+                // whitelisted so they always narrate; every other POI is
+                // filtered to categorically-historical + has
+                // historical_note. The "POI" FAB (showAllPoisActive) is
+                // the escape hatch that turns the filter off.
+                refreshHistoricalModeForActiveTour()
             }
             tourIsPaused -> {
                 DebugLogger.i("SalemMainActivity",
                     "Walk sim: tour '${activeTour!!.tour.name}' was Paused → resuming via startTour (idempotent)")
                 tourViewModel.startTour(activeTour.tour.id)
+                refreshHistoricalModeForActiveTour()
             }
             else -> {
                 val stateLabel = when (initialTourState) {
@@ -1948,6 +1953,47 @@ class SalemMainActivity : AppCompatActivity() {
             // S112: Always reload the narration markers — both branches need them,
             // but the OFF branch filters them down to historic + attraction + paid.
             loadNarrationPointMarkers()
+            // S125 (2026-04-14): map visibility and narration filter are
+            // now tied. When the FAB is ON, announce every POI (Historical
+            // Mode off); when OFF, the narration engine filters to
+            // categorically-historical + whitelisted tour stops.
+            refreshHistoricalModeForActiveTour()
+        }
+    }
+
+    /**
+     * S125: Apply the narration-filter mode that matches the current tour
+     * state and the "Show All POIs" FAB.
+     *
+     *   showAllPoisActive == true                                  → off
+     *   showAllPoisActive == false AND an Active/Paused tour exists → on
+     *   showAllPoisActive == false AND no tour                      → off
+     *       (Explore Salem ambient — hear everything nearby.)
+     *
+     * When Historical Mode is on, the tour's stops are whitelisted so they
+     * always narrate regardless of category. Every other POI must be
+     * categorically historical (see
+     * NarrationGeofenceManager.isCategoricallyHistorical) and have a
+     * non-blank historical_note.
+     */
+    internal fun refreshHistoricalModeForActiveTour() {
+        val state = tourViewModel.tourState.value
+        val activeTour = when (state) {
+            is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> state.activeTour
+            is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> state.activeTour
+            else -> null
+        }
+        if (activeTour != null && !showAllPoisActive) {
+            val stopIds = activeTour.stops.map { it.poiId }.toSet()
+            narrationGeofenceManager.setHistoricalMode(true, stopIds)
+            DebugLogger.i("SalemMainActivity",
+                "Historical Mode ON — tour '${activeTour.tour.name}' (${stopIds.size} stops whitelisted)")
+        } else {
+            if (narrationGeofenceManager.isHistoricalMode()) {
+                narrationGeofenceManager.setHistoricalMode(false)
+                val reason = if (showAllPoisActive) "Show All POIs FAB ON" else "no tour active"
+                DebugLogger.i("SalemMainActivity", "Historical Mode OFF — $reason")
+            }
         }
     }
 
