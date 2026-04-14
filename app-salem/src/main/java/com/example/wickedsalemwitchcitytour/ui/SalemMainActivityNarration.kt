@@ -559,19 +559,17 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
  * at the first fix.
  */
 internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Double) {
-    // S115: Stationary freeze — if the motion tracker says the device is
-    // physically still, skip the bearing update entirely. GPS jitter that
-    // moves the reading 1-5m would otherwise thrash lastMovementBearing
-    // between random values and make heading-up rotation spin while the
-    // tablet sits on a desk. By not updating here, the bearing goes stale
-    // (age > 3s), and the heading-up logic's hybrid source selector falls
-    // back to the device orientation sensor — which DOES know the tablet
-    // is still and reports a constant azimuth.
-    val stationary = motionTracker?.isStationary() == true
+    // S125 (field-test 2026-04-14): removed the motionTracker.isStationary()
+    // gate. In the field the TYPE_SIGNIFICANT_MOTION sensor consistently
+    // reported "stationary" while the user was walking (tourist pace doesn't
+    // always trigger "significant" motion). That suppressed EVERY bearing
+    // update — 266 "frozen" events vs 2 "moved" in a 24-minute walk — so
+    // heading-up broke after the first fix. The GPS distance delta
+    // (BEARING_UPDATE_MIN_MOVE_M = 1.0 m) is already a robust signal for
+    // "real step", and if the user genuinely parks the device, the delta
+    // stays below 1 m and the bearing naturally goes stale.
 
-    // Update movement bearing if we have a meaningful step AND we're not
-    // in stationary freeze mode.
-    if (!stationary && (lastUserLat != 0.0 || lastUserLng != 0.0)) {
+    if (lastUserLat != 0.0 || lastUserLng != 0.0) {
         val moved = haversineM(lastUserLat, lastUserLng, lat, lng)
         if (moved >= BEARING_UPDATE_MIN_MOVE_M) {
             val prevBearing = lastMovementBearing
@@ -589,11 +587,6 @@ internal fun SalemMainActivity.updateNarrationUserPosition(lat: Double, lng: Dou
         } else {
             DebugLogger.d("BEARING", "still — moved=${"%.2f".format(moved)}m (under ${BEARING_UPDATE_MIN_MOVE_M}m threshold)")
         }
-    } else if (stationary) {
-        DebugLogger.d(
-            "BEARING",
-            "frozen — motion tracker says stationary, bearing update suppressed"
-        )
     }
 
     // S115: Dwell anchor maintenance. First fix seeds the anchor. Subsequent
@@ -697,6 +690,19 @@ private fun isPoiAhead(poiLat: Double, poiLng: Double): Boolean {
  * the tier filter (explicit user intent overrides auto-prioritization).
  */
 internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Boolean) {
+    // S125 (field-test 2026-04-14): EARLY no-narrative gate. If the POI has
+    // no narration text for this mode, drop the ENTRY entirely — no stamp,
+    // no cancel, no queue add. Without this gate a no-text POI would still
+    // refresh the min-hold stamp and block better POIs behind it, AND trip
+    // the "DIRECT PLAY: ... no narration text, skipping" path which leaves
+    // currentNarration set to a silent POI and blocks the next dequeue.
+    val previewText = narrationGeofenceManager.getNarrationForPass(point)
+        ?: point.shortNarration ?: point.description
+    if (previewText.isNullOrBlank()) {
+        DebugLogger.d("NARR-QUEUE", "SKIP (no narrative): ${point.name}")
+        return
+    }
+
     val tier = NarrationTierClassifier.classify(point)
     // Phase 9R.0: A new POI interrupts whatever is currently playing:
     //   - Newspaper dispatches (tag "newspaper_1692") — ALWAYS interrupt
@@ -730,8 +736,13 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
             currentNarration = null
         }
     }
-    // Stamp the start so future POIs know when min-hold expires.
-    lastPoiNarrationStartMs = now
+    // S125: DO NOT stamp lastPoiNarrationStartMs here. The pre-S125 code
+    // stamped on every ENTRY (including DROP-ENTRY append-to-queue), so
+    // a rapid burst of ENTRY events kept refreshing the stamp forward and
+    // the 10 s min-hold never actually expired (field test saw 134 DROP
+    // ENTRIES out of 140 ENTRY events). The stamp is now written only by
+    // the two sites that START a narration: PLAY DIRECT below and
+    // playNextNarration's pick-winner path.
     DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} tier=$tier ad=${point.adPriority} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
     if (point.id == currentNarration?.id) {
@@ -761,6 +772,9 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         if (rawText != null) {
             narrationGeofenceManager.recordVisit(point.id)
             DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId")
+            // S125: stamp the min-hold clock here (at the actual play-start)
+            // instead of at the top of enqueueNarration.
+            lastPoiNarrationStartMs = System.currentTimeMillis()
             // Phase 9R.0: chapter break via two separate TTS segments —
             // "You are at {POI}." plays first, the body plays second. Tagged
             // "poi_narration" so a subsequent POI ENTRY can interrupt the
@@ -768,6 +782,8 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
             tourViewModel.speakTaggedNarration("poi_narration", "You are at ${point.name}.", point.name, voiceId)
             tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
         } else {
+            // S125 — should never fire now that the top of enqueueNarration
+            // rejects no-narrative POIs. Keep the branch as a safety net.
             DebugLogger.w("NARR-PLAY", "DIRECT PLAY: ${point.name} — no narration text, skipping")
         }
         updateQueueIndicator()
@@ -862,19 +878,51 @@ private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
 
     if (survivors.isEmpty()) return null
 
-    // Step 2: find highest non-empty tier; Step 3: closest within that tier
-    for (tier in NarrationTier.values()) {
-        val candidates = survivors.filter { NarrationTierClassifier.classify(it) == tier }
-        if (candidates.isEmpty()) continue
-        val winner = candidates.minByOrNull { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }
-            ?: continue
+    // S125 (field-test 2026-04-14): tour-aware ordering.
+    //
+    //   - Tour active/paused ("Salem Heritage Trail", any curated tour):
+    //     tier-first, then closest-within-tier. Historic landmarks and
+    //     paid merchants should still win over adjacent rest-tier POIs
+    //     even if the rest-tier POI is physically closer. This matches
+    //     Phase 9R.0 Historical Mode semantics.
+    //
+    //   - Tour idle ("Explore Salem" ambient):
+    //     closest-first, tier as tiebreaker. In heavy-density retail blocks
+    //     the user wants to hear about the thing they're literally standing
+    //     next to, not the HISTORIC plaque 38 m down the street.
+    val tourState = tourViewModel.tourState.value
+    val tourMode = tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active ||
+                   tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
+
+    if (tourMode) {
+        // Tier-first (original Phase 9T behavior).
+        for (tier in NarrationTier.values()) {
+            val candidates = survivors.filter { NarrationTierClassifier.classify(it) == tier }
+            if (candidates.isEmpty()) continue
+            val winner = candidates.minByOrNull { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }
+                ?: continue
+            narrationQueue.remove(winner)
+            DebugLogger.i("NARR-QUEUE",
+                "Picked ${winner.name} tier=$tier dist=${haversineM(lastUserLat, lastUserLng, winner.lat, winner.lng).toInt()}m " +
+                "(tour-mode, ${candidates.size} in tier, ${survivors.size} total survivors)")
+            return winner
+        }
+        return null
+    } else {
+        // Closest-first, tier as tiebreaker (Explore Salem ambient).
+        val winner = survivors.minWithOrNull(
+            compareBy<SalemPoi>(
+                { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) },
+                { NarrationTierClassifier.classify(it).ordinal }
+            )
+        ) ?: return null
         narrationQueue.remove(winner)
+        val winnerTier = NarrationTierClassifier.classify(winner)
         DebugLogger.i("NARR-QUEUE",
-            "Picked ${winner.name} tier=$tier dist=${haversineM(lastUserLat, lastUserLng, winner.lat, winner.lng).toInt()}m " +
-            "(${candidates.size} in tier, ${survivors.size} total survivors)")
+            "Picked ${winner.name} tier=$winnerTier dist=${haversineM(lastUserLat, lastUserLng, winner.lat, winner.lng).toInt()}m " +
+            "(explore-mode closest-first, ${survivors.size} total survivors)")
         return winner
     }
-    return null
 }
 
 /** Play the next narration point from the queue (S112: tier+distance dequeue). S125: suspend so the queue-filter dead-end can await runSilenceFill(). */
@@ -908,6 +956,10 @@ internal suspend fun SalemMainActivity.playNextNarration() {
     DebugLogger.i("NARR-PLAY", "  text=${if (rawText != null) "${rawText.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay")
     if (rawText != null && narrationAutoPlay) {
         DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakNarration() voice=$voiceId")
+        // S125: stamp the min-hold clock at the actual play-start, matching
+        // the PLAY DIRECT path so bursts of ENTRY events can't keep sliding
+        // the stamp forward via the old unconditional write.
+        lastPoiNarrationStartMs = System.currentTimeMillis()
         // Phase 9R.0: chapter break via two separate TTS segments. Tagged
         // "poi_narration" so the next POI ENTRY can cancel-interrupt this
         // POI's read once the walker has moved past its CPA.

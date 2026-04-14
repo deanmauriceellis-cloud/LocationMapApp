@@ -144,6 +144,17 @@ class DeviceOrientationTracker(
     private var cachedDeclinationTimeMs: Long = 0L
     private var loggedInitialDeclination: Boolean = false
 
+    /**
+     * S125: Wall-clock ms of the last ORIENT-RAW debug log. Sensor samples
+     * arrive ~100 Hz in practice on the Lenovo tablet; the pre-S125 code
+     * emitted ORIENT-RAW every time, which burned log bandwidth, slowed
+     * main-thread delivery of other tags, and contributed nothing past
+     * the first ~10 samples per second. Field test 2026-04-14 saw
+     * 100 Hz spam for the whole 24-min walk. Throttled to ~10 Hz below.
+     */
+    private var lastOrientRawLogMs: Long = 0L
+    private val ORIENT_RAW_LOG_MIN_GAP_MS: Long = 100L
+
     private var registered: Boolean = false
     private val rotationMatrix = FloatArray(9)
     private val remappedMatrix = FloatArray(9)
@@ -342,16 +353,19 @@ class DeviceOrientationTracker(
         currentAzimuthDeg = azimuthDeg
         lastUpdateMs = System.currentTimeMillis()
 
-        // S115: Trace every raw sensor sample so the post-mortem log shows
-        // the full azimuth stream (not just the apply/static-transition
-        // events). Critical for diagnosing rotation smoothness issues
-        // where samples get lost between the sensor and the map.
-        DebugLogger.d(
-            "ORIENT-RAW",
-            "azimuth=${"%.1f".format(azimuthDeg)}° " +
-                "(mag=${"%.1f".format(magneticAzimuthDeg)}°, decl=${"%.1f".format(cachedDeclinationDeg)}°, " +
-                "static=${isInStaticMode})"
-        )
+        // S125: rate-limit ORIENT-RAW to ~10 Hz. The sensor fires ~100 Hz
+        // on the tablet; trace at full rate floods logcat and steals
+        // main-thread time from the map rotation apply pass. The caller's
+        // smoothing + apply loop is already rate-limited elsewhere.
+        if (lastUpdateMs - lastOrientRawLogMs >= ORIENT_RAW_LOG_MIN_GAP_MS) {
+            lastOrientRawLogMs = lastUpdateMs
+            DebugLogger.d(
+                "ORIENT-RAW",
+                "azimuth=${"%.1f".format(azimuthDeg)}° " +
+                    "(mag=${"%.1f".format(magneticAzimuthDeg)}°, decl=${"%.1f".format(cachedDeclinationDeg)}°, " +
+                    "static=${isInStaticMode})"
+            )
+        }
 
         onUpdate()
     }
