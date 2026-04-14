@@ -135,7 +135,16 @@ class NarrationGeofenceManager @Inject constructor(
         return isCategoricallyHistorical(point)
     }
 
-    /** POI ID → timestamp when narrated (expires after REPEAT_WINDOW_MS) */
+    /**
+     * POI ID → timestamp when narrated (expires after REPEAT_WINDOW_MS).
+     *
+     * S125: Mirrored to SharedPreferences so the dedup window survives
+     * process death. Overnight test 2026-04-14 showed 18 PID forks across
+     * ~7.5 h (APK installs, ANR restarts, etc.); each previously wiped
+     * this map, so POIs re-narrated within the 1-hour window after every
+     * restart. Writes are apply() (async, minimal I/O overhead) and the
+     * map is loaded at construction, then pruned of expired entries.
+     */
     private val narratedAt = mutableMapOf<String, Long>()
 
     /**
@@ -144,9 +153,9 @@ class NarrationGeofenceManager @Inject constructor(
      * S112: Reduced from 12 hours → 1 hour per operator direction.
      * Rationale: 12h was too long for typical session use; reducing to 1h
      * lets POIs repeat on a return-loop drive or after a short break, which
-     * is the common case for sightseeing. Process death still clears this
-     * map entirely (in-memory only), so first-fix-per-session is always
-     * a fresh narration regardless of this window.
+     * is the common case for sightseeing.
+     *
+     * S125: Now persistent across process death via narratedAtPrefs.
      */
     private val REPEAT_WINDOW_MS = 1 * 60 * 60 * 1000L  // 1 hour
 
@@ -156,6 +165,46 @@ class NarrationGeofenceManager @Inject constructor(
     /** Persistent visit counts per POI (survives app restarts, drives multi-pass narration) */
     private val visitPrefs: SharedPreferences =
         context.getSharedPreferences("narration_visits", Context.MODE_PRIVATE)
+
+    /** S125: Persistent mirror of [narratedAt] so the 1-hour dedup window survives PID forks. */
+    private val narratedAtPrefs: SharedPreferences =
+        context.getSharedPreferences("narration_narrated_at", Context.MODE_PRIVATE)
+
+    init {
+        // S125: Hydrate narratedAt from disk, dropping anything older than
+        // REPEAT_WINDOW_MS. Cheap — typical walk narrates 10-100 POIs in an
+        // hour so the stored map is small.
+        val now = System.currentTimeMillis()
+        var loaded = 0
+        var dropped = 0
+        for ((id, any) in narratedAtPrefs.all) {
+            val ts = (any as? Long) ?: continue
+            if (now - ts < REPEAT_WINDOW_MS) {
+                narratedAt[id] = ts
+                loaded++
+            } else {
+                dropped++
+            }
+        }
+        if (dropped > 0) {
+            // Purge expired keys from disk
+            val editor = narratedAtPrefs.edit()
+            for ((id, any) in narratedAtPrefs.all) {
+                val ts = (any as? Long) ?: continue
+                if (now - ts >= REPEAT_WINDOW_MS) editor.remove(id)
+            }
+            editor.apply()
+        }
+        com.example.locationmapapp.util.DebugLogger.i(
+            "NARR-GEO",
+            "narratedAt hydrated: loaded=$loaded, dropped=$dropped (window=${REPEAT_WINDOW_MS / 60000}m)"
+        )
+    }
+
+    /** S125: Write one narratedAt entry to the persistent mirror. */
+    private fun persistNarrated(pointId: String, ts: Long) {
+        narratedAtPrefs.edit().putLong(pointId, ts).apply()
+    }
 
     /** Events emitted when a narration point is approached or entered */
     private val _events = MutableSharedFlow<NarrationGeofenceEvent>(extraBufferCapacity = 16)
@@ -315,6 +364,7 @@ class NarrationGeofenceManager @Inject constructor(
                 distanceM <= entryRadius -> {
                     if (!isOnCooldown(point.id, now)) {
                         narratedAt[point.id] = now
+                        persistNarrated(point.id, now)
                         cooldowns[point.id] = now
                         lastEntryEmitTime = now
                         entryCount++
@@ -421,6 +471,7 @@ class NarrationGeofenceManager @Inject constructor(
     fun triggerReachOut(nearbyPoint: NearbyPoint) {
         val now = System.currentTimeMillis()
         narratedAt[nearbyPoint.point.id] = now
+        persistNarrated(nearbyPoint.point.id, now)
         cooldowns[nearbyPoint.point.id] = now
         lastEntryEmitTime = now
         _events.tryEmit(NarrationGeofenceEvent(
@@ -436,15 +487,18 @@ class NarrationGeofenceManager @Inject constructor(
         return System.currentTimeMillis() - lastEntryEmitTime
     }
 
-    /** Reset tracking (e.g., when user starts a new walk sim) */
+    /** Reset tracking (e.g., when user starts a new walk sim). S125: also wipes persistent mirror. */
     fun resetSession() {
         narratedAt.clear()
         cooldowns.clear()
+        narratedAtPrefs.edit().clear().apply()
     }
 
     /** Mark a specific point as narrated (e.g., user tapped it in dock) */
     fun markTriggered(pointId: String) {
-        narratedAt[pointId] = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        narratedAt[pointId] = now
+        persistNarrated(pointId, now)
     }
 
     /** Check if a point has been narrated within the repeat window */
@@ -462,10 +516,15 @@ class NarrationGeofenceManager @Inject constructor(
         return (now - ts) < REPEAT_WINDOW_MS
     }
 
-    /** Remove expired entries older than the repeat window */
+    /** Remove expired entries older than the repeat window. S125: also prunes persistent mirror. */
     private fun purgeExpired() {
         val now = System.currentTimeMillis()
-        narratedAt.entries.removeIf { now - it.value >= REPEAT_WINDOW_MS }
+        val expired = narratedAt.entries.filter { now - it.value >= REPEAT_WINDOW_MS }.map { it.key }
+        if (expired.isEmpty()) return
+        for (id in expired) narratedAt.remove(id)
+        val editor = narratedAtPrefs.edit()
+        for (id in expired) editor.remove(id)
+        editor.apply()
     }
 
     private fun isOnCooldown(pointId: String, now: Long): Boolean {

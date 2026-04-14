@@ -12,11 +12,16 @@
  *   2. GET /api/intel/entity/{id}/narration               → historical_note field if present
  *   3. GET /api/intel/entity/{id}/dump                    → generated_narrations.historical_note
  *                                                        OR mode_c_historic_building_details.tour_note
- *   4. GET /api/intel/entity/{id}/narration               → medium_narration FALLBACK (tagged)
  *
- * Source 4 is a temporary fallback so the demo has *something* while SI
- * finishes the dedicated tour-guide-voice pass. When source 1/2/3 returns
- * content, it overwrites the fallback automatically on the next run.
+ * S125 (2026-04-14): removed the medium_narration fallback. Overnight test
+ * 2026-04-14 showed it was writing business-description prose into
+ * historical_note for ~1,100 POIs, which then leaked modern shops, tour
+ * companies, witch museums, etc. into Historical Mode (Spellbound Tours,
+ * Vampfangs, Salem Ghosts Tours, World of Wizardry narrating as 1692
+ * history). Without a dedicated tour-guide-voice pass from SI, the note
+ * is left NULL — which is correct: the POI then falls back to its short
+ * narration (or is filtered out by the narration-note requirement in
+ * NarrationGeofenceManager.isHistoricalQualified).
  *
  * Usage:
  *   node scripts/sync-historical-notes-from-intel.js
@@ -144,13 +149,10 @@ async function fetchHistoricalNote(entityId) {
     if (hit) return { text: hit, source: 'si_dump_endpoint' };
   } catch (_) {}
 
-  // 4. Fallback: use medium_narration (or long_narration) from /narration so
-  // the demo has *something* until SI's dedicated pass completes.
-  if (narration) {
-    const fallback = firstNonEmpty(narration.medium_narration, narration.long_narration, narration.entity_narration);
-    if (fallback) return { text: fallback, source: 'fallback_medium_narration' };
-  }
-
+  // S125: No fallback. If SI returns no dedicated historical_note, leave the
+  // column NULL. Historical Mode's categorical + note filter will silence
+  // the POI rather than pollute the immersive track with modern business
+  // prose.
   return null;
 }
 

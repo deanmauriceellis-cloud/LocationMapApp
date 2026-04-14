@@ -16,8 +16,10 @@
 #      the keeper from cancelling a walk mid-route ("display jumps to a
 #      different point over and over" issue).
 #
-# The polling cadence is 60 s — slow enough not to spam adb/curl, fast
-# enough to pick up a fresh walk within a minute of the previous completing.
+# The polling cadence is 15 s (dropped from 60 s in S125). Rationale:
+# overnight 2026-04-14 logged up to 60 s of silence between walk completion
+# and next walk start because the keeper only checked once per minute. 15 s
+# keeps cadence tight without meaningful adb/curl load.
 
 DEVICE="HNY0CY0W"
 PKG="com.example.wickedsalemwitchcitytour"
@@ -98,13 +100,15 @@ while true; do
     continue
   fi
   if walk_still_running; then
-    # Already walking — let it run, check again in 60s
-    sleep 60
+    # Already walking — let it run, check again in 15s (S125)
+    sleep 15
   else
     log "no walk in progress → starting one"
     start_walk
     # Let the walk actually begin (first step log lands ~3s after trigger)
-    # before next walk_still_running check.
-    sleep 60
+    # before the next walk_still_running check. 30s guard is generous enough
+    # to rule out false-negatives from a slow first-step log while still
+    # cutting the old 60s dead-air window on back-to-back restarts.
+    sleep 30
   fi
 done

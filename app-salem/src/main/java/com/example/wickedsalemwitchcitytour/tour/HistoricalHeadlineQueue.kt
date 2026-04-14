@@ -158,10 +158,17 @@ class HistoricalHeadlineQueue @Inject constructor(
                         Gson().fromJson(reader, Bundle::class.java)
                     }
                 }
-                val list = loaded.newspapers
+                // S125: Defensive chronological sort. Overnight test 2026-04-14
+                // observed dispatch #44 (April 13) firing before #45 (April 8)
+                // because the bundled JSON came out of SI's /salem-1692/export
+                // with inconsistent date-then-id ordering. The publisher
+                // script uses `ORDER BY date ASC, id ASC` which should be
+                // correct, but sort again here so a bad asset never confuses
+                // the timeline the walker hears.
+                val list = loaded.newspapers.sortedWith(compareBy({ it.date }, { it.id }))
                 newspapers = list
                 DebugLogger.i(TAG,
-                    "loaded ${list.size} 1692 newspaper dispatches from $ASSET (v${loaded.version})")
+                    "loaded ${list.size} 1692 newspaper dispatches from $ASSET (v${loaded.version}, re-sorted by date+id)")
                 list
             } catch (e: Exception) {
                 DebugLogger.e(TAG, "Failed to load $ASSET: ${e.message}", e)

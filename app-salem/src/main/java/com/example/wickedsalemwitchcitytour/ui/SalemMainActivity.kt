@@ -36,8 +36,11 @@ import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.example.wickedsalemwitchcitytour.R
 import com.example.locationmapapp.data.model.GeocodeSuggestion
 import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategories
@@ -159,6 +162,20 @@ class SalemMainActivity : AppCompatActivity() {
      * POI" and ready for a newspaper).
      */
     internal var newspaperSilenceSlotCounter: Int = 2
+
+    /**
+     * S125: wall-clock ms when the most recent 1692 newspaper dispatch was
+     * last fired. Stamped by every code path that calls
+     * `speakTaggedNarration("newspaper_1692", ...)` and read by the heartbeat
+     * coroutine to decide whether a newspaper is overdue. Overnight test
+     * 2026-04-14 showed that back-to-back POI interrupts via
+     * `cancelSegmentsWithTag("poi_narration")` oscillate the TTS state
+     * Speaking↔Speaking so the silence branch never runs, starving the
+     * newspaper queue (~35 unique dispatches against a 202-article corpus
+     * in 7.5 h). The heartbeat uses this stamp to force a dispatch if no
+     * newspaper has fired within NEWSPAPER_HEARTBEAT_INTERVAL_MS.
+     */
+    internal var lastNewspaperFiredMs: Long = 0L
 
     /**
      * Phase 9R.0: wall-clock ms of the last POI narration START — used by
@@ -294,6 +311,22 @@ class SalemMainActivity : AppCompatActivity() {
 
     // Walk simulator
     internal var walkSimJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * S125: Walk-sim lifecycle mutex.
+     *
+     * Shared between the UI-triggered walk ([startWalkSim]) and the HTTP-
+     * triggered walk ([DebugEndpoints.handleWalkTour]) so only ONE of the
+     * two paths can be in its "cancel prior + start fresh" critical
+     * section at a time. Held briefly during cancel-and-start only; the
+     * long-running step loop runs OUTSIDE the lock so subsequent start
+     * requests aren't blocked for the full walk duration.
+     *
+     * Prevents the 2026-04-14 overnight "map bouncing between two
+     * positions" bug where a phantom UI tap and a /walk-tour call
+     * concurrently emitted setManualLocation, each ~500 ms apart.
+     */
+    internal val walkMutex = Mutex()
     internal var walkSimRunning: Boolean = false
 
     // Show-all-POIs debug toggle
@@ -710,7 +743,12 @@ class SalemMainActivity : AppCompatActivity() {
     }
     override fun onPause() {
         super.onPause(); binding.mapView.onPause()
-        DebugHttpServer.endpoints = null
+        // S125: DO NOT clear DebugHttpServer.endpoints here. Overnight test
+        // 2026-04-14 logged 4 x "Activity not active" 503 responses when the
+        // tablet screen locked — the keeper couldn't restart the walk while
+        // paused. The endpoints reference is safe across pause/resume (it
+        // drives ViewModels and walkScope coroutines that don't need the
+        // UI). Cleared on onDestroy instead.
         // S115: Always stop sensor listeners when the activity is not
         // visible. No cost to restart on the next onResume.
         deviceOrientationTracker?.stop()
@@ -719,13 +757,52 @@ class SalemMainActivity : AppCompatActivity() {
     }
     override fun onDestroy() {
         super.onDestroy()
+        DebugHttpServer.endpoints = null
         DebugHttpServer.stop()
+        releaseWalkWakeLock()
         // S110: log any active POI proximity encounters that were in flight
         // when the activity was destroyed. The DB rows already hold their
         // last-known values; this is just for the diagnostic log so a
         // post-mortem reader can see what was open at destroy time.
         poiEncounterTracker.flushAll()
         DebugLogger.i("SalemMainActivity","onDestroy()")
+    }
+
+    /**
+     * S125: PARTIAL wake lock held for the duration of a walk-sim (UI or
+     * HTTP-triggered). Without this, overnight walks intermittently stalled
+     * when the tablet went into deep sleep after screen-off — coroutine
+     * delays missed their wall-clock targets and /walk-tour status polls
+     * saw no progress for minutes at a time.
+     *
+     * The wake lock does NOT keep the screen on (the operator uses
+     * `adb shell svc power stayon true` for that during tests). It only
+     * prevents CPU suspend so our step loop keeps emitting setManualLocation
+     * at 1 Hz regardless of screen state.
+     */
+    private var walkWakeLock: android.os.PowerManager.WakeLock? = null
+
+    internal fun acquireWalkWakeLock(tag: String = "WickedSalem:walkSim") {
+        val wl = walkWakeLock
+        if (wl?.isHeld == true) return
+        val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+        walkWakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, tag).apply {
+            setReferenceCounted(false)
+            // Absolute cap — releases automatically if the walk never calls
+            // release() (crash, OOM, etc.). 6 h covers a worst-case overnight
+            // test; normal walks are under an hour.
+            acquire(6 * 60 * 60 * 1000L)
+        }
+        DebugLogger.i("WAKE-LOCK", "acquired ($tag)")
+    }
+
+    internal fun releaseWalkWakeLock() {
+        val wl = walkWakeLock ?: return
+        walkWakeLock = null
+        if (wl.isHeld) {
+            wl.release()
+            DebugLogger.i("WAKE-LOCK", "released")
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -1258,16 +1335,21 @@ class SalemMainActivity : AppCompatActivity() {
     private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 5_000L
 
     private fun startWalkSim() {
-        // S124 Phase 9R.0: guard against concurrent walks. If the DebugEndpoints
-        // walkJob is running (from /walk-tour), cancel it before starting the
-        // Activity's walkSimJob. Otherwise both call viewModel.setManualLocation
-        // every second with different interpolated points, causing the map to
-        // bounce between two positions — the "stuck in some strange mode" bug.
-        com.example.wickedsalemwitchcitytour.util.DebugHttpServer.endpoints?.cancelAnyWalk()
-        // Also guard against double-tap on the UI button: if walkSimJob is
-        // already running, cancel it first so the new one starts cleanly.
-        walkSimJob?.cancel()
+        // S125: wrap the whole cancel+start sequence under walkMutex so the
+        // HTTP-triggered walk path ([DebugEndpoints.handleWalkTour]) and the
+        // UI button path can't race. Kotlin's cancel() is cooperative —
+        // without cancelAndJoin the old walkSimJob keeps emitting
+        // setManualLocation for up to a second after cancel(), producing
+        // the "map bouncing between two positions" bug seen overnight.
+        // The long-running walk coroutine is launched INSIDE the lock but
+        // assigned to walkSimJob and left to run outside, so the mutex is
+        // released as soon as the new job has started.
+        lifecycleScope.launch {
+        walkMutex.withLock {
+        com.example.wickedsalemwitchcitytour.util.DebugHttpServer.endpoints?.cancelWalkAndJoin()
+        val prevWalk = walkSimJob
         walkSimJob = null
+        prevWalk?.cancelAndJoin()
         walkSimRunning = false
 
         // S118: If a tour is active/paused, walk that tour's route instead
@@ -1326,7 +1408,7 @@ class SalemMainActivity : AppCompatActivity() {
         val routeLabel: String
         if (activeTour != null) {
             val tourRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadAllRoutePoints(this, activeTour.tour.id)
+                .loadAllRoutePoints(this@SalemMainActivity, activeTour.tour.id)
             if (tourRoute.isNotEmpty()) {
                 routePoints = tourRoute
                 routeLabel = activeTour.tour.name
@@ -1342,7 +1424,7 @@ class SalemMainActivity : AppCompatActivity() {
                         "Walk sim using tour stop coordinates: '${activeTour.tour.name}' (${stopPoints.size} stops)")
                 } else {
                     routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                        .loadDowntownRoute(this)
+                        .loadDowntownRoute(this@SalemMainActivity)
                     routeLabel = "Downtown Salem"
                     DebugLogger.w("SalemMainActivity",
                         "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
@@ -1352,7 +1434,7 @@ class SalemMainActivity : AppCompatActivity() {
             // Heritage Trail was just auto-started above; its state hasn't
             // flipped yet but the bundled route asset is available right now.
             val trailRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadAllRoutePoints(this, "tour_salem_heritage_trail")
+                .loadAllRoutePoints(this@SalemMainActivity, "tour_salem_heritage_trail")
             if (trailRoute.isNotEmpty()) {
                 routePoints = trailRoute
                 routeLabel = "Salem Heritage Trail"
@@ -1360,19 +1442,19 @@ class SalemMainActivity : AppCompatActivity() {
                     "Walk sim using auto-started Heritage Trail route (${trailRoute.size} points)")
             } else {
                 routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                    .loadDowntownRoute(this)
+                    .loadDowntownRoute(this@SalemMainActivity)
                 routeLabel = "Downtown Salem"
                 DebugLogger.w("SalemMainActivity",
                     "Heritage Trail asset missing — falling back to downtown route")
             }
         } else {
             routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadDowntownRoute(this)
+                .loadDowntownRoute(this@SalemMainActivity)
             routeLabel = "Downtown Salem"
         }
         if (routePoints.isEmpty()) {
             toast("No route data available")
-            return
+            return@withLock
         }
         // Reset narration session so all POIs can trigger fresh (clears narratedToday + cooldowns)
         narrationGeofenceManager.resetSession()
@@ -1384,6 +1466,9 @@ class SalemMainActivity : AppCompatActivity() {
         DebugLogger.i("SalemMainActivity", "Walk sim started: '$routeLabel' — ${routePoints.size} route points (narration session reset)")
 
         walkSimJob = lifecycleScope.launch {
+            // S125: hold a PARTIAL wake lock for the whole walk so the CPU
+            // doesn't sleep when the screen locks mid-run.
+            acquireWalkWakeLock("WickedSalem:walkSimUi")
             // S124 Phase 9R.0: default walk-sim speed is 2.0 m/s — a brisk
             // walking pace, ~33% of the 6.0 m/s demo replay speed used earlier.
             // For the 3.6-mile Heritage Trail this is ~48 min end-to-end,
@@ -1591,6 +1676,11 @@ class SalemMainActivity : AppCompatActivity() {
                 toast("Walk simulation complete")
             }
         }
+        // S125: release the wake lock whether we ended cleanly, got cancelled,
+        // or threw. Safer than sprinkling release calls through every exit.
+        walkSimJob?.invokeOnCompletion { releaseWalkWakeLock() }
+        }  // end walkMutex.withLock
+        }  // end lifecycleScope.launch
     }
 
     private fun stopWalkSim() {
@@ -1609,12 +1699,32 @@ class SalemMainActivity : AppCompatActivity() {
      * Activity's walkSimJob before starting its own. Same guard direction
      * as startWalkSim's call into DebugHttpServer.endpoints.cancelAnyWalk().
      * Silent (no toast) since the caller is the debug endpoint, not the user.
+     *
+     * S125: fire-and-forget; use [stopWalkSimExternalAndJoin] when the
+     * caller needs to wait for the old coroutine to fully exit before
+     * starting a new walk. Kotlin's cancel() is cooperative and the old
+     * walkSimJob can continue to emit setManualLocation for up to ~1 s
+     * after cancel(), producing the map-bounce symptom observed overnight.
      */
     internal fun stopWalkSimExternal() {
         walkSimJob?.cancel()
         walkSimJob = null
         walkSimRunning = false
         narrationGeofenceManager.walkSimMode = false
+    }
+
+    /**
+     * S125: cancel the Activity's walkSimJob AND wait for it to terminate.
+     * Caller should hold [walkMutex] if the goal is to atomically cancel
+     * the prior walk and start a new one without an interleaved emission
+     * window.
+     */
+    internal suspend fun stopWalkSimExternalAndJoin() {
+        val j = walkSimJob
+        walkSimJob = null
+        walkSimRunning = false
+        narrationGeofenceManager.walkSimMode = false
+        j?.cancelAndJoin()
     }
 
     /**

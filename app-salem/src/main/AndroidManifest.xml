@@ -25,6 +25,12 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!-- S125: Keep CPU running during walk-sim when the screen locks.
+         Without this, overnight walks stall intermittently because the
+         tablet deep-sleeps and our coroutine delays fall behind the
+         simulated GPS timestamps. PARTIAL — screen may still turn off. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:name=".WickedSalemApp"
         android:allowBackup="true"

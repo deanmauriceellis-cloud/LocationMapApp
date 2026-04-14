@@ -36,6 +36,7 @@ import com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withLock
 import org.osmdroid.util.GeoPoint
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
@@ -694,10 +695,26 @@ class DebugEndpoints(
      * cancel any DebugEndpoints-initiated walk before starting its own.
      * Prevents two concurrent walks emitting setManualLocation to the same
      * ViewModel (the "map bouncing between two positions" bug).
+     *
+     * S125: fire-and-forget; use [cancelWalkAndJoin] when the caller
+     * needs to wait for the old coroutine to fully exit before starting
+     * a new walk.
      */
     fun cancelAnyWalk() {
         walkJob?.cancel()
         walkJob = null
+    }
+
+    /**
+     * S125: cancel the HTTP-triggered walk AND wait for it to terminate.
+     * Kotlin's cancel() is cooperative — without this the old walkJob keeps
+     * emitting setManualLocation for up to ~1 s after cancel, which
+     * overlaps with the new walk's emissions (map bounce).
+     */
+    suspend fun cancelWalkAndJoin() {
+        val j = walkJob
+        walkJob = null
+        j?.cancelAndJoin()
     }
 
     private fun handleWalkTour(params: Map<String, String>): EndpointResult {
@@ -709,13 +726,6 @@ class DebugEndpoints(
         // Idle and the narration filter never engages.
         val startTour = params["start_tour"]?.equals("false", ignoreCase = true) != true
 
-        // Stop any existing walk — BOTH our own walkJob AND the Activity's
-        // walkSimJob. Without the activity-side cancel, a UI walk-button tap
-        // and a /walk-tour call can run concurrently, both emitting
-        // setManualLocation every second and making the map bounce.
-        walkJob?.cancel()
-        activity.stopWalkSimExternal()
-
         val routePoints = TourRouteLoader.loadAllRoutePoints(activity, tourId)
         if (routePoints.isEmpty()) {
             return EndpointResult(400, body = gson.toJson(mapOf("error" to "No route data for $tourId")))
@@ -726,17 +736,33 @@ class DebugEndpoints(
 
         DebugLogger.i("DebugEndpoints", "Walk simulator: $tourId, ${interpolated.size} steps, speed=${speedMps}m/s, ETA=${interpolated.size}s, startTour=$startTour")
 
+        // S125: cancel-and-join both prior walks (HTTP + UI) atomically under
+        // the shared walkMutex before we start the new walk. Without join(),
+        // the prior walkJob keeps emitting setManualLocation for up to ~1 s
+        // after cancel() and overlaps with the new emissions (map bounce
+        // observed multiple times overnight 2026-04-14). The long-running
+        // step loop runs AFTER the mutex releases so subsequent walk-start
+        // requests aren't blocked for the full duration.
+        val prevWalk = walkJob
         walkJob = walkScope.launch {
-            // Activate the tour first (enables HISTORICAL mode for themed tours).
-            if (startTour) {
-                try {
-                    withContext(Dispatchers.Main) {
-                        activity.tourViewModel.startTour(tourId)
+            activity.walkMutex.withLock {
+                prevWalk?.cancelAndJoin()
+                activity.stopWalkSimExternalAndJoin()
+                if (startTour) {
+                    try {
+                        withContext(Dispatchers.Main) {
+                            activity.tourViewModel.startTour(tourId)
+                        }
+                    } catch (e: Exception) {
+                        DebugLogger.w("DebugEndpoints", "startTour($tourId) failed (continuing walk): ${e.message}")
                     }
-                } catch (e: Exception) {
-                    DebugLogger.w("DebugEndpoints", "startTour($tourId) failed (continuing walk): ${e.message}")
                 }
+                // S125: acquire wake lock while we still hold the mutex so
+                // the next caller can't race us during lock acquisition.
+                activity.acquireWalkWakeLock("WickedSalem:walkSimHttp")
             }
+            // Step loop runs outside the mutex so the next /walk-tour or UI
+            // tap doesn't have to wait for us to finish the whole route.
             for ((i, point) in interpolated.withIndex()) {
                 if (!isActive) break
                 withContext(Dispatchers.Main) {
@@ -746,6 +772,9 @@ class DebugEndpoints(
             }
             DebugLogger.i("DebugEndpoints", "Walk simulator complete")
         }
+        // S125: release the wake lock when the walk ends — normal completion,
+        // cancel-and-join from another path, or an uncaught exception.
+        walkJob?.invokeOnCompletion { activity.releaseWalkWakeLock() }
 
         val etaMin = interpolated.size / 60.0
         return EndpointResult(body = gson.toJson(mapOf(

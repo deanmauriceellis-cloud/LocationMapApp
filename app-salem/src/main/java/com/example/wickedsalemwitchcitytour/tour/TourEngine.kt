@@ -364,20 +364,50 @@ class TourEngine @Inject constructor(
 
     /** React to a geofence event with auto-narration. */
     private fun handleGeofenceEvent(event: TourGeofenceEvent) {
-        if (!narrationManager.autoNarrationEnabled) return
+        // S125: Historical Mode routes tour-stop narration through
+        // NarrationGeofenceManager instead — it honors the whitelist,
+        // reads `historical_note` via getNarrationForPass, and respects
+        // the 1692-newspaper interleave. Skipping the TourEngine's direct
+        // speakShort/Long here prevents the overnight-test bug where tour
+        // stops like "Salem Common" fired a SHORT_NARRATION using the
+        // legacy short text and bypassed the Historical Mode gate.
+        val skipDirectNarration =
+            narrationGeofenceManager.isHistoricalMode() || !narrationManager.autoNarrationEnabled
 
         when (event.type) {
             GeofenceEventType.APPROACH -> {
-                narrationManager.speakShortNarration(event.poi)
+                if (!skipDirectNarration) narrationManager.speakShortNarration(event.poi)
             }
             GeofenceEventType.ENTRY -> {
-                narrationManager.speakLongNarration(event.poi)
+                if (!skipDirectNarration) narrationManager.speakLongNarration(event.poi)
+                // S125: Auto-advance the tour HUD when the walker reaches
+                // the current stop's POI. Previously the index only moved
+                // on an explicit Next tap, so the overnight walker completed
+                // the Heritage Trail with the HUD stuck at "Tour: 1/10 —
+                // Unknown" for the full 41 minutes.
+                maybeAdvanceOnEntry(event.poi.id)
             }
             GeofenceEventType.EXIT -> {
-                // Speak transition to next stop if available
-                event.stop.transitionNarration?.let { narrationManager.speakTransition(it) }
+                if (!skipDirectNarration) {
+                    event.stop.transitionNarration?.let { narrationManager.speakTransition(it) }
+                }
             }
         }
+    }
+
+    /**
+     * S125: If the entered POI matches the current stop's POI, advance.
+     * No-op when no tour is active or the match fails (walker may be
+     * passing a prior/later stop out of sequence — we never jump the
+     * index non-monotonically from a geofence event).
+     */
+    private fun maybeAdvanceOnEntry(poiId: String) {
+        val current = activeOrNull() ?: return
+        val idx = current.progress.currentStopIndex
+        val expected = current.stops.getOrNull(idx)?.poiId ?: return
+        if (expected != poiId) return
+        DebugLogger.i(TAG, "Auto-advance on ENTRY: stop $idx/${current.stops.size} poi=$poiId")
+        advanceToNextStop()
     }
 
     // ── Custom Tour Builder ──────────────────────────────────────────────

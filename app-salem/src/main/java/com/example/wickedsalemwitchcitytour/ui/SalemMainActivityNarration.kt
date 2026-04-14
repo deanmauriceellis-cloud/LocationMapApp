@@ -177,6 +177,16 @@ private const val PACING_BURST_SIZE = 3
 private const val PACING_COOLDOWN_MS = 30_000L
 private var consecutiveNarrations: Int = 0
 
+/**
+ * S125: Maximum silence between 1692 newspaper dispatches while in Historical
+ * Mode. A per-activity heartbeat coroutine wakes up every interval and, if no
+ * newspaper has fired within that window, cancels any in-flight POI narration
+ * and forces the next dispatch. Safety net for the starvation case where
+ * back-to-back POI cancel-interrupts keep the TTS state oscillating so the
+ * Idle silence branch never runs. See SalemMainActivity.lastNewspaperFiredMs.
+ */
+private const val NEWSPAPER_HEARTBEAT_INTERVAL_MS = 5 * 60_000L
+
 /** S115: Lat/lng of the anchor point where the current dwell session began. 0.0 = no active dwell. */
 private var dwellAnchorLat: Double = 0.0
 private var dwellAnchorLng: Double = 0.0
@@ -314,186 +324,224 @@ internal fun SalemMainActivity.initNarrationSystem() {
                         DebugLogger.i("NARR-STATE", "  Queue filled during silence (${narrationQueue.size}) → playing")
                         playNextNarration()
                     } else {
-                        // ── S110 staleness gate ──
-                        //    Suppress reach-out entirely when GPS is stale. Without
-                        //    this, the reach-out logic happily searches for the
-                        //    "nearest unnarrated POI" against a frozen position
-                        //    and cycles through every POI in the cluster — the
-                        //    bug that ran the user through downtown Salem while
-                        //    they were sitting at home.
-                        val now = System.currentTimeMillis()
-                        val ageMs = if (lastFixAtMs == 0L) Long.MAX_VALUE else (now - lastFixAtMs)
-                        if (ageMs > GPS_STALE_THRESHOLD_MS) {
-                            DebugLogger.w("NARR-STATE",
-                                "  REACH-OUT SUPPRESSED: GPS stale " +
-                                "(age=${if (ageMs == Long.MAX_VALUE) "never" else "${ageMs / 1000}s"}, " +
-                                "threshold=${GPS_STALE_THRESHOLD_MS / 1000}s)")
-                            clearNarrationHighlight()  // S112+: nothing more coming → no ring
-                            return@collectLatest
-                        }
-
-                        // S115: Dwell expansion — if the dwell cap for this
-                        // session is reached, stop expanding and go quiet
-                        // until the user walks out of the anchor zone.
-                        //
-                        // Phase 9R.0: in Historical Mode, use the silence that
-                        // would normally follow the dwell cap as a cue to play
-                        // the next 1692 headline. The cap protects against POI
-                        // reach-out spamming the same cluster — it should NOT
-                        // silence the filler queue.
-                        if (dwellPoisPlayed >= DWELL_MAX_POIS_PER_SESSION) {
-                            if (narrationGeofenceManager.isHistoricalMode()) {
-                                val h = historicalHeadlineQueue.pollNext()
-                                if (h != null) {
-                                    DebugLogger.i(
-                                        "NARR-HEADLINE",
-                                        "SILENCE FILL (dwell cap): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
-                                    )
-                                    // Phase 9R.0: 1692 headline filler uses a consistent narrator voice
-// (AU English female) distinct from the per-POI TTS voices — establishes
-// an auditory "newsreader" identity for the timeline track.
-// Tagged speak — lets POI ENTRY cancel an in-flight newspaper via
-// tourViewModel.cancelSegmentsWithTag("newspaper_1692").
-// Clear the prior POI's map highlight — newspaper is not tied to a POI.
-clearNarrationHighlight()
-tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
-                                    historicalHeadlineQueue.advance()
-                                    return@collectLatest
-                                }
-                            }
-                            DebugLogger.i(
-                                "NARR-STATE",
-                                "  REACH-OUT HELD: dwell cap reached " +
-                                    "($dwellPoisPlayed/$DWELL_MAX_POIS_PER_SESSION POIs this stop) — " +
-                                    "waiting for user to move"
-                            )
-                            clearNarrationHighlight()
-                            return@collectLatest
-                        }
-
-                        // Phase 9R.0: interleave 1692 headlines with POI
-                        // reach-outs. Salem's downtown is dense enough that
-                        // reach-out almost always finds a nearby historical
-                        // POI — so if we only speak headlines when reach-out
-                        // returns null, headlines never fire in practice.
-                        // Alternate: every OTHER silence slot goes to a
-                        // 1692 headline (if queue not exhausted), the rest
-                        // go to POI reach-out. This keeps both streams alive
-                        // without starving either.
-                        // 2:1 POI-reach-out:newspaper ratio. Fire newspaper
-                        // only every 3rd silence slot; the other two get POI
-                        // reach-out attempts first (fall through below).
-                        val fireNewspaperThisSlot =
-                            narrationGeofenceManager.isHistoricalMode() &&
-                            newspaperSilenceSlotCounter >= 2
-                        if (fireNewspaperThisSlot) {
-                            val h = historicalHeadlineQueue.pollNext()
-                            if (h != null) {
-                                newspaperSilenceSlotCounter = 0
-                                DebugLogger.i(
-                                    "NARR-HEADLINE",
-                                    "SILENCE FILL (2:1 interleave): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
-                                )
-                                clearNarrationHighlight()
-                                tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
-                                historicalHeadlineQueue.advance()
-                                return@collectLatest
-                            }
-                        }
-                        newspaperSilenceSlotCounter++
-
-                        // S115: Try the current dwell radius first; if nothing,
-                        // step the radius up the DWELL ladder and retry until
-                        // we either find a POI or hit DWELL_RADIUS_MAX_M.
-                        var attemptRadius = dwellCurrentRadiusM
-                        var nearest = narrationGeofenceManager.findNearestUnnarrated(attemptRadius)
-                        while (nearest == null && attemptRadius < DWELL_RADIUS_MAX_M) {
-                            val nextRadius = when {
-                                attemptRadius < DWELL_RADIUS_MEDIUM_M -> DWELL_RADIUS_MEDIUM_M
-                                else -> DWELL_RADIUS_MAX_M
-                            }
-                            DebugLogger.i(
-                                "NARR-DWELL",
-                                "EXPAND: ${attemptRadius.toInt()}m empty → trying ${nextRadius.toInt()}m"
-                            )
-                            attemptRadius = nextRadius
-                            nearest = narrationGeofenceManager.findNearestUnnarrated(attemptRadius)
-                        }
-
-                        if (nearest != null) {
-                            dwellCurrentRadiusM = attemptRadius
-                            dwellPoisPlayed++
-                            DebugLogger.i(
-                                "NARR-STATE",
-                                "  REACH-OUT: ${nearest.point.name} " +
-                                    "(${nearest.distanceM.toInt()}m) " +
-                                    "dwellRadius=${attemptRadius.toInt()}m " +
-                                    "dwellPlayed=$dwellPoisPlayed/$DWELL_MAX_POIS_PER_SESSION " +
-                                    "gpsAge=${ageMs}ms"
-                            )
-                            narrationGeofenceManager.triggerReachOut(nearest)
-                        } else {
-                            // Phase 9R.0: in Historical Mode, silence becomes
-                            // the cue for 1692 "headline news" — fill the gap
-                            // with the next timeline event in chronological
-                            // order. Runs ONLY when the reach-out above also
-                            // found nothing, so any nearby POI still wins.
-                            // When a POI narration fires mid-headline the TTS
-                            // is interrupted and the queue pointer does NOT
-                            // advance (advance happens only after a clean
-                            // delivery), so we'll replay the same headline at
-                            // the next silence.
-                            val headlineFired = if (narrationGeofenceManager.isHistoricalMode()) {
-                                val h = historicalHeadlineQueue.pollNext()
-                                if (h != null) {
-                                    DebugLogger.i(
-                                        "NARR-HEADLINE",
-                                        "SILENCE FILL: 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
-                                    )
-                                    // Same cleanup + tagging as the other two
-                                    // headline sites — clear prior POI highlight
-                                    // + use the newspaper_1692 tag so POI ENTRY
-                                    // can cancel-interrupt this dispatch.
-                                    clearNarrationHighlight()
-                                    tourViewModel.speakTaggedNarration(
-                                        "newspaper_1692",
-                                        h.text,
-                                        "Salem 1692 — ${h.date}",
-                                        "en-au-x-auc-local"
-                                    )
-                                    // Optimistic advance — reasonable since
-                                    // the TTS completion observer will not
-                                    // re-enter this branch for this fill. If
-                                    // interrupted mid-speak, the worst case
-                                    // is skipping one headline; if we did
-                                    // NOT advance here and the speak did
-                                    // succeed, we'd replay the same headline
-                                    // forever on back-to-back silences.
-                                    historicalHeadlineQueue.advance()
-                                    true
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
-
-                            if (!headlineFired) {
-                                DebugLogger.i(
-                                    "NARR-STATE",
-                                    "  Nothing within ${DWELL_RADIUS_MAX_M.toInt()}m reach-out radius " +
-                                        "(gpsAge=${ageMs}ms, dwellPlayed=$dwellPoisPlayed, histMode=${narrationGeofenceManager.isHistoricalMode()})"
-                                )
-                                clearNarrationHighlight()  // S112+: nothing more coming → no ring
-                            }
-                        }
+                        // S125: silence-fill body lifted into a helper so the
+                        // queue-empty-after-filter path in playNextNarration
+                        // can also reach it (overnight test 2026-04-14
+                        // showed ~5-minute dead-end silences when the queue
+                        // held a single POI that the bearing filter dropped).
+                        runSilenceFill()
                     }
                 }
             }
         }
     }
 
+    // S125: Newspaper heartbeat — guarantees a 1692 dispatch at least every
+    // NEWSPAPER_HEARTBEAT_INTERVAL_MS while in Historical Mode. Overnight
+    // 2026-04-14 saw ~35 unique dispatches in 7.5 h against a 202-article
+    // corpus because constant POI cancel-interrupts kept TTS state
+    // oscillating Speaking↔Speaking so the silence branch never fired.
+    // This is a safety net, not the primary dispatch path.
+    lifecycleScope.launch {
+        DebugLogger.i(
+            "NARR-HEARTBEAT",
+            "START — interval=${NEWSPAPER_HEARTBEAT_INTERVAL_MS / 1000}s"
+        )
+        while (isActive) {
+            delay(NEWSPAPER_HEARTBEAT_INTERVAL_MS)
+            if (!narrationGeofenceManager.isHistoricalMode()) continue
+            val now = System.currentTimeMillis()
+            val sinceLast = if (lastNewspaperFiredMs == 0L) Long.MAX_VALUE else now - lastNewspaperFiredMs
+            if (sinceLast < NEWSPAPER_HEARTBEAT_INTERVAL_MS) {
+                DebugLogger.d(
+                    "NARR-HEARTBEAT",
+                    "SKIP — newspaper fired ${sinceLast / 1000}s ago (< ${NEWSPAPER_HEARTBEAT_INTERVAL_MS / 1000}s)"
+                )
+                continue
+            }
+            val h = historicalHeadlineQueue.pollNext()
+            if (h == null) {
+                DebugLogger.d("NARR-HEARTBEAT", "SKIP — headline queue empty")
+                continue
+            }
+            DebugLogger.i(
+                "NARR-HEARTBEAT",
+                "FORCE — ${if (sinceLast == Long.MAX_VALUE) "never" else "${sinceLast / 1000}s"} since last newspaper, " +
+                    "cancelling POI for ${h.date} ${h.name}"
+            )
+            tourViewModel.cancelSegmentsWithTag("poi_narration")
+            clearNarrationHighlight()
+            tourViewModel.speakTaggedNarration(
+                "newspaper_1692",
+                h.text,
+                "Salem 1692 — ${h.date}",
+                "en-au-x-auc-local"
+            )
+            historicalHeadlineQueue.advance()
+            lastNewspaperFiredMs = System.currentTimeMillis()
+        }
+    }
+
     DebugLogger.i("SalemMainActivity", "initNarrationSystem() complete")
+}
+
+/**
+ * S125: Silence-fill logic extracted from the narrationState observer so the
+ * "queue empty after filter" branch in [playNextNarration] can reach it too.
+ *
+ * Runs the GPS staleness gate → dwell-cap branch → 2:1 newspaper/POI
+ * interleave → progressive dwell-radius reach-out. Every newspaper path
+ * stamps [SalemMainActivity.lastNewspaperFiredMs] so the heartbeat knows the
+ * queue is alive.
+ *
+ * Preconditions: caller has already confirmed the narration queue is empty.
+ * Callers: narrationState Idle observer (after its silence delay) and
+ * playNextNarration() when pickNextFromQueue() returns null.
+ */
+internal suspend fun SalemMainActivity.runSilenceFill() {
+    // ── S110 staleness gate ──
+    //    Suppress reach-out entirely when GPS is stale. Without
+    //    this, the reach-out logic happily searches for the
+    //    "nearest unnarrated POI" against a frozen position
+    //    and cycles through every POI in the cluster — the
+    //    bug that ran the user through downtown Salem while
+    //    they were sitting at home.
+    val now = System.currentTimeMillis()
+    val ageMs = if (lastFixAtMs == 0L) Long.MAX_VALUE else (now - lastFixAtMs)
+    if (ageMs > GPS_STALE_THRESHOLD_MS) {
+        DebugLogger.w("NARR-STATE",
+            "  REACH-OUT SUPPRESSED: GPS stale " +
+            "(age=${if (ageMs == Long.MAX_VALUE) "never" else "${ageMs / 1000}s"}, " +
+            "threshold=${GPS_STALE_THRESHOLD_MS / 1000}s)")
+        clearNarrationHighlight()  // S112+: nothing more coming → no ring
+        return
+    }
+
+    // S115: Dwell expansion — if the dwell cap for this
+    // session is reached, stop expanding and go quiet
+    // until the user walks out of the anchor zone.
+    //
+    // Phase 9R.0: in Historical Mode, use the silence that
+    // would normally follow the dwell cap as a cue to play
+    // the next 1692 headline. The cap protects against POI
+    // reach-out spamming the same cluster — it should NOT
+    // silence the filler queue.
+    if (dwellPoisPlayed >= DWELL_MAX_POIS_PER_SESSION) {
+        if (narrationGeofenceManager.isHistoricalMode()) {
+            val h = historicalHeadlineQueue.pollNext()
+            if (h != null) {
+                DebugLogger.i(
+                    "NARR-HEADLINE",
+                    "SILENCE FILL (dwell cap): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                )
+                clearNarrationHighlight()
+                tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
+                historicalHeadlineQueue.advance()
+                lastNewspaperFiredMs = System.currentTimeMillis()
+                return
+            }
+        }
+        DebugLogger.i(
+            "NARR-STATE",
+            "  REACH-OUT HELD: dwell cap reached " +
+                "($dwellPoisPlayed/$DWELL_MAX_POIS_PER_SESSION POIs this stop) — " +
+                "waiting for user to move"
+        )
+        clearNarrationHighlight()
+        return
+    }
+
+    // Phase 9R.0: 2:1 POI-reach-out:newspaper ratio. Fire newspaper
+    // only every 3rd silence slot; the other two get POI reach-out
+    // attempts first (fall through below).
+    val fireNewspaperThisSlot =
+        narrationGeofenceManager.isHistoricalMode() &&
+        newspaperSilenceSlotCounter >= 2
+    if (fireNewspaperThisSlot) {
+        val h = historicalHeadlineQueue.pollNext()
+        if (h != null) {
+            newspaperSilenceSlotCounter = 0
+            DebugLogger.i(
+                "NARR-HEADLINE",
+                "SILENCE FILL (2:1 interleave): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+            )
+            clearNarrationHighlight()
+            tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
+            historicalHeadlineQueue.advance()
+            lastNewspaperFiredMs = System.currentTimeMillis()
+            return
+        }
+    }
+    newspaperSilenceSlotCounter++
+
+    // S115: Try the current dwell radius first; if nothing,
+    // step the radius up the DWELL ladder and retry until
+    // we either find a POI or hit DWELL_RADIUS_MAX_M.
+    var attemptRadius = dwellCurrentRadiusM
+    var nearest = narrationGeofenceManager.findNearestUnnarrated(attemptRadius)
+    while (nearest == null && attemptRadius < DWELL_RADIUS_MAX_M) {
+        val nextRadius = when {
+            attemptRadius < DWELL_RADIUS_MEDIUM_M -> DWELL_RADIUS_MEDIUM_M
+            else -> DWELL_RADIUS_MAX_M
+        }
+        DebugLogger.i(
+            "NARR-DWELL",
+            "EXPAND: ${attemptRadius.toInt()}m empty → trying ${nextRadius.toInt()}m"
+        )
+        attemptRadius = nextRadius
+        nearest = narrationGeofenceManager.findNearestUnnarrated(attemptRadius)
+    }
+
+    if (nearest != null) {
+        dwellCurrentRadiusM = attemptRadius
+        dwellPoisPlayed++
+        DebugLogger.i(
+            "NARR-STATE",
+            "  REACH-OUT: ${nearest.point.name} " +
+                "(${nearest.distanceM.toInt()}m) " +
+                "dwellRadius=${attemptRadius.toInt()}m " +
+                "dwellPlayed=$dwellPoisPlayed/$DWELL_MAX_POIS_PER_SESSION " +
+                "gpsAge=${ageMs}ms"
+        )
+        narrationGeofenceManager.triggerReachOut(nearest)
+        return
+    }
+
+    // Reach-out found nothing — in Historical Mode, use the silence
+    // as a cue for a 1692 headline. Runs only when reach-out also
+    // found nothing, so any nearby POI still wins.
+    val headlineFired = if (narrationGeofenceManager.isHistoricalMode()) {
+        val h = historicalHeadlineQueue.pollNext()
+        if (h != null) {
+            DebugLogger.i(
+                "NARR-HEADLINE",
+                "SILENCE FILL: 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+            )
+            clearNarrationHighlight()
+            tourViewModel.speakTaggedNarration(
+                "newspaper_1692",
+                h.text,
+                "Salem 1692 — ${h.date}",
+                "en-au-x-auc-local"
+            )
+            historicalHeadlineQueue.advance()
+            lastNewspaperFiredMs = System.currentTimeMillis()
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    }
+
+    if (!headlineFired) {
+        DebugLogger.i(
+            "NARR-STATE",
+            "  Nothing within ${DWELL_RADIUS_MAX_M.toInt()}m reach-out radius " +
+                "(gpsAge=${ageMs}ms, dwellPlayed=$dwellPoisPlayed, histMode=${narrationGeofenceManager.isHistoricalMode()})"
+        )
+        clearNarrationHighlight()  // S112+: nothing more coming → no ring
+    }
 }
 
 /**
@@ -829,13 +877,21 @@ private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
     return null
 }
 
-/** Play the next narration point from the queue (S112: tier+distance dequeue) */
-internal fun SalemMainActivity.playNextNarration() {
+/** Play the next narration point from the queue (S112: tier+distance dequeue). S125: suspend so the queue-filter dead-end can await runSilenceFill(). */
+internal suspend fun SalemMainActivity.playNextNarration() {
     val point = pickNextFromQueue()
     if (point == null) {
-        DebugLogger.i("NARR-PLAY", "playNextNarration: queue empty after filter, nothing to play")
+        // S125: queue-filter dead-end. Before this change we returned
+        // silently here, which meant a queue holding a single POI that
+        // the bearing filter dropped as "behind user" would stall the
+        // whole audio stream until a new ENTRY event arrived — seen as
+        // multi-minute silence windows in the 2026-04-14 overnight test.
+        // Fall through to the same silence-fill logic the Idle observer
+        // uses so the reach-out/newspaper machinery still runs.
+        DebugLogger.i("NARR-PLAY", "playNextNarration: queue empty after filter → silence-fill")
         clearNarrationHighlight()  // S112+: nothing playing → no ring
         refreshProximityDockFromQueue()
+        runSilenceFill()
         return
     }
     currentNarration = point
