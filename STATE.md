@@ -2,31 +2,30 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-13 — Session 122 (AudioCraft installation — tooling session)
+**Last updated:** 2026-04-13 — Session 123 (POI dedup, narration resync, Phase 9R Historical Tour Mode spec)
 
 ---
 
-## TOP PRIORITY — Next Session (S123)
+## TOP PRIORITY — Next Session (S124)
 
-**Phase 9U: Unified POI Table — Session 123 (Legacy Cleanup)**
+**Phase 9U: Unified POI Table — Session 124 (Legacy Cleanup, deferred from S122/S123)**
 
-S122 was a tooling session — AudioCraft (AudioGen) installed for sound effect generation. Original S122 scope deferred to S123.
+S122 was tooling (AudioCraft install). S123 pivoted to POI dedup + narration resync + Phase 9R requirements spec. The original cleanup scope is now S124.
 
-**Session 123 scope:**
+**Session 124 scope:**
 1. Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB
 2. Remove NarrationPoint entity/DAO and legacy repository methods
 3. Heading-up rotation smoothness fix (deferred from S115)
 4. End-to-end device verification with new narrations
+5. **NEW (small UI):** surface `historical_note` field unconditionally in admin POI editor (General tab) so operator can hand-author samples while waiting for SalemIntelligence Tasks 1-5 to ship
 
-**Key facts (unchanged from S121):**
-- SQLite: 2,190 POIs, 1,391 visible, 827 narrated, 4.9 MB
-- Narration model: short_narration (853 POIs) + long_narration (1,556 POIs). No multipass.
-- 572 unlinked POIs exported to SalemIntelligence for narration generation
+**Post-S123 key facts:**
+- PG: **2,080 active POIs** (down from 2,190 by S123 dedup; 110 soft-deleted, all tagged for pre-Play-Store hard-delete)
+- Narration model: short_narration (1,417 POIs) + long_narration (1,555 POIs). No multipass.
+- is_narrated=true on 1,543 POIs (up from 824 pre-sync)
+- 572 unlinked POIs still missing intel_entity_id; ~510 BCS-linked POIs still pending narration generation in SalemIntelligence Phase 2
 
-**New tooling (S122):**
-- AudioCraft (AudioGen) installed at `~/AI-Studio/audiocraft/` — text-to-sound-effect generation on RTX 3090
-- Web UI (`~/AI-Studio/audiocraft-webui.sh`) + CLI (`~/AI-Studio/audiocraft-generate.sh`)
-- Service reference: `~/AI-Studio/USAGE.md`
+**Phase 9R Historical Tour Mode requirements doc:** `docs/salem-intelligence-historical-tour-request.md` (5 tasks for SalemIntelligence; LMA-side work blocked on those + Phase 9Q building bridge)
 
 ---
 
@@ -37,14 +36,14 @@ S122 was a tooling session — AudioCraft (AudioGen) installed for sound effect 
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
-| **9U** Unified POI Table | **S121 DONE (narration sync + simplification)** | 1 session left (S122). Legacy table drop, NarrationPoint removal, heading-up fix. |
+| **9U** Unified POI Table | **S123 DONE (dedup + narration resync)** | 1 session left (S124). Legacy table drop, NarrationPoint removal, heading-up fix. |
 | **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9U+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 122. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 123. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -61,6 +60,7 @@ S122 was a tooling session — AudioCraft (AudioGen) installed for sound effect 
 - **POI encounter review screen** — future in-app debug menu feature.
 - **Pre-existing GPS log redundancy** — 4 lines from 4 layers per fix.
 - **Narration sheet has no `setPeekHeight`** — 168dp workaround handles common case.
+- **PRE-PRODUCTION HARD-DELETE: dedup loser rows** — S123 soft-deleted **110 duplicate POIs** across two passes: 86 from name-based pass (`data_source LIKE '%dedup-2026-04-13-loser%'`) + 24 from address-based pass (`data_source LIKE '%address-dedup-2026-04-13-loser%'`). Before Play Store APK build, hard-delete these so they don't ship in the bundled Room DB. Plan: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Dedup scripts: `cache-proxy/scripts/dedup-2026-04-13/`. Operator rule applied: rows with unique `intel_entity_id` (BCS) are kept regardless of address collision.
 
 ---
 
@@ -83,9 +83,9 @@ S122 was a tooling session — AudioCraft (AudioGen) installed for sound effect 
 
 ---
 
-## Expanded vision (updated S116)
+## Expanded vision (updated S123)
 
-- **Phase 9U** — Unified POI Table + BCS Import. 1 session left (S122). Legacy cleanup + heading-up fix. **NEXT.**
+- **Phase 9U** — Unified POI Table + BCS Import. 1 session left (S124). Legacy cleanup + heading-up fix + admin historical_note field. **NEXT.**
 - **Phase 9P.C** — Publish loop. Operational (publish-salem-pois.js shipped S118).
 - **Phase 9Q** — Salem Domain Content Bridge. 2-3 sessions. Simplified by 9U unified table.
 - **Phase 9R** — Historic Tour Mode. 4-6 sessions.
@@ -97,8 +97,8 @@ S122 was a tooling session — AudioCraft (AudioGen) installed for sound effect 
 
 ## POI Inventory
 
-- **Current PG:** **2,190 unified POIs** in `salem_pois` (827 narrated, 1,556 with long_narration, 853 with short_narration). Multipass columns dropped.
-- **Room DB:** 2,190 POIs in `salem_pois` table (4.9 MB bundled). SalemPoi entity + SalemPoiDao operational.
+- **Current PG:** **2,080 active POIs** in `salem_pois` (1,543 narrated, 1,555 with long_narration, 1,417 with short_narration). 110 soft-deleted by S123 dedup, pending pre-Play-Store hard-delete. Multipass columns dropped.
+- **Room DB:** stale until next bundle export (will reflect 2,080 once published).
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
 
 ---

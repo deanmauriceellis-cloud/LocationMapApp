@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S112 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S113 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 113: 2026-04-09 — POI Detail Sheet: full-screen dialog with hero + descriptions + TTS read-through
+
+Built a new POI detail window that opens on tap of a dock icon, map marker, or narration banner — hero image strip (20% of screen, fitXY stretch from hash-pinned `poi-icons/` pool or red "ASSIGN HERO" placeholder), overview row, Visit Website through in-app WebView, short/about/story narrative sections, and render-time-synthesized action buttons. Three iterations in one session: initial BottomSheetDialogFragment build, full-screen DialogFragment conversion + TTS trim (drops action button narration, reads only name/address/phone/website-ack + descriptions), then highlight-ring tap-interception fix (polygons moved to overlay index 0 with null titles and non-consuming click listeners) plus narration banner click handlers plus verbose click-path logging. End-of-session hero regen pass deferred — operator escalated it into a new sibling product at `~/Development/SalemIntelligence` (knowledgebase + LLM for per-business research-driven prompts) that takes a day to build.
+
+Full session detail: `docs/session-logs/session-113-2026-04-09.md`. Commit: `2826145`.
+
+---
 
 ## Session 112: 2026-04-09 — Major narration overhaul: tiered queue, density cascade, ahead-only filter, glowing highlight ring, walk-sim 3x removal, fresh-start reset, POI button tier filter, home-stops-walksim
 

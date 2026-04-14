@@ -398,10 +398,16 @@ export function AdminMap({
       <MapContainer
         center={SALEM_CENTER}
         zoom={INITIAL_ZOOM}
+        maxZoom={22}
         className="h-full w-full"
         zoomControl={true}
       >
-        <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={19} />
+        <TileLayer
+          url={TILE_URL}
+          attribution={TILE_ATTR}
+          maxZoom={22}
+          maxNativeZoom={19}
+        />
         <MarkerLayer
           pois={pois}
           selectedKey={selectedKey}
