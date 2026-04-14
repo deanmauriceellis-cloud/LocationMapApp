@@ -5,7 +5,7 @@
     "theme": "witch_trials",
     "description": "Walk in the footsteps of the accused, the accusers, and the condemned. This GPS-guided tour traces the Salem witch hysteria of 1692 across nineteen stops, from the courthouse where the Court of Oyer and Terminer sentenced the innocent to the solemn memorial where their names are inscribed in stone. Every stop has a direct connection to the events of 1692. The route forms a walkable downtown loop of approximately three kilometers, taking about two hours including narration. Comfortable shoes recommended.",
     "estimatedMinutes": 19,
-    "distanceKm": 8.6,
+    "distanceKm": 0,
     "stopCount": 19,
     "difficulty": "moderate",
     "isLoop": true
