@@ -1354,6 +1354,22 @@ class SalemMainActivity : AppCompatActivity() {
      */
     private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 5_000L
 
+    /**
+     * S125: Distance threshold (meters) at which the walk-sim treats the
+     * user as "not in Salem" and drops them at a random point along the
+     * tour route instead of the canonical step 0. Measured from the user's
+     * last real GPS fix to the first point of the loaded tour route.
+     *
+     * 3 km covers the broader Salem area (downtown ≈ 1 km² radius from
+     * the Heritage Trail anchor, plus generous padding for the Witch
+     * House, Pickering Wharf, Chestnut Street, etc.) while still
+     * triggering on dev-mode test runs from the operator's workshop /
+     * anywhere outside city limits. Randomization only fires on fresh
+     * walk starts — resumed walks (via the FAB pause/resume fields)
+     * always pick up where the walker left off regardless of location.
+     */
+    private val WALK_SIM_RANDOMIZE_THRESHOLD_M: Double = 3_000.0
+
     private fun startWalkSim() {
         // S125: wrap the whole cancel+start sequence under walkMutex so the
         // HTTP-triggered walk path ([DebugEndpoints.handleWalkTour]) and the
@@ -1502,11 +1518,11 @@ class SalemMainActivity : AppCompatActivity() {
             // S125: FAB pause/resume — if the last paused walk was on the same
             // route and we have a saved step index in-bounds, skip ahead.
             // Otherwise treat this as a fresh walk and reset the marker.
-            val resumeFromStep = if (
-                walkSimResumeRouteLabel == routeLabel &&
+            val isResume = walkSimResumeRouteLabel == routeLabel &&
                 walkSimResumeRouteSize == interpolated.size &&
                 walkSimResumeStepIdx in 1 until interpolated.size
-            ) {
+
+            val resumeFromStep = if (isResume) {
                 DebugLogger.i("WALK-SIM",
                     "RESUME: continuing '$routeLabel' from step ${walkSimResumeStepIdx}/${interpolated.size}")
                 toast("Resuming walk at step ${walkSimResumeStepIdx}/${interpolated.size}")
@@ -1517,7 +1533,35 @@ class SalemMainActivity : AppCompatActivity() {
                         "Fresh walk (resume state invalidated): label '${walkSimResumeRouteLabel}' → '$routeLabel', " +
                         "size ${walkSimResumeRouteSize} → ${interpolated.size}, idx=${walkSimResumeStepIdx}")
                 }
-                0
+                // S125 (2026-04-14 operator ask): if a fresh walk is starting and
+                // the user's real GPS puts them well outside Salem, drop the
+                // walker at a random point along the tour route so successive
+                // dev-mode test runs hit different neighborhoods. Threshold is
+                // distance to the first route point — anything over 3 km is
+                // "not in town" (covers home-office test runs, airports, etc.).
+                // When we ARE in Salem (or no GPS yet) we still start at step 0
+                // so the geofence trigger order matches the Heritage Trail's
+                // intended narrative arc.
+                val userPt = lastGpsPoint
+                val firstPt = interpolated.firstOrNull()
+                if (userPt != null && firstPt != null && interpolated.size > 10) {
+                    val distFromRouteStartM = distanceBetween(userPt, firstPt)
+                    if (distFromRouteStartM > WALK_SIM_RANDOMIZE_THRESHOLD_M) {
+                        val randomIdx = (0 until interpolated.size).random()
+                        DebugLogger.i(
+                            "WALK-SIM",
+                            "OUT OF SALEM (user ${distFromRouteStartM.toInt()}m from route start, " +
+                                "threshold ${WALK_SIM_RANDOMIZE_THRESHOLD_M.toInt()}m) — " +
+                                "starting fresh walk at random step $randomIdx/${interpolated.size}"
+                        )
+                        toast("Not in Salem — starting walk at random point ($randomIdx/${interpolated.size})")
+                        randomIdx
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
             }
             walkSimResumeRouteLabel = routeLabel
             walkSimResumeRouteSize = interpolated.size
