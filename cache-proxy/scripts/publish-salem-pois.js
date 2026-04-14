@@ -130,7 +130,8 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   confidence REAL NOT NULL DEFAULT 0.8,
   is_tour_poi INTEGER NOT NULL DEFAULT 0,
   is_narrated INTEGER NOT NULL DEFAULT 0,
-  default_visible INTEGER NOT NULL DEFAULT 1
+  default_visible INTEGER NOT NULL DEFAULT 1,
+  has_announce_narration INTEGER NOT NULL DEFAULT 0
 )`;
 
 // Update Room version hash table
@@ -167,7 +168,8 @@ async function main() {
         year_established, amenities, district,
         related_figure_ids, related_fact_ids, related_source_ids,
         data_source, confidence,
-        is_tour_poi, is_narrated, default_visible
+        is_tour_poi, is_narrated, default_visible,
+        has_announce_narration
       FROM salem_pois
       WHERE deleted_at IS NULL
       ORDER BY category, priority, name
@@ -199,10 +201,12 @@ async function main() {
   }
   const db = new Database(SQLITE_PATH);
 
-  // Create table + clear
+  // Drop + recreate so schema changes (e.g. S125 has_announce_narration)
+  // take effect. The bundled Room DB is always full-replaced by this
+  // script — no migration logic lives here.
+  db.exec('DROP TABLE IF EXISTS salem_pois');
   db.exec(CREATE_TABLE_SQL);
-  const deleted = db.prepare('DELETE FROM salem_pois').run();
-  console.log(`Cleared ${deleted.changes} existing salem_pois rows from SQLite`);
+  console.log(`Rebuilt salem_pois table with current schema`);
 
   // Prepare insert
   const insertStmt = db.prepare(`
@@ -222,7 +226,8 @@ async function main() {
       year_established, amenities, district,
       related_figure_ids, related_fact_ids, related_source_ids,
       data_source, confidence,
-      is_tour_poi, is_narrated, default_visible
+      is_tour_poi, is_narrated, default_visible,
+      has_announce_narration
     ) VALUES (
       @id, @name, @lat, @lng, @address, @status, @category, @subcategory,
       @short_narration, @long_narration,
@@ -239,7 +244,8 @@ async function main() {
       @year_established, @amenities, @district,
       @related_figure_ids, @related_fact_ids, @related_source_ids,
       @data_source, @confidence,
-      @is_tour_poi, @is_narrated, @default_visible
+      @is_tour_poi, @is_narrated, @default_visible,
+      @has_announce_narration
     )
   `);
 
@@ -304,6 +310,7 @@ async function main() {
         is_tour_poi: r.is_tour_poi ? 1 : 0,
         is_narrated: r.is_narrated ? 1 : 0,
         default_visible: r.default_visible !== false ? 1 : 0,
+        has_announce_narration: r.has_announce_narration ? 1 : 0,
       });
     }
   });
@@ -315,10 +322,12 @@ async function main() {
   const countResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois').get();
   const visibleResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois WHERE default_visible = 1').get();
   const narratedResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois WHERE is_narrated = 1').get();
+  const silentResult = db.prepare('SELECT COUNT(*) as cnt FROM salem_pois WHERE has_announce_narration = 0').get();
   console.log(`\nSQLite verification:`);
   console.log(`  Total: ${countResult.cnt}`);
   console.log(`  Visible: ${visibleResult.cnt}`);
   console.log(`  Narrated: ${narratedResult.cnt}`);
+  console.log(`  Silent (no announce narration): ${silentResult.cnt}`);
 
   db.close();
 

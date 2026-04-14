@@ -103,5 +103,14 @@ data class SalemPoi(
     // ── Flags ──
     @ColumnInfo(name = "is_tour_poi") val isTourPoi: Boolean = false,
     @ColumnInfo(name = "is_narrated") val isNarrated: Boolean = false,
-    @ColumnInfo(name = "default_visible") val defaultVisible: Boolean = true
+    @ColumnInfo(name = "default_visible") val defaultVisible: Boolean = true,
+    /**
+     * S125: precomputed flag — TRUE iff the POI has any text the narration
+     * engine would actually speak (historical_note / short_narration /
+     * description). Populated by `cache-proxy/scripts/flag-narration-status.js`
+     * and propagated via publish-salem-pois.js. Runtime does the same null
+     * check at enqueue time; this column is for reports, admin-tool
+     * filtering, and future bulk-generation targeting.
+     */
+    @ColumnInfo(name = "has_announce_narration") val hasAnnounceNarration: Boolean = false
 )
