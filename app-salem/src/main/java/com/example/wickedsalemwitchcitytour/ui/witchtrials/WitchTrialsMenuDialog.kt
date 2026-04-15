@@ -17,6 +17,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.GridLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -24,8 +25,10 @@ import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsArticle
+import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNewspaper
 import com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WitchTrialsMenuDialog.kt"
@@ -39,6 +42,7 @@ private const val SALEM_TEXT = "#F5F0E8"
 private const val SALEM_TEXT_DIM = "#B8AFA0"
 
 private const val TTS_TAG = "witchtrials_article"
+private const val TTS_TAG_NEWS = "witchtrials_newspaper"
 
 @SuppressLint("SetTextI18n")
 fun SalemMainActivity.showWitchTrialsMenuDialog() {
@@ -138,7 +142,7 @@ fun SalemMainActivity.showWitchTrialsMenuDialog() {
         icon = "\uD83D\uDCF0",
         title = "The Oracle Newspaper",
         desc = "202 period newspaper articles, browsable by date and crisis phase."
-    ) { showWitchTrialsNewspapersPlaceholder() }
+    ) { showWitchTrialsNewspaperBrowserDialog() }
 
     val peopleCard = panelCard(
         icon = "\uD83D\uDC65",
@@ -499,17 +503,462 @@ internal fun SalemMainActivity.showWitchTrialsTileDetailDialog(article: WitchTri
     }
 }
 
-// ── Phase 4, 5 placeholders ───────────────────────────────────────────
+// ── Phase 9X.4 — Newspaper browser dialog (S130) ──────────────────────
+
+private val CRISIS_PHASE_LABELS = mapOf(
+    -1 to "All",
+    0 to "Pre-crisis",
+    1 to "Ignition",
+    2 to "Accusation",
+    3 to "Examinations",
+    4 to "Court of O&T",
+    5 to "Mass trials",
+    6 to "Aftermath"
+)
 
 @SuppressLint("SetTextI18n")
-internal fun SalemMainActivity.showWitchTrialsNewspapersPlaceholder() {
-    showComingSoonDialog(
-        title = "The Oracle Newspaper",
-        body = "Coming in Phase 4: browse all 202 Salem newspapers " +
-               "(1691-11-01 through 1693-05-09), filtered by crisis phase, " +
-               "with TTS playback per article."
-    )
+internal fun SalemMainActivity.showWitchTrialsNewspaperBrowserDialog() {
+    DebugLogger.i("WitchTrials", "showWitchTrialsNewspaperBrowserDialog")
+
+    val density = resources.displayMetrics.density
+    val dp = { v: Int -> (v * density).toInt() }
+
+    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+    val titleText = TextView(this).apply {
+        text = "Salem Witch Trials — The Oracle Newspaper"
+        textSize = 18f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+    }
+    val closeBtn = TextView(this).apply {
+        text = "\u2715"; textSize = 22f
+        setTextColor(Color.WHITE)
+        setPadding(dp(16), 0, dp(8), 0)
+        setOnClickListener { dialog.dismiss() }
+    }
+    val headerRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(20), dp(14), dp(16), dp(6))
+        addView(titleText)
+        addView(closeBtn)
+    }
+
+    val countText = TextView(this).apply {
+        text = "202 articles — November 1691 through May 1693. Tap any to read."
+        textSize = 12f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setPadding(dp(20), 0, dp(20), dp(10))
+    }
+
+    // Filter chip row (horizontal scroll)
+    val chipRowLL = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(12), dp(2), dp(12), dp(8))
+    }
+    val chipRow = HorizontalScrollView(this).apply {
+        isHorizontalScrollBarEnabled = false
+        addView(chipRowLL)
+    }
+
+    val listLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(12), dp(4), dp(12), dp(24))
+    }
+    val scroll = ScrollView(this).apply { addView(listLayout) }
+
+    val loadingText = TextView(this).apply {
+        text = "Loading 202 newspapers…"
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        gravity = Gravity.CENTER
+        setPadding(dp(24), dp(40), dp(24), dp(40))
+    }
+
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
+        addView(headerRow)
+        addView(countText)
+        addView(chipRow)
+        addView(loadingText)
+    }
+
+    dialog.setContentView(root)
+    dialog.setOnDismissListener {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_NEWS)
+    }
+    dialog.show()
+
+    lifecycleScope.launch {
+        try {
+            DebugLogger.i("WitchTrials", "newspapers: calling getAllNewspapers()")
+            val all = witchTrialsViewModel.getAllNewspapers().sortedBy { it.date }
+            DebugLogger.i("WitchTrials", "newspapers: loaded ${all.size}")
+
+            root.removeView(loadingText)
+            root.addView(scroll)
+
+            val phases = (listOf(-1) + all.map { it.crisisPhase }.distinct().sorted())
+            var activePhase = -1
+            val chipViews = mutableMapOf<Int, TextView>()
+
+            fun rebuildList() {
+                listLayout.removeAllViews()
+                val filtered = if (activePhase == -1) all else all.filter { it.crisisPhase == activePhase }
+                if (filtered.isEmpty()) {
+                    listLayout.addView(TextView(this@showWitchTrialsNewspaperBrowserDialog).apply {
+                        text = "No articles for this phase."
+                        textSize = 13f
+                        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+                        setPadding(dp(24), dp(40), dp(24), dp(40))
+                    })
+                } else {
+                    for (paper in filtered) {
+                        listLayout.addView(buildNewspaperRow(paper, dp) {
+                            showWitchTrialsNewspaperDetailDialog(paper)
+                        })
+                    }
+                }
+                DebugLogger.i("WitchTrials", "newspapers: rebuilt list phase=$activePhase rows=${filtered.size}")
+            }
+
+            fun applyChipStyle(view: TextView, selected: Boolean) {
+                val bg = GradientDrawable().apply {
+                    setColor(Color.parseColor(if (selected) SALEM_GOLD else SALEM_SURFACE))
+                    cornerRadius = dp(20).toFloat()
+                    setStroke(dp(1), Color.parseColor(SALEM_GOLD))
+                }
+                view.background = bg
+                view.setTextColor(Color.parseColor(if (selected) SALEM_DARK else SALEM_TEXT))
+            }
+
+            for (phase in phases) {
+                val label = CRISIS_PHASE_LABELS[phase] ?: "Phase $phase"
+                val chip = TextView(this@showWitchTrialsNewspaperBrowserDialog).apply {
+                    text = label
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                    isClickable = true
+                    isFocusable = true
+                }
+                applyChipStyle(chip, phase == activePhase)
+                chip.setOnClickListener {
+                    if (activePhase == phase) return@setOnClickListener
+                    val prev = activePhase
+                    activePhase = phase
+                    chipViews[prev]?.let { applyChipStyle(it, false) }
+                    applyChipStyle(chip, true)
+                    rebuildList()
+                }
+                chipRowLL.addView(chip, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = dp(8) })
+                chipViews[phase] = chip
+            }
+
+            rebuildList()
+        } catch (e: Exception) {
+            DebugLogger.e("WitchTrials", "newspapers FAILED: ${e.message}", e)
+            loadingText.text = "Failed to load: ${e.message}"
+        }
+    }
 }
+
+private fun SalemMainActivity.buildNewspaperRow(
+    paper: WitchTrialsNewspaper,
+    dp: (Int) -> Int,
+    onClick: () -> Unit
+): LinearLayout {
+    val phaseLabel = CRISIS_PHASE_LABELS[paper.crisisPhase] ?: "Phase ${paper.crisisPhase}"
+
+    // Line 1: "MMM D, 1692: HEADLINE IN ALL CAPS" — old-school tabloid
+    val datePart = shortTabloidDate(paper.longDate, paper.date)
+    val headline = paper.headline ?: fallbackHeadline(paper)
+    val headlineText = TextView(this).apply {
+        text = "$datePart:  $headline"
+        textSize = 17f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        setLineSpacing(dp(2).toFloat(), 1.1f)
+    }
+
+    // Line 2: single-sentence event summary
+    val summaryLine = (paper.headlineSummary
+        ?: paper.summary?.takeIf { it.isNotBlank() }
+        ?: paper.lede
+        ?: "").let { firstSentence(it) }
+    val summaryText = TextView(this).apply {
+        text = summaryLine
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        setPadding(0, dp(6), 0, 0)
+    }
+
+    // Phase chip in a small footer row on the right
+    val phaseChip = TextView(this).apply {
+        text = phaseLabel
+        textSize = 10f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setPadding(dp(8), dp(2), dp(8), dp(2))
+        val cbg = GradientDrawable().apply {
+            setColor(Color.parseColor("#3B2A6A"))
+            cornerRadius = dp(8).toFloat()
+        }
+        background = cbg
+    }
+    val footerRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.END
+        setPadding(0, dp(8), 0, 0)
+        addView(phaseChip)
+    }
+
+    val bg = GradientDrawable().apply {
+        setColor(Color.parseColor(SALEM_SURFACE))
+        cornerRadius = dp(10).toFloat()
+        setStroke(dp(1), Color.parseColor("#3A3A50"))
+    }
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = bg
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(5); bottomMargin = dp(7) }
+        isClickable = true
+        isFocusable = true
+        addView(headlineText)
+        addView(summaryText)
+        addView(footerRow)
+        setOnClickListener { onClick() }
+    }
+}
+
+/** "November 22, 1691" → "Nov 22, 1691" (fallback: raw date). */
+private fun shortTabloidDate(longDate: String?, isoDate: String): String {
+    if (!longDate.isNullOrBlank()) {
+        // "November 22, 1691" → split on space, abbreviate the month
+        val parts = longDate.split(" ")
+        if (parts.size == 3) {
+            val month = parts[0].take(3)  // "November" → "Nov"
+            return "$month ${parts[1]} ${parts[2]}"
+        }
+        return longDate
+    }
+    return isoDate
+}
+
+/** Cheap headline derived from summary if LLM headline is missing. */
+private fun fallbackHeadline(paper: WitchTrialsNewspaper): String {
+    val basis = paper.summary ?: paper.lede ?: ""
+    val firstDozen = firstSentence(basis).take(60).uppercase()
+    return if (firstDozen.isBlank()) "SALEM DISPATCH" else firstDozen
+}
+
+/** Return everything up to and including the first sentence terminator. */
+private fun firstSentence(text: String): String {
+    if (text.isBlank()) return ""
+    val trimmed = text.trim()
+    // Look for the first ., !, or ? that is followed by whitespace or end-of-string
+    val regex = Regex("""[.!?](?=\s|$)""")
+    val match = regex.find(trimmed)
+    return if (match != null) trimmed.substring(0, match.range.last + 1) else trimmed
+}
+
+// ── Phase 9X.4 — Newspaper detail dialog (S130) ───────────────────────
+
+@SuppressLint("SetTextI18n")
+internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: WitchTrialsNewspaper) {
+    DebugLogger.i("WitchTrials", "showNewspaperDetail date=${paper.date} phase=${paper.crisisPhase}")
+
+    val density = resources.displayMetrics.density
+    val dp = { v: Int -> (v * density).toInt() }
+
+    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+    val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+    val narratorMode = prefs.getBoolean(MenuPrefs.PREF_NARRATOR_MODE_ENABLED, false)
+
+    var speaking = false
+
+    val closeBtn = TextView(this).apply {
+        text = "\u2715"; textSize = 22f
+        setTextColor(Color.WHITE)
+        setPadding(dp(16), 0, dp(8), 0)
+        setOnClickListener { dialog.dismiss() }
+    }
+    val topBar = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.END
+        setPadding(dp(8), dp(8), dp(8), 0)
+        addView(closeBtn)
+    }
+
+    val phaseLabel = CRISIS_PHASE_LABELS[paper.crisisPhase] ?: "Phase ${paper.crisisPhase}"
+    val phaseText = TextView(this).apply {
+        text = phaseLabel.uppercase()
+        textSize = 11f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(null, Typeface.BOLD)
+        letterSpacing = 0.15f
+        setPadding(dp(24), dp(4), dp(24), dp(2))
+    }
+
+    val dateText = TextView(this).apply {
+        text = paper.longDate ?: paper.date
+        textSize = 22f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        setPadding(dp(24), dp(2), dp(24), dp(4))
+    }
+
+    val dowText = TextView(this).apply {
+        text = paper.dayOfWeek ?: ""
+        textSize = 13f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setTypeface(null, Typeface.ITALIC)
+        setPadding(dp(24), 0, dp(24), dp(12))
+    }
+
+    val summaryText = TextView(this).apply {
+        text = paper.summary ?: paper.lede ?: ""
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setTypeface(null, Typeface.ITALIC)
+        setLineSpacing(dp(3).toFloat(), 1.15f)
+        setPadding(dp(24), 0, dp(24), dp(16))
+    }
+
+    // Body points list — parsed from JSON string
+    val bodyContainer = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(24), dp(4), dp(24), dp(24))
+    }
+    val points = runCatching {
+        val arr = JSONArray(paper.bodyPoints)
+        (0 until arr.length()).map { arr.optString(it, "") }.filter { it.isNotBlank() }
+    }.getOrElse { emptyList() }
+
+    if (points.isNotEmpty()) {
+        for (pt in points) {
+            val bullet = TextView(this).apply {
+                text = "•  $pt"
+                textSize = 15f
+                setTextColor(Color.parseColor(SALEM_TEXT))
+                setLineSpacing(dp(4).toFloat(), 1.2f)
+                setPadding(0, dp(4), 0, dp(10))
+            }
+            bodyContainer.addView(bullet)
+        }
+    } else {
+        // Fallback — show the full TTS text as a single flowing paragraph
+        bodyContainer.addView(TextView(this).apply {
+            text = paper.ttsFullText
+            textSize = 15f
+            setTextColor(Color.parseColor(SALEM_TEXT))
+            setLineSpacing(dp(4).toFloat(), 1.15f)
+        })
+    }
+
+    val speakBtn = TextView(this).apply {
+        text = "\u25B6 Speak"
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setTypeface(null, Typeface.BOLD)
+        setPadding(dp(24), dp(10), dp(24), dp(10))
+        val pillBg = GradientDrawable().apply {
+            setColor(Color.parseColor("#3B2A6A"))
+            cornerRadius = dp(20).toFloat()
+            setStroke(dp(1), Color.parseColor(SALEM_GOLD))
+        }
+        background = pillBg
+        isClickable = true
+        isFocusable = true
+    }
+
+    fun startSpeaking() {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_NEWS)
+        tourViewModel.speakSheetSection(
+            tag = TTS_TAG_NEWS,
+            text = paper.ttsFullText,
+            label = paper.longDate ?: paper.date,
+            voiceId = null
+        )
+        speaking = true
+        speakBtn.text = "\u25A0 Stop"
+    }
+
+    fun stopSpeaking() {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_NEWS)
+        speaking = false
+        speakBtn.text = "\u25B6 Speak"
+    }
+
+    speakBtn.setOnClickListener { if (speaking) stopSpeaking() else startSpeaking() }
+
+    val speakRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(dp(16), dp(4), dp(16), dp(16))
+        addView(speakBtn)
+    }
+
+    val contentColumn = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(topBar)
+        addView(phaseText)
+        addView(dateText)
+        addView(dowText)
+        addView(summaryText)
+        addView(speakRow)
+        addView(bodyContainer)
+    }
+
+    val scroll = ScrollView(this).apply {
+        addView(contentColumn)
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+    }
+
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
+        addView(scroll)
+    }
+
+    dialog.setContentView(root)
+    dialog.setOnDismissListener {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_NEWS)
+    }
+    dialog.show()
+
+    if (narratorMode) {
+        DebugLogger.i("WitchTrials", "narrator-mode on — auto-speaking ${paper.date}")
+        startSpeaking()
+    }
+}
+
+// ── Phase 5 placeholder (People — S131) ───────────────────────────────
 
 @SuppressLint("SetTextI18n")
 internal fun SalemMainActivity.showWitchTrialsPeoplePlaceholder() {

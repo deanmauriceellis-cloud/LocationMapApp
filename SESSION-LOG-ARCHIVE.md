@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S119 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S120 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 120: 2026-04-13 — Phase 9U consumer migration (NarrationPoint→SalemPoi), admin tree rework, parking lot triage
+
+Consumer migration across 13 Android files — entire narration pipeline now queries unified `salem_pois` table via SalemPoi entity. PoiHeroResolver upgraded to use S119 hero images. Admin PoiTree gets 3-level tree (category→subcategory→POI), "Visible only" filter, human-readable labels. AdminMap renders hidden POIs at 35% opacity. Default visibility fixed for 210 POIs. 29 S119 parking lot items triaged into master plan backlog.
+
+Full session detail: `docs/session-logs/session-120-2026-04-13.md`.
+
+---
 
 ## Session 119: 2026-04-12 — Hero image generation pipeline — 1,295 cartoon Halloween hero images
 

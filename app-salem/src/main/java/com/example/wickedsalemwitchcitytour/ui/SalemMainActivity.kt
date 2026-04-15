@@ -47,6 +47,7 @@ import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategories
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.wickedsalemwitchcitytour.databinding.ActivityMainBinding
 import com.example.wickedsalemwitchcitytour.ui.menu.AppBarMenuManager
+import com.example.wickedsalemwitchcitytour.ui.witchtrials.showWitchTrialsMenuDialog
 import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.ui.menu.MenuEventListener
 import com.example.wickedsalemwitchcitytour.ui.radar.RadarRefreshScheduler
@@ -4125,6 +4126,12 @@ class SalemMainActivity : AppCompatActivity() {
             resetIdleTimer()
             DebugLogger.i("SalemMainActivity", "onEventsRequested")
             showEventsDialog()
+        }
+
+        override fun onWitchTrialsRequested() {
+            resetIdleTimer()
+            DebugLogger.i("SalemMainActivity", "onWitchTrialsRequested")
+            this@SalemMainActivity.showWitchTrialsMenuDialog()
         }
 
         // ── Safety net ────────────────────────────────────────────────────────

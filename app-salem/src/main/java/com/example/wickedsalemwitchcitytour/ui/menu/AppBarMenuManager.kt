@@ -322,8 +322,9 @@ class AppBarMenuManager(
         )
 
         val row4Btns = listOf(
-            GridBtn(R.drawable.ic_tour,   "Tours")  { popup.dismiss(); menuEventListener.onTourRequested() },
-            GridBtn(R.drawable.ic_events, "Events") { popup.dismiss(); menuEventListener.onEventsRequested() }
+            GridBtn(R.drawable.ic_tour,         "Tours")        { popup.dismiss(); menuEventListener.onTourRequested() },
+            GridBtn(R.drawable.ic_events,       "Events")       { popup.dismiss(); menuEventListener.onEventsRequested() },
+            GridBtn(R.drawable.ic_witch_trials, "Witch Trials") { popup.dismiss(); menuEventListener.onWitchTrialsRequested() }
         )
 
         addGridButtons(row1, row1Btns)

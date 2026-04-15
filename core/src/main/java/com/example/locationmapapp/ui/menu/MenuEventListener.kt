@@ -243,6 +243,9 @@ interface MenuEventListener {
     /** Open the events calendar (Haunted Happenings, exhibits, seasonal). */
     fun onEventsRequested()
 
+    /** Open the Salem Witch Trials 3-panel sub-menu (History / Newspapers / People). */
+    fun onWitchTrialsRequested() {}
+
     // =========================================================================
     // TOOLBAR ACTIONS
     // =========================================================================

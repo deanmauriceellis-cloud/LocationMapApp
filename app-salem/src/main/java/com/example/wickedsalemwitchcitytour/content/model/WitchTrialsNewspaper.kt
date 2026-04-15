@@ -44,5 +44,11 @@ data class WitchTrialsNewspaper(
     @ColumnInfo(name = "data_source") val dataSource: String = "salem_corpus",
     val confidence: Float = 0.85f,
     @ColumnInfo(name = "verified_date") val verifiedDate: String? = null,
-    @ColumnInfo(name = "generator_model") val generatorModel: String? = null
+    @ColumnInfo(name = "generator_model") val generatorModel: String? = null,
+
+    /** Short ALL-CAPS 1692-tabloid-style headline (5-8 words). S130 Phase 9X.4b. */
+    val headline: String? = null,
+
+    /** Single-sentence "most important event" line shown under the headline. */
+    @ColumnInfo(name = "headline_summary") val headlineSummary: String? = null
 )
