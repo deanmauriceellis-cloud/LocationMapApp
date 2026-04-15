@@ -1787,7 +1787,7 @@ The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that 
 
 **Goal:** Add a third top-level entry point alongside "Explore Salem" and "Take a Tour" — **The Salem Witch Trials** — turning the app into a deep historical reader anchored to the 1692 corpus already living at `~/Development/Salem/data/json/` (3,893 facts, 4,950 primary sources, 88 dated 1692 events, 202 LLM-generated newspaper articles, 2,176 NPC records).
 
-**Target:** 8 sessions (S127 – S134) | **Status:** **IN PROGRESS — 2 / 8 done (S127 + S128)** | **Added:** Session 127 | **Priority:** TOP — overrides 9Q + 9R + OMEN-004
+**Target:** 8 sessions (S127 – S134) | **Status:** **IN PROGRESS — 3 / 8 done (S127 + S128 + S129)** | **Added:** Session 127 | **Priority:** TOP — overrides 9Q + 9R + OMEN-004
 
 **Plan file:** `~/.claude/plans/rosy-shimmying-stream.md` (committed by the operator at S127).
 
@@ -1823,7 +1823,7 @@ Splash layout: hero (Witch Trials, flagship) + 2 below (Explore Salem + Take a T
 |---|---|---|---|
 | 9X.1 | S127 | Foundation: PG schema, Room entities + DAOs, Hilt repo + ViewModel, narrator-mode preference, hero+2-below welcome dialog, 3-panel sub-menu with placeholder navigation, asset directory + stubs | **DONE** (commit `ebc9e30`) |
 | 9X.2 | S128 | History generation pipeline. Python `tools/witch-trials-generator/`, `salem_corpus_loader`, prompt templates per tile type, `generate_articles.py` runs against the local LLM, all 16 articles drafted in PG with provenance. Operator-runnable. | **DONE** (commit pending) — bypassed Oracle's 30s wrapper timeout, hit Ollama direct (`salem-village:latest` = same Gemma3:27B model), 6.8 min total run, 16/16 articles 494-695 words each, all in PG with `data_source='ollama_direct_salem_village'` |
-| 9X.3 | S129 | History 4×4 tile UI + detail screen. Publish script bakes `articles.json` to assets, GridLayout grid with title + teaser per tile, detail Dialog with body + Speak button, narrator-mode auto-play. | TODO |
+| 9X.3 | S129 | History 4×4 tile UI + detail screen. Publish script bakes `articles.json` to assets, GridLayout grid with title + teaser per tile, detail Dialog with body + Speak button, narrator-mode auto-play. | **DONE** (commit pending) — `publish-witch-trials.js` (JSON fallback) + `bundle-witch-trials-into-db.js` (primary — pre-populates the bundled Room DB directly, needed because the retrofitted asset DB silently dropped Room `@Insert` writes), `WitchTrialsHistoryDialog` 4×4 GridLayout, `WitchTrialsTileDetailDialog` with `tourViewModel.speakSheetSection(tag="witchtrials_article", …)` Speak pill + narrator-mode auto-play, verified on Lenovo HNY0CY0W |
 | 9X.4 | S130 | Oracle Newspaper panel. Bundle all 202 newspapers via publish script, browser dialog with crisis-phase filter chips, detail dialog with TTS, cross-link infra (dates in History → newspapers). | TODO |
 | 9X.5 | S131 | People bio generation + browser + bio detail. `generate_bios.py` against Oracle, 49 bios in PG, faction-filtered list, bio detail with metadata + body + Speak. Cross-link infra (names in History/Newspapers → bios). | TODO |
 | 9X.6 | S132 | Pencil-sketch portraits via local SD Forge. 49 portraits at 512×512, ~5-10 MB asset weight, manual review pass for any drift. | TODO |

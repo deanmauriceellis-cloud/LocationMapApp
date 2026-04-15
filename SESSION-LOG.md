@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 119-128. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 120-129. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 129: 2026-04-15 — Phase 9X.3 Salem Witch Trials History 4×4 tile UI + detail dialog shipped
+
+Shipped Phase 9X.3 end-to-end: `WitchTrialsHistoryDialog` (full-screen 4×4 GridLayout of tile cards with tile-kind iconography, period label, bold title, teaser), `WitchTrialsTileDetailDialog` (hero header, italic teaser, pill "▶ Speak" button bound to `tourViewModel.speakSheetSection(tag="witchtrials_article", …)` with auto-cancel-on-dismiss and narrator-mode auto-play). Two publish paths shipped: `publish-witch-trials.js` (JSON asset fallback) + `bundle-witch-trials-into-db.js` (primary — uses `better-sqlite3` to pre-populate the bundled Room DB directly), the latter needed because a retrofitted asset DB silently dropped Room `@Insert` writes on a journal-mode flip. Had to bake the three Phase 9X tables + v7 identity hash (`0545a31e8fb7ce05e575755b61532d46`) into the asset DB to close the original install-crash (`SQLiteException: no such table: salem_witch_trials_articles`). Verified on Lenovo HNY0CY0W with fresh install: welcome → hero → sub-menu → grid → tile #2 → Speak TTS → close → tile #16 all work clean.
+
+Full session detail: `docs/session-logs/session-129-2026-04-15.md`. Commit: pending.
+
+---
 
 ## Session 128: 2026-04-15 — Phase 9X.2 Salem Witch Trials History articles: 16/16 generated + loaded into PG
 
@@ -76,13 +84,5 @@ Full session detail: `docs/session-logs/session-120-2026-04-13.md`.
 
 ---
 
-## Session 119: 2026-04-12 — Hero image generation pipeline — 1,295 cartoon Halloween hero images
-
-Built complete hero image generation pipeline: SalemIntelligence export → Forge API batch generation (DreamShaper 8) → live QC web viewer → DB population. 1,295 images generated, 1,013 POIs updated with image_asset paths, bundled DB republished. 29 parking lot items captured covering app modes, UX overhaul, search, onboarding, and hero image refinement roadmap.
-
-Full session detail: `docs/session-logs/session-119-2026-04-12.md`. Commit: `67874e8`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 118 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 119 and earlier are in SESSION-LOG-ARCHIVE.md -->

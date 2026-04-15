@@ -2,37 +2,39 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-15 — Session 128 (Phase 9X.2 history article generation done — 16/16 in PG)
+**Last updated:** 2026-04-15 — Session 129 (Phase 9X.3 History 4×4 tile UI + detail dialog shipped)
 
 ---
 
-## TOP PRIORITY — Next Session (S129)
+## TOP PRIORITY — Next Session (S130)
 
-**Phase 9X.3 — wire the 16 generated history articles into the app UI.**
+**Phase 9X.4 — wire the 202 Salem 1692 newspapers into The Oracle Newspaper panel.**
 
 Master plan section: Phase 9X.
 
-Step-by-step for S129:
-1. Build `cache-proxy/scripts/publish-witch-trials.js` — read all 16 active rows from `salem_witch_trials_articles`, serialize to `app-salem/src/main/assets/witch_trials/articles.json` (mirrors the `publish-salem-pois.js` pattern). Run it.
-2. Wire `WitchTrialsRepository` (already scaffolded S127) to read from the bundled JSON via the existing asset loader pattern, then upsert into Room.
-3. Replace the 9X.1 placeholder `showComingSoonDialog` for the History card with a new `WitchTrialsHistoryDialog` — full-screen, 4×4 GridLayout of tile cards, each showing the title + teaser, witch/period iconography per tile_kind.
-4. Build `WitchTrialsTileDetailDialog` — full-screen, hero header (title + period_label), scrolling body with paragraph breaks, "Speak" button bound to the existing app TTS, optional auto-play when narrator-mode preference is on.
-5. Verify on Lenovo HNY0CY0W with `assembleDebug` + `installDebug` + force-stop + relaunch + tap through all 16 tiles. No crashes, no wrap clipping at 4×4 on the 10" display.
-6. Commit + push.
+Step-by-step for S130:
+1. Build `cache-proxy/scripts/bundle-witch-trials-newspapers-into-db.js` — mirror of `bundle-witch-trials-into-db.js` (S129) but for the `salem_witch_trials_newspapers` table. Source: PG `salem_witch_trials_newspapers` OR the existing Salem corpus newspapers JSON (whichever is already primed).
+2. Replace `showWitchTrialsNewspapersPlaceholder()` in `WitchTrialsMenuDialog.kt` with `WitchTrialsNewspaperBrowserDialog` — full-screen list/browser sorted chronologically, crisis-phase filter chips across the top, each row shows date + lede.
+3. Build `WitchTrialsNewspaperDetailDialog` — full-screen, date + long_date header, summary, body_points, `ttsFullText` Speak pill, reuse the same `tourViewModel.speakSheetSection(tag="witchtrials_newspaper", …)` pattern from S129.
+4. Verify on Lenovo HNY0CY0W.
+5. Commit + push.
 
-After S129 the History panel is a working reader (no cross-links yet, no audio asset-bundling — runtime TTS only). Newspaper panel + People panel still placeholder.
+After S130 the Oracle Newspaper panel is a working reader. People panel (S131) still placeholder.
 
-**Post-S128 key facts:**
-- **All 16 history articles in PG** (`salem_witch_trials_articles`). Body lengths 3,138-4,232 chars / 494-695 words. All `verified_date=NULL`, `admin_dirty=FALSE`, `data_source='ollama_direct_salem_village'`, `generator_model='ollama_direct_salem_village_gemma3_27b_q4km'`, `confidence=0.7`. Operator review (via admin tool, Phase 9X.7) pending.
-- **GPU-swap dance avoided.** S128's planned dance (SI down → Oracle up → Oracle generation → swap back) was bypassed by hitting Ollama directly — same `salem-village:latest` model the Oracle uses internally. Saved ~50 min of clock + service downtime. Same approach will work for 9X.5 NPC bios.
-- **`tools/witch-trials-generator/`** — new Python project. `salem_corpus_loader.py` (date-buckets `_all_facts.json`'s 1,743 dated facts), `prompts/{intro,monthly,quiet_month,fallout,closing,epilogue}.j2`, `generate_articles.py` (Ollama direct, --resume + --only flags, per-tile checkpoints in `output/`), `import_to_pg.py` (idempotent UPSERT, preserves `admin_dirty=TRUE` rows).
-- **Welcome dialog still hero + 2 below** (S127 work). Verified.
-- **3 PG tables** in production from S127: `salem_witch_trials_articles` (now populated), `salem_witch_trials_npc_bios` (still empty — S131), `salem_witch_trials_newspapers` (still empty — S130).
+**Post-S129 key facts:**
+- **Phase 9X.3 shipped end-to-end.** History 4×4 tile grid + tile detail dialog + Speak TTS + narrator-mode auto-play all live. Verified on Lenovo HNY0CY0W — fresh install, cold launch, welcome, hero, sub-menu, grid, tile #2, tile #16 all render clean; Speak fires NarrationMgr with tag `witchtrials_article_<nanos>`; dismiss cancels via `cancelSegmentsWithTag`.
+- **Two publish paths for article data**:
+  - `cache-proxy/scripts/publish-witch-trials.js` — writes `app-salem/src/main/assets/witch_trials/articles.json` (fallback path, used by the Repository's `hydrateArticlesIfNeeded()` if the bundled DB has <16 rows).
+  - `cache-proxy/scripts/bundle-witch-trials-into-db.js` — primary path, uses `better-sqlite3` to write the 16 rows directly into `app-salem/src/main/assets/salem_content.db` at build time. **This is the path that actually ships the data**; the JSON asset is defensive only. Needed because a patched/retrofitted Room asset DB silently dropped `@Insert` writes after a journal-mode flip (root cause not fully diagnosed — working theory: post-patch sqlite3-CLI rollback-journal DB confuses Room's WAL transition).
+- **Missing Phase 9X tables in the bundled DB** caused the first crash (`SQLiteException: no such table: salem_witch_trials_articles`). Fixed by baking the three tables (articles + npc_bios + newspapers) into the asset DB with the canonical CREATE TABLE SQL extracted from `SalemContentDatabase_Impl.java` (v7 identity hash `0545a31e8fb7ce05e575755b61532d46`). **S130/S131 must not re-introduce this issue** — any new Room entities added this phase need parallel table bakes into the asset DB.
+- **`cache-proxy/package.json` gained `better-sqlite3`** dependency as of S129 — do not remove.
+- **Verbose debug logging** added to `WitchTrialsRepository.hydrateArticlesIfNeeded` and `WitchTrialsMenuDialog.showWitchTrialsHistoryDialog`. Filter tag `WitchTrials` + `WitchTrialsRepo` in logcat.
+- **3 PG tables** in production: `salem_witch_trials_articles` (16 rows, bundled to DB), `salem_witch_trials_npc_bios` (empty — S131), `salem_witch_trials_newspapers` (empty or partial — S130 consolidates).
 - **Room DB version 7** unchanged.
-- **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 15 days out). Documented at S134 close.
+- **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 15 days out).
 - **PG: 1,868 active POIs** unchanged. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
 
-**Phase 9X status:** 2 / 8 sessions done. ~6 sessions of feature work ahead (S129–S134). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** 3 / 8 sessions done. ~5 sessions of feature work ahead (S130–S134). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -44,14 +46,14 @@ After S129 the History panel is a working reader (no cross-links yet, no audio a
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
 | **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
-| **9X** Salem Witch Trials Feature | **IN PROGRESS — 2/8 sessions done (S127, S128)** | **TOP PRIORITY (S129-S134).** S127 shipped foundation (hero+2-below welcome + 3-panel sub-menu + 3 PG tables). S128 shipped history-article generation pipeline + 16/16 articles in PG. Phase 9X.3 (S129) wires articles into the History 4×4 tile UI + detail dialog. |
+| **9X** Salem Witch Trials Feature | **IN PROGRESS — 3/8 sessions done (S127, S128, S129)** | **TOP PRIORITY (S130-S134).** S127 shipped foundation. S128 shipped history-article generation (16/16 in PG). S129 shipped the History 4×4 tile UI + detail dialog + Speak TTS. Phase 9X.4 (S130) wires the 202 newspapers into The Oracle Newspaper panel. |
 | **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 128. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 129. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

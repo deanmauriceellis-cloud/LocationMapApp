@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S118 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S119 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 119: 2026-04-12 — Hero image generation pipeline — 1,295 cartoon Halloween hero images
+
+Built complete hero image generation pipeline: SalemIntelligence export → Forge API batch generation (DreamShaper 8) → live QC web viewer → DB population. 1,295 images generated, 1,013 POIs updated with image_asset paths, bundled DB republished. 29 parking lot items captured covering app modes, UX overhaul, search, onboarding, and hero image refinement roadmap.
+
+Full session detail: `docs/session-logs/session-119-2026-04-12.md`. Commit: `67874e8`.
+
+---
 
 ## Session 118: 2026-04-12 — Phase 9U BCS import (976→2190 POIs), SalemPoi Room entity, walk sim overhaul
 

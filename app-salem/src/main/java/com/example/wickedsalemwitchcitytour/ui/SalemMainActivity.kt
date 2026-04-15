@@ -81,6 +81,7 @@ class SalemMainActivity : AppCompatActivity() {
     internal val geofenceViewModel: GeofenceViewModel by viewModels()
     internal val tourViewModel: TourViewModel by viewModels()
     internal val eventsViewModel: EventsViewModel by viewModels()
+    internal val witchTrialsViewModel: com.example.wickedsalemwitchcitytour.ui.witchtrials.WitchTrialsViewModel by viewModels()
 
     internal lateinit var appBarMenuManager: AppBarMenuManager
     internal val radarScheduler = RadarRefreshScheduler()
