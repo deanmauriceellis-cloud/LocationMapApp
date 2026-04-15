@@ -25,7 +25,7 @@ Deferred from Session 124 scope (still open):
 - ~~Remove NarrationPoint entity/DAO and legacy repository methods.~~ **DONE S126** (also removed SalemBusiness; TourPoi rerouted to salem_pois projection).
 - Heading-up rotation smoothness — currently **disabled** via `HEADING_UP_ENABLED=false`; redesign needed (GPS noise + sensor freeze). Code preserved.
 - ~~Admin `historical_note` field surfacing on General tab.~~ **Already done in S125 admin-tooling commits** — verified S126.
-- **NEW S126:** `tools/generate-poi-inventory-pdf.py` still queries the dropped `salem_tour_pois` / `salem_businesses` / `narration_points` tables and will error on next run. Operator inventory tool, not on the hot path. Rewrite to query `salem_pois` with category filters when needed.
+- ~~**NEW S126:** `tools/generate-poi-inventory-pdf.py` still queries the dropped legacy tables.~~ **DONE S126** (commit `fddd673`) — rewrote tool to read unified `salem_pois`, two sections (Tour vs Modern), category → subcategory grouping. Verified: 1,868 POIs in PDF.
 
 **Post-S125 key facts:**
 - PG: **1,868 active POIs** (211 soft-deleted this session by the stale-UUID sweep; tagged `dedup-stale-uuid-2026-04-14-loser` for pre-Play-Store hard-delete).
