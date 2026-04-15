@@ -35,6 +35,7 @@ import com.example.wickedsalemwitchcitytour.tour.NarrationState
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceEvent
 import com.example.wickedsalemwitchcitytour.tour.TourState
 import com.example.wickedsalemwitchcitytour.tour.TourSummary
+import com.example.wickedsalemwitchcitytour.ui.witchtrials.showWitchTrialsMenuDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
@@ -99,8 +100,55 @@ internal fun SalemMainActivity.showWelcomeDialog() {
         setPadding(0, 0, 0, dp(32))
     }
 
-    // ── Choice cards ──
-    fun choiceCard(
+    // ── HERO card (Phase 9X — Salem Witch Trials flagship) ──
+    //
+    // Full-width, prominent, gold-accent border, vertical layout: large icon +
+    // big serif title + subtitle ribbon. This is the marquee entry point.
+    val heroBg = GradientDrawable().apply {
+        // Slightly darker surface than the side cards to make the gold border pop
+        setColor(Color.parseColor("#1F1830"))
+        setStroke(dp(2), Color.parseColor(SALEM_GOLD))
+        cornerRadius = dp(14).toFloat()
+    }
+    val heroCard = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = heroBg
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(dp(20), dp(24), dp(20), dp(24))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            marginStart = dp(24); marginEnd = dp(24); bottomMargin = dp(16)
+        }
+        addView(TextView(this@showWelcomeDialog).apply {
+            text = "\uD83D\uDD2E"  // crystal ball — flagship icon
+            textSize = 40f
+            gravity = Gravity.CENTER
+        })
+        addView(TextView(this@showWelcomeDialog).apply {
+            text = "The Salem Witch Trials"
+            textSize = 22f
+            setTextColor(Color.parseColor(SALEM_GOLD))
+            setTypeface(Typeface.SERIF, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, 0)
+        })
+        addView(TextView(this@showWelcomeDialog).apply {
+            text = "History  \u00B7  Newspapers  \u00B7  People"
+            textSize = 13f
+            setTextColor(Color.parseColor(SALEM_TEXT))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, 0)
+        })
+        setOnClickListener {
+            dialog.dismiss()
+            showWitchTrialsMenuDialog()
+        }
+    }
+
+    // ── Compact bottom-row cards (Explore + Take a Tour, half-width each) ──
+    fun compactCard(
         icon: String, label: String, desc: String, onClick: () -> Unit
     ): LinearLayout {
         val bg = GradientDrawable().apply {
@@ -108,50 +156,57 @@ internal fun SalemMainActivity.showWelcomeDialog() {
             cornerRadius = dp(12).toFloat()
         }
         return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = LinearLayout.VERTICAL
             background = bg
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(20))
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
             ).apply {
-                marginStart = dp(24); marginEnd = dp(24); bottomMargin = dp(16)
+                marginStart = dp(8); marginEnd = dp(8)
             }
-            // Icon
             addView(TextView(this@showWelcomeDialog).apply {
-                text = icon; textSize = 32f
-                setPadding(0, 0, dp(16), 0)
+                text = icon; textSize = 28f
+                gravity = Gravity.CENTER
             })
-            // Text column
-            val col = LinearLayout(this@showWelcomeDialog).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            col.addView(TextView(this@showWelcomeDialog).apply {
-                text = label; textSize = 18f
+            addView(TextView(this@showWelcomeDialog).apply {
+                text = label; textSize = 16f
                 setTextColor(Color.parseColor(SALEM_GOLD))
                 setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(6), 0, 0)
             })
-            col.addView(TextView(this@showWelcomeDialog).apply {
-                text = desc; textSize = 13f
-                setTextColor(Color.parseColor(SALEM_TEXT))
+            addView(TextView(this@showWelcomeDialog).apply {
+                text = desc; textSize = 11f
+                setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+                gravity = Gravity.CENTER
                 setPadding(0, dp(4), 0, 0)
             })
-            addView(col)
             setOnClickListener { onClick() }
         }
     }
 
-    val exploreCard = choiceCard(
+    val exploreCard = compactCard(
         "\uD83D\uDDFA", "Explore Salem",
-        "See what\u2019s around you. Browse the map freely."
+        "Browse the map freely."
     ) { dialog.dismiss() }
 
-    val tourCard = choiceCard(
+    val tourCard = compactCard(
         "\uD83D\uDEB6", "Take a Tour",
-        "Guided walking tours with GPS narration."
+        "Guided GPS walking tours."
     ) { dialog.dismiss(); showTourSelectionDialog() }
+
+    val bottomRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            marginStart = dp(16); marginEnd = dp(16)
+        }
+        addView(exploreCard)
+        addView(tourCard)
+    }
 
     // ── Hint ──
     val hint = TextView(this).apply {
@@ -172,8 +227,8 @@ internal fun SalemMainActivity.showWelcomeDialog() {
         background = bg
         addView(title)
         addView(subtitle)
-        addView(exploreCard)
-        addView(tourCard)
+        addView(heroCard)
+        addView(bottomRow)
         addView(hint)
     }
 

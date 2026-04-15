@@ -173,6 +173,9 @@ interface MenuEventListener {
     /** Toggle debug banner visibility for silent background POI fill. */
     fun onSilentFillDebugToggled(enabled: Boolean)
 
+    /** Phase 9X: Witch Trials feature — when on, detail screens auto-speak the body. */
+    fun onNarratorModeToggled(enabled: Boolean) {}
+
     // =========================================================================
     // ALERTS / GEOFENCE
     // =========================================================================

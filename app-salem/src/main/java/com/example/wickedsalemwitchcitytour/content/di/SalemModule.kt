@@ -44,4 +44,8 @@ object SalemModule {
     @Provides fun provideTourStopDao(db: SalemContentDatabase): TourStopDao = db.tourStopDao()
     @Provides fun provideEventsCalendarDao(db: SalemContentDatabase): EventsCalendarDao = db.eventsCalendarDao()
     @Provides fun provideSalemPoiDao(db: SalemContentDatabase): SalemPoiDao = db.salemPoiDao()
+
+    @Provides fun provideWitchTrialsArticleDao(db: SalemContentDatabase): WitchTrialsArticleDao = db.witchTrialsArticleDao()
+    @Provides fun provideWitchTrialsNpcBioDao(db: SalemContentDatabase): WitchTrialsNpcBioDao = db.witchTrialsNpcBioDao()
+    @Provides fun provideWitchTrialsNewspaperDao(db: SalemContentDatabase): WitchTrialsNewspaperDao = db.witchTrialsNewspaperDao()
 }

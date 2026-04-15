@@ -3921,6 +3921,12 @@ class SalemMainActivity : AppCompatActivity() {
             toggleLocationMode()
         }
 
+        override fun onNarratorModeToggled(enabled: Boolean) {
+            DebugLogger.i("SalemMainActivity", "onNarratorModeToggled: $enabled")
+            toast(if (enabled) "Narrator Mode: ON — detail screens auto-speak"
+                  else "Narrator Mode: OFF")
+        }
+
         // ── Alerts / Geofence ─────────────────────────────────────────────────
 
         override fun onAlertsRequested() {

@@ -382,3 +382,136 @@ CREATE INDEX IF NOT EXISTS idx_spois_wave            ON salem_pois (wave) WHERE 
 CREATE INDEX IF NOT EXISTS idx_spois_intel_entity    ON salem_pois (intel_entity_id) WHERE intel_entity_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_spois_tour            ON salem_pois (id) WHERE is_tour_poi = true;
 CREATE INDEX IF NOT EXISTS idx_spois_district        ON salem_pois (district) WHERE district IS NOT NULL;
+
+-- ════════════════════════════════════════════════════════════════════
+-- The Salem Witch Trials feature (Phase 9X, S127)
+--
+-- Three tables backing the new top-level "Salem Witch Trials" panel:
+--   salem_witch_trials_articles   — 16 history tile articles
+--                                   (intro + 12 months of 1692 + fallout +
+--                                    closing + epilogue)
+--   salem_witch_trials_npc_bios   — ~49 Tier 1+2 NPC biographies
+--   salem_witch_trials_newspapers — 202 1692-era newspaper articles
+--                                   (sourced from ~/Development/Salem)
+--
+-- All three follow the salem_pois pattern: admin_dirty + soft-delete
+-- + provenance fields (data_source / confidence / verified_date), so
+-- the admin web tool can edit drafts and the publish script can bake
+-- non-deleted rows into bundled JSON assets in the APK.
+-- ════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS salem_witch_trials_articles (
+  -- Identity
+  id                     TEXT PRIMARY KEY,                       -- e.g. 'pre_1692', 'jan_1692', ..., 'fallout_1693', 'closing', 'epilogue'
+  tile_order             INTEGER NOT NULL,                       -- 1..16 (display order in 4x4 grid)
+  tile_kind              TEXT NOT NULL,                          -- 'intro' | 'month' | 'fallout' | 'closing' | 'epilogue'
+  -- Content
+  title                  TEXT NOT NULL,                          -- e.g. 'March 1692 — The Examinations Begin'
+  period_label           TEXT,                                   -- e.g. 'March 1, 1692 → March 31, 1692'
+  teaser                 TEXT NOT NULL,                          -- ~80 word card-face summary
+  body                   TEXT NOT NULL,                          -- 500-1000 word article body, may contain [[entity_id]] markup
+  -- Cross-link metadata
+  related_npc_ids        JSONB NOT NULL DEFAULT '[]',            -- NPC ids referenced in body
+  related_event_ids      JSONB NOT NULL DEFAULT '[]',            -- event ids referenced in body
+  related_newspaper_dates JSONB NOT NULL DEFAULT '[]',           -- newspaper YYYY-MM-DD strings referenced
+  -- Provenance
+  data_source            TEXT NOT NULL DEFAULT 'salem_oracle',   -- 'salem_oracle' | 'claude_generated' | 'human_authored'
+  confidence             REAL NOT NULL DEFAULT 0.7,
+  verified_date          TIMESTAMPTZ,                            -- NULL until human-reviewed
+  generator_model        TEXT,                                   -- e.g. 'gemma3:27b'
+  generator_prompt_hash  TEXT,                                   -- so we can detect prompt drift
+  -- Editorial workflow
+  admin_dirty            BOOLEAN NOT NULL DEFAULT FALSE,         -- flipped TRUE by admin tool edits
+  admin_dirty_at         TIMESTAMPTZ,
+  -- Lifecycle
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at             TIMESTAMPTZ                             -- soft delete (NULL = active)
+);
+
+CREATE INDEX IF NOT EXISTS idx_swta_order         ON salem_witch_trials_articles (tile_order);
+CREATE INDEX IF NOT EXISTS idx_swta_kind          ON salem_witch_trials_articles (tile_kind);
+CREATE INDEX IF NOT EXISTS idx_swta_active        ON salem_witch_trials_articles (id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_swta_admin_dirty   ON salem_witch_trials_articles (admin_dirty) WHERE admin_dirty = TRUE;
+CREATE INDEX IF NOT EXISTS idx_swta_unverified    ON salem_witch_trials_articles (verified_date) WHERE verified_date IS NULL;
+
+
+CREATE TABLE IF NOT EXISTS salem_witch_trials_npc_bios (
+  -- Identity (id matches Salem corpus NPC id, e.g. 'rebecca_nurse')
+  id                     TEXT PRIMARY KEY,
+  name                   TEXT NOT NULL,                          -- 'Rebecca Nurse'
+  display_name           TEXT,                                   -- 'Rebecca Towne Nurse' (longer form for header)
+  -- Salem-corpus metadata snapshot (for fast reads w/o hitting JSON)
+  tier                   INTEGER NOT NULL,                       -- 1 or 2 (V1 ships Tier 1+2 only)
+  role                   TEXT NOT NULL,                          -- 'Lead judge of the Court of Oyer and Terminer'
+  faction                TEXT,                                   -- 'Authority (hardliner)' | 'Accused' | 'Accuser' etc
+  born_year              INTEGER,
+  died_year              INTEGER,
+  age_in_1692            INTEGER,
+  historical_outcome     TEXT,                                   -- 1-2 sentence outcome summary (e.g. 'Executed July 19, 1692. Pardoned 1711.')
+  -- Generated content
+  bio                    TEXT NOT NULL,                          -- ~500 word LLM bio, may contain [[entity_id]] markup
+  -- Cross-link metadata
+  related_npc_ids        JSONB NOT NULL DEFAULT '[]',
+  related_event_ids      JSONB NOT NULL DEFAULT '[]',
+  related_newspaper_dates JSONB NOT NULL DEFAULT '[]',
+  -- Portrait (Phase 6)
+  portrait_asset         TEXT,                                   -- 'witch_trials/portraits/rebecca_nurse.jpg' (NULL until Phase 6)
+  -- Provenance
+  data_source            TEXT NOT NULL DEFAULT 'salem_oracle',
+  confidence             REAL NOT NULL DEFAULT 0.7,
+  verified_date          TIMESTAMPTZ,
+  generator_model        TEXT,
+  generator_prompt_hash  TEXT,
+  -- Editorial workflow
+  admin_dirty            BOOLEAN NOT NULL DEFAULT FALSE,
+  admin_dirty_at         TIMESTAMPTZ,
+  -- Lifecycle
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at             TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_swtnb_tier         ON salem_witch_trials_npc_bios (tier);
+CREATE INDEX IF NOT EXISTS idx_swtnb_faction      ON salem_witch_trials_npc_bios (faction);
+CREATE INDEX IF NOT EXISTS idx_swtnb_active       ON salem_witch_trials_npc_bios (id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_swtnb_admin_dirty  ON salem_witch_trials_npc_bios (admin_dirty) WHERE admin_dirty = TRUE;
+CREATE INDEX IF NOT EXISTS idx_swtnb_unverified   ON salem_witch_trials_npc_bios (verified_date) WHERE verified_date IS NULL;
+
+
+CREATE TABLE IF NOT EXISTS salem_witch_trials_newspapers (
+  -- Identity (id matches Salem corpus, e.g. 'salem_oracle_1692-03-01')
+  id                     TEXT PRIMARY KEY,
+  date                   TEXT NOT NULL,                          -- ISO YYYY-MM-DD (e.g. '1692-03-01')
+  day_of_week            TEXT,                                   -- 'Tuesday'
+  long_date              TEXT,                                   -- 'March 1, 1692'
+  crisis_phase           INTEGER NOT NULL DEFAULT 0,             -- 0=pre-crisis .. 6=aftermath
+  -- Content (denormalized for fast read)
+  summary                TEXT,                                   -- 1-2 sentence summary (card face)
+  lede                   TEXT,                                   -- opening paragraph
+  body_points            JSONB DEFAULT '[]',                     -- bullet list of mid-article points
+  tts_full_text          TEXT NOT NULL,                          -- full narrative for TTS / detail screen body
+  -- Source attribution
+  events_referenced      JSONB DEFAULT '[]',
+  event_count            INTEGER DEFAULT 0,
+  fact_count             INTEGER DEFAULT 0,
+  primary_source_count   INTEGER DEFAULT 0,
+  -- Provenance
+  data_source            TEXT NOT NULL DEFAULT 'salem_corpus',   -- bundled from ~/Development/Salem newspapers
+  confidence             REAL NOT NULL DEFAULT 0.85,
+  verified_date          TIMESTAMPTZ,
+  generator_model        TEXT,                                   -- 'salem-village (gemma3:27b)' from corpus
+  generated_at           TIMESTAMPTZ,                            -- as produced by Salem corpus
+  -- Editorial workflow
+  admin_dirty            BOOLEAN NOT NULL DEFAULT FALSE,
+  admin_dirty_at         TIMESTAMPTZ,
+  -- Lifecycle
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at             TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_swtn_date          ON salem_witch_trials_newspapers (date);
+CREATE INDEX IF NOT EXISTS idx_swtn_phase         ON salem_witch_trials_newspapers (crisis_phase);
+CREATE INDEX IF NOT EXISTS idx_swtn_active        ON salem_witch_trials_newspapers (id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_swtn_admin_dirty   ON salem_witch_trials_newspapers (admin_dirty) WHERE admin_dirty = TRUE;

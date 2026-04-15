@@ -77,4 +77,8 @@ object MenuPrefs {
     const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
     const val PREF_POPULATE_POIS         = "populate_pois_on"
     const val PREF_SILENT_FILL_DEBUG     = "silent_fill_debug_on"
+
+    // ── Witch Trials feature (Phase 9X, S127) ─────────────────────────────
+    /** When true, detail screens (history tile, newspaper, NPC bio) auto-speak the body 1s after open. */
+    const val PREF_NARRATOR_MODE_ENABLED = "narrator_mode_enabled"
 }

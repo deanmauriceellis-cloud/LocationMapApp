@@ -714,6 +714,9 @@ class AppBarMenuManager(
                 R.id.menu_util_silent_fill_debug ->
                     toggleBinary(item, MenuPrefs.PREF_SILENT_FILL_DEBUG) { menuEventListener.onSilentFillDebugToggled(it) }
 
+                R.id.menu_util_narrator_mode ->
+                    toggleBinary(item, MenuPrefs.PREF_NARRATOR_MODE_ENABLED) { menuEventListener.onNarratorModeToggled(it) }
+
                 R.id.menu_util_legend -> menuEventListener.onLegendRequested()
 
                 else -> {
@@ -726,7 +729,8 @@ class AppBarMenuManager(
         syncCheckStates(popup.menu,
             R.id.menu_util_record_gps          to MenuPrefs.PREF_RECORD_GPS,
             R.id.menu_util_gps_mode            to MenuPrefs.PREF_GPS_MODE,
-            R.id.menu_util_silent_fill_debug   to MenuPrefs.PREF_SILENT_FILL_DEBUG
+            R.id.menu_util_silent_fill_debug   to MenuPrefs.PREF_SILENT_FILL_DEBUG,
+            R.id.menu_util_narrator_mode       to MenuPrefs.PREF_NARRATOR_MODE_ENABLED
         )
         // Update populate title to reflect running state
         val popRunning = prefs.getBoolean(MenuPrefs.PREF_POPULATE_POIS, false)

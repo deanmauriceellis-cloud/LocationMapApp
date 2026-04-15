@@ -89,4 +89,11 @@
         android:title="Map Legend"
         app:showAsAction="never" />
 
+    <!-- Phase 9X: Witch Trials narrator mode (auto-speak detail screen body) -->
+    <item
+        android:id="@+id/menu_util_narrator_mode"
+        android:title="Narrator Mode (auto-speak)"
+        android:checkable="true"
+        app:showAsAction="never" />
+
 </menu>
