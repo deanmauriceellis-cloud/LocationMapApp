@@ -10,52 +10,83 @@
 package com.example.wickedsalemwitchcitytour.content.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.RewriteQueriesToDropUnusedColumns
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 
+/**
+ * Phase 9U: legacy `tour_pois` table dropped. Surviving call sites
+ * (TourEngine.getTourPoiById, TourEngine.getAllTourPois, TourViewModel)
+ * read from `salem_pois` projected into TourPoi shape. Same projection
+ * TourStopDao.findTourPoisByTour uses.
+ */
 @Dao
 interface TourPoiDao {
 
-    @Query("SELECT * FROM tour_pois WHERE id = :id")
+    @Query("""
+        SELECT
+            p.id                       AS id,
+            p.name                     AS name,
+            p.lat                      AS lat,
+            p.lng                      AS lng,
+            COALESCE(p.address, '')    AS address,
+            p.category                 AS category,
+            p.subcategory              AS subcategories,
+            p.short_narration          AS short_narration,
+            p.long_narration           AS long_narration,
+            p.description              AS description,
+            p.historical_period        AS historical_period,
+            p.admission_info           AS admission_info,
+            p.hours                    AS hours,
+            p.phone                    AS phone,
+            p.website                  AS website,
+            p.image_asset              AS image_asset,
+            p.geofence_radius_m        AS geofence_radius_m,
+            p.requires_transportation  AS requires_transportation,
+            p.wheelchair_accessible    AS wheelchair_accessible,
+            p.seasonal                 AS seasonal,
+            p.priority                 AS priority,
+            p.data_source              AS data_source,
+            p.confidence               AS confidence,
+            NULL                       AS verified_date,
+            0                          AS created_at,
+            0                          AS updated_at,
+            0                          AS stale_after
+        FROM salem_pois p
+        WHERE p.id = :id
+    """)
     suspend fun findById(id: String): TourPoi?
 
-    @Query("SELECT * FROM tour_pois WHERE category = :category ORDER BY priority ASC, name ASC")
-    suspend fun findByCategory(category: String): List<TourPoi>
-
-    @RewriteQueriesToDropUnusedColumns
     @Query("""
-        SELECT *,
-          ((:lat - lat) * (:lat - lat) + (:lng - lng) * (:lng - lng)) AS dist_sq
-        FROM tour_pois
-        WHERE lat BETWEEN :lat - :radiusDeg AND :lat + :radiusDeg
-          AND lng BETWEEN :lng - :radiusDeg AND :lng + :radiusDeg
-        ORDER BY dist_sq ASC
+        SELECT
+            p.id                       AS id,
+            p.name                     AS name,
+            p.lat                      AS lat,
+            p.lng                      AS lng,
+            COALESCE(p.address, '')    AS address,
+            p.category                 AS category,
+            p.subcategory              AS subcategories,
+            p.short_narration          AS short_narration,
+            p.long_narration           AS long_narration,
+            p.description              AS description,
+            p.historical_period        AS historical_period,
+            p.admission_info           AS admission_info,
+            p.hours                    AS hours,
+            p.phone                    AS phone,
+            p.website                  AS website,
+            p.image_asset              AS image_asset,
+            p.geofence_radius_m        AS geofence_radius_m,
+            p.requires_transportation  AS requires_transportation,
+            p.wheelchair_accessible    AS wheelchair_accessible,
+            p.seasonal                 AS seasonal,
+            p.priority                 AS priority,
+            p.data_source              AS data_source,
+            p.confidence               AS confidence,
+            NULL                       AS verified_date,
+            0                          AS created_at,
+            0                          AS updated_at,
+            0                          AS stale_after
+        FROM salem_pois p
+        ORDER BY p.priority ASC, p.name ASC
     """)
-    suspend fun findNearby(lat: Double, lng: Double, radiusDeg: Double): List<TourPoi>
-
-    @Query("SELECT * FROM tour_pois WHERE name LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' ORDER BY priority ASC")
-    suspend fun search(query: String): List<TourPoi>
-
-    @Query("SELECT * FROM tour_pois ORDER BY priority ASC, name ASC")
     suspend fun findAll(): List<TourPoi>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(pois: List<TourPoi>)
-
-    // --- Provenance & Staleness ---
-
-    @Query("SELECT * FROM tour_pois WHERE stale_after > 0 AND stale_after < :now ORDER BY stale_after ASC")
-    suspend fun findStale(now: Long): List<TourPoi>
-
-    @Query("SELECT * FROM tour_pois WHERE data_source = :source ORDER BY name ASC")
-    suspend fun findBySource(source: String): List<TourPoi>
-
-    @Query("UPDATE tour_pois SET updated_at = :now WHERE id = :id")
-    suspend fun markUpdated(id: String, now: Long)
-
-    @Query("UPDATE tour_pois SET stale_after = :staleAfter WHERE id = :id")
-    suspend fun setStaleAfter(id: String, staleAfter: Long)
 }

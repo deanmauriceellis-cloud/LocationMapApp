@@ -16,8 +16,6 @@ import com.example.wickedsalemwitchcitytour.content.model.*
 
 @Database(
     entities = [
-        TourPoi::class,
-        SalemBusiness::class,
         HistoricalFigure::class,
         HistoricalFact::class,
         TimelineEvent::class,
@@ -25,15 +23,13 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         Tour::class,
         TourStop::class,
         EventsCalendar::class,
-        NarrationPoint::class,
         SalemPoi::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class SalemContentDatabase : RoomDatabase() {
     abstract fun tourPoiDao(): TourPoiDao
-    abstract fun salemBusinessDao(): SalemBusinessDao
     abstract fun historicalFigureDao(): HistoricalFigureDao
     abstract fun historicalFactDao(): HistoricalFactDao
     abstract fun timelineEventDao(): TimelineEventDao
@@ -41,6 +37,5 @@ abstract class SalemContentDatabase : RoomDatabase() {
     abstract fun tourDao(): TourDao
     abstract fun tourStopDao(): TourStopDao
     abstract fun eventsCalendarDao(): EventsCalendarDao
-    abstract fun narrationPointDao(): NarrationPointDao
     abstract fun salemPoiDao(): SalemPoiDao
 }

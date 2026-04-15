@@ -21,7 +21,6 @@ import javax.inject.Singleton
 @Singleton
 class SalemContentRepository @Inject constructor(
     private val tourPoiDao: TourPoiDao,
-    private val salemBusinessDao: SalemBusinessDao,
     private val historicalFigureDao: HistoricalFigureDao,
     private val historicalFactDao: HistoricalFactDao,
     private val timelineEventDao: TimelineEventDao,
@@ -29,7 +28,6 @@ class SalemContentRepository @Inject constructor(
     private val tourDao: TourDao,
     private val tourStopDao: TourStopDao,
     private val eventsCalendarDao: EventsCalendarDao,
-    private val narrationPointDao: NarrationPointDao,
     private val salemPoiDao: SalemPoiDao
 ) {
 
@@ -44,38 +42,11 @@ class SalemContentRepository @Inject constructor(
     /** Get the full TourPoi objects for each stop in a tour, ordered. */
     suspend fun getTourPois(tourId: String): List<TourPoi> = tourStopDao.findTourPoisByTour(tourId)
 
-    // ── Tour POIs ────────────────────────────────────────────────────────
+    // ── Tour POIs (project from salem_pois — Phase 9U) ───────────────────
 
     suspend fun getAllTourPois(): List<TourPoi> = tourPoiDao.findAll()
 
     suspend fun getTourPoiById(id: String): TourPoi? = tourPoiDao.findById(id)
-
-    suspend fun getTourPoisByCategory(category: String): List<TourPoi> =
-        tourPoiDao.findByCategory(category)
-
-    /**
-     * Find tour POIs within [radiusM] meters of the given point.
-     * Converts meters to approximate degrees for the bounding-box pre-filter.
-     */
-    suspend fun getTourPoisNearby(lat: Double, lng: Double, radiusM: Double): List<TourPoi> {
-        val radiusDeg = radiusM / 111_000.0
-        return tourPoiDao.findNearby(lat, lng, radiusDeg)
-    }
-
-    suspend fun searchTourPois(query: String): List<TourPoi> = tourPoiDao.search(query)
-
-    // ── Businesses ───────────────────────────────────────────────────────
-
-    suspend fun getBusinessesByType(type: String): List<SalemBusiness> =
-        salemBusinessDao.findByType(type)
-
-    suspend fun getBusinessesNearby(lat: Double, lng: Double, radiusM: Double): List<SalemBusiness> {
-        val radiusDeg = radiusM / 111_000.0
-        return salemBusinessDao.findNearby(lat, lng, radiusDeg)
-    }
-
-    suspend fun searchBusinesses(query: String): List<SalemBusiness> =
-        salemBusinessDao.search(query)
 
     // ── Historical Figures ───────────────────────────────────────────────
 
@@ -134,64 +105,9 @@ class SalemContentRepository @Inject constructor(
 
     // ── Provenance & Staleness ─────────────────────────────────────────
 
-    /** Find all stale tour POIs (stale_after > 0 and expired). */
-    suspend fun getStaleTourPois(): List<TourPoi> =
-        tourPoiDao.findStale(System.currentTimeMillis())
-
-    /** Find all stale businesses. */
-    suspend fun getStaleBusinesses(): List<SalemBusiness> =
-        salemBusinessDao.findStale(System.currentTimeMillis())
-
     /** Find all stale events. */
     suspend fun getStaleEvents(): List<EventsCalendar> =
         eventsCalendarDao.findStale(System.currentTimeMillis())
-
-    /** Find tour POIs by data source. */
-    suspend fun getTourPoisBySource(source: String): List<TourPoi> =
-        tourPoiDao.findBySource(source)
-
-    /** Find businesses by data source. */
-    suspend fun getBusinessesBySource(source: String): List<SalemBusiness> =
-        salemBusinessDao.findBySource(source)
-
-    /** Touch the updated_at timestamp for a tour POI. */
-    suspend fun markTourPoiUpdated(id: String) =
-        tourPoiDao.markUpdated(id, System.currentTimeMillis())
-
-    /** Touch the updated_at timestamp for a business. */
-    suspend fun markBusinessUpdated(id: String) =
-        salemBusinessDao.markUpdated(id, System.currentTimeMillis())
-
-    // ── Narration Points (Phase 9T) ────────────────────────────────────
-
-    suspend fun getAllNarrationPoints(): List<NarrationPoint> = narrationPointDao.getAll()
-
-    suspend fun getNarrationPointById(id: String): NarrationPoint? = narrationPointDao.findById(id)
-
-    suspend fun getNarrationPointsByType(type: String): List<NarrationPoint> =
-        narrationPointDao.findByType(type)
-
-    suspend fun getNarrationPointsByWave(wave: Int): List<NarrationPoint> =
-        narrationPointDao.findByWave(wave)
-
-    suspend fun getNarrationPointsNearby(lat: Double, lng: Double, radiusM: Double): List<NarrationPoint> {
-        val radiusDeg = radiusM / 111_000.0
-        return narrationPointDao.findNearby(lat, lng, radiusDeg)
-    }
-
-    suspend fun getNarrationPointsInBbox(
-        latMin: Double, latMax: Double, lngMin: Double, lngMax: Double
-    ): List<NarrationPoint> = narrationPointDao.findInBbox(latMin, latMax, lngMin, lngMax)
-
-    suspend fun searchNarrationPoints(query: String): List<NarrationPoint> =
-        narrationPointDao.search(query)
-
-    suspend fun getNarrationPointCount(): Int = narrationPointDao.count()
-
-    suspend fun getNarrationPointsWithNarration(): Int = narrationPointDao.countWithNarration()
-
-    suspend fun insertNarrationPoints(points: List<NarrationPoint>) =
-        narrationPointDao.insertAll(points)
 
     // ── Unified POIs (Phase 9U — salem_pois table) ───────────────────────
 
@@ -246,8 +162,6 @@ class SalemContentRepository @Inject constructor(
 
     // ── Bulk Insert (for content pipeline) ───────────────────────────────
 
-    suspend fun insertTourPois(pois: List<TourPoi>) = tourPoiDao.insertAll(pois)
-    suspend fun insertBusinesses(businesses: List<SalemBusiness>) = salemBusinessDao.insertAll(businesses)
     suspend fun insertFigures(figures: List<HistoricalFigure>) = historicalFigureDao.insertAll(figures)
     suspend fun insertFacts(facts: List<HistoricalFact>) = historicalFactDao.insertAll(facts)
     suspend fun insertTimelineEvents(events: List<TimelineEvent>) = timelineEventDao.insertAll(events)

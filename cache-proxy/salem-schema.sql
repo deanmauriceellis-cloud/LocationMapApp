@@ -21,161 +21,16 @@ CREATE INDEX IF NOT EXISTS idx_pois_data_source ON pois (data_source);
 CREATE INDEX IF NOT EXISTS idx_pois_stale_after ON pois (stale_after) WHERE stale_after IS NOT NULL;
 
 -- ════════════════════════════════════════════════════════════════════
--- Salem Tour POIs — curated tour-worthy locations with narration
+-- Legacy POI tables — REMOVED in Phase 9U (Session 126, 2026-04-15)
 -- ════════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS salem_tour_pois (
-  id                     TEXT PRIMARY KEY,
-  name                   TEXT NOT NULL,
-  lat                    DOUBLE PRECISION NOT NULL,
-  lng                    DOUBLE PRECISION NOT NULL,
-  address                TEXT NOT NULL,
-  category               TEXT NOT NULL,
-  subcategories          JSONB DEFAULT '[]',
-  short_narration        TEXT,
-  long_narration         TEXT,
-  description            TEXT,
-  historical_period      TEXT,
-  admission_info         TEXT,
-  hours                  TEXT,
-  phone                  TEXT,
-  website                TEXT,
-  image_asset            TEXT,
-  geofence_radius_m      INTEGER DEFAULT 50,
-  requires_transportation BOOLEAN DEFAULT FALSE,
-  wheelchair_accessible  BOOLEAN DEFAULT TRUE,
-  seasonal               BOOLEAN DEFAULT FALSE,
-  priority               INTEGER DEFAULT 3,
-  -- Provenance & Staleness
-  data_source            TEXT NOT NULL DEFAULT 'manual_curated',
-  confidence             REAL NOT NULL DEFAULT 1.0,
-  verified_date          TIMESTAMPTZ,
-  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  stale_after            TIMESTAMPTZ,
-  deleted_at             TIMESTAMPTZ                        -- soft delete (NULL = active), Phase 9P.4
-);
-
--- Phase 9P.4: backfill deleted_at on existing deployments
-ALTER TABLE salem_tour_pois ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-
-CREATE INDEX IF NOT EXISTS idx_salem_pois_category ON salem_tour_pois (category);
-CREATE INDEX IF NOT EXISTS idx_salem_pois_lat_lng ON salem_tour_pois (lat, lng);
-CREATE INDEX IF NOT EXISTS idx_salem_pois_data_source ON salem_tour_pois (data_source);
-CREATE INDEX IF NOT EXISTS idx_salem_pois_stale ON salem_tour_pois (stale_after) WHERE stale_after IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_salem_pois_active ON salem_tour_pois (id) WHERE deleted_at IS NULL;
-
+-- The three pre-unification tables — salem_tour_pois, salem_businesses,
+-- salem_narration_points — were merged into salem_pois in Phase 9U
+-- (Session 117, see below) and dropped from PG. Their CREATE statements
+-- and indexes have been removed from this file. The old importer
+-- scripts (cache-proxy/scripts/import-narration-points.js,
+-- import-tour-pois-and-businesses.js, migrate-to-unified-pois.js) are
+-- preserved in git history; do not re-run them.
 -- ════════════════════════════════════════════════════════════════════
--- Salem Businesses — restaurants, bars, shops, lodging, attractions
--- ════════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS salem_businesses (
-  id                TEXT PRIMARY KEY,
-  name              TEXT NOT NULL,
-  lat               DOUBLE PRECISION NOT NULL,
-  lng               DOUBLE PRECISION NOT NULL,
-  address           TEXT NOT NULL,
-  business_type     TEXT NOT NULL,
-  cuisine_type      TEXT,
-  price_range       TEXT,
-  hours             TEXT,
-  phone             TEXT,
-  website           TEXT,
-  description       TEXT,
-  historical_note   TEXT,
-  tags              JSONB DEFAULT '[]',
-  rating            REAL,
-  image_asset       TEXT,
-  -- Provenance & Staleness
-  data_source       TEXT NOT NULL DEFAULT 'manual_curated',
-  confidence        REAL NOT NULL DEFAULT 1.0,
-  verified_date     TIMESTAMPTZ,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  stale_after       TIMESTAMPTZ,
-  deleted_at        TIMESTAMPTZ                              -- soft delete (NULL = active), Phase 9P.4
-);
-
--- Phase 9P.4: backfill deleted_at on existing deployments
-ALTER TABLE salem_businesses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-
-CREATE INDEX IF NOT EXISTS idx_salem_biz_type ON salem_businesses (business_type);
-CREATE INDEX IF NOT EXISTS idx_salem_biz_lat_lng ON salem_businesses (lat, lng);
-CREATE INDEX IF NOT EXISTS idx_salem_biz_data_source ON salem_businesses (data_source);
-CREATE INDEX IF NOT EXISTS idx_salem_biz_stale ON salem_businesses (stale_after) WHERE stale_after IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_salem_biz_active ON salem_businesses (id) WHERE deleted_at IS NULL;
-
--- ════════════════════════════════════════════════════════════════════
--- Salem Narration Points — ambient narration POIs (Phase 9P, Session 98)
--- Imported from tools/salem-data/narration-priority-pois.json and the
--- bundled narration_points table in salem-content/salem_content.sql.
--- PostgreSQL becomes the canonical source of truth going forward; the
--- JSON files retire to historical-artifact status after the migration.
--- ════════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS salem_narration_points (
-  id                 TEXT PRIMARY KEY,
-  name               TEXT NOT NULL,
-  lat                DOUBLE PRECISION NOT NULL,
-  lng                DOUBLE PRECISION NOT NULL,
-  address            TEXT,
-  -- Bundled SQL uses 'type' for category; we use 'category' to match PoiCategories.kt
-  -- and CMS conventions. Importer maps bundled.type → category.
-  category           TEXT NOT NULL,
-  subcategory        TEXT,
-  -- Narration content
-  -- Tier system (geofence trigger duration):
-  --   short_narration = walk-by geofence trigger (~20-50 words, TTS announcement)
-  --   long_narration  = detail view / linger (~200-500 words)
-  short_narration    TEXT,
-  long_narration     TEXT,
-  description        TEXT,
-  -- Geofence + tour metadata
-  geofence_radius_m  INTEGER NOT NULL DEFAULT 40,
-  geofence_shape     TEXT NOT NULL DEFAULT 'circle',  -- 'circle' | 'corridor'
-  corridor_points    TEXT,                              -- serialized polyline for corridor shape
-  priority           INTEGER NOT NULL DEFAULT 3,
-  wave               INTEGER,
-  -- Contact metadata
-  phone              TEXT,
-  website            TEXT,
-  hours              TEXT,
-  -- Media assets (default — merchant overrides below take precedence at runtime)
-  image_asset        TEXT,
-  voice_clip_asset   TEXT,
-  -- Cross-references to historical content (populated by Phase 9Q building→POI bridge backfill)
-  related_figure_ids JSONB DEFAULT '[]',
-  related_fact_ids   JSONB DEFAULT '[]',
-  related_source_ids JSONB DEFAULT '[]',
-  -- Action button JSON config (Visit / Directions / More Info / etc.)
-  action_buttons     JSONB DEFAULT '[]',
-  -- Merchant advertising fields (foundation for Phase 17; populated/edited later)
-  merchant_tier      INTEGER NOT NULL DEFAULT 0,       -- 0=none, 1=basic, 2=premium, 3=featured
-  ad_priority        INTEGER NOT NULL DEFAULT 0,       -- queue priority boost for paying merchants
-  custom_icon_asset  TEXT,                              -- merchant-supplied icon override
-  custom_voice_asset TEXT,                              -- merchant-supplied voice clip override
-  custom_description TEXT,                              -- merchant-supplied description override
-  -- Source metadata (where this POI came from)
-  source_id          TEXT,
-  source_categories  JSONB DEFAULT '[]',
-  tags               JSONB DEFAULT '[]',
-  -- Provenance & Staleness (matches existing salem_* table pattern)
-  data_source        TEXT NOT NULL DEFAULT 'overpass_import',
-  confidence         REAL NOT NULL DEFAULT 0.8,
-  verified_date      TIMESTAMPTZ,
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  stale_after        TIMESTAMPTZ,
-  deleted_at         TIMESTAMPTZ                        -- soft delete (NULL = active)
-);
-
-CREATE INDEX IF NOT EXISTS idx_salem_narration_category ON salem_narration_points (category);
-CREATE INDEX IF NOT EXISTS idx_salem_narration_lat_lng ON salem_narration_points (lat, lng);
-CREATE INDEX IF NOT EXISTS idx_salem_narration_data_source ON salem_narration_points (data_source);
-CREATE INDEX IF NOT EXISTS idx_salem_narration_wave ON salem_narration_points (wave) WHERE wave IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_salem_narration_active ON salem_narration_points (id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_salem_narration_stale ON salem_narration_points (stale_after) WHERE stale_after IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_salem_narration_merchant_tier ON salem_narration_points (merchant_tier) WHERE merchant_tier > 0;
 
 -- ════════════════════════════════════════════════════════════════════
 -- Historical Figures
@@ -382,12 +237,6 @@ CREATE TABLE IF NOT EXISTS salem_sync_state (
 -- Subcategory PK format: `{CATEGORY_ID}__{slug}` — e.g. `FOOD_DRINK__restaurants`.
 -- This lets POI tables FK directly to the subcategory row without needing
 -- a separate category_id column on the POI side.
---
--- Scope note: salem_tour_pois is DELIBERATELY excluded from this taxonomy.
--- Its `category` column holds tour-chapter themes (witch_trials, maritime,
--- literary, landmark, museum, park, visitor_services) which are a different
--- concept from the PoiCategories.kt layer taxonomy. Tour POIs are 45 curated
--- rows with bespoke metadata and are handled in their own path.
 -- ════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS salem_poi_categories (
@@ -420,14 +269,11 @@ CREATE INDEX IF NOT EXISTS idx_salem_poi_subcat_category ON salem_poi_subcategor
 -- ════════════════════════════════════════════════════════════════════
 -- Unified Salem POIs — Phase 9U (Session 117)
 --
--- Merges salem_tour_pois (45 curated 1692 stops), salem_businesses
--- (861 local businesses), and salem_narration_points (817 ambient
--- narration POIs) into a single canonical table. Every Salem POI —
--- restaurant, witch shop, dentist, park, historic house — lives here
--- with one schema, one category FK, and one admin interface.
---
--- Superset of all three source tables + SalemIntelligence BCS
--- enrichment columns for the Phase 9U Session 118 import.
+-- Single canonical table for every Salem POI — restaurant, witch shop,
+-- dentist, park, historic house. Merged from the three pre-unification
+-- tables (salem_tour_pois 45 + salem_businesses 861 + salem_narration_points
+-- 817) which were dropped in S126. Superset schema + SalemIntelligence
+-- BCS enrichment columns from the S118 import.
 -- ════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS salem_pois (
@@ -525,7 +371,7 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   legacy_tour_category   TEXT
 );
 
--- Indexes (prefixed idx_spois_ to avoid collision with legacy salem_tour_pois indexes)
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_spois_category        ON salem_pois (category);
 CREATE INDEX IF NOT EXISTS idx_spois_lat_lng         ON salem_pois (lat, lng);
 CREATE INDEX IF NOT EXISTS idx_spois_data_source     ON salem_pois (data_source);
@@ -536,53 +382,3 @@ CREATE INDEX IF NOT EXISTS idx_spois_wave            ON salem_pois (wave) WHERE 
 CREATE INDEX IF NOT EXISTS idx_spois_intel_entity    ON salem_pois (intel_entity_id) WHERE intel_entity_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_spois_tour            ON salem_pois (id) WHERE is_tour_poi = true;
 CREATE INDEX IF NOT EXISTS idx_spois_district        ON salem_pois (district) WHERE district IS NOT NULL;
-
--- ────────────────────────────────────────────────────────────────────
--- New POI taxonomy columns on salem_businesses
--- (nullable; populated by the S115 backfill pass)
--- ────────────────────────────────────────────────────────────────────
-
-ALTER TABLE salem_businesses ADD COLUMN IF NOT EXISTS category    TEXT;
-ALTER TABLE salem_businesses ADD COLUMN IF NOT EXISTS subcategory TEXT;
-
-CREATE INDEX IF NOT EXISTS idx_salem_biz_category    ON salem_businesses (category)    WHERE category IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_salem_biz_subcategory ON salem_businesses (subcategory) WHERE subcategory IS NOT NULL;
-
--- ────────────────────────────────────────────────────────────────────
--- Foreign keys to the taxonomy lookup tables
---
--- These guard the NEW columns (nullable, enforced from day 1) and the
--- existing `subcategory` column on salem_narration_points (NULL on all
--- 814 rows today — safe to FK immediately).
---
--- NOT FK'd this session:
---   - salem_narration_points.category  — 814 rows of legacy lowercase
---     coarse values ('shop','restaurant','services',...). FK added in
---     S115 after the backfill normalizes them to PoiLayerId form.
---   - salem_tour_pois.*                — different category concept
---     (tour-chapter themes), explicitly scoped out of this taxonomy.
--- ────────────────────────────────────────────────────────────────────
-
-DO $$
-BEGIN
-  -- salem_narration_points.subcategory -> salem_poi_subcategories(id)
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_salem_narration_subcategory') THEN
-    ALTER TABLE salem_narration_points
-      ADD CONSTRAINT fk_salem_narration_subcategory
-      FOREIGN KEY (subcategory) REFERENCES salem_poi_subcategories(id) ON DELETE RESTRICT;
-  END IF;
-
-  -- salem_businesses.category -> salem_poi_categories(id)
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_salem_business_category') THEN
-    ALTER TABLE salem_businesses
-      ADD CONSTRAINT fk_salem_business_category
-      FOREIGN KEY (category) REFERENCES salem_poi_categories(id) ON DELETE RESTRICT;
-  END IF;
-
-  -- salem_businesses.subcategory -> salem_poi_subcategories(id)
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_salem_business_subcategory') THEN
-    ALTER TABLE salem_businesses
-      ADD CONSTRAINT fk_salem_business_subcategory
-      FOREIGN KEY (subcategory) REFERENCES salem_poi_subcategories(id) ON DELETE RESTRICT;
-  END IF;
-END $$;

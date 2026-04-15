@@ -10,16 +10,14 @@
 package com.example.wickedsalemwitchcitytour.content.model
 
 import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 
 /**
- * Tour-worthy points of interest with narration — ~50-100 curated locations.
- * These are the stops on walking tours: memorials, museums, historic sites, etc.
+ * Tour-stop projection. Phase 9U removed the legacy `tour_pois` table; this
+ * type is now a Room result POJO produced by TourPoiDao + TourStopDao
+ * projecting from `salem_pois`. No `@Entity` — the table is gone.
  */
-@Entity(tableName = "tour_pois")
 data class TourPoi(
-    @PrimaryKey val id: String,
+    val id: String,
     val name: String,
     val lat: Double,
     val lng: Double,

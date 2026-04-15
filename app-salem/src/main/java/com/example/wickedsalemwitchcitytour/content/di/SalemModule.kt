@@ -36,7 +36,6 @@ object SalemModule {
             .build()
 
     @Provides fun provideTourPoiDao(db: SalemContentDatabase): TourPoiDao = db.tourPoiDao()
-    @Provides fun provideSalemBusinessDao(db: SalemContentDatabase): SalemBusinessDao = db.salemBusinessDao()
     @Provides fun provideHistoricalFigureDao(db: SalemContentDatabase): HistoricalFigureDao = db.historicalFigureDao()
     @Provides fun provideHistoricalFactDao(db: SalemContentDatabase): HistoricalFactDao = db.historicalFactDao()
     @Provides fun provideTimelineEventDao(db: SalemContentDatabase): TimelineEventDao = db.timelineEventDao()
@@ -44,6 +43,5 @@ object SalemModule {
     @Provides fun provideTourDao(db: SalemContentDatabase): TourDao = db.tourDao()
     @Provides fun provideTourStopDao(db: SalemContentDatabase): TourStopDao = db.tourStopDao()
     @Provides fun provideEventsCalendarDao(db: SalemContentDatabase): EventsCalendarDao = db.eventsCalendarDao()
-    @Provides fun provideNarrationPointDao(db: SalemContentDatabase): NarrationPointDao = db.narrationPointDao()
     @Provides fun provideSalemPoiDao(db: SalemContentDatabase): SalemPoiDao = db.salemPoiDao()
 }
