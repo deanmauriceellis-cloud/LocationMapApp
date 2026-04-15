@@ -1,0 +1,26 @@
+{%- import "_macros.j2" as m -%}
+{{ m.persona_block() }}
+
+ARTICLE: tile #{{ tile_order }} of 16 — {{ period_label }}
+TITLE GUIDANCE: "{{ title }}" (you may use this verbatim or refine it within the constraints).
+
+PERIOD FRAMING:
+{{ framing }}
+
+{{ m.events_block(events_for_period) }}
+
+{{ m.facts_block(facts_for_period) }}
+
+{{ m.corpus_instruction() }}
+
+WHAT THIS TILE IS:
+This is the FALLOUT chapter — the trials end, formally and procedurally. It must:
+- Cover Jan–May 1693 substantively: the Superior Court of Judicature, the new
+  rule against spectral evidence, the dramatic drop in conviction rate (3 of
+  56 indictments — those three reprieved by Phips), the May 1693 general
+  jailhouse delivery, the running tally (20 executed, 5+ dead in jail).
+- Then briefly extend through the rest of 1693 — sentences vacated piecemeal,
+  no public reckoning yet.
+- Be precise about WHAT ENDED. The trials ended legally. The trauma did not.
+
+Return the JSON object now.

@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S117 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S118 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 118: 2026-04-12 — Phase 9U BCS import (976→2190 POIs), SalemPoi Room entity, walk sim overhaul
+
+Imported 1,766 BCS POIs from SalemIntelligence — 404 existing enriched, 1,214 new inserted, total 2,190. Built PG→SQLite publish pipeline, new unified SalemPoi Room entity + DAO (version 5). Walk sim fixes: 3-then-30s narration pacing, dwell rate-limiting, direct-play bypass, skip button, icon refresh. Tour-aware walk sim: Walk button follows selected tour route.
+
+Full session detail: `docs/session-logs/session-118-2026-04-12.md`. Commits: `5213be7`, `a4ac369`.
+
+---
 
 ## Session 117: 2026-04-12 — Phase 9U Session 117: unified salem_pois table — three-table merge complete
 

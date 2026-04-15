@@ -1787,7 +1787,7 @@ The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that 
 
 **Goal:** Add a third top-level entry point alongside "Explore Salem" and "Take a Tour" — **The Salem Witch Trials** — turning the app into a deep historical reader anchored to the 1692 corpus already living at `~/Development/Salem/data/json/` (3,893 facts, 4,950 primary sources, 88 dated 1692 events, 202 LLM-generated newspaper articles, 2,176 NPC records).
 
-**Target:** 8 sessions (S127 – S134) | **Status:** **IN PROGRESS — Phase 1 (S127) DONE** | **Added:** Session 127 | **Priority:** TOP — overrides 9Q + 9R + OMEN-004
+**Target:** 8 sessions (S127 – S134) | **Status:** **IN PROGRESS — 2 / 8 done (S127 + S128)** | **Added:** Session 127 | **Priority:** TOP — overrides 9Q + 9R + OMEN-004
 
 **Plan file:** `~/.claude/plans/rosy-shimmying-stream.md` (committed by the operator at S127).
 
@@ -1807,13 +1807,13 @@ Splash layout: hero (Witch Trials, flagship) + 2 below (Explore Salem + Take a T
 
 ### Architecture
 
-**Generation (build-time):** Salem Oracle (`:8088`, gemma3:27b on RTX 3090) drafts all 16 history articles + 49 NPC bios. One-time GPU swap with SalemIntelligence per generation run. Newspapers come pre-generated from the Salem corpus — bundled directly.
+**Generation (build-time):** Articles drafted via direct calls to Ollama (`:11434`, `salem-village:latest` = Gemma3:27B Q4_K_M with baked-in Salem knowledge — same model the Oracle uses). Bypasses Salem Oracle's `/api/oracle/ask` wrapper because that wrapper has a hard 30s timeout to its internal Ollama client and our long-form prompts run 21-31s comfortably (and could spike longer on cold cache). The bypass also means **no GPU swap is required** — SalemIntelligence and the article generator can both run concurrently with Ollama provided VRAM headroom holds (Gemma3:27B Q4_K_M ~22 GB, KV cache ~2 GB; the 3090 has 24 GB total so SI must be down OR using CPU embeddings during generation runs). Article generator confirmed at S128 with run time 6.8 min for 16 articles. Newspapers come pre-generated from the Salem corpus — bundled directly. 49 NPC bios in 9X.5 will use the same direct-Ollama path.
 
 **Editorial:** PG-backed (`salem_witch_trials_articles` / `salem_witch_trials_npc_bios` / `salem_witch_trials_newspapers`), edited via the existing admin web tool pattern (mirrors `salem_pois`'s `admin_dirty + admin_dirty_at + soft-delete + provenance` model). Publish script (`publish-witch-trials.js`) writes bundled JSON assets to `app-salem/src/main/assets/witch_trials/`.
 
 **Runtime:** Fully offline. Bundled JSON + Room. App TTS speaks bodies. No server calls.
 
-**Provenance:** Every generated row carries `data_source` (`'salem_oracle'` | `'claude_generated'` | `'human_authored'`), `confidence` (default 0.7 for LLM, 0.85 for newspapers, 1.0 for human-edited), `verified_date` (NULL until human review), `generator_model`, `generator_prompt_hash`. GOVERNANCE.md compliance baked in.
+**Provenance:** Every generated row carries `data_source` (`'ollama_direct_salem_village'` | `'salem_oracle'` | `'claude_generated'` | `'human_authored'`), `confidence` (default 0.7 for LLM, 0.85 for newspapers, 1.0 for human-edited), `verified_date` (NULL until human review), `generator_model` (S128 articles use `'ollama_direct_salem_village_gemma3_27b_q4km'`), `generator_prompt_hash`. GOVERNANCE.md compliance baked in.
 
 **Portraits:** 49 NPCs get pencil-sketch portraits via local Stable Diffusion (Forge `:7860`) with a fixed prompt template — uniform style across all of them, even where free historical likenesses exist.
 
@@ -1822,7 +1822,7 @@ Splash layout: hero (Witch Trials, flagship) + 2 below (Explore Salem + Take a T
 | Phase | Session | Goal | Status |
 |---|---|---|---|
 | 9X.1 | S127 | Foundation: PG schema, Room entities + DAOs, Hilt repo + ViewModel, narrator-mode preference, hero+2-below welcome dialog, 3-panel sub-menu with placeholder navigation, asset directory + stubs | **DONE** (commit `ebc9e30`) |
-| 9X.2 | S128 | History generation pipeline. Python `tools/witch-trials-generator/`, `salem_corpus_loader`, prompt templates per tile type, `generate_articles.py` runs against Salem Oracle, all 16 articles drafted in PG with provenance. Operator-runnable. | TODO |
+| 9X.2 | S128 | History generation pipeline. Python `tools/witch-trials-generator/`, `salem_corpus_loader`, prompt templates per tile type, `generate_articles.py` runs against the local LLM, all 16 articles drafted in PG with provenance. Operator-runnable. | **DONE** (commit pending) — bypassed Oracle's 30s wrapper timeout, hit Ollama direct (`salem-village:latest` = same Gemma3:27B model), 6.8 min total run, 16/16 articles 494-695 words each, all in PG with `data_source='ollama_direct_salem_village'` |
 | 9X.3 | S129 | History 4×4 tile UI + detail screen. Publish script bakes `articles.json` to assets, GridLayout grid with title + teaser per tile, detail Dialog with body + Speak button, narrator-mode auto-play. | TODO |
 | 9X.4 | S130 | Oracle Newspaper panel. Bundle all 202 newspapers via publish script, browser dialog with crisis-phase filter chips, detail dialog with TTS, cross-link infra (dates in History → newspapers). | TODO |
 | 9X.5 | S131 | People bio generation + browser + bio detail. `generate_bios.py` against Oracle, 49 bios in PG, faction-filtered list, bio detail with metadata + body + Speak. Cross-link infra (names in History/Newspapers → bios). | TODO |
@@ -1863,7 +1863,7 @@ Splash layout: hero (Witch Trials, flagship) + 2 below (Explore Salem + Take a T
 
 ### Risks / known constraints
 
-- **Oracle GPU contention** with SalemIntelligence — sequential swap per generation run (Phases 9X.2 articles, 9X.5 bios). Documented in the generator README.
+- ~~**Oracle GPU contention** with SalemIntelligence — sequential swap per generation run (Phases 9X.2 articles, 9X.5 bios).~~ **Resolved at S128.** Generator now talks to Ollama directly (skipping Oracle), and per-call latency is well within VRAM-sharing tolerance. Operator may still want SI down during the heavy ~7 min run if VRAM headroom is tight, but the swap is no longer architecturally required.
 - **November + December 1692 events sparse** (0 events each in Salem corpus). Generator handles by widening the prompt window with adjacent facts and explicit "the calm between executions" framing.
 - **DB version bump** triggered destructive migration on existing installs — operator explicitly accepts this for the test app. Pre-Play-Store: real Room migrations remain on the carry-forward list.
 - **Portrait quality drift** — Phase 9X.6 budgets a manual review pass; failures get hand-prompted with seed adjustments.

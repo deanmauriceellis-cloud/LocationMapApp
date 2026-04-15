@@ -1,0 +1,34 @@
+{%- import "_macros.j2" as m -%}
+{{ m.persona_block() }}
+
+ARTICLE: tile #{{ tile_order }} of 16 — {{ period_label }}
+TITLE GUIDANCE: "{{ title }}" (you may use this verbatim or refine it within the constraints).
+
+PERIOD FRAMING:
+{{ framing }}
+
+{{ m.events_block(events_for_period) }}
+
+{{ m.facts_block(facts_for_period) }}
+
+{{ m.corpus_instruction() }}
+
+WHAT THIS TILE IS:
+This is a CALM-MONTH chapter — a month between the executions and the formal
+end of the trials. The Salem corpus has thin or no anchor events for this month,
+which is HISTORICALLY ACCURATE: the tide had turned. Do NOT manufacture drama
+to fill the space. Instead:
+
+- Convey what was actually happening: roughly 150 accused remained in jail.
+  Court of Oyer and Terminer dissolved (Oct 29, 1692). The Superior Court of
+  Judicature being constituted to replace it. Spectral evidence about to be
+  ruled inadmissible. Releases on bond beginning. Conditions inside the jails
+  (cold, illness, infants dying — Sarah Good's daughter Mercy is a known case).
+  The afflictions in the village quieting but not vanished.
+- Convey the texture of waiting. The accused did not yet know they would
+  survive; the accusers did not yet know the rules were about to change.
+- Be honest about the silence. A short paragraph noting that the corpus
+  preserves few specific events for this month is acceptable IF it serves
+  the reader's understanding rather than reading as a confession of weakness.
+
+Return the JSON object now.

@@ -1,0 +1,28 @@
+{%- import "_macros.j2" as m -%}
+{{ m.persona_block() }}
+
+ARTICLE: tile #{{ tile_order }} of 16 — {{ period_label }}
+TITLE GUIDANCE: "{{ title }}" (you may use this verbatim or refine it within the constraints).
+
+PERIOD FRAMING:
+{{ framing }}
+
+{{ m.events_block(events_for_period) }}
+
+{{ m.facts_block(facts_for_period) }}
+
+{{ m.corpus_instruction() }}
+
+WHAT THIS TILE IS:
+This is one MONTHLY chapter inside the 1692 sequence. It must:
+- Stay strictly inside {{ period_label }}. Do not foreshadow events of later
+  months by name; the reader will read those tiles next. You may close on a
+  forward-leaning sentence, but no "later that summer..." spoilers.
+- Name the actual people who acted this month. Specific dates matter — give
+  them. Specific places matter — name them (Ingersoll's Ordinary, the Salem
+  Village Meeting House, Proctor's Ledge, Salem Town courthouse).
+- Where applicable, quote one primary source from this month: a court record,
+  an examination transcript, a letter, a sermon. Attribute it correctly.
+- Do not summarize the trials in general. Stay in the month.
+
+Return the JSON object now.

@@ -1,0 +1,30 @@
+{%- import "_macros.j2" as m -%}
+{{ m.persona_block() }}
+
+ARTICLE: tile #{{ tile_order }} of 16 — {{ period_label }}
+TITLE GUIDANCE: "{{ title }}" (you may use this verbatim or refine it within the constraints).
+
+PERIOD FRAMING:
+{{ framing }}
+
+{{ m.events_block(events_for_period) }}
+
+{{ m.facts_block(facts_for_period) }}
+
+{{ m.corpus_instruction() }}
+
+WHAT THIS TILE IS:
+This is the EPILOGUE — three centuries of Salem's memory. Closing tile of the
+sequence. It must:
+- Trace the cultural through-line, lightly: Hawthorne (whose great-great-grand-
+  father John Hathorne was the unrepentant chief examiner; Nathaniel added the
+  'w' to his surname); Arthur Miller's "The Crucible" (1953) as McCarthy-era
+  allegory; the 1992 Tercentenary Memorial; the 2017 dedication of Proctor's
+  Ledge as the actual execution site.
+- Acknowledge modern Salem as a city that lives inside the trauma it inflicted
+  and the global tourist economy that has grown around it. Don't moralize about
+  the tourism — describe it accurately.
+- Land on the 2026 quadricentennial. The reader is here, now, on the threshold
+  of that anniversary. Close the loop without a sermon.
+
+Return the JSON object now.

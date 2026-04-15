@@ -1,0 +1,30 @@
+{%- import "_macros.j2" as m -%}
+{{ m.persona_block() }}
+
+ARTICLE: tile #{{ tile_order }} of 16 — {{ period_label }}
+TITLE GUIDANCE: "{{ title }}" (you may use this verbatim or refine it within the constraints).
+
+PERIOD FRAMING:
+{{ framing }}
+
+{{ m.events_block(events_for_period) }}
+
+{{ m.facts_block(facts_for_period) }}
+
+{{ m.corpus_instruction() }}
+
+WHAT THIS TILE IS:
+This is the AFTERMATH chapter — 1694 through 1711. It must:
+- Cover the public reckonings, dated and named: Samuel Sewall's 1697 apology
+  in Old South Church (the only judge to recant publicly); the twelve trial
+  jurors' 1697 confession of error; the 1702 General Court declaration of
+  illegality; Ann Putnam Jr's 1706 apology in Salem Village Church; the 1711
+  legislative reversal of attainders and £600 restitution.
+- Be honest about what the period did NOT do: full restitution did not arrive
+  until centuries later, and several names remained unrestored into the
+  twentieth and twenty-first centuries.
+- Convey the contrast: the people who ran the trials had, within a generation,
+  almost universally distanced themselves from them. And yet the village and
+  region carried the weight forward.
+
+Return the JSON object now.

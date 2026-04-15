@@ -1,0 +1,30 @@
+{%- import "_macros.j2" as m -%}
+{{ m.persona_block() }}
+
+ARTICLE: tile #{{ tile_order }} of 16 — {{ period_label }}
+TITLE GUIDANCE: "{{ title }}" (you may use this verbatim or refine it within the constraints).
+
+PERIOD FRAMING:
+{{ framing }}
+
+{{ m.events_block(events_for_period) }}
+
+{{ m.facts_block(facts_for_period) }}
+
+{{ m.corpus_instruction() }}
+
+WHAT THIS TILE IS:
+This is the OPENING article in a 16-tile sequence. It must:
+- Set the historical stage WITHOUT yet narrating any of the 1692 afflictions.
+- Explain the structural pre-conditions: Salem Village vs. Salem Town, the
+  Putnam–Porter feud, Reverend Parris's contested ministry, the salary/firewood
+  dispute, the loss of the Massachusetts Bay charter (1684), King William's War
+  driving refugees south from Maine, the deeper Puritan cosmology that made
+  spectral evidence intelligible to educated men.
+- Leave the reader pointed at January 1692 — the village is wound tight and
+  something is going to break.
+
+DO NOT mention specific accusers, accused, or court proceedings — those belong
+to the monthly tiles. End the article on the threshold.
+
+Return the JSON object now.
