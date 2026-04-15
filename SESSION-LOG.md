@@ -1,8 +1,24 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 116-125. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 118-127. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 127: 2026-04-15 — Phase 9X.1 Salem Witch Trials feature foundation: schema + splash + 3-panel skeleton
+
+Operator pivoted ahead of Phase 9Q/9R into a new top-level "The Salem Witch Trials" feature (hero+2-below welcome dialog → 3-panel sub-menu: History 4×4 tile grid + Oracle Newspaper browser + People of Salem 1692 portraits/bios). Plan locked via 13 dialog-box Q&A (8 sessions S127-S134, full scope, OMEN-004 deliberately slipped). Phase 1 shipped foundation: 3 PG tables (`salem_witch_trials_articles/npc_bios/newspapers` mirroring `salem_pois` admin_dirty + soft-delete + provenance pattern), 3 Room entities + DAOs + Hilt providers (DB v6 → v7), `WitchTrialsRepository` + `WitchTrialsViewModel`, `MenuPrefs.PREF_NARRATOR_MODE_ENABLED` + utility menu toggle, redesigned welcome dialog (gold-bordered crystal-ball hero card + horizontal Explore/Tour row), `WitchTrialsMenuDialog` with 3 panel cards + "coming in Phase N" placeholders, asset directory `app-salem/src/main/assets/witch_trials/` with empty stubs. Verified visually on Lenovo HNY0CY0W (uninstall+install due to DB version bump, granted location, force-stop+launcher restart, screenshots confirm all 3 navigation paths).
+
+Full session detail: `docs/session-logs/session-126-2026-04-15.md` (Phase 9X.1 section). Commit: `ebc9e30`. Master plan: new Phase 9X section. Plan file: `~/.claude/plans/rosy-shimmying-stream.md`.
+
+---
+
+## Session 126: 2026-04-15 — Phase 9U closeout + GPS-off-means-off + walk-from-long-press + tour-broken hotfix
+
+Cleaned up Phase 9U: deleted NarrationPoint + SalemBusiness Room entities, rerouted `TourPoi` to project from `salem_pois` (no longer `@Entity`), dropped 23 dead repository methods, bumped DB version 5→6, removed legacy CREATE statements from `cache-proxy/salem-schema.sql`, archived 3 one-shot migration scripts to `docs/archive/`. Fixed inventory PDF tool to query `salem_pois` instead of dropped tables. Walk button now starts the tour from the long-press location (snap to nearest interpolated step, back off 15 for clean APPROACH→ENTRY arc). GPS toggle FAB + `setManualLocation` now actually cancel the GMS provider so the hardware stops polling — closes the "heartbeat brings me back home" leak. Tour-selection-broken regression caused by DB version bump (Room destructive migration wiped tour rows) — fixed by uninstall+reinstall, operator accepts destructive-restart for the test app.
+
+Full session detail: `docs/session-logs/session-126-2026-04-15.md`. Commits: `5335ff3` (S125 carry-over) → `bf2c026` (Phase 9U cleanup) → `fddd673` (PDF tool) → `cf09e59` (STATE) → `a997a6a` (walk from long-press) → `1b499a3` (GPS off) → `ebc9e30` (Phase 9X.1 — see S127 entry).
+
+---
 
 ## Session 125: 2026-04-14 — Overnight-test fixes + narration coverage to 100% + legacy-tour restoration + admin SI bridge
 
@@ -68,21 +84,5 @@ Full session detail: `docs/session-logs/session-118-2026-04-12.md`. Commits: `52
 
 ---
 
-## Session 117: 2026-04-12 — Phase 9U Session 117: unified salem_pois table — three-table merge complete
-
-Merged `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_pois` (45) into a single `salem_pois` table (71 columns, 976 rows, 14 categories). Steps 9U.1-9U.6 shipped: unified DDL, migration script, FK repointing, admin backend + frontend rewritten for single-table queries, old tables renamed to `_legacy`. `PoiKind` type removed entirely from frontend. Zero TypeScript errors.
-
-Full session detail: `docs/session-logs/session-117-2026-04-12.md`.
-
 ---
-
-## Session 116: 2026-04-12 — Phase 9U planning: Unified POI table + SalemIntelligence import
-
-Planning session — no code changes. Three strategic decisions: (1) V1 commercial release is fully offline, no hosted LLM/KB, SalemIntelligence is build-time data source only. (2) All 19 BCS categories map to existing 22 LMA categories with no new top-level types (4 new subcategories). (3) Merge `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_pois` (45) into a single `salem_pois` table — analysis confirmed 817/817 narration points match businesses by name+coordinates, they're the same entities stored twice. Added Phase 9U to the master plan (4 sessions S117-S120, 17 steps) covering schema migration, BCS import (~900 new entities → ~2,600 total), admin tool adaptation, publish loop, and Room migration. Heading-up rotation smoothness deferred to S120.
-
-Full session detail: `docs/session-logs/session-116-2026-04-12.md`.
-
----
-
----
-<!-- END OF ROLLING WINDOW — Sessions 115 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 117 and earlier are in SESSION-LOG-ARCHIVE.md -->

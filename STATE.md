@@ -2,37 +2,37 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-14 — Session 125 (23 commits: overnight-test fixes, 100% narration coverage, stale UUID sweep, legacy tour restoration, admin→SI bridge, walk-sim UX)
+**Last updated:** 2026-04-15 — Session 126/127 (Phase 9U closeout + Witch Trials Phase 1 foundation shipped)
 
 ---
 
-## TOP PRIORITY — Next Session (S126)
+## TOP PRIORITY — Next Session (S128)
 
-**Field-test the S125 output + continue Phase 9U cleanup.**
+**Phase 9X.2 — generate the 16 Salem Witch Trials History articles via Salem Oracle.**
 
-Immediate verification (need real-world walk to prove out):
-1. **4 non-Heritage tours** with random-start + Historical Mode + OSRM route backfill. Pick each of tour_essentials / tour_explorer / tour_grand / tour_witch_trials from the selection screen, tap Walk from Beverly, confirm:
-   - Walker spawns near a random tour stop (toast names it).
-   - Walker follows actual streets (OSRM polyline) not straight lines between stops.
-   - Narration fires immediately at the spawn stop, continues at subsequent stops.
-   - Modern POIs (shops / auto-repair / law offices) stay silent — only tour stops + historical_note POIs narrate.
-   - Tap "POI" FAB → all POIs narrate + all markers show; tap again → filter restores.
-2. **Admin tool** at http://localhost:4302/ — verify PoiEditDialog AI-assist button works via SI (`:8089`) adapter.
-3. **admin_dirty flag** — edit a POI via the admin UI, confirm `admin_dirty=TRUE` in PG.
+Plan file: `~/.claude/plans/rosy-shimmying-stream.md`. Master plan section: Phase 9X.
 
-Deferred from Session 124 scope (still open):
-- ~~Drop legacy tables (narration_points, tour_pois, salem_businesses) from Room DB.~~ **DONE S126.**
-- ~~Remove NarrationPoint entity/DAO and legacy repository methods.~~ **DONE S126** (also removed SalemBusiness; TourPoi rerouted to salem_pois projection).
-- Heading-up rotation smoothness — currently **disabled** via `HEADING_UP_ENABLED=false`; redesign needed (GPS noise + sensor freeze). Code preserved.
-- ~~Admin `historical_note` field surfacing on General tab.~~ **Already done in S125 admin-tooling commits** — verified S126.
-- ~~**NEW S126:** `tools/generate-poi-inventory-pdf.py` still queries the dropped legacy tables.~~ **DONE S126** (commit `fddd673`) — rewrote tool to read unified `salem_pois`, two sections (Tour vs Modern), category → subcategory grouping. Verified: 1,868 POIs in PDF.
+Step-by-step for S128:
+1. Bring Salem Oracle (`:8088`) up — operator coordinates GPU swap (SalemIntelligence `:8089` goes down for the duration).
+2. Bootstrap `tools/witch-trials-generator/` Python project: venv, requirements, README that documents the GPU-swap dance.
+3. Build `salem_corpus_loader.py` — reads `~/Development/Salem/data/json/`, buckets events + facts by month for 1692 (incl. 1691 events for the intro, 1693 for fallout, post-1693 for epilogue). Note Nov + Dec 1692 have 0 events — handler widens prompt with adjacent facts and adds "calm between executions" framing.
+4. Write Jinja prompt templates (`prompts/`) per tile type: intro / monthly / fallout / closing / epilogue.
+5. Run `generate_articles.py` against Oracle — sequential, ~3-4 min per call, ~50-60 min total. Resets history between articles.
+6. Run `import_to_pg.py` to load JSON into `salem_witch_trials_articles` with `data_source='salem_oracle'`, `confidence=0.7`, `verified_date=NULL`, `generator_model='gemma3:27b'`, `generator_prompt_hash`.
+7. Verify: `psql -c "SELECT id, title, length(body) FROM salem_witch_trials_articles ORDER BY tile_order"` returns 16 rows with bodies between 500-1500 chars worth of prose.
+8. Commit + push. Operator brings SI back up.
 
-**Post-S125 key facts:**
-- PG: **1,868 active POIs** (211 soft-deleted this session by the stale-UUID sweep; tagged `dedup-stale-uuid-2026-04-14-loser` for pre-Play-Store hard-delete).
-- **Narration coverage: 2,079 / 1,868 = 100%** — every live POI has short_narration (12 via SI re-link, 194 from SI cache, 228 local stubs for POIs SI doesn't know, rest pre-existing).
-- **historical_note coverage** on tour-relevant categories: TOURISM_HISTORY 101/131, ENTERTAINMENT-with-year 13/13, PARKS_REC 3/65 (most are unlinked), WORSHIP 6/10.
-- **34 unlinked POIs** still carry local stubs (no SI entity at all — truly SI-unknown, not stale linkage).
-- **5 tours** restored and visible on the tour-selection screen: Heritage Trail (10), Walking Through Salem (14), Salem Explorer (20), Grand Salem Tour (24), Salem Witch Trials Walking Tour (19). All have OSRM walking polylines.
+After S128 the articles exist in PG only — no app integration yet. That lands in Phase 9X.3 (S129).
+
+**Post-S127 key facts:**
+- Welcome dialog rebuilt as **hero + 2 below**. New flagship hero card "The Salem Witch Trials" + bottom row of Explore Salem + Take a Tour. Verified on Lenovo HNY0CY0W.
+- **3 new PG tables** in production: `salem_witch_trials_articles` (16-row capacity), `salem_witch_trials_npc_bios` (~49-row capacity), `salem_witch_trials_newspapers` (202-row capacity). All mirror `salem_pois` admin_dirty + soft-delete + provenance pattern.
+- **Room DB version 6 → 7** (3 new entities + DAOs + Hilt providers). Destructive migration accepted on test app.
+- **Narrator Mode preference** wired into utility menu (`PREF_NARRATOR_MODE_ENABLED`). Off by default. Will drive auto-speak on detail-screen settle in Phase 9X.8.
+- **OMEN-004 deliberately slipped** (2026-04-30 first-Kotlin-test deadline). Documented at S134 close.
+- **PG: 1,868 active POIs** unchanged from S125. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
+
+**Phase 9X status:** 1 / 8 sessions done. ~7 sessions of feature work ahead (≈ S128–S134). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -43,14 +43,15 @@ Deferred from Session 124 scope (still open):
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
-| **9U** Unified POI Table | **S123 DONE (dedup + narration resync)** | 1 session left (S124). Legacy table drop, NarrationPoint removal, heading-up fix. |
-| **9Q** Salem Domain Content Bridge | not started | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
-| **9R** Historic Tour Mode | not started | opt-in chapter-based 1692 tour |
-| **10** Production readiness | DEFERRED behind 9U+9Q+9R | Firebase, photos, DB hardening, emulator verification |
+| **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
+| **9X** Salem Witch Trials Feature | **IN PROGRESS — 1/8 sessions done (S127)** | **TOP PRIORITY (S128-S134).** Hero+2-below welcome + 3-panel sub-menu + 3 PG tables shipped S127. Phase 9X.2 (S128) generates 16 history articles via Salem Oracle. |
+| **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
+| **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
+| **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 123. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 127. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

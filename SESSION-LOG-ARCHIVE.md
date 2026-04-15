@@ -5,7 +5,23 @@
 
 ---
 
-# Sessions S001-S115 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S117 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 117: 2026-04-12 — Phase 9U Session 117: unified salem_pois table — three-table merge complete
+
+Merged `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_pois` (45) into a single `salem_pois` table (71 columns, 976 rows, 14 categories). Steps 9U.1-9U.6 shipped: unified DDL, migration script, FK repointing, admin backend + frontend rewritten for single-table queries, old tables renamed to `_legacy`. `PoiKind` type removed entirely from frontend. Zero TypeScript errors.
+
+Full session detail: `docs/session-logs/session-117-2026-04-12.md`.
+
+---
+
+## Session 116: 2026-04-12 — Phase 9U planning: Unified POI table + SalemIntelligence import
+
+Planning session — no code changes. Three strategic decisions: (1) V1 commercial release is fully offline, no hosted LLM/KB, SalemIntelligence is build-time data source only. (2) All 19 BCS categories map to existing 22 LMA categories with no new top-level types (4 new subcategories). (3) Merge `salem_narration_points` (817), `salem_businesses` (861), and `salem_tour_pois` (45) into a single `salem_pois` table — analysis confirmed 817/817 narration points match businesses by name+coordinates, they're the same entities stored twice. Added Phase 9U to the master plan (4 sessions S117-S120, 17 steps) covering schema migration, BCS import (~900 new entities → ~2,600 total), admin tool adaptation, publish loop, and Room migration. Heading-up rotation smoothness deferred to S120.
+
+Full session detail: `docs/session-logs/session-116-2026-04-12.md`.
+
+---
 
 ## Session 115: 2026-04-10 — Android debug + tour polish: 18 fixes, heading-up smoothness deferred
 

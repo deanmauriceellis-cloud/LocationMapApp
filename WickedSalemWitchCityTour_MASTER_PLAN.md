@@ -29,9 +29,10 @@
 13. [Phase 9A+ — Tour Hardening & Offline Foundation](#phase-9a--tour-hardening--offline-foundation)
 14. [Phase 9T — Salem Walking Tour Restructure](#phase-9t--salem-walking-tour-restructure)
 15. [Phase 9P — POI Admin Tool (Developer Infrastructure)](#phase-9p--poi-admin-tool-developer-infrastructure)
-16. [Phase 9U — Unified POI Table & SalemIntelligence Import](#phase-9u--unified-poi-table--salemintelligence-import) **← PRIORITY**
-17. [Phase 9Q — Salem Domain Content Bridge](#phase-9q--salem-domain-content-bridge)
-17. [Phase 9R — Historic Tour Mode (App-Side)](#phase-9r--historic-tour-mode-app-side)
+16. [Phase 9U — Unified POI Table & SalemIntelligence Import](#phase-9u--unified-poi-table--salemintelligence-import) — DONE (S125-S126)
+17. [Phase 9X — The Salem Witch Trials Feature](#phase-9x--the-salem-witch-trials-feature) **← PRIORITY (S127-S134)**
+18. [Phase 9Q — Salem Domain Content Bridge](#phase-9q--salem-domain-content-bridge) — queued behind 9X
+19. [Phase 9R — Historic Tour Mode (App-Side)](#phase-9r--historic-tour-mode-app-side) — queued behind 9X
 18. [Phase 9B — Feature Tier Matrix & Gating Infrastructure](#phase-9b--feature-tier-matrix--gating-infrastructure)
 16. [Phase 9C — User Settings & Alert Preferences](#phase-9c--user-settings--alert-preferences)
 17. [Phase 9D — Contextual Alert System](#phase-9d--contextual-alert-system)
@@ -1779,6 +1780,94 @@ The Salem sibling project exposes a dev-side LLM-backed API ("the Oracle") that 
 - Building → POI bridge construction (Phase 9Q — now simpler with unified table: `salem_building_poi_map.poi_id` references `salem_pois.id` directly, no `poi_kind` column needed)
 - Live OTA sync (Phase 10)
 - `hours` text → JSONB parsing for existing freeform strings (BCS imports get structured JSONB; legacy rows keep `hours_text`)
+
+---
+
+## Phase 9X — The Salem Witch Trials Feature
+
+**Goal:** Add a third top-level entry point alongside "Explore Salem" and "Take a Tour" — **The Salem Witch Trials** — turning the app into a deep historical reader anchored to the 1692 corpus already living at `~/Development/Salem/data/json/` (3,893 facts, 4,950 primary sources, 88 dated 1692 events, 202 LLM-generated newspaper articles, 2,176 NPC records).
+
+**Target:** 8 sessions (S127 – S134) | **Status:** **IN PROGRESS — Phase 1 (S127) DONE** | **Added:** Session 127 | **Priority:** TOP — overrides 9Q + 9R + OMEN-004
+
+**Plan file:** `~/.claude/plans/rosy-shimmying-stream.md` (committed by the operator at S127).
+
+### Vision
+
+Behind the new entry point sits a 3-panel sub-menu:
+
+1. **The Salem Witch Trials History** — 4×4 grid of tiles narrating the trials chronologically (Pre-1692 vibe → 12 monthly tiles for Jan–Dec 1692 → 1693 Fallout → Closing summary → NPC Epilogue). Each tile face shows a title + ~80-word teaser; tap opens a detail screen with a 500-1000 word LLM-generated article and audio narration.
+2. **The Oracle Newspaper** — chronological browser over all 202 existing Salem newspapers (1691-11-01 → 1693-05-09), with crisis-phase filtering and per-article TTS playback.
+3. **The People of Salem 1692** — roster of the 49 principal figures (Tier 1 + Tier 2 from the Salem corpus), each with a uniformly-stylized pencil-sketch portrait, header metadata (name, role, born/died, faction, historical_outcome) and a 500-word LLM bio.
+
+Every detail screen carries a global "Narrator Mode" preference toggle (mirrors the existing Historical Mode pattern) that auto-plays the body via the app's existing Android system TTS pipeline. Bodies use `[[entity_id]]` markup so a name in a History article links to that NPC's bio, a date links to the relevant tile or newspaper, and an event link lands on the corresponding tile.
+
+A "Today in 1692" card on the Witch Trials top panel matches the current month-day to a 1692 anchor event, making the panel feel alive on every launch.
+
+Splash layout: hero (Witch Trials, flagship) + 2 below (Explore Salem + Take a Tour).
+
+### Architecture
+
+**Generation (build-time):** Salem Oracle (`:8088`, gemma3:27b on RTX 3090) drafts all 16 history articles + 49 NPC bios. One-time GPU swap with SalemIntelligence per generation run. Newspapers come pre-generated from the Salem corpus — bundled directly.
+
+**Editorial:** PG-backed (`salem_witch_trials_articles` / `salem_witch_trials_npc_bios` / `salem_witch_trials_newspapers`), edited via the existing admin web tool pattern (mirrors `salem_pois`'s `admin_dirty + admin_dirty_at + soft-delete + provenance` model). Publish script (`publish-witch-trials.js`) writes bundled JSON assets to `app-salem/src/main/assets/witch_trials/`.
+
+**Runtime:** Fully offline. Bundled JSON + Room. App TTS speaks bodies. No server calls.
+
+**Provenance:** Every generated row carries `data_source` (`'salem_oracle'` | `'claude_generated'` | `'human_authored'`), `confidence` (default 0.7 for LLM, 0.85 for newspapers, 1.0 for human-edited), `verified_date` (NULL until human review), `generator_model`, `generator_prompt_hash`. GOVERNANCE.md compliance baked in.
+
+**Portraits:** 49 NPCs get pencil-sketch portraits via local Stable Diffusion (Forge `:7860`) with a fixed prompt template — uniform style across all of them, even where free historical likenesses exist.
+
+### Phase breakdown
+
+| Phase | Session | Goal | Status |
+|---|---|---|---|
+| 9X.1 | S127 | Foundation: PG schema, Room entities + DAOs, Hilt repo + ViewModel, narrator-mode preference, hero+2-below welcome dialog, 3-panel sub-menu with placeholder navigation, asset directory + stubs | **DONE** (commit `ebc9e30`) |
+| 9X.2 | S128 | History generation pipeline. Python `tools/witch-trials-generator/`, `salem_corpus_loader`, prompt templates per tile type, `generate_articles.py` runs against Salem Oracle, all 16 articles drafted in PG with provenance. Operator-runnable. | TODO |
+| 9X.3 | S129 | History 4×4 tile UI + detail screen. Publish script bakes `articles.json` to assets, GridLayout grid with title + teaser per tile, detail Dialog with body + Speak button, narrator-mode auto-play. | TODO |
+| 9X.4 | S130 | Oracle Newspaper panel. Bundle all 202 newspapers via publish script, browser dialog with crisis-phase filter chips, detail dialog with TTS, cross-link infra (dates in History → newspapers). | TODO |
+| 9X.5 | S131 | People bio generation + browser + bio detail. `generate_bios.py` against Oracle, 49 bios in PG, faction-filtered list, bio detail with metadata + body + Speak. Cross-link infra (names in History/Newspapers → bios). | TODO |
+| 9X.6 | S132 | Pencil-sketch portraits via local SD Forge. 49 portraits at 512×512, ~5-10 MB asset weight, manual review pass for any drift. | TODO |
+| 9X.7 | S133 | Cross-linking renderer (`[[npc:id]]` / `[[date:YYYY-MM-DD]]` / `[[event:id]]` / `[[newspaper:YYYY-MM-DD]]` ClickableSpans) + admin web tool integration (PG admin endpoints + edit dialogs mirroring PoiEditDialog) + "Today in 1692" splash card. | TODO |
+| 9X.8 | S134 | Polish, audio integration (auto-speak on detail-screen settle), empty-state polish, Lenovo end-to-end field test, STATE.md + master-plan + OMEN report updates. Slip OMEN-004 explicitly noted. | TODO |
+
+### Critical files
+
+**App:** `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/witchtrials/` (NEW package) — `WitchTrialsMenuDialog`, `WitchTrialsHistoryDialog`, `WitchTrialsTileDetailDialog`, `WitchTrialsNewspaperBrowserDialog`, `WitchTrialsNewspaperDetailDialog`, `WitchTrialsPeopleBrowserDialog`, `WitchTrialsBioDetailDialog`, `WitchTrialsViewModel`, `WitchTrialsRepository`, `EntityLinkSpan`. Plus `content/model/WitchTrials*.kt` + `content/dao/WitchTrials*Dao.kt`.
+
+**Cache-proxy:** `salem-schema.sql` (3 new tables — DONE), `lib/admin-witch-trials.js` (NEW, mirrors `lib/admin-pois.js`), `scripts/publish-witch-trials.js` (NEW, mirrors `publish-1692-newspapers.js`).
+
+**Web admin:** `web/src/admin/WitchTrialsArticleEditDialog.tsx`, `WitchTrialsBioEditDialog.tsx`, `WitchTrialsNewspaperEditDialog.tsx` (NEW, mirror `PoiEditDialog.tsx`).
+
+**Generator:** `tools/witch-trials-generator/` (NEW Python project) — `generate_articles.py`, `generate_bios.py`, `generate_portraits.py`, `salem_corpus_loader.py`, `import_to_pg.py`, `prompts/` Jinja templates.
+
+**Assets:** `app-salem/src/main/assets/witch_trials/{articles,npc_bios,newspapers}.json` + `portraits/{npc_id}.jpg`.
+
+### Operator decisions (Q&A locked S127)
+
+| | Decision |
+|---|---|
+| Tile count | 16 = 1 intro + 12 months + 1 fallout + 1 closing + 1 epilogue |
+| NPC scope | Tier 1 + Tier 2 = ~49 figures |
+| LLM source | Salem Oracle `:8088` (one-time GPU swap) |
+| Audio | Reuse existing Android system TTS at runtime — no audio assets to bundle |
+| Cross-links | `[[entity_id]]` markup, V1 |
+| Today card | Yes, V1 |
+| Narration toggle | Global preference (one toggle, mirrors Historical Mode) |
+| Portraits | Locally generated via Stable Diffusion, uniform pencil-sketch style across all 49 |
+| Editorial | PG-backed + admin web tool (mirrors `salem_pois`) |
+| Newspapers panel | Bundle all 202 from Salem JSON corpus |
+| Provenance | Day-one (`data_source`, `confidence`, `verified_date`) |
+| Splash layout | Hero + 2 below (Witch Trials = flagship hero card) |
+| Scope | 8 sessions, full scope |
+| OMEN-004 | Slipped — documented in S134 OMEN report |
+
+### Risks / known constraints
+
+- **Oracle GPU contention** with SalemIntelligence — sequential swap per generation run (Phases 9X.2 articles, 9X.5 bios). Documented in the generator README.
+- **November + December 1692 events sparse** (0 events each in Salem corpus). Generator handles by widening the prompt window with adjacent facts and explicit "the calm between executions" framing.
+- **DB version bump** triggered destructive migration on existing installs — operator explicitly accepts this for the test app. Pre-Play-Store: real Room migrations remain on the carry-forward list.
+- **Portrait quality drift** — Phase 9X.6 budgets a manual review pass; failures get hand-prompted with seed adjustments.
+- **OMEN-004 Kotlin unit test** deadline 2026-04-30 — deliberately slipped.
 
 ---
 
