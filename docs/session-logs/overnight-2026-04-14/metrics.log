@@ -1784,3 +1784,991 @@ logcat: 916773 lines (+5957 since last sample)
   App PID              : 14010
   Map center           : endpoint unreachable
 
+
+================ 2026-04-14 12:59:06 ================
+logcat: 932003 lines (+15230 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 0
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 3
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 20
+  Unique dates spoken  : 7
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 1
+  POI-interrupted-POI  : 5
+  Dropped (min-hold)   : 4
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 14010
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 13:14:07 ================
+logcat: 943022 lines (+11019 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 0
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 3
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 20
+  Unique dates spoken  : 7
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 1
+  POI-interrupted-POI  : 5
+  Dropped (min-hold)   : 4
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 14010
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 13:29:08 ================
+logcat: 1143875 lines (+200853 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 1
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 34
+  Unique dates spoken  : 12
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 5
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 6
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 22084
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 13:44:09 ================
+logcat: 1373840 lines (+229965 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 13:59:10 ================
+logcat: 1382905 lines (+9065 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 14:14:11 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 14:29:12 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 14:44:12 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 14:59:13 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 15:14:14 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 16756
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 15:29:16 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 15:44:16 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 15:59:18 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 22896
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 16:14:19 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 26505
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 16:29:20 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 26505
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 16:44:20 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 3847
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 16:59:21 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 10943
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 17:14:22 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 13070
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 17:29:23 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : 18431
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 17:44:24 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 17:59:25 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 18:14:26 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 18:29:27 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 18:44:28 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 18:59:29 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+
+
+================ 2026-04-14 19:14:30 ================
+logcat: 1382905 lines (+0 since last sample)
+
+-- Walk sim sessions --
+  Walk sim started     : 2
+  Walk complete        : 0
+  Walk-tour fired      : 9
+
+-- Tour engine --
+  Tour started         : 0
+  Historical Mode ON   : 4
+
+-- POI narrations --
+  ENTRY events (total) : 0
+  Unique POIs entered  : 0
+  Top 10 POIs:
+
+-- 1692 Newspaper --
+  Dispatches fired     : 47
+  Unique dates spoken  : 16
+  Pointer advances     : 0
+
+-- Interrupts --
+  Newspaper cancelled  : 8
+  POI-interrupted-POI  : 6
+  Dropped (min-hold)   : 7
+
+-- Errors / crashes --
+  FATAL EXCEPTION      : 0
+  ANR                  : 0
+  E/SalemMainActivity  : 0
+  NARR-GEO errors      : 0
+
+-- Device state --
+  App PID              : NOT RUNNING
+  Map center           : endpoint unreachable
+

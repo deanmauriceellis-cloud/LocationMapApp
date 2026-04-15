@@ -67,7 +67,14 @@
 
 // ─── Base URL resolution ──────────────────────────────────────────────────
 
-const DEFAULT_INTEL_BASE = 'http://localhost:8089'
+// S125: default to same-origin so the browser calls go through the Vite
+// dev proxy (vite.config.ts proxies /api/intel → http://localhost:8089).
+// This avoids CORS breakage when the admin UI is served from a LAN IP
+// like http://10.0.0.229:4302 and SI doesn't send
+// Access-Control-Allow-Origin. Operator can still override with
+// VITE_SALEM_INTELLIGENCE_URL (preferred) or VITE_SALEM_ORACLE_URL for
+// deployments where Vite isn't in front.
+const DEFAULT_INTEL_BASE = ''
 
 function resolveBase(): string {
   const fromIntel = (import.meta.env?.VITE_SALEM_INTELLIGENCE_URL as string | undefined)?.trim()
