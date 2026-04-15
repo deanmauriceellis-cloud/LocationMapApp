@@ -145,6 +145,10 @@ class MainViewModel @Inject constructor(
     fun setManualLocation(point: GeoPoint) {
         _currentLocation.value = LocationUpdate(point, null, null, 0f)
         _locationMode.value = LocationMode.MANUAL
+        // S126: when entering MANUAL, fully tear down the GMS provider so the
+        // hardware stops polling and no late GPS emission can race past the
+        // gate and snap the map back to the user's real location.
+        stopLocationPolling()
         DebugLogger.i(TAG, "Manual location: ${point.latitude}, ${point.longitude}")
     }
 
@@ -167,9 +171,34 @@ class MainViewModel @Inject constructor(
     }
 
     fun toggleLocationMode() {
-        _locationMode.value = if (_locationMode.value == LocationMode.GPS)
+        val newMode = if (_locationMode.value == LocationMode.GPS)
             LocationMode.MANUAL else LocationMode.GPS
-        DebugLogger.i(TAG, "Location mode → ${_locationMode.value}")
+        _locationMode.value = newMode
+        // S126: GPS off must mean GPS off — kill the GMS provider so the
+        // hardware stops polling and no leak path can recenter the map.
+        // GPS on → restart via onPermissionGranted (idempotent early-return
+        // if the job is somehow still alive).
+        if (newMode == LocationMode.MANUAL) {
+            stopLocationPolling()
+        } else {
+            onPermissionGranted()
+        }
+        DebugLogger.i(TAG, "Location mode → $newMode")
+    }
+
+    /**
+     * S126: Cancel the GMS FusedLocationProvider flow. Idempotent — safe to
+     * call when the job is already null. After this returns the GPS hardware
+     * stops polling (battery + privacy + no-leak guarantee). Reverse with
+     * [onPermissionGranted].
+     */
+    private fun stopLocationPolling() {
+        val job = locationJob
+        if (job != null) {
+            DebugLogger.i(TAG, "stopLocationPolling() — cancelling GMS provider")
+            job.cancel()
+            locationJob = null
+        }
     }
 
     // ── Data loads — user-initiated only, never called from init ──────────────
