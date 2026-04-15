@@ -11,11 +11,12 @@ Why this script exists: the operator needs a paper-style inspection
 document of every POI in the dataset. Useful for review, dedup
 hunting, content audits, and pre-migration sanity checks.
 
-Source of truth: the bundled content DB is the single source for
-this document. tour_pois (45 rows) and salem_businesses (861 rows)
-live ONLY in the bundled DB at the moment. narration_points (817 rows)
-is also in PostgreSQL (814 rows after S98 import), but the bundled
-DB is the more inclusive copy.
+Source of truth: Phase 9U unified `salem_pois` table in the bundled
+SQLite content DB. The legacy `tour_pois` / `salem_businesses` /
+`narration_points` tables were dropped in S126 — every POI now lives
+in `salem_pois` with a single schema. The PDF splits them into
+"Tour POIs" (is_tour_poi=1) vs "Modern POIs" so the curated stops
+still get their own pass.
 
 Output: docs/poi-inventory-YYYY-MM-DD.pdf (gitignored).
 
@@ -206,17 +207,22 @@ def render_poi(row, columns, kind_label):
 # ─── Section builders ────────────────────────────────────────────────────────
 
 def build_section(db, table, columns, primary_group_col, secondary_group_col,
-                  kind_label, section_title, total_filter='1=1'):
+                  kind_label, section_title, total_filter='1=1', filter_params=()):
     """
     Build a complete section: title + grouped POIs (primary → secondary → entity).
     `secondary_group_col` may be None if there's no natural sub-grouping;
     in that case all POIs in a primary group appear directly under it.
+    `filter_params` is the tuple of bind params for any '?' placeholders in
+    `total_filter` (e.g. ('1',) for is_tour_poi = ?).
     """
     elems = [Paragraph(section_title, styles['SectionH1'])]
 
-    total_rows = db.execute(f"SELECT COUNT(*) FROM {table} WHERE {total_filter}").fetchone()[0]
+    total_rows = db.execute(
+        f"SELECT COUNT(*) FROM {table} WHERE {total_filter}", filter_params
+    ).fetchone()[0]
     primary_count = db.execute(
-        f"SELECT COUNT(DISTINCT COALESCE({primary_group_col}, '(none)')) FROM {table} WHERE {total_filter}"
+        f"SELECT COUNT(DISTINCT COALESCE({primary_group_col}, '(none)')) FROM {table} WHERE {total_filter}",
+        filter_params,
     ).fetchone()[0]
     elems.append(Paragraph(
         f"{total_rows} POIs across {primary_count} {primary_group_col} buckets. "
@@ -226,7 +232,8 @@ def build_section(db, table, columns, primary_group_col, secondary_group_col,
 
     primary_values = [r[0] for r in db.execute(
         f"SELECT DISTINCT COALESCE({primary_group_col}, '(none)') AS g "
-        f"FROM {table} WHERE {total_filter} ORDER BY g"
+        f"FROM {table} WHERE {total_filter} ORDER BY g",
+        filter_params,
     ).fetchall()]
 
     for primary in primary_values:
@@ -238,7 +245,7 @@ def build_section(db, table, columns, primary_group_col, secondary_group_col,
             rows = db.execute(
                 f"SELECT * FROM {table} WHERE COALESCE({primary_group_col}, '(none)') = ? "
                 f"AND {total_filter} ORDER BY name",
-                (primary,),
+                (primary,) + filter_params,
             ).fetchall()
             for row in rows:
                 elems.extend(render_poi(row, columns, kind_label))
@@ -247,7 +254,7 @@ def build_section(db, table, columns, primary_group_col, secondary_group_col,
                 f"SELECT DISTINCT COALESCE({secondary_group_col}, '(none)') AS g "
                 f"FROM {table} WHERE COALESCE({primary_group_col}, '(none)') = ? "
                 f"AND {total_filter} ORDER BY g",
-                (primary,),
+                (primary,) + filter_params,
             ).fetchall()]
 
             for secondary in secondary_values:
@@ -259,7 +266,7 @@ def build_section(db, table, columns, primary_group_col, secondary_group_col,
                     f"WHERE COALESCE({primary_group_col}, '(none)') = ? "
                     f"AND COALESCE({secondary_group_col}, '(none)') = ? "
                     f"AND {total_filter} ORDER BY name",
-                    (primary, secondary),
+                    (primary, secondary) + filter_params,
                 ).fetchall()
                 for row in rows:
                     elems.extend(render_poi(row, columns, kind_label))
@@ -287,13 +294,13 @@ def main():
     print(f"Writing to:   {OUT_PATH}")
 
     counts = {
-        t: db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-        for t in ('tour_pois', 'salem_businesses', 'narration_points')
+        'tour':    db.execute("SELECT COUNT(*) FROM salem_pois WHERE is_tour_poi = 1").fetchone()[0],
+        'modern':  db.execute("SELECT COUNT(*) FROM salem_pois WHERE is_tour_poi = 0").fetchone()[0],
     }
-    print(f"Source counts: tour_pois={counts['tour_pois']}, "
-          f"salem_businesses={counts['salem_businesses']}, "
-          f"narration_points={counts['narration_points']}, "
-          f"TOTAL={sum(counts.values())}")
+    counts['total'] = counts['tour'] + counts['modern']
+    print(f"Source counts: tour POIs={counts['tour']}, "
+          f"modern POIs={counts['modern']}, "
+          f"TOTAL={counts['total']}")
 
     doc = SimpleDocTemplate(
         OUT_PATH,
@@ -321,10 +328,9 @@ def main():
     ))
     story.append(Spacer(1, 0.2 * inch))
     story.append(Paragraph(
-        f"<b>{counts['tour_pois']}</b> Tour POIs • "
-        f"<b>{counts['salem_businesses']}</b> Salem Businesses • "
-        f"<b>{counts['narration_points']}</b> Narration Points • "
-        f"<b>{sum(counts.values())}</b> total",
+        f"<b>{counts['tour']}</b> Tour POIs (curated stops) • "
+        f"<b>{counts['modern']}</b> Modern POIs • "
+        f"<b>{counts['total']}</b> total — all from unified <font face='Courier'>salem_pois</font>",
         styles['Normal'],
     ))
     story.append(Spacer(1, 0.4 * inch))
@@ -335,44 +341,33 @@ def main():
     ))
     story.append(PageBreak())
 
-    # ─── Section 1: Tour POIs ───────────────────────────────────────────────
-    # tour_pois.subcategories is a JSON array — group by the first element.
-    print("Building Section 1: Tour POIs...")
-    cols_tour = get_columns(db, 'tour_pois')
+    # ─── Section 1: Tour POIs (curated stops, is_tour_poi = 1) ──────────────
+    print(f"Building Section 1: Tour POIs ({counts['tour']} rows)...")
+    cols_unified = get_columns(db, 'salem_pois')
     story.extend(build_section(
         db,
-        table='tour_pois',
-        columns=cols_tour,
+        table='salem_pois',
+        columns=cols_unified,
         primary_group_col='category',
-        secondary_group_col=None,  # subcategories is JSON, hard to GROUP BY natively
+        secondary_group_col='subcategory',
         kind_label='tour',
-        section_title='Section 1 — Tour POIs (45 rows)',
+        section_title=f'Section 1 — Tour POIs ({counts["tour"]} rows)',
+        total_filter='is_tour_poi = ?',
+        filter_params=(1,),
     ))
 
-    # ─── Section 2: Salem Businesses ────────────────────────────────────────
-    print("Building Section 2: Salem Businesses...")
-    cols_biz = get_columns(db, 'salem_businesses')
+    # ─── Section 2: Modern POIs (everything else, is_tour_poi = 0) ──────────
+    print(f"Building Section 2: Modern POIs ({counts['modern']} rows)...")
     story.extend(build_section(
         db,
-        table='salem_businesses',
-        columns=cols_biz,
-        primary_group_col='business_type',
-        secondary_group_col='cuisine_type',
-        kind_label='business',
-        section_title='Section 2 — Salem Businesses (861 rows)',
-    ))
-
-    # ─── Section 3: Narration Points ────────────────────────────────────────
-    print("Building Section 3: Narration Points...")
-    cols_nar = get_columns(db, 'narration_points')
-    story.extend(build_section(
-        db,
-        table='narration_points',
-        columns=cols_nar,
-        primary_group_col='type',
-        secondary_group_col='wave',  # Wave 1-4 is the natural sub-grouping
-        kind_label='narration',
-        section_title='Section 3 — Narration Points (817 rows)',
+        table='salem_pois',
+        columns=cols_unified,
+        primary_group_col='category',
+        secondary_group_col='subcategory',
+        kind_label='modern',
+        section_title=f'Section 2 — Modern POIs ({counts["modern"]} rows)',
+        total_filter='is_tour_poi = ?',
+        filter_params=(0,),
     ))
 
     print("Rendering PDF... (this can take a minute or two)")
