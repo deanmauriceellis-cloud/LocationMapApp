@@ -1542,6 +1542,36 @@ class SalemMainActivity : AppCompatActivity() {
                         "Fresh walk (resume state invalidated): label '${walkSimResumeRouteLabel}' → '$routeLabel', " +
                         "size ${walkSimResumeRouteSize} → ${interpolated.size}, idx=${walkSimResumeStepIdx}")
                 }
+                // S126 (operator ask): if the user picked a spot via map
+                // long-press (LocationMode.MANUAL), START THE WALK FROM THAT
+                // POINT — snap to the nearest interpolated step on the tour
+                // route, back off 15 steps so the walker approaches rather
+                // than spawning inside the geofence. Manual pick wins over
+                // both the random-start branch and the step-0 default.
+                val manualPt = if (viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL) {
+                    viewModel.currentLocation.value?.point
+                } else null
+                val firstPt = interpolated.firstOrNull()
+                val manualStartIdx: Int? = if (manualPt != null && interpolated.size > 10) {
+                    var bestStep = 0
+                    var bestDist = Float.MAX_VALUE
+                    for (i in interpolated.indices) {
+                        val d = distanceBetween(interpolated[i], manualPt)
+                        if (d < bestDist) {
+                            bestDist = d
+                            bestStep = i
+                        }
+                    }
+                    val backedOff = (bestStep - 15).coerceAtLeast(0)
+                    DebugLogger.i(
+                        "WALK-SIM",
+                        "MANUAL PICK — long-press at ${"%.5f".format(manualPt.latitude)},${"%.5f".format(manualPt.longitude)} " +
+                            "maps to step $bestStep (off by ${bestDist.toInt()}m), starting at step $backedOff/${interpolated.size}"
+                    )
+                    toast("Starting walk from picked location")
+                    backedOff
+                } else null
+
                 // S125 (2026-04-14 operator ask): if a fresh walk is starting and
                 // the user's real GPS puts them well outside Salem, drop the
                 // walker at a random point along the tour route so successive
@@ -1552,8 +1582,9 @@ class SalemMainActivity : AppCompatActivity() {
                 // so the geofence trigger order matches the Heritage Trail's
                 // intended narrative arc.
                 val userPt = lastGpsPoint
-                val firstPt = interpolated.firstOrNull()
-                if (userPt != null && firstPt != null && interpolated.size > 10) {
+                if (manualStartIdx != null) {
+                    manualStartIdx
+                } else if (userPt != null && firstPt != null && interpolated.size > 10) {
                     val distFromRouteStartM = distanceBetween(userPt, firstPt)
                     if (distFromRouteStartM > WALK_SIM_RANDOMIZE_THRESHOLD_M) {
                         // S125 (2026-04-14 v2): pick a random TOUR STOP, not a
