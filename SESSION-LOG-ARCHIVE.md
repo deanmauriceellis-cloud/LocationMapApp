@@ -5,7 +5,31 @@
 
 ---
 
-# Sessions S001-S123 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S126 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 126: 2026-04-15 — Phase 9U closeout + GPS-off-means-off + walk-from-long-press + tour-broken hotfix
+
+Cleaned up Phase 9U: deleted NarrationPoint + SalemBusiness Room entities, rerouted `TourPoi` to project from `salem_pois` (no longer `@Entity`), dropped 23 dead repository methods, bumped DB version 5→6. Walk button now starts the tour from the long-press location. GPS toggle FAB + `setManualLocation` now actually cancel the GMS provider. Tour-selection-broken regression fixed.
+
+Full session detail: `docs/session-logs/session-126-2026-04-15.md`. Commits: `5335ff3` → `ebc9e30`.
+
+---
+
+## Session 125: 2026-04-14 — Overnight-test fixes + narration coverage to 100% + legacy-tour restoration + admin SI bridge
+
+Single-day megasession (23 commits). Shipped all 11 overnight-test P0/P1/P2/P3/P4 fixes. Generated narrations for 422 silent POIs via SalemIntelligence. Swept 216 stale SI UUIDs. Re-imported 4 legacy tours with OSRM polylines. Admin editorial-AI client retargeted from Oracle to SI.
+
+Full session detail: `docs/session-logs/session-125-2026-04-14.md`. Commit: `4be98ce`.
+
+---
+
+## Session 124: 2026-04-14 — Heritage Trail Phase 9R.0 + 1692 newspaper corpus + overnight endurance walk
+
+Shipped Phase 9R.0: Heritage Trail bundled asset, 202 newspaper dispatches, `HistoricalHeadlineQueue`, 2:1 silence-fill interleave, AU female voice. 1,143 POIs now have `historical_note`. Ran 7.5-hour overnight endurance walk.
+
+Full session detail: `docs/session-logs/session-124-2026-04-13.md`. Commit: `12fa5a8`.
+
+---
 
 ## Session 123: 2026-04-13 — POI dedup (110 soft-deleted), narration resync (+719 narrated), Phase 9R Historical Tour Mode spec
 

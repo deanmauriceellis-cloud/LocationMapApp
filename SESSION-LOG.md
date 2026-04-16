@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 124-133. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 124-134. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 136: 2026-04-16 — BCS dedup finalization + device verification + newspaper dock mode
+
+BCS re-import from fresh SI export (1,560 entities): 1,375 enriched, 89 orphans soft-deleted, all 7 BCS-vs-BCS dedup groups resolved. Walk-sim speed reverted to 1.4 m/s. Device verification confirmed newspaper dispatches fire during tour mode (S132 gate fix working). Built narration dock newspaper mode — "THE ORACLE" masthead + date on bottom sheet during newspaper playback, tap opens detail dialog. Next: HTML/WebView newspaper renderer (step 2) + SI-generated month tiles (step 3).
+
+Full session detail: `docs/session-logs/session-136-2026-04-16.md`. Commit: `pending`.
+
+---
 
 ## Session 135: 2026-04-16 — BCS dedup + ATTRACTION removal + SI sync + newspaper overhaul
 
@@ -76,29 +84,5 @@ Full session detail: `docs/session-logs/session-126-2026-04-15.md` (Phase 9X.1 s
 
 ---
 
-## Session 126: 2026-04-15 — Phase 9U closeout + GPS-off-means-off + walk-from-long-press + tour-broken hotfix
-
-Cleaned up Phase 9U: deleted NarrationPoint + SalemBusiness Room entities, rerouted `TourPoi` to project from `salem_pois` (no longer `@Entity`), dropped 23 dead repository methods, bumped DB version 5→6, removed legacy CREATE statements from `cache-proxy/salem-schema.sql`, archived 3 one-shot migration scripts to `docs/archive/`. Fixed inventory PDF tool to query `salem_pois` instead of dropped tables. Walk button now starts the tour from the long-press location (snap to nearest interpolated step, back off 15 for clean APPROACH→ENTRY arc). GPS toggle FAB + `setManualLocation` now actually cancel the GMS provider so the hardware stops polling — closes the "heartbeat brings me back home" leak. Tour-selection-broken regression caused by DB version bump (Room destructive migration wiped tour rows) — fixed by uninstall+reinstall, operator accepts destructive-restart for the test app.
-
-Full session detail: `docs/session-logs/session-126-2026-04-15.md`. Commits: `5335ff3` (S125 carry-over) → `bf2c026` (Phase 9U cleanup) → `fddd673` (PDF tool) → `cf09e59` (STATE) → `a997a6a` (walk from long-press) → `1b499a3` (GPS off) → `ebc9e30` (Phase 9X.1 — see S127 entry).
-
 ---
-
-## Session 125: 2026-04-14 — Overnight-test fixes + narration coverage to 100% + legacy-tour restoration + admin SI bridge
-
-Single-day megasession (23 commits). Shipped all 11 overnight-test P0/P1/P2/P3/P4 fixes (newspaper heartbeat, dual-walk mutex, Historical Mode TourEngine routing, narratedAt persistence, wake-lock, etc.). Generated narrations for 422 silent POIs via SalemIntelligence (194 cached + 228 stubs, later upgraded by the SI-unknown GET-vs-POST bug fix). Swept 216 stale SI UUIDs: 12 re-linked, 211 soft-deleted. Re-imported 4 legacy tours (essentials / explorer / grand / witch_trials) into PG with fresh OSRM walking polylines so walk-sim follows streets. Heading-up map rotation disabled pending rework. Admin editorial-AI client retargeted from Salem Oracle `:8088` to SalemIntelligence `:8089` (adapter preserves types). Walk-sim random-start now anchors to a random tour stop so narration fires immediately. `has_announce_narration` + `admin_dirty` flags added to salem_pois. OMEN NOTE-L016 filed (Oracle→SI gaps); OMEN Open Item #7 closed (stale-UUID sweep self-resolved).
-
-Full session detail: `docs/session-logs/session-125-2026-04-14.md`. Commit: `4be98ce` (HEAD).
-
----
-
-## Session 124: 2026-04-14 — Heritage Trail Phase 9R.0 + 1692 newspaper corpus + overnight endurance walk
-
-Shipped Phase 9R.0: Heritage Trail bundled asset (1692 yellow-line route + 11 stops), 1692 newspaper corpus (202 dispatches), `HistoricalHeadlineQueue` with SharedPreferences pointer, 2:1 POI/newspaper silence-fill interleave, AU female voice for newspapers, tag-based narration cancellation. 1,143 POIs now have `historical_note` (up from ~180). Ran a 7.5-hour overnight Heritage Trail endurance walk on the TB305FU tablet — produced `session-124-overnight-issues.md` cataloguing 11 prioritized bugs that Session 125 then consumed.
-
-Full session detail: `docs/session-logs/session-124-2026-04-13.md` + `docs/session-logs/session-124-overnight-issues.md`. Commit: `12fa5a8`.
-
----
-
----
-<!-- END OF ROLLING WINDOW — Sessions 123 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 126 and earlier are in SESSION-LOG-ARCHIVE.md -->

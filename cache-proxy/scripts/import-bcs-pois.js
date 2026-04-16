@@ -33,7 +33,7 @@ const DRY_RUN = process.argv.includes('--dry-run');
 const snapshotIdx = process.argv.indexOf('--snapshot');
 const SNAPSHOT_PATH = snapshotIdx !== -1
   ? process.argv[snapshotIdx + 1]
-  : path.resolve(__dirname, '../../tools/salem-data/bcs-export-2026-04-12.json');
+  : path.resolve(__dirname, '../../tools/salem-data/bcs-export-2026-04-16.json');
 
 if (!process.env.DATABASE_URL) {
   try { require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); } catch (_) {}
@@ -384,11 +384,39 @@ async function main() {
       inserted++;
     }
 
+    console.log(`  Inserted: ${inserted}`);
+
+    // ── Phase D: ORPHAN CLEANUP ──────────────────────────────────────────
+    // Soft-delete LMA rows whose intel_entity_id no longer appears in the
+    // SI export. These are entities SI merged or deleted upstream.
+    const exportEntityIds = new Set(validPois.map(p => p.entity_id));
+
+    const { rows: linkedRows } = await client.query(
+      `SELECT id, name, intel_entity_id FROM salem_pois
+       WHERE deleted_at IS NULL AND intel_entity_id IS NOT NULL`
+    );
+
+    const orphans = linkedRows.filter(r => !exportEntityIds.has(r.intel_entity_id));
+    let orphanDeleted = 0;
+
+    for (const orphan of orphans) {
+      if (!DRY_RUN) {
+        await client.query(
+          `UPDATE salem_pois
+           SET deleted_at = NOW(),
+               data_source = data_source || '|bcs-orphan-2026-04-16'
+           WHERE id = $1`,
+          [orphan.id]
+        );
+      }
+      console.log(`    Orphan: ${orphan.id} (${orphan.name}) — entity ${orphan.intel_entity_id} not in export`);
+      orphanDeleted++;
+    }
+    console.log(`  Orphans soft-deleted: ${orphanDeleted}`);
+
     if (!DRY_RUN) {
       await client.query('COMMIT');
     }
-
-    console.log(`  Inserted: ${inserted}`);
 
     // ── Summary ───────────────────────────────────────────────────────────
     console.log(`\n=== Category distribution (new inserts) ===`);

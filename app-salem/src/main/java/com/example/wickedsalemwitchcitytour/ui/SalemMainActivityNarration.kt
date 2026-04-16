@@ -8,6 +8,7 @@
 package com.example.wickedsalemwitchcitytour.ui
 
 import android.graphics.Color
+import android.graphics.Typeface
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -18,6 +19,7 @@ import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.tour.*
+import com.example.wickedsalemwitchcitytour.ui.witchtrials.showWitchTrialsNewspaperDetailDialog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -297,9 +299,25 @@ internal fun SalemMainActivity.initNarrationSystem() {
     lifecycleScope.launch {
         tourViewModel.narrationState.collectLatest { state ->
             DebugLogger.i("NARR-STATE", "narrationState → $state (autoPlay=$narrationAutoPlay, queueSize=${narrationQueue.size})")
+
+            // S136: Show "The Oracle" newspaper dock when a newspaper dispatch is playing
+            if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking) {
+                val seg = state.segment
+                if (seg != null && seg.id.startsWith("newspaper_1692_")) {
+                    showNewspaperSheet(seg)
+                }
+            }
+
+            if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle) {
+                // S136: hide newspaper sheet when dispatch ends
+                if (currentNewspaperHeadline != null) {
+                    binding.root.findViewById<View>(R.id.narrationSheet)?.visibility = View.GONE
+                }
+            }
             if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle && narrationAutoPlay) {
                 // Clear currentNarration — TTS is done, allow next entry to play immediately
                 currentNarration = null
+                currentNewspaperHeadline = null
                 DebugLogger.i("NARR-STATE", "  Idle → currentNarration cleared, queueSize=${narrationQueue.size}")
 
                 // S118: Pacing — after every 3rd consecutive narration, cool down 30s
@@ -392,6 +410,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 continue
             }
             clearNarrationHighlight()
+            currentNewspaperHeadline = h
             tourViewModel.speakTaggedNarration(
                 "newspaper_1692",
                 h.text,
@@ -441,6 +460,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                 return
             }
             clearNarrationHighlight()
+            currentNewspaperHeadline = h
             tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
             historicalHeadlineQueue.advance()
             lastNewspaperFiredMs = System.currentTimeMillis()
@@ -495,6 +515,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                     return
                 }
                 clearNarrationHighlight()
+                currentNewspaperHeadline = h
                 tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
                 historicalHeadlineQueue.advance()
                 lastNewspaperFiredMs = System.currentTimeMillis()
@@ -531,6 +552,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                 return
             }
             clearNarrationHighlight()
+            currentNewspaperHeadline = h
             tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
             historicalHeadlineQueue.advance()
             lastNewspaperFiredMs = System.currentTimeMillis()
@@ -1152,10 +1174,146 @@ internal fun SalemMainActivity.refreshProximityDockFromQueue() {
 }
 
 /**
+ * S136: Show the narration bottom sheet in "The Oracle" newspaper mode.
+ * Repurposes the existing sheet views — category area becomes masthead + date,
+ * title shows the headline, text shows the summary, and tapping opens the
+ * newspaper detail dialog.
+ */
+internal fun SalemMainActivity.showNewspaperSheet(
+    segment: com.example.wickedsalemwitchcitytour.tour.NarrationSegment
+) {
+    val sheet = binding.root.findViewById<View>(R.id.narrationSheet) ?: return
+    val headline = currentNewspaperHeadline ?: return
+
+    // Look up the full newspaper entity for headline + summary
+    val newspaperDate = headline.date // ISO date e.g. "1691-11-01"
+
+    // Category row → "The Oracle" masthead + date
+    sheet.findViewById<View>(R.id.categoryDot)?.visibility = View.GONE
+    sheet.findViewById<TextView>(R.id.categoryLabel)?.apply {
+        text = "THE ORACLE"
+        setTextColor(Color.parseColor("#D4A843"))
+        textSize = 12f
+        setTypeface(Typeface.SERIF, Typeface.BOLD_ITALIC)
+    }
+    sheet.findViewById<TextView>(R.id.distanceLabel)?.apply {
+        val displayDate = headline.date // Will be enhanced after DAO lookup
+        text = segment.poiName.removePrefix("Salem 1692 — ")
+        setTextColor(Color.parseColor("#D4A843"))
+    }
+
+    // Image: hidden for newspaper
+    sheet.findViewById<View>(R.id.narrationImage)?.visibility = View.GONE
+
+    // Title: headline from the headline queue
+    val headlineText = segment.text.let { fullText ->
+        // Extract the headline — it's between the dateline period and the body start
+        val datelineEnd = fullText.indexOf(". ", 6)
+        if (datelineEnd > 0) {
+            val afterDateline = fullText.substring(datelineEnd + 2)
+            // Headline is the ALL-CAPS portion at the start
+            val headlineEnd = afterDateline.indexOfFirst { it.isLowerCase() }
+            if (headlineEnd > 2) afterDateline.substring(0, headlineEnd).trim().trimEnd('!')
+            else afterDateline.take(80)
+        } else fullText.take(80)
+    }
+    sheet.findViewById<TextView>(R.id.narrationTitle)?.apply {
+        text = headlineText
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+    }
+
+    // Text: first ~200 chars of the body (after headline)
+    val bodyPreview = segment.text.let { fullText ->
+        val datelineEnd = fullText.indexOf(". ", 6)
+        if (datelineEnd > 0) {
+            val afterDateline = fullText.substring(datelineEnd + 2)
+            val headlineEnd = afterDateline.indexOfFirst { it.isLowerCase() }
+            if (headlineEnd > 2) afterDateline.substring(headlineEnd - 1).take(300).trim()
+            else afterDateline.take(300).trim()
+        } else fullText.take(300).trim()
+    }
+    sheet.findViewById<TextView>(R.id.narrationText)?.text = bodyPreview
+
+    // Queue indicator: show dispatch number
+    sheet.findViewById<TextView>(R.id.queueIndicator)?.apply {
+        text = "Dispatch ${headline.index + 1} of ${headline.total}"
+        visibility = View.VISIBLE
+    }
+
+    // Show the sheet
+    sheet.visibility = View.VISIBLE
+
+    // Tap handler: open newspaper detail dialog
+    val tapHandler = View.OnClickListener {
+        DebugLogger.i("SalemMainActivity",
+            "NEWSPAPER BANNER TAP date=$newspaperDate → opening newspaper detail")
+        lifecycleScope.launch {
+            val newspaper = witchTrialsViewModel.getNewspaperByDate(newspaperDate)
+            if (newspaper != null) {
+                showWitchTrialsNewspaperDetailDialog(newspaper)
+            }
+        }
+    }
+    sheet.setOnClickListener(tapHandler)
+    sheet.findViewById<TextView>(R.id.narrationTitle)?.apply {
+        isClickable = true
+        isFocusable = true
+        setOnClickListener(tapHandler)
+    }
+    sheet.findViewById<TextView>(R.id.narrationText)?.apply {
+        isClickable = true
+        isFocusable = true
+        setOnClickListener(tapHandler)
+    }
+
+    // Action buttons: Skip and Play/Pause only, hide the rest
+    sheet.findViewById<View>(R.id.btnSkip)?.setOnClickListener {
+        tourViewModel.stopNarration()
+        currentNewspaperHeadline = null
+        sheet.visibility = View.GONE
+    }
+    sheet.findViewById<TextView>(R.id.btnPlayPause)?.apply {
+        text = "⏸ Pause"
+        setOnClickListener {
+            if (tourViewModel.isNarrating()) {
+                tourViewModel.pauseNarration()
+                text = "▶ Listen"
+            } else {
+                tourViewModel.resumeNarration()
+                text = "⏸ Pause"
+            }
+        }
+    }
+    sheet.findViewById<TextView>(R.id.btnMoreInfo)?.apply {
+        text = "Read"
+        visibility = View.VISIBLE
+        setOnClickListener(tapHandler)
+    }
+    sheet.findViewById<View>(R.id.btnDirections)?.visibility = View.GONE
+    sheet.findViewById<View>(R.id.btnGeofence)?.visibility = View.GONE
+}
+
+/**
  * Show the narration bottom sheet for a narration point.
  */
 internal fun SalemMainActivity.showNarrationSheet(point: SalemPoi) {
     val sheet = binding.root.findViewById<View>(R.id.narrationSheet) ?: return
+
+    // S136: Restore POI-mode styling (undo any newspaper-mode changes)
+    sheet.findViewById<View>(R.id.categoryDot)?.visibility = View.VISIBLE
+    sheet.findViewById<TextView>(R.id.categoryLabel)?.apply {
+        setTextColor(Color.parseColor("#AB47BC"))
+        textSize = 11f
+        setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    sheet.findViewById<TextView>(R.id.distanceLabel)?.setTextColor(Color.parseColor("#888888"))
+    sheet.findViewById<TextView>(R.id.narrationTitle)?.setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+    sheet.findViewById<TextView>(R.id.btnMoreInfo)?.apply {
+        text = "More"
+        visibility = View.VISIBLE
+    }
+    sheet.findViewById<View>(R.id.btnDirections)?.visibility = View.VISIBLE
+    sheet.findViewById<View>(R.id.btnGeofence)?.visibility = View.VISIBLE
 
     // Populate content
     sheet.findViewById<TextView>(R.id.narrationTitle)?.text = point.name

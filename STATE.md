@@ -2,30 +2,28 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 135 (BCS dedup + ATTRACTION removal + SI sync + newspaper overhaul)
+**Last updated:** 2026-04-16 — Session 136 (BCS dedup finalization + device verification + newspaper dock mode)
 
 ---
 
-## TOP PRIORITY — Next Session (S136)
+## TOP PRIORITY — Next Session (S137)
 
-**Continue device verification: newspaper dispatches during tour mode + walk-sim end-to-end test, then Phase 9X close-out.**
+**Build HTML/WebView "The Oracle" newspaper renderer (Step 2) + SI-generated 16-tile month content (Step 3).**
 
-Master plan section: Phase 9X.
+Master plan section: Phase 9X (newspaper UI enhancement).
 
-S135 shipped massive data quality + narration overhaul. S136 picks up device verification of the newspaper dispatch fix (S132 tour-active gate was blocking them) and walk-sim tuning (3.0 m/s, 15s dwell). After verification, Phase 9X is COMPLETE.
+S136 completed device verification (newspaper dispatches confirmed working during tour mode) and built the narration dock newspaper mode (Step 1). S137 picks up the HTML/WebView newspaper renderer to replace the native-TextView detail dialog, then SI-generated month tiles for the History panel.
 
-**Post-S135 key facts:**
-- **BCS dedup completed.** 39 non-BCS POIs soft-deleted in favor of BCS survivors. 12 tour stops repointed. 1 hard-deleted (hawthorne_hotel_lodging).
-- **ATTRACTION tier removed.** 3-tier system: PAID/HISTORIC/REST. FAB OFF = HISTORICAL_BUILDINGS only. Vampfangs (1993) no longer triggers as historic (year ≤1860 threshold).
-- **SalemIntelligence full re-sync.** Fresh BCS export (1,564 entities, 0 placeholder coords). 1,281 enriched, 100 new inserts. **PG: 1,928 total POIs** (1,515 narrated). BCS-vs-BCS dupes still pending manual review.
-- **Heritage Trail route regenerated.** OSRM street-following polylines, 4 landmark coords fixed. 10 legs, 452 points, 3.6 miles, proper loop.
-- **Newspaper dispatch overhaul.** Room DB source (headlines available), dateline+headline+body format, yield-to-POI, 3s delay. **Fixed S132 tour-active gate** that was blocking newspapers — just deployed, awaiting verification.
-- **Walk-sim tuned.** 3.0 m/s, 2.5s GPS interval, 15s minimum POI dwell.
-- **Publish pipeline hardened.** Room-compatible CREATE TABLE (no DEFAULTs) for salem_pois + witch trials tables.
+**Post-S136 key facts:**
+- **BCS dedup fully resolved.** All 7 BCS-vs-BCS groups match SI verdicts. 93 orphans soft-deleted + 4 LMA-side dedup. **PG: 1,837 active POIs** (1,483 narrated).
+- **Walk-sim speed reverted** to 1.4 m/s (realistic pace, narration has time to play).
+- **Newspaper dispatches verified.** Fire during tour mode in Historical Mode (S132 gate fix confirmed). Room DB source working (202 articles, dateline+headline+body).
+- **Narration dock newspaper mode shipped.** "THE ORACLE" masthead + date on bottom sheet during newspaper playback. Tap opens detail dialog.
+- **Newspaper detail dialog needs upgrade.** Currently native TextViews with body-point bullets. Step 2: HTML/WebView with "The Oracle" branding, headline, cross-linked NPCs.
 - **Room `@Insert` silent-drop** from S129 still latent.
 - **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
 
-**Phase 9X status:** 8/8 sessions done code-wise. Device verification in progress (S135→S136). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** Device verification COMPLETE. Newspaper UI enhancement in progress (Step 1 done, Steps 2-3 next). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -44,7 +42,7 @@ S135 shipped massive data quality + narration overhaul. S136 picks up device ver
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 133. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 136. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -99,8 +97,8 @@ S135 shipped massive data quality + narration overhaul. S136 picks up device ver
 
 ## POI Inventory
 
-- **Current PG:** **1,928 total POIs** in `salem_pois` (1,515 narrated). S135 BCS dedup soft-deleted 39 + hard-deleted 1 + SI re-import added 100 new. BCS-vs-BCS dupes still pending.
-- **Room DB:** published from PG, in sync (1,928 rows).
+- **Current PG:** **1,837 active POIs** in `salem_pois` (1,483 narrated). S136 BCS re-import + orphan cleanup (93 soft-deleted) + LMA-side dedup (4 soft-deleted). All BCS-vs-BCS dupes resolved.
+- **Room DB:** published from PG, in sync (1,837 rows).
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
 
 ---

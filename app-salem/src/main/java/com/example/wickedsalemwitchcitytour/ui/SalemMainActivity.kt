@@ -180,6 +180,13 @@ class SalemMainActivity : AppCompatActivity() {
     internal var lastNewspaperFiredMs: Long = 0L
 
     /**
+     * S136: The currently-playing newspaper headline (set just before speakTaggedNarration,
+     * cleared when narration goes Idle). Used by the narration dock to show "The Oracle"
+     * masthead + date instead of POI info during newspaper playback.
+     */
+    internal var currentNewspaperHeadline: com.example.wickedsalemwitchcitytour.tour.HistoricalHeadlineQueue.Headline? = null
+
+    /**
      * Phase 9R.0: wall-clock ms of the last POI narration START — used by
      * [enqueueNarration] to enforce a minimum-hold window so cascaded
      * ENTRY events (several POIs within a walker's initial geofence cluster)
@@ -1516,10 +1523,10 @@ class SalemMainActivity : AppCompatActivity() {
             // S125: hold a PARTIAL wake lock for the whole walk so the CPU
             // doesn't sleep when the screen locks mid-run.
             acquireWalkWakeLock("WickedSalem:walkSimUi")
-            // S135: walk-sim speed 3.0 m/s — brisk walking pace.
-            // ~32 min end-to-end for the 3.6-mile Heritage Trail.
-            val interpolated = interpolateWalkRoute(routePoints, 3.0f)
-            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 3.0m/s")
+            // S136: walk-sim speed 1.4 m/s — realistic walking pace.
+            // Gives narration time to finish before hitting next POI.
+            val interpolated = interpolateWalkRoute(routePoints, 1.4f)
+            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
 
             // S125: FAB pause/resume — if the last paused walk was on the same
             // route and we have a saved step index in-bounds, skip ahead.
