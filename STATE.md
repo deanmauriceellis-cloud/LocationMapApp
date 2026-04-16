@@ -2,43 +2,29 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-15 — Session 131 (Phase 9X.5 People of Salem 1692 panel + TTS chunking shipped)
+**Last updated:** 2026-04-16 — Session 132 (Phase 9X.6 pencil-sketch portraits + bug fixes shipped)
 
 ---
 
-## TOP PRIORITY — Next Session (S132)
+## TOP PRIORITY — Next Session (S133)
 
-**Phase 9X.6 — pencil-sketch portraits for the 49 principal figures via local Stable Diffusion.**
+**Phase 9X.7 — cross-linking + admin integration + Today-in-1692 card.**
 
 Master plan section: Phase 9X.
 
-Step-by-step for S132 (per master plan):
-1. Fixed prompt template for uniform pencil-sketch style (no free-likeness mixing). Generate 49 portraits at 512×512 via Forge `:7860` — budget 5-10 MB total asset weight.
-2. Populate `salem_witch_trials_npc_bios.portrait_asset` with the bundled filename (`portraits/{npc_id}.jpg`).
-3. Wire the portrait into `WitchTrialsBioDetailDialog` (hero image above the name, round or square-with-corner-radius per design taste).
-4. Optionally show a small circular thumbnail on `buildBioRow` — verify that doesn't blow out the row height.
-5. Manual review pass for any quality drift; re-prompt the worst offenders with seed adjustments.
-6. Verify on Lenovo HNY0CY0W.
-7. Commit + push.
+After S133, Phase 9X will be 7/8 done. S134 = polish + field test + master plan/STATE/OMEN report updates.
 
-**GPU gate:** Forge on `:7860` contends with SalemIntelligence + Ollama for the RTX 3090. Confirm workload before starting the generation batch (49 × ~15s/portrait at 512² ≈ 12-15 min, can run with SI up if VRAM headroom holds).
+**Post-S132 key facts:**
+- **Phase 9X.6 shipped end-to-end.** 49 pencil-sketch portraits generated via Oracle→SD pipeline: Oracle extracted period-accurate appearance descriptions (role-aware vestments — Geneva bands for clergy, judicial justaucorps, per-station dress codes), distilled into SD prompt tails, rendered through 4 checkpoints × 2 prompt versions (392 total). Operator selected **RealVisXL V5.0 v2** (role-aware). 49 grayscale JPGs bundled at 2.5 MB total in `app-salem/src/main/assets/portraits/`.
+- **Portrait UI**: 160dp hero in bio detail (rounded corners, role-tinted border) + 48dp circular thumbnails in People browser rows. All bitmap decoding async via `Dispatchers.IO` + `LruCache(60)`.
+- **Bug fix S132**: ambient HINT narrations now suppressed during active/paused tours via tour-state gate in `runSilenceFill()`. No more "Lappin Park Little Free Library" interrupting tour narration.
+- **Bug fix S132**: portrait bitmap ANR eliminated — zero main-thread `BitmapFactory.decodeStream()`.
+- **AI Studio expanded**: 5 checkpoints now available (dreamshaper_8, DreamShaperXL Turbo, RealVisXL V5.0, Juggernaut XL v9, Flux.1 dev nf4). Forge `--api` enabled. 392 comparison portraits in `/tmp/s132-gallery/`.
+- **Room `@Insert` silent-drop** from S129 still latent — S132 sidestepped via `better-sqlite3` bake. Worth root-causing before Play Store.
+- **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
+- **PG: 2,080 active POIs** unchanged. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
 
-After S132, Phase 9X will be 6/8 done. S133 = cross-linking + admin integration + Today-in-1692 card. S134 = polish + field test + master plan/STATE/OMEN report updates.
-
-**Post-S131 key facts:**
-- **Phase 9X.5 shipped end-to-end.** 49 Tier-1/2 figures imported from `~/Development/Salem/data/json/npcs/` (filter: `tier == 1 || tier == 2`). Bios assembled from narrative subfields (life_before_1692 / role_in_crisis / emotional_arc / how_they_see_world / emotional_landscape / sermon_influence / appearance) into `## Header\n\nbody` markdown — 10K-21K chars per figure. Imported via `cache-proxy/scripts/import-witch-trials-npc-bios.js`, baked via `bundle-witch-trials-npc-bios-into-db.js`.
-- **People browser** (`WitchTrialsPeopleBrowserDialog`) — horizontal filter chip row (All / Judges / Accusers / Accused / Clergy / Officials / Others), vertical rows sorted by role bucket → tier → name. Each row: 17sp gold serif name, 13sp italic role descriptor, footer with colored role chip + `born – died` span (or "b. YYYY" / "d. YYYY" fallback). Border tinted per role (scarlet / gold / gray / purple / silver / slate).
-- **Bio detail** (`WitchTrialsBioDetailDialog`) — role eyebrow tinted to role color, 24sp bold gold name, `YYYY – YYYY · age N in 1692` dates, italic short-bio, optional "Outcome: …" line, Speak pill, `renderBioBody()` that splits `\n\n` blocks and renders `## ` lines as gold bold subheadings.
-- **Role bucketing is heuristic** — `roleTypeOf(bio)` text-matches `role + faction.lowercase()` with precedence JUDGE → CLERGY → ACCUSER → ACCUSED → OFFICIAL → OTHER. If any figure bucket looks wrong in deep-dive testing, tweak the regex order or add explicit id overrides.
-- **TTS chunking (`chunkForTts`, 3500-char cap)** — Android TTS caps per-utterance speech at ~4000 chars. Long bios (14K for Stoughton, 21K for ann_putnam_jr) now split into sentence-bounded chunks that enqueue sequentially under one `witchtrials_bio_` tag prefix. Verified: 5 chunks for Stoughton (3454/3500/3253/3127/1018), `TTS start` with no error, Stop drains all queued segments.
-- **PG now has**: `salem_witch_trials_articles` (16 rows, S128), `salem_witch_trials_newspapers` (202 rows + headlines, S130), **`salem_witch_trials_npc_bios` (49 rows, S131)**. Room schema still v8 (no bump needed — npc_bios table structure unchanged since v7).
-- **Asset DB** now carries all three witch-trials tables populated: 16 articles + 202 newspapers + 49 bios. `salem_content.db` size bumped modestly by the ~700KB of bio text.
-- **Portrait generation (Phase 9X.6)** is the last content-generation step. After that, 9X.7 = cross-linking + admin integration, 9X.8 = polish + field test.
-- **Room `@Insert` silent-drop** from S129 still latent — S131 sidestepped it once more via `better-sqlite3` bake. Worth root-causing before Play Store.
-- **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 15 days out).
-- **PG: 1,868 active POIs** unchanged. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
-
-**Phase 9X status:** 5 / 8 sessions done. 3 sessions of feature work ahead (S132-S134). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** 6 / 8 sessions done. 2 sessions of feature work ahead (S133-S134). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -50,7 +36,7 @@ After S132, Phase 9X will be 6/8 done. S133 = cross-linking + admin integration 
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
 | **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
-| **9X** Salem Witch Trials Feature | **IN PROGRESS — 5/8 sessions done (S127, S128, S129, S130, S131)** | **TOP PRIORITY (S132-S134).** S127 foundation. S128 history-article LLM gen (16/16). S129 History 4×4 tile UI. S130 Oracle Newspaper panel (202 articles + 202 AI tabloid headlines). S131 People panel (49 Tier-1/2 figures, role-filtered browser + bio detail + TTS chunker). Phase 9X.6 (S132) adds pencil-sketch portraits for all 49. |
+| **9X** Salem Witch Trials Feature | **IN PROGRESS — 6/8 sessions done (S127-S132)** | **TOP PRIORITY (S133-S134).** S127 foundation. S128 history-article LLM gen (16/16). S129 History 4×4 tile UI. S130 Oracle Newspaper panel (202 articles + 202 AI tabloid headlines). S131 People panel (49 Tier-1/2 figures, role-filtered browser + bio detail + TTS chunker). S132 pencil-sketch portraits (49, RealVisXL V5.0, Oracle-extracted vestments) + ambient-narration tour gate + async bitmap loading. Phase 9X.7 (S133) = cross-linking + admin integration + Today-in-1692 card. |
 | **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |

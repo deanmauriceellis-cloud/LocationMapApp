@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S121 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S122 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 122: 2026-04-13 — AudioCraft (AudioGen) installation for Salem sound effects
+
+Installed AudioCraft 1.4.0a2 with AudioGen medium model at `~/AI-Studio/audiocraft/` for generating custom sound effects (geofence triggers, atmospheric audio, notifications). Resolved Python 3.12 / CUDA 13.0 / torchaudio 2.11 compatibility chain. Built Gradio web UI with Salem preset categories and CLI generation script. Created `~/AI-Studio/USAGE.md` service reference. No changes to LocationMapApp codebase — tooling session only.
+
+Full session detail: `docs/session-logs/session-122-2026-04-13.md`.
+
+---
 
 ## Session 121: 2026-04-13 — SalemIntelligence narration sync, drop multipass, tap-to-speak detail sheet, icon + dwell fixes
 
