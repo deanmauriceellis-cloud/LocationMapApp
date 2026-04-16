@@ -1516,15 +1516,10 @@ class SalemMainActivity : AppCompatActivity() {
             // S125: hold a PARTIAL wake lock for the whole walk so the CPU
             // doesn't sleep when the screen locks mid-run.
             acquireWalkWakeLock("WickedSalem:walkSimUi")
-            // S124 Phase 9R.0: default walk-sim speed is 2.0 m/s — a brisk
-            // walking pace, ~33% of the 6.0 m/s demo replay speed used earlier.
-            // For the 3.6-mile Heritage Trail this is ~48 min end-to-end,
-            // which preserves the narration cadence (average ~400m anchor
-            // spacing = 200s = comfortably above the 30s dwell cooldown).
-            // Speed can still be overridden via /walk-tour?speed=N for faster
-            // replay or slower demos.
-            val interpolated = interpolateWalkRoute(routePoints, 2.0f)
-            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
+            // S135: walk-sim speed 3.0 m/s — brisk walking pace.
+            // ~32 min end-to-end for the 3.6-mile Heritage Trail.
+            val interpolated = interpolateWalkRoute(routePoints, 3.0f)
+            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 3.0m/s")
 
             // S125: FAB pause/resume — if the last paused walk was on the same
             // route and we have a saved step index in-bounds, skip ahead.
@@ -1801,7 +1796,9 @@ class SalemMainActivity : AppCompatActivity() {
                         // chunk) before we start polling for Idle — without
                         // this the dwell would exit immediately in the gap
                         // between "request speak" and "speaking".
-                        val minHoldMs = 4_000L
+                        // S135: 15s minimum dwell so the walker pauses long
+                        // enough to hear meaningful narration at each POI.
+                        val minHoldMs = 15_000L
                         while (true) {
                             if (walkSimJob?.isCancelled == true) break
                             val elapsed = System.currentTimeMillis() - dwellStart
@@ -2023,7 +2020,7 @@ class SalemMainActivity : AppCompatActivity() {
                 toast("Showing ALL POIs")
             } else {
                 binding.btnShowAllPois.setBackgroundResource(R.drawable.zoom_toggle_bg)
-                toast("Historic + attractions only")
+                toast("Historic sites only")
             }
             DebugLogger.i("SalemMainActivity", "Show all POIs → $showAllPoisActive")
             loadCachedPoisForVisibleArea()
@@ -2086,9 +2083,9 @@ class SalemMainActivity : AppCompatActivity() {
      * are loaded once — the icon refresh on zoom change (refreshNarrationIcons)
      * only updates markers within the visible viewport.
      *
-     * S112: Honors the POI button (`showAllPoisActive`):
+     * S112/S135: Honors the POI button (`showAllPoisActive`):
      *   - ON  → all narration points are loaded (full set)
-     *   - OFF → only points classified as PAID, HISTORIC, or ATTRACTION
+     *   - OFF → only HISTORICAL_BUILDINGS category (+ PAID merchants)
      *
      * Always removes any previously-loaded narration markers from the map
      * before loading the new set, so toggling the button is fully reversible.
@@ -2108,10 +2105,7 @@ class SalemMainActivity : AppCompatActivity() {
                     allPoints
                 } else {
                     allPoints.filter { p ->
-                        val tier = com.example.wickedsalemwitchcitytour.tour.NarrationTierClassifier.classify(p)
-                        tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.PAID ||
-                        tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.HISTORIC ||
-                        tier == com.example.wickedsalemwitchcitytour.tour.NarrationTier.ATTRACTION
+                        p.adPriority > 0 || p.category == "HISTORICAL_BUILDINGS"
                     }
                 }
                 // Phase 9R.0: when Historical Mode is on, strip out modern POIs
@@ -2764,14 +2758,16 @@ class SalemMainActivity : AppCompatActivity() {
             //   while the activity is alive. The old null-check was the proxy for
             //   "narration system initialized?"; that's now structurally guaranteed.
             val narrationActive = true
+            // S135: GPS rate doubled (5s→2.5s, min 2s→1s) for tighter
+            // geofence detection and smoother walk-sim tracking.
             val desiredInterval = when {
                 (speedMph ?: 0.0) > 20.0 -> 10_000L
-                narrationActive -> 5_000L
+                narrationActive -> 2_500L
                 else -> 60_000L
             }
             if (desiredInterval != currentGpsIntervalMs) {
                 currentGpsIntervalMs = desiredInterval
-                val minInterval = if (desiredInterval <= 5_000L) 2_000L else if (desiredInterval == 10_000L) 5_000L else 30_000L
+                val minInterval = if (desiredInterval <= 2_500L) 1_000L else if (desiredInterval == 10_000L) 5_000L else 30_000L
                 DebugLogger.i("SalemMainActivity", "GPS interval → ${desiredInterval}ms (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
                 viewModel.restartLocationUpdates(desiredInterval, minInterval)
             }
@@ -2943,15 +2939,14 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 // Clear cluster markers when showing individual POIs
                 clearClusterMarkers()
-                // S112: POI button filter — ON shows all OSM POIs, OFF shows only the
-                // historic + attraction tier set (paid customers don't apply to OSM
-                // places — adPriority is a NarrationPoint-only field).
+                // S135: POI button filter — ON shows all OSM POIs, OFF shows only
+                // HISTORIC tier (HISTORICAL_BUILDINGS, museums, monuments, etc.).
                 val filtered = if (showAllPoisActive) {
                     places
                 } else {
                     places.filter {
                         com.example.wickedsalemwitchcitytour.tour.NarrationTierClassifier
-                            .isHistoricOrAttractionTag(it.category)
+                            .isHistoricTag(it.category)
                     }
                 }
                 DebugLogger.i("SalemMainActivity", "POI layer filter: ${places.size} → ${filtered.size} (showAll=$showAllPoisActive)")

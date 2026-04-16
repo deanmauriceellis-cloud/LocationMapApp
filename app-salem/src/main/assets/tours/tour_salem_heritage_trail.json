@@ -9,7 +9,7 @@
     "stopCount": 11,
     "historical": true,
     "source": "YellowLine.txt (operator) + public OSRM foot profile + Nominatim geocoding",
-    "builtAt": "2026-04-14T02:54:10.856Z"
+    "builtAt": "2026-04-16T19:01:34.007Z"
   },
   "stops": [
     {
@@ -1567,14 +1567,10 @@
         [
           42.521611,
           -70.898863
-        ],
-        [
-          42.521611,
-          -70.898863
         ]
       ],
       "routeDistanceM": 331,
-      "routeDurationS": 267
+      "routeDurationS": 265
     },
     {
       "order": 9,
@@ -1586,6 +1582,10 @@
       "walkingMinutesFromPrev": 4,
       "distanceMFromPrev": 331,
       "routeToNext": [
+        [
+          42.521611,
+          -70.898863
+        ],
         [
           42.521611,
           -70.898863
@@ -1744,7 +1744,7 @@
         ]
       ],
       "routeDistanceM": 430,
-      "routeDurationS": 345
+      "routeDurationS": 347
     },
     {
       "order": 10,

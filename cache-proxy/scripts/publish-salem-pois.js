@@ -72,6 +72,9 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Room-compatible CREATE TABLE for salem_pois (must match SalemPoi.kt exactly)
+// CRITICAL: NO DEFAULT clauses — Room validates the pre-packaged DB schema
+// against @Entity definitions and crashes if any column has a DEFAULT that
+// Room doesn't expect (defaultValue='undefined' in Room = no SQL DEFAULT).
 const CREATE_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS salem_pois (
   id TEXT NOT NULL PRIMARY KEY,
@@ -79,29 +82,29 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   lat REAL NOT NULL,
   lng REAL NOT NULL,
   address TEXT,
-  status TEXT DEFAULT 'open',
+  status TEXT,
   category TEXT NOT NULL,
   subcategory TEXT,
   short_narration TEXT,
   long_narration TEXT,
-  geofence_radius_m INTEGER NOT NULL DEFAULT 40,
-  geofence_shape TEXT NOT NULL DEFAULT 'circle',
+  geofence_radius_m INTEGER NOT NULL,
+  geofence_shape TEXT NOT NULL,
   corridor_points TEXT,
-  priority INTEGER NOT NULL DEFAULT 3,
+  priority INTEGER NOT NULL,
   wave INTEGER,
   voice_clip_asset TEXT,
   custom_voice_asset TEXT,
   cuisine_type TEXT,
   price_range TEXT,
   rating REAL,
-  merchant_tier INTEGER NOT NULL DEFAULT 0,
-  ad_priority INTEGER NOT NULL DEFAULT 0,
+  merchant_tier INTEGER NOT NULL,
+  ad_priority INTEGER NOT NULL,
   historical_period TEXT,
   historical_note TEXT,
   admission_info TEXT,
-  requires_transportation INTEGER NOT NULL DEFAULT 0,
-  wheelchair_accessible INTEGER NOT NULL DEFAULT 1,
-  seasonal INTEGER NOT NULL DEFAULT 0,
+  requires_transportation INTEGER NOT NULL,
+  wheelchair_accessible INTEGER NOT NULL,
+  seasonal INTEGER NOT NULL,
   phone TEXT,
   email TEXT,
   website TEXT,
@@ -126,11 +129,11 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   related_figure_ids TEXT,
   related_fact_ids TEXT,
   related_source_ids TEXT,
-  data_source TEXT NOT NULL DEFAULT 'manual_curated',
-  confidence REAL NOT NULL DEFAULT 0.8,
-  is_tour_poi INTEGER NOT NULL DEFAULT 0,
-  is_narrated INTEGER NOT NULL DEFAULT 0,
-  default_visible INTEGER NOT NULL DEFAULT 1,
+  data_source TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  is_tour_poi INTEGER NOT NULL,
+  is_narrated INTEGER NOT NULL,
+  default_visible INTEGER NOT NULL,
   has_announce_narration INTEGER NOT NULL DEFAULT 0
 )`;
 

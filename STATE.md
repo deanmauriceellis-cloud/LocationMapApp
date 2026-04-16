@@ -2,27 +2,30 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 134 (Category reclassification + Historic Sites feature)
+**Last updated:** 2026-04-16 — Session 135 (BCS dedup + ATTRACTION removal + SI sync + newspaper overhaul)
 
 ---
 
-## TOP PRIORITY — Next Session (S135)
+## TOP PRIORITY — Next Session (S136)
 
-**Phase 9X.8 completion — device verification of Historic Sites + all Witch Trials features, then Phase 9X close-out.**
+**Continue device verification: newspaper dispatches during tour mode + walk-sim end-to-end test, then Phase 9X close-out.**
 
 Master plan section: Phase 9X.
 
-S135 picks up where S134 left off. APK is installed clean on Lenovo, no crashes. User needs to verify the new Historic Sites feature and existing Witch Trials features on device before Phase 9X is marked COMPLETE.
+S135 shipped massive data quality + narration overhaul. S136 picks up device verification of the newspaper dispatch fix (S132 tour-active gate was blocking them) and walk-sim tuning (3.0 m/s, 15s dwell). After verification, Phase 9X is COMPLETE.
 
-**Post-S134 key facts:**
-- **Category reclassification shipped.** 22 → 20 categories. `TOURISM_HISTORY` split into `HISTORICAL_BUILDINGS` (117 POIs) + `TOUR_COMPANIES` (17 POIs) + redistributed to `ENTERTAINMENT`/`PARKS_REC`. `HAUNTED_ATTRACTION` (10 POIs → ENTERTAINMENT) and `GHOST_TOUR` (4 POIs → TOUR_COMPANIES) deleted. `HISTORIC_HOUSE` merged into HISTORICAL_BUILDINGS. 77 POIs backfilled with `year_established`. 12+ code files updated across Kotlin + TypeScript.
-- **"Historic Sites of Salem" feature built.** New 4th tile on Witch Trials menu. Browser dialog with 4 era filter chips + scrollable site list + detail dialog with cross-linking + TTS. **Awaiting device verification.**
-- **Publish pipeline fixed.** New `publish-witch-trials-to-sqlite.js` populates all 3 witch trials tables into bundled SQLite alongside `publish-salem-pois.js`.
+**Post-S135 key facts:**
+- **BCS dedup completed.** 39 non-BCS POIs soft-deleted in favor of BCS survivors. 12 tour stops repointed. 1 hard-deleted (hawthorne_hotel_lodging).
+- **ATTRACTION tier removed.** 3-tier system: PAID/HISTORIC/REST. FAB OFF = HISTORICAL_BUILDINGS only. Vampfangs (1993) no longer triggers as historic (year ≤1860 threshold).
+- **SalemIntelligence full re-sync.** Fresh BCS export (1,564 entities, 0 placeholder coords). 1,281 enriched, 100 new inserts. **PG: 1,928 total POIs** (1,515 narrated). BCS-vs-BCS dupes still pending manual review.
+- **Heritage Trail route regenerated.** OSRM street-following polylines, 4 landmark coords fixed. 10 legs, 452 points, 3.6 miles, proper loop.
+- **Newspaper dispatch overhaul.** Room DB source (headlines available), dateline+headline+body format, yield-to-POI, 3s delay. **Fixed S132 tour-active gate** that was blocking newspapers — just deployed, awaiting verification.
+- **Walk-sim tuned.** 3.0 m/s, 2.5s GPS interval, 15s minimum POI dwell.
+- **Publish pipeline hardened.** Room-compatible CREATE TABLE (no DEFAULTs) for salem_pois + witch trials tables.
 - **Room `@Insert` silent-drop** from S129 still latent.
 - **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
-- **PG: 1,868 active POIs** (down from 2,080 — reclassification moved some to soft-deleted duplicates). **Narration coverage: 100%**. **5 tours** with OSRM polylines.
 
-**Phase 9X status:** 8 / 8 sessions done code-wise. Device verification pending (S135). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** 8/8 sessions done code-wise. Device verification in progress (S135→S136). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -96,8 +99,8 @@ S135 picks up where S134 left off. APK is installed clean on Lenovo, no crashes.
 
 ## POI Inventory
 
-- **Current PG:** **2,080 active POIs** in `salem_pois` (1,543 narrated, 1,555 with long_narration, 1,417 with short_narration). 110 soft-deleted by S123 dedup, pending pre-Play-Store hard-delete. Multipass columns dropped.
-- **Room DB:** stale until next bundle export (will reflect 2,080 once published).
+- **Current PG:** **1,928 total POIs** in `salem_pois` (1,515 narrated). S135 BCS dedup soft-deleted 39 + hard-deleted 1 + SI re-import added 100 new. BCS-vs-BCS dupes still pending.
+- **Room DB:** published from PG, in sync (1,928 rows).
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
 
 ---

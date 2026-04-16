@@ -95,15 +95,18 @@ class NarrationGeofenceManager @Inject constructor(
      *      historic houses, museums, cemeteries, memorials)
      *   2. `historical_period` is populated (curated "this is historic" tag)
      *   3. category is amusement-like (ENTERTAINMENT / MUSEUM / PARKS_REC /
-     *      WORSHIP / etc.) AND `year_established` is set — gives us
+     *      WORSHIP / etc.) AND `year_established` ≤ 1860 — gives us
      *      Hamilton Hall 1805, Ropes Mansion 1727, historic churches, etc.
+     *      The 1860 cutoff matches the S134 HISTORICAL_BUILDINGS reclassification
+     *      boundary. Modern venues (Vampfangs 1993, etc.) are excluded.
      *      Modern BCS shops sit in SHOPPING/FOOD_DRINK so they miss this.
      */
     private fun isCategoricallyHistorical(point: SalemPoi): Boolean {
         val cat = point.category.uppercase()
         if (cat == "HISTORICAL_BUILDINGS") return true
         if (!point.historicalPeriod.isNullOrBlank()) return true
-        if (cat in AMUSEMENT_LIKE_CATEGORIES && point.yearEstablished != null) return true
+        val year = point.yearEstablished
+        if (cat in AMUSEMENT_LIKE_CATEGORIES && year != null && year <= 1860) return true
         return false
     }
 
@@ -256,15 +259,14 @@ class NarrationGeofenceManager @Inject constructor(
         /**
          * Categories that count as "amusement-like" for Historical Mode map
          * visibility. A POI in one of these categories shows on the map if it
-         * also has `year_established` populated — a signal that the venue is
+         * also has `year_established` ≤ 1860 — a signal that the venue is
          * genuinely historical (museum, historic hall, old church, preserved
          * park). Used by [isVisibleInHistoricalMode]. Do NOT add SHOPPING,
          * FOOD_DRINK, OFFICES, HEALTHCARE, AUTO_SERVICES, or WITCH_SHOP here
          * — those would drag modern businesses into the immersive tour view.
          */
         private val AMUSEMENT_LIKE_CATEGORIES = setOf(
-            "ENTERTAINMENT", "AMUSEMENT", "AMUSEMENTS",
-            "ATTRACTION", "ATTRACTIONS", "MUSEUM",
+            "ENTERTAINMENT", "MUSEUM",
             "PARKS_REC", "WORSHIP"
         )
     }

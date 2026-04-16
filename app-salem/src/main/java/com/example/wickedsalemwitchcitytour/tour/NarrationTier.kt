@@ -3,12 +3,12 @@
  * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
  *
  * Phase 9T+ (S112) — narration queue tiered priority + 50m discard.
+ * S135: Removed ATTRACTION tier — only PAID, HISTORIC, REST remain.
  *
- * Operator-specified ordering (S112 narration redesign):
+ * Operator-specified ordering:
  *   PAID       → adPriority > 0 — paying merchant customers, top of the list
  *   HISTORIC   → HISTORICAL_BUILDINGS, CIVIC categories
- *   ATTRACTION → TOUR_COMPANIES, WITCH_SHOP, PSYCHIC, ENTERTAINMENT
- *   REST       → everything else (food, transit, retail, lodging, etc.)
+ *   REST       → everything else (entertainment, food, transit, retail, etc.)
  *
  * Within each tier, the closer POI wins. Anything farther than 50m from the
  * current user position is dropped at dequeue time before tier evaluation.
@@ -34,8 +34,7 @@ import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 enum class NarrationTier {
     PAID,        // adPriority > 0 — paying merchants override category
     HISTORIC,    // HISTORICAL_BUILDINGS, CIVIC
-    ATTRACTION,  // TOUR_COMPANIES, WITCH_SHOP, PSYCHIC, ENTERTAINMENT
-    REST         // everything else
+    REST         // everything else (entertainment, shops, food, etc.)
 }
 
 object NarrationTierClassifier {
@@ -50,11 +49,6 @@ object NarrationTierClassifier {
         "CIVIC"              to NarrationTier.HISTORIC,
         "EDUCATION"          to NarrationTier.HISTORIC,
 
-        // ── ATTRACTION tier ───────────────────────────────────────────────
-        "TOUR_COMPANIES"      to NarrationTier.ATTRACTION,
-        "WITCH_SHOP"          to NarrationTier.ATTRACTION,
-        "PSYCHIC"             to NarrationTier.ATTRACTION,
-        "ENTERTAINMENT"       to NarrationTier.ATTRACTION,
     )
 
     /**
@@ -90,26 +84,7 @@ object NarrationTierClassifier {
         put("library", NarrationTier.HISTORIC)
         put("public_building", NarrationTier.HISTORIC)
 
-        // ── ATTRACTION tier ───────────────────────────────────────────────
-        put("tour_companies", NarrationTier.ATTRACTION)
-        put("tour", NarrationTier.ATTRACTION)
-        put("walking_tour", NarrationTier.ATTRACTION)
-        put("witch_shop", NarrationTier.ATTRACTION)
-        put("witchcraft", NarrationTier.ATTRACTION)
-        put("occult", NarrationTier.ATTRACTION)
-        put("psychic", NarrationTier.ATTRACTION)
-        put("tarot", NarrationTier.ATTRACTION)
-        put("fortune_teller", NarrationTier.ATTRACTION)
-        put("attraction", NarrationTier.ATTRACTION)
-        put("theme_park", NarrationTier.ATTRACTION)
-        put("theatre", NarrationTier.ATTRACTION)
-        put("cinema", NarrationTier.ATTRACTION)
-        put("arts_centre", NarrationTier.ATTRACTION)
-        put("gallery", NarrationTier.ATTRACTION)
-        put("nightclub", NarrationTier.ATTRACTION)
-        put("comedy_club", NarrationTier.ATTRACTION)
-        put("zoo", NarrationTier.ATTRACTION)
-        put("aquarium", NarrationTier.ATTRACTION)
+        // All other OSM tags (entertainment, shops, etc.) fall through to REST
     }
 
     /**
@@ -131,12 +106,9 @@ object NarrationTierClassifier {
     }
 
     /**
-     * Returns true if the OSM category is HISTORIC or ATTRACTION (the two
-     * tiers visible in the POI button OFF state, alongside any future
-     * paid customers — which OSM places cannot be).
+     * Returns true if the OSM category maps to the HISTORIC tier.
      */
-    fun isHistoricOrAttractionTag(category: String?): Boolean {
-        val tier = classifyOsmCategory(category)
-        return tier == NarrationTier.HISTORIC || tier == NarrationTier.ATTRACTION
+    fun isHistoricTag(category: String?): Boolean {
+        return classifyOsmCategory(category) == NarrationTier.HISTORIC
     }
 }

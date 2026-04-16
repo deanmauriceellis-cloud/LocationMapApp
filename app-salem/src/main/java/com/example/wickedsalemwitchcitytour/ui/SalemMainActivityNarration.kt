@@ -369,6 +369,11 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 )
                 continue
             }
+            // S135: yield to any POI narration currently playing
+            if (tourViewModel.isNarrating()) {
+                DebugLogger.d("NARR-HEARTBEAT", "SKIP — TTS currently speaking, yielding")
+                continue
+            }
             val h = historicalHeadlineQueue.pollNext()
             if (h == null) {
                 DebugLogger.d("NARR-HEARTBEAT", "SKIP — headline queue empty")
@@ -376,10 +381,16 @@ internal fun SalemMainActivity.initNarrationSystem() {
             }
             DebugLogger.i(
                 "NARR-HEARTBEAT",
-                "FORCE — ${if (sinceLast == Long.MAX_VALUE) "never" else "${sinceLast / 1000}s"} since last newspaper, " +
-                    "cancelling POI for ${h.date} ${h.name}"
+                "FIRE — ${if (sinceLast == Long.MAX_VALUE) "never" else "${sinceLast / 1000}s"} since last newspaper, " +
+                    "3s delay then ${h.date} ${h.name}"
             )
-            tourViewModel.cancelSegmentsWithTag("poi_narration")
+            // S135: 3-second pause before newspaper starts
+            delay(3000)
+            // Re-check: a POI may have started during the delay
+            if (tourViewModel.isNarrating()) {
+                DebugLogger.d("NARR-HEARTBEAT", "ABORT — POI started during 3s delay, yielding")
+                continue
+            }
             clearNarrationHighlight()
             tourViewModel.speakTaggedNarration(
                 "newspaper_1692",
@@ -409,16 +420,37 @@ internal fun SalemMainActivity.initNarrationSystem() {
  * playNextNarration() when pickNextFromQueue() returns null.
  */
 internal suspend fun SalemMainActivity.runSilenceFill() {
-    // ── S132 tour-active gate ──
+    // ── S132/S135 tour-active gate ──
     //    When a structured tour is active or paused, suppress ambient
-    //    reach-out entirely. Tour narration is curated — ambient HINT
-    //    POIs ("Lappin Park Little Free Library") interrupt the tour
-    //    experience. The tour engine manages its own narration queue;
-    //    silence-fill should only run in Explore/ambient mode.
+    //    POI reach-out but ALLOW newspaper dispatches through. Tour
+    //    narration is curated — ambient HINT POIs interrupt the tour
+    //    experience. But 1692 newspaper filler IS part of the curated
+    //    Historical Mode experience and should play during silence gaps.
     val tourState = tourViewModel.tourState.value
-    if (tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active ||
-        tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused) {
-        DebugLogger.d("NARR-STATE", "  REACH-OUT SUPPRESSED: tour active (${tourState::class.simpleName})")
+    val tourActive = tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active ||
+        tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
+    if (tourActive && narrationGeofenceManager.isHistoricalMode()) {
+        // Tour is running in Historical Mode — fire newspaper filler only
+        val h = historicalHeadlineQueue.pollNext()
+        if (h != null) {
+            DebugLogger.i("NARR-HEADLINE",
+                "TOUR SILENCE FILL: 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}")
+            delay(3000)
+            if (tourViewModel.isNarrating()) {
+                DebugLogger.d("NARR-HEADLINE", "ABORT (tour silence) — POI started during 3s delay")
+                return
+            }
+            clearNarrationHighlight()
+            tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
+            historicalHeadlineQueue.advance()
+            lastNewspaperFiredMs = System.currentTimeMillis()
+        } else {
+            DebugLogger.d("NARR-STATE", "  TOUR SILENCE: headline queue empty")
+        }
+        return
+    }
+    if (tourActive) {
+        DebugLogger.d("NARR-STATE", "  REACH-OUT SUPPRESSED: tour active, no historical mode")
         return
     }
 
@@ -455,8 +487,13 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
             if (h != null) {
                 DebugLogger.i(
                     "NARR-HEADLINE",
-                    "SILENCE FILL (dwell cap): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                    "SILENCE FILL (dwell cap): 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
                 )
+                delay(3000)
+                if (tourViewModel.isNarrating()) {
+                    DebugLogger.d("NARR-HEADLINE", "ABORT (dwell cap) — POI started during 3s delay")
+                    return
+                }
                 clearNarrationHighlight()
                 tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
                 historicalHeadlineQueue.advance()
@@ -486,8 +523,13 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
             newspaperSilenceSlotCounter = 0
             DebugLogger.i(
                 "NARR-HEADLINE",
-                "SILENCE FILL (2:1 interleave): 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                "SILENCE FILL (2:1 interleave): 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
             )
+            delay(3000)
+            if (tourViewModel.isNarrating()) {
+                DebugLogger.d("NARR-HEADLINE", "ABORT (2:1) — POI started during 3s delay")
+                return
+            }
             clearNarrationHighlight()
             tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
             historicalHeadlineQueue.advance()
@@ -533,23 +575,30 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
     // Reach-out found nothing — in Historical Mode, use the silence
     // as a cue for a 1692 headline. Runs only when reach-out also
     // found nothing, so any nearby POI still wins.
+    // S135: 3s delay before newspaper, yield if POI starts during delay.
     val headlineFired = if (narrationGeofenceManager.isHistoricalMode()) {
         val h = historicalHeadlineQueue.pollNext()
         if (h != null) {
             DebugLogger.i(
                 "NARR-HEADLINE",
-                "SILENCE FILL: 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
+                "SILENCE FILL: 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
             )
-            clearNarrationHighlight()
-            tourViewModel.speakTaggedNarration(
-                "newspaper_1692",
-                h.text,
-                "Salem 1692 — ${h.date}",
-                "en-au-x-auc-local"
-            )
-            historicalHeadlineQueue.advance()
-            lastNewspaperFiredMs = System.currentTimeMillis()
-            true
+            delay(3000)
+            if (tourViewModel.isNarrating()) {
+                DebugLogger.d("NARR-HEADLINE", "ABORT (silence fill) — POI started during 3s delay")
+                false
+            } else {
+                clearNarrationHighlight()
+                tourViewModel.speakTaggedNarration(
+                    "newspaper_1692",
+                    h.text,
+                    "Salem 1692 — ${h.date}",
+                    "en-au-x-auc-local"
+                )
+                historicalHeadlineQueue.advance()
+                lastNewspaperFiredMs = System.currentTimeMillis()
+                true
+            }
         } else {
             false
         }
@@ -881,7 +930,7 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
 /**
  * S112: Pick the next SalemPoi to play, applying the dequeue rules:
  *   1. Drop everything farther than 50m from the current user position.
- *   2. Find the highest non-empty tier (PAID → HISTORIC → ATTRACTION → REST).
+ *   2. Find the highest non-empty tier (PAID → HISTORIC → REST).
  *   3. Within that tier, return the closest POI to the user.
  *
  * The picked entry is REMOVED from the queue. Returns null if the queue is

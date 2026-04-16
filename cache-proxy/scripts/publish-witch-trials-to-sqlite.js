@@ -33,6 +33,70 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 async function main() {
   const db = new Database(SQLITE_PATH);
 
+  // --- Create tables if missing (publish-salem-pois.js rebuilds the DB from scratch) ---
+  // Schema must match Room @Entity definitions EXACTLY: no DEFAULT clauses,
+  // correct NOT NULL. Room validates on open and crashes on any mismatch.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS salem_witch_trials_newspapers (
+      id TEXT NOT NULL PRIMARY KEY,
+      date TEXT NOT NULL,
+      day_of_week TEXT,
+      long_date TEXT,
+      crisis_phase INTEGER NOT NULL,
+      summary TEXT,
+      lede TEXT,
+      body_points TEXT NOT NULL,
+      tts_full_text TEXT NOT NULL,
+      events_referenced TEXT NOT NULL,
+      event_count INTEGER NOT NULL,
+      fact_count INTEGER NOT NULL,
+      primary_source_count INTEGER NOT NULL,
+      data_source TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      verified_date TEXT,
+      generator_model TEXT,
+      headline TEXT,
+      headline_summary TEXT
+    );
+    CREATE TABLE IF NOT EXISTS salem_witch_trials_npc_bios (
+      id TEXT NOT NULL PRIMARY KEY,
+      name TEXT NOT NULL,
+      display_name TEXT,
+      tier INTEGER NOT NULL,
+      role TEXT NOT NULL,
+      faction TEXT,
+      born_year INTEGER,
+      died_year INTEGER,
+      age_in_1692 INTEGER,
+      historical_outcome TEXT,
+      bio TEXT NOT NULL,
+      related_npc_ids TEXT NOT NULL,
+      related_event_ids TEXT NOT NULL,
+      related_newspaper_dates TEXT NOT NULL,
+      portrait_asset TEXT,
+      data_source TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      verified_date TEXT,
+      generator_model TEXT
+    );
+    CREATE TABLE IF NOT EXISTS salem_witch_trials_articles (
+      id TEXT NOT NULL PRIMARY KEY,
+      tile_order INTEGER NOT NULL,
+      tile_kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      period_label TEXT,
+      teaser TEXT NOT NULL,
+      body TEXT NOT NULL,
+      related_npc_ids TEXT NOT NULL,
+      related_event_ids TEXT NOT NULL,
+      related_newspaper_dates TEXT NOT NULL,
+      data_source TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      verified_date TEXT,
+      generator_model TEXT
+    );
+  `);
+
   // --- Newspapers ---
   const { rows: papers } = await pool.query('SELECT * FROM salem_witch_trials_newspapers ORDER BY date');
   console.log(`PG newspapers: ${papers.length}`);

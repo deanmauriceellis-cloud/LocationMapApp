@@ -45,35 +45,39 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// ── BCS category → LMA category mapping (S116 decisions) ───────────────────
+// ── BCS category → LMA category mapping (S134/S135 — 20 categories) ─────────
+//
+// S134: TOURISM_HISTORY split into HISTORICAL_BUILDINGS + TOUR_COMPANIES.
+//       HAUNTED_ATTRACTION → ENTERTAINMENT. GHOST_TOUR → TOUR_COMPANIES.
+//       HISTORIC_HOUSE merged into HISTORICAL_BUILDINGS.
+// S135: ATTRACTION tier removed from narration system.
 
 // Tourist-relevant categories → default_visible = true
 const TOURIST_VISIBLE = new Set([
-  'FOOD_DRINK', 'WITCH_SHOP', 'TOURISM_HISTORY', 'ENTERTAINMENT',
-  'LODGING', 'SHOPPING', 'GHOST_TOUR', 'HAUNTED_ATTRACTION',
-  'HISTORIC_HOUSE', 'PSYCHIC',
+  'FOOD_DRINK', 'WITCH_SHOP', 'HISTORICAL_BUILDINGS', 'ENTERTAINMENT',
+  'LODGING', 'SHOPPING', 'TOUR_COMPANIES', 'PSYCHIC',
 ]);
 
 const BCS_CATEGORY_MAP = {
-  restaurant:         { category: 'FOOD_DRINK',       subcategory: null },
-  cafe:               { category: 'FOOD_DRINK',       subcategory: 'FOOD_DRINK__cafes' },
-  bar:                { category: 'FOOD_DRINK',       subcategory: 'FOOD_DRINK__bars' },
-  shop_occult:        { category: 'WITCH_SHOP',       subcategory: null },
-  shop_retail:        { category: 'SHOPPING',          subcategory: null },
-  museum:             { category: 'TOURISM_HISTORY',   subcategory: 'TOURISM_HISTORY__museums' },
-  attraction:         { category: 'TOURISM_HISTORY',   subcategory: 'TOURISM_HISTORY__attractions' },
-  tour_operator:      { category: 'ENTERTAINMENT',     subcategory: 'ENTERTAINMENT__tour_operators' },
-  hotel_lodging:      { category: 'LODGING',           subcategory: null },
-  gallery_art:        { category: 'TOURISM_HISTORY',   subcategory: 'TOURISM_HISTORY__galleries' },
-  performance_venue:  { category: 'ENTERTAINMENT',     subcategory: null },
-  shop_bookstore:     { category: 'SHOPPING',          subcategory: 'SHOPPING__bookstores' },
-  shop_antiques:      { category: 'SHOPPING',          subcategory: 'SHOPPING__antiques' },
-  spa_beauty:         { category: 'SHOPPING',          subcategory: 'SHOPPING__beauty_spa' },
-  fitness:            { category: 'ENTERTAINMENT',     subcategory: 'ENTERTAINMENT__fitness' },
-  service_health:     { category: 'HEALTHCARE',        subcategory: null },
-  education:          { category: 'EDUCATION',         subcategory: null },
-  religious:          { category: 'WORSHIP',           subcategory: null },
-  other:              { category: 'CIVIC',             subcategory: null },
+  restaurant:         { category: 'FOOD_DRINK',           subcategory: null },
+  cafe:               { category: 'FOOD_DRINK',           subcategory: 'FOOD_DRINK__cafes' },
+  bar:                { category: 'FOOD_DRINK',           subcategory: 'FOOD_DRINK__bars' },
+  shop_occult:        { category: 'WITCH_SHOP',           subcategory: null },
+  shop_retail:        { category: 'SHOPPING',              subcategory: null },
+  museum:             { category: 'HISTORICAL_BUILDINGS',  subcategory: 'HISTORICAL_BUILDINGS__museums' },
+  attraction:         { category: 'ENTERTAINMENT',         subcategory: null },
+  tour_operator:      { category: 'TOUR_COMPANIES',        subcategory: null },
+  hotel_lodging:      { category: 'LODGING',               subcategory: null },
+  gallery_art:        { category: 'ENTERTAINMENT',         subcategory: 'ENTERTAINMENT__galleries' },
+  performance_venue:  { category: 'ENTERTAINMENT',         subcategory: null },
+  shop_bookstore:     { category: 'SHOPPING',              subcategory: 'SHOPPING__bookstores' },
+  shop_antiques:      { category: 'SHOPPING',              subcategory: 'SHOPPING__antiques' },
+  spa_beauty:         { category: 'SHOPPING',              subcategory: 'SHOPPING__beauty_spa' },
+  fitness:            { category: 'ENTERTAINMENT',         subcategory: 'ENTERTAINMENT__fitness' },
+  service_health:     { category: 'HEALTHCARE',            subcategory: null },
+  education:          { category: 'EDUCATION',             subcategory: null },
+  religious:          { category: 'WORSHIP',               subcategory: null },
+  other:              { category: 'CIVIC',                 subcategory: null },
 };
 
 // ── service_professional keyword decomposition (S116) ───────────────────────
@@ -206,7 +210,9 @@ async function main() {
     console.log(`Existing salem_pois: ${existing.length}`);
 
     // Build lookup structures
-    const existingIds = new Set(existing.map(r => r.id));
+    // Load ALL IDs (including soft-deleted) to avoid PK collisions on insert
+    const { rows: allIds } = await client.query('SELECT id FROM salem_pois');
+    const existingIds = new Set(allIds.map(r => r.id));
     const existingByNorm = new Map();
     for (const row of existing) {
       const norm = normalizeName(row.name);
@@ -261,6 +267,16 @@ async function main() {
       const updates = {};
       // Always set the intel link
       updates.intel_entity_id = bcs.entity_id;
+
+      // S135: Always update coords from BCS — SI has validated all geocodes.
+      // Only skip if BCS still has the old placeholder (42.5213339, -70.8958456).
+      const isPlaceholder = Math.abs(bcs.latitude - 42.5213339) < 0.0001 &&
+                            Math.abs(bcs.longitude - (-70.8958456)) < 0.0001;
+      if (!isPlaceholder) {
+        updates.lat = bcs.latitude;
+        updates.lng = bcs.longitude;
+      }
+      if (bcs.street_address) updates.address = bcs.street_address;
 
       // Enrich with BCS data only if current value is null/empty
       if (!existingRow.phone && bcs.phone) updates.phone = bcs.phone;
