@@ -297,11 +297,11 @@ object PoiCategories {
             color = Color.parseColor("#4E342E")
         ),
 
-        // 13 — Tourism & History
+        // 13 — Historic Sites
         PoiCategory(
-            id = PoiLayerId.TOURISM_HISTORY,
-            label = "Tourism & History",
-            prefKey = "poi_tourism_history_on",
+            id = PoiLayerId.HISTORICAL_BUILDINGS,
+            label = "Historic Sites",
+            prefKey = "poi_historical_buildings_on",
             tags = listOf("tourism=museum", "tourism=attraction", "tourism=viewpoint",
                            "historic=memorial", "historic=monument",
                            "tourism=artwork", "tourism=gallery", "tourism=information",

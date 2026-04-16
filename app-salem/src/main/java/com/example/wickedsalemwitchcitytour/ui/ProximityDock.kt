@@ -47,9 +47,8 @@ class ProximityDock(private val context: Context, private val rootView: View) {
     private val categoryColors = mapOf(
         "WITCH_SHOP"          to "#6A1B9A",
         "PSYCHIC"             to "#AB47BC",
-        "GHOST_TOUR"          to "#E040FB",
-        "HAUNTED_ATTRACTION"  to "#D500F9",
-        "TOURISM_HISTORY"     to "#8D6E63",
+        "TOUR_COMPANIES"      to "#FF6F00",
+        "HISTORICAL_BUILDINGS" to "#8D6E63",
         "ENTERTAINMENT"       to "#FF6F00",
         "PARKS_REC"           to "#2E7D32",
         "LODGING"             to "#7B1FA2",
@@ -68,9 +67,8 @@ class ProximityDock(private val context: Context, private val rootView: View) {
     private val categoryToFolder = mapOf(
         "WITCH_SHOP"          to "witch_shop",
         "PSYCHIC"             to "psychic",
-        "GHOST_TOUR"          to "ghost_tour",
-        "HAUNTED_ATTRACTION"  to "haunted_attraction",
-        "TOURISM_HISTORY"     to "tourism_history",
+        "TOUR_COMPANIES"      to "tour_companies",
+        "HISTORICAL_BUILDINGS" to "historical_buildings",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",
@@ -178,7 +176,7 @@ class ProximityDock(private val context: Context, private val rootView: View) {
 
     /** Load icon from assets/poi-icons/{folder}/ for this POI */
     private fun loadPoiIcon(point: SalemPoi, imageView: ImageView) {
-        val folder = categoryToFolder[point.category] ?: "tourism_history"
+        val folder = categoryToFolder[point.category] ?: "historical_buildings"
 
         val icons = categoryIcons.getOrPut(folder) {
             try {

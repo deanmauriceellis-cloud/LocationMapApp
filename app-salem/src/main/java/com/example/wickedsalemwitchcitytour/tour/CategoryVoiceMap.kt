@@ -49,10 +49,9 @@ object CategoryVoiceMap {
     private val categoryVoice: Map<String, String> = mapOf(
         // ── SalemPoi.category (uppercase — Phase 9U unified table) ──
         "WITCH_SHOP"          to UK_1,  // Female — mysterious shopkeeper
-        "GHOST_TOUR"          to UK_2,  // Male — dramatic storyteller
-        "HAUNTED_ATTRACTION"  to UK_2,  // Male — dramatic storyteller
+        "TOUR_COMPANIES"      to UK_2,  // Male — dramatic storyteller
         "PSYCHIC"             to UK_3,  // Female soft — ethereal, mystical
-        "TOURISM_HISTORY"     to US_7,  // Male narrator — documentary voice
+        "HISTORICAL_BUILDINGS" to US_7, // Male narrator — documentary voice
         "FOOD_DRINK"          to US_1,  // Female warm — welcoming
         "LODGING"             to US_8,  // Female crisp — professional hospitality
         "SHOPPING"            to US_3,  // Female bright — retail energy
@@ -69,8 +68,7 @@ object CategoryVoiceMap {
         // ── Legacy lowercase types / OSM tags (backward compatibility) ──
         "witch_shop"          to UK_1,
         "witch_museum"        to UK_4,
-        "ghost_tour"          to UK_2,
-        "haunted_attraction"  to UK_2,
+        "tour_companies"      to UK_2,
         "psychic"             to UK_3,
         "cemetery"            to UK_6,
         "historic_site"       to US_7,

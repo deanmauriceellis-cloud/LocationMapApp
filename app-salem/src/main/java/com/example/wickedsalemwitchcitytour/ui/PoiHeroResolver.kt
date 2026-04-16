@@ -38,9 +38,8 @@ object PoiHeroResolver {
     private val categoryToFolder = mapOf(
         "WITCH_SHOP"          to "witch_shop",
         "PSYCHIC"             to "psychic",
-        "GHOST_TOUR"          to "ghost_tour",
-        "HAUNTED_ATTRACTION"  to "haunted_attraction",
-        "TOURISM_HISTORY"     to "tourism_history",
+        "TOUR_COMPANIES"      to "tour_companies",
+        "HISTORICAL_BUILDINGS" to "historical_buildings",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",

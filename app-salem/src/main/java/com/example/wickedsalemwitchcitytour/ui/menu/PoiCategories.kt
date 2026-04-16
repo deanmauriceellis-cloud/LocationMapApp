@@ -16,7 +16,7 @@ import com.example.locationmapapp.ui.menu.PoiLayerId
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module PoiCategories.kt"
 
 /**
- * Central config for all 22 POI categories (17 standard + 5 Salem-specific).
+ * Central config for all 20 POI categories (17 standard + 3 Salem-specific).
  * Menu items, toggles, restore, Overpass queries, and marker colors are all driven from this list.
  *
  * ── Mirror file (Phase 9P.6, Session 101) ──
@@ -335,37 +335,29 @@ object PoiCategories {
             historicTourDefault = true
         ),
 
-        // 13 — Tourism & History (default ON — primary layer for Salem tour app)
+        // 13 — Historic Sites (default ON — primary layer for Salem tour app)
+        // S134: replaced TOURISM_HISTORY. Genuine historic buildings, home sites, cemeteries,
+        // memorials, forts, wharves, districts. Modern attractions/tours moved to ENTERTAINMENT/TOUR_COMPANIES.
         PoiCategory(
-            id = PoiLayerId.TOURISM_HISTORY,
-            label = "Tourism & History",
-            prefKey = "poi_tourism_history_on",
-            tags = listOf("tourism=museum", "tourism=attraction", "tourism=viewpoint",
-                           "historic=memorial", "historic=monument",
-                           "tourism=artwork", "tourism=gallery", "tourism=information",
-                           "historic=cemetery", "historic=building",
-                           "historic=ruins", "historic=maritime",
-                           "tourism=zoo", "tourism=aquarium", "tourism=theme_park"),
+            id = PoiLayerId.HISTORICAL_BUILDINGS,
+            label = "Historic Sites",
+            prefKey = "poi_historic_sites_on",
+            tags = listOf("historic=building", "historic=house", "historic=memorial",
+                           "historic=monument", "historic=cemetery", "historic=maritime",
+                           "historic=ruins"),
             subtypes = listOf(
-                PoiSubtype("Museums",     listOf("tourism=museum")),
-                PoiSubtype("Attractions", listOf("tourism=attraction")),
-                PoiSubtype("Viewpoints",  listOf("tourism=viewpoint")),
+                PoiSubtype("Historic Buildings", listOf("historic=building")),
+                PoiSubtype("Cemeteries",  listOf("historic=cemetery")),
                 PoiSubtype("Memorials",   listOf("historic=memorial")),
                 PoiSubtype("Monuments",   listOf("historic=monument")),
-                PoiSubtype("Public Art",  listOf("tourism=artwork")),
-                PoiSubtype("Galleries",   listOf("tourism=gallery")),
-                PoiSubtype("Info Points", listOf("tourism=information")),
-                PoiSubtype("Cemeteries",  listOf("historic=cemetery")),
-                PoiSubtype("Historic Bldgs", listOf("historic=building")),
-                PoiSubtype("Ruins",       listOf("historic=ruins")),
                 PoiSubtype("Maritime",    listOf("historic=maritime")),
-                PoiSubtype("Zoos",        listOf("tourism=zoo")),
-                PoiSubtype("Aquariums",   listOf("tourism=aquarium")),
-                PoiSubtype("Theme Parks", listOf("tourism=theme_park"))
+                PoiSubtype("Historic Districts", listOf("historic=district")),
+                PoiSubtype("Home Sites",  listOf("historic=site")),
+                PoiSubtype("Ruins",       listOf("historic=ruins"))
             ),
-            color = Color.parseColor("#FF6F00"),
+            color = Color.parseColor("#8D6E63"),
             defaultEnabled = true,
-            historicTourDefault = true  // Heart of historic tour mode — memorials, monuments, museums, cemeteries
+            historicTourDefault = true  // Heart of historic tour mode — buildings, memorials, cemeteries
         ),
 
         // 14 — Emergency Svc
@@ -454,7 +446,9 @@ object PoiCategories {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // Salem-Specific Categories (18-22)
+        // Salem-Specific Categories (18-20)
+        // S134: was 18-22. HAUNTED_ATTRACTION→ENTERTAINMENT, HISTORIC_HOUSE→HISTORICAL_BUILDINGS,
+        // GHOST_TOUR→TOUR_COMPANIES. TOURISM_HISTORY split into HISTORICAL_BUILDINGS+others.
         // ═══════════════════════════════════════════════════════════════
 
         // 18 — Witch & Occult Shops
@@ -492,55 +486,23 @@ object PoiCategories {
             defaultEnabled = true
         ),
 
-        // 20 — Ghost Tours
+        // 20 — Tour Companies
+        // S134: absorbed GHOST_TOUR + walking tour companies from old TOURISM_HISTORY
         PoiCategory(
-            id = PoiLayerId.GHOST_TOUR,
-            label = "Ghost Tours",
-            prefKey = "poi_ghost_tour_on",
-            tags = listOf("tourism=ghost_tour"),
+            id = PoiLayerId.TOUR_COMPANIES,
+            label = "Tour Companies",
+            prefKey = "poi_tour_companies_on",
+            tags = listOf("tourism=walking_tour", "tourism=ghost_tour",
+                           "tourism=ghost_walk", "tourism=historical_tour"),
             subtypes = listOf(
-                PoiSubtype("Walking Tours",      listOf("tourism=ghost_walk")),
-                PoiSubtype("Haunted Tours",      listOf("tourism=haunted_tour")),
-                PoiSubtype("Night Tours",        listOf("tourism=night_tour")),
-                PoiSubtype("Historical Tours",   listOf("tourism=historical_tour"))
+                PoiSubtype("Walking Tours",    listOf("tourism=walking_tour")),
+                PoiSubtype("Ghost Tours",      listOf("tourism=ghost_tour")),
+                PoiSubtype("Food Tours",       listOf("tourism=food_tour")),
+                PoiSubtype("Trolley Tours",    listOf("tourism=trolley_tour"))
             ),
-            color = Color.parseColor("#E040FB"),
+            color = Color.parseColor("#FF6F00"),
             defaultEnabled = true,
-            historicTourDefault = true  // Ghost tours are historic-tour-adjacent
-        ),
-
-        // 21 — Haunted Attractions
-        PoiCategory(
-            id = PoiLayerId.HAUNTED_ATTRACTION,
-            label = "Haunted Attractions",
-            prefKey = "poi_haunted_attraction_on",
-            tags = listOf("tourism=haunted_attraction"),
-            subtypes = listOf(
-                PoiSubtype("Haunted Houses",     listOf("tourism=haunted_house")),
-                PoiSubtype("Scare Attractions",  listOf("tourism=scare")),
-                PoiSubtype("Wax Museums",        listOf("tourism=wax_museum")),
-                PoiSubtype("Escape Horror",      listOf("tourism=escape_horror"))
-            ),
-            color = Color.parseColor("#D500F9"),
-            defaultEnabled = true
-        ),
-
-        // 22 — Historic Houses
-        PoiCategory(
-            id = PoiLayerId.HISTORIC_HOUSE,
-            label = "Historic Houses",
-            prefKey = "poi_historic_house_on",
-            tags = listOf("historic=house", "building=historic"),
-            subtypes = listOf(
-                PoiSubtype("Colonial Houses",    listOf("historic=colonial_house")),
-                PoiSubtype("Witch Trial Houses", listOf("historic=witch_trial_house")),
-                PoiSubtype("Maritime Houses",    listOf("historic=maritime_house")),
-                PoiSubtype("Literary Houses",    listOf("historic=literary_house")),
-                PoiSubtype("Museum Houses",      listOf("historic=museum_house"))
-            ),
-            color = Color.parseColor("#8D6E63"),
-            defaultEnabled = true,
-            historicTourDefault = true  // Witch trial houses, colonial houses central to 1692 narrative
+            historicTourDefault = true  // Tour companies are relevant in historic tour mode
         )
     )
 

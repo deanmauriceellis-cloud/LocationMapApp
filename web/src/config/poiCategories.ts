@@ -6,7 +6,7 @@
  * MIRROR OF: app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/menu/PoiCategories.kt
  * ════════════════════════════════════════════════════════════════════════
  *
- * Hand-port of the 22-category POI taxonomy used by the Salem Android module.
+ * Hand-port of the 20-category POI taxonomy used by the Salem Android module.
  * Used by the Salem POI Admin Tool (Phase 9P.B) for the left-side tree pane,
  * category-aware edit dialog, and per-mode visibility schema (9P.4a).
  *
@@ -14,7 +14,7 @@
  *   - categories.ts is the 17-category taxonomy used by the GENERIC public
  *     web app for OSM POI classification. Shape uses `tagMatches: { key, values }[]`.
  *   - poiCategories.ts (this file) mirrors the Salem Android module's exact
- *     taxonomy: 17 standard + 5 Salem-specific categories, with `tags: string[]`
+ *     taxonomy: 17 standard + 3 Salem-specific categories, with `tags: string[]`
  *     ("amenity=restaurant" form), plus per-mode visibility flags.
  *   - The two files will probably be unified in a future refactor (TODO Phase 9C
  *     or later), but until then this file is the source of truth for the admin
@@ -74,20 +74,18 @@ export const PoiLayerId = {
   PARKING: 'PARKING',
   FINANCE: 'FINANCE',
   WORSHIP: 'WORSHIP',
-  TOURISM_HISTORY: 'TOURISM_HISTORY',
+  HISTORICAL_BUILDINGS: 'HISTORICAL_BUILDINGS',
   EMERGENCY: 'EMERGENCY',
   AUTO_SERVICES: 'AUTO_SERVICES',
   ENTERTAINMENT: 'ENTERTAINMENT',
   OFFICES: 'OFFICES',
-  // 5 Salem-specific
+  // 3 Salem-specific (S134: was 5; HAUNTED_ATTRACTION→ENTERTAINMENT, HISTORIC_HOUSE→HISTORICAL_BUILDINGS, GHOST_TOUR→TOUR_COMPANIES)
   WITCH_SHOP: 'WITCH_SHOP',
   PSYCHIC: 'PSYCHIC',
-  GHOST_TOUR: 'GHOST_TOUR',
-  HAUNTED_ATTRACTION: 'HAUNTED_ATTRACTION',
-  HISTORIC_HOUSE: 'HISTORIC_HOUSE',
+  TOUR_COMPANIES: 'TOUR_COMPANIES',
 } as const;
 
-// ─── 22 categories ───────────────────────────────────────────────────────────
+// ─── 20 categories ───────────────────────────────────────────────────────────
 
 export const POI_CATEGORIES: PoiCategory[] = [
   // 1 — Food & Drink
@@ -396,38 +394,29 @@ export const POI_CATEGORIES: PoiCategory[] = [
     historicTourDefault: true,
   },
 
-  // 13 — Tourism & History (default ON — primary layer for Salem tour app)
-  // Heart of historic tour mode — memorials, monuments, museums, cemeteries
+  // 13 — Historic Sites (default ON — primary layer for Salem tour app)
+  // S134: replaced TOURISM_HISTORY. Genuine historic buildings, home sites, cemeteries,
+  // memorials, forts, wharves, districts. Modern attractions/tours → ENTERTAINMENT/TOUR_COMPANIES.
   {
-    id: PoiLayerId.TOURISM_HISTORY,
-    label: 'Tourism & History',
-    prefKey: 'poi_tourism_history_on',
+    id: PoiLayerId.HISTORICAL_BUILDINGS,
+    label: 'Historic Sites',
+    prefKey: 'poi_historic_sites_on',
     tags: [
-      'tourism=museum', 'tourism=attraction', 'tourism=viewpoint',
-      'historic=memorial', 'historic=monument',
-      'tourism=artwork', 'tourism=gallery', 'tourism=information',
-      'historic=cemetery', 'historic=building',
-      'historic=ruins', 'historic=maritime',
-      'tourism=zoo', 'tourism=aquarium', 'tourism=theme_park',
+      'historic=building', 'historic=house', 'historic=memorial',
+      'historic=monument', 'historic=cemetery', 'historic=maritime',
+      'historic=ruins',
     ],
     subtypes: [
-      { label: 'Museums',      tags: ['tourism=museum'] },
-      { label: 'Attractions',  tags: ['tourism=attraction'] },
-      { label: 'Viewpoints',   tags: ['tourism=viewpoint'] },
-      { label: 'Memorials',    tags: ['historic=memorial'] },
-      { label: 'Monuments',    tags: ['historic=monument'] },
-      { label: 'Public Art',   tags: ['tourism=artwork'] },
-      { label: 'Galleries',    tags: ['tourism=gallery'] },
-      { label: 'Info Points',  tags: ['tourism=information'] },
-      { label: 'Cemeteries',   tags: ['historic=cemetery'] },
-      { label: 'Historic Bldgs', tags: ['historic=building'] },
-      { label: 'Ruins',        tags: ['historic=ruins'] },
-      { label: 'Maritime',     tags: ['historic=maritime'] },
-      { label: 'Zoos',         tags: ['tourism=zoo'] },
-      { label: 'Aquariums',    tags: ['tourism=aquarium'] },
-      { label: 'Theme Parks',  tags: ['tourism=theme_park'] },
+      { label: 'Historic Buildings', tags: ['historic=building'] },
+      { label: 'Cemeteries',         tags: ['historic=cemetery'] },
+      { label: 'Memorials',          tags: ['historic=memorial'] },
+      { label: 'Monuments',          tags: ['historic=monument'] },
+      { label: 'Maritime',           tags: ['historic=maritime'] },
+      { label: 'Historic Districts', tags: ['historic=district'] },
+      { label: 'Home Sites',         tags: ['historic=site'] },
+      { label: 'Ruins',              tags: ['historic=ruins'] },
     ],
-    color: '#FF6F00',
+    color: '#8D6E63',
     defaultEnabled: true,
     historicTourDefault: true,
   },
@@ -531,7 +520,9 @@ export const POI_CATEGORIES: PoiCategory[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════
-  // Salem-Specific Categories (18-22)
+  // Salem-Specific Categories (18-20)
+  // S134: was 18-22. HAUNTED_ATTRACTION→ENTERTAINMENT, HISTORIC_HOUSE→HISTORICAL_BUILDINGS,
+  // GHOST_TOUR→TOUR_COMPANIES. TOURISM_HISTORY split into HISTORICAL_BUILDINGS+others.
   // ═══════════════════════════════════════════════════════════════
 
   // 18 — Witch & Occult Shops (modern Salem witch shops fit the historic atmosphere)
@@ -570,54 +561,20 @@ export const POI_CATEGORIES: PoiCategory[] = [
     historicTourDefault: false,
   },
 
-  // 20 — Ghost Tours (historic-tour-adjacent)
+  // 20 — Tour Companies
+  // S134: absorbed GHOST_TOUR + walking tour companies from old TOURISM_HISTORY
   {
-    id: PoiLayerId.GHOST_TOUR,
-    label: 'Ghost Tours',
-    prefKey: 'poi_ghost_tour_on',
-    tags: ['tourism=ghost_tour'],
+    id: PoiLayerId.TOUR_COMPANIES,
+    label: 'Tour Companies',
+    prefKey: 'poi_tour_companies_on',
+    tags: ['tourism=walking_tour', 'tourism=ghost_tour', 'tourism=ghost_walk', 'tourism=historical_tour'],
     subtypes: [
-      { label: 'Walking Tours',    tags: ['tourism=ghost_walk'] },
-      { label: 'Haunted Tours',    tags: ['tourism=haunted_tour'] },
-      { label: 'Night Tours',      tags: ['tourism=night_tour'] },
-      { label: 'Historical Tours', tags: ['tourism=historical_tour'] },
+      { label: 'Walking Tours', tags: ['tourism=walking_tour'] },
+      { label: 'Ghost Tours',   tags: ['tourism=ghost_tour'] },
+      { label: 'Food Tours',    tags: ['tourism=food_tour'] },
+      { label: 'Trolley Tours', tags: ['tourism=trolley_tour'] },
     ],
-    color: '#E040FB',
-    defaultEnabled: true,
-    historicTourDefault: true,
-  },
-
-  // 21 — Haunted Attractions (modern attractions, distracts from 1692)
-  {
-    id: PoiLayerId.HAUNTED_ATTRACTION,
-    label: 'Haunted Attractions',
-    prefKey: 'poi_haunted_attraction_on',
-    tags: ['tourism=haunted_attraction'],
-    subtypes: [
-      { label: 'Haunted Houses',    tags: ['tourism=haunted_house'] },
-      { label: 'Scare Attractions', tags: ['tourism=scare'] },
-      { label: 'Wax Museums',       tags: ['tourism=wax_museum'] },
-      { label: 'Escape Horror',     tags: ['tourism=escape_horror'] },
-    ],
-    color: '#D500F9',
-    defaultEnabled: true,
-    historicTourDefault: false,
-  },
-
-  // 22 — Historic Houses (witch trial houses, colonial houses central to 1692)
-  {
-    id: PoiLayerId.HISTORIC_HOUSE,
-    label: 'Historic Houses',
-    prefKey: 'poi_historic_house_on',
-    tags: ['historic=house', 'building=historic'],
-    subtypes: [
-      { label: 'Colonial Houses',    tags: ['historic=colonial_house'] },
-      { label: 'Witch Trial Houses', tags: ['historic=witch_trial_house'] },
-      { label: 'Maritime Houses',    tags: ['historic=maritime_house'] },
-      { label: 'Literary Houses',    tags: ['historic=literary_house'] },
-      { label: 'Museum Houses',      tags: ['historic=museum_house'] },
-    ],
-    color: '#8D6E63',
+    color: '#FF6F00',
     defaultEnabled: true,
     historicTourDefault: true,
   },

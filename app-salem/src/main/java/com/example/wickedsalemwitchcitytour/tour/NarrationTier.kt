@@ -6,8 +6,8 @@
  *
  * Operator-specified ordering (S112 narration redesign):
  *   PAID       → adPriority > 0 — paying merchant customers, top of the list
- *   HISTORIC   → TOURISM_HISTORY, HISTORIC_HOUSE, CIVIC categories
- *   ATTRACTION → GHOST_TOUR, HAUNTED_ATTRACTION, WITCH_SHOP, PSYCHIC, ENTERTAINMENT
+ *   HISTORIC   → HISTORICAL_BUILDINGS, CIVIC categories
+ *   ATTRACTION → TOUR_COMPANIES, WITCH_SHOP, PSYCHIC, ENTERTAINMENT
  *   REST       → everything else (food, transit, retail, lodging, etc.)
  *
  * Within each tier, the closer POI wins. Anything farther than 50m from the
@@ -33,8 +33,8 @@ import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
  */
 enum class NarrationTier {
     PAID,        // adPriority > 0 — paying merchants override category
-    HISTORIC,    // TOURISM_HISTORY, HISTORIC_HOUSE, CIVIC
-    ATTRACTION,  // GHOST_TOUR, HAUNTED_ATTRACTION, WITCH_SHOP, PSYCHIC, ENTERTAINMENT
+    HISTORIC,    // HISTORICAL_BUILDINGS, CIVIC
+    ATTRACTION,  // TOUR_COMPANIES, WITCH_SHOP, PSYCHIC, ENTERTAINMENT
     REST         // everything else
 }
 
@@ -46,13 +46,12 @@ object NarrationTierClassifier {
      */
     private val categoryToTier: Map<String, NarrationTier> = mapOf(
         // ── HISTORIC tier ─────────────────────────────────────────────────
-        "TOURISM_HISTORY"    to NarrationTier.HISTORIC,
+        "HISTORICAL_BUILDINGS" to NarrationTier.HISTORIC,
         "CIVIC"              to NarrationTier.HISTORIC,
         "EDUCATION"          to NarrationTier.HISTORIC,
 
         // ── ATTRACTION tier ───────────────────────────────────────────────
-        "GHOST_TOUR"          to NarrationTier.ATTRACTION,
-        "HAUNTED_ATTRACTION"  to NarrationTier.ATTRACTION,
+        "TOUR_COMPANIES"      to NarrationTier.ATTRACTION,
         "WITCH_SHOP"          to NarrationTier.ATTRACTION,
         "PSYCHIC"             to NarrationTier.ATTRACTION,
         "ENTERTAINMENT"       to NarrationTier.ATTRACTION,
@@ -81,7 +80,7 @@ object NarrationTierClassifier {
         put("grave_yard", NarrationTier.HISTORIC)
         put("information", NarrationTier.HISTORIC)
         put("visitor_info", NarrationTier.HISTORIC)
-        put("historic_house", NarrationTier.HISTORIC)
+        put("historical_buildings", NarrationTier.HISTORIC)
         put("townhall", NarrationTier.HISTORIC)
         put("courthouse", NarrationTier.HISTORIC)
         put("post_office", NarrationTier.HISTORIC)
@@ -92,11 +91,9 @@ object NarrationTierClassifier {
         put("public_building", NarrationTier.HISTORIC)
 
         // ── ATTRACTION tier ───────────────────────────────────────────────
-        put("ghost_tour", NarrationTier.ATTRACTION)
+        put("tour_companies", NarrationTier.ATTRACTION)
         put("tour", NarrationTier.ATTRACTION)
         put("walking_tour", NarrationTier.ATTRACTION)
-        put("haunted_attraction", NarrationTier.ATTRACTION)
-        put("haunted_house", NarrationTier.ATTRACTION)
         put("witch_shop", NarrationTier.ATTRACTION)
         put("witchcraft", NarrationTier.ATTRACTION)
         put("occult", NarrationTier.ATTRACTION)

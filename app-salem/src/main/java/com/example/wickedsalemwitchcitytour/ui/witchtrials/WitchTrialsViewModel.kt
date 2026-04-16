@@ -7,6 +7,7 @@ package com.example.wickedsalemwitchcitytour.ui.witchtrials
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsArticle
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNewspaper
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNpcBio
@@ -59,6 +60,9 @@ class WitchTrialsViewModel @Inject constructor(
 
     suspend fun getAllBios(): List<WitchTrialsNpcBio> = repository.getAllBios()
     suspend fun getBioById(id: String): WitchTrialsNpcBio? = repository.getBioById(id)
+
+    // ── Historic Sites (S134) ─────────────────────────────────────────
+    suspend fun getHistoricSites(): List<SalemPoi> = repository.getHistoricSites()
 
     // ── Phase 9X.7 — Cross-linking indexes (S133) ─────────────────────
 

@@ -79,11 +79,10 @@ interface TreeFilter {
 /** Category display names for nicer labels */
 const CATEGORY_LABELS: Record<string, string> = {
   FOOD_DRINK: 'Food & Drink',
-  TOURISM_HISTORY: 'Tourism & History',
+  HISTORICAL_BUILDINGS: 'Historic Sites',
   WITCH_SHOP: 'Witch & Occult',
   PSYCHIC: 'Psychic & Tarot',
-  GHOST_TOUR: 'Ghost Tours',
-  HAUNTED_ATTRACTION: 'Haunted Attractions',
+  TOUR_COMPANIES: 'Tour Companies',
   ENTERTAINMENT: 'Entertainment',
   PARKS_REC: 'Parks & Recreation',
   LODGING: 'Lodging',

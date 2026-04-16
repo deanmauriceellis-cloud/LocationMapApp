@@ -91,7 +91,7 @@ class NarrationGeofenceManager @Inject constructor(
      * immersive Historical track — the exact opposite of the intent.
      *
      * A POI is categorically historical when ANY of:
-     *   1. category = TOURISM_HISTORY (landmarks, statues, monuments,
+     *   1. category = HISTORICAL_BUILDINGS (landmarks, statues, monuments,
      *      historic houses, museums, cemeteries, memorials)
      *   2. `historical_period` is populated (curated "this is historic" tag)
      *   3. category is amusement-like (ENTERTAINMENT / MUSEUM / PARKS_REC /
@@ -101,7 +101,7 @@ class NarrationGeofenceManager @Inject constructor(
      */
     private fun isCategoricallyHistorical(point: SalemPoi): Boolean {
         val cat = point.category.uppercase()
-        if (cat == "TOURISM_HISTORY") return true
+        if (cat == "HISTORICAL_BUILDINGS") return true
         if (!point.historicalPeriod.isNullOrBlank()) return true
         if (cat in AMUSEMENT_LIKE_CATEGORIES && point.yearEstablished != null) return true
         return false

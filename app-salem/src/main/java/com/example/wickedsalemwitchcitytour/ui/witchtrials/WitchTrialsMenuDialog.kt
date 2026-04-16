@@ -27,6 +27,7 @@ import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsArticle
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNewspaper
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNpcBio
@@ -193,6 +194,12 @@ fun SalemMainActivity.showWitchTrialsMenuDialog() {
         desc = "Forty-nine principal figures: judges, accusers, accused, clergy."
     ) { showWitchTrialsPeopleBrowserDialog() }
 
+    val historicSitesCard = panelCard(
+        icon = "\uD83C\uDFDB",   // 🏛 classical building
+        title = "Historic Sites of Salem",
+        desc = "117 historic buildings, home sites, cemeteries, and landmarks across four centuries."
+    ) { showHistoricSitesBrowserDialog() }
+
     // ── Today in 1692 card placeholder (populated async) ──
     val todayCardContainer = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -205,6 +212,7 @@ fun SalemMainActivity.showWitchTrialsMenuDialog() {
         addView(historyCard)
         addView(newspapersCard)
         addView(peopleCard)
+        addView(historicSitesCard)
     }
     val scroll = ScrollView(this).apply { addView(listLayout) }
 
@@ -1884,5 +1892,445 @@ private fun chunkForTts(text: String): List<String> {
     }
     if (current.isNotBlank()) chunks.add(current.toString().trim())
     return chunks
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Historic Sites of Salem — S134 browser + detail
+// ═════════════════════════════════════════════════════════════════════════════
+
+private const val TTS_TAG_SITE = "historic_site"
+
+/** Era filter labels and year ranges for the Historic Sites browser. */
+private data class EraFilter(val label: String, val minYear: Int, val maxYear: Int)
+
+private val ERA_FILTERS = listOf(
+    EraFilter("All", 0, 9999),
+    EraFilter("1692 & Before", 0, 1692),
+    EraFilter("Colonial 1693–1776", 1693, 1776),
+    EraFilter("Federal 1777–1850", 1777, 1850),
+)
+
+@SuppressLint("SetTextI18n")
+internal fun SalemMainActivity.showHistoricSitesBrowserDialog() {
+    DebugLogger.i("WitchTrials", "showHistoricSitesBrowserDialog")
+
+    val density = resources.displayMetrics.density
+    val dp = { v: Int -> (v * density).toInt() }
+
+    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+    val titleText = TextView(this).apply {
+        text = "Historic Sites of Salem"
+        textSize = 18f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+    }
+    val closeBtn = TextView(this).apply {
+        text = "\u2715"; textSize = 22f
+        setTextColor(Color.WHITE)
+        setPadding(dp(16), 0, dp(8), 0)
+        setOnClickListener { dialog.dismiss() }
+    }
+    val headerRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(20), dp(14), dp(16), dp(6))
+        addView(titleText)
+        addView(closeBtn)
+    }
+
+    val countText = TextView(this).apply {
+        text = "Loading historic sites…"
+        textSize = 12f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setPadding(dp(20), 0, dp(20), dp(10))
+    }
+
+    // Era filter chip row
+    val chipRowLL = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(12), dp(2), dp(12), dp(8))
+    }
+    val chipRow = HorizontalScrollView(this).apply {
+        isHorizontalScrollBarEnabled = false
+        addView(chipRowLL)
+    }
+
+    val listLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(12), dp(4), dp(12), dp(24))
+    }
+    val scroll = ScrollView(this).apply { addView(listLayout) }
+
+    val loadingText = TextView(this).apply {
+        text = "Loading historic sites…"
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        gravity = Gravity.CENTER
+        setPadding(dp(24), dp(40), dp(24), dp(40))
+    }
+
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
+        addView(headerRow)
+        addView(countText)
+        addView(chipRow)
+        addView(loadingText)
+    }
+
+    dialog.setContentView(root)
+    dialog.setOnDismissListener {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_SITE)
+    }
+    dialog.show()
+
+    lifecycleScope.launch {
+        try {
+            val all = witchTrialsViewModel.getHistoricSites()
+                .sortedWith(compareBy<SalemPoi> { it.yearEstablished ?: Int.MAX_VALUE }.thenBy { it.name })
+
+            root.removeView(loadingText)
+            root.addView(scroll)
+
+            var activeIdx = 0   // 0 = "All"
+            val chipViews = mutableMapOf<Int, TextView>()
+
+            fun matchesEra(poi: SalemPoi, era: EraFilter): Boolean {
+                if (era.minYear == 0 && era.maxYear == 9999) return true
+                val yr = poi.yearEstablished ?: return false
+                return yr in era.minYear..era.maxYear
+            }
+
+            fun rebuildList() {
+                listLayout.removeAllViews()
+                val era = ERA_FILTERS[activeIdx]
+                val filtered = if (activeIdx == 0) all else all.filter { matchesEra(it, era) }
+
+                countText.text = if (activeIdx == 0) {
+                    "${all.size} historic sites across four centuries. Tap any to read."
+                } else {
+                    "${filtered.size} sites — ${era.label}"
+                }
+
+                if (filtered.isEmpty()) {
+                    listLayout.addView(TextView(this@showHistoricSitesBrowserDialog).apply {
+                        text = "No sites for this era."
+                        textSize = 13f
+                        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+                        setPadding(dp(24), dp(40), dp(24), dp(40))
+                    })
+                } else {
+                    for (poi in filtered) {
+                        listLayout.addView(buildHistoricSiteRow(poi, dp) {
+                            showHistoricSiteDetailDialog(poi)
+                        })
+                    }
+                }
+            }
+
+            fun applyChipStyle(view: TextView, selected: Boolean) {
+                val bg = GradientDrawable().apply {
+                    setColor(Color.parseColor(if (selected) SALEM_GOLD else SALEM_SURFACE))
+                    cornerRadius = dp(20).toFloat()
+                    setStroke(dp(1), Color.parseColor(SALEM_GOLD))
+                }
+                view.background = bg
+                view.setTextColor(Color.parseColor(if (selected) SALEM_DARK else SALEM_TEXT))
+            }
+
+            for ((idx, era) in ERA_FILTERS.withIndex()) {
+                val chip = TextView(this@showHistoricSitesBrowserDialog).apply {
+                    text = era.label
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                    isClickable = true
+                    isFocusable = true
+                }
+                applyChipStyle(chip, idx == activeIdx)
+                chip.setOnClickListener {
+                    if (activeIdx == idx) return@setOnClickListener
+                    val prev = activeIdx
+                    activeIdx = idx
+                    chipViews[prev]?.let { applyChipStyle(it, false) }
+                    applyChipStyle(chip, true)
+                    rebuildList()
+                }
+                chipRowLL.addView(chip, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = dp(8) })
+                chipViews[idx] = chip
+            }
+
+            rebuildList()
+        } catch (e: Exception) {
+            DebugLogger.e("WitchTrials", "historic sites FAILED: ${e.message}", e)
+            loadingText.text = "Failed to load: ${e.message}"
+        }
+    }
+}
+
+/** Build a single row for the historic sites list. */
+private fun SalemMainActivity.buildHistoricSiteRow(
+    poi: SalemPoi,
+    dp: (Int) -> Int,
+    onClick: () -> Unit
+): LinearLayout {
+    // Line 1: Name (gold, serif)
+    val nameText = TextView(this).apply {
+        text = poi.name
+        textSize = 16f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+    }
+
+    // Line 2: Year + address
+    val yearStr = poi.yearEstablished?.toString() ?: ""
+    val addrStr = poi.address?.takeIf { it.isNotBlank() } ?: ""
+    val metaLine = listOf(yearStr, addrStr).filter { it.isNotBlank() }.joinToString(" — ")
+    val metaText = TextView(this).apply {
+        text = metaLine
+        textSize = 12f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setPadding(0, dp(2), 0, 0)
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+
+    // Line 3: Historical note preview
+    val preview = (poi.historicalNote ?: poi.description ?: poi.shortDescription ?: "")
+        .take(120).let { if (it.length >= 120) "$it…" else it }
+    val previewText = TextView(this).apply {
+        text = preview
+        textSize = 13f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setPadding(0, dp(4), 0, 0)
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+
+    // Era badge
+    val eraBadge = poi.yearEstablished?.let { yr ->
+        val eraLabel = when {
+            yr <= 1692 -> "1692"
+            yr <= 1776 -> "Colonial"
+            yr <= 1850 -> "Federal"
+            else -> "${yr}s"
+        }
+        TextView(this).apply {
+            text = eraLabel
+            textSize = 10f
+            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+            setPadding(dp(8), dp(2), dp(8), dp(2))
+            val cbg = GradientDrawable().apply {
+                setColor(Color.parseColor("#3B2A6A"))
+                cornerRadius = dp(8).toFloat()
+            }
+            background = cbg
+        }
+    }
+
+    val col = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(nameText)
+        if (metaLine.isNotBlank()) addView(metaText)
+        if (preview.isNotBlank()) addView(previewText)
+        eraBadge?.let {
+            addView(LinearLayout(this@buildHistoricSiteRow).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END
+                setPadding(0, dp(6), 0, 0)
+                addView(it)
+            })
+        }
+    }
+
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val rowBg = GradientDrawable().apply {
+            setColor(Color.parseColor(SALEM_SURFACE))
+            cornerRadius = dp(10).toFloat()
+        }
+        background = rowBg
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(10) }
+        addView(col)
+        setOnClickListener { onClick() }
+    }
+}
+
+/** Full-screen detail view for a single historic site. */
+@SuppressLint("SetTextI18n")
+private fun SalemMainActivity.showHistoricSiteDetailDialog(poi: SalemPoi) {
+    DebugLogger.i("WitchTrials", "showHistoricSiteDetailDialog: ${poi.id}")
+
+    val density = resources.displayMetrics.density
+    val dp = { v: Int -> (v * density).toInt() }
+
+    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+    // ── Header ──
+    val titleText = TextView(this).apply {
+        text = poi.name
+        textSize = 20f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+    }
+    val closeBtn = TextView(this).apply {
+        text = "\u2715"; textSize = 22f
+        setTextColor(Color.WHITE)
+        setPadding(dp(16), 0, dp(8), 0)
+        setOnClickListener { dialog.dismiss() }
+    }
+    val headerRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(20), dp(14), dp(16), dp(6))
+        addView(titleText)
+        addView(closeBtn)
+    }
+
+    // ── Year + era eyebrow ──
+    val yearStr = poi.yearEstablished?.let { yr ->
+        val eraLabel = when {
+            yr <= 1692 -> "Salem 1692 & Before"
+            yr <= 1776 -> "Colonial Era (1693–1776)"
+            yr <= 1850 -> "Federal & Maritime (1777–1850)"
+            else -> "Modern"
+        }
+        "Est. $yr — $eraLabel"
+    }
+    val eyebrowText = yearStr?.let {
+        TextView(this).apply {
+            text = it
+            textSize = 13f
+            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+            setPadding(dp(20), dp(2), dp(20), dp(4))
+        }
+    }
+
+    // ── Address ──
+    val addressText = poi.address?.takeIf { it.isNotBlank() }?.let {
+        TextView(this).apply {
+            text = "\uD83D\uDCCD $it"  // 📍
+            textSize = 13f
+            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+            setPadding(dp(20), dp(2), dp(20), dp(12))
+        }
+    }
+
+    // ── Body (historical note, with cross-linking) ──
+    val bodyContent = poi.historicalNote
+        ?: poi.description
+        ?: poi.shortDescription
+        ?: "No historical information available for this site."
+
+    val bodyText = TextView(this).apply {
+        text = bodyContent
+        textSize = 16f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setPadding(dp(20), dp(8), dp(20), dp(20))
+        setLineSpacing(dp(3).toFloat(), 1.2f)
+        movementMethod = LinkMovementMethod.getInstance()
+    }
+
+    // Apply cross-linking if indexes are ready (S133 EntityLinkRenderer)
+    lifecycleScope.launch {
+        witchTrialsViewModel.ensureLinkIndexes()
+        if (witchTrialsViewModel.linkIndexesReady) {
+            val linked = renderLinkedText(
+                text = bodyContent,
+                bioIndex = witchTrialsViewModel.bioIndex,
+                nameIndex = witchTrialsViewModel.nameIndex,
+                excludeNpcId = null,
+                onEntityTap = { link -> handleEntityLink(link, dialog) }
+            )
+            bodyText.text = linked
+            bodyText.highlightColor = Color.TRANSPARENT
+        }
+    }
+
+    // ── TTS button ──
+    // ── TTS speak/stop toggle ──
+    val ttsChunks = chunkForTts(bodyContent)
+    var speaking = false
+    val speakBtn = TextView(this).apply {
+        text = "\u25B6 Speak"
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(null, Typeface.BOLD)
+        setPadding(dp(20), dp(12), dp(20), dp(12))
+        isClickable = true
+        isFocusable = true
+        val bg = GradientDrawable().apply {
+            setColor(Color.parseColor(SALEM_SURFACE))
+            cornerRadius = dp(8).toFloat()
+            setStroke(dp(1), Color.parseColor(SALEM_GOLD))
+        }
+        background = bg
+    }
+    fun startSpeaking() {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_SITE)
+        for ((i, chunk) in ttsChunks.withIndex()) {
+            tourViewModel.speakSheetSection(
+                tag = TTS_TAG_SITE,
+                text = chunk,
+                label = if (ttsChunks.size == 1) poi.name else "${poi.name} (${i + 1}/${ttsChunks.size})",
+                voiceId = null
+            )
+        }
+        speaking = true
+        speakBtn.text = "\u25A0 Stop"
+    }
+    fun stopSpeaking() {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_SITE)
+        speaking = false
+        speakBtn.text = "\u25B6 Speak"
+    }
+    speakBtn.setOnClickListener { if (speaking) stopSpeaking() else startSpeaking() }
+    val ttsRow = LinearLayout(this).apply {
+        setPadding(dp(20), dp(8), dp(20), dp(20))
+        addView(speakBtn)
+    }
+
+    // ── Scroll body ──
+    val bodyLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        eyebrowText?.let { addView(it) }
+        addressText?.let { addView(it) }
+        addView(bodyText)
+        addView(ttsRow)
+    }
+    val scroll = ScrollView(this).apply { addView(bodyLayout) }
+
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
+        addView(headerRow)
+        addView(scroll)
+    }
+
+    dialog.setContentView(root)
+    dialog.setOnDismissListener {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_SITE)
+    }
+    dialog.show()
 }
 

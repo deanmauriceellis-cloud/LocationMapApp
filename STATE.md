@@ -2,28 +2,27 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 133 (Phase 9X.7 cross-linking + Today-in-1692 + admin integration shipped)
+**Last updated:** 2026-04-16 — Session 134 (Category reclassification + Historic Sites feature)
 
 ---
 
-## TOP PRIORITY — Next Session (S134)
+## TOP PRIORITY — Next Session (S135)
 
-**Phase 9X.8 — polish, audio integration, Lenovo field test, STATE + master plan + OMEN report.**
+**Phase 9X.8 completion — device verification of Historic Sites + all Witch Trials features, then Phase 9X close-out.**
 
 Master plan section: Phase 9X.
 
-S134 is the final Phase 9X session. After S134, Phase 9X is COMPLETE. Next up: Phase 9Q (Salem Domain Content Bridge).
+S135 picks up where S134 left off. APK is installed clean on Lenovo, no crashes. User needs to verify the new Historic Sites feature and existing Witch Trials features on device before Phase 9X is marked COMPLETE.
 
-**Post-S133 key facts:**
-- **Phase 9X.7 shipped end-to-end.** Three deliverables:
-  - **Cross-linking**: `EntityLinkRenderer.kt` auto-detects 49 NPC names (1,110+ mentions) as gold underlined ClickableSpans in article/bio/newspaper detail dialogs. Tapping navigates to bio detail. Explicit `[[npc:id]]` / `[[newspaper:YYYY-MM-DD]]` markup supported for future enrichment.
-  - **Today-in-1692 card**: gold-bordered card at top of Witch Trials menu, matching current month-day to 202-newspaper corpus (±3 day window).
-  - **Admin tool integration**: cache-proxy REST endpoints for all 3 witch trials tables + React `WitchTrialsPanel` with tabbed browsing + inline editing. POIs/Witch Trials toggle in admin header.
-- **Room `@Insert` silent-drop** from S129 still latent — worth root-causing before Play Store.
+**Post-S134 key facts:**
+- **Category reclassification shipped.** 22 → 20 categories. `TOURISM_HISTORY` split into `HISTORICAL_BUILDINGS` (117 POIs) + `TOUR_COMPANIES` (17 POIs) + redistributed to `ENTERTAINMENT`/`PARKS_REC`. `HAUNTED_ATTRACTION` (10 POIs → ENTERTAINMENT) and `GHOST_TOUR` (4 POIs → TOUR_COMPANIES) deleted. `HISTORIC_HOUSE` merged into HISTORICAL_BUILDINGS. 77 POIs backfilled with `year_established`. 12+ code files updated across Kotlin + TypeScript.
+- **"Historic Sites of Salem" feature built.** New 4th tile on Witch Trials menu. Browser dialog with 4 era filter chips + scrollable site list + detail dialog with cross-linking + TTS. **Awaiting device verification.**
+- **Publish pipeline fixed.** New `publish-witch-trials-to-sqlite.js` populates all 3 witch trials tables into bundled SQLite alongside `publish-salem-pois.js`.
+- **Room `@Insert` silent-drop** from S129 still latent.
 - **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
-- **PG: 2,080 active POIs** unchanged. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
+- **PG: 1,868 active POIs** (down from 2,080 — reclassification moved some to soft-deleted duplicates). **Narration coverage: 100%**. **5 tours** with OSRM polylines.
 
-**Phase 9X status:** 7 / 8 sessions done. 1 session of polish/test ahead (S134). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** 8 / 8 sessions done code-wise. Device verification pending (S135). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 

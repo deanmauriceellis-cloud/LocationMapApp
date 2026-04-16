@@ -7,9 +7,11 @@ package com.example.wickedsalemwitchcitytour.ui.witchtrials
 
 import android.content.Context
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.content.dao.SalemPoiDao
 import com.example.wickedsalemwitchcitytour.content.dao.WitchTrialsArticleDao
 import com.example.wickedsalemwitchcitytour.content.dao.WitchTrialsNewspaperDao
 import com.example.wickedsalemwitchcitytour.content.dao.WitchTrialsNpcBioDao
+import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsArticle
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNewspaper
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNpcBio
@@ -34,7 +36,8 @@ class WitchTrialsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val articleDao: WitchTrialsArticleDao,
     private val npcBioDao: WitchTrialsNpcBioDao,
-    private val newspaperDao: WitchTrialsNewspaperDao
+    private val newspaperDao: WitchTrialsNewspaperDao,
+    private val salemPoiDao: SalemPoiDao
 ) {
 
     companion object {
@@ -77,6 +80,12 @@ class WitchTrialsRepository @Inject constructor(
     suspend fun getNewspapersByMonthDay(month: Int, day: Int): List<WitchTrialsNewspaper> =
         newspaperDao.findByMonthDay("%-${"%02d".format(month)}-${"%02d".format(day)}")
     suspend fun getNewspaperCount(): Int = newspaperDao.count()
+
+    // ── Historic Sites (S134 — "Historic Sites of Salem" feature) ─────
+    suspend fun getHistoricSites(): List<SalemPoi> =
+        salemPoiDao.findByCategory("HISTORICAL_BUILDINGS")
+    suspend fun getHistoricSiteById(id: String): SalemPoi? =
+        salemPoiDao.findById(id)
 
     // ── Hydration ──────────────────────────────────────────────────────
 
