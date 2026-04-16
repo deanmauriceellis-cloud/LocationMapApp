@@ -409,6 +409,19 @@ internal fun SalemMainActivity.initNarrationSystem() {
  * playNextNarration() when pickNextFromQueue() returns null.
  */
 internal suspend fun SalemMainActivity.runSilenceFill() {
+    // ── S132 tour-active gate ──
+    //    When a structured tour is active or paused, suppress ambient
+    //    reach-out entirely. Tour narration is curated — ambient HINT
+    //    POIs ("Lappin Park Little Free Library") interrupt the tour
+    //    experience. The tour engine manages its own narration queue;
+    //    silence-fill should only run in Explore/ambient mode.
+    val tourState = tourViewModel.tourState.value
+    if (tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active ||
+        tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused) {
+        DebugLogger.d("NARR-STATE", "  REACH-OUT SUPPRESSED: tour active (${tourState::class.simpleName})")
+        return
+    }
+
     // ── S110 staleness gate ──
     //    Suppress reach-out entirely when GPS is stale. Without
     //    this, the reach-out logic happily searches for the

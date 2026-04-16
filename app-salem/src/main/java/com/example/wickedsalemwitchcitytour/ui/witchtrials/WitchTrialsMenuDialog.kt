@@ -16,8 +16,10 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.ViewGroup
+import android.graphics.BitmapFactory
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -28,7 +30,10 @@ import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsArticle
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNewspaper
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNpcBio
 import com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+import android.util.LruCache
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 @Suppress("unused")
@@ -45,6 +50,40 @@ private const val SALEM_TEXT_DIM = "#B8AFA0"
 private const val TTS_TAG = "witchtrials_article"
 private const val TTS_TAG_NEWS = "witchtrials_newspaper"
 private const val TTS_TAG_BIO = "witchtrials_bio"
+
+/** Thread-safe bitmap cache for portrait thumbnails. Shared across browse/detail. */
+private val portraitCache = LruCache<String, android.graphics.Bitmap>(60)
+
+/** Load a portrait bitmap off the main thread, set it on the ImageView when ready. */
+private fun SalemMainActivity.loadPortraitAsync(
+    assetPath: String,
+    imageView: ImageView,
+    targetSize: Int = 0
+) {
+    portraitCache.get(assetPath)?.let { imageView.setImageBitmap(it); return }
+    lifecycleScope.launch {
+        val bmp = withContext(Dispatchers.IO) {
+            try {
+                val opts = if (targetSize > 0) {
+                    // Decode bounds first for downsampling
+                    val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    assets.open(assetPath).use { BitmapFactory.decodeStream(it, null, boundsOpts) }
+                    val w = boundsOpts.outWidth; val h = boundsOpts.outHeight
+                    val sample = maxOf(1, minOf(w, h) / targetSize)
+                    BitmapFactory.Options().apply { inSampleSize = sample }
+                } else null
+                assets.open(assetPath).use { BitmapFactory.decodeStream(it, null, opts) }
+            } catch (e: Exception) {
+                DebugLogger.w("WitchTrials", "portrait load failed: $assetPath — ${e.message}")
+                null
+            }
+        }
+        bmp?.let {
+            portraitCache.put(assetPath, it)
+            imageView.setImageBitmap(it)
+        }
+    }
+}
 
 @SuppressLint("SetTextI18n")
 fun SalemMainActivity.showWitchTrialsMenuDialog() {
@@ -1220,13 +1259,41 @@ private fun SalemMainActivity.buildBioRow(
         addView(datesText)
     }
 
+    // Circular thumbnail from portrait asset — loaded async to avoid ANR
+    val thumb: ImageView? = bio.portraitAsset?.takeIf { it.isNotBlank() }?.let { assetPath ->
+        ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            val size = dp(48)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                marginEnd = dp(12)
+            }
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+            setBackgroundColor(Color.parseColor(SALEM_SURFACE))
+            loadPortraitAsync(assetPath, this, targetSize = 96)
+        }
+    }
+
+    val textColumn = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        addView(nameText)
+        addView(descText)
+        addView(footerRow)
+    }
+
     val bg = GradientDrawable().apply {
         setColor(Color.parseColor(SALEM_SURFACE))
         cornerRadius = dp(10).toFloat()
         setStroke(dp(1), Color.parseColor(role.color))
     }
     return LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
         background = bg
         setPadding(dp(16), dp(14), dp(16), dp(14))
         layoutParams = LinearLayout.LayoutParams(
@@ -1235,9 +1302,8 @@ private fun SalemMainActivity.buildBioRow(
         ).apply { topMargin = dp(5); bottomMargin = dp(7) }
         isClickable = true
         isFocusable = true
-        addView(nameText)
-        addView(descText)
-        addView(footerRow)
+        thumb?.let { addView(it) }
+        addView(textColumn)
         setOnClickListener { onClick() }
     }
 }
@@ -1281,6 +1347,32 @@ internal fun SalemMainActivity.showWitchTrialsBioDetailDialog(bio: WitchTrialsNp
         gravity = Gravity.END
         setPadding(dp(8), dp(8), dp(8), 0)
         addView(closeBtn)
+    }
+
+    // Portrait hero image — loaded async from bundled assets
+    val portraitView: ImageView? = bio.portraitAsset?.takeIf { it.isNotBlank() }?.let { assetPath ->
+        ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            val size = dp(160)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(8)
+                bottomMargin = dp(8)
+            }
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, dp(12).toFloat())
+                }
+            }
+            val borderBg = GradientDrawable().apply {
+                setColor(Color.parseColor(SALEM_SURFACE))
+                cornerRadius = dp(12).toFloat()
+                setStroke(dp(2), Color.parseColor(role.color))
+            }
+            background = borderBg
+            loadPortraitAsync(assetPath, this)
+        }
     }
 
     val roleEyebrow = TextView(this).apply {
@@ -1387,6 +1479,7 @@ internal fun SalemMainActivity.showWitchTrialsBioDetailDialog(bio: WitchTrialsNp
     val contentColumn = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         addView(topBar)
+        portraitView?.let { addView(it) }
         addView(roleEyebrow)
         addView(nameText)
         addView(datesText)
