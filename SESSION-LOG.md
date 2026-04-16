@@ -8,7 +8,7 @@
 
 Shipped Phase 9X.7 end-to-end: `EntityLinkRenderer.kt` auto-detects 49 NPC names (1,110+ mentions across all bios) as gold underlined ClickableSpans in article, bio, and newspaper detail dialogs — tapping navigates to the bio detail with self-linking excluded. "Today in 1692" gold-bordered card at top of Witch Trials menu matches the current calendar month-day to the 202-newspaper corpus (±3 day window). Admin tool integration: cache-proxy REST endpoints for all 3 witch trials tables + React `WitchTrialsPanel` with tabbed article/bio/newspaper browsers and inline editing, accessed via POIs/Witch Trials toggle in the admin header.
 
-Full session detail: `docs/session-logs/session-133-2026-04-16.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-133-2026-04-16.md`. Commit: `2669ea6`.
 
 ---
 
