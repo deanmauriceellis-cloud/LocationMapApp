@@ -2,40 +2,43 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-15 — Session 130 (Phase 9X.4 Oracle Newspaper panel + tabloid-headline UX overhaul shipped)
+**Last updated:** 2026-04-15 — Session 131 (Phase 9X.5 People of Salem 1692 panel + TTS chunking shipped)
 
 ---
 
-## TOP PRIORITY — Next Session (S131)
+## TOP PRIORITY — Next Session (S132)
 
-**Phase 9X.5 — wire the 49 historical figures into The People of Salem 1692 panel.**
+**Phase 9X.6 — pencil-sketch portraits for the 49 principal figures via local Stable Diffusion.**
 
 Master plan section: Phase 9X.
 
-Step-by-step for S131:
-1. Source bios — `~/Development/Salem/data/json/npcs/` has 49 figures in bucketed `.json` files (accusers/accused/judges/clergy/officials). Consolidate into `salem_witch_trials_npc_bios` (currently empty) via a new `import-witch-trials-npc-bios.js` in cache-proxy/scripts. Map: `id`, `name`, `role_type` (judge/accuser/accused/clergy/official), `role_label`, `short_bio`, `long_bio`, `tts_full_text`, `dates`, `faction`, `portrait_asset` (defer photo lookup to post-Play-Store).
-2. Build `cache-proxy/scripts/bundle-witch-trials-npc-bios-into-db.js` — mirror the S129/S130 bake path using `better-sqlite3`. Asset DB already has `salem_witch_trials_npc_bios` table (S129 bake), just populate rows.
-3. Replace `showWitchTrialsPeoplePlaceholder()` with `WitchTrialsPeopleBrowserDialog` — full-screen, role-type filter chips, grid or list of bio cards (name + role chip + 1-line descriptor). Color-code by role (judge=scarlet, accuser=gold, accused=gray, clergy=purple, official=silver).
-4. Build `WitchTrialsBioDetailDialog` — full-screen, role eyebrow + name + dates + short-bio italic + Speak pill (`witchtrials_bio` tag) + long_bio scrollable.
-5. Verify on Lenovo HNY0CY0W.
-6. Commit + push.
+Step-by-step for S132 (per master plan):
+1. Fixed prompt template for uniform pencil-sketch style (no free-likeness mixing). Generate 49 portraits at 512×512 via Forge `:7860` — budget 5-10 MB total asset weight.
+2. Populate `salem_witch_trials_npc_bios.portrait_asset` with the bundled filename (`portraits/{npc_id}.jpg`).
+3. Wire the portrait into `WitchTrialsBioDetailDialog` (hero image above the name, round or square-with-corner-radius per design taste).
+4. Optionally show a small circular thumbnail on `buildBioRow` — verify that doesn't blow out the row height.
+5. Manual review pass for any quality drift; re-prompt the worst offenders with seed adjustments.
+6. Verify on Lenovo HNY0CY0W.
+7. Commit + push.
 
-After S131 the 3-panel sub-menu is fully functional. Phase 9X will be 5/8 done.
+**GPU gate:** Forge on `:7860` contends with SalemIntelligence + Ollama for the RTX 3090. Confirm workload before starting the generation batch (49 × ~15s/portrait at 512² ≈ 12-15 min, can run with SI up if VRAM headroom holds).
 
-**Post-S130 key facts:**
-- **Phase 9X.4 shipped end-to-end + an unplanned UX upgrade.** The Oracle Newspaper panel now loads all 202 period dispatches (1691-11-01 → 1693-05-09) with 7 crisis-phase filter chips (All/Pre-crisis/Ignition/Accusation/Examinations/Court of O&T/Mass trials/Aftermath). Each list row shows: Line 1 — "Nov 22, 1691: PARRIS PREACHES OF VILLAGE CURSE!" (17sp serif gold bold). Line 2 — single-sentence event summary (14sp). Right-aligned phase chip footer. Detail dialog: phase eyebrow + long-date + day-of-week + italic summary + Speak pill (tag `witchtrials_newspaper`) + bulleted body-points list.
-- **All 202 headlines + event-lines are LLM-generated** via Ollama `salem-village:latest` (gemma3:27b q4) in 10.9 min, 3.3 s/call average, 0 failures. Generator script: `cache-proxy/scripts/generate-witch-trials-newspaper-headlines.js` — idempotent, retries once on parse fail, writes to PG directly. Persisted in new columns `headline` + `headline_summary`.
-- **Witch Trials is now also reachable from the 9-dot tour menu** (row 4, alongside Tours and Events). New event `onWitchTrialsRequested()` (default-impl in MenuEventListener, overridden in `SalemMainActivity.menuEventListenerImpl`). New drawable `ic_witch_trials.xml`.
-- **Room bumped v7 → v8** — additive columns on `WitchTrialsNewspaper`: `headline: String?`, `headlineSummary: String?` (`@ColumnInfo("headline_summary")`). New identity hash `458bb11df51a54f5284a03ef1d2913aa`. `fallbackToDestructiveMigration()` still in place — no manual migration required for dev.
-- **Asset DB bake script (`bundle-witch-trials-newspapers-into-db.js`) is now schema-aware**: it patches `ALTER TABLE ... ADD COLUMN IF NOT present`, rewrites `room_master_table.identity_hash` to the v8 hash, and inserts the 2 new fields. Run again any time the v8 schema needs to be re-applied.
-- **Salem Oracle `/api/oracle/chat` returned 404** during the prompt-endpoint probe — bypassed in favor of direct Ollama calls (same path S128 used). Confirm whether Oracle chat moved or needs reauth before a future session that actually needs the Oracle RAG path.
-- **PG now has**: `salem_witch_trials_articles` (16 rows, v7 bake), `salem_witch_trials_newspapers` (202 rows + headline + headline_summary columns, v8 bake), `salem_witch_trials_npc_bios` (empty — S131).
-- **3 PG tables** in production + the legacy `salem_newspapers_1692` still exists (source of the S130 consolidation) — harmless, keep for now; pre-Play-Store cleanup can drop it.
-- **Room `@Insert` silent-drop** from S129 is still a latent risk — S130 worked around it again via `better-sqlite3` bake. Worth root-causing before Play Store.
+After S132, Phase 9X will be 6/8 done. S133 = cross-linking + admin integration + Today-in-1692 card. S134 = polish + field test + master plan/STATE/OMEN report updates.
+
+**Post-S131 key facts:**
+- **Phase 9X.5 shipped end-to-end.** 49 Tier-1/2 figures imported from `~/Development/Salem/data/json/npcs/` (filter: `tier == 1 || tier == 2`). Bios assembled from narrative subfields (life_before_1692 / role_in_crisis / emotional_arc / how_they_see_world / emotional_landscape / sermon_influence / appearance) into `## Header\n\nbody` markdown — 10K-21K chars per figure. Imported via `cache-proxy/scripts/import-witch-trials-npc-bios.js`, baked via `bundle-witch-trials-npc-bios-into-db.js`.
+- **People browser** (`WitchTrialsPeopleBrowserDialog`) — horizontal filter chip row (All / Judges / Accusers / Accused / Clergy / Officials / Others), vertical rows sorted by role bucket → tier → name. Each row: 17sp gold serif name, 13sp italic role descriptor, footer with colored role chip + `born – died` span (or "b. YYYY" / "d. YYYY" fallback). Border tinted per role (scarlet / gold / gray / purple / silver / slate).
+- **Bio detail** (`WitchTrialsBioDetailDialog`) — role eyebrow tinted to role color, 24sp bold gold name, `YYYY – YYYY · age N in 1692` dates, italic short-bio, optional "Outcome: …" line, Speak pill, `renderBioBody()` that splits `\n\n` blocks and renders `## ` lines as gold bold subheadings.
+- **Role bucketing is heuristic** — `roleTypeOf(bio)` text-matches `role + faction.lowercase()` with precedence JUDGE → CLERGY → ACCUSER → ACCUSED → OFFICIAL → OTHER. If any figure bucket looks wrong in deep-dive testing, tweak the regex order or add explicit id overrides.
+- **TTS chunking (`chunkForTts`, 3500-char cap)** — Android TTS caps per-utterance speech at ~4000 chars. Long bios (14K for Stoughton, 21K for ann_putnam_jr) now split into sentence-bounded chunks that enqueue sequentially under one `witchtrials_bio_` tag prefix. Verified: 5 chunks for Stoughton (3454/3500/3253/3127/1018), `TTS start` with no error, Stop drains all queued segments.
+- **PG now has**: `salem_witch_trials_articles` (16 rows, S128), `salem_witch_trials_newspapers` (202 rows + headlines, S130), **`salem_witch_trials_npc_bios` (49 rows, S131)**. Room schema still v8 (no bump needed — npc_bios table structure unchanged since v7).
+- **Asset DB** now carries all three witch-trials tables populated: 16 articles + 202 newspapers + 49 bios. `salem_content.db` size bumped modestly by the ~700KB of bio text.
+- **Portrait generation (Phase 9X.6)** is the last content-generation step. After that, 9X.7 = cross-linking + admin integration, 9X.8 = polish + field test.
+- **Room `@Insert` silent-drop** from S129 still latent — S131 sidestepped it once more via `better-sqlite3` bake. Worth root-causing before Play Store.
 - **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 15 days out).
 - **PG: 1,868 active POIs** unchanged. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
 
-**Phase 9X status:** 4 / 8 sessions done. ~4 sessions of feature work ahead (S131–S134). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** 5 / 8 sessions done. 3 sessions of feature work ahead (S132-S134). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -47,14 +50,14 @@ After S131 the 3-panel sub-menu is fully functional. Phase 9X will be 5/8 done.
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
 | **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
-| **9X** Salem Witch Trials Feature | **IN PROGRESS — 4/8 sessions done (S127, S128, S129, S130)** | **TOP PRIORITY (S131-S134).** S127 foundation. S128 history-article LLM gen (16/16). S129 History 4×4 tile UI. S130 Oracle Newspaper panel (202 articles + 202 AI tabloid headlines + 2-line row UI + 9-dot menu entry, Room v7→v8). Phase 9X.5 (S131) wires 49 figures into The People of Salem 1692 panel. |
+| **9X** Salem Witch Trials Feature | **IN PROGRESS — 5/8 sessions done (S127, S128, S129, S130, S131)** | **TOP PRIORITY (S132-S134).** S127 foundation. S128 history-article LLM gen (16/16). S129 History 4×4 tile UI. S130 Oracle Newspaper panel (202 articles + 202 AI tabloid headlines). S131 People panel (49 Tier-1/2 figures, role-filtered browser + bio detail + TTS chunker). Phase 9X.6 (S132) adds pencil-sketch portraits for all 49. |
 | **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 130. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 131. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

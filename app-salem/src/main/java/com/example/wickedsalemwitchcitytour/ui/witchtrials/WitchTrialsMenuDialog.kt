@@ -26,6 +26,7 @@ import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsArticle
 import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNewspaper
+import com.example.wickedsalemwitchcitytour.content.model.WitchTrialsNpcBio
 import com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -43,6 +44,7 @@ private const val SALEM_TEXT_DIM = "#B8AFA0"
 
 private const val TTS_TAG = "witchtrials_article"
 private const val TTS_TAG_NEWS = "witchtrials_newspaper"
+private const val TTS_TAG_BIO = "witchtrials_bio"
 
 @SuppressLint("SetTextI18n")
 fun SalemMainActivity.showWitchTrialsMenuDialog() {
@@ -148,7 +150,7 @@ fun SalemMainActivity.showWitchTrialsMenuDialog() {
         icon = "\uD83D\uDC65",
         title = "The People of Salem 1692",
         desc = "Forty-nine principal figures: judges, accusers, accused, clergy."
-    ) { showWitchTrialsPeoplePlaceholder() }
+    ) { showWitchTrialsPeopleBrowserDialog() }
 
     val listLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -958,20 +960,51 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
     }
 }
 
-// ── Phase 5 placeholder (People — S131) ───────────────────────────────
+// ── Phase 9X.5 — People of Salem 1692 browser (S131) ──────────────────
 
-@SuppressLint("SetTextI18n")
-internal fun SalemMainActivity.showWitchTrialsPeoplePlaceholder() {
-    showComingSoonDialog(
-        title = "The People of Salem 1692",
-        body = "Coming in Phase 5: 49 principal figures with hand-drawn " +
-               "pencil-sketch portraits, biographies, and cross-links to the " +
-               "tiles and newspapers where they appear."
-    )
+internal enum class RoleType(val label: String, val plural: String, val color: String) {
+    JUDGE("Judge", "Judges", "#C62828"),              // scarlet
+    ACCUSER("Accuser", "Accusers", "#C9A84C"),        // gold
+    ACCUSED("Accused", "Accused", "#9E9E9E"),         // gray
+    CLERGY("Clergy", "Clergy", "#7B3FA8"),            // purple
+    OFFICIAL("Official", "Officials", "#BDBDBD"),     // silver
+    OTHER("Figure", "Others", "#5C6670")
+}
+
+/** Derive a role bucket from the free-text `role` + `faction` fields. */
+private fun roleTypeOf(bio: WitchTrialsNpcBio): RoleType {
+    val text = (bio.role + " " + (bio.faction ?: "")).lowercase()
+    return when {
+        // Judges come first — "examiner" and "justice" both count
+        text.contains("judge") || text.contains("examiner") ||
+            text.contains("justice") || text.contains("magistrate") ->
+            RoleType.JUDGE
+        text.contains("minister") || text.contains("reverend") ||
+            text.contains("clergy") || text.contains("preacher") ||
+            bio.id.startsWith("rev_") || bio.name.startsWith("Rev.") ->
+            RoleType.CLERGY
+        text.contains("afflicted") || text.contains("accuser") ||
+            text.contains("complaint filer") || text.contains("parish clerk") ||
+            text.contains("putnam/accuser") ->
+            RoleType.ACCUSER
+        text.contains("accused") || text.contains("hanged") ||
+            text.contains("executed") || text.contains("pressed") ||
+            text.contains("prison") || text.contains("confessor") ||
+            text.contains("recanter") || text.contains("victim") ->
+            RoleType.ACCUSED
+        text.contains("governor") || text.contains("constable") ||
+            text.contains("physician") || text.contains("doctor") ||
+            text.contains("deputy") || text.contains("militia") ||
+            text.contains("merchant") || text.contains("intellectual") ->
+            RoleType.OFFICIAL
+        else -> RoleType.OTHER
+    }
 }
 
 @SuppressLint("SetTextI18n")
-private fun SalemMainActivity.showComingSoonDialog(title: String, body: String) {
+internal fun SalemMainActivity.showWitchTrialsPeopleBrowserDialog() {
+    DebugLogger.i("WitchTrials", "showWitchTrialsPeopleBrowserDialog")
+
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -979,42 +1012,501 @@ private fun SalemMainActivity.showComingSoonDialog(title: String, body: String) 
     dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
 
     val titleText = TextView(this).apply {
-        text = title
-        textSize = 20f
+        text = "The People of Salem 1692"
+        textSize = 18f
         setTextColor(Color.parseColor(SALEM_GOLD))
         setTypeface(Typeface.SERIF, Typeface.BOLD)
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
     }
     val closeBtn = TextView(this).apply {
-        text = "\u2715"
-        textSize = 20f
+        text = "\u2715"; textSize = 22f
         setTextColor(Color.WHITE)
-        setPadding(dp(16), 0, dp(4), 0)
+        setPadding(dp(16), 0, dp(8), 0)
         setOnClickListener { dialog.dismiss() }
     }
     val headerRow = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(20), dp(16), dp(12), dp(12))
+        setPadding(dp(20), dp(14), dp(16), dp(6))
         addView(titleText)
         addView(closeBtn)
     }
 
-    val bodyText = TextView(this).apply {
-        text = body
+    val countText = TextView(this).apply {
+        text = "Forty-nine principal figures. Tap any name to read the bio."
+        textSize = 12f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setPadding(dp(20), 0, dp(20), dp(10))
+    }
+
+    val chipRowLL = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(12), dp(2), dp(12), dp(8))
+    }
+    val chipRow = HorizontalScrollView(this).apply {
+        isHorizontalScrollBarEnabled = false
+        addView(chipRowLL)
+    }
+
+    val listLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(12), dp(4), dp(12), dp(24))
+    }
+    val scroll = ScrollView(this).apply { addView(listLayout) }
+
+    val loadingText = TextView(this).apply {
+        text = "Loading 49 figures…"
         textSize = 14f
-        setTextColor(Color.parseColor(SALEM_TEXT))
-        setPadding(dp(24), dp(40), dp(24), dp(40))
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
         gravity = Gravity.CENTER
+        setPadding(dp(24), dp(40), dp(24), dp(40))
     }
 
     val root = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Color.parseColor(SALEM_DARK))
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
         addView(headerRow)
-        addView(bodyText)
+        addView(countText)
+        addView(chipRow)
+        addView(loadingText)
     }
 
     dialog.setContentView(root)
+    dialog.setOnDismissListener {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_BIO)
+    }
     dialog.show()
+
+    lifecycleScope.launch {
+        try {
+            DebugLogger.i("WitchTrials", "people: calling getAllBios()")
+            val raw = witchTrialsViewModel.getAllBios()
+            DebugLogger.i("WitchTrials", "people: loaded ${raw.size}")
+
+            val withRole = raw.map { it to roleTypeOf(it) }
+                // Sort: role bucket order, then tier, then name
+                .sortedWith(compareBy({ it.second.ordinal }, { it.first.tier }, { it.first.name }))
+
+            root.removeView(loadingText)
+            root.addView(scroll)
+
+            val presentRoles = withRole.map { it.second }.distinct()
+            val chipOrder: List<RoleType?> = listOf(null) + RoleType.values().filter { it in presentRoles }
+
+            var activeRole: RoleType? = null
+            val chipViews = mutableMapOf<RoleType?, TextView>()
+
+            fun rebuildList() {
+                listLayout.removeAllViews()
+                val filtered = if (activeRole == null) withRole else withRole.filter { it.second == activeRole }
+                if (filtered.isEmpty()) {
+                    listLayout.addView(TextView(this@showWitchTrialsPeopleBrowserDialog).apply {
+                        text = "No figures in this bucket."
+                        textSize = 13f
+                        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+                        setPadding(dp(24), dp(40), dp(24), dp(40))
+                    })
+                } else {
+                    for ((bio, role) in filtered) {
+                        listLayout.addView(buildBioRow(bio, role, dp) {
+                            showWitchTrialsBioDetailDialog(bio, role)
+                        })
+                    }
+                }
+                DebugLogger.i("WitchTrials", "people: rebuilt list role=${activeRole?.label ?: "All"} rows=${filtered.size}")
+            }
+
+            fun applyChipStyle(view: TextView, selected: Boolean, role: RoleType?) {
+                val accentColor = role?.color ?: SALEM_GOLD
+                val bg = GradientDrawable().apply {
+                    setColor(Color.parseColor(if (selected) accentColor else SALEM_SURFACE))
+                    cornerRadius = dp(20).toFloat()
+                    setStroke(dp(1), Color.parseColor(accentColor))
+                }
+                view.background = bg
+                view.setTextColor(Color.parseColor(if (selected) SALEM_DARK else SALEM_TEXT))
+            }
+
+            for (role in chipOrder) {
+                val label = role?.plural ?: "All"
+                val chip = TextView(this@showWitchTrialsPeopleBrowserDialog).apply {
+                    text = label
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                    isClickable = true
+                    isFocusable = true
+                }
+                applyChipStyle(chip, role == activeRole, role)
+                chip.setOnClickListener {
+                    if (activeRole == role) return@setOnClickListener
+                    val prev = activeRole
+                    activeRole = role
+                    chipViews[prev]?.let { applyChipStyle(it, false, prev) }
+                    applyChipStyle(chip, true, role)
+                    rebuildList()
+                }
+                chipRowLL.addView(chip, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = dp(8) })
+                chipViews[role] = chip
+            }
+
+            rebuildList()
+        } catch (e: Exception) {
+            DebugLogger.e("WitchTrials", "people FAILED: ${e.message}", e)
+            loadingText.text = "Failed to load: ${e.message}"
+        }
+    }
 }
+
+private fun SalemMainActivity.buildBioRow(
+    bio: WitchTrialsNpcBio,
+    role: RoleType,
+    dp: (Int) -> Int,
+    onClick: () -> Unit
+): LinearLayout {
+    // Line 1: NAME (bold serif gold, 17sp)
+    val nameText = TextView(this).apply {
+        text = bio.name
+        textSize = 17f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+    }
+
+    // Line 2: short role descriptor, italic
+    val descText = TextView(this).apply {
+        text = bio.role
+        textSize = 13f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setTypeface(null, Typeface.ITALIC)
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        setPadding(0, dp(4), 0, 0)
+    }
+
+    // Role chip (right-aligned footer)
+    val roleChip = TextView(this).apply {
+        text = role.label
+        textSize = 10f
+        setTextColor(Color.WHITE)
+        setTypeface(null, Typeface.BOLD)
+        letterSpacing = 0.12f
+        setPadding(dp(10), dp(3), dp(10), dp(3))
+        val cbg = GradientDrawable().apply {
+            setColor(Color.parseColor(role.color))
+            cornerRadius = dp(8).toFloat()
+        }
+        background = cbg
+    }
+    // Dates spanned right of role chip
+    val datesSpan = buildDatesSpan(bio)
+    val datesText = TextView(this).apply {
+        text = datesSpan
+        textSize = 11f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setPadding(dp(10), 0, 0, 0)
+    }
+    val footerRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        setPadding(0, dp(8), 0, 0)
+        addView(roleChip)
+        addView(datesText)
+    }
+
+    val bg = GradientDrawable().apply {
+        setColor(Color.parseColor(SALEM_SURFACE))
+        cornerRadius = dp(10).toFloat()
+        setStroke(dp(1), Color.parseColor(role.color))
+    }
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = bg
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(5); bottomMargin = dp(7) }
+        isClickable = true
+        isFocusable = true
+        addView(nameText)
+        addView(descText)
+        addView(footerRow)
+        setOnClickListener { onClick() }
+    }
+}
+
+private fun buildDatesSpan(bio: WitchTrialsNpcBio): String {
+    val b = bio.bornYear
+    val d = bio.diedYear
+    return when {
+        b != null && d != null -> "$b – $d"
+        b != null -> "b. $b"
+        d != null -> "d. $d"
+        else -> ""
+    }
+}
+
+// ── Phase 9X.5 — Bio detail dialog (S131) ─────────────────────────────
+
+@SuppressLint("SetTextI18n")
+internal fun SalemMainActivity.showWitchTrialsBioDetailDialog(bio: WitchTrialsNpcBio, role: RoleType) {
+    DebugLogger.i("WitchTrials", "showBioDetail id=${bio.id} role=${role.label}")
+
+    val density = resources.displayMetrics.density
+    val dp = { v: Int -> (v * density).toInt() }
+
+    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+    val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+    val narratorMode = prefs.getBoolean(MenuPrefs.PREF_NARRATOR_MODE_ENABLED, false)
+
+    var speaking = false
+
+    val closeBtn = TextView(this).apply {
+        text = "\u2715"; textSize = 22f
+        setTextColor(Color.WHITE)
+        setPadding(dp(16), 0, dp(8), 0)
+        setOnClickListener { dialog.dismiss() }
+    }
+    val topBar = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.END
+        setPadding(dp(8), dp(8), dp(8), 0)
+        addView(closeBtn)
+    }
+
+    val roleEyebrow = TextView(this).apply {
+        text = role.label.uppercase()
+        textSize = 11f
+        setTextColor(Color.parseColor(role.color))
+        setTypeface(null, Typeface.BOLD)
+        letterSpacing = 0.15f
+        setPadding(dp(24), dp(4), dp(24), dp(2))
+    }
+
+    val nameText = TextView(this).apply {
+        text = bio.name
+        textSize = 24f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        setPadding(dp(24), dp(2), dp(24), dp(4))
+    }
+
+    val datesText = TextView(this).apply {
+        val span = buildDatesSpan(bio)
+        val age = bio.ageIn1692?.takeIf { it > 0 }?.let { " · age $it in 1692" } ?: ""
+        text = if (span.isBlank() && age.isBlank()) "" else "$span$age"
+        textSize = 13f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setTypeface(null, Typeface.ITALIC)
+        setPadding(dp(24), 0, dp(24), dp(10))
+    }
+
+    val shortBioText = TextView(this).apply {
+        text = bio.role
+        textSize = 15f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setTypeface(null, Typeface.ITALIC)
+        setLineSpacing(dp(3).toFloat(), 1.15f)
+        setPadding(dp(24), 0, dp(24), dp(14))
+    }
+
+    val outcomeText = bio.historicalOutcome?.takeIf { it.isNotBlank() }?.let { outcome ->
+        TextView(this).apply {
+            text = "Outcome: $outcome"
+            textSize = 13f
+            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+            setLineSpacing(dp(2).toFloat(), 1.15f)
+            setPadding(dp(24), 0, dp(24), dp(14))
+        }
+    }
+
+    // Long-bio body — render `## Header\n\ntext` sections with gold subheadings
+    val bodyContainer = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(24), dp(6), dp(24), dp(28))
+    }
+    renderBioBody(bio.bio, bodyContainer, dp)
+
+    val speakBtn = TextView(this).apply {
+        text = "\u25B6 Speak"
+        textSize = 14f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setTypeface(null, Typeface.BOLD)
+        setPadding(dp(24), dp(10), dp(24), dp(10))
+        val pillBg = GradientDrawable().apply {
+            setColor(Color.parseColor("#3B2A6A"))
+            cornerRadius = dp(20).toFloat()
+            setStroke(dp(1), Color.parseColor(SALEM_GOLD))
+        }
+        background = pillBg
+        isClickable = true
+        isFocusable = true
+    }
+
+    val ttsChunks = chunkForTts(ttsTextForBio(bio))
+
+    fun startSpeaking() {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_BIO)
+        DebugLogger.i("WitchTrials", "bio speak: ${ttsChunks.size} chunks, lengths=${ttsChunks.map { it.length }}")
+        for ((i, chunk) in ttsChunks.withIndex()) {
+            tourViewModel.speakSheetSection(
+                tag = TTS_TAG_BIO,
+                text = chunk,
+                label = if (ttsChunks.size == 1) bio.name else "${bio.name} (${i + 1}/${ttsChunks.size})",
+                voiceId = null
+            )
+        }
+        speaking = true
+        speakBtn.text = "\u25A0 Stop"
+    }
+
+    fun stopSpeaking() {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_BIO)
+        speaking = false
+        speakBtn.text = "\u25B6 Speak"
+    }
+
+    speakBtn.setOnClickListener { if (speaking) stopSpeaking() else startSpeaking() }
+
+    val speakRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(dp(16), dp(4), dp(16), dp(16))
+        addView(speakBtn)
+    }
+
+    val contentColumn = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(topBar)
+        addView(roleEyebrow)
+        addView(nameText)
+        addView(datesText)
+        addView(shortBioText)
+        outcomeText?.let { addView(it) }
+        addView(speakRow)
+        addView(bodyContainer)
+    }
+
+    val scroll = ScrollView(this).apply {
+        addView(contentColumn)
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+    }
+
+    val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
+        )
+        background = bg
+        addView(scroll)
+    }
+
+    dialog.setContentView(root)
+    dialog.setOnDismissListener {
+        tourViewModel.cancelSegmentsWithTag(TTS_TAG_BIO)
+    }
+    dialog.show()
+
+    if (narratorMode) {
+        DebugLogger.i("WitchTrials", "narrator-mode on — auto-speaking ${bio.id}")
+        startSpeaking()
+    }
+}
+
+/** Render the `## Header\n\nparagraph\n\nparagraph` bio format into TextViews. */
+private fun SalemMainActivity.renderBioBody(bio: String, container: LinearLayout, dp: (Int) -> Int) {
+    val blocks = bio.split(Regex("\n\n+"))
+    for (block in blocks) {
+        val t = block.trim()
+        if (t.isEmpty()) continue
+        if (t.startsWith("## ")) {
+            val header = t.removePrefix("## ").trim()
+            container.addView(TextView(this).apply {
+                text = header
+                textSize = 13f
+                setTextColor(Color.parseColor(SALEM_GOLD))
+                setTypeface(null, Typeface.BOLD)
+                letterSpacing = 0.1f
+                setPadding(0, dp(14), 0, dp(4))
+            })
+        } else {
+            container.addView(TextView(this).apply {
+                text = t
+                textSize = 15f
+                setTextColor(Color.parseColor(SALEM_TEXT))
+                setLineSpacing(dp(4).toFloat(), 1.2f)
+                setPadding(0, dp(2), 0, dp(8))
+            })
+        }
+    }
+}
+
+/** Strip markdown headers so TTS reads a clean narrative. */
+private fun ttsTextForBio(bio: WitchTrialsNpcBio): String {
+    val sb = StringBuilder()
+    sb.append(bio.name).append(". ").append(bio.role).append(".\n\n")
+    val cleaned = bio.bio.lineSequence().filterNot { it.startsWith("## ") }.joinToString("\n")
+    sb.append(cleaned)
+    return sb.toString()
+}
+
+/**
+ * Android TTS caps each utterance at ~4000 chars (getMaxSpeechInputLength()).
+ * Split long text at sentence boundaries so multi-thousand-char bios speak
+ * in sequence instead of erroring out. NarrationManager enqueues each chunk
+ * as a separate segment with a unique id but matching tag, so the Stop pill
+ * still cancels every chunk via cancelSegmentsWithTag prefix match.
+ */
+private const val TTS_CHUNK_MAX = 3500
+
+private fun chunkForTts(text: String): List<String> {
+    if (text.length <= TTS_CHUNK_MAX) return listOf(text)
+    // Split into paragraphs first, then sentences. Each chunk accumulates
+    // paragraphs/sentences until it would exceed TTS_CHUNK_MAX.
+    val sentencePattern = Regex("""[^.!?]+[.!?]+(?:\s+|$)""")
+    val pieces: List<String> = text.split(Regex("\n\n+"))
+        .flatMap { para ->
+            if (para.length <= TTS_CHUNK_MAX) listOf(para)
+            else sentencePattern.findAll(para).map { it.value }.toList().ifEmpty { listOf(para) }
+        }
+
+    val chunks = mutableListOf<String>()
+    val current = StringBuilder()
+    for (piece in pieces) {
+        if (piece.length > TTS_CHUNK_MAX) {
+            // Flush current, then hard-split the oversized piece.
+            if (current.isNotEmpty()) {
+                chunks.add(current.toString().trim()); current.setLength(0)
+            }
+            var remaining = piece
+            while (remaining.length > TTS_CHUNK_MAX) {
+                chunks.add(remaining.substring(0, TTS_CHUNK_MAX))
+                remaining = remaining.substring(TTS_CHUNK_MAX)
+            }
+            if (remaining.isNotBlank()) current.append(remaining)
+        } else if (current.length + piece.length + 2 > TTS_CHUNK_MAX && current.isNotEmpty()) {
+            chunks.add(current.toString().trim())
+            current.setLength(0)
+            current.append(piece)
+        } else {
+            if (current.isNotEmpty()) current.append("\n\n")
+            current.append(piece)
+        }
+    }
+    if (current.isNotBlank()) chunks.add(current.toString().trim())
+    return chunks
+}
+
