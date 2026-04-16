@@ -13,7 +13,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PoiTree, type PoiRow, type PoiSelection } from './PoiTree'
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog } from './PoiEditDialog'
+import { WitchTrialsPanel } from './WitchTrialsPanel'
 import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
+
+type AdminView = 'pois' | 'witch-trials'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -23,6 +26,9 @@ type OraclePillState =
   | { kind: 'unavailable'; reason: string }
 
 export function AdminLayout() {
+  // View toggle (POIs vs Witch Trials)
+  const [view, setView] = useState<AdminView>('pois')
+
   // Shared POI dataset — populated by PoiTree's onDataLoaded callback
   const [pois, setPois] = useState<PoiRow[] | null>(null)
   const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
@@ -159,25 +165,50 @@ export function AdminLayout() {
     <div className="h-screen w-screen flex flex-col bg-slate-100 text-slate-900">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 h-12 bg-slate-800 text-slate-100 shadow">
-        <h1 className="text-base font-semibold tracking-wide mr-4">
+        <h1 className="text-base font-semibold tracking-wide mr-2">
           LocationMapApp Admin
-          <span className="ml-2 text-xs font-normal text-slate-400">/ Salem POIs</span>
         </h1>
 
-        <button
-          type="button"
-          onClick={handleHighlightDuplicates}
-          className="px-3 py-1 text-sm rounded bg-slate-700 hover:bg-slate-600 transition-colors"
-        >
-          Highlight Duplicates
-        </button>
-        <button
-          type="button"
-          onClick={handlePublish}
-          className="px-3 py-1 text-sm rounded bg-emerald-700 hover:bg-emerald-600 transition-colors"
-        >
-          Publish
-        </button>
+        {/* View toggle */}
+        <div className="flex rounded overflow-hidden border border-slate-600 mr-3">
+          <button
+            type="button"
+            onClick={() => setView('pois')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'pois' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            POIs
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('witch-trials')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'witch-trials' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            Witch Trials
+          </button>
+        </div>
+
+        {view === 'pois' && (
+          <>
+            <button
+              type="button"
+              onClick={handleHighlightDuplicates}
+              className="px-3 py-1 text-sm rounded bg-slate-700 hover:bg-slate-600 transition-colors"
+            >
+              Highlight Duplicates
+            </button>
+            <button
+              type="button"
+              onClick={handlePublish}
+              className="px-3 py-1 text-sm rounded bg-emerald-700 hover:bg-emerald-600 transition-colors"
+            >
+              Publish
+            </button>
+          </>
+        )}
 
         <div className="flex-1" />
 
@@ -192,32 +223,41 @@ export function AdminLayout() {
         </button>
       </header>
 
-      {/* Body: tree + map */}
-      <div className="flex-1 flex min-h-0">
-        <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
-          <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            POIs
-          </div>
-          <div className="flex-1 min-h-0">
-            <PoiTree
-              onSelect={handleTreeSelect}
-              onDataLoaded={handleDataLoaded}
-              externalPois={pois}
-            />
-          </div>
-        </aside>
+      {/* Body */}
+      {view === 'witch-trials' ? (
+        <div className="flex-1 min-h-0">
+          <WitchTrialsPanel />
+        </div>
+      ) : (
+        <>
+          {/* POI view: tree + map */}
+          <div className="flex-1 flex min-h-0">
+            <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
+              <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                POIs
+              </div>
+              <div className="flex-1 min-h-0">
+                <PoiTree
+                  onSelect={handleTreeSelect}
+                  onDataLoaded={handleDataLoaded}
+                  externalPois={pois}
+                />
+              </div>
+            </aside>
 
-        <main className="flex-1 relative bg-slate-200 min-h-0">
-          <AdminMap
-            pois={pois}
-            selectedPoi={selectedPoi}
-            onPoiSelect={handleMapSelect}
-            onPoiMoved={handlePoiMoved}
-          />
-        </main>
-      </div>
+            <main className="flex-1 relative bg-slate-200 min-h-0">
+              <AdminMap
+                pois={pois}
+                selectedPoi={selectedPoi}
+                onPoiSelect={handleMapSelect}
+                onPoiMoved={handlePoiMoved}
+              />
+            </main>
+          </div>
+        </>
+      )}
 
-      {/* Edit dialog */}
+      {/* Edit dialog (POI view only) */}
       <PoiEditDialog
         open={editOpen}
         poi={selectedPoi?.poi ?? null}

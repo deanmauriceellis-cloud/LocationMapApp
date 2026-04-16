@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S122 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S123 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 123: 2026-04-13 — POI dedup (110 soft-deleted), narration resync (+719 narrated), Phase 9R Historical Tour Mode spec
+
+Two-pass POI dedup: name-based (86 losers, prefix-stripping) + address-based (24 losers, with stoplist + same-category guard + min-unique-tokens guard + BCS-uniqueness preservation). Re-ran SalemIntelligence narration sync (1,227 PG updates, +567 short / +719 is_narrated). Wrote Phase 9R Historical Tour Mode requirements spec (`docs/salem-intelligence-historical-tour-request.md`) plus cross-project coordination notes (NOTE-SI006, NOTE-S008) and direct doc copies to SI/Salem trees. Admin map zoom expanded to z22. Net POI count 2,190 → 2,080; 110 losers tagged for pre-Play-Store hard-delete.
+
+Full session detail: `docs/session-logs/session-123-2026-04-13.md`.
+
+---
 
 ## Session 122: 2026-04-13 — AudioCraft (AudioGen) installation for Salem sound effects
 

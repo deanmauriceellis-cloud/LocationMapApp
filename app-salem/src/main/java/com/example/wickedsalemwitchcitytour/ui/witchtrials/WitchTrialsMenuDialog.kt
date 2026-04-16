@@ -14,6 +14,7 @@ import android.app.Dialog
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.method.LinkMovementMethod
 import android.view.Gravity
 import android.view.ViewGroup
 import android.graphics.BitmapFactory
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import java.util.Calendar
 
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WitchTrialsMenuDialog.kt"
@@ -191,8 +193,15 @@ fun SalemMainActivity.showWitchTrialsMenuDialog() {
         desc = "Forty-nine principal figures: judges, accusers, accused, clergy."
     ) { showWitchTrialsPeopleBrowserDialog() }
 
+    // ── Today in 1692 card placeholder (populated async) ──
+    val todayCardContainer = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(20), 0, dp(20), dp(14))
+    }
+
     val listLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        addView(todayCardContainer)
         addView(historyCard)
         addView(newspapersCard)
         addView(peopleCard)
@@ -213,6 +222,163 @@ fun SalemMainActivity.showWitchTrialsMenuDialog() {
 
     dialog.setContentView(root)
     dialog.show()
+
+    // ── Load "Today in 1692" card ──
+    lifecycleScope.launch {
+        val card = buildTodayIn1692Card(dp)
+        if (card != null) {
+            todayCardContainer.addView(card)
+        }
+    }
+}
+
+// ── Phase 9X.7 — "Today in 1692" card (S133) ─────────────────────────
+
+/**
+ * Build a "Today in 1692" card by matching the current calendar month-day
+ * against newspaper dates. Returns null if no newspaper falls within ±3 days.
+ *
+ * - Exact match: "Today in 1692" — shows headline + summary.
+ * - Near match (±1-3 days): "Near this day in 1692" — shows the closest.
+ */
+private suspend fun SalemMainActivity.buildTodayIn1692Card(
+    dp: (Int) -> Int
+): LinearLayout? {
+    val cal = Calendar.getInstance()
+    val month = cal.get(Calendar.MONTH) + 1 // Calendar.MONTH is 0-based
+    val day = cal.get(Calendar.DAY_OF_MONTH)
+
+    // Try exact match first
+    val exact = witchTrialsViewModel.getNewspapersByMonthDay(month, day)
+    if (exact.isNotEmpty()) {
+        val paper = exact.first()
+        return buildTodayCard(
+            dp = dp,
+            label = "Today in 1692",
+            date = paper.longDate ?: paper.date,
+            headline = paper.headline ?: "SALEM DISPATCH",
+            summary = paper.headlineSummary ?: paper.summary ?: paper.lede ?: "",
+            onClick = { showWitchTrialsNewspaperDetailDialog(paper) }
+        )
+    }
+
+    // Try ±1-3 day window, expanding until we find something
+    for (offset in 1..3) {
+        for (delta in listOf(-offset, offset)) {
+            val probe = Calendar.getInstance().apply {
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+                add(Calendar.DAY_OF_MONTH, delta)
+            }
+            val probeMonth = probe.get(Calendar.MONTH) + 1
+            val probeDay = probe.get(Calendar.DAY_OF_MONTH)
+            val nearby = witchTrialsViewModel.getNewspapersByMonthDay(probeMonth, probeDay)
+            if (nearby.isNotEmpty()) {
+                val paper = nearby.first()
+                val daysLabel = if (kotlin.math.abs(delta) == 1) "Yesterday" else "${kotlin.math.abs(delta)} days ago"
+                val prefix = if (delta < 0) daysLabel else "In ${ kotlin.math.abs(delta)} day${if (kotlin.math.abs(delta) > 1) "s" else ""}"
+                return buildTodayCard(
+                    dp = dp,
+                    label = "Near this day in 1692",
+                    date = paper.longDate ?: paper.date,
+                    headline = paper.headline ?: "SALEM DISPATCH",
+                    summary = paper.headlineSummary ?: paper.summary ?: paper.lede ?: "",
+                    onClick = { showWitchTrialsNewspaperDetailDialog(paper) }
+                )
+            }
+        }
+    }
+
+    return null // No newspaper within ±3 days of today
+}
+
+private fun SalemMainActivity.buildTodayCard(
+    dp: (Int) -> Int,
+    label: String,
+    date: String,
+    headline: String,
+    summary: String,
+    onClick: () -> Unit
+): LinearLayout {
+    val cardBg = GradientDrawable().apply {
+        setColor(Color.parseColor("#2A1F3E"))
+        cornerRadius = dp(14).toFloat()
+        setStroke(dp(2), Color.parseColor(SALEM_GOLD))
+    }
+
+    val labelText = TextView(this).apply {
+        text = "\uD83D\uDD6F\uFE0F  $label"  // candle emoji
+        textSize = 11f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(null, Typeface.BOLD)
+        letterSpacing = 0.12f
+    }
+
+    val dateText = TextView(this).apply {
+        text = date
+        textSize = 18f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        setPadding(0, dp(4), 0, dp(2))
+    }
+
+    val headlineText = TextView(this).apply {
+        text = headline
+        textSize = 15f
+        setTextColor(Color.parseColor(SALEM_TEXT))
+        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        setPadding(0, dp(4), 0, dp(2))
+    }
+
+    val summaryText = TextView(this).apply {
+        text = firstSentence(summary)
+        textSize = 13f
+        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        setPadding(0, dp(2), 0, dp(4))
+    }
+
+    val readBtn = TextView(this).apply {
+        text = "Read \u25B6"
+        textSize = 12f
+        setTextColor(Color.parseColor(SALEM_GOLD))
+        setTypeface(null, Typeface.BOLD)
+        setPadding(dp(14), dp(6), dp(14), dp(6))
+        val pillBg = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            cornerRadius = dp(14).toFloat()
+            setStroke(dp(1), Color.parseColor(SALEM_GOLD))
+        }
+        background = pillBg
+    }
+
+    val footerRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.END
+        setPadding(0, dp(4), 0, 0)
+        addView(readBtn)
+    }
+
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = cardBg
+        setPadding(dp(18), dp(16), dp(18), dp(14))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        isClickable = true
+        isFocusable = true
+        addView(labelText)
+        addView(dateText)
+        addView(headlineText)
+        addView(summaryText)
+        addView(footerRow)
+        setOnClickListener { onClick() }
+    }
 }
 
 // ── Phase 9X.3 — History 4×4 tile grid (S129) ────────────────────────
@@ -449,13 +615,14 @@ internal fun SalemMainActivity.showWitchTrialsTileDetailDialog(article: WitchTri
         setPadding(dp(24), 0, dp(24), dp(16))
     }
 
-    // Body — render paragraphs (split on blank lines or \n\n)
+    // Body — render paragraphs with entity cross-links
     val bodyText = TextView(this).apply {
-        text = article.body
         textSize = 15f
         setTextColor(Color.parseColor(SALEM_TEXT))
         setLineSpacing(dp(4).toFloat(), 1.15f)
         setPadding(dp(24), dp(8), dp(24), dp(24))
+        // Plain text initially; linked text set after index load
+        text = article.body
     }
 
     // Speak button — toggles TTS on/off
@@ -541,6 +708,45 @@ internal fun SalemMainActivity.showWitchTrialsTileDetailDialog(article: WitchTri
     if (narratorMode) {
         DebugLogger.i("WitchTrials", "narrator-mode on — auto-speaking ${article.id}")
         startSpeaking()
+    }
+
+    // Cross-link NPC names in the body text (S133)
+    lifecycleScope.launch {
+        witchTrialsViewModel.ensureLinkIndexes()
+        val linked = renderLinkedText(
+            text = article.body,
+            bioIndex = witchTrialsViewModel.bioIndex,
+            nameIndex = witchTrialsViewModel.nameIndex,
+            excludeNpcId = null,
+            onEntityTap = { link -> handleEntityLink(link, dialog) }
+        )
+        bodyText.text = linked
+        bodyText.movementMethod = LinkMovementMethod.getInstance()
+        // Disable highlight on tap — ClickableSpan handles color
+        bodyText.highlightColor = Color.TRANSPARENT
+    }
+}
+
+/**
+ * Navigate to the appropriate detail dialog for a tapped entity link.
+ * Optionally dismisses [parentDialog] before navigating.
+ */
+private fun SalemMainActivity.handleEntityLink(link: EntityLink, parentDialog: Dialog? = null) {
+    when (link) {
+        is EntityLink.Npc -> {
+            val role = roleTypeOf(link.bio)
+            DebugLogger.i("WitchTrials", "entity link tap: npc=${link.id}")
+            showWitchTrialsBioDetailDialog(link.bio, role)
+        }
+        is EntityLink.NewspaperDate -> {
+            DebugLogger.i("WitchTrials", "entity link tap: newspaper=${link.date}")
+            lifecycleScope.launch {
+                val paper = witchTrialsViewModel.getNewspaperByDate(link.date)
+                if (paper != null) {
+                    showWitchTrialsNewspaperDetailDialog(paper)
+                }
+            }
+        }
     }
 }
 
@@ -997,6 +1203,49 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
         DebugLogger.i("WitchTrials", "narrator-mode on — auto-speaking ${paper.date}")
         startSpeaking()
     }
+
+    // Cross-link NPC names in the newspaper body (S133)
+    lifecycleScope.launch {
+        witchTrialsViewModel.ensureLinkIndexes()
+        val vm = witchTrialsViewModel
+        bodyContainer.removeAllViews()
+        if (points.isNotEmpty()) {
+            for (pt in points) {
+                val linked = renderLinkedText(
+                    text = "•  $pt",
+                    bioIndex = vm.bioIndex,
+                    nameIndex = vm.nameIndex,
+                    excludeNpcId = null,
+                    onEntityTap = { link -> handleEntityLink(link) }
+                )
+                bodyContainer.addView(TextView(this@showWitchTrialsNewspaperDetailDialog).apply {
+                    text = linked
+                    textSize = 15f
+                    setTextColor(Color.parseColor(SALEM_TEXT))
+                    setLineSpacing(dp(4).toFloat(), 1.2f)
+                    setPadding(0, dp(4), 0, dp(10))
+                    movementMethod = LinkMovementMethod.getInstance()
+                    highlightColor = Color.TRANSPARENT
+                })
+            }
+        } else {
+            val linked = renderLinkedText(
+                text = paper.ttsFullText,
+                bioIndex = vm.bioIndex,
+                nameIndex = vm.nameIndex,
+                excludeNpcId = null,
+                onEntityTap = { link -> handleEntityLink(link) }
+            )
+            bodyContainer.addView(TextView(this@showWitchTrialsNewspaperDetailDialog).apply {
+                text = linked
+                textSize = 15f
+                setTextColor(Color.parseColor(SALEM_TEXT))
+                setLineSpacing(dp(4).toFloat(), 1.15f)
+                movementMethod = LinkMovementMethod.getInstance()
+                highlightColor = Color.TRANSPARENT
+            })
+        }
+    }
 }
 
 // ── Phase 9X.5 — People of Salem 1692 browser (S131) ──────────────────
@@ -1426,7 +1675,8 @@ internal fun SalemMainActivity.showWitchTrialsBioDetailDialog(bio: WitchTrialsNp
         orientation = LinearLayout.VERTICAL
         setPadding(dp(24), dp(6), dp(24), dp(28))
     }
-    renderBioBody(bio.bio, bodyContainer, dp)
+    // Render plain initially; cross-linked text applied after index load
+    renderBioBody(bio.bio, bodyContainer, dp, excludeNpcId = null, onEntityTap = null)
 
     val speakBtn = TextView(this).apply {
         text = "\u25B6 Speak"
@@ -1517,10 +1767,30 @@ internal fun SalemMainActivity.showWitchTrialsBioDetailDialog(bio: WitchTrialsNp
         DebugLogger.i("WitchTrials", "narrator-mode on — auto-speaking ${bio.id}")
         startSpeaking()
     }
+
+    // Cross-link NPC names in the bio body (S133)
+    lifecycleScope.launch {
+        witchTrialsViewModel.ensureLinkIndexes()
+        bodyContainer.removeAllViews()
+        renderBioBody(
+            bio = bio.bio,
+            container = bodyContainer,
+            dp = dp,
+            excludeNpcId = bio.id,
+            onEntityTap = { link -> handleEntityLink(link) }
+        )
+    }
 }
 
-/** Render the `## Header\n\nparagraph\n\nparagraph` bio format into TextViews. */
-private fun SalemMainActivity.renderBioBody(bio: String, container: LinearLayout, dp: (Int) -> Int) {
+/** Render the `## Header\n\nparagraph\n\nparagraph` bio format into TextViews.
+ *  When [onEntityTap] is non-null, paragraph text gets entity-linked spans. */
+private fun SalemMainActivity.renderBioBody(
+    bio: String,
+    container: LinearLayout,
+    dp: (Int) -> Int,
+    excludeNpcId: String?,
+    onEntityTap: ((EntityLink) -> Unit)?
+) {
     val blocks = bio.split(Regex("\n\n+"))
     for (block in blocks) {
         val t = block.trim()
@@ -1537,11 +1807,24 @@ private fun SalemMainActivity.renderBioBody(bio: String, container: LinearLayout
             })
         } else {
             container.addView(TextView(this).apply {
-                text = t
                 textSize = 15f
                 setTextColor(Color.parseColor(SALEM_TEXT))
                 setLineSpacing(dp(4).toFloat(), 1.2f)
                 setPadding(0, dp(2), 0, dp(8))
+                if (onEntityTap != null && witchTrialsViewModel.linkIndexesReady) {
+                    val linked = renderLinkedText(
+                        text = t,
+                        bioIndex = witchTrialsViewModel.bioIndex,
+                        nameIndex = witchTrialsViewModel.nameIndex,
+                        excludeNpcId = excludeNpcId,
+                        onEntityTap = onEntityTap
+                    )
+                    text = linked
+                    movementMethod = LinkMovementMethod.getInstance()
+                    highlightColor = Color.TRANSPARENT
+                } else {
+                    text = t
+                }
             })
         }
     }

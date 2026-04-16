@@ -74,6 +74,8 @@ class WitchTrialsRepository @Inject constructor(
     suspend fun getNewspaperById(id: String): WitchTrialsNewspaper? = newspaperDao.findById(id)
     suspend fun getNewspaperByDate(date: String): WitchTrialsNewspaper? = newspaperDao.findByDate(date)
     suspend fun getNewspapersByPhase(phase: Int): List<WitchTrialsNewspaper> = newspaperDao.findByPhase(phase)
+    suspend fun getNewspapersByMonthDay(month: Int, day: Int): List<WitchTrialsNewspaper> =
+        newspaperDao.findByMonthDay("%-${"%02d".format(month)}-${"%02d".format(day)}")
     suspend fun getNewspaperCount(): Int = newspaperDao.count()
 
     // ── Hydration ──────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ import javax.inject.Inject
  *
  * Phase 1 ships counts + lazy load methods. Real list/detail flows
  * land in Phase 3 (history tiles), Phase 4 (newspapers), Phase 5 (people).
+ * Phase 9X.7 (S133) adds cross-linking indexes for entity auto-detection.
  */
 @HiltViewModel
 class WitchTrialsViewModel @Inject constructor(
@@ -53,7 +54,39 @@ class WitchTrialsViewModel @Inject constructor(
 
     suspend fun getAllNewspapers(): List<WitchTrialsNewspaper> = repository.getAllNewspapers()
     suspend fun getNewspaperByDate(date: String): WitchTrialsNewspaper? = repository.getNewspaperByDate(date)
+    suspend fun getNewspapersByMonthDay(month: Int, day: Int): List<WitchTrialsNewspaper> =
+        repository.getNewspapersByMonthDay(month, day)
 
     suspend fun getAllBios(): List<WitchTrialsNpcBio> = repository.getAllBios()
     suspend fun getBioById(id: String): WitchTrialsNpcBio? = repository.getBioById(id)
+
+    // ── Phase 9X.7 — Cross-linking indexes (S133) ─────────────────────
+
+    /** NPC id → bio. Built lazily on first access. */
+    var bioIndex: Map<String, WitchTrialsNpcBio> = emptyMap()
+        private set
+
+    /** NPC name → bio, sorted longest-first for greedy matching. */
+    var nameIndex: List<Pair<String, WitchTrialsNpcBio>> = emptyList()
+        private set
+
+    /** True once indexes are built. */
+    var linkIndexesReady: Boolean = false
+        private set
+
+    /** Cached bios list for cross-link navigation. */
+    private var cachedBios: List<WitchTrialsNpcBio> = emptyList()
+
+    /**
+     * Ensure cross-linking indexes are built. Call before rendering linked
+     * text. Idempotent — builds only once.
+     */
+    suspend fun ensureLinkIndexes() {
+        if (linkIndexesReady) return
+        cachedBios = repository.getAllBios()
+        val (bi, ni) = buildLinkIndexes(cachedBios)
+        bioIndex = bi
+        nameIndex = ni
+        linkIndexesReady = true
+    }
 }

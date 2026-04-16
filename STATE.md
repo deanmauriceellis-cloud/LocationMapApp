@@ -2,29 +2,28 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 132 (Phase 9X.6 pencil-sketch portraits + bug fixes shipped)
+**Last updated:** 2026-04-16 — Session 133 (Phase 9X.7 cross-linking + Today-in-1692 + admin integration shipped)
 
 ---
 
-## TOP PRIORITY — Next Session (S133)
+## TOP PRIORITY — Next Session (S134)
 
-**Phase 9X.7 — cross-linking + admin integration + Today-in-1692 card.**
+**Phase 9X.8 — polish, audio integration, Lenovo field test, STATE + master plan + OMEN report.**
 
 Master plan section: Phase 9X.
 
-After S133, Phase 9X will be 7/8 done. S134 = polish + field test + master plan/STATE/OMEN report updates.
+S134 is the final Phase 9X session. After S134, Phase 9X is COMPLETE. Next up: Phase 9Q (Salem Domain Content Bridge).
 
-**Post-S132 key facts:**
-- **Phase 9X.6 shipped end-to-end.** 49 pencil-sketch portraits generated via Oracle→SD pipeline: Oracle extracted period-accurate appearance descriptions (role-aware vestments — Geneva bands for clergy, judicial justaucorps, per-station dress codes), distilled into SD prompt tails, rendered through 4 checkpoints × 2 prompt versions (392 total). Operator selected **RealVisXL V5.0 v2** (role-aware). 49 grayscale JPGs bundled at 2.5 MB total in `app-salem/src/main/assets/portraits/`.
-- **Portrait UI**: 160dp hero in bio detail (rounded corners, role-tinted border) + 48dp circular thumbnails in People browser rows. All bitmap decoding async via `Dispatchers.IO` + `LruCache(60)`.
-- **Bug fix S132**: ambient HINT narrations now suppressed during active/paused tours via tour-state gate in `runSilenceFill()`. No more "Lappin Park Little Free Library" interrupting tour narration.
-- **Bug fix S132**: portrait bitmap ANR eliminated — zero main-thread `BitmapFactory.decodeStream()`.
-- **AI Studio expanded**: 5 checkpoints now available (dreamshaper_8, DreamShaperXL Turbo, RealVisXL V5.0, Juggernaut XL v9, Flux.1 dev nf4). Forge `--api` enabled. 392 comparison portraits in `/tmp/s132-gallery/`.
-- **Room `@Insert` silent-drop** from S129 still latent — S132 sidestepped via `better-sqlite3` bake. Worth root-causing before Play Store.
+**Post-S133 key facts:**
+- **Phase 9X.7 shipped end-to-end.** Three deliverables:
+  - **Cross-linking**: `EntityLinkRenderer.kt` auto-detects 49 NPC names (1,110+ mentions) as gold underlined ClickableSpans in article/bio/newspaper detail dialogs. Tapping navigates to bio detail. Explicit `[[npc:id]]` / `[[newspaper:YYYY-MM-DD]]` markup supported for future enrichment.
+  - **Today-in-1692 card**: gold-bordered card at top of Witch Trials menu, matching current month-day to 202-newspaper corpus (±3 day window).
+  - **Admin tool integration**: cache-proxy REST endpoints for all 3 witch trials tables + React `WitchTrialsPanel` with tabbed browsing + inline editing. POIs/Witch Trials toggle in admin header.
+- **Room `@Insert` silent-drop** from S129 still latent — worth root-causing before Play Store.
 - **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
 - **PG: 2,080 active POIs** unchanged. **Narration coverage: 100%**. **5 tours** with OSRM polylines.
 
-**Phase 9X status:** 6 / 8 sessions done. 2 sessions of feature work ahead (S133-S134). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** 7 / 8 sessions done. 1 session of polish/test ahead (S134). Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -36,14 +35,14 @@ After S133, Phase 9X will be 7/8 done. S134 = polish + field test + master plan/
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
 | **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
-| **9X** Salem Witch Trials Feature | **IN PROGRESS — 6/8 sessions done (S127-S132)** | **TOP PRIORITY (S133-S134).** S127 foundation. S128 history-article LLM gen (16/16). S129 History 4×4 tile UI. S130 Oracle Newspaper panel (202 articles + 202 AI tabloid headlines). S131 People panel (49 Tier-1/2 figures, role-filtered browser + bio detail + TTS chunker). S132 pencil-sketch portraits (49, RealVisXL V5.0, Oracle-extracted vestments) + ambient-narration tour gate + async bitmap loading. Phase 9X.7 (S133) = cross-linking + admin integration + Today-in-1692 card. |
+| **9X** Salem Witch Trials Feature | **IN PROGRESS — 7/8 sessions done (S127-S133)** | **TOP PRIORITY (S134 = final).** S127 foundation. S128 history-article LLM gen. S129 History 4×4 tile UI. S130 Oracle Newspaper panel. S131 People panel + TTS chunker. S132 pencil-sketch portraits + bug fixes. S133 cross-linking (1,110+ NPC name auto-links) + Today-in-1692 card + admin integration. S134 = polish + audio + field test. |
 | **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 131. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 133. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

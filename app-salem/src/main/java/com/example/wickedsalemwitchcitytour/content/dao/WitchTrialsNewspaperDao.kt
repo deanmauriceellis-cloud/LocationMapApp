@@ -29,6 +29,10 @@ interface WitchTrialsNewspaperDao {
     @Query("SELECT * FROM salem_witch_trials_newspapers WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
     suspend fun findByDateRange(startDate: String, endDate: String): List<WitchTrialsNewspaper>
 
+    /** Find newspapers matching a month-day pattern (e.g. "%-04-16" for April 16). */
+    @Query("SELECT * FROM salem_witch_trials_newspapers WHERE date LIKE :monthDayPattern ORDER BY date ASC")
+    suspend fun findByMonthDay(monthDayPattern: String): List<WitchTrialsNewspaper>
+
     @Query("SELECT COUNT(*) FROM salem_witch_trials_newspapers")
     suspend fun count(): Int
 
