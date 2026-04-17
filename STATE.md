@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 142 (V1 UI hide + full rebrand to `com.destructiveaigurus.katrinasmysticvisitorsguide` / "Katrina's Mystic Visitors Guide - Salem"; device-verified; 3 commits)
+**Last updated:** 2026-04-17 — Session 142 (V1 UI hide + full rebrand + splash retitle; all device-verified; 5 commits)
 
 ---
 
@@ -19,6 +19,7 @@
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 
 **Post-S142 key facts:**
+- **Splash screen retitled** — `splashTitle` "Wicked Salem" → **"Katrina's Mystic Visitors Guide"** (32sp Creepster gold #C9A84C), `splashSubtitle` "Witch Tours" → **"Historic Salem Tour App"** (20sp Creepster white #F5F0E8). Font sizes dropped from 42sp/24sp and letter-spacing trimmed to fit the longer strings under the Creepster display font without overflow. `splash_witchkitty.png` illustration and `splash_voiceover.wav` intentionally NOT touched — operator regenerating both in a dedicated content-art session (Katrina photo + screaming-cat voiceover). Part of a broader location-aware art/sound initiative flagged as carry-forward.
 - **Rebrand to Play-Store-ready identity** — `applicationId` `com.example.wickedsalemwitchcitytour` → **`com.destructiveaigurus.katrinasmysticvisitorsguide`** (frozen, immutable once shipped; clears Play Store's block on `com.example.*`). Display label "Wicked Salem" → **"Katrina's Mystic Visitors Guide - Salem"**. Internal code namespace, class names (`WickedSalemApp`), themes (`Theme.WickedSalem*`), module (`:app-salem`), and docs intentionally unchanged per operator direction. `FileProvider` authority parameterized to `${applicationId}.fileprovider` (manifest) / `$packageName.fileprovider` (Kotlin caller) so it auto-syncs. Device-verified on Lenovo HNY0CY0W: old package uninstalled, new installed, launcher resolves, `aapt2 dump badging` confirms label, no crashes, V1 offline enforcement intact, 1,837 POIs loaded.
 - **V1 UI hide complete** — seven online-only entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) gated behind `FeatureFlags.V1_OFFLINE_ONLY` in `app-salem/.../ui/menu/AppBarMenuManager.kt`. Combined with S141's data-layer enforcement, V1 now has **three-layer offline coverage**: OkHttp interceptor (hard backstop) + ViewModel gates (clean logs) + UI hide (no visible surface). Flipping one boolean in `FeatureFlags.kt` reverses all of it for V2.
 - **Device-verified on Lenovo HNY0CY0W**: weather + tile-source icons absent from uiautomator dump; grid dropdown row 1 (Transit/Webcams/Aircraft/Radar) gone, leaving 11 cells across 3 rows; TFR item absent from alerts popup; no crashes, no ANRs during splash → map → grid → alerts cycle.
@@ -66,6 +67,11 @@
 ---
 
 ## Carry-forward Items (NOT blocking Phase 9U)
+
+**Content-art regen queue (post-S142):**
+- **Splash illustration** — replace `splash_witchkitty.png` with a photo/stylized render of Katrina (operator's cat, the app's namesake). Style direction TBD (photographic with color grading vs. SD img2img stylized to match the current cartoon palette).
+- **Splash voiceover** — replace `splash_voiceover.wav` with a screaming-cat sound per operator's spec. Approach TBD (freesound.org samples + sox, AudioGen on RTX 3090, or hybrid). GPU-caution rule applies — confirm SalemIntelligence / AudioCraft not active before generative audio jobs.
+- **Location-aware art/sound initiative** — broader operator theme: "a bunch of things I want to do with artwork and sound in this location since we are location aware." Geofence-triggered art/audio per POI or area. No formal scope yet — candidate for new phase entry once parking-lot triage opens.
 
 **Still pending (carry into S120+):**
 - **Heading-up rotation smoothness** — root cause identified in S115 (100 Hz sensor + main-thread saturation). Plan: cut log chatter, rate-limit apply, move sensor processing to background HandlerThread, switch static detection to wall-clock. **Scheduled for S120 Step 9U.17.**
