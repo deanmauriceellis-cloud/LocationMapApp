@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 132-141. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 133-142. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 142: 2026-04-17 — V1 UI hide for seven online-only features
+
+Operator directed picking up S141's deferred UI hide pass, deferring the 8-12h soak to their own schedule, and moving OMEN-004's deadline from 2026-04-30 to 2026-08-30. Explore subagent's survey found all 7 entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) concentrated in a single file — `app-salem/.../ui/menu/AppBarMenuManager.kt`. Shipped six surgical edits behind `FeatureFlags.V1_OFFLINE_ONLY`: hid the dead-code top-bar XML items defensively, hid the slim-toolbar weather + tile-source icons, hid grid-dropdown row 1 (Transit/Webcams/Aircraft/Radar), added early-return guards to all four `show*Menu()` paths, removed `menu_tfr_overlay` from the alerts popup, and stopped `computeActiveLayerCount()` from counting the 8 online-only layer prefs so the grid badge can't reflect stale state. Device-verified on Lenovo HNY0CY0W: `uiautomator dump` shows weather + tile-source icons absent from the toolbar icon row (View.GONE removes them from layout entirely), grid dropdown renders 11 cells across 3 rows (rows 2-4) with row 1 gone, alerts popup has Speed Camera / School Zone / Flood / Crossing / Alert Sound / Alert Distance / Zone Databases but no TFR. No FATAL, no ANR, no AndroidRuntime exceptions across the splash → map → grid → alerts cycle. Combined with S141's data-layer enforcement, V1 now has three-layer offline coverage — OkHttp interceptor (hard backstop) + ViewModel gates (clean logs) + UI hide (no visible surface).
+
+Full session detail: `docs/session-logs/session-142-2026-04-17.md`. Commits: `8b4c210` (UI hide) + the S142 close-out commit.
+
+---
 
 ## Session 141: 2026-04-17 — V1 offline-mode enforcement + log tuning
 
@@ -76,13 +84,5 @@ Full session detail: `docs/session-logs/session-133-2026-04-16.md`. Commit: `266
 
 ---
 
-## Session 132: 2026-04-15/16 — Phase 9X.6 pencil-sketch portraits for 49 figures + bug fixes
-
-Shipped Phase 9X.6: Oracle-extracted period-accurate appearance descriptions (role-aware vestments — Geneva bands for clergy, judicial justaucorps, per-station dress codes) distilled into SD prompt tails, then rendered through 4 checkpoints × 2 prompt versions (392 total portraits). Operator selected RealVisXL V5.0 v2 (role-aware). 49 grayscale JPGs (2.5 MB) bundled in APK, wired as 160dp hero portrait in bio detail and 48dp circular thumbnails in People browser, all decoded async via `Dispatchers.IO` + `LruCache(60)`. Bug fixes: ambient HINT narrations now suppressed during active tours (`runSilenceFill` tour-state gate); portrait bitmap ANR eliminated. AI Studio expanded with 3 new checkpoints (RealVisXL, Juggernaut XL, Flux.1 dev nf4) and `--api` flag.
-
-Full session detail: `docs/session-logs/session-132-2026-04-15.md`. Commit: `9b81ce4`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 131 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 132 and earlier are in SESSION-LOG-ARCHIVE.md -->

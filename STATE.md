@@ -2,22 +2,30 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 141 (V1 offline-mode enforcement shipped; tuning pass; 7 commits)
+**Last updated:** 2026-04-17 — Session 142 (V1 UI hide for 7 online-only features; device-verified; 1 commit)
 
 ---
 
-## TOP PRIORITY — Next Session (S142)
+## TOP PRIORITY — Next Session (S143)
 
-**Operator-pending — three items compete:**
+**Operator-directed starting point:** **37-item parking lot review** at `docs/parking-lot-S138-master-review.md` — 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2). Outcome: triage into master plan, pick the next phase (9Q / 9R / 10), or schedule further sub-work.
 
-1. **Long-run device soak (8-12 h)** to confirm S141 tuning landed cleanly — especially GPS-OBS backoff producing ~15 W-lines vs S140's 1,208 over a stale window, and that narration autoplay still runs continuously through the no-network-at-all V1 posture.
-2. **UI toggle hiding** for online-only features (radar button, weather widget, transit tab, aircraft overlay, webcams, TFR download, online tile switcher). Correctness is already handled by the OkHttp backstop; these toggles currently no-op silently. Cosmetic polish that gets us closer to Play Store ready.
-3. **37-item parking lot review** at `docs/parking-lot-S138-master-review.md` — 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2). Still awaiting operator triage. Until this lands, choosing the next phase (9Q / 9R / 10) is premature.
-4. **OMEN-004 — first real Kotlin unit test** — deadline **2026-04-30 (13 days out)**. Slipped 7 sessions now. Small scope, low risk, clears an OMEN directive.
+**Background items (not blocking S143):**
+- **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff produces ~15 W-lines vs S140's 1,208 baseline and that narration autoplay runs continuously with V1 posture.
+- **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142, ~4.5 months out). Small scope, low risk, clears an OMEN directive.
+- **NOTE-L014 Privacy Policy** — drafted S114, pending OMEN review (29 sessions).
+- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — 16 sessions pending operator decision.
+- **NOTE-L018 PG-13 content rule** — pending OMEN acceptance + upstream relay.
+- **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 
-**Default if operator gives no direction:** start S142 by surfacing these and letting the operator pick. If pushed autonomous: UI hiding first (shipping-readiness), then long-soak verification, then OMEN-004, then parking lot.
+**Post-S142 key facts:**
+- **V1 UI hide complete** — seven online-only entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) gated behind `FeatureFlags.V1_OFFLINE_ONLY` in `app-salem/.../ui/menu/AppBarMenuManager.kt`. Combined with S141's data-layer enforcement, V1 now has **three-layer offline coverage**: OkHttp interceptor (hard backstop) + ViewModel gates (clean logs) + UI hide (no visible surface). Flipping one boolean in `FeatureFlags.kt` reverses all of it for V2.
+- **Device-verified on Lenovo HNY0CY0W**: weather + tile-source icons absent from uiautomator dump; grid dropdown row 1 (Transit/Webcams/Aircraft/Radar) gone, leaving 11 cells across 3 rows; TFR item absent from alerts popup; no crashes, no ANRs during splash → map → grid → alerts cycle.
+- **Legacy finding**: `menu_main_toolbar.xml` top-bar menu (`menu_top_weather / transit / cams / aircraft / radar`) is **dead code** in the current build — `onMenuInflated()` is defined on AppBarMenuManager but no activity calls it. The real top-bar is the slim toolbar. The hide gates in `onMenuInflated` are defensive for future re-wiring.
+- **NVMe advisory LIFTED** as of 2026-04-17 (OMEN S021). Normal commit/push cadence resumes.
+- **OMEN-004 deadline: 2026-04-30 → 2026-08-30** (operator direction). Surfaced in S142 OMEN report.
 
-**Post-S141 key facts:**
+**S141 facts still current:**
 - **V1 offline-mode enforcement shipped** — `FeatureFlags.V1_OFFLINE_ONLY = true` (compile-time const in `:core`). Three-layer enforcement: ViewModel gates (early-return) → OkHttp `OfflineModeInterceptor` (hard backstop in all 13 client sites) → offline-only tile sources (empty URL so osmdroid downloader refuses). V2 resumes by flipping one boolean.
 - **Find feature fully offline** — `FindViewModel` rewritten from cache-proxy `FindRepository` to `SalemPoiDao` (Room). Proximity search, text search, category counts, website lookup all served from the bundled 1,837-POI `salem_content.db`. Public API preserved; `SalemMainActivityFind` unchanged. Session-level `hashCode → SalemPoi` cache for `fetchPoiWebsiteDirectly` with name+coord fallback.
 - **Walking directions offline** — `WalkingDirections.getRoute()` returns straight-line, `getMultiStopRoute()` returns multi-segment straight-line, `getBundledTourRoute(tourId)` loads the pre-computed OSRM polyline from `assets/tours/{tourId}.json` (already generated for all 5 tours by S125's `backfill-tour-routes.js`). `TourViewModel.getFullTourRoute` prefers the bundled polyline for the active tour. `WalkingRoute.road` is nullable.
@@ -31,8 +39,7 @@
 - **BCS dedup fully resolved** (from S136). **PG: 1,837 active POIs** (1,483 narrated).
 - **Walk-sim dwell cap** now 180s (was 60s); waived while TTS speaking.
 - **Room `@Insert` silent-drop** from S129 still latent.
-- **OMEN-004** still deliberately slipped — deadline 2026-04-30, **13 days out**.
-- **NVMe advisory** (2026-04-16): all S141 commits pushed immediately after each meaningful unit of work per the advisory. 7 pushes across the session.
+- **NVMe advisory** (2026-04-16) — LIFTED 2026-04-17. Normal commit/push cadence resumes.
 
 **Salem 400+ launch deadline 2026-09-01 still tracks.** 4.5 months runway.
 
@@ -53,7 +60,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 141. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 142. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -76,14 +83,15 @@
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court.
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 13 sessions running. Needs OMEN to execute or retract.
+1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court (29 sessions).
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 16 sessions running. Needs OMEN to execute or retract.
 3. **OMEN-002 history rotation** — operator action only.
-4. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, **13 days out**).
+4. **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142). Previously 2026-04-30. Surfaced to OMEN in S142 report for amendment or acknowledgment.
 5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
 6. **Cross-project: SalemIntelligence** — Phase 1 KB live. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2.
 7. **NOTE-L018 — PG-13 standing content rule** proposed to OMEN at S138 via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
-8. **NVMe advisory (2026-04-16)** — compliant. S140 committed after each meaningful unit and pushed immediately.
+8. **NOTE-L019 — `restrooms_zombie.png` regen** (LOW) — one themed POI icon rsync-skipped during the Session 020 NVMe clone. No deadline, no blocker. Regen during a content-art session.
+9. **NVMe advisory** — LIFTED 2026-04-17 (OMEN S021). Normal commit/push cadence resumes.
 7. ~~**Cross-project: stale intel_entity_id UUIDs in salem_pois**~~ — **CLOSED S125 2026-04-14 (commit `870733b`).** Self-resolved on LMA's side via `cache-proxy/scripts/dedup-stale-intel-links.js`. Pulled SI's `/api/intel/poi-export` (1597 canonical entities), probed every LMA linkage, fuzzy-matched stale UUIDs by name + coord + `/context` validity, then re-linked survivors and soft-deleted the rest. Outcome: 12 canonicals re-linked (chezcasa, lafayette_hotel, rockafellas_restaurant, the_village + 8 others), 211 soft-deleted with `data_source LIKE '%dedup-stale-uuid-2026-04-14-loser%'` (pending pre-Play-Store hard-delete), 0 stale linkages remaining. Bonus: fixed a `generate-narration-from-intel.js` bug that was aborting on GET 404 instead of falling through to POST `/generate` — any future rerun now correctly synthesizes narrations for SI-known-but-uncached entities. No OMEN action required.
 
 ---
