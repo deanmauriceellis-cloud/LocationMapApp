@@ -206,10 +206,14 @@ class TourViewModel @Inject constructor(
 
     /** Get multi-stop route preview for the entire active tour. */
     fun getFullTourRoute() {
+        val tourId = (tourEngine.tourState.value as? TourState.Active)?.activeTour?.tour?.id
         val points = tourEngine.getAllStopLocations()
         if (points.size < 2) return
         viewModelScope.launch {
-            _walkingRoute.value = walkingDirections.getMultiStopRoute(points)
+            // Prefer the pre-computed bundled polyline for the active tour —
+            // straight-line fallback if the asset is missing or no active tour.
+            val bundled = tourId?.let { walkingDirections.getBundledTourRoute(it) }
+            _walkingRoute.value = bundled ?: walkingDirections.getMultiStopRoute(points)
         }
     }
 
