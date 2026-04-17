@@ -648,7 +648,7 @@ internal fun SalemMainActivity.exportGeofenceDatabase(dbId: String, dbName: Stri
         return
     }
     try {
-        val uri = FileProvider.getUriForFile(this, "com.example.wickedsalemwitchcitytour.fileprovider", file)
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/x-sqlite3"
             putExtra(Intent.EXTRA_STREAM, uri)
