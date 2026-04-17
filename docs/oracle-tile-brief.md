@@ -129,3 +129,24 @@ Each tile needs these fields:
 - Include specific dates where known
 - Keep the `teaser` punchy — it's shown on a small tile card in a 4x4 grid
 - The `title` should be an ALL-CAPS newspaper headline style (like the existing Oracle headlines)
+
+## Content rating constraint — PG-13 (IARC Teen / 13+)
+
+All tile content must meet **PG-13 / Teen** standards. This app is a tasteful historical tour, not a horror experience.
+
+**OK (historical, factual, educational framing):**
+- Executions by hanging, pressing (Giles Corey), imprisonment, deaths in jail
+- Trial testimony, spectral evidence, accusations, confessions
+- Witchcraft beliefs and period superstitions as historical context
+- Gallows, trials, magistrates, ministers, accusers, the afflicted girls
+- Named individuals' fates stated factually
+
+**NOT OK:**
+- Graphic depictions of suffering — lingering on physical detail of torture, execution, or bodies
+- Strong profanity (mild period exclamations like "hell" or "damn" in dialogue are fine)
+- Gore — blood, wounds, mutilation described in visceral detail
+- Sexual content or innuendo
+- Modern political / editorial takes; maintain period-historical voice
+- Glorification of suffering; keep the tone dignified and retrospective
+
+**Tone:** somber, period-appropriate, respectful of the dead, factual. "The Oracle looks back" framing is inherently reflective — lean into that. A Teen reader should come away informed and moved, not repulsed.
