@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 131-140. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 132-141. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 141: 2026-04-17 — V1 offline-mode enforcement + log tuning
+
+Operator opened the session with a 12-hour Lenovo logcat dump (the S140 device build still running) and asked for a tuning pass. Log review found no crashes / ANRs / OOMs but five real issues: ~720 cache-proxy circuit-breaker W-lines, 1,208 GPS-OBS stale-heartbeat W-lines, 118 `TransitViewModel` main-thread blocks averaging 1.1s (the MBTA fleet StateFlow recompose), 3 spurious `TTS ERROR` E-lines (cancel-vs-real-error mislogging), and 2 walk-sim `DWELL CAP` hits. Operator directed **disable all outbound network features for V1** (including MBTA, so the 1.1s recompose goes away too), keep the three log-tuning fixes, and for V1 walking directions use pre-computed polylines. S141 shipped seven commits: `FeatureFlags.V1_OFFLINE_ONLY` + `OfflineModeInterceptor` installed in all 13 OkHttpClient sites, ViewModel early-return gates on Transit / Weather / Geofence / Aircraft / Main, `FindViewModel` rewritten to `SalemPoiDao` (A1 — offline Room search over 1,837 bundled POIs), `WalkingDirections` V1 offline path using the already-bundled `assets/tours/{tourId}.json` OSRM polylines from S125, `TileSourceManager` forced to empty-URL offline mode (DARK hidden in V1), GPS-OBS backoff cadence (30s → 5m → 15m by stale age), `NarrationMgr.intentionallyStopping` flag to distinguish cancel vs real TTS error, walk-sim dwell cap 60 → 180s that also waives cap while TTS still speaking. Device-verified on Lenovo HNY0CY0W cold boot: zero outbound-network W-lines, tile source reports `v1Offline=true`, GPS-OBS banner shows new backoff message, tour restored at stop 2/10, 1,837 POIs loaded from Room, no crashes. V2 = flip one boolean in `FeatureFlags`.
+
+Full session detail: `docs/session-logs/session-141-2026-04-17.md`. Commits: `e50966b` (interceptor) + `e5208af` (VM gates) + `0f98b69` (FindVM→Room) + `d68440c` (WalkingDirections offline) + `d10c9d8` (tiles + log tuning) + `7a2e886` (MainVM gates) + `9d412c0` (log finalized) + the S141 close-out commit.
+
+---
 
 ## Session 140: 2026-04-16/17 — Phase 9X Step 3 complete; Oracle tiles imported, bundled, device-verified on Lenovo; Phase 9X now COMPLETE
 
@@ -76,13 +84,5 @@ Full session detail: `docs/session-logs/session-132-2026-04-15.md`. Commit: `9b8
 
 ---
 
-## Session 131: 2026-04-15 — Phase 9X.5 People of Salem 1692 panel + TTS chunking for long bios
-
-Shipped Phase 9X.5 end-to-end: imported 49 Tier-1/2 historical figures from `~/Development/Salem/data/json/npcs/` into `salem_witch_trials_npc_bios` (bios assembled by concatenating narrative sections — life_before_1692, role_in_crisis, emotional_arc, etc. — into a `## Header`-delimited body, 10K–21K chars each), baked into the asset DB, and built the `WitchTrialsPeopleBrowserDialog` + `WitchTrialsBioDetailDialog` pair. Browser sorts by role bucket → tier → name, filter chips (All / Judges / Accusers / Accused / Clergy / Officials / Others) colour-coded per STATE.md (scarlet / gold / gray / purple / silver / slate); detail dialog renders gold `## ` subheadings, dates + age-in-1692, historical outcome, and Speak TTS. Root-caused and fixed the long-bio TTS error by adding `chunkForTts()` — splits on paragraph then sentence boundaries at a 3500-char cap; the 14K Stoughton bio now enqueues as 5 segments under the `witchtrials_bio_` tag prefix, and Stop still drains all chunks via `cancelSegmentsWithTag`.
-
-Full session detail: `docs/session-logs/session-131-2026-04-15.md`. Commit: `f312b5e`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 130 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 131 and earlier are in SESSION-LOG-ARCHIVE.md -->

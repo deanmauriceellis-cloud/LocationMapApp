@@ -2,31 +2,37 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 140 (Phase 9X Step 3 shipped; Oracle tiles imported, bundled, device-verified on Lenovo; **Phase 9X COMPLETE**)
+**Last updated:** 2026-04-17 — Session 141 (V1 offline-mode enforcement shipped; tuning pass; 7 commits)
 
 ---
 
-## TOP PRIORITY — Next Session (S141)
+## TOP PRIORITY — Next Session (S142)
 
-**Operator-pending — two items compete for the first S141 slot:**
+**Operator-pending — three items compete:**
 
-1. **37-item parking lot review** at `docs/parking-lot-S138-master-review.md` — 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2). Awaiting operator triage before any master-plan integration. Until this lands, the plan is in flux and choosing the next phase (9Q / 9R / 10) is premature.
-2. **OMEN-004 — first real Kotlin unit test** — deadline **2026-04-30** (now 13 days out). Deliberately slipped since S134 (6 sessions). Small scope, low risk, clears an OMEN directive.
+1. **Long-run device soak (8-12 h)** to confirm S141 tuning landed cleanly — especially GPS-OBS backoff producing ~15 W-lines vs S140's 1,208 over a stale window, and that narration autoplay still runs continuously through the no-network-at-all V1 posture.
+2. **UI toggle hiding** for online-only features (radar button, weather widget, transit tab, aircraft overlay, webcams, TFR download, online tile switcher). Correctness is already handled by the OkHttp backstop; these toggles currently no-op silently. Cosmetic polish that gets us closer to Play Store ready.
+3. **37-item parking lot review** at `docs/parking-lot-S138-master-review.md` — 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2). Still awaiting operator triage. Until this lands, choosing the next phase (9Q / 9R / 10) is premature.
+4. **OMEN-004 — first real Kotlin unit test** — deadline **2026-04-30 (13 days out)**. Slipped 7 sessions now. Small scope, low risk, clears an OMEN directive.
 
-**Default assumption if operator gives no direction:** start S141 by surfacing both and letting the operator pick. If pushed to proceed autonomously: OMEN-004 first (deadline-driven), then parking-lot review (open-ended).
+**Default if operator gives no direction:** start S142 by surfacing these and letting the operator pick. If pushed autonomous: UI hiding first (shipping-readiness), then long-soak verification, then OMEN-004, then parking lot.
 
-**Post-S140 key facts:**
-- **Phase 9X COMPLETE** — 14 actual sessions (S127-S140) vs 8 originally planned. All originally-planned deliverables plus 202 Oracle headlines, HTML/WebView newspaper renderer, PG-13 content rule, parking-lot triage.
-- **Salem Witch Trials panel fully populated and device-verified** on Lenovo TB305FU: 4×4 History grid with 16 fresh Oracle/gemma3 tiles, Oracle Newspaper (202 dispatches), People of Salem 1692 (49 bios), Historic Sites (117 POIs), Today-in-1692 card.
-- **V1 commercial posture locked** (S138): $19.99 flat paid, fully offline, no ads, no LLM, no tiers (all deferred to V2). IARC Teen (PG-13), Target Audience 13+, no Designed for Families, no 18+ click-through, Play Integrity + ProGuard/R8 as hardening.
-- **PG-13 standing content rule** in effect across all channels (narration, text, TTS / sox audio, SD prompts, portraits, external-generator briefs to Oracle / SalemIntelligence / Forge / ComfyUI / Bark / Piper). Rule memory: `feedback_pg13_content_rule.md`. S140 verified Oracle's 16 tiles comply.
+**Post-S141 key facts:**
+- **V1 offline-mode enforcement shipped** — `FeatureFlags.V1_OFFLINE_ONLY = true` (compile-time const in `:core`). Three-layer enforcement: ViewModel gates (early-return) → OkHttp `OfflineModeInterceptor` (hard backstop in all 13 client sites) → offline-only tile sources (empty URL so osmdroid downloader refuses). V2 resumes by flipping one boolean.
+- **Find feature fully offline** — `FindViewModel` rewritten from cache-proxy `FindRepository` to `SalemPoiDao` (Room). Proximity search, text search, category counts, website lookup all served from the bundled 1,837-POI `salem_content.db`. Public API preserved; `SalemMainActivityFind` unchanged. Session-level `hashCode → SalemPoi` cache for `fetchPoiWebsiteDirectly` with name+coord fallback.
+- **Walking directions offline** — `WalkingDirections.getRoute()` returns straight-line, `getMultiStopRoute()` returns multi-segment straight-line, `getBundledTourRoute(tourId)` loads the pre-computed OSRM polyline from `assets/tours/{tourId}.json` (already generated for all 5 tours by S125's `backfill-tour-routes.js`). `TourViewModel.getFullTourRoute` prefers the bundled polyline for the active tour. `WalkingRoute.road` is nullable.
+- **Log tuning shipped:** GPS-OBS stale-heartbeat backoff (30s → 5m → 15m by stale age; S140 showed 1,208 W-lines over 12h — projected to drop to ~15). `NarrationMgr.intentionallyStopping` flag distinguishes cancel vs real TTS error (spurious `E TTS ERROR` gone from cancel paths). `WALK_SIM_DWELL_MAX_MS` 60 → 180s and waives cap while TTS still actively speaking (Oracle tiles of 2-3 min no longer get cut off).
+- **Device-verified** on Lenovo HNY0CY0W: zero outbound-network W-lines at cold boot, `TileSourceManager: buildSource(SATELLITE) v1Offline=true`, tour restored at stop 2/10, 1,837 POIs loaded from Room, no crashes, no ANRs.
+- **Phase 9X COMPLETE** (from S140) — 14 actual sessions (S127-S140) vs 8 originally planned.
+- **V1 commercial posture locked** (S138): $19.99 flat paid, fully offline, no ads, no LLM, no tiers. IARC Teen (PG-13). S141 brought the code into full compliance with the offline-only half.
+- **PG-13 standing content rule** in effect. Rule memory: `feedback_pg13_content_rule.md`.
 - **Device-verify preference:** Lenovo TB305FU (HNY0CY0W) over any emulator. Memory: `feedback_lenovo_over_emulator.md`.
-- **NOTE-L018 proposed to OMEN** (PG-13 content rule) via out-of-cycle notification at S138. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
+- **NOTE-L018 (PG-13)** still pending OMEN acceptance + upstream relay.
 - **BCS dedup fully resolved** (from S136). **PG: 1,837 active POIs** (1,483 narrated).
-- **Walk-sim** at 1.4 m/s (realistic pace).
+- **Walk-sim dwell cap** now 180s (was 60s); waived while TTS speaking.
 - **Room `@Insert` silent-drop** from S129 still latent.
 - **OMEN-004** still deliberately slipped — deadline 2026-04-30, **13 days out**.
-- **NVMe advisory** (2026-04-16): boot drive has 110 data-integrity errors at 438 PoH, replacement expected 2026-04-17. Commit early and often, push after every commit. Hourly rsync + pg_dump backups running.
+- **NVMe advisory** (2026-04-16): all S141 commits pushed immediately after each meaningful unit of work per the advisory. 7 pushes across the session.
 
 **Salem 400+ launch deadline 2026-09-01 still tracks.** 4.5 months runway.
 
@@ -47,7 +53,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 140. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 141. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
