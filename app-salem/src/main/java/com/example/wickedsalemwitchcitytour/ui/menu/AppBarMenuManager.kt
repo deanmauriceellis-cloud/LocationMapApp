@@ -33,6 +33,7 @@ import com.example.locationmapapp.ui.menu.MenuEventListener
 import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.FeatureFlags
 import com.google.android.material.slider.Slider
 
 @Suppress("unused")
@@ -82,6 +83,14 @@ class AppBarMenuManager(
 
     fun onMenuInflated(menu: Menu) {
         DebugLogger.i(TAG, "onMenuInflated() — ${menu.size()} top-level items")
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            menu.findItem(R.id.menu_top_weather)?.isVisible = false
+            menu.findItem(R.id.menu_top_transit)?.isVisible = false
+            menu.findItem(R.id.menu_top_cams)?.isVisible = false
+            menu.findItem(R.id.menu_top_aircraft)?.isVisible = false
+            menu.findItem(R.id.menu_top_radar)?.isVisible = false
+            DebugLogger.i(TAG, "V1_OFFLINE_ONLY — hid weather/transit/cams/aircraft/radar top-bar items")
+        }
         toolbar.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Top-bar click: '${item.title}' id=0x${item.itemId.toString(16)}")
             when (item.itemId) {
@@ -135,7 +144,12 @@ class AppBarMenuManager(
         weatherIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
         alertsIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
 
-        weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            weatherIcon.visibility = View.GONE
+            DebugLogger.i(TAG, "V1_OFFLINE_ONLY — slim-toolbar weather icon hidden")
+        } else {
+            weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
+        }
         alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         gridButton.setOnClickListener { showGridDropdown(it) }
 
@@ -170,10 +184,16 @@ class AppBarMenuManager(
             icon.setOnClickListener { menuEventListener.onAboutRequested() }
         }
 
-        // Tile source picker icon — PopupMenu with Satellite/Street/Dark
+        // Tile source picker icon — PopupMenu with Satellite/Street/Dark.
+        // V1 hides the picker entirely; tile source is fixed to the default offline SATELLITE.
         tileSourceIcon?.let { icon ->
-            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
-            icon.setOnClickListener { showTileSourcePopup(icon) }
+            if (FeatureFlags.V1_OFFLINE_ONLY) {
+                icon.visibility = View.GONE
+                DebugLogger.i(TAG, "V1_OFFLINE_ONLY — slim-toolbar tile-source icon hidden")
+            } else {
+                icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+                icon.setOnClickListener { showTileSourcePopup(icon) }
+            }
         }
 
         DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, Home, TileSource, Alerts, Grid, About)")
@@ -228,14 +248,17 @@ class AppBarMenuManager(
     /** Count how many data layers are currently enabled. */
     fun computeActiveLayerCount(): Int {
         var count = 0
-        if (prefs.getBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, true)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_TRAINS, false)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_SUBWAY, false)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUSES, false)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_RADAR_ON, false)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_METAR_DISPLAY, false)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) count++
-        if (prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, false)) count++
+        if (!FeatureFlags.V1_OFFLINE_ONLY) {
+            // Online-only layers — skipped in V1 since their UI toggles are hidden.
+            if (prefs.getBoolean(MenuPrefs.PREF_AIRCRAFT_DISPLAY, true)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_TRAINS, false)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_SUBWAY, false)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_MBTA_BUSES, false)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_RADAR_ON, false)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_METAR_DISPLAY, false)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_WEBCAMS_ON, true)) count++
+            if (prefs.getBoolean(MenuPrefs.PREF_TFR_OVERLAY, false)) count++
+        }
         if (prefs.getBoolean(MenuPrefs.PREF_CAMERA_OVERLAY, false)) count++
         return count
     }
@@ -327,13 +350,18 @@ class AppBarMenuManager(
             GridBtn(R.drawable.ic_witch_trials, "Witch Trials") { popup.dismiss(); menuEventListener.onWitchTrialsRequested() }
         )
 
-        addGridButtons(row1, row1Btns)
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            // Row 1 (Transit/Webcams/Aircraft/Radar) is all online-only — hide the row.
+            row1.visibility = View.GONE
+        } else {
+            addGridButtons(row1, row1Btns)
+        }
         addGridButtons(row2, row2Btns)
         addGridButtons(row3, row3Btns)
         addGridButtons(row4, row4Btns)
 
         popup.showAsDropDown(anchor)
-        DebugLogger.i(TAG, "showGridDropdown() — 14 buttons shown")
+        DebugLogger.i(TAG, "showGridDropdown() shown (v1Offline=${FeatureFlags.V1_OFFLINE_ONLY})")
     }
 
     /** Density-independent pixel helper. */
@@ -344,6 +372,10 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showTransitMenu(anchor: View) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.i(TAG, "showTransitMenu suppressed — V1_OFFLINE_ONLY")
+            return
+        }
         val popup = buildPopup(anchor, R.menu.menu_transit)
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Transit: '${item.title}'")
@@ -417,6 +449,10 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showCamsMenu(anchor: View) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.i(TAG, "showCamsMenu suppressed — V1_OFFLINE_ONLY")
+            return
+        }
         val popup = buildPopup(anchor, R.menu.menu_cams)
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "CAMs: '${item.title}'")
@@ -486,6 +522,10 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showAircraftMenu(anchor: View) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.i(TAG, "showAircraftMenu suppressed — V1_OFFLINE_ONLY")
+            return
+        }
         val popup = buildPopup(anchor, R.menu.menu_aircraft)
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Aircraft: '${item.title}'")
@@ -529,6 +569,10 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showRadarMenu(anchor: View) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.i(TAG, "showRadarMenu suppressed — V1_OFFLINE_ONLY")
+            return
+        }
         val popup = buildPopup(anchor, R.menu.menu_radar)
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Radar: '${item.title}'")
@@ -746,6 +790,11 @@ class AppBarMenuManager(
 
     fun showAlertsMenu(anchor: View) {
         val popup = buildPopup(anchor, R.menu.menu_alerts)
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            // TFR data comes from a live aviation feed — remove the toggle in V1
+            // so the user doesn't see a switch that would never populate data.
+            popup.menu.removeItem(R.id.menu_tfr_overlay)
+        }
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Alerts: '${item.title}'")
             when (item.itemId) {
