@@ -222,6 +222,7 @@ class MainViewModel @Inject constructor(
 
     /** Load cached POIs within a bounding box from the proxy's poi-cache. */
     fun loadCachedPoisForBbox(south: Double, west: Double, north: Double, east: Double) {
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "loadCachedPoisForBbox() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { placesRepository.fetchCachedPoisInBbox(south, west, north, east) }
@@ -244,6 +245,7 @@ class MainViewModel @Inject constructor(
     /** Direct suspend call for populate scanner — returns result without LiveData.
      *  @param radiusOverride if non-null, overrides the radius hint (used for cap-retry) */
     suspend fun populateSearchAt(point: GeoPoint, categories: List<String> = emptyList(), radiusOverride: Int? = null): com.example.locationmapapp.data.model.PopulateSearchResult? {
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return null
         return try {
             placesRepository.searchPoisForPopulate(point, categories, radiusOverride)
         } catch (e: Exception) {
@@ -254,6 +256,7 @@ class MainViewModel @Inject constructor(
 
     /** Cancel all queued Overpass requests at the proxy. Call on follow/move/stop. */
     fun cancelPendingOverpass() {
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return
         viewModelScope.launch(Dispatchers.IO) {
             placesRepository.cancelPendingOverpass()
         }
