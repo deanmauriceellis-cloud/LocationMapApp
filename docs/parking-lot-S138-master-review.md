@@ -189,6 +189,7 @@
 - **Complexity:** **M** — read + consolidate existing docs into one `docs/LEGAL-WALKTHROUGH.md` with: app name options, URL options, TOS stub, hosted-URL requirement for Privacy Policy (NOTE-L017), Google commission (15%/30%), age gate decision tree, data-safety form prep, trademark/copyright status.
 - **Dependencies:** operator decides app name + URL; NOTE-L014 Privacy Policy is still "in OMEN's court."
 - **Rec:** **FOLD into Phase 11 Launch Readiness.** One session to write the walkthrough doc.
+- **S138 update:** Operator clarified this is a **PG-13 app** (IARC Teen / 13+ target audience). Legal walkthrough scope simplified — no adult-only framing needed. Bar POIs = non-promotional map data (no opinion content).
 
 ---
 
@@ -201,6 +202,7 @@
 - **Complexity:** **M** — most items in NOTE-L017 are operator setup (dev account, merchant profile, content rating). Claude-Code-side items: target SDK, AAB build, signing key, store listing assets, data-safety form. Age-gate-via-paid hypothesis needs research — Google's age-assurance applies to apps rated Teen+ regardless of paid status; paid apps still need content rating; "avoid age validation" may not hold.
 - **Dependencies:** NOTE-L017, NOTE-L014, #10.
 - **Rec:** **FOLD into Phase 11.** Verify the age-gate-via-paid assumption in the legal walkthrough (#10) first. Update `project_business_model.md` memory with the $19.99 pivot.
+- **S138 RESOLVED (operator clarification):** Content rating = **Teen (PG-13)**, Target Audience = **13+**. Google's Family Link handles age enforcement automatically per Teen content rating; no developer-side age gate needed. Bar POIs = non-promotional references. No adult-only EULA click-through. Data Safety form = all "none" (offline V1). Privacy Policy hosted publicly (already drafted). Play Integrity API folded into #35 hardening. No state-level age-law exposure (no adult content, no data collection).
 
 ---
 
