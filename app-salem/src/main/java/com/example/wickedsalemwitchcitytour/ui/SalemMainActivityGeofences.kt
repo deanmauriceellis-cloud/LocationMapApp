@@ -993,6 +993,7 @@ internal fun SalemMainActivity.showWebcamPreviewDialog(webcam: com.example.locat
                     val client = okhttp3.OkHttpClient.Builder()
                         .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                         .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .addInterceptor(com.example.locationmapapp.util.network.OfflineModeInterceptor())
                         .build()
                     val request = okhttp3.Request.Builder().url(webcam.previewUrl).build()
                     val response = client.newCall(request).execute()

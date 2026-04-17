@@ -14,6 +14,7 @@ import com.example.locationmapapp.data.model.AuthResponse
 import com.example.locationmapapp.data.model.AuthUser
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
+import com.example.locationmapapp.util.network.OfflineModeInterceptor
 import com.google.gson.JsonParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class AuthRepository @Inject constructor(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(OfflineModeInterceptor())
         .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 

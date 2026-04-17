@@ -13,6 +13,7 @@ import com.example.locationmapapp.data.model.CommentsResponse
 import com.example.locationmapapp.data.model.PoiComment
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
+import com.example.locationmapapp.util.network.OfflineModeInterceptor
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,6 +39,7 @@ class CommentRepository @Inject constructor(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(OfflineModeInterceptor())
         .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 

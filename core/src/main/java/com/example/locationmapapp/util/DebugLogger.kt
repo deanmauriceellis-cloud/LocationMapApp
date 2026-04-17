@@ -119,6 +119,7 @@ object DebugLogger {
         while (cur != null && depth < 5) {
             when (cur) {
                 is com.example.locationmapapp.util.network.CircuitOpenException,
+                is com.example.locationmapapp.util.network.OfflineModeException,
                 is ConnectException,
                 is SocketTimeoutException,
                 is UnknownHostException -> return true
