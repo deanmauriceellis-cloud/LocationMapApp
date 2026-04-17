@@ -2,28 +2,28 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 136 (BCS dedup finalization + device verification + newspaper dock mode)
+**Last updated:** 2026-04-16 — Session 137 (HTML/WebView "The Oracle" newspaper renderer + Oracle tile brief)
 
 ---
 
-## TOP PRIORITY — Next Session (S137)
+## TOP PRIORITY — Next Session (S138)
 
-**Build HTML/WebView "The Oracle" newspaper renderer (Step 2) + SI-generated 16-tile month content (Step 3).**
+**Wire Salem Oracle-generated 16-tile Newspaper Digests into `salem_witch_trials_articles` + device-verify the new HTML/WebView newspaper renderer.**
 
-Master plan section: Phase 9X (newspaper UI enhancement).
+Master plan section: Phase 9X close-out.
 
-S136 completed device verification (newspaper dispatches confirmed working during tour mode) and built the narration dock newspaper mode (Step 1). S137 picks up the HTML/WebView newspaper renderer to replace the native-TextView detail dialog, then SI-generated month tiles for the History panel.
+S137 shipped Step 2 (HTML/WebView newspaper renderer) and wrote `docs/oracle-tile-brief.md` — complete brief for Salem Oracle to generate all 16 History panel tiles (intro, 12 months of 1692, fallout, closing, epilogue) as Oracle Newspaper Digests. Oracle is already hot from the biography run. S138 imports the Oracle output, bakes into bundled asset DB, and verifies on device.
 
-**Post-S136 key facts:**
-- **BCS dedup fully resolved.** All 7 BCS-vs-BCS groups match SI verdicts. 93 orphans soft-deleted + 4 LMA-side dedup. **PG: 1,837 active POIs** (1,483 narrated).
-- **Walk-sim speed reverted** to 1.4 m/s (realistic pace, narration has time to play).
-- **Newspaper dispatches verified.** Fire during tour mode in Historical Mode (S132 gate fix confirmed). Room DB source working (202 articles, dateline+headline+body).
-- **Narration dock newspaper mode shipped.** "THE ORACLE" masthead + date on bottom sheet during newspaper playback. Tap opens detail dialog.
-- **Newspaper detail dialog needs upgrade.** Currently native TextViews with body-point bullets. Step 2: HTML/WebView with "The Oracle" branding, headline, cross-linked NPCs.
+**Post-S137 key facts:**
+- **Newspaper detail dialog is now WebView/HTML.** "The Oracle" masthead + dateline/phase row + ALL-CAPS headline + italic deck + flowing justified paragraphs with gold drop cap + dotted-underline NPC cross-links. NPC taps go through `shouldOverrideUrlLoading` → bio detail dialog. Build clean, device-verify pending.
+- **Oracle tile brief at `docs/oracle-tile-brief.md`** — ready for Oracle to generate.
+- **BCS dedup fully resolved** (from S136). **PG: 1,837 active POIs** (1,483 narrated).
+- **Walk-sim** at 1.4 m/s (realistic pace).
+- **Narration dock newspaper mode** working (S136).
 - **Room `@Insert` silent-drop** from S129 still latent.
 - **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
 
-**Phase 9X status:** Device verification COMPLETE. Newspaper UI enhancement in progress (Step 1 done, Steps 2-3 next). Salem 400+ launch deadline 2026-09-01 still tracks.
+**Phase 9X status:** Newspaper UI enhancement Steps 1 + 2 shipped. Step 3 (tile content) pending Oracle output. After S138, Phase 9X is COMPLETE. Salem 400+ launch deadline 2026-09-01 still tracks.
 
 ---
 
@@ -42,7 +42,7 @@ S136 completed device verification (newspaper dispatches confirmed working durin
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 136. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 137. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

@@ -1033,12 +1033,264 @@ private fun firstSentence(text: String): String {
     return if (match != null) trimmed.substring(0, match.range.last + 1) else trimmed
 }
 
-// ── Phase 9X.4 — Newspaper detail dialog (S130) ───────────────────────
+// ── Phase 9X.4 — Newspaper detail dialog (S130→S137 WebView rewrite) ──
+
+/** HTML-escape for safe embedding in WebView content. */
+private fun htmlEscape(text: String): String =
+    text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("\"", "&quot;").replace("'", "&#39;")
+
+/**
+ * Render text as HTML with NPC name auto-linking and explicit [[markup]].
+ * Returns HTML with `<a class="npc-link" href="npc://id">Name</a>` links.
+ */
+private fun renderHtmlWithLinks(
+    text: String,
+    bioIndex: Map<String, WitchTrialsNpcBio>,
+    nameIndex: List<Pair<String, WitchTrialsNpcBio>>
+): String {
+    data class HtmlLink(val start: Int, val end: Int, val href: String, val display: String)
+
+    // Phase 1: resolve explicit [[npc:id]] / [[newspaper:YYYY-MM-DD]] markup
+    val markupPattern = Regex("""\[\[(npc|newspaper|date|event):([^\]]+)\]\]""")
+    val links = mutableListOf<HtmlLink>()
+    val sb = StringBuilder()
+    var lastEnd = 0
+
+    for (match in markupPattern.findAll(text)) {
+        sb.append(text, lastEnd, match.range.first)
+        val kind = match.groupValues[1]
+        val value = match.groupValues[2]
+        val insertStart = sb.length
+        when (kind) {
+            "npc" -> {
+                val bio = bioIndex[value]
+                val displayName = bio?.let { it.displayName ?: it.name } ?: value
+                sb.append(displayName)
+                if (bio != null) links.add(HtmlLink(insertStart, sb.length, "npc://$value", displayName))
+            }
+            "newspaper", "date" -> {
+                sb.append(value)
+                links.add(HtmlLink(insertStart, sb.length, "newspaper://$value", value))
+            }
+            else -> sb.append(value)
+        }
+        lastEnd = match.range.last + 1
+    }
+    sb.append(text, lastEnd, text.length)
+    val cleaned = sb.toString()
+
+    // Phase 2: auto-detect NPC names (longest-first greedy, skip covered regions)
+    val covered = links.map { it.start until it.end }.toMutableList()
+    for ((name, bio) in nameIndex) {
+        var searchFrom = 0
+        while (searchFrom < cleaned.length) {
+            val idx = cleaned.indexOf(name, searchFrom, ignoreCase = false)
+            if (idx < 0) break
+            val end = idx + name.length
+            val validStart = idx == 0 || !cleaned[idx - 1].isLetter()
+            val validEnd = end >= cleaned.length || !cleaned[end].isLetter()
+            val overlapping = covered.any { r -> idx < r.last + 1 && end > r.first }
+            if (validStart && validEnd && !overlapping) {
+                links.add(HtmlLink(idx, end, "npc://${bio.id}", name))
+                covered.add(idx until end)
+            }
+            searchFrom = end
+        }
+    }
+
+    // Build HTML — walk through the cleaned text, escaping plain segments, inserting <a> tags
+    val sorted = links.sortedBy { it.start }
+    val html = StringBuilder()
+    var pos = 0
+    for (link in sorted) {
+        html.append(htmlEscape(cleaned.substring(pos, link.start)))
+        html.append("<a class=\"npc-link\" href=\"${link.href}\">${htmlEscape(link.display)}</a>")
+        pos = link.end
+    }
+    html.append(htmlEscape(cleaned.substring(pos)))
+    return html.toString()
+}
+
+/**
+ * Build the full "The Oracle" newspaper HTML page for a WebView.
+ * Colonial newspaper aesthetic with dark Salem palette.
+ */
+private fun buildNewspaperHtml(
+    paper: WitchTrialsNewspaper,
+    bioIndex: Map<String, WitchTrialsNpcBio>,
+    nameIndex: List<Pair<String, WitchTrialsNpcBio>>
+): String {
+    val phaseLabel = htmlEscape(CRISIS_PHASE_LABELS[paper.crisisPhase] ?: "Phase ${paper.crisisPhase}")
+    val headline = htmlEscape(paper.headline ?: fallbackHeadline(paper))
+    val dateline = htmlEscape(paper.longDate ?: paper.date)
+    val dayOfWeek = paper.dayOfWeek?.let { htmlEscape(it) } ?: ""
+    val deck = paper.headlineSummary?.takeIf { it.isNotBlank() }
+        ?: paper.summary?.takeIf { it.isNotBlank() }
+        ?: paper.lede?.takeIf { it.isNotBlank() }
+        ?: ""
+
+    // Body: use body_points as paragraphs (not bullets), fallback to ttsFullText
+    val bodyHtml = buildString {
+        val points = runCatching {
+            val arr = JSONArray(paper.bodyPoints)
+            (0 until arr.length()).map { arr.optString(it, "") }.filter { it.isNotBlank() }
+        }.getOrElse { emptyList() }
+
+        if (points.isNotEmpty()) {
+            for (pt in points) {
+                append("<p>")
+                append(renderHtmlWithLinks(pt, bioIndex, nameIndex))
+                append("</p>\n")
+            }
+        } else {
+            // Split ttsFullText into paragraphs on double newlines or single newlines
+            val paragraphs = paper.ttsFullText
+                .split(Regex("\n\n+|\n"))
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+            if (paragraphs.size > 1) {
+                for (p in paragraphs) {
+                    append("<p>")
+                    append(renderHtmlWithLinks(p, bioIndex, nameIndex))
+                    append("</p>\n")
+                }
+            } else {
+                // Single block — wrap in one paragraph
+                append("<p>")
+                append(renderHtmlWithLinks(paper.ttsFullText.trim(), bioIndex, nameIndex))
+                append("</p>\n")
+            }
+        }
+    }
+
+    val deckHtml = if (deck.isNotBlank()) "<div class=\"deck\">${htmlEscape(deck)}</div>" else ""
+
+    return """<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:linear-gradient(180deg,#1A0F2E 0%,#2D1B4E 100%);
+  color:#F5F0E8;
+  font-family:Georgia,'Times New Roman',serif;
+  padding:20px 22px 48px;
+  -webkit-text-size-adjust:none;
+}
+.masthead{
+  text-align:center;
+  padding:4px 0 10px;
+  border-bottom:3px double #C9A84C;
+}
+.masthead-title{
+  font-size:38px;
+  color:#C9A84C;
+  letter-spacing:8px;
+  font-variant:small-caps;
+  font-weight:bold;
+  line-height:1.1;
+}
+.masthead-sub{
+  font-size:10px;
+  color:#B8AFA0;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  margin-top:3px;
+}
+.info-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:11px;
+  color:#B8AFA0;
+  padding:8px 0;
+  border-bottom:1px solid #3A3A50;
+}
+.phase{
+  font-size:10px;
+  color:#C9A84C;
+  text-transform:uppercase;
+  letter-spacing:2px;
+  font-weight:bold;
+}
+.headline{
+  font-size:26px;
+  font-weight:bold;
+  color:#F5F0E8;
+  text-align:center;
+  margin:16px 0 8px;
+  line-height:1.2;
+  letter-spacing:0.5px;
+}
+.deck{
+  font-size:15px;
+  font-style:italic;
+  color:#D4C8A8;
+  text-align:center;
+  margin:0 0 14px;
+  line-height:1.5;
+}
+.rule{border:none;border-top:1px solid #3A3A50;margin:12px 0 16px}
+.body p{
+  font-size:16px;
+  line-height:1.7;
+  margin:0 0 14px;
+  text-align:justify;
+  text-indent:1.5em;
+}
+.body p:first-child{text-indent:0}
+.body p:first-child::first-letter{
+  font-size:3.2em;
+  float:left;
+  line-height:0.8;
+  padding:4px 8px 0 0;
+  color:#C9A84C;
+  font-weight:bold;
+}
+a.npc-link{
+  color:#C9A84C;
+  text-decoration:underline;
+  text-decoration-style:dotted;
+  text-underline-offset:2px;
+}
+.footer{
+  margin-top:24px;
+  padding-top:12px;
+  border-top:1px solid #3A3A50;
+  font-size:10px;
+  color:#6A6270;
+  text-align:center;
+  line-height:1.6;
+}
+</style>
+</head>
+<body>
+<div class="masthead">
+  <div class="masthead-title">The Oracle</div>
+  <div class="masthead-sub">Salem Village, Massachusetts</div>
+</div>
+<div class="info-row">
+  <span>$dateline${if (dayOfWeek.isNotEmpty()) " &middot; $dayOfWeek" else ""}</span>
+  <span class="phase">$phaseLabel</span>
+</div>
+<div class="headline">$headline</div>
+$deckHtml
+<hr class="rule">
+<div class="body">
+$bodyHtml</div>
+<div class="footer">
+  Events: ${paper.eventCount} &middot; Facts: ${paper.factCount} &middot; Primary Sources: ${paper.primarySourceCount}<br>
+  Source: Salem Corpus
+</div>
+</body></html>"""
+}
 
 @SuppressLint("SetTextI18n")
 internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: WitchTrialsNewspaper) {
     DebugLogger.i("WitchTrials", "showNewspaperDetail date=${paper.date} phase=${paper.crisisPhase}")
 
+    val activity = this
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -1050,6 +1302,7 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
 
     var speaking = false
 
+    // Close button
     val closeBtn = TextView(this).apply {
         text = "\u2715"; textSize = 22f
         setTextColor(Color.WHITE)
@@ -1059,76 +1312,52 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
     val topBar = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.END
-        setPadding(dp(8), dp(8), dp(8), 0)
+        setPadding(dp(8), dp(4), dp(8), 0)
         addView(closeBtn)
     }
 
-    val phaseLabel = CRISIS_PHASE_LABELS[paper.crisisPhase] ?: "Phase ${paper.crisisPhase}"
-    val phaseText = TextView(this).apply {
-        text = phaseLabel.uppercase()
-        textSize = 11f
-        setTextColor(Color.parseColor(SALEM_GOLD))
-        setTypeface(null, Typeface.BOLD)
-        letterSpacing = 0.15f
-        setPadding(dp(24), dp(4), dp(24), dp(2))
-    }
-
-    val dateText = TextView(this).apply {
-        text = paper.longDate ?: paper.date
-        textSize = 22f
-        setTextColor(Color.parseColor(SALEM_GOLD))
-        setTypeface(Typeface.SERIF, Typeface.BOLD)
-        setPadding(dp(24), dp(2), dp(24), dp(4))
-    }
-
-    val dowText = TextView(this).apply {
-        text = paper.dayOfWeek ?: ""
-        textSize = 13f
-        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-        setTypeface(null, Typeface.ITALIC)
-        setPadding(dp(24), 0, dp(24), dp(12))
-    }
-
-    val summaryText = TextView(this).apply {
-        text = paper.summary ?: paper.lede ?: ""
-        textSize = 14f
-        setTextColor(Color.parseColor(SALEM_TEXT))
-        setTypeface(null, Typeface.ITALIC)
-        setLineSpacing(dp(3).toFloat(), 1.15f)
-        setPadding(dp(24), 0, dp(24), dp(16))
-    }
-
-    // Body points list — parsed from JSON string
-    val bodyContainer = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(24), dp(4), dp(24), dp(24))
-    }
-    val points = runCatching {
-        val arr = JSONArray(paper.bodyPoints)
-        (0 until arr.length()).map { arr.optString(it, "") }.filter { it.isNotBlank() }
-    }.getOrElse { emptyList() }
-
-    if (points.isNotEmpty()) {
-        for (pt in points) {
-            val bullet = TextView(this).apply {
-                text = "•  $pt"
-                textSize = 15f
-                setTextColor(Color.parseColor(SALEM_TEXT))
-                setLineSpacing(dp(4).toFloat(), 1.2f)
-                setPadding(0, dp(4), 0, dp(10))
-            }
-            bodyContainer.addView(bullet)
+    // WebView for the newspaper content
+    val webView = android.webkit.WebView(this).apply {
+        setBackgroundColor(Color.parseColor("#1A0F2E"))
+        settings.apply {
+            javaScriptEnabled = false
+            builtInZoomControls = false
+            displayZoomControls = false
         }
-    } else {
-        // Fallback — show the full TTS text as a single flowing paragraph
-        bodyContainer.addView(TextView(this).apply {
-            text = paper.ttsFullText
-            textSize = 15f
-            setTextColor(Color.parseColor(SALEM_TEXT))
-            setLineSpacing(dp(4).toFloat(), 1.15f)
-        })
+        webViewClient = object : android.webkit.WebViewClient() {
+            @Deprecated("Deprecated in Java")
+            override fun shouldOverrideUrlLoading(view: android.webkit.WebView?, url: String?): Boolean {
+                url ?: return false
+                when {
+                    url.startsWith("npc://") -> {
+                        val npcId = url.removePrefix("npc://")
+                        DebugLogger.i("WitchTrials", "newspaper link tap: npc=$npcId")
+                        activity.lifecycleScope.launch {
+                            activity.witchTrialsViewModel.ensureLinkIndexes()
+                            val bio = activity.witchTrialsViewModel.bioIndex[npcId]
+                            if (bio != null) {
+                                val role = roleTypeOf(bio)
+                                activity.showWitchTrialsBioDetailDialog(bio, role)
+                            }
+                        }
+                        return true
+                    }
+                    url.startsWith("newspaper://") -> {
+                        val date = url.removePrefix("newspaper://")
+                        DebugLogger.i("WitchTrials", "newspaper link tap: newspaper=$date")
+                        activity.lifecycleScope.launch {
+                            val np = activity.witchTrialsViewModel.getNewspaperByDate(date)
+                            if (np != null) activity.showWitchTrialsNewspaperDetailDialog(np)
+                        }
+                        return true
+                    }
+                    else -> return false
+                }
+            }
+        }
     }
 
+    // Speak button bar (native, below the WebView)
     val speakBtn = TextView(this).apply {
         text = "\u25B6 Speak"
         textSize = 14f
@@ -1168,27 +1397,8 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
     val speakRow = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(dp(16), dp(4), dp(16), dp(16))
+        setPadding(dp(16), dp(8), dp(16), dp(12))
         addView(speakBtn)
-    }
-
-    val contentColumn = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        addView(topBar)
-        addView(phaseText)
-        addView(dateText)
-        addView(dowText)
-        addView(summaryText)
-        addView(speakRow)
-        addView(bodyContainer)
-    }
-
-    val scroll = ScrollView(this).apply {
-        addView(contentColumn)
-        layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        )
     }
 
     val root = LinearLayout(this).apply {
@@ -1198,7 +1408,11 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
             intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
         )
         background = bg
-        addView(scroll)
+        addView(topBar)
+        addView(webView, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        addView(speakRow)
     }
 
     dialog.setContentView(root)
@@ -1212,47 +1426,15 @@ internal fun SalemMainActivity.showWitchTrialsNewspaperDetailDialog(paper: Witch
         startSpeaking()
     }
 
-    // Cross-link NPC names in the newspaper body (S133)
+    // Load HTML content with NPC cross-links
     lifecycleScope.launch {
         witchTrialsViewModel.ensureLinkIndexes()
-        val vm = witchTrialsViewModel
-        bodyContainer.removeAllViews()
-        if (points.isNotEmpty()) {
-            for (pt in points) {
-                val linked = renderLinkedText(
-                    text = "•  $pt",
-                    bioIndex = vm.bioIndex,
-                    nameIndex = vm.nameIndex,
-                    excludeNpcId = null,
-                    onEntityTap = { link -> handleEntityLink(link) }
-                )
-                bodyContainer.addView(TextView(this@showWitchTrialsNewspaperDetailDialog).apply {
-                    text = linked
-                    textSize = 15f
-                    setTextColor(Color.parseColor(SALEM_TEXT))
-                    setLineSpacing(dp(4).toFloat(), 1.2f)
-                    setPadding(0, dp(4), 0, dp(10))
-                    movementMethod = LinkMovementMethod.getInstance()
-                    highlightColor = Color.TRANSPARENT
-                })
-            }
-        } else {
-            val linked = renderLinkedText(
-                text = paper.ttsFullText,
-                bioIndex = vm.bioIndex,
-                nameIndex = vm.nameIndex,
-                excludeNpcId = null,
-                onEntityTap = { link -> handleEntityLink(link) }
-            )
-            bodyContainer.addView(TextView(this@showWitchTrialsNewspaperDetailDialog).apply {
-                text = linked
-                textSize = 15f
-                setTextColor(Color.parseColor(SALEM_TEXT))
-                setLineSpacing(dp(4).toFloat(), 1.15f)
-                movementMethod = LinkMovementMethod.getInstance()
-                highlightColor = Color.TRANSPARENT
-            })
-        }
+        val html = buildNewspaperHtml(
+            paper,
+            witchTrialsViewModel.bioIndex,
+            witchTrialsViewModel.nameIndex
+        )
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 }
 
