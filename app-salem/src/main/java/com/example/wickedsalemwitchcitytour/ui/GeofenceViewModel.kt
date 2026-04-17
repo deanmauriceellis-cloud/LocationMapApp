@@ -24,6 +24,7 @@ import com.example.locationmapapp.data.repository.GeofenceRepository
 import com.example.locationmapapp.data.repository.TfrRepository
 import com.example.locationmapapp.util.GeofenceEngine
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.FeatureFlags
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -73,6 +74,7 @@ class GeofenceViewModel @Inject constructor(
     val geofenceEngine = GeofenceEngine()
 
     fun loadTfrs(south: Double, west: Double, north: Double, east: Double) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "loadTfrs() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { tfrRepository.fetchTfrs(south, west, north, east) }
@@ -88,6 +90,7 @@ class GeofenceViewModel @Inject constructor(
     }
 
     fun loadCameras(south: Double, west: Double, north: Double, east: Double) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "loadCameras() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { geofenceRepository.fetchCameras(south, west, north, east) }
@@ -97,6 +100,7 @@ class GeofenceViewModel @Inject constructor(
     }
 
     fun loadSchools(south: Double, west: Double, north: Double, east: Double) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "loadSchools() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { geofenceRepository.fetchSchools(south, west, north, east) }
@@ -106,6 +110,7 @@ class GeofenceViewModel @Inject constructor(
     }
 
     fun loadFloodZones(south: Double, west: Double, north: Double, east: Double) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "loadFloodZones() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { geofenceRepository.fetchFloodZones(south, west, north, east) }
@@ -115,6 +120,7 @@ class GeofenceViewModel @Inject constructor(
     }
 
     fun loadCrossings(south: Double, west: Double, north: Double, east: Double) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "loadCrossings() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { geofenceRepository.fetchCrossings(south, west, north, east) }
@@ -150,6 +156,7 @@ class GeofenceViewModel @Inject constructor(
     }
 
     suspend fun fetchTfrsDirectly(south: Double, west: Double, north: Double, east: Double): List<TfrZone> {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return emptyList()
         return try {
             tfrRepository.fetchTfrs(south, west, north, east)
         } catch (e: Exception) {
@@ -188,6 +195,12 @@ class GeofenceViewModel @Inject constructor(
     // ── Geofence Databases ───────────────────────────────────────────────────
 
     fun fetchGeofenceCatalog() {
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            // V1 still wants to show local-only databases if any are installed
+            val localOnly = geofenceDatabaseRepository.getLocalOnlyDatabaseInfos()
+            if (localOnly.isNotEmpty()) _geofenceCatalog.value = localOnly
+            return
+        }
         viewModelScope.launch {
             runCatching { geofenceDatabaseRepository.fetchCatalog() }
                 .onSuccess { catalog ->
@@ -239,6 +252,7 @@ class GeofenceViewModel @Inject constructor(
         geofenceDatabaseRepository.getDatabaseFile(id)
 
     fun downloadGeofenceDatabase(id: String) {
+        if (FeatureFlags.V1_OFFLINE_ONLY) return
         viewModelScope.launch {
             _databaseDownloadProgress.value = Pair(id, 0)
             val success = geofenceDatabaseRepository.downloadDatabase(id) { pct ->
