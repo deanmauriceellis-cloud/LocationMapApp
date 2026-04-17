@@ -2,21 +2,25 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 137 (HTML/WebView "The Oracle" newspaper renderer + Oracle tile brief)
+**Last updated:** 2026-04-16 — Session 138 (parking-lot triage + V1 commercial posture locked + PG-13 standing content rule; end-of-session paperwork landed retroactively at S139 open)
 
 ---
 
-## TOP PRIORITY — Next Session (S138)
+## TOP PRIORITY — Next Session (S139)
 
-**Wire Salem Oracle-generated 16-tile Newspaper Digests into `salem_witch_trials_articles` + device-verify the new HTML/WebView newspaper renderer.**
+**Resume the deferred S138 TOP PRIORITY: wire Salem Oracle-generated 16-tile Newspaper Digests into `salem_witch_trials_articles` + device-verify the new HTML/WebView newspaper renderer.**
 
 Master plan section: Phase 9X close-out.
 
-S137 shipped Step 2 (HTML/WebView newspaper renderer) and wrote `docs/oracle-tile-brief.md` — complete brief for Salem Oracle to generate all 16 History panel tiles (intro, 12 months of 1692, fallout, closing, epilogue) as Oracle Newspaper Digests. Oracle is already hot from the biography run. S138 imports the Oracle output, bakes into bundled asset DB, and verifies on device.
+S138 was pulled into operator-driven strategy work (37-item parking-lot triage, four business-model decisions via dialog, PG-13 standing content rule, out-of-cycle OMEN notification) and did NOT execute the planned tile-import / device-verify work. That work rolls to S139. Salem Oracle is generating under the PG-13-constrained `docs/oracle-tile-brief.md`; S139 starts by checking whether Oracle has finished, then importing + baking + device-verifying.
 
-**Post-S137 key facts:**
-- **Newspaper detail dialog is now WebView/HTML.** "The Oracle" masthead + dateline/phase row + ALL-CAPS headline + italic deck + flowing justified paragraphs with gold drop cap + dotted-underline NPC cross-links. NPC taps go through `shouldOverrideUrlLoading` → bio detail dialog. Build clean, device-verify pending.
-- **Oracle tile brief at `docs/oracle-tile-brief.md`** — ready for Oracle to generate.
+**Post-S138 key facts:**
+- **V1 commercial posture locked:** $19.99 flat paid app, fully offline, no ads, no LLM, no tiers (all deferred to V2). IARC Teen (PG-13), Target Audience 13+, no Designed for Families, no 18+ click-through, Play Integrity + ProGuard/R8 as hardening.
+- **PG-13 standing content rule** in effect across all channels (narration, text, TTS / sox audio, SD prompts, portraits, external-generator briefs to Oracle / SalemIntelligence / Forge / ComfyUI / Bark / Piper). Rule memory: `feedback_pg13_content_rule.md`. Oracle tile brief already carries the constraint.
+- **37-item parking lot** triaged at `docs/parking-lot-S138-master-review.md` — awaiting operator review before any master-plan integration. 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2).
+- **NOTE-L018 proposed to OMEN** (PG-13 content rule) via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
+- **Newspaper detail dialog is WebView/HTML** (S137). Build clean, device-verify still pending.
+- **Oracle tile brief at `docs/oracle-tile-brief.md`** — ready for Oracle, now PG-13-constrained.
 - **BCS dedup fully resolved** (from S136). **PG: 1,837 active POIs** (1,483 narrated).
 - **Walk-sim** at 1.4 m/s (realistic pace).
 - **Narration dock newspaper mode** working (S136).
@@ -42,7 +46,7 @@ S137 shipped Step 2 (HTML/WebView newspaper renderer) and wrote `docs/oracle-til
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 137. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 138. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
