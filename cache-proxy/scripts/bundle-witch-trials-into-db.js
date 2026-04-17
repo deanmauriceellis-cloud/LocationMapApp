@@ -51,6 +51,11 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   const db = new Database(DB);
   db.pragma('journal_mode = DELETE');
+  // Full-set replace: clear existing rows so id-convention changes don't
+  // leave orphans (e.g. S140 migration from S128 snake_case ids to the
+  // Oracle-native intro_pre_1692 / month_1692_NN convention).
+  const preBundle = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_articles').get().c;
+  db.exec('DELETE FROM salem_witch_trials_articles');
   const insert = db.prepare(`
     INSERT OR REPLACE INTO salem_witch_trials_articles
       (id, tile_order, tile_kind, title, period_label, teaser, body,
@@ -82,6 +87,6 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const count = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_articles').get().c;
   db.exec('VACUUM');
   db.close();
-  console.log(`Bundled ${rows.length} articles into ${DB}. Post-insert COUNT=${count}.`);
+  console.log(`Cleared ${preBundle} pre-existing rows. Bundled ${rows.length} articles into ${DB}. Post-insert COUNT=${count}.`);
   await pool.end();
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
