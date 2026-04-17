@@ -582,9 +582,11 @@
 - [ ] Priority order — of the "fast wins," which first after Oracle tiles land?
 - [ ] V2 items — #31 (chatbot) accepted as post-launch?
 - [ ] OMEN batch — OK to bundle #5, #8, #16, #22, #23, #24, #33 into the S138 OMEN report?
-- [ ] $19.99 pricing — update `project_business_model.md` memory from tiered to $19.99 flat?
-- [ ] Personal context — save operator's Beverly / William Woodbury house 1676 residency as user memory?
+- [x] **$19.99 pricing — RESOLVED (S138 dialog):** Replace tiered model with $19.99 flat. V1 is single paid SKU, offline-only, no ads, no LLM. `project_business_model.md` memory rewritten.
+- [x] **Personal context — RESOLVED (S138 dialog):** William Woodbury house / Beverly / Old Planters residency saved as PRIVATE user memory (`user_personal_context_beverly.md`). Never surfaced in public artifacts.
+- [x] **GPS FAB (#34) — RESOLVED which one:** Bottom-left GPS / journey FAB. Still needs code audit next session to confirm handler scope matches code-comment claim.
+- [x] **Age-gate theory (#11) — RESOLVED via operator reframe:** V1 goes fully offline, no network, user can delete all on-device data. Claude response: offline-only solves data/privacy concerns but NOT IARC content-rating-driven age-assurance. Salem trials content probably rates Teen, which triggers age gate regardless of paid/offline. Legal walkthrough (#10) to confirm under Google's current Developer Program Policies.
 
 ---
 
-**Next action:** awaiting operator review. No code changes this session unless explicitly directed.
+**Next action:** awaiting operator review of remaining open items above. No code changes this session unless explicitly directed.
