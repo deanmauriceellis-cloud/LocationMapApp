@@ -1343,9 +1343,12 @@ class SalemMainActivity : AppCompatActivity() {
      * Rationale: 30-60 s narrations at each of ~20 POIs along the trail
      * would otherwise freeze the walker for 10-20 min of static time.
      * A realistic tourist looks at a POI briefly then walks on while
-     * listening. 60 s is the upper bound — most narrations end earlier.
+     * listening. 180 s is the upper bound — S137 Oracle tiles run 2-3 min,
+     * so 60s (the S125 value) was cutting real narration short. The dwell
+     * loop below waives the cap while TTS is actively speaking, so in
+     * practice the cap only fires if narration legitimately stalls.
      */
-    private val WALK_SIM_DWELL_MAX_MS: Long = 60_000L
+    private val WALK_SIM_DWELL_MAX_MS: Long = 180_000L
 
     /**
      * Legacy constant retained for compatibility with the `hold=…s` log
@@ -1810,9 +1813,21 @@ class SalemMainActivity : AppCompatActivity() {
                             if (walkSimJob?.isCancelled == true) break
                             val elapsed = System.currentTimeMillis() - dwellStart
                             if (elapsed >= WALK_SIM_DWELL_MAX_MS) {
-                                DebugLogger.w("WALK-SIM",
-                                    "DWELL CAP hit (${WALK_SIM_DWELL_MAX_MS / 1000}s) — resuming walk")
-                                break
+                                // S141: waive the cap while TTS is still
+                                // actively speaking. Oracle tiles can run
+                                // 2-3 min; cutting them off produces a
+                                // jarring mid-sentence resume. Only break
+                                // on the cap if narration has genuinely
+                                // stalled (idle or the segment ended).
+                                val state = tourViewModel.narrationState.value
+                                val stillSpeaking = state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking
+                                if (!stillSpeaking) {
+                                    DebugLogger.w("WALK-SIM",
+                                        "DWELL CAP hit (${WALK_SIM_DWELL_MAX_MS / 1000}s, narration idle) — resuming walk")
+                                    break
+                                }
+                                // Otherwise log once and let the inner
+                                // ttsIdle/queueEmpty exit handle it naturally.
                             }
                             viewModel.setManualLocation(point)
                             // Only start checking TTS state after minHoldMs
@@ -2608,9 +2623,10 @@ class SalemMainActivity : AppCompatActivity() {
         //   the difference between "GPS is fine, heartbeat ticking silently" and "heartbeat
         //   coroutine crashed".
         lifecycleScope.launch {
-            DebugLogger.i("GPS-OBS", "HEARTBEAT START — tick=10s, stale-threshold=${GPS_STALE_THRESHOLD_MS / 1000}s, ok-log=60s")
+            DebugLogger.i("GPS-OBS", "HEARTBEAT START — tick=10s, stale-threshold=${GPS_STALE_THRESHOLD_MS / 1000}s, ok-log=60s, stale-backoff=5m→5m cadence, 30m→15m cadence")
             var lastOkLogAt = 0L
             var lastStaleLogAt = 0L
+            var staleSinceMs = 0L
             var wasStale = false
             while (true) {
                 kotlinx.coroutines.delay(10_000L)
@@ -2631,18 +2647,31 @@ class SalemMainActivity : AppCompatActivity() {
                         DebugLogger.w("GPS-OBS",
                             "HEARTBEAT STALE (transition) — last fix ${ageMs / 1000}s ago, narration reach-out suppressed")
                         wasStale = true
+                        staleSinceMs = now
                         lastStaleLogAt = now
                     }
                     // Transition: stale → healthy
                     !isStale && wasStale -> {
                         DebugLogger.i("GPS-OBS",
-                            "HEARTBEAT recovered — fresh fix after ${ageMs}ms")
+                            "HEARTBEAT recovered — fresh fix after ${ageMs}ms (was stale ${(now - staleSinceMs) / 1000}s)")
                         wasStale = false
+                        staleSinceMs = 0L
                         lastOkLogAt = now
                     }
-                    // Steady-state stale: throttled to once per 30s
+                    // Steady-state stale: backoff cadence so a phone sitting
+                    // indoors for hours doesn't spam 1,200+ W-lines. First 5
+                    // minutes → 30s cadence (responsive while the user is
+                    // actively walking). 5-30 minutes → 5m cadence. After 30
+                    // minutes → 15m cadence. This keeps the heartbeat visible
+                    // for post-mortem without burying real signal.
                     isStale -> {
-                        if (now - lastStaleLogAt >= 30_000L) {
+                        val staleForMs = now - staleSinceMs
+                        val cadenceMs = when {
+                            staleForMs >= 30 * 60_000L -> 15 * 60_000L
+                            staleForMs >= 5 * 60_000L  -> 5 * 60_000L
+                            else                        -> 30_000L
+                        }
+                        if (now - lastStaleLogAt >= cadenceMs) {
                             DebugLogger.w("GPS-OBS",
                                 "HEARTBEAT still-stale — last fix ${ageMs / 1000}s ago")
                             lastStaleLogAt = now

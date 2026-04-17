@@ -10,6 +10,7 @@
 package com.example.wickedsalemwitchcitytour.ui
 
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.FeatureFlags
 import org.osmdroid.tileprovider.tilesource.ITileSource
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -41,8 +42,17 @@ object TileSourceManager {
     /** Default tile source for the app. */
     const val DEFAULT_SOURCE = Id.SATELLITE
 
-    /** All available tile source IDs in display order. */
-    val ALL_IDS = listOf(Id.SATELLITE, Id.STREET, Id.DARK)
+    /**
+     * All available tile source IDs in display order.
+     *
+     * V1 offline posture: DARK (CartoDB Dark Matter) is online-only — the
+     * bundled `salem_tiles.sqlite` archive holds only `Esri-WorldImagery`
+     * and `Mapnik` tiles, so DARK would fail silently. V2 can re-add DARK
+     * once online fetching resumes.
+     */
+    val ALL_IDS: List<String> =
+        if (FeatureFlags.V1_OFFLINE_ONLY) listOf(Id.SATELLITE, Id.STREET)
+        else listOf(Id.SATELLITE, Id.STREET, Id.DARK)
 
     /** Human-readable labels for PopupMenu display. */
     fun label(id: String): String = when (id) {
@@ -54,7 +64,22 @@ object TileSourceManager {
 
     /** Build an osmdroid ITileSource for the given ID. */
     fun buildSource(id: String): ITileSource {
-        DebugLogger.i(TAG, "buildSource($id)")
+        DebugLogger.i(TAG, "buildSource($id) v1Offline=${FeatureFlags.V1_OFFLINE_ONLY}")
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            // Serve exclusively from the bundled salem_tiles.sqlite archive —
+            // no network fetch attempts. The source name must match the
+            // archive's `provider` column so osmdroid's file archive provider
+            // can find the row.
+            return when (id) {
+                Id.SATELLITE -> buildOfflineArchiveSource("Esri-WorldImagery", 0, USGS_MAX_ZOOM)
+                Id.STREET -> buildOfflineArchiveSource("Mapnik", 0, 19)
+                Id.DARK -> buildOfflineArchiveSource("Esri-WorldImagery", 0, USGS_MAX_ZOOM) // V2-only; fall back to satellite
+                else -> {
+                    DebugLogger.w(TAG, "Unknown tile source ID '$id', falling back to SATELLITE (offline)")
+                    buildOfflineArchiveSource("Esri-WorldImagery", 0, USGS_MAX_ZOOM)
+                }
+            }
+        }
         return when (id) {
             Id.SATELLITE -> buildUsgsSource()
             Id.STREET -> TileSourceFactory.MAPNIK
@@ -63,6 +88,26 @@ object TileSourceManager {
                 DebugLogger.w(TAG, "Unknown tile source ID '$id', falling back to SATELLITE")
                 buildUsgsSource()
             }
+        }
+    }
+
+    /**
+     * Offline-only tile source: returns an empty URL so osmdroid's network
+     * downloader refuses to fetch anything. Tiles resolve through the file
+     * archive provider (reading `salem_tiles.sqlite`) only. The source name
+     * must match the archive's `provider` column.
+     */
+    private fun buildOfflineArchiveSource(
+        providerName: String,
+        minZoom: Int,
+        maxZoom: Int
+    ): OnlineTileSourceBase {
+        return object : OnlineTileSourceBase(
+            providerName,
+            minZoom, maxZoom, 256, "",
+            arrayOf("")
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String = ""
         }
     }
 

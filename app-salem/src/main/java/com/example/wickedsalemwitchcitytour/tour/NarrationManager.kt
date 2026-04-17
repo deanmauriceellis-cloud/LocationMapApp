@@ -71,6 +71,15 @@ class NarrationManager @Inject constructor(
     /** Currently speaking segment. */
     private var currentSegment: NarrationSegment? = null
 
+    /**
+     * S141: set to true immediately before any intentional `tts.stop()` call
+     * (cancel, pause, skip, shutdown). Android TTS fires `onError` on the
+     * aborted utterance; without this flag the error handler can't tell
+     * "we aborted it" from "TTS actually failed" and every cancel logged at
+     * E-level. Set-and-reset inside the one thread owning the TTS listener.
+     */
+    @Volatile private var intentionallyStopping: Boolean = false
+
     private val _state = MutableStateFlow<NarrationState>(NarrationState.Idle)
     val state: StateFlow<NarrationState> = _state.asStateFlow()
 
@@ -102,7 +111,12 @@ class NarrationManager @Inject constructor(
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
-                    DebugLogger.e(TAG, "TTS ERROR: $utteranceId (queue remaining: ${queue.size})")
+                    if (intentionallyStopping) {
+                        DebugLogger.i(TAG, "TTS cancelled: $utteranceId (queue remaining: ${queue.size})")
+                        intentionallyStopping = false
+                    } else {
+                        DebugLogger.e(TAG, "TTS ERROR: $utteranceId (queue remaining: ${queue.size})")
+                    }
                     currentSegment = null
                     playNext()
                 }
@@ -222,6 +236,7 @@ class NarrationManager @Inject constructor(
 
         val current = currentSegment
         if (current != null && current.id.startsWith(tag)) {
+            intentionallyStopping = true
             tts?.stop()
             currentSegment = null
             DebugLogger.i(TAG, "cancelSegmentsWithTag($tag): killed current + removed $removedQueued queued")
@@ -235,6 +250,7 @@ class NarrationManager @Inject constructor(
 
     fun pause() {
         if (_state.value is NarrationState.Speaking) {
+            intentionallyStopping = true
             tts?.stop()
             _state.value = NarrationState.Paused(currentSegment)
             DebugLogger.i(TAG, "Paused")
@@ -254,6 +270,7 @@ class NarrationManager @Inject constructor(
     }
 
     fun stop() {
+        intentionallyStopping = true
         tts?.stop()
         queue.clear()
         currentSegment = null
@@ -263,6 +280,7 @@ class NarrationManager @Inject constructor(
 
     /** Skip the current segment and play the next one. */
     fun skip() {
+        intentionallyStopping = true
         tts?.stop()
         currentSegment = null
         DebugLogger.i(TAG, "Skipped current segment")
