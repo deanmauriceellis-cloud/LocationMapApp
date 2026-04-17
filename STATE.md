@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 142 (V1 UI hide for 7 online-only features; device-verified; 1 commit)
+**Last updated:** 2026-04-17 — Session 142 (V1 UI hide + full rebrand to `com.destructiveaigurus.katrinasmysticvisitorsguide` / "Katrina's Mystic Visitors Guide - Salem"; device-verified; 3 commits)
 
 ---
 
@@ -19,6 +19,7 @@
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 
 **Post-S142 key facts:**
+- **Rebrand to Play-Store-ready identity** — `applicationId` `com.example.wickedsalemwitchcitytour` → **`com.destructiveaigurus.katrinasmysticvisitorsguide`** (frozen, immutable once shipped; clears Play Store's block on `com.example.*`). Display label "Wicked Salem" → **"Katrina's Mystic Visitors Guide - Salem"**. Internal code namespace, class names (`WickedSalemApp`), themes (`Theme.WickedSalem*`), module (`:app-salem`), and docs intentionally unchanged per operator direction. `FileProvider` authority parameterized to `${applicationId}.fileprovider` (manifest) / `$packageName.fileprovider` (Kotlin caller) so it auto-syncs. Device-verified on Lenovo HNY0CY0W: old package uninstalled, new installed, launcher resolves, `aapt2 dump badging` confirms label, no crashes, V1 offline enforcement intact, 1,837 POIs loaded.
 - **V1 UI hide complete** — seven online-only entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) gated behind `FeatureFlags.V1_OFFLINE_ONLY` in `app-salem/.../ui/menu/AppBarMenuManager.kt`. Combined with S141's data-layer enforcement, V1 now has **three-layer offline coverage**: OkHttp interceptor (hard backstop) + ViewModel gates (clean logs) + UI hide (no visible surface). Flipping one boolean in `FeatureFlags.kt` reverses all of it for V2.
 - **Device-verified on Lenovo HNY0CY0W**: weather + tile-source icons absent from uiautomator dump; grid dropdown row 1 (Transit/Webcams/Aircraft/Radar) gone, leaving 11 cells across 3 rows; TFR item absent from alerts popup; no crashes, no ANRs during splash → map → grid → alerts cycle.
 - **Legacy finding**: `menu_main_toolbar.xml` top-bar menu (`menu_top_weather / transit / cams / aircraft / radar`) is **dead code** in the current build — `onMenuInflated()` is defined on AppBarMenuManager but no activity calls it. The real top-bar is the slim toolbar. The hide gates in `onMenuInflated` are defensive for future re-wiring.
