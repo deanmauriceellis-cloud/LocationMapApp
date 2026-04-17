@@ -2,32 +2,33 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-16 — Session 139 (retroactive close-out of S138 paperwork; no code work; Phase 9X Step 3 now rolls to S140)
+**Last updated:** 2026-04-17 — Session 140 (Phase 9X Step 3 shipped; Oracle tiles imported, bundled, device-verified on Lenovo; **Phase 9X COMPLETE**)
 
 ---
 
-## TOP PRIORITY — Next Session (S140)
+## TOP PRIORITY — Next Session (S141)
 
-**Resume the twice-deferred Phase 9X Step 3: wire Salem Oracle-generated 16-tile Newspaper Digests into `salem_witch_trials_articles` + device-verify the new HTML/WebView newspaper renderer.**
+**Operator-pending — two items compete for the first S141 slot:**
 
-Master plan section: Phase 9X close-out.
+1. **37-item parking lot review** at `docs/parking-lot-S138-master-review.md` — 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2). Awaiting operator triage before any master-plan integration. Until this lands, the plan is in flux and choosing the next phase (9Q / 9R / 10) is premature.
+2. **OMEN-004 — first real Kotlin unit test** — deadline **2026-04-30** (now 13 days out). Deliberately slipped since S134 (6 sessions). Small scope, low risk, clears an OMEN directive.
 
-S138 was pulled into operator-driven strategy work (parking-lot triage, business-model decisions, PG-13 standing content rule, out-of-cycle OMEN notification). S139 was entirely the retroactive close-out of S138's missed paperwork (single commit `675cc58`; no code work). The planned tile-import / device-verify work rolls to S140. Salem Oracle is generating under the PG-13-constrained `docs/oracle-tile-brief.md`; S140 starts by checking whether Oracle has finished, then importing + baking + device-verifying.
+**Default assumption if operator gives no direction:** start S141 by surfacing both and letting the operator pick. If pushed to proceed autonomously: OMEN-004 first (deadline-driven), then parking-lot review (open-ended).
 
-**Post-S138 key facts:**
-- **V1 commercial posture locked:** $19.99 flat paid app, fully offline, no ads, no LLM, no tiers (all deferred to V2). IARC Teen (PG-13), Target Audience 13+, no Designed for Families, no 18+ click-through, Play Integrity + ProGuard/R8 as hardening.
-- **PG-13 standing content rule** in effect across all channels (narration, text, TTS / sox audio, SD prompts, portraits, external-generator briefs to Oracle / SalemIntelligence / Forge / ComfyUI / Bark / Piper). Rule memory: `feedback_pg13_content_rule.md`. Oracle tile brief already carries the constraint.
-- **37-item parking lot** triaged at `docs/parking-lot-S138-master-review.md` — awaiting operator review before any master-plan integration. 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2).
-- **NOTE-L018 proposed to OMEN** (PG-13 content rule) via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
-- **Newspaper detail dialog is WebView/HTML** (S137). Build clean, device-verify still pending.
-- **Oracle tile brief at `docs/oracle-tile-brief.md`** — ready for Oracle, now PG-13-constrained.
+**Post-S140 key facts:**
+- **Phase 9X COMPLETE** — 14 actual sessions (S127-S140) vs 8 originally planned. All originally-planned deliverables plus 202 Oracle headlines, HTML/WebView newspaper renderer, PG-13 content rule, parking-lot triage.
+- **Salem Witch Trials panel fully populated and device-verified** on Lenovo TB305FU: 4×4 History grid with 16 fresh Oracle/gemma3 tiles, Oracle Newspaper (202 dispatches), People of Salem 1692 (49 bios), Historic Sites (117 POIs), Today-in-1692 card.
+- **V1 commercial posture locked** (S138): $19.99 flat paid, fully offline, no ads, no LLM, no tiers (all deferred to V2). IARC Teen (PG-13), Target Audience 13+, no Designed for Families, no 18+ click-through, Play Integrity + ProGuard/R8 as hardening.
+- **PG-13 standing content rule** in effect across all channels (narration, text, TTS / sox audio, SD prompts, portraits, external-generator briefs to Oracle / SalemIntelligence / Forge / ComfyUI / Bark / Piper). Rule memory: `feedback_pg13_content_rule.md`. S140 verified Oracle's 16 tiles comply.
+- **Device-verify preference:** Lenovo TB305FU (HNY0CY0W) over any emulator. Memory: `feedback_lenovo_over_emulator.md`.
+- **NOTE-L018 proposed to OMEN** (PG-13 content rule) via out-of-cycle notification at S138. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
 - **BCS dedup fully resolved** (from S136). **PG: 1,837 active POIs** (1,483 narrated).
 - **Walk-sim** at 1.4 m/s (realistic pace).
-- **Narration dock newspaper mode** working (S136).
 - **Room `@Insert` silent-drop** from S129 still latent.
-- **OMEN-004 still deliberately slipped** (deadline 2026-04-30, 14 days out).
+- **OMEN-004** still deliberately slipped — deadline 2026-04-30, **13 days out**.
+- **NVMe advisory** (2026-04-16): boot drive has 110 data-integrity errors at 438 PoH, replacement expected 2026-04-17. Commit early and often, push after every commit. Hourly rsync + pg_dump backups running.
 
-**Phase 9X status:** Newspaper UI enhancement Steps 1 + 2 shipped. Step 3 (tile content) pending Oracle output. After S138, Phase 9X is COMPLETE. Salem 400+ launch deadline 2026-09-01 still tracks.
+**Salem 400+ launch deadline 2026-09-01 still tracks.** 4.5 months runway.
 
 ---
 
@@ -39,14 +40,14 @@ S138 was pulled into operator-driven strategy work (parking-lot triage, business
 | **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
 | **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
 | **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
-| **9X** Salem Witch Trials Feature | **IN PROGRESS — 7/8 sessions done (S127-S133)** | **TOP PRIORITY (S134 = final).** S127 foundation. S128 history-article LLM gen. S129 History 4×4 tile UI. S130 Oracle Newspaper panel. S131 People panel + TTS chunker. S132 pencil-sketch portraits + bug fixes. S133 cross-linking (1,110+ NPC name auto-links) + Today-in-1692 card + admin integration. S134 = polish + audio + field test. |
+| **9X** Salem Witch Trials Feature | **COMPLETE (S127-S140, 14 sessions)** | S127 foundation. S128 history-article LLM gen. S129 History 4×4 tile UI. S130 Oracle Newspaper panel + 202 AI headlines. S131 People panel + TTS chunker. S132 pencil-sketch portraits + bug fixes. S133 cross-linking (1,110+ NPC name auto-links) + Today-in-1692 card + admin integration. S134 Historic Sites feature + category reclass. S135-S136 BCS dedup + newspaper dock mode. S137 HTML/WebView newspaper renderer + Oracle tile brief. S138 V1 posture locked + PG-13 standing rule + parking lot. S139 retroactive paperwork. S140 Oracle tile import + bundled Room bake + Lenovo device-verify. |
 | **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
 | **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
 | **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 139. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 140. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -70,11 +71,13 @@ S138 was pulled into operator-driven strategy work (parking-lot triage, business
 ## OMEN Open Items
 
 1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court.
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 12 sessions running. Needs OMEN to execute or retract.
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 13 sessions running. Needs OMEN to execute or retract.
 3. **OMEN-002 history rotation** — operator action only.
-4. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, 18 days out).
+4. **OMEN-004 — first real Kotlin unit test** (Phase 1 deadline 2026-04-30, **13 days out**).
 5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
 6. **Cross-project: SalemIntelligence** — Phase 1 KB live. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2.
+7. **NOTE-L018 — PG-13 standing content rule** proposed to OMEN at S138 via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
+8. **NVMe advisory (2026-04-16)** — compliant. S140 committed after each meaningful unit and pushed immediately.
 7. ~~**Cross-project: stale intel_entity_id UUIDs in salem_pois**~~ — **CLOSED S125 2026-04-14 (commit `870733b`).** Self-resolved on LMA's side via `cache-proxy/scripts/dedup-stale-intel-links.js`. Pulled SI's `/api/intel/poi-export` (1597 canonical entities), probed every LMA linkage, fuzzy-matched stale UUIDs by name + coord + `/context` validity, then re-linked survivors and soft-deleted the rest. Outcome: 12 canonicals re-linked (chezcasa, lafayette_hotel, rockafellas_restaurant, the_village + 8 others), 211 soft-deleted with `data_source LIKE '%dedup-stale-uuid-2026-04-14-loser%'` (pending pre-Play-Store hard-delete), 0 stale linkages remaining. Bonus: fixed a `generate-narration-from-intel.js` bug that was aborting on GET 404 instead of falling through to POST `/generate` — any future rerun now correctly synthesizes narrations for SI-known-but-uncached entities. No OMEN action required.
 
 ---
