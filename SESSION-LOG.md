@@ -8,7 +8,7 @@
 
 Pivoted #44 splash voiceover from cat sounds to runtime Android TTS (welcome line "Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App") — new process-scoped `SplashVoice` warms up the TTS engine in `WickedSalemApp.onCreate`, SplashActivity holds the visual splash until `UtteranceProgressListener.onDone` fires (15 s safety cap). Fixed AutoZone narrating at cold-start by gating `enqueueNarration` on the existing S145 `AudioControl` group system and flipping the Businesses toggle default to OFF. Pulled 18 corrected coordinates from SalemIntelligence (all 10 phantom-Samantha POIs relocated to their real positions; Starbird Dispensary moved 1.8 km, AutoZone 2.2 km) via new `sync-coords-from-intel.js`, then soft-deleted 7 Samantha-cluster junk duplicates. Added a "Use Real GPS Outside Salem" toggle to the Journey menu so operator can follow real GPS during drives from Beverly → Salem; setter re-emits `_currentLocation` via `requestLastKnownLocation()` for instant map refresh. Session closed with operator heading out on a field test — S150 will debug the tour log.
 
-Full session detail: `docs/session-logs/session-149-2026-04-18.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-149-2026-04-18.md`. Commit: `dff701a`.
 
 ---
 
