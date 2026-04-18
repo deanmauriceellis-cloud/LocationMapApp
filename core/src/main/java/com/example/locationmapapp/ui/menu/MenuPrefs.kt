@@ -77,6 +77,10 @@ object MenuPrefs {
     const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
     const val PREF_POPULATE_POIS         = "populate_pois_on"
     const val PREF_SILENT_FILL_DEBUG     = "silent_fill_debug_on"
+    /** S149: when true, disable the out-of-Salem-bbox clamp so the app uses real GPS
+     *  positions regardless of whether the fix lands inside the Salem bounding box.
+     *  Default off — preserves the Samantha-statue clamp for demo / testing modes. */
+    const val PREF_GPS_BBOX_OVERRIDE     = "gps_bbox_override_on"
 
     // ── Witch Trials feature (Phase 9X, S127) ─────────────────────────────
     /** When true, detail screens (history tile, newspaper, NPC bio) auto-speak the body 1s after open. */

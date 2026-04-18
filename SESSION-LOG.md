@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 139-148. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 140-149. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 149: 2026-04-18 — Splash TTS warm-start, businesses narration gate, SI coord sync, Use-Real-GPS override
+
+Pivoted #44 splash voiceover from cat sounds to runtime Android TTS (welcome line "Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App") — new process-scoped `SplashVoice` warms up the TTS engine in `WickedSalemApp.onCreate`, SplashActivity holds the visual splash until `UtteranceProgressListener.onDone` fires (15 s safety cap). Fixed AutoZone narrating at cold-start by gating `enqueueNarration` on the existing S145 `AudioControl` group system and flipping the Businesses toggle default to OFF. Pulled 18 corrected coordinates from SalemIntelligence (all 10 phantom-Samantha POIs relocated to their real positions; Starbird Dispensary moved 1.8 km, AutoZone 2.2 km) via new `sync-coords-from-intel.js`, then soft-deleted 7 Samantha-cluster junk duplicates. Added a "Use Real GPS Outside Salem" toggle to the Journey menu so operator can follow real GPS during drives from Beverly → Salem; setter re-emits `_currentLocation` via `requestLastKnownLocation()` for instant map refresh. Session closed with operator heading out on a field test — S150 will debug the tour log.
+
+Full session detail: `docs/session-logs/session-149-2026-04-18.md`. Commit: `<sha>`.
+
+---
 
 ## Session 148: 2026-04-18 — #44 splash voiceover — screech prototype rejected, friendly-meow direction locked, blocked on Ollama VRAM release
 
@@ -79,12 +87,6 @@ Shipped the twice-deferred Phase 9X Step 3. Discovered Salem Oracle had already 
 Full session detail: `docs/session-logs/session-140-2026-04-16.md`. Commits: `9374380` (importer) + `c588658` (bundle fix + refreshed assets) + the S140 close-out commit.
 
 ---
-
-## Session 139: 2026-04-16 — Retroactive close-out of S138 paperwork (no code work)
-
-Operator opened the session with *"I thought I did a session end last session — if that was not captured, make it happen."* Evidence confirmed S138's five code commits were on master and pushed, but the session-end paperwork (live-log close block, SESSION-LOG entry, STATE refresh, OMEN report) had been skipped. S139 executed the retroactive close in a single commit (`675cc58`): appended a clearly-labelled close block to the S138 live log with honest narrative of what S138 actually shipped vs. the planned TOP PRIORITY, prepended the S138 entry to SESSION-LOG.md while rolling S128 to the archive, refreshed STATE.md (TOP PRIORITY rewritten for S139+, V1-posture key facts added, sessions count 137 → 138), and wrote the thin-template OMEN report at `~/Development/OMEN/reports/locationmapapp/session-138-2026-04-16.md`. Operator then ended S139; Phase 9X Step 3 (Oracle tile import + device-verify) rolls to S140.
-
-Full session detail: `docs/session-logs/session-139-2026-04-16.md`. Commits: `675cc58` (retroactive close of S138) + the S139 close-out commit. No code changes. Phase 9X Step 3 still pending.
 
 ---
 

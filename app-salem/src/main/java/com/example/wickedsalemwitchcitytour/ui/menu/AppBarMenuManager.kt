@@ -933,6 +933,9 @@ class AppBarMenuManager(
                 R.id.menu_util_gps_mode ->
                     toggleBinary(item, MenuPrefs.PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
 
+                R.id.menu_util_gps_bbox_override ->
+                    toggleBinary(item, MenuPrefs.PREF_GPS_BBOX_OVERRIDE) { menuEventListener.onGpsBboxOverrideToggled(it) }
+
                 R.id.menu_util_silent_fill_debug ->
                     toggleBinary(item, MenuPrefs.PREF_SILENT_FILL_DEBUG) { menuEventListener.onSilentFillDebugToggled(it) }
 
@@ -951,6 +954,7 @@ class AppBarMenuManager(
         syncCheckStates(popup.menu,
             R.id.menu_util_record_gps          to MenuPrefs.PREF_RECORD_GPS,
             R.id.menu_util_gps_mode            to MenuPrefs.PREF_GPS_MODE,
+            R.id.menu_util_gps_bbox_override   to MenuPrefs.PREF_GPS_BBOX_OVERRIDE,
             R.id.menu_util_silent_fill_debug   to MenuPrefs.PREF_SILENT_FILL_DEBUG,
             R.id.menu_util_narrator_mode       to MenuPrefs.PREF_NARRATOR_MODE_ENABLED
         )

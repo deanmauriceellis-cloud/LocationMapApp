@@ -885,6 +885,22 @@ private fun isPoiAhead(poiLat: Double, poiLng: Double): Boolean {
  * the tier filter (explicit user intent overrides auto-prioritization).
  */
 internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Boolean) {
+    // S149 (field-test 2026-04-18): AudioControl group gate for automatic
+    // geofence ENTRY events. If the user has muted the POI's group in the
+    // Audio Control popup (e.g. Businesses off), skip the enqueue entirely
+    // rather than letting the POI sit in narrationQueue and eventually get
+    // dropped at the NarrationManager TTS gate — which would leave
+    // currentNarration stuck on a silent POI and deadlock the queue.
+    //
+    // User-initiated taps (jumpToFront=true) always fire — explicit intent
+    // overrides the ambient default, matching the Audio Control design.
+    if (!jumpToFront &&
+        !com.example.wickedsalemwitchcitytour.audio.AudioControl.isPoiSpeechEnabled(point.category)) {
+        DebugLogger.d("NARR-QUEUE",
+            "SKIP (AudioControl group muted): ${point.name} category=${point.category}")
+        return
+    }
+
     // S125 (field-test 2026-04-14): EARLY no-narrative gate. If the POI has
     // no narration text for this mode, drop the ENTRY entirely — no stamp,
     // no cancel, no queue add. Without this gate a no-text POI would still
@@ -1085,11 +1101,9 @@ private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
         return null
     } else {
         // S144: Cold-start tier-first. While the user has not moved far from
-        // their initial anchor (typically the Samantha-statue clamp for out-
-        // of-bbox launches, or the user's real entry point for in-Salem
-        // walks) prefer HISTORIC / PAID over REST so the opening narration
-        // is Salem-flavored. After the user moves past the threshold revert
-        // to S125's closest-first explore behavior.
+        // their initial anchor prefer HISTORIC / PAID over REST so the opening
+        // narration is Salem-flavored. After the user moves past the threshold
+        // revert to S125's closest-first explore behavior.
         val distFromStart = if (narrationStartLat == 0.0 && narrationStartLng == 0.0) 0.0
                             else haversineM(narrationStartLat, narrationStartLng, lastUserLat, lastUserLng)
         val useTierFirst = distFromStart < START_TIER_RADIUS_M

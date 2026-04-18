@@ -63,7 +63,11 @@ object AudioControl {
     fun isOracleEnabled(): Boolean     = requirePrefs().getBoolean(PREF_ORACLE, true)
     fun isMeaningfulEnabled(): Boolean = requirePrefs().getBoolean(PREF_MEANINGFUL, true)
     fun isAmbientEnabled(): Boolean    = requirePrefs().getBoolean(PREF_AMBIENT, true)
-    fun isBusinessesEnabled(): Boolean = requirePrefs().getBoolean(PREF_BUSINESSES, true)
+    // S149: Businesses default OFF — operator direction 2026-04-18. AutoZone,
+    // retail, etc. should only narrate once the user explicitly opts in via
+    // the Audio Control popup. Oracle + Meaningful + Ambient remain default-on
+    // so the historic-tour experience fires out of the box.
+    fun isBusinessesEnabled(): Boolean = requirePrefs().getBoolean(PREF_BUSINESSES, false)
 
     fun detailLevel(): DetailLevel =
         DetailLevel.values().getOrElse(requirePrefs().getInt(PREF_DETAIL, DetailLevel.STANDARD.ordinal)) {

@@ -12,6 +12,7 @@ package com.example.wickedsalemwitchcitytour
 import android.app.Application
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
+import com.example.wickedsalemwitchcitytour.util.SplashVoice
 import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration
 import androidx.preference.PreferenceManager
@@ -43,5 +44,9 @@ class WickedSalemApp : Application() {
 
         // 3. Extract bundled offline tiles to osmdroid base path on first launch.
         OfflineTileManager.extractArchiveIfNeeded(applicationContext)
+
+        // 4. Warm up the splash TTS engine so SplashActivity can speak without
+        //    eating a ~3-4s engine-bind delay on top of its animation budget.
+        SplashVoice.initEarly(applicationContext)
     }
 }

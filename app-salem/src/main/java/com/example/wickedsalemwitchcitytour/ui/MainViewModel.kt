@@ -57,8 +57,41 @@ class MainViewModel @Inject constructor(
     // When a GPS fix lands outside the Salem bbox, the app pretends the user is
     // at the Samantha statue. Log the substitution once per transition so we
     // can see it in GPS-OBS without spamming on every fix.
+    //
+    // S149: [bypassBboxClamp] flips off the Samantha substitution so the app
+    // can use real GPS positions outside the Salem bbox — surfaced as the
+    // "Use Real GPS Outside Salem" toggle in the Journey menu. Useful for
+    // operator field-testing when driving from home to Salem (the map tracks
+    // your actual drive instead of pinning you to Samantha until you cross
+    // the bbox boundary).
     private var lastClampState: Boolean? = null
+    var bypassBboxClamp: Boolean = false
+        set(value) {
+            field = value
+            lastClampState = null  // always force a fresh clamp-log on the next fix
+            DebugLogger.i(TAG, "bypassBboxClamp = $value (real-GPS-outside-Salem override)")
+            // S149: re-emit the last-known location immediately so the map moves
+            // the instant the flag flips, rather than waiting up to the full
+            // GPS polling interval for the next fix to arrive. Only fire the
+            // refresh once GPS polling is actually running (locationJob != null)
+            // — during the startup path setupMap() writes this flag BEFORE
+            // permission is granted, and calling getLastKnownLocation() then
+            // would hit an unguarded SecurityException. The startup refresh is
+            // handled naturally by the onPermissionGranted → requestLastKnown
+            // path that runs a few lines later in SalemMainActivity.
+            if (_locationMode.value == LocationMode.GPS && locationJob?.isActive == true) {
+                requestLastKnownLocation()
+            }
+        }
+
     private fun clampAndLog(lat: Double, lng: Double, acc: Float): GeoPoint {
+        if (bypassBboxClamp) {
+            if (lastClampState != true) {
+                DebugLogger.i(TAG, "location → bbox clamp BYPASSED (lat=$lat lng=$lng acc=${acc}m) — using raw GPS")
+                lastClampState = true
+            }
+            return GeoPoint(lat, lng)
+        }
         val inside = SalemBounds.isInSalemBbox(lat, lng)
         if (lastClampState != inside) {
             if (inside) {

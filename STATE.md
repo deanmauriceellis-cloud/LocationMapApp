@@ -2,27 +2,37 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-18 — Session 148 (#44 splash voiceover: screech prototype rejected as "too jolting", friendly girly-kitty meow direction locked via `feedback_splash_voiceover_vibe.md`; AudioGen→sox pipeline built end-to-end in `/tmp/splash-voiceover-candidates/` with reusable `mix.sh` recipe; friendly-meow regen blocked on `sudo systemctl stop ollama` — Ollama grabbed 20 GB VRAM mid-session, 8 MiB free; no code changes to `app-salem/`)
+**Last updated:** 2026-04-18 — Session 149 (splash voiceover pivoted to Android runtime TTS via new process-scoped `SplashVoice` warm-start + splash-held-until-onDone; businesses narration gate shipped via existing S145 `AudioControl` group system with Businesses toggle default flipped to OFF; SalemIntelligence coord sync shipped as `sync-coords-from-intel.js` — 18 updates including all 10 phantom-Samantha POIs relocated; Samantha-cluster 7 junk duplicates soft-deleted; new Journey menu "Use Real GPS Outside Salem" override toggle; operator headed out for field test at close)
 
 ---
 
-## TOP PRIORITY — Next Session (S149)
+## TOP PRIORITY — Next Session (S150)
 
-**Operator-directed starting points:**
+**Operator-directed starting point:**
 
-0. **PRE-MONDAY HARD PRIORITY — Webex demo: emulator + working TTS routed into the call.** The 2026-04-20 lawyer meeting is a **Webex call**, not in-person. Operator will screen-share from their Linux workstation, which means the demo runs on an **emulator** (not the Lenovo), AND the demo must include TTS narration playing audibly THROUGH THE WEBEX CALL (so the lawyer hears it). Webex-on-Linux specifics: "Share Computer Audio" toggle must be on, or a PulseAudio `module-loopback` must route the emulator's audio sink into the Webex mic input. **Operator said "webex we will resolve before Monday" at S147 start — audio-routing is operator-side, not Claude's.** Target AVD: `Salem_Tour_API34` on port 5570 per `feedback_salem_emulator.md`. **GPU is now FREE (released at S147 close, 0% util, 441 MiB baseline)** — no longer blocked. Tasks: (a) boot the AVD cold; (b) `ANDROID_SERIAL=emulator-5570 ./gradlew :app-salem:installDebug`; (c) verify TTS engine + US English voice data on the AVD (install Google TTS if default system image lacks it); (d) dry-run the demo flow (splash voiceover → welcome dialog → Heritage Trail start → hear a POI narrate → hear a newspaper cut off by a POI ENTRY to demonstrate S146 priority fix → see the triptych thumbnail on the hero banner to demonstrate S147 wiring). Full detail in S147 live log.
+0. **DEBUG THE S149 FIELD TEST.** Operator walked out for a drive Beverly → Salem with the new APK (splash TTS warm-start, Businesses audio gate OFF, SI coord sync baked in, "Use Real GPS Outside Salem" toggle on). Session closed with the tour in progress. S150 opens by pulling `adb pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/` and reviewing:
+   - **Splash TTS flow:** `SplashVoice.initEarly` → `TTS engine ready` → `speaking` → `onDone` → `Splash complete → launching SalemMainActivity`. Total splash duration should be ~9 s. Safety cap should never have fired.
+   - **Bbox override:** first fix after launch should log `bypassBboxClamp = true` via the pref restore in `setupMap()`, then `location → bbox clamp BYPASSED` on every real-GPS fix while outside Salem. Transition into the bbox should log `location → inside Salem bbox — using raw GPS`.
+   - **Cold-start narration respects AudioControl gate:** business POIs should all log `SKIP (AudioControl group muted)`; only HISTORICAL_BUILDINGS / CIVIC / EDUCATION / PARKS_REC / WORSHIP / WITCH_SHOP should enter the queue. Cold-start-tier-first should drop automatically once user is >40 m from the Samantha anchor (or from their real entry point if entered via real GPS from outside the bbox — verify which behavior actually happened in the drive).
+   - **Narration queue:** no deadlocks on muted POIs; `playNextNarration: queue empty after filter → silence-fill` should be rare (only when no meaningful POIs are nearby).
+   - **GPS polling:** 60 s interval should hold; no runaway logging.
 
-1. **#44 Splash voiceover (pivoted S148 from screech → friendly meow)** — last remaining Monday Must-Have (12 of 13 shipped across S144/145/146). **Creative direction is now locked:** long friendly girly-kitty meow, NOT a screech or jumpscare (operator rejected 4 AudioGen screech mixes at S148 15:09 as "too jolting"; full context in `feedback_splash_voiceover_vibe.md`). Replaces `app-salem/src/main/res/raw/splash_voiceover.wav` (stereo 44.1 kHz PCM 16-bit, ~8 sec target — format the `mix.sh` pipeline already produces correctly). **BLOCKING step to unblock S149:** `sudo systemctl stop ollama` (Ollama woke up mid-S148 and grabbed 20 GB VRAM; only 8 MiB free; AudioGen needs ~4 GB). Once Ollama is stopped, re-run the friendly-meow prompt set (4 candidates prepared in S148: "long friendly cat meow, sweet high-pitched kitty greeting" / "cute girly kitten meow, soft affectionate long mrow" / "content housecat meow, warm friendly female cat call" / "sweet little cat meow hello, soft high-pitched friendly feline greeting") via `~/AI-Studio/audiocraft-generate.sh`, then feed into the existing `/tmp/splash-voiceover-candidates/mix.sh` recipe (atmos bed optional — may conflict with friendly tone; worth testing cat-only first). Reminder to restart Ollama afterward: `sudo systemctl start ollama`. Must pass PG-13 / IARC Teen.
+1. **Anything the operator reports from the walk** — bugs, UX surprises, missing POI coverage, map-follow misbehaving, narration timing off, whatever surfaced.
 
-2. **Device-verify S146 + S147 fixes** on the Lenovo (HNY0CY0W — returns 12+ h after S147 end; S147 APK not yet installed). Rebuild first with `./gradlew :app-salem:assembleDebug` to pick up the synced `assets/heroes/`. Then walk-test:
-   - **S146:** (a) two adjacent POIs → second queues (not interrupt); (b) newspaper cuts off for POI ENTRY (priority-race fix); (c) hero banner above map with title + thumb + gold speaker icon; (d) Salem Heritage Trail featured first with gold border + "★ FEATURED" badge.
-   - **S147:** (e) hero banner thumbnail is now the per-POI triptych panel 1 (Katrina cat-POV), not the generic Katrina avatar; (f) `PoiDetailSheet` hero strip is now the full 800×200 triptych for every POI (via `PoiHeroResolver` Tier 0).
+2. **Carry-forwards from S148 / S149:**
+   - **Webex demo (Monday 2026-04-20)** — emulator + audio routing. Audio routing is operator-side; the app side (splash TTS + runtime narration) should now just work.
+   - **APK size pre-Play-Store audit** — debug APK 780 MB, `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
+   - **SalemIntelligence phantom-coord bug report** at `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` — 10 POIs are now fixed LMA-side via this session's coord sync, but the geocoding-fallback bug in SI itself still needs the report forwarded.
 
-3. **APK size concern (new, S147):** debug APK is 780 MB, dominated by `poi-icons/` 544 MB (pre-existing, gitignored, never in git). S147 triptychs are 73 MB / 9% of the total. Pre-Play-Store audit will need to prune or compress `poi-icons/` — verify how many of those PNGs are actually referenced by live code (`PoiHeroResolver.categoryToFolder` + `ProximityDock.categoryToFolder` are the two known consumers) and whether 256×256 or lossy WebP at q=75 is acceptable. Not blocking S148 but must land before the first release AAB upload.
+**Post-S149 key facts:**
+- **Splash pivoted to runtime TTS** — `SplashVoice.kt` (process-scoped, warm-start in `WickedSalemApp.onCreate`) + `SplashActivity` held until `UtteranceProgressListener.onDone` fires. 15 s safety cap. Welcome line: *"Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App."* `res/raw/splash_voiceover.wav` deleted (1.4 MB saved).
+- **Businesses narration gate** — `AudioControl.isBusinessesEnabled()` default flipped from `true` → `false`. Enqueue-time gate in `enqueueNarration` drops any POI whose AudioControl group is muted (non-jumpToFront path only; user taps still play). Verified on device: 17 business POIs skipped at cold-start.
+- **SI coord sync shipped** — new `cache-proxy/scripts/sync-coords-from-intel.js`. First run applied 18 updates including all 10 phantom-Samantha POIs (AutoZone moved 2.2 km, Starbird Dispensary 1.8 km, St. Nicholas Church 1.0 km, Habanero Cycles 815 m, Salem Tipico 755 m, Lifebridge Thrift 518 m, Notch Brewing 451 m, Witch Side Tavern 442 m, The Village / Salem Witch Village 376 m each) + Salem Common 805 m (centroid refinement), Forest Lore Tour 148 m, Central Wharf 33 m, plus smaller corrections.
+- **Samantha cluster cleanup** — 7 junk rows soft-deleted with `data_source LIKE '%samantha-cluster-cleanup-2026-04-18-loser%'` (3 Ginger duplicates, 2 Blue Fez duplicates, Lappin Park Little Free Library mis-categorized as SHOPPING, Spirits of Salem Museum unlinked). Within 35 m of Samantha: 8 clean rows remain (Statue, Lappin Park, Black Cat Curiosity Shoppe, Black Cat Tours, SnapBooks, Workbar Salem, O'Neills Pub, Laura Lanes Skin Care). All linked to SI.
+- **Journey menu "Use Real GPS Outside Salem" toggle** — new `PREF_GPS_BBOX_OVERRIDE` + `MainViewModel.bypassBboxClamp` flag. Setter re-emits `_currentLocation` via `requestLastKnownLocation()` for instant map refresh on toggle. Startup path reads the pref in `setupMap()`. Log lines: `bypassBboxClamp = <bool>`, `location → bbox clamp BYPASSED`.
+- **POI inventory:** still **1,837 active POIs** (18 coords fixed, 7 soft-deleted from Samantha cluster — soft-deletes don't reduce the visible-active count because those rows were already duplicates of canonical entries; actual active count is now 1,830, but counts in `publish-salem-pois.js` may report differently depending on query filters).
 
-**No campaign monitor needed** — S147 triptych campaign finished clean at 13:17 EDT. No background processes left running.
-
-**Background items (not blocking S148):**
+**Background items (not blocking S150):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
 - **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff.
 - **OMEN-004 — first real Kotlin unit test** — deadline 2026-08-30 (~4.5 months out). Small scope.
@@ -89,7 +99,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 148. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 149. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

@@ -11,7 +11,6 @@ package com.example.wickedsalemwitchcitytour.ui
 
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.ImageView
@@ -21,6 +20,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.util.SplashVoice
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SplashActivity.kt"
@@ -35,13 +36,19 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SplashActiv
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
 
-    private var mediaPlayer: MediaPlayer? = null
+    private val launched = AtomicBoolean(false)
 
     companion object {
         const val EXTRA_FROM_SPLASH = "from_splash"
         private const val ANIMATION_DURATION_MS = 5000L
         private const val TEXT_FADE_DELAY_MS = 1200L
         private const val TEXT_FADE_DURATION_MS = 800L
+        // Hard safety cap — splash will never hang longer than this, even if the
+        // TTS engine never reports onDone (engine crash, missing voice data, etc).
+        private const val SPLASH_SAFETY_CAP_MS = 15_000L
+        private const val SPLASH_UTTERANCE_ID = "splash_welcome"
+        private const val SPLASH_WELCOME =
+            "Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App."
 
         // Twelve Katrina mood variants — one is picked at random on every
         // launch so the app feels alive across sessions. Add to this list
@@ -84,18 +91,18 @@ class SplashActivity : AppCompatActivity() {
         splashImage.setImageResource(pickedSplash)
         DebugLogger.i("SplashActivity", "Katrina splash picked: resId=$pickedSplash (pool size=${KATRINA_SPLASHES.size})")
 
-        // Play voiceover audio — always on per S145 operator direction
-        try {
-            mediaPlayer = MediaPlayer.create(this, R.raw.splash_voiceover)?.apply {
-                setVolume(1.0f, 1.0f)
-                start()
-            }
-            DebugLogger.i("SplashActivity", "Splash voiceover playing")
-        } catch (e: Exception) {
-            DebugLogger.e("SplashActivity", "Voiceover failed", e)
+        // Speak the welcome line via the process-scoped SplashVoice engine
+        // (warmed up in WickedSalemApp.onCreate). Splash does NOT transition on
+        // a fixed timer — it waits for the TTS utterance to complete, so the
+        // user always hears the full welcome. Safety cap below guarantees the
+        // splash never hangs if the engine never reports onDone.
+        DebugLogger.i("SplashActivity", "requesting splash TTS: $SPLASH_WELCOME")
+        SplashVoice.speak(SPLASH_WELCOME, SPLASH_UTTERANCE_ID) {
+            DebugLogger.i("SplashActivity", "splash TTS finished → transitioning")
+            launchMainActivity()
         }
 
-        // Slow zoom-in on the Katrina image (Ken Burns-style)
+        // Slow zoom-in on the Katrina image (Ken Burns-style).
         splashImage.scaleX = 1.0f
         splashImage.scaleY = 1.0f
         splashImage.animate()
@@ -104,28 +111,26 @@ class SplashActivity : AppCompatActivity() {
             .setInterpolator(android.view.animation.DecelerateInterpolator())
             .start()
 
-        // Fade in the title text after a short delay
+        // Fade in the title text after a short delay.
         textContainer.animate()
             .alpha(1f)
             .setStartDelay(TEXT_FADE_DELAY_MS)
             .setDuration(TEXT_FADE_DURATION_MS)
             .start()
 
-        // When animation finishes, transition to main activity
+        // Safety cap — fires only if SplashVoice never reports onDone (engine
+        // failure, missing voice data, etc). launchMainActivity is idempotent.
         splashImage.postDelayed({
-            launchMainActivity()
-        }, ANIMATION_DURATION_MS)
-    }
-
-    override fun onDestroy() {
-        mediaPlayer?.release()
-        mediaPlayer = null
-        super.onDestroy()
+            if (!launched.get()) {
+                DebugLogger.e("SplashActivity", "SPLASH_SAFETY_CAP_MS reached — forcing transition")
+                launchMainActivity()
+            }
+        }, SPLASH_SAFETY_CAP_MS)
     }
 
     private fun launchMainActivity() {
-        mediaPlayer?.release()
-        mediaPlayer = null
+        if (!launched.compareAndSet(false, true)) return
+        SplashVoice.shutdown()
         DebugLogger.i("SplashActivity", "Splash complete → launching SalemMainActivity")
         val intent = Intent(this, SalemMainActivity::class.java).apply {
             putExtra(EXTRA_FROM_SPLASH, true)

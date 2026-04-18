@@ -170,6 +170,11 @@ interface MenuEventListener {
     /** Switch between automatic GPS centering and manual tap-to-set-location mode. */
     fun onGpsModeToggled(autoGps: Boolean)
 
+    /** S149: toggle the Samantha-bbox clamp — when true, real GPS is used regardless
+     *  of whether the user is inside or outside the Salem bounding box. Default impl
+     *  is a no-op so non-Salem consumers of this interface don't have to implement it. */
+    fun onGpsBboxOverrideToggled(useRealGps: Boolean) {}
+
     /** Toggle debug banner visibility for silent background POI fill. */
     fun onSilentFillDebugToggled(enabled: Boolean)
 

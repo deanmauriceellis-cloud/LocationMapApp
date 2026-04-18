@@ -1057,7 +1057,10 @@ class SalemMainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
         val tileSourceId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
             ?: TileSourceManager.DEFAULT_SOURCE
-        DebugLogger.i("SalemMainActivity", "setupMap() — tileSource=$tileSourceId fromSplash=$fromSplash")
+        // S149: restore the "Use Real GPS Outside Salem" pref so the bbox-clamp
+        // bypass persists across app restarts (operator field-test convenience).
+        viewModel.bypassBboxClamp = prefs.getBoolean(MenuPrefs.PREF_GPS_BBOX_OVERRIDE, false)
+        DebugLogger.i("SalemMainActivity", "setupMap() — tileSource=$tileSourceId fromSplash=$fromSplash bypassBbox=${viewModel.bypassBboxClamp}")
         binding.mapView.apply {
             setTileSource(TileSourceManager.buildSource(tileSourceId))
             setMultiTouchControls(true)
@@ -4035,6 +4038,13 @@ class SalemMainActivity : AppCompatActivity() {
         override fun onGpsModeToggled(autoGps: Boolean) {
             DebugLogger.i("SalemMainActivity", "onGpsModeToggled: autoGps=$autoGps")
             toggleLocationMode()
+        }
+
+        override fun onGpsBboxOverrideToggled(useRealGps: Boolean) {
+            DebugLogger.i("SalemMainActivity", "onGpsBboxOverrideToggled: useRealGps=$useRealGps")
+            viewModel.bypassBboxClamp = useRealGps
+            toast(if (useRealGps) "Using real GPS outside Salem"
+                  else "Snapping to Samantha statue outside Salem")
         }
 
         override fun onNarratorModeToggled(enabled: Boolean) {

@@ -76,6 +76,13 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <!-- S149: override the Salem bbox clamp (use real GPS even outside Salem) -->
+    <item
+        android:id="@+id/menu_util_gps_bbox_override"
+        android:title="Use Real GPS Outside Salem"
+        android:checkable="true"
+        app:showAsAction="never" />
+
     <!-- Silent POI fill debug banner (checkable — shows banner when background fill is running) -->
     <item
         android:id="@+id/menu_util_silent_fill_debug"
