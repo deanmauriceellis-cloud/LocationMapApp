@@ -25,6 +25,6 @@
         <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
         <!-- Android 12+ system splash screen customization -->
         <item name="android:windowSplashScreenBackground">@color/salemDarkPurple</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_witchkitty</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_katrina_12</item>
     </style>
 </resources>

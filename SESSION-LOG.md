@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 134-143. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 135-144. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 144: 2026-04-17 — Samantha clamp + 7 Monday Must-Haves (Katrina mascot pass)
+
+Monster session — 8 ship items, including the full Katrina mascot rollout. Operator opened with a GPS-outside-bbox clamp directive ("default to Samantha statue when outside Salem") which exposed a data-quality bug: 10 BCS POIs share phantom coordinates 0.2 m off the Samantha statue, so the clamp triggered a commercial (AutoZone) as the opening narration. Shipped the clamp (`SalemBounds.kt` + 4 MainViewModel emission-site clamps + 5 hardcoded-fallback swaps), cold-start tier-first narration (HISTORIC wins near the anchor so Salem-flavored POIs open the session), and wrote a formal bug report to SalemIntelligence at `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` for the operator to forward. Then drove into the Monday Must-Haves block — 7 of 13 shipped: **#40** hub-card retitle, **#46** splash stale-concept cleanup, **#43** Katrina splash (12 randomized painterly moods, picked at runtime) + app icon (library-tea scene wired through the full adaptive-icon stack at all 5 mipmap densities), **#50** TTS pause-only-at-sentence-end (40+ abbreviation set + initial/continuation guard replacing the naive `[.!?]` regex that chopped at every "Dr." and "Mrs."), **#49** Find menu full (hide 4 online-only/empty tiles, Salem-voice relabels for the remaining 16, 16 painterly cartoon tile illustrations generated in Forge and wired as layered backgrounds with black-tint + shadow-label for legibility), **#47** welcome dialog reinforcement (Katrina avatar medallion + Creepster title matching splash + Salem-voice card copy), **#47b** welcome restructure after operator feedback (reordered Take-a-Tour → Witch Trials → Explore, icons moved to left column, one-line descriptive titles + one-line action blurbs, three pose-specific Katrina icons: tour-guide/scholar/explorer), and **#13 + #48** top toolbar + grid dropdown (V1 collapsed to 2 clean rows of 4 tiles — POI/Find/Go To/Journey and Tours/Events/Witch Trials/Legend; Social/Chat/Profile stripped since their auth flow requires a backend; Utility popup renamed Journey and slimmed to user-facing items only). Parking-lot #35 escalated to **HARD PRE-V1 RELEASE BLOCKER** per operator direction (all assets encrypted + ProGuard/R8 obfuscation before the first Play Store submission). Remaining Monday items: #10/#11 legal write-ups, #27 hero-view rebuild, #45 universal audio control, #44 screaming-cat voiceover. Phase status unchanged (9X still COMPLETE from S140). Session count 143 → 144.
+
+Full session detail: `docs/session-logs/session-144-2026-04-17.md`. Commit: (to be filled on this session's close-out commit).
+
+---
 
 ## Session 143: 2026-04-17 — Tile coverage + red-ball + POI icon/hero fixes + z21 overzoom + Monday-lawyer parking-lot restructure
 
@@ -80,13 +88,5 @@ Full session detail: `docs/session-logs/session-135-2026-04-16.md`. Commit: `d18
 
 ---
 
-## Session 134: 2026-04-16 — POI category reclassification + Historic Sites of Salem feature
-
-Shipped two major deliverables. (1) POI category reclassification: split `TOURISM_HISTORY` into `HISTORICAL_BUILDINGS` (117 POIs) and `TOUR_COMPANIES` (17 POIs), deleted `HAUNTED_ATTRACTION` and `GHOST_TOUR` categories, backfilled `year_established` for 77 POIs from historical notes. 22→20 categories, 12+ code files updated across Kotlin + TypeScript. (2) "Historic Sites of Salem" — new 4th tile on Witch Trials menu with era filter chips (ALL / 1692 & Before / Colonial / Federal), scrollable site list, and detail dialog with NPC cross-linking + TTS. Fixed bundled SQLite publish pipeline — new `publish-witch-trials-to-sqlite.js` populates all 3 witch trials tables. Device verification deferred to S135.
-
-Full session detail: `docs/session-logs/session-134-2026-04-16.md`. Commit: `25dbb49`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 132 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 134 and earlier are in SESSION-LOG-ARCHIVE.md -->

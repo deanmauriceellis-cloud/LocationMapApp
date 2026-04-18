@@ -54,6 +54,23 @@ class MainViewModel @Inject constructor(
     private val _currentLocation = MutableLiveData<LocationUpdate>()
     val currentLocation: LiveData<LocationUpdate> = _currentLocation
 
+    // When a GPS fix lands outside the Salem bbox, the app pretends the user is
+    // at the Samantha statue. Log the substitution once per transition so we
+    // can see it in GPS-OBS without spamming on every fix.
+    private var lastClampState: Boolean? = null
+    private fun clampAndLog(lat: Double, lng: Double, acc: Float): GeoPoint {
+        val inside = SalemBounds.isInSalemBbox(lat, lng)
+        if (lastClampState != inside) {
+            if (inside) {
+                DebugLogger.i(TAG, "location → inside Salem bbox (lat=$lat lng=$lng acc=${acc}m) — using raw GPS")
+            } else {
+                DebugLogger.i(TAG, "location → OUTSIDE Salem bbox (lat=$lat lng=$lng acc=${acc}m) — snapping to Samantha statue ${SalemBounds.SAMANTHA_LAT},${SalemBounds.SAMANTHA_LON}")
+            }
+            lastClampState = inside
+        }
+        return if (inside) GeoPoint(lat, lng) else SalemBounds.SAMANTHA_STATUE
+    }
+
     private val _locationMode = MutableLiveData<LocationMode>(LocationMode.GPS)
     val locationMode: LiveData<LocationMode> = _locationMode
 
@@ -94,7 +111,7 @@ class MainViewModel @Inject constructor(
                     DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
                     if (_locationMode.value == LocationMode.GPS) {
                         _currentLocation.value = LocationUpdate(
-                            point = GeoPoint(loc.latitude, loc.longitude),
+                            point = clampAndLog(loc.latitude, loc.longitude, loc.accuracy),
                             speedMps = if (loc.hasSpeed()) loc.speed else null,
                             bearing = if (loc.hasBearing()) loc.bearing else null,
                             accuracy = loc.accuracy
@@ -117,7 +134,7 @@ class MainViewModel @Inject constructor(
                     DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
                     if (_locationMode.value == LocationMode.GPS) {
                         _currentLocation.value = LocationUpdate(
-                            point = GeoPoint(loc.latitude, loc.longitude),
+                            point = clampAndLog(loc.latitude, loc.longitude, loc.accuracy),
                             speedMps = if (loc.hasSpeed()) loc.speed else null,
                             bearing = if (loc.hasBearing()) loc.bearing else null,
                             accuracy = loc.accuracy
@@ -134,7 +151,7 @@ class MainViewModel @Inject constructor(
     fun onGpsLocationUpdate(location: Location) {
         if (_locationMode.value == LocationMode.GPS) {
             _currentLocation.value = LocationUpdate(
-                point = GeoPoint(location.latitude, location.longitude),
+                point = clampAndLog(location.latitude, location.longitude, location.accuracy),
                 speedMps = if (location.hasSpeed()) location.speed else null,
                 bearing = if (location.hasBearing()) location.bearing else null,
                 accuracy = location.accuracy
@@ -159,7 +176,7 @@ class MainViewModel @Inject constructor(
             if (loc != null && _locationMode.value == LocationMode.GPS) {
                 DebugLogger.i(TAG, "lastKnownLocation: lat=${loc.latitude} lon=${loc.longitude} — centering map now")
                 _currentLocation.value = LocationUpdate(
-                    point = GeoPoint(loc.latitude, loc.longitude),
+                    point = clampAndLog(loc.latitude, loc.longitude, loc.accuracy),
                     speedMps = null,
                     bearing = null,
                     accuracy = loc.accuracy

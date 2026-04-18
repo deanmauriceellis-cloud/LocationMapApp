@@ -9,7 +9,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/splash_background">
 
-    <!-- WitchKitty splash image — centered, fills most of screen -->
+    <!-- Katrina splash image — centered, fills most of screen -->
     <ImageView
         android:id="@+id/splashImage"
         android:layout_width="match_parent"
@@ -17,8 +17,8 @@
         android:layout_marginBottom="120dp"
         android:layout_gravity="center"
         android:scaleType="centerInside"
-        android:src="@drawable/splash_witchkitty"
-        android:contentDescription="WitchKitty" />
+        android:src="@drawable/splash_katrina_12"
+        android:contentDescription="Katrina" />
 
     <!-- App title — scary Creepster font, fades in at bottom -->
     <LinearLayout

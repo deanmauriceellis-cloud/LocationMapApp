@@ -2,31 +2,40 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 143 (tile bbox expansion + red-ball + POI icon/hero fixes + z21 overzoom + Monday-lawyer parking-lot restructure; all device-verified; 1 session-end commit)
+**Last updated:** 2026-04-17 — Session 144 (Samantha-statue out-of-bbox clamp + cold-start tier-first narration + 7 Monday Must-Haves shipped in one session; all device-verified; 1 session-end commit)
 
 ---
 
-## TOP PRIORITY — Next Session (S144)
+## TOP PRIORITY — Next Session (S145)
 
-**Operator-directed starting point:** **walkthrough of the ⭐ Monday Must-Haves block** in `docs/parking-lot-S138-master-review.md` — 13 items committed for the 2026-04-20 lawyer meeting (C-corp formation). Items: #10 legal walkthrough write-up, #11 $19.99+age-gate counsel write-up, #13 top menu redesign, #27 hero-view rebuild, #40 hub-card retitle, #43 Katrina splash graphic, #44 screaming-cat voiceover, #45 universal audio control, #46 splash stale-concept cleanup, #47 opening menu reinforcement, #48 menu-keys/grid-dropdown reinforcement, #49 find-menu reinforcement, #50 TTS pause-at-sentence-end tuning. Scope estimate: 5 Easy, 7 Medium, 2 content-art half-sessions across ~3-4 focused sessions Fri 2026-04-17 → Mon 2026-04-20.
+**Operator-directed starting point:** **finish the remaining 5 Monday Must-Haves** before the 2026-04-20 lawyer C-corp meeting. 7 of 13 shipped in S144. Remaining:
 
-**Background items (not blocking S144):**
+- **#10** Legal walkthrough write-up — consolidate COPPA / IARC Teen / Privacy / ads posture / data-collection for counsel (writing, no code).
+- **#11** $19.99 + age-gate counsel-ready write-up — document the S138 posture decision (flat paid → no COPPA via Google Play, no tiers in V1) (writing).
+- **#27** Rebuild top hero view (M code — structural).
+- **#45** Universal audio control at top menu (M code — touches NarrationMgr, Oracle reader, Witch Trials reader, splash voiceover).
+- **#44** Screaming-cat splash voiceover (½ session content-art, pairs with existing Katrina splash work).
+
+**Background items (not blocking S145):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
-- **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff produces ~15 W-lines vs S140's 1,208 baseline.
+- **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff.
 - **OMEN-004 — first real Kotlin unit test** — deadline 2026-08-30 (~4.5 months out). Small scope.
-- **NOTE-L014 Privacy Policy** — drafted S114, pending OMEN review (30 sessions).
-- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — 17 sessions pending operator decision.
+- **NOTE-L014 Privacy Policy** — drafted S114, pending OMEN review (31 sessions).
+- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — 18 sessions pending operator decision.
 - **NOTE-L018 PG-13 content rule** — pending OMEN acceptance + upstream relay.
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
+- **SalemIntelligence bug report** — `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` drafted S144 for operator to forward to SI. 10 BCS POIs with phantom coords 0.2 m off Samantha statue (geocoding fallback bug).
 
-**Post-S143 key facts:**
-- **Tile bundle regen shipped** — `tools/download_salem_tiles.py` rewritten to per-zoom/per-bbox schema. `BBOX_DOWNTOWN` (42.508–42.530 N, -70.905 to -70.876 W, ~2.5×2.4 km) gets z18+z19; `BBOX_FULL_SALEM` (42.475–42.545 N, -70.958 to -70.835 W, ~7.8×10 km covering Willows peninsula to Forest River Park, Peabody border to harbor/Winter Island) gets z16+z17. Total bundle: **7,133 tiles, 89 MB** (up from 40 MB). Downloaded in ~20 min, 0 errors. **Willows tip at 42.555+ N is still out of bundle** — parking-lot #39.
-- **Low-zoom red ball shipped** — new `SalemLocationBallOverlay.kt` paints a 40dp red disc (bright fill #E53935α200 + dark stroke #7F0000) at Salem center whenever `zoom < 16` (bundled-tile floor). Screen-pixel radius (not metric) so it stays visible at z3-z15. Added at overlay index 0; POI markers/GPS dot/trigger rings draw on top.
-- **POI marker icons fixed** — `MarkerIconHelper.CATEGORY_MAP` + `CIRCLE_ICON_MAP` now handle `HISTORICAL_BUILDINGS` (brown #8D6E63 + `tourism_history/historic_building`) and `TOUR_COMPANIES` (pink-purple #E040FB + `ghost_tour/walking_tour`). 131 previously-invisible POIs restored.
-- **POI hero images fixed** — `PoiHeroResolver.categoryToFolder` + `ProximityDock.categoryToFolder` remapped `HISTORICAL_BUILDINGS` → existing `historic_house/` art set (40 variants) and `TOUR_COMPANIES` → existing `ghost_tour/` art set (32 variants); added missing `AUTO_SERVICES` + `FINANCE` entries. ~87 POIs recovered themed heroes instead of red "ASSIGN HERO" placeholder.
-- **Overzoom to z21 shipped** — `MAP_MAX_OVERZOOM = 21.0` constant. `MapView.maxZoomLevel = 21.0` always. Tile sources still capped at `USGS_MAX_ZOOM = 19`; osmdroid auto-upsamples z19 tiles for z20/z21 view. POI markers separate further at tight downtown clusters; some partial mitigation for #38 spiderfy. `performCinematicZoom` still capped at 19 so splash animation lands on clean tiles.
-- **Stale-app-data regression noted** — after `install -r` over a stale previous install, app silent-crashed with `SQLiteException: no such table: salem_pois` from Room cache mismatch. Fresh `adb uninstall` + install resolved it. Treating as transient dev-friction, not a code bug. If it recurs, investigate Room's handling of `createFromAsset` + `fallbackToDestructiveMigration` over pre-existing mismatched-identity-hash DBs.
-- **Parking-lot restructure** — new cluster view (A–I) + Monday Must-Haves block at top of `docs/parking-lot-S138-master-review.md`. 50 total items tracked (37 original + 13 S143 additions). See `docs/parking-lot-S138-master-review.md` for the cluster breakdown.
+**Post-S144 key facts:**
+- **Samantha clamp shipped** — GPS fixes outside the Salem bbox (42.475–42.545 N × -70.958 to -70.835 W) snap to the Bewitched / Samantha Statue (42.5213319, -70.8958518). New `SalemBounds.kt` helper + clamp at all 4 MainViewModel GPS emission sites. Raw GPS still logs to GPS-OBS for diagnostics; only the `_currentLocation` emission gets replaced. Transition logged once per inside/outside flip.
+- **Cold-start tier-first narration shipped** — explore-mode narration queue prefers HISTORIC/CIVIC/EDUCATION tier while the user is within 40 m of their initial narration anchor. After crossing the threshold, reverts to S125's closest-first retail-block behavior.
+- **Katrina mascot rollout** — 12 Salem/Halloween-themed splash variants (library-tea, pumpkin patch, moonlit rooftop, cozy bookshop, autumn leaves, jack-o-lantern, crystal orb, lighthouse, fireside, starry bat sky, forest ranger, witchy library tea) at `res/drawable-nodpi/splash_katrina_01..12.jpg` (800×1000 Q80, ~125 KB avg, 1.5 MB total). `SplashActivity.KATRINA_SPLASHES.random()` picks one per launch. Library-tea (#12) is the `splash_katrina_12` fallback referenced by `themes.xml` windowSplashScreenAnimatedIcon and `activity_splash.xml` src.
+- **App icon — library-tea scene** — center-cropped 1024×1024 from `vibe-12-witchy-library-tea`. Mipmap PNGs at all 5 densities for `ic_launcher.png`, `ic_launcher_round.png`, `ic_launcher_foreground.png`. Adaptive icon XMLs updated to reference bitmap foreground; old vector "W" logo deleted. Background vector kept as deep-purple #2D1B4E.
+- **Welcome dialog restructured (#47 + #47b)** — three cards ordered Take-a-Tour (hero, gold border, 84dp icon) → Witch Trials (64dp icon) → Explore (64dp icon). Icons on the left, Katrina avatar medallion + Creepster title at the top for splash continuity. Three pose-specific Katrina icons: `welcome_card_tour` (green velvet colonial coat + brass candle), `welcome_card_trials` (open spellbook + quill), `welcome_card_explore` (teal bowtie + parchment map). All built as local `drawable-nodpi/welcome_card_*.jpg` at 320×320 Q85 (~25 KB each).
+- **Find menu reinforced (#49)** — 4 online/empty tiles hidden (Fuel & Charging, Transit, Parking, Emergency); 15 of 16 remaining tiles relabeled in Salem voice via local override map (Food & Drink → Taverns & Cafés, Healthcare → Apothecaries & Clinics, Worship → Churches & Meetinghouses, etc.); 16 painterly cartoon tile illustrations generated in Forge (`batch-find-tiles.py`) and wired as layered backgrounds with 0x99 black tint + white bold label + shadow for legibility. `FIND_SALEM_LABEL` + `FIND_TILE_ASSET` + `FIND_HIDE_IN_V1` are local to `SalemMainActivityFind.kt` so `PoiCategories.kt` mirror contract to `web/src/config/poiCategories.ts` stays untouched.
+- **TTS tuning (#50)** — replaced naive `[.!?]` chunker regex in `WitchTrialsMenuDialog.chunkForTts` with a character-walker `splitIntoSentences()` that honors 40+ abbreviations (Mr/Mrs/Dr/Rev/Inc/Ltd/a.m./p.m./Jan/Feb/etc/Mass/Ave/…), single-letter initials, and next-char-lowercase continuation. Only splits at real sentence ends. Short text (< 3500 chars) still speaks as one utterance with natural Android TTS prosody.
+- **Top toolbar + grid dropdown (#13 + #48)** — V1 toolbar: Home | [spacer] | Grid | About (Weather, Alerts, MapLayers all hidden). V1 grid: 2 rows of 4 — Row A: POI / Find / Go To / **Journey** (renamed Utility) / Row B: Tours / Events / Witch Trials / Legend. Social/Chat/Profile removed (auth needs online backend). Journey popup slimmed — only user-facing items remain (Record GPS, Build Story, Email GPX, GPS Mode, Narrator Mode, Legend); dev items stripped.
+- **Parking-lot #35 escalated to HARD PRE-V1 RELEASE BLOCKER** per operator direction — all assets encrypted + ProGuard/R8 obfuscation before first Play Store submission. Tracked as task #6.
 
 **S141 facts still current:**
 - **V1 offline-mode enforcement shipped** — `FeatureFlags.V1_OFFLINE_ONLY = true` (compile-time const in `:core`). Three-layer enforcement: ViewModel gates (early-return) → OkHttp `OfflineModeInterceptor` (hard backstop in all 13 client sites) → offline-only tile sources (empty URL so osmdroid downloader refuses). V2 resumes by flipping one boolean.
@@ -63,7 +72,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 143. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 144. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -91,12 +100,12 @@
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court (30 sessions).
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 17 sessions running. Needs OMEN to execute or retract.
+1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court (31 sessions).
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 18 sessions running. Needs OMEN to execute or retract.
 3. **OMEN-002 history rotation** — operator action only.
 4. **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142). Previously 2026-04-30. Surfaced to OMEN in S142 report for amendment or acknowledgment.
 5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
-6. **Cross-project: SalemIntelligence** — Phase 1 KB live. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2.
+6. **Cross-project: SalemIntelligence** — Phase 1 KB live. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2. **S144 new bug report:** `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` — 10 BCS POIs have phantom coords 0.2 m off the Samantha statue (geocoding fallback anchoring unresolvable POIs to a famous landmark). Operator to forward to SI.
 7. **NOTE-L018 — PG-13 standing content rule** proposed to OMEN at S138 via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
 8. **NOTE-L019 — `restrooms_zombie.png` regen** (LOW) — one themed POI icon rsync-skipped during the Session 020 NVMe clone. No deadline, no blocker. Regen during a content-art session.
 9. **NVMe advisory** — LIFTED 2026-04-17 (OMEN S021). Normal commit/push cadence resumes.

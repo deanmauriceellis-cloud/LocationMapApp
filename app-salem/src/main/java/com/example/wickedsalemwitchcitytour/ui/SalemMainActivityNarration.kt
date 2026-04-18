@@ -50,6 +50,18 @@ private var lastUserLat: Double = 0.0
 private var lastUserLng: Double = 0.0
 
 /**
+ * S144: cold-start anchor — first GPS fix the narration queue sees. While the
+ * user has not moved farther than [START_TIER_RADIUS_M] from this point the
+ * explore-mode dequeue uses tier-first ordering (HISTORIC / CIVIC before
+ * REST) so the opening narration is Salem-flavored, not whatever commercial
+ * POI happened to geocode to the same coordinate. Once the user crosses the
+ * threshold the queue reverts to S125's closest-first retail-block behavior.
+ */
+private var narrationStartLat: Double = 0.0
+private var narrationStartLng: Double = 0.0
+private const val START_TIER_RADIUS_M = 40.0
+
+/**
  * S112+: Three-level discard radius cascade. The dequeue starts at the
  * standard radius and tightens stepwise as density increases:
  *   - STANDARD (40m): sparse mode, broad reach
@@ -778,6 +790,11 @@ internal fun SalemMainActivity.updateNarrationUserPosition(
 
     lastUserLat = lat
     lastUserLng = lng
+    if (narrationStartLat == 0.0 && narrationStartLng == 0.0) {
+        narrationStartLat = lat
+        narrationStartLng = lng
+        DebugLogger.i("NARR-QUEUE", "cold-start anchor set at $lat,$lng — tier-first dequeue until user moves ${START_TIER_RADIUS_M.toInt()}m")
+    }
     refreshProximityDockFromQueue()
 }
 
@@ -1061,18 +1078,40 @@ private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
         }
         return null
     } else {
-        // Closest-first, tier as tiebreaker (Explore Salem ambient).
-        val winner = survivors.minWithOrNull(
-            compareBy<SalemPoi>(
-                { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) },
-                { NarrationTierClassifier.classify(it).ordinal }
+        // S144: Cold-start tier-first. While the user has not moved far from
+        // their initial anchor (typically the Samantha-statue clamp for out-
+        // of-bbox launches, or the user's real entry point for in-Salem
+        // walks) prefer HISTORIC / PAID over REST so the opening narration
+        // is Salem-flavored. After the user moves past the threshold revert
+        // to S125's closest-first explore behavior.
+        val distFromStart = if (narrationStartLat == 0.0 && narrationStartLng == 0.0) 0.0
+                            else haversineM(narrationStartLat, narrationStartLng, lastUserLat, lastUserLng)
+        val useTierFirst = distFromStart < START_TIER_RADIUS_M
+
+        val winner = if (useTierFirst) {
+            var chosen: SalemPoi? = null
+            for (tier in NarrationTier.values()) {
+                val candidates = survivors.filter { NarrationTierClassifier.classify(it) == tier }
+                if (candidates.isEmpty()) continue
+                chosen = candidates.minByOrNull { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) }
+                break
+            }
+            chosen
+        } else {
+            survivors.minWithOrNull(
+                compareBy<SalemPoi>(
+                    { haversineM(lastUserLat, lastUserLng, it.lat, it.lng) },
+                    { NarrationTierClassifier.classify(it).ordinal }
+                )
             )
-        ) ?: return null
+        } ?: return null
         narrationQueue.remove(winner)
         val winnerTier = NarrationTierClassifier.classify(winner)
+        val modeLabel = if (useTierFirst) "cold-start tier-first (${distFromStart.toInt()}m from anchor)"
+                        else "explore-mode closest-first"
         DebugLogger.i("NARR-QUEUE",
             "Picked ${winner.name} tier=$winnerTier dist=${haversineM(lastUserLat, lastUserLng, winner.lat, winner.lng).toInt()}m " +
-            "(explore-mode closest-first, ${survivors.size} total survivors)")
+            "($modeLabel, ${survivors.size} total survivors)")
         return winner
     }
 }

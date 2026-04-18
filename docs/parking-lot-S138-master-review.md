@@ -607,11 +607,13 @@ Explicitly post-launch.
 
 ---
 
-### 35 — Encrypt all objects / harden IP
+### 35 — Encrypt all objects / harden IP **[HARD PRE-V1 RELEASE BLOCKER — S144]**
 
 > "every object we use for information must be encrypted. I don't want people reverse hacking us and stealing our IP. The entire application has to be hardened."
+>
+> **Operator direction S144 (2026-04-17):** park this as a **hard pre-V1-release blocker** — "all data encrypted and code obfuscation before release." Gates the first Play Store submission. No release AAB ships until (a) bundled assets are encrypted at rest and (b) ProGuard/R8 obfuscation + string encryption is enabled on the release build.
 
-- **Category:** security · pre-launch hardening
+- **Category:** security · pre-launch hardening · **V1 release gate**
 - **Status:** 🔴 NOT STARTED. Mentions exist in `GOVERNANCE.md`, `DESIGN-REVIEW.md`, `COMMERCIALIZATION.md` — policy but no implementation.
 - **Complexity:** **H** — options:
   - (a) SQLCipher for bundled Room DB (~10MB added, CPU overhead on first open).

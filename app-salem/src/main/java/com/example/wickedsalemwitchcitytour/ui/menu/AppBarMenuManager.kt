@@ -146,11 +146,12 @@ class AppBarMenuManager(
 
         if (FeatureFlags.V1_OFFLINE_ONLY) {
             weatherIcon.visibility = View.GONE
-            DebugLogger.i(TAG, "V1_OFFLINE_ONLY — slim-toolbar weather icon hidden")
+            alertsIcon.visibility = View.GONE
+            DebugLogger.i(TAG, "V1_OFFLINE_ONLY — slim-toolbar weather + alerts icons hidden")
         } else {
             weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
+            alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         }
-        alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         gridButton.setOnClickListener { showGridDropdown(it) }
 
         // Home icon — tap: go home, long-press: set/clear home
@@ -351,14 +352,35 @@ class AppBarMenuManager(
         )
 
         if (FeatureFlags.V1_OFFLINE_ONLY) {
-            // Row 1 (Transit/Webcams/Aircraft/Radar) is all online-only — hide the row.
+            // S144 V1 grid — two clean rows of four, all functional offline.
+            //   Row 1 (Transit/Webcams/Aircraft/Radar): hidden (online-only).
+            //   Row 2 (V1 layout): POI | Find | Go To | Journey (was "Utility").
+            //   Row 3 (V1 layout): Tours | Events | Witch Trials | Legend.
+            //   Row 4: hidden (merged into row 3).
+            // Social / Chat / Profile stripped — require an auth backend the
+            // offline build cannot reach.
             row1.visibility = View.GONE
+            val v1Row2 = listOf(
+                GridBtn(R.drawable.ic_poi,           "POI")     { popup.dismiss(); showPoiMenu(anchor) },
+                GridBtn(R.drawable.ic_search,        "Find")    { popup.dismiss(); menuEventListener.onFindRequested() },
+                GridBtn(R.drawable.ic_goto_location, "Go To")   { popup.dismiss(); menuEventListener.onGoToLocationRequested() },
+                GridBtn(R.drawable.ic_debug,         "Journey") { popup.dismiss(); showUtilityMenu(anchor) }
+            )
+            val v1Row3 = listOf(
+                GridBtn(R.drawable.ic_tour,         "Tours")        { popup.dismiss(); menuEventListener.onTourRequested() },
+                GridBtn(R.drawable.ic_events,       "Events")       { popup.dismiss(); menuEventListener.onEventsRequested() },
+                GridBtn(R.drawable.ic_witch_trials, "Witch Trials") { popup.dismiss(); menuEventListener.onWitchTrialsRequested() },
+                GridBtn(R.drawable.ic_legend,       "Legend")       { popup.dismiss(); menuEventListener.onLegendRequested() }
+            )
+            addGridButtons(row2, v1Row2)
+            addGridButtons(row3, v1Row3)
+            row4.visibility = View.GONE
         } else {
             addGridButtons(row1, row1Btns)
+            addGridButtons(row2, row2Btns)
+            addGridButtons(row3, row3Btns)
+            addGridButtons(row4, row4Btns)
         }
-        addGridButtons(row2, row2Btns)
-        addGridButtons(row3, row3Btns)
-        addGridButtons(row4, row4Btns)
 
         popup.showAsDropDown(anchor)
         DebugLogger.i(TAG, "showGridDropdown() shown (v1Offline=${FeatureFlags.V1_OFFLINE_ONLY})")
@@ -731,8 +753,23 @@ class AppBarMenuManager(
 
     private fun showUtilityMenu(anchor: View) {
         val popup = buildPopup(anchor, R.menu.menu_utility)
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            // S144 — Journey menu (V1) is user-facing, not a dev console.
+            // Hide every item that needs the network or only makes sense to
+            // the operator's dev workflow. What remains is: Record GPS, Build
+            // Story (local breadcrumb review), Email GPX, GPS Mode toggle,
+            // Narrator Mode toggle, and Map Legend.
+            popup.menu.removeItem(R.id.menu_util_analyze_today)       // online
+            popup.menu.removeItem(R.id.menu_util_anomalies)           // online
+            popup.menu.removeItem(R.id.menu_util_populate_pois)       // dev
+            popup.menu.removeItem(R.id.menu_util_probe_10km)          // dev / online
+            popup.menu.removeItem(R.id.menu_util_fill_probe)          // dev stub
+            popup.menu.removeItem(R.id.menu_util_debug_log)           // dev
+            popup.menu.removeItem(R.id.menu_util_silent_fill_debug)   // dev
+            popup.menu.removeItem(R.id.menu_util_divider)
+        }
         popup.setOnMenuItemClickListener { item ->
-            DebugLogger.i(TAG, "Utility: '${item.title}'")
+            DebugLogger.i(TAG, "Journey: '${item.title}'")
             when (item.itemId) {
                 R.id.menu_util_record_gps ->
                     toggleBinary(item, MenuPrefs.PREF_RECORD_GPS) { menuEventListener.onGpsRecordingToggled(it) }

@@ -1015,18 +1015,18 @@ class SalemMainActivity : AppCompatActivity() {
             if (fromSplash) {
                 // Start on Salem at street level — no wasted tile loading
                 controller.setZoom(18.0)
-                controller.setCenter(GeoPoint(42.5225, -70.8897)) // Downtown Salem
+                controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             } else {
                 controller.setZoom(18.0)
-                controller.setCenter(GeoPoint(42.5225, -70.8897)) // Downtown Salem
+                controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             }
         }
         // Splash fallback: if no GPS fix within 3s, zoom to Salem center
         if (fromSplash) {
             binding.mapView.postDelayed({
                 if (!initialCenterDone && fromSplash) {
-                    DebugLogger.i("SalemMainActivity", "Splash fallback — no GPS fix, zooming to Salem center")
-                    performCinematicZoom(GeoPoint(42.521, -70.887))
+                    DebugLogger.i("SalemMainActivity", "Splash fallback — no GPS fix, zooming to Samantha statue")
+                    performCinematicZoom(SalemBounds.SAMANTHA_STATUE)
                     fromSplash = false
                     initialCenterDone = true
                 }
@@ -3259,7 +3259,7 @@ class SalemMainActivity : AppCompatActivity() {
     // =========================================================================
 
     internal fun searchFromCurrentLocation() {
-        val loc = viewModel.currentLocation.value?.point ?: GeoPoint(42.3601, -71.0589)
+        val loc = viewModel.currentLocation.value?.point ?: SalemBounds.SAMANTHA_STATUE
         DebugLogger.i("SalemMainActivity", "searchFromCurrentLocation() lat=${loc.latitude} lon=${loc.longitude}")
         viewModel.searchPoisAt(loc)
         toast("Searching POIs…")
@@ -3902,7 +3902,7 @@ class SalemMainActivity : AppCompatActivity() {
                 return
             }
             val tags = appBarMenuManager.getActiveTags(layerId)
-            val loc = viewModel.currentLocation.value?.point ?: GeoPoint(42.3601, -71.0589)
+            val loc = viewModel.currentLocation.value?.point ?: SalemBounds.SAMANTHA_STATUE
             viewModel.searchPoisAt(loc, tags, layerId)
             toast("Loading ${cat.label}…")
         }

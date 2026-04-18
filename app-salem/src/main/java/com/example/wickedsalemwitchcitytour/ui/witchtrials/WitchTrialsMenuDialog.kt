@@ -2035,18 +2035,94 @@ private fun ttsTextForBio(bio: WitchTrialsNpcBio): String {
  * in sequence instead of erroring out. NarrationManager enqueues each chunk
  * as a separate segment with a unique id but matching tag, so the Stop pill
  * still cancels every chunk via cancelSegmentsWithTag prefix match.
+ *
+ * S144: pauses land ONLY at true sentence ends — abbreviations ("Dr.",
+ * "Mrs.", "Rev.", "a.m."), single-letter initials ("J.P."), and
+ * continuations (next non-whitespace char is lowercase) do not trigger
+ * chunk boundaries. The naive `[.!?]` regex chopped names mid-word.
  */
 private const val TTS_CHUNK_MAX = 3500
+
+/** Common abbreviations whose trailing period must NOT end a sentence. */
+private val TTS_ABBREVIATIONS = setOf(
+    // Titles
+    "mr", "mrs", "ms", "mx", "dr", "rev", "fr", "sr", "jr",
+    "st", "sgt", "lt", "capt", "cpl", "col", "gen", "maj", "pvt",
+    "pres", "prof", "hon",
+    // Organizations / commerce
+    "inc", "ltd", "co", "corp", "llc",
+    // Latin / editorial
+    "etc", "vs", "viz", "ibid", "cf", "i.e", "e.g",
+    // References
+    "no", "vol", "ch", "p", "pp", "fig", "ed", "eds",
+    // Time
+    "a.m", "p.m", "am", "pm",
+    // Months (common abbreviation in historical corpus)
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+    // Weekdays
+    "mon", "tue", "tues", "wed", "thu", "thur", "thurs", "fri", "sat", "sun",
+    // US state postal / common colonial abbreviations
+    "mass", "conn", "penn", "va",
+    // Street descriptors (appear in Salem addresses)
+    "ave", "blvd", "rd", "ln", "pl", "pk",
+)
+
+/**
+ * Split `text` into sentences, honoring abbreviations and initials.
+ * Returns a list whose concatenation equals `text` up to whitespace.
+ * Each sentence carries its own terminator (`. ! ?` or ellipsis).
+ */
+private fun splitIntoSentences(text: String): List<String> {
+    if (text.isBlank()) return emptyList()
+    val sentences = mutableListOf<String>()
+    val sb = StringBuilder()
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        sb.append(c)
+        if (c == '.' || c == '!' || c == '?') {
+            // Absorb consecutive terminators — "!!", "...", "?!", etc.
+            while (i + 1 < text.length && text[i + 1] in ".!?") {
+                i++; sb.append(text[i])
+            }
+            val afterIdx = i + 1
+            if (afterIdx >= text.length) {
+                // Terminator at end of text — flush and exit.
+                sentences.add(sb.toString().trim())
+                sb.setLength(0)
+                break
+            }
+            if (text[afterIdx].isWhitespace()) {
+                // Peek at the word immediately preceding the terminator run.
+                val stem = sb.toString().trimEnd('.', '!', '?')
+                val lastWord = stem.takeLastWhile { it.isLetter() }.lowercase()
+                val isAbbrev = lastWord in TTS_ABBREVIATIONS || lastWord.length == 1
+                // Peek at next non-whitespace char — lowercase = mid-sentence continuation.
+                val nextNonWs = (afterIdx until text.length).firstOrNull { !text[it].isWhitespace() }
+                val isContinuation = nextNonWs != null && text[nextNonWs].isLowerCase()
+                if (!isAbbrev && !isContinuation) {
+                    // Real sentence boundary.
+                    sentences.add(sb.toString().trim())
+                    sb.setLength(0)
+                    // Skip the intervening whitespace — next iteration starts at nextNonWs.
+                    i = (nextNonWs ?: text.length) - 1
+                }
+            }
+        }
+        i++
+    }
+    if (sb.isNotBlank()) sentences.add(sb.toString().trim())
+    return sentences.filter { it.isNotBlank() }
+}
 
 private fun chunkForTts(text: String): List<String> {
     if (text.length <= TTS_CHUNK_MAX) return listOf(text)
     // Split into paragraphs first, then sentences. Each chunk accumulates
     // paragraphs/sentences until it would exceed TTS_CHUNK_MAX.
-    val sentencePattern = Regex("""[^.!?]+[.!?]+(?:\s+|$)""")
     val pieces: List<String> = text.split(Regex("\n\n+"))
         .flatMap { para ->
             if (para.length <= TTS_CHUNK_MAX) listOf(para)
-            else sentencePattern.findAll(para).map { it.value }.toList().ifEmpty { listOf(para) }
+            else splitIntoSentences(para).ifEmpty { listOf(para) }
         }
 
     val chunks = mutableListOf<String>()

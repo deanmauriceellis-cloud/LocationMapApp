@@ -25,7 +25,7 @@ import org.osmdroid.views.overlay.Overlay
  * (z3 — the map's configured minZoom — up to z15).
  */
 class SalemLocationBallOverlay(
-    private val center: GeoPoint = GeoPoint(42.5225, -70.8897),
+    private val center: GeoPoint = SalemBounds.SAMANTHA_STATUE,
     private val hideAtOrAboveZoom: Double = 16.0,
     private val radiusDp: Float = 40f
 ) : Overlay() {

@@ -47,6 +47,66 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Marker
 import android.content.Context
 
+// ── S144 Find modal Salem-voice reinforcement (#49) ────────────────────────
+//
+// (a) V1 is offline-only. These categories either require a live cache-proxy
+//     or have zero POIs in the bundled Room DB. They are filtered out of the
+//     Find grid so users only see tiles that will return results.
+//
+// (b) Per-tile label override — keeps the canonical PoiCategories.kt labels
+//     (mirrored to the web admin tool) generic, while the in-app Find surface
+//     speaks Salem's 1692/colonial voice. Each key is a PoiLayerId constant
+//     from PoiCategories.ALL; any id not in the map falls back to cat.label.
+//
+// (c) Illustration asset name per tile — painterly cartoon icons generated
+//     in Forge (see ~/AI-Studio/katrina-mascot/find-tiles/). File lives in
+//     res/drawable-nodpi/find_tile_<id>.jpg. Missing asset → fall back to
+//     the original colored-rectangle + label-only tile.
+private val FIND_HIDE_IN_V1: Set<String> = setOf(
+    com.example.locationmapapp.ui.menu.PoiLayerId.FUEL_CHARGING,
+    com.example.locationmapapp.ui.menu.PoiLayerId.TRANSIT,
+    com.example.locationmapapp.ui.menu.PoiLayerId.PARKING,
+    com.example.locationmapapp.ui.menu.PoiLayerId.EMERGENCY,
+)
+
+private val FIND_SALEM_LABEL: Map<String, String> = mapOf(
+    com.example.locationmapapp.ui.menu.PoiLayerId.FOOD_DRINK           to "Taverns & Cafés",
+    com.example.locationmapapp.ui.menu.PoiLayerId.CIVIC                to "Town Halls & Civic",
+    com.example.locationmapapp.ui.menu.PoiLayerId.PARKS_REC            to "Parks & Gardens",
+    com.example.locationmapapp.ui.menu.PoiLayerId.SHOPPING             to "Shops & Markets",
+    com.example.locationmapapp.ui.menu.PoiLayerId.HEALTHCARE           to "Apothecaries & Clinics",
+    com.example.locationmapapp.ui.menu.PoiLayerId.EDUCATION            to "Schools & Libraries",
+    com.example.locationmapapp.ui.menu.PoiLayerId.LODGING              to "Inns & Lodging",
+    com.example.locationmapapp.ui.menu.PoiLayerId.FINANCE              to "Banks",
+    com.example.locationmapapp.ui.menu.PoiLayerId.WORSHIP              to "Churches & Meetinghouses",
+    com.example.locationmapapp.ui.menu.PoiLayerId.HISTORICAL_BUILDINGS to "Historic Sites",
+    com.example.locationmapapp.ui.menu.PoiLayerId.AUTO_SERVICES        to "Auto & Repair",
+    com.example.locationmapapp.ui.menu.PoiLayerId.ENTERTAINMENT        to "Amusements & Stages",
+    com.example.locationmapapp.ui.menu.PoiLayerId.OFFICES              to "Offices",
+    com.example.locationmapapp.ui.menu.PoiLayerId.WITCH_SHOP           to "Witch & Occult",
+    com.example.locationmapapp.ui.menu.PoiLayerId.PSYCHIC              to "Psychic & Tarot",
+    com.example.locationmapapp.ui.menu.PoiLayerId.TOUR_COMPANIES       to "Tours & Guides",
+)
+
+private val FIND_TILE_ASSET: Map<String, String> = mapOf(
+    com.example.locationmapapp.ui.menu.PoiLayerId.FOOD_DRINK           to "find_tile_food_drink",
+    com.example.locationmapapp.ui.menu.PoiLayerId.CIVIC                to "find_tile_civic",
+    com.example.locationmapapp.ui.menu.PoiLayerId.PARKS_REC            to "find_tile_parks",
+    com.example.locationmapapp.ui.menu.PoiLayerId.SHOPPING             to "find_tile_shopping",
+    com.example.locationmapapp.ui.menu.PoiLayerId.HEALTHCARE           to "find_tile_healthcare",
+    com.example.locationmapapp.ui.menu.PoiLayerId.EDUCATION            to "find_tile_education",
+    com.example.locationmapapp.ui.menu.PoiLayerId.LODGING              to "find_tile_lodging",
+    com.example.locationmapapp.ui.menu.PoiLayerId.FINANCE              to "find_tile_finance",
+    com.example.locationmapapp.ui.menu.PoiLayerId.WORSHIP              to "find_tile_worship",
+    com.example.locationmapapp.ui.menu.PoiLayerId.HISTORICAL_BUILDINGS to "find_tile_historic",
+    com.example.locationmapapp.ui.menu.PoiLayerId.AUTO_SERVICES        to "find_tile_auto",
+    com.example.locationmapapp.ui.menu.PoiLayerId.ENTERTAINMENT        to "find_tile_entertainment",
+    com.example.locationmapapp.ui.menu.PoiLayerId.OFFICES              to "find_tile_offices",
+    com.example.locationmapapp.ui.menu.PoiLayerId.WITCH_SHOP           to "find_tile_witch",
+    com.example.locationmapapp.ui.menu.PoiLayerId.PSYCHIC              to "find_tile_psychic",
+    com.example.locationmapapp.ui.menu.PoiLayerId.TOUR_COMPANIES       to "find_tile_tours",
+)
+
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivityFind.kt"
 
@@ -117,7 +177,8 @@ internal fun SalemMainActivity.showFindCategoryGrid(dialog: android.app.Dialog) 
 
     // ── Category Grid — auto-fit cell height ──
     val colCount = 4
-    val totalCells = PoiCategories.ALL.size + 1 // +1 for Favorites
+    val visibleCats = PoiCategories.ALL.filter { it.id !in FIND_HIDE_IN_V1 }
+    val totalCells = visibleCats.size + 1 // +1 for Favorites
     val rowCount = (totalCells + colCount - 1) / colCount
     val screenH = resources.displayMetrics.heightPixels
     val headerH = dp(40)     // header area
@@ -178,7 +239,7 @@ internal fun SalemMainActivity.showFindCategoryGrid(dialog: android.app.Dialog) 
     favCell.setOnClickListener { showFavoritesResults(dialog) }
     grid.addView(favCell)
 
-    for (cat in PoiCategories.ALL) {
+    for (cat in visibleCats) {
         val catCount = counts?.let { c ->
             cat.tags.sumOf { tag -> c.counts[tag] ?: 0 }
         }
@@ -199,13 +260,41 @@ internal fun SalemMainActivity.showFindCategoryGrid(dialog: android.app.Dialog) 
             setPadding(dp(6), dp(6), dp(6), dp(6))
         }
 
-        // Label
+        // S144: background illustration — resolved by category id.
+        // Missing drawable → no illustration, tile stays a clean color swatch.
+        FIND_TILE_ASSET[cat.id]?.let { assetName ->
+            val resId = resources.getIdentifier(assetName, "drawable", packageName)
+            if (resId != 0) {
+                val art = ImageView(this).apply {
+                    setImageResource(resId)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    alpha = 0.85f
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                cell.addView(art)
+                val tint = android.view.View(this).apply {
+                    setBackgroundColor(Color.argb(0x99, 0, 0, 0))
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                cell.addView(tint)
+            }
+        }
+
+        // Label — Salem-voice override if present, else PoiCategories canonical label.
+        val displayLabel = FIND_SALEM_LABEL[cat.id] ?: cat.label
         val label = TextView(this).apply {
-            text = cat.label
+            text = displayLabel
             textSize = 12f
             setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             maxLines = 2
+            setShadowLayer(3f, 1f, 1f, Color.BLACK)
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,

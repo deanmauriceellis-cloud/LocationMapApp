@@ -82,137 +82,147 @@ internal fun SalemMainActivity.showWelcomeDialog() {
     dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
     dialog.setCancelable(false)
 
-    // ── Brand title ──
+    // ── Katrina avatar medallion — brand continuity with splash + launcher icon ──
+    val creepster = try { androidx.core.content.res.ResourcesCompat.getFont(this, R.font.creepster) } catch (e: Exception) { null }
+    val avatar = ImageView(this).apply {
+        setImageResource(R.drawable.welcome_katrina_avatar)
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        layoutParams = LinearLayout.LayoutParams(dp(120), dp(120)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = dp(32)
+            bottomMargin = dp(8)
+        }
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setOval(0, 0, view.width, view.height)
+            }
+        }
+    }
+
+    // ── Brand title — Creepster matches splash typography for continuity ──
     val title = TextView(this).apply {
-        text = "Wicked Salem"
-        textSize = 28f
+        text = "Katrina's Mystic Visitors Guide"
+        textSize = 26f
         setTextColor(Color.parseColor(SALEM_GOLD))
-        setTypeface(Typeface.SERIF, Typeface.BOLD)
+        if (creepster != null) typeface = creepster else setTypeface(Typeface.SERIF, Typeface.BOLD)
+        letterSpacing = 0.06f
         gravity = Gravity.CENTER
-        setPadding(0, dp(48), 0, dp(4))
+        maxLines = 2
+        setPadding(dp(24), dp(8), dp(24), dp(4))
+        setShadowLayer(6f, 2f, 3f, Color.parseColor("#88000000"))
     }
     val subtitle = TextView(this).apply {
-        text = "Witch City Tour"
-        textSize = 16f
+        text = "A mystic guide to historic Salem"
+        textSize = 14f
         setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-        setTypeface(Typeface.SERIF, Typeface.NORMAL)
+        setTypeface(Typeface.SERIF, Typeface.ITALIC)
         gravity = Gravity.CENTER
-        setPadding(0, 0, 0, dp(32))
+        setPadding(0, 0, 0, dp(28))
     }
 
-    // ── HERO card (Phase 9X — Salem Witch Trials flagship) ──
+    // ── Card factory — horizontal row: [round Katrina icon] | title / blurb ──
     //
-    // Full-width, prominent, gold-accent border, vertical layout: large icon +
-    // big serif title + subtitle ribbon. This is the marquee entry point.
-    val heroBg = GradientDrawable().apply {
-        // Slightly darker surface than the side cards to make the gold border pop
-        setColor(Color.parseColor("#1F1830"))
-        setStroke(dp(2), Color.parseColor(SALEM_GOLD))
-        cornerRadius = dp(14).toFloat()
-    }
-    val heroCard = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = heroBg
-        gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(dp(20), dp(24), dp(20), dp(24))
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            marginStart = dp(24); marginEnd = dp(24); bottomMargin = dp(16)
-        }
-        addView(TextView(this@showWelcomeDialog).apply {
-            text = "\uD83D\uDD2E"  // crystal ball — flagship icon
-            textSize = 40f
-            gravity = Gravity.CENTER
-        })
-        addView(TextView(this@showWelcomeDialog).apply {
-            text = "The Salem Witch Trials"
-            textSize = 22f
-            setTextColor(Color.parseColor(SALEM_GOLD))
-            setTypeface(Typeface.SERIF, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, 0)
-        })
-        addView(TextView(this@showWelcomeDialog).apply {
-            text = "History  \u00B7  Newspapers  \u00B7  People"
-            textSize = 13f
-            setTextColor(Color.parseColor(SALEM_TEXT))
-            gravity = Gravity.CENTER
-            setPadding(0, dp(6), 0, 0)
-        })
-        setOnClickListener {
-            dialog.dismiss()
-            showWitchTrialsMenuDialog()
-        }
-    }
-
-    // ── Compact bottom-row cards (Explore + Take a Tour, half-width each) ──
-    fun compactCard(
-        icon: String, label: String, desc: String, onClick: () -> Unit
+    // S144 operator direction: every entry point on the hub card has its own
+    // Katrina pose (tour-guide / scholar / explorer). Icon stays on the left
+    // to minimize horizontal waste; the text column gets descriptive single-
+    // line title + single-line action blurb.
+    fun katrinaCard(
+        iconRes: Int,
+        title: String,
+        blurb: String,
+        isHero: Boolean,
+        onClick: () -> Unit
     ): LinearLayout {
         val bg = GradientDrawable().apply {
-            setColor(Color.parseColor(SALEM_SURFACE))
-            cornerRadius = dp(12).toFloat()
+            setColor(Color.parseColor(if (isHero) "#1F1830" else SALEM_SURFACE))
+            if (isHero) setStroke(dp(2), Color.parseColor(SALEM_GOLD))
+            cornerRadius = dp(if (isHero) 14 else 12).toFloat()
         }
+        val iconSize = if (isHero) dp(84) else dp(64)
+        val vPad = if (isHero) dp(18) else dp(14)
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             background = bg
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), vPad, dp(18), vPad)
             layoutParams = LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = dp(8); marginEnd = dp(8)
+                marginStart = dp(24); marginEnd = dp(24); bottomMargin = dp(12)
             }
-            addView(TextView(this@showWelcomeDialog).apply {
-                text = icon; textSize = 28f
-                gravity = Gravity.CENTER
+
+            // Katrina avatar — round-clipped
+            addView(ImageView(this@showWelcomeDialog).apply {
+                setImageResource(iconRes)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                    marginEnd = dp(14)
+                }
+                clipToOutline = true
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                        outline.setOval(0, 0, view.width, view.height)
+                    }
+                }
             })
-            addView(TextView(this@showWelcomeDialog).apply {
-                text = label; textSize = 16f
-                setTextColor(Color.parseColor(SALEM_GOLD))
-                setTypeface(null, Typeface.BOLD)
-                gravity = Gravity.CENTER
-                setPadding(0, dp(6), 0, 0)
-            })
-            addView(TextView(this@showWelcomeDialog).apply {
-                text = desc; textSize = 11f
-                setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-                gravity = Gravity.CENTER
-                setPadding(0, dp(4), 0, 0)
+
+            // Text column — title (one line, truncate) + blurb (one line, truncate)
+            addView(LinearLayout(this@showWelcomeDialog).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+                addView(TextView(this@showWelcomeDialog).apply {
+                    text = title
+                    textSize = if (isHero) 18f else 16f
+                    setTextColor(Color.parseColor(SALEM_GOLD))
+                    setTypeface(Typeface.SERIF, Typeface.BOLD)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+                addView(TextView(this@showWelcomeDialog).apply {
+                    text = blurb
+                    textSize = 12f
+                    setTextColor(Color.parseColor(SALEM_TEXT))
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(0, dp(3), 0, 0)
+                })
             })
             setOnClickListener { onClick() }
         }
     }
 
-    val exploreCard = compactCard(
-        "\uD83D\uDDFA", "Explore Salem",
-        "Browse the map freely."
-    ) { dialog.dismiss() }
-
-    val tourCard = compactCard(
-        "\uD83D\uDEB6", "Take a Tour",
-        "Guided GPS walking tours."
+    val tourCard = katrinaCard(
+        R.drawable.welcome_card_tour,
+        "Guided Walking Tours of Salem",
+        "Let Katrina narrate the witch-city streets.",
+        isHero = true
     ) { dialog.dismiss(); showTourSelectionDialog() }
 
-    val bottomRow = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            marginStart = dp(16); marginEnd = dp(16)
-        }
-        addView(exploreCard)
-        addView(tourCard)
-    }
+    val trialsCard = katrinaCard(
+        R.drawable.welcome_card_trials,
+        "The Salem Witch Trials of 1692",
+        "History, newspapers, and the souls of 1692.",
+        isHero = false
+    ) { dialog.dismiss(); showWitchTrialsMenuDialog() }
+
+    val exploreCard = katrinaCard(
+        R.drawable.welcome_card_explore,
+        "Explore Salem on Your Own",
+        "Wander wherever your curiosity leads.",
+        isHero = false
+    ) { dialog.dismiss() }
 
     // ── Hint ──
     val hint = TextView(this).apply {
-        text = "Long-press the map to jump to any location"
+        text = "Long-press the map to leap anywhere in Salem."
         textSize = 11f
         setTextColor(Color.parseColor(SALEM_TEXT_DIM))
+        setTypeface(Typeface.SERIF, Typeface.ITALIC)
         gravity = Gravity.CENTER
         setPadding(0, dp(24), 0, dp(16))
     }
@@ -225,10 +235,12 @@ internal fun SalemMainActivity.showWelcomeDialog() {
             intArrayOf(Color.parseColor("#1A0F2E"), Color.parseColor(SALEM_PURPLE))
         )
         background = bg
+        addView(avatar)
         addView(title)
         addView(subtitle)
-        addView(heroCard)
-        addView(bottomRow)
+        addView(tourCard)
+        addView(trialsCard)
+        addView(exploreCard)
         addView(hint)
     }
 

@@ -26,11 +26,11 @@ import com.example.wickedsalemwitchcitytour.R
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SplashActivity.kt"
 
 /**
- * SplashActivity — Branded launch screen for WickedSalemWitchCityTour.
+ * SplashActivity — Branded launch screen for Katrina's Mystic Visitors Guide.
  *
- * Flow: WitchKitty image with slow zoom (2.5s) → "Wicked Salem Witch Tours" text fade-in →
- * crossfade transition to SalemMainActivity with EXTRA_FROM_SPLASH flag
- * so the map can perform the cinematic zoom-in animation.
+ * Flow: Katrina image with slow zoom → title "Katrina's Mystic Visitors Guide" +
+ * subtitle "Historic Salem Tour App" fade-in → crossfade to SalemMainActivity
+ * with EXTRA_FROM_SPLASH flag so the map performs the cinematic zoom-in.
  */
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
@@ -42,6 +42,24 @@ class SplashActivity : AppCompatActivity() {
         private const val ANIMATION_DURATION_MS = 5000L
         private const val TEXT_FADE_DELAY_MS = 1200L
         private const val TEXT_FADE_DURATION_MS = 800L
+
+        // Twelve Katrina mood variants — one is picked at random on every
+        // launch so the app feels alive across sessions. Add to this list
+        // (and drop the matching drawable-nodpi/ JPEG) to expand the pool.
+        private val KATRINA_SPLASHES = intArrayOf(
+            R.drawable.splash_katrina_01,
+            R.drawable.splash_katrina_02,
+            R.drawable.splash_katrina_03,
+            R.drawable.splash_katrina_04,
+            R.drawable.splash_katrina_05,
+            R.drawable.splash_katrina_06,
+            R.drawable.splash_katrina_07,
+            R.drawable.splash_katrina_08,
+            R.drawable.splash_katrina_09,
+            R.drawable.splash_katrina_10,
+            R.drawable.splash_katrina_11,
+            R.drawable.splash_katrina_12,
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +80,10 @@ class SplashActivity : AppCompatActivity() {
         val splashImage = findViewById<ImageView>(R.id.splashImage)
         val textContainer = findViewById<android.view.View>(R.id.splashTextContainer)
 
+        val pickedSplash = KATRINA_SPLASHES.random()
+        splashImage.setImageResource(pickedSplash)
+        DebugLogger.i("SplashActivity", "Katrina splash picked: resId=$pickedSplash (pool size=${KATRINA_SPLASHES.size})")
+
         // Play voiceover audio
         try {
             mediaPlayer = MediaPlayer.create(this, R.raw.splash_voiceover)?.apply {
@@ -73,7 +95,7 @@ class SplashActivity : AppCompatActivity() {
             DebugLogger.e("SplashActivity", "Voiceover failed", e)
         }
 
-        // Slow zoom-in on the WitchKitty image (Ken Burns-style)
+        // Slow zoom-in on the Katrina image (Ken Burns-style)
         splashImage.scaleX = 1.0f
         splashImage.scaleY = 1.0f
         splashImage.animate()
