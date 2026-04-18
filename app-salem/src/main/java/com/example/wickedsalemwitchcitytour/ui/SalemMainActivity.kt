@@ -69,6 +69,16 @@ import androidx.preference.PreferenceManager
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SalemMainActivity.kt"
 
+/**
+ * Map's user-facing max zoom. Tiles top out at z19 (USGS_MAX_ZOOM) — beyond
+ * that osmdroid stretches the highest-available tile (pixelated) so the user
+ * still sees something. The win: POI markers separate further at z20/21,
+ * making overlap-heavy downtown clusters (historic house + museum + shop at
+ * the same address) individually tappable without any spiderfy UI. Drop
+ * back to 19 if the pixelation ever feels worse than the marker-overlap.
+ */
+internal const val MAP_MAX_OVERZOOM = 21.0
+
 @AndroidEntryPoint
 class SalemMainActivity : AppCompatActivity() {
 
@@ -127,6 +137,14 @@ class SalemMainActivity : AppCompatActivity() {
     internal var userTriggerRing40: org.osmdroid.views.overlay.Polygon? = null
     internal var userTriggerRing30: org.osmdroid.views.overlay.Polygon? = null
     internal var userTriggerRing20: org.osmdroid.views.overlay.Polygon? = null
+
+    /**
+     * Low-zoom location ball. Bundled tiles start at zoom 16; below that the
+     * map is blank. This overlay paints a bright red disc over Salem when
+     * zoomed out so the user still has location context. Self-hides at
+     * zoom >= 16 inside its own draw().
+     */
+    private var salemLocationBall: SalemLocationBallOverlay? = null
 
     // Phase 9T: Narration system
     /**
@@ -908,7 +926,7 @@ class SalemMainActivity : AppCompatActivity() {
             DebugLogger.i("SalemMainActivity", "Debug: center map at $lat, $lon")
         }
         if (extras.containsKey("zoom")) {
-            val zoom = extras.getInt("zoom").toDouble().coerceIn(1.0, 20.0)
+            val zoom = extras.getInt("zoom").toDouble().coerceIn(1.0, MAP_MAX_OVERZOOM)
             binding.mapView.controller.setZoom(zoom)
             updateZoomBubble()
             DebugLogger.i("SalemMainActivity", "Debug: zoom=$zoom")
@@ -990,8 +1008,10 @@ class SalemMainActivity : AppCompatActivity() {
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setBuiltInZoomControls(false)
             minZoomLevel = 3.0
-            maxZoomLevel = if (tileSourceId == TileSourceManager.Id.SATELLITE)
-                TileSourceManager.USGS_MAX_ZOOM.toDouble() else 19.0
+            // Allow overzoom to 21: tiles top out at z19 (USGS_MAX_ZOOM), osmdroid
+            // upsamples beyond that. Trade pixel detail for POI-marker separation
+            // at tight clusters downtown.
+            maxZoomLevel = MAP_MAX_OVERZOOM
             if (fromSplash) {
                 // Start on Salem at street level — no wasted tile loading
                 controller.setZoom(18.0)
@@ -1011,6 +1031,15 @@ class SalemMainActivity : AppCompatActivity() {
                     initialCenterDone = true
                 }
             }, 3000L)
+        }
+        // Low-zoom Salem location ball. Bundled tiles start at z16; this
+        // overlay gives the user visual context when zoomed out past that.
+        // Added at index 0 so POI markers / GPS dot / routes draw over it
+        // during the transition zooms where both are visible.
+        if (salemLocationBall == null) {
+            salemLocationBall = SalemLocationBallOverlay()
+            binding.mapView.overlays.add(0, salemLocationBall)
+            DebugLogger.i("SalemMainActivity", "SalemLocationBallOverlay wired (shows at zoom < 16)")
         }
         setupZoomSlider()
         setupZoomToggle()
@@ -1091,16 +1120,13 @@ class SalemMainActivity : AppCompatActivity() {
         DebugLogger.i("SalemMainActivity", "Map configured — overlays=${binding.mapView.overlays.size}")
     }
 
-    /** Set map max zoom based on tile source — USGS satellite caps at 16, others at 19. */
+    /** Set map max zoom. All sources now allow overzoom to 21 (z19 tiles upsampled). */
     internal fun applyTileSourceZoomLimits(tileSourceId: String) {
-        val maxZoom = if (tileSourceId == TileSourceManager.Id.SATELLITE)
-            TileSourceManager.USGS_MAX_ZOOM.toDouble() else 19.0
-        binding.mapView.maxZoomLevel = maxZoom
-        // If currently zoomed past new max, snap back
-        if (binding.mapView.zoomLevelDouble > maxZoom) {
-            binding.mapView.controller.setZoom(maxZoom)
+        binding.mapView.maxZoomLevel = MAP_MAX_OVERZOOM
+        if (binding.mapView.zoomLevelDouble > MAP_MAX_OVERZOOM) {
+            binding.mapView.controller.setZoom(MAP_MAX_OVERZOOM)
         }
-        DebugLogger.i("SalemMainActivity", "Max zoom set to $maxZoom for $tileSourceId")
+        DebugLogger.i("SalemMainActivity", "Max zoom set to $MAP_MAX_OVERZOOM for $tileSourceId")
     }
 
     /**

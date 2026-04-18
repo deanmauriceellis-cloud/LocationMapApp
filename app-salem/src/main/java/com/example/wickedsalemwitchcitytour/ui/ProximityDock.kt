@@ -63,12 +63,14 @@ class ProximityDock(private val context: Context, private val rootView: View) {
         "AUTO_SERVICES"       to "#455A64",
     )
 
-    /** SalemPoi.category → poi-icons folder name */
+    /** SalemPoi.category → poi-icons folder name. Kept in sync with PoiHeroResolver. */
     private val categoryToFolder = mapOf(
         "WITCH_SHOP"          to "witch_shop",
         "PSYCHIC"             to "psychic",
-        "TOUR_COMPANIES"      to "tour_companies",
-        "HISTORICAL_BUILDINGS" to "historical_buildings",
+        // S143: remapped to existing art sets (originally pointed at folders
+        // that never shipped). See PoiHeroResolver for rationale.
+        "TOUR_COMPANIES"      to "ghost_tour",
+        "HISTORICAL_BUILDINGS" to "historic_house",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",
@@ -79,6 +81,8 @@ class ProximityDock(private val context: Context, private val rootView: View) {
         "WORSHIP"             to "worship",
         "HEALTHCARE"          to "healthcare",
         "OFFICES"             to "offices",
+        "AUTO_SERVICES"       to "auto_services",
+        "FINANCE"             to "finance",
     )
 
     /**

@@ -2,30 +2,31 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 142 (V1 UI hide + full rebrand + splash retitle; all device-verified; 5 commits)
+**Last updated:** 2026-04-17 — Session 143 (tile bbox expansion + red-ball + POI icon/hero fixes + z21 overzoom + Monday-lawyer parking-lot restructure; all device-verified; 1 session-end commit)
 
 ---
 
-## TOP PRIORITY — Next Session (S143)
+## TOP PRIORITY — Next Session (S144)
 
-**Operator-directed starting point:** **37-item parking lot review** at `docs/parking-lot-S138-master-review.md` — 16 clusters, 6 proposed new phases (9P.C Admin Polygons, UX Refresh, Content Eggs + Graveyard Souls, Ops Infrastructure, Pre-Launch Hardening, Find v2). Outcome: triage into master plan, pick the next phase (9Q / 9R / 10), or schedule further sub-work.
+**Operator-directed starting point:** **walkthrough of the ⭐ Monday Must-Haves block** in `docs/parking-lot-S138-master-review.md` — 13 items committed for the 2026-04-20 lawyer meeting (C-corp formation). Items: #10 legal walkthrough write-up, #11 $19.99+age-gate counsel write-up, #13 top menu redesign, #27 hero-view rebuild, #40 hub-card retitle, #43 Katrina splash graphic, #44 screaming-cat voiceover, #45 universal audio control, #46 splash stale-concept cleanup, #47 opening menu reinforcement, #48 menu-keys/grid-dropdown reinforcement, #49 find-menu reinforcement, #50 TTS pause-at-sentence-end tuning. Scope estimate: 5 Easy, 7 Medium, 2 content-art half-sessions across ~3-4 focused sessions Fri 2026-04-17 → Mon 2026-04-20.
 
-**Background items (not blocking S143):**
-- **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff produces ~15 W-lines vs S140's 1,208 baseline and that narration autoplay runs continuously with V1 posture.
-- **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142, ~4.5 months out). Small scope, low risk, clears an OMEN directive.
-- **NOTE-L014 Privacy Policy** — drafted S114, pending OMEN review (29 sessions).
-- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — 16 sessions pending operator decision.
+**Background items (not blocking S144):**
+- **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
+- **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff produces ~15 W-lines vs S140's 1,208 baseline.
+- **OMEN-004 — first real Kotlin unit test** — deadline 2026-08-30 (~4.5 months out). Small scope.
+- **NOTE-L014 Privacy Policy** — drafted S114, pending OMEN review (30 sessions).
+- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — 17 sessions pending operator decision.
 - **NOTE-L018 PG-13 content rule** — pending OMEN acceptance + upstream relay.
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 
-**Post-S142 key facts:**
-- **Splash screen retitled** — `splashTitle` "Wicked Salem" → **"Katrina's Mystic Visitors Guide"** (32sp Creepster gold #C9A84C), `splashSubtitle` "Witch Tours" → **"Historic Salem Tour App"** (20sp Creepster white #F5F0E8). Font sizes dropped from 42sp/24sp and letter-spacing trimmed to fit the longer strings under the Creepster display font without overflow. `splash_witchkitty.png` illustration and `splash_voiceover.wav` intentionally NOT touched — operator regenerating both in a dedicated content-art session (Katrina photo + screaming-cat voiceover). Part of a broader location-aware art/sound initiative flagged as carry-forward.
-- **Rebrand to Play-Store-ready identity** — `applicationId` `com.example.wickedsalemwitchcitytour` → **`com.destructiveaigurus.katrinasmysticvisitorsguide`** (frozen, immutable once shipped; clears Play Store's block on `com.example.*`). Display label "Wicked Salem" → **"Katrina's Mystic Visitors Guide - Salem"**. Internal code namespace, class names (`WickedSalemApp`), themes (`Theme.WickedSalem*`), module (`:app-salem`), and docs intentionally unchanged per operator direction. `FileProvider` authority parameterized to `${applicationId}.fileprovider` (manifest) / `$packageName.fileprovider` (Kotlin caller) so it auto-syncs. Device-verified on Lenovo HNY0CY0W: old package uninstalled, new installed, launcher resolves, `aapt2 dump badging` confirms label, no crashes, V1 offline enforcement intact, 1,837 POIs loaded.
-- **V1 UI hide complete** — seven online-only entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) gated behind `FeatureFlags.V1_OFFLINE_ONLY` in `app-salem/.../ui/menu/AppBarMenuManager.kt`. Combined with S141's data-layer enforcement, V1 now has **three-layer offline coverage**: OkHttp interceptor (hard backstop) + ViewModel gates (clean logs) + UI hide (no visible surface). Flipping one boolean in `FeatureFlags.kt` reverses all of it for V2.
-- **Device-verified on Lenovo HNY0CY0W**: weather + tile-source icons absent from uiautomator dump; grid dropdown row 1 (Transit/Webcams/Aircraft/Radar) gone, leaving 11 cells across 3 rows; TFR item absent from alerts popup; no crashes, no ANRs during splash → map → grid → alerts cycle.
-- **Legacy finding**: `menu_main_toolbar.xml` top-bar menu (`menu_top_weather / transit / cams / aircraft / radar`) is **dead code** in the current build — `onMenuInflated()` is defined on AppBarMenuManager but no activity calls it. The real top-bar is the slim toolbar. The hide gates in `onMenuInflated` are defensive for future re-wiring.
-- **NVMe advisory LIFTED** as of 2026-04-17 (OMEN S021). Normal commit/push cadence resumes.
-- **OMEN-004 deadline: 2026-04-30 → 2026-08-30** (operator direction). Surfaced in S142 OMEN report.
+**Post-S143 key facts:**
+- **Tile bundle regen shipped** — `tools/download_salem_tiles.py` rewritten to per-zoom/per-bbox schema. `BBOX_DOWNTOWN` (42.508–42.530 N, -70.905 to -70.876 W, ~2.5×2.4 km) gets z18+z19; `BBOX_FULL_SALEM` (42.475–42.545 N, -70.958 to -70.835 W, ~7.8×10 km covering Willows peninsula to Forest River Park, Peabody border to harbor/Winter Island) gets z16+z17. Total bundle: **7,133 tiles, 89 MB** (up from 40 MB). Downloaded in ~20 min, 0 errors. **Willows tip at 42.555+ N is still out of bundle** — parking-lot #39.
+- **Low-zoom red ball shipped** — new `SalemLocationBallOverlay.kt` paints a 40dp red disc (bright fill #E53935α200 + dark stroke #7F0000) at Salem center whenever `zoom < 16` (bundled-tile floor). Screen-pixel radius (not metric) so it stays visible at z3-z15. Added at overlay index 0; POI markers/GPS dot/trigger rings draw on top.
+- **POI marker icons fixed** — `MarkerIconHelper.CATEGORY_MAP` + `CIRCLE_ICON_MAP` now handle `HISTORICAL_BUILDINGS` (brown #8D6E63 + `tourism_history/historic_building`) and `TOUR_COMPANIES` (pink-purple #E040FB + `ghost_tour/walking_tour`). 131 previously-invisible POIs restored.
+- **POI hero images fixed** — `PoiHeroResolver.categoryToFolder` + `ProximityDock.categoryToFolder` remapped `HISTORICAL_BUILDINGS` → existing `historic_house/` art set (40 variants) and `TOUR_COMPANIES` → existing `ghost_tour/` art set (32 variants); added missing `AUTO_SERVICES` + `FINANCE` entries. ~87 POIs recovered themed heroes instead of red "ASSIGN HERO" placeholder.
+- **Overzoom to z21 shipped** — `MAP_MAX_OVERZOOM = 21.0` constant. `MapView.maxZoomLevel = 21.0` always. Tile sources still capped at `USGS_MAX_ZOOM = 19`; osmdroid auto-upsamples z19 tiles for z20/z21 view. POI markers separate further at tight downtown clusters; some partial mitigation for #38 spiderfy. `performCinematicZoom` still capped at 19 so splash animation lands on clean tiles.
+- **Stale-app-data regression noted** — after `install -r` over a stale previous install, app silent-crashed with `SQLiteException: no such table: salem_pois` from Room cache mismatch. Fresh `adb uninstall` + install resolved it. Treating as transient dev-friction, not a code bug. If it recurs, investigate Room's handling of `createFromAsset` + `fallbackToDestructiveMigration` over pre-existing mismatched-identity-hash DBs.
+- **Parking-lot restructure** — new cluster view (A–I) + Monday Must-Haves block at top of `docs/parking-lot-S138-master-review.md`. 50 total items tracked (37 original + 13 S143 additions). See `docs/parking-lot-S138-master-review.md` for the cluster breakdown.
 
 **S141 facts still current:**
 - **V1 offline-mode enforcement shipped** — `FeatureFlags.V1_OFFLINE_ONLY = true` (compile-time const in `:core`). Three-layer enforcement: ViewModel gates (early-return) → OkHttp `OfflineModeInterceptor` (hard backstop in all 13 client sites) → offline-only tile sources (empty URL so osmdroid downloader refuses). V2 resumes by flipping one boolean.
@@ -62,16 +63,16 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 142. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 143. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
 ## Carry-forward Items (NOT blocking Phase 9U)
 
-**Content-art regen queue (post-S142):**
-- **Splash illustration** — replace `splash_witchkitty.png` with a photo/stylized render of Katrina (operator's cat, the app's namesake). Style direction TBD (photographic with color grading vs. SD img2img stylized to match the current cartoon palette).
-- **Splash voiceover** — replace `splash_voiceover.wav` with a screaming-cat sound per operator's spec. Approach TBD (freesound.org samples + sox, AudioGen on RTX 3090, or hybrid). GPU-caution rule applies — confirm SalemIntelligence / AudioCraft not active before generative audio jobs.
-- **Location-aware art/sound initiative** — broader operator theme: "a bunch of things I want to do with artwork and sound in this location since we are location aware." Geofence-triggered art/audio per POI or area. No formal scope yet — candidate for new phase entry once parking-lot triage opens.
+**Content-art regen queue (post-S143):**
+- **Splash illustration (#43)** — replace `splash_witchkitty.png` with a photo/stylized render of Katrina. Monday must-have per S143 operator direction.
+- **Splash voiceover (#44)** — replace `splash_voiceover.wav` with a screaming-cat sound. Monday must-have per S143 operator direction. GPU-caution rule applies.
+- **Location-aware art/sound initiative** — broader operator theme; no formal scope yet. Candidate for new phase entry post-launch.
 
 **Still pending (carry into S120+):**
 - **Heading-up rotation smoothness** — root cause identified in S115 (100 Hz sensor + main-thread saturation). Plan: cut log chatter, rate-limit apply, move sensor processing to background HandlerThread, switch static detection to wall-clock. **Scheduled for S120 Step 9U.17.**
@@ -90,8 +91,8 @@
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court (29 sessions).
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 16 sessions running. Needs OMEN to execute or retract.
+1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court (30 sessions).
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 17 sessions running. Needs OMEN to execute or retract.
 3. **OMEN-002 history rotation** — operator action only.
 4. **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142). Previously 2026-04-30. Surfaced to OMEN in S142 report for amendment or acknowledgment.
 5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.

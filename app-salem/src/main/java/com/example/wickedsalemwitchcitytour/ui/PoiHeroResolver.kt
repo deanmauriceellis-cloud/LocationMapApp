@@ -38,8 +38,14 @@ object PoiHeroResolver {
     private val categoryToFolder = mapOf(
         "WITCH_SHOP"          to "witch_shop",
         "PSYCHIC"             to "psychic",
-        "TOUR_COMPANIES"      to "tour_companies",
-        "HISTORICAL_BUILDINGS" to "historical_buildings",
+        // S143: TOUR_COMPANIES / HISTORICAL_BUILDINGS originally pointed at
+        // `tour_companies/` and `historical_buildings/` — folders that were
+        // never generated, so 131 POIs fell through to the red placeholder.
+        // Redirected to the closest on-disk art sets: ghost_tour/ (walking /
+        // haunted / historical / night tour variants) and historic_house/
+        // (colonial / literary / maritime / museum / witch-trial house).
+        "TOUR_COMPANIES"      to "ghost_tour",
+        "HISTORICAL_BUILDINGS" to "historic_house",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",
@@ -50,6 +56,10 @@ object PoiHeroResolver {
         "WORSHIP"             to "worship",
         "HEALTHCARE"          to "healthcare",
         "OFFICES"             to "offices",
+        // S143: AUTO_SERVICES and FINANCE folders exist on disk but were
+        // never registered here — 52 + 5 POIs unnecessarily hit RedPlaceholder.
+        "AUTO_SERVICES"       to "auto_services",
+        "FINANCE"             to "finance",
     )
 
     /** Cached file listings per folder (filled lazily on first access). */

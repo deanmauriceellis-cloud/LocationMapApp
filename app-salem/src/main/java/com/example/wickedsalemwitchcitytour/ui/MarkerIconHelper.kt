@@ -180,6 +180,8 @@ object MarkerIconHelper {
         "psychic"             to "psychic/psychic_reading",
         "haunted_attraction"  to "haunted_attraction/haunted_house",
         "historic_house"      to "historic_house/colonial_house",
+        "historical_buildings" to "tourism_history/historic_building",
+        "tour_companies"      to "ghost_tour/walking_tour",
         // Venue / Other / catch-all narration_point types
         "venue" to "entertainment/event_venue",
         "shop" to "shopping/gift_shop",
@@ -370,6 +372,13 @@ object MarkerIconHelper {
         "finance"             to Pair(R.drawable.ic_poi,           Color.parseColor("#00695C")),
         "auto_services"       to Pair(R.drawable.ic_poi,           Color.parseColor("#37474F")),
         "worship"             to Pair(R.drawable.ic_poi,           Color.parseColor("#4E342E")),
+        // S143: two categories introduced by the S134 historic-sites reclass
+        // that were missing from the icon map — fell through to DEFAULT and
+        // rendered as a near-invisible generic dot. Brown for buildings
+        // matches the existing `historic_house` palette; pink-purple for tour
+        // companies groups them visually with `ghost_tour`.
+        "historical_buildings" to Pair(R.drawable.ic_poi,          Color.parseColor("#8D6E63")),
+        "tour_companies"       to Pair(R.drawable.ic_poi,          Color.parseColor("#E040FB")),
     )
 
     // Default fallback

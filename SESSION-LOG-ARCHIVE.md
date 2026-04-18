@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S132 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S133 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 133: 2026-04-16 — Phase 9X.7 cross-linking + Today-in-1692 card + admin integration
+
+Shipped Phase 9X.7 end-to-end: `EntityLinkRenderer.kt` auto-detects 49 NPC names (1,110+ mentions across all bios) as gold underlined ClickableSpans in article, bio, and newspaper detail dialogs — tapping navigates to the bio detail with self-linking excluded. "Today in 1692" gold-bordered card at top of Witch Trials menu matches the current calendar month-day to the 202-newspaper corpus (±3 day window). Admin tool integration: cache-proxy REST endpoints for all 3 witch trials tables + React `WitchTrialsPanel` with tabbed article/bio/newspaper browsers and inline editing, accessed via POIs/Witch Trials toggle in the admin header.
+
+Full session detail: `docs/session-logs/session-133-2026-04-16.md`. Commit: `2669ea6`.
+
+---
 
 ## Session 132: 2026-04-15/16 — Phase 9X.6 pencil-sketch portraits for 49 figures + bug fixes
 

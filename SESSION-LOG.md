@@ -1,8 +1,18 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 133-142. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 134-143. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 143: 2026-04-17 — Tile coverage + red-ball + POI icon/hero fixes + z21 overzoom + Monday-lawyer parking-lot restructure
+
+Operator redirected pre-parking-lot to four map-layer concerns. **(1) Tile coverage** — the post-rebrand virgin install exposed that bundled tiles only covered tight downtown Salem; rewrote `tools/download_salem_tiles.py` to a per-zoom/per-bbox schema (z19+z18 downtown, z16-17 full Salem city 42.475–42.545 N × -70.958 to -70.835 W). Downloaded 3,838 new tiles in ~20 min (0 errors), bundle grew 40 MB → 89 MB with 7,133 total tiles across Esri satellite + OSM Mapnik. **(2) Red-ball low-zoom fallback** — new `SalemLocationBallOverlay.kt` paints a 40dp red disc at Salem center whenever `zoom < 16` (the floor of bundled tiles); screen-pixel rather than metric radius so the ball stays the same size from z3→z15. Added at overlay index 0 so POI markers/GPS dot draw on top. **(3) Orphaned POI categories** — `MarkerIconHelper.CATEGORY_MAP` + `CIRCLE_ICON_MAP` had no entries for `HISTORICAL_BUILDINGS` (115 POIs, added by S134 historic-sites reclass) or `TOUR_COMPANIES` (16 POIs) so 131 markers fell through to the DEFAULT 5px generic purple dot and visually disappeared; added both to both maps. **(4) Orphaned hero-image folders** — `PoiHeroResolver.categoryToFolder` + `ProximityDock.categoryToFolder` pointed HISTORICAL_BUILDINGS and TOUR_COMPANIES at folders that never shipped (`historical_buildings/`, `tour_companies/`), and omitted AUTO_SERVICES (52 POIs) + FINANCE (5 POIs) entirely; remapped to existing art sets (`historic_house/` 40 variants, `ghost_tour/` 32 variants) and added the two missing entries so ~87 POIs recovered their themed hero instead of showing the red "ASSIGN HERO" placeholder. **(5) Overzoom to z21** — added `MAP_MAX_OVERZOOM = 21.0` constant; tiles still top out at z19 (`USGS_MAX_ZOOM`), osmdroid upsamples z19 tiles for z20/z21 view (pixel detail degrades, POI markers separate further at tight downtown clusters); kept `performCinematicZoom()` capped at 19 so splash entry still lands on clean tiles. Device-verified all five on Lenovo HNY0CY0W after a clean `adb uninstall`/reinstall (the `install -r` path silent-crashed on stale app-data Room caches — treated as transient dev friction, not a code bug). Screenshots at `docs/session-logs/assets/s143/` confirm tile coverage, red ball at z10, and Historical Buildings markers now distinct around the Samantha statue.
+
+**Parking-lot re-cluster for Monday lawyer meeting:** operator declared a Monday 2026-04-20 lawyer appointment for C-corp formation and directed a full parking-lot restructure prioritized around what must-land before that meeting. Added a **cluster view** at the top of `docs/parking-lot-S138-master-review.md` regrouping all 45 items (37 original + 8 S143 additions #38-#45) into nine thematic clusters A–I ordered by operator value. Inserted a **⭐ Monday Must-Haves** block declaring 13 items committed for the Monday meeting: #10 legal walkthrough write-up, #11 $19.99+age-gate counsel write-up, #13 top menu redesign, #27 hero-view rebuild, #40 hub-card retitle ("Wicked Salem" residue), #43 Katrina splash graphic, #44 screaming-cat voiceover, #45 universal audio control (promoted from Cluster D), and new items #46 splash stale-concept cleanup, #47 opening menu reinforcement, #48 menu-keys/grid-dropdown reinforcement, #49 find-menu reinforcement, #50 TTS pause-at-sentence-end tuning. Each new item (#46-#50) got a full detail block with investigation notes and scope. Total must-have scope: 5 Easy, 7 Medium, 2 content-art half-sessions across ~3-4 focused sessions Fri 2026-04-17 → Mon 2026-04-20 — operator flagged "it is going to be a busy weekend!"
+
+Full session detail: `docs/session-logs/session-143-2026-04-17.md`. Commits: (to be filled on this session's close-out commit — S143 shipped six edited files plus one new overlay file plus a 50 MB tile-bundle regen plus the parking-lot restructure; everything rides on one session-end commit).
+
+---
 
 ## Session 142: 2026-04-17 — V1 UI hide + full rebrand (applicationId + display label)
 
@@ -75,14 +85,6 @@ Full session detail: `docs/session-logs/session-135-2026-04-16.md`. Commit: `d18
 Shipped two major deliverables. (1) POI category reclassification: split `TOURISM_HISTORY` into `HISTORICAL_BUILDINGS` (117 POIs) and `TOUR_COMPANIES` (17 POIs), deleted `HAUNTED_ATTRACTION` and `GHOST_TOUR` categories, backfilled `year_established` for 77 POIs from historical notes. 22→20 categories, 12+ code files updated across Kotlin + TypeScript. (2) "Historic Sites of Salem" — new 4th tile on Witch Trials menu with era filter chips (ALL / 1692 & Before / Colonial / Federal), scrollable site list, and detail dialog with NPC cross-linking + TTS. Fixed bundled SQLite publish pipeline — new `publish-witch-trials-to-sqlite.js` populates all 3 witch trials tables. Device verification deferred to S135.
 
 Full session detail: `docs/session-logs/session-134-2026-04-16.md`. Commit: `25dbb49`.
-
----
-
-## Session 133: 2026-04-16 — Phase 9X.7 cross-linking + Today-in-1692 card + admin integration
-
-Shipped Phase 9X.7 end-to-end: `EntityLinkRenderer.kt` auto-detects 49 NPC names (1,110+ mentions across all bios) as gold underlined ClickableSpans in article, bio, and newspaper detail dialogs — tapping navigates to the bio detail with self-linking excluded. "Today in 1692" gold-bordered card at top of Witch Trials menu matches the current calendar month-day to the 202-newspaper corpus (±3 day window). Admin tool integration: cache-proxy REST endpoints for all 3 witch trials tables + React `WitchTrialsPanel` with tabbed article/bio/newspaper browsers and inline editing, accessed via POIs/Witch Trials toggle in the admin header.
-
-Full session detail: `docs/session-logs/session-133-2026-04-16.md`. Commit: `2669ea6`.
 
 ---
 

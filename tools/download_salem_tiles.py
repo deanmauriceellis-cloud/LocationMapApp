@@ -22,32 +22,49 @@ import sys
 import time
 import urllib.request
 
-# ── Bounding box: downtown Salem walking tour area ──────────────────────
-# Covers all 14 Salem Essentials tour stops plus generous buffer for panning.
-# NW corner: north of Salem Common
-# SE corner: south of Witch Trials Memorial + harbor area past House of Seven Gables
-BBOX = {
+# ── Bounding boxes: tiered coverage ─────────────────────────────────────
+# DOWNTOWN: the Salem Essentials walking tour area (Salem Common to House of
+#   Seven Gables harbor). Pixel-perfect zoom 19 is reserved for this tight box.
+# FULL_SALEM: the full Salem, MA city footprint — Salem Willows peninsula
+#   (north), Forest River Park (south), Peabody border (west), harbor +
+#   Winter Island (east). Zoom 16-18 span this box so panning to any corner
+#   of the city shows tiles instead of gray.
+BBOX_DOWNTOWN = {
     "north": 42.530,
     "south": 42.508,
     "west": -70.905,
     "east": -70.876,
 }
+BBOX_FULL_SALEM = {
+    "north": 42.545,
+    "south": 42.475,
+    "west": -70.958,
+    "east": -70.835,
+}
 
 # ── Tile sources ────────────────────────────────────────────────────────
 # Provider names MUST match the osmdroid ITileSource.name() values exactly.
 # osmdroid's DatabaseFileArchive queries: WHERE key = ? AND provider = ?
-# Per-source zoom ranges: satellite gets zoom 19 (primary view), street stops at 18.
+# Tiered zoom/bbox pairs: low zooms cover the whole city; zoom 19 stays tight
+# on downtown to keep bundle size reasonable.
 SOURCES = {
     "Esri-WorldImagery": {
         # ArcGIS uses z/y/x (row/column), not z/x/y
         "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        "zoom_min": 16,
-        "zoom_max": 19,
+        "zoom_bboxes": [
+            (16, BBOX_FULL_SALEM),
+            (17, BBOX_FULL_SALEM),
+            (18, BBOX_DOWNTOWN),
+            (19, BBOX_DOWNTOWN),
+        ],
     },
     "Mapnik": {
         "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "zoom_min": 16,
-        "zoom_max": 18,
+        "zoom_bboxes": [
+            (16, BBOX_FULL_SALEM),
+            (17, BBOX_FULL_SALEM),
+            (18, BBOX_DOWNTOWN),
+        ],
     },
 }
 
@@ -108,29 +125,31 @@ def main():
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    print(f"Salem Offline Tile Downloader")
-    print(f"Bounding box: {BBOX}")
+    print(f"Salem Offline Tile Downloader (tiered coverage)")
+    print(f"  Downtown bbox : {BBOX_DOWNTOWN}")
+    print(f"  Full Salem    : {BBOX_FULL_SALEM}")
     print(f"Output: {output_path}")
     print()
 
     # ── Calculate tile counts per source ────────────────────────────────
-    # Each source has its own zoom range (satellite gets zoom 19, street stops at 18).
+    # Each source has its own zoom/bbox pairs: low zooms cover the whole city,
+    # zoom 19 stays tight on downtown.
     total_tiles = 0
     source_zoom_details = {}
     for source_name, source_config in SOURCES.items():
-        z_min = source_config["zoom_min"]
-        z_max = source_config["zoom_max"]
+        pairs = source_config["zoom_bboxes"]
         details = []
         source_tiles = 0
-        print(f"  {source_name} (zoom {z_min}-{z_max}):")
-        for zoom in range(z_min, z_max + 1):
-            x_min, x_max, y_min, y_max = get_tile_ranges(BBOX, zoom)
+        print(f"  {source_name}:")
+        for zoom, bbox in pairs:
+            x_min, x_max, y_min, y_max = get_tile_ranges(bbox, zoom)
             nx = x_max - x_min + 1
             ny = y_max - y_min + 1
             count = nx * ny
             source_tiles += count
             details.append((zoom, x_min, x_max, y_min, y_max, nx, ny, count))
-            print(f"    Zoom {zoom:2d}: {nx}×{ny} = {count:5d} tiles")
+            scope = "full-salem" if bbox is BBOX_FULL_SALEM else "downtown"
+            print(f"    Zoom {zoom:2d} ({scope:10s}): {nx}×{ny} = {count:5d} tiles")
         total_tiles += source_tiles
         source_zoom_details[source_name] = details
         print(f"    Subtotal: {source_tiles} tiles")
@@ -166,7 +185,8 @@ def main():
     start_time = time.time()
 
     for source_name, source_config in SOURCES.items():
-        print(f"── {source_name} (zoom {source_config['zoom_min']}-{source_config['zoom_max']}) ──")
+        zooms = [z for z, _ in source_config["zoom_bboxes"]]
+        print(f"── {source_name} (zoom {min(zooms)}-{max(zooms)}) ──")
         source_start = time.time()
         source_count = 0
 

@@ -1,8 +1,132 @@
-# Parking Lot — S138 Master Review (2026-04-16)
+# Parking Lot — S138 Master Review (2026-04-16, re-clustered S143 2026-04-17)
 
 > **Purpose:** Capture 37 critical items from operator's S138 "prep list" verbatim, triage each against current code state, and hold them until the user picks what to pull into the master plan.
 > **Nothing here is scheduled yet.** This is a triage document — the master plan only gets updated after operator review.
 > **Origin conversation:** Session 138, 2026-04-16, operator direction: "parking items… need to figure out what is easy and what doesn't work."
+> **S143 update (2026-04-17):** Operator meeting a lawyer **Monday 2026-04-20** for C-corp formation and legal kickoff. S144 will walk the full parking lot (45 items total: 37 original + 8 S143 additions). Priorities split into **Monday cutoff** (what matters for the lawyer meeting), **post-Monday pre-launch** (before 2026-09-01 Salem 400+ launch), and **V2 / deferred**.
+
+---
+
+## S143 walkthrough roadmap — cluster view (use this for S144)
+
+> **How to read this:** Items are regrouped into thematic clusters by "what makes sense to work on together." Each item keeps its original number (1-37 from S138 + 38-45 from S143) so detailed writeups below remain findable. Clusters are ordered by operator-value priority: legal/brand items that help the C-corp pitch first, then content/UX polish for launch, then back-office work.
+
+### ⭐ Monday Must-Haves (operator-declared, S143)
+
+> **Operator direction (2026-04-17):** "I have a lot of tuning I will need to do to the UI to remove stale concepts (Splash screen for instance) and need to reinforce the opening menu and the menu keys and the find menu along with the audio control — those are must have to me before Monday."
+>
+> These are the items the operator commits to shipping before the **2026-04-20 lawyer meeting**. Some are existing parking-lot items promoted here; some are new items (#46–#49) added S143 to cover surfaces the original S138 list didn't explicitly flag. Clusters A and B below still hold the detailed groupings — this block is the "what must land" list.
+
+| # | Item | Origin | Scope |
+|---|---|---|---|
+| #10 | Legal walkthrough write-up | S138 | M — consolidate COPPA/IARC/privacy for counsel |
+| #11 | Play Store $19.99 + age-gate reasoning (counsel-ready) | S138 | M — write up the S138 decision |
+| #13 | Top menu strip redesign (Salem-witchy buttons) | S138 | M — brand-forward grid dropdown |
+| #27 | Rebuild top hero view | S138 | M — brand-forward home/hub |
+| #40 | Hub-card retitle ("Wicked Salem" residue on Explore Salem card) | S143 | E |
+| #43 | Katrina splash graphic | S143 | ½ session (content-art) |
+| #44 | Screaming-cat splash voiceover | S143 | ½ session (content-art, pairs w/ #43) |
+| **#45** | **Universal audio control at top menu** | S143 | **M — promoted from Cluster D** |
+| **#46** | **Splash screen stale-concept cleanup** | **S143 new** | E–M — text, flow, leftover wording |
+| **#47** | **Opening menu reinforcement** | **S143 new** | M — hub card layout, entries, brand |
+| **#48** | **Menu keys / grid dropdown reinforcement** | **S143 new** | M — tile labels, icons, order, brand |
+| **#49** | **Find menu reinforcement** | **S143 new** | M — category tiles, search UX, results |
+| **#50** | **TTS tuning — pause only at sentence ends** | **S143 new** | E–M — chunker + pause logic |
+
+**Total must-have scope estimate:** 5 Easy, 7 Medium, 2 content-art (½ each). Roughly **3–4 working sessions** between now (Friday 2026-04-17) and Monday 2026-04-20 — **busy weekend**, workable if dedicated. Cluster A items #10/#11 are writing, not code; run in parallel with UI work. #35 (IP hardening) deliberately NOT in must-haves — operator may want that decision to follow counsel's input.
+
+**Risk flags for operator to confirm S144 walkthrough:**
+- Scope fit for 3-day window — any items to drop/defer?
+- Content-art (#43/#44) needs GPU — confirm SalemIntelligence / AudioCraft free time.
+- #46–#49 are brand-new items with no prior triage — S144 walkthrough should drill into each to confirm what "reinforcement" means in code terms.
+
+---
+
+### 🏛️ Cluster A — Legal & IP (**Monday-facing**)
+Directly affects the lawyer meeting or material for counsel to review.
+- **#10** Legal walkthrough write-up — consolidated COPPA/IARC Teen/privacy/ads posture
+- **#11** Play Store $19.99 paid + age-gate reasoning — decision resolved S138; counsel-ready write-up needed
+- **#35** Encrypt all objects / harden IP — defensive IP posture for C-corp valuation
+- **Reference docs (read, don't re-do):** `IP.md` (14 patentable innovations), `GOVERNANCE.md`, `NOTE-L017` Play Store checklist, `NOTE-L014` Privacy Policy (pending OMEN)
+
+### 🎨 Cluster B — Brand & Identity (**Monday-facing polish**)
+So the app visually matches the new "Katrina's Mystic Visitors Guide / DestructiveAIGurus" identity when the operator demos it to counsel.
+- **#40** Hub-card retitle — last "Wicked Salem" residue on the "Explore Salem" hub card (E)
+- **#43** Katrina splash graphic — replace `splash_witchkitty.png` (½ session content-art)
+- **#44** Screaming-cat voiceover — replace `splash_voiceover.wav` (½ session content-art, pairs with #43)
+- **#13** Top menu strip redesign (Salem-witchy buttons) (M)
+- **#27** Rebuild top hero view (M)
+
+### 📖 Cluster C — Content & Narration polish (**post-Monday, pre-launch**)
+V1 narrative experience — what the paying visitor hears and reads.
+- **#2** Narration repetition while moving
+- **#12** Easter eggs (witch-fly-by, last words)
+- **#19** Graveyard souls / ambient memorial eggs
+- **#25** Transit narration wrap-around
+- **#29** Dedicated "Salem Witch History" entry activity
+- **#30** History narrative quit on silence
+- **#32** Repeat history narrative after POI interruption
+- **#36** Pencil-sketch image per newspaper day
+- **#37** Narration FAB (Off / Historical / Historical+Civil / All)
+
+### 🎯 Cluster D — UX polish (**post-Monday, pre-launch**)
+Feel-good improvements that raise quality bar but aren't ship-blockers.
+- **#4** Bearing-up / GPS+sensor movement priority
+- **#14** POI experience overhaul (tour vs wander)
+- **#20** Fuzzy find rework (v2)
+- **#21** Investigate running bugs + log triage
+- **#26** No POI photos ever (confirm + enforce)
+- **#28** POI graphics tiered by merchant payment (V1 skip — tiering deferred to V2)
+- **#34** GPS FAB scope audit (app-only vs system-wide)
+- **#38** Spiderfy overlapping POIs (partial mitigation shipped S143 via z21 overzoom)
+- **#42** Waypoint numbered-badge overlap with POI icon
+- **#45** Universal audio control at top menu
+
+### 🗂️ Cluster E — Admin & Data infrastructure (**post-Monday**)
+Back-office work that unlocks content pipelines. Will touch the Room migration debt from NOTE-L015.
+- **#1** Polygon POIs + sensor lines + multi-location triggers → **NEW-PHASE 9P.C**
+- **#5** Still-duplicate POI merging + OMEN SI-side coordination
+
+### ⚙️ Cluster F — Ops tooling (**operator productivity, any time**)
+Makes the operator more efficient; ship as time allows. Invisible to end-users.
+- **#3** Randomize "walk" start location outside Salem
+- **#6** Walk speedup 2× in dead zones
+- **#7** Tour inventory PDF tool
+- **#9** DME_ global start/stop scripts + USAGE.md
+- **#15** Debug logging standards doc
+- **#17** Periodic `/events` review cadence
+- **#18** Periodic POI revalidation cadence
+- **#41** Dev broadcast map-center handle (added S143)
+
+### 🚧 Cluster G — Pre-launch hardening (**close to 2026-09-01**)
+Final-mile items before Play Store submission.
+- **#35** IP hardening (also in Cluster A — lands wherever post-counsel decides)
+- **#39** Willows tile gap close (+50 tiles, trivial regen, added S143)
+
+### 🔷 Cluster H — OMEN cross-project (**not in operator's hands**)
+Upstream dependencies; OMEN sequences them.
+- **#5** (SI side) still-duplicate POI merging
+- **#8** Merge `~/Development/Salem` → SalemIntelligence
+- **#16** Salem 1692 knowledge in SalemIntelligence
+- **#22** Accusers' ends (historical content)
+- **#23** Accusers tracked (historical content)
+- **#24** Cross-project items via OMEN (meta)
+- **#33** William Woodbury / Beverly historical integration (SI content; display folds back to LMA)
+
+### 🚫 Cluster I — V2 / deferred
+Explicitly post-launch.
+- **#31** Self-contained chatbot (conflicts with V1 offline-only posture)
+
+---
+
+### S144 walkthrough checklist
+
+- [ ] For each Cluster A + B item: confirm "Monday cutoff" OR move to post-Monday
+- [ ] For each post-Monday item: confirm cluster assignment; promote or demote as needed
+- [ ] Pick top 3–5 items to start S144+ work on
+- [ ] OMEN relay: bundle any Cluster H promotions into next OMEN report
+- [ ] Resolve Cluster E Room-migration dependency (NOTE-L015 DB wipe debt) — Cluster E work forces this conversation
+- [ ] Decide whether #35 (IP hardening) is lawyer-prep (Cluster A) or pre-launch-prep (Cluster G) — depends on C-corp / patent-filing timeline counsel advises
 
 ---
 
@@ -592,3 +716,249 @@
 ---
 
 **Next action:** awaiting operator review of remaining open items above. No code changes this session unless explicitly directed.
+
+---
+
+## S143 additions (2026-04-17)
+
+### #38 — Spiderfy overlapping-POI disambiguation
+**Origin:** S143 operator idea while device-testing.
+
+**Problem:** Salem downtown has many co-located POIs (historic house + museum + gift shop at the same footprint). Tapping the map over a cluster currently selects one at random — the user can't reach the others without zooming in to the exact pixel where each POI sits.
+
+**Proposed UX (operator's spec):**
+- Tap hits a cluster → a small red-filled circle marks the tap point
+- Overlapping POIs fan out onto a ring around the tap point
+- Leader lines drawn from tap-point to each fanned POI
+- Tapping a fanned POI selects it; tap elsewhere collapses the fan
+
+**Claude recommendation (hybrid):**
+- 2–8 overlapping → spiderfy (as described)
+- 9+ overlapping → bottom-sheet list (too crowded for a ring)
+- Single tap with no overlap → current behavior (direct select)
+
+**Scope estimate:** ~1–2 sessions. Covers: overlap detection (collect all POIs within N screen-pixels of tap), ring layout math, animated fan open/close, hit-testing on fanned ring, dismiss handling (tap-outside + back button), leader-line polygons, z-order management against existing overlays (GPS dot, trigger rings, red location ball). Partial mitigation already shipped in S143 via overzoom-to-z21 (POI markers separate further at z20/z21, reducing but not eliminating the need).
+
+**Dependencies:** none — pure client-side UI over existing POI markers.
+
+**Status:** Parked.
+
+---
+
+### #39 — Tile bbox north-edge gap (Salem Willows)
+**Origin:** S143 device-verify — bbox set to 42.475–42.545 N covers Salem city proper but cuts off the Salem Willows peninsula tip (lighthouse + park extend to ~42.560 N). Operator's test device was parked at 42.5567 and saw gray.
+
+**Proposed fix:** extend bbox north from 42.545 → 42.560. Cost: ~50 extra tiles at z16–17 full-Salem (under 1 MB, ~20s download time). Trivial regen.
+
+**Status:** Parked — operator doesn't live in Salem so the gap only affects NE-peninsula coverage. Revisit if/when Willows content gets built out.
+
+---
+
+### #40 — Post-splash "Explore Salem" hub card still says "Wicked Salem / Witch City Tour"
+**Origin:** S143 device-verify after S142 splash retitle.
+
+**Context:** S142 retitled `activity_splash.xml` to "Katrina's Mystic Visitors Guide / Historic Salem Tour App" but the hub screen reached by tapping "Explore Salem" on the post-splash home card still shows the old "Wicked Salem / Witch City Tour" banner. Launcher label + splash are under the new identity; this intermediate card was missed.
+
+**Scope:** 1 string edit + device-verify. Small.
+
+**Status:** Parked.
+
+---
+
+### #41 — Dev broadcast handle for map-center from adb
+**Origin:** S143 operator request while device-testing — "we need a dev test way to do that."
+
+**Problem:** No way from adb/terminal to tell the app "center the map at lat,lng and zoom." Every device-verify pass requires physical taps through the UI (grid → Find → search → tap result → tap Map button), which is slow and fragile under automation.
+
+**Proposed fix:** `BroadcastReceiver` registered in `SalemMainActivity.onCreate` gated behind `BuildConfig.DEBUG` (debug builds only, stripped from release). Accepts:
+```
+adb shell am broadcast -a com.destructiveaigurus.dev.GOTO --ef lat 42.5215 --ef lng -70.8928 --ei zoom 18
+```
+
+Also needs `buildFeatures { buildConfig = true }` in `app-salem/build.gradle` so `BuildConfig.DEBUG` is generated.
+
+**Scope:** ~15 min. Receiver class + manifest registration (runtime only, not static) + one-line call to `map.controller.animateTo(GeoPoint(lat, lng), zoom, 800L)`.
+
+**Status:** Parked — operator said "we'll work on that" (deferred) during S143 device-verify.
+
+---
+
+### #42 — Waypoint numbered badge overlaps POI marker
+**Origin:** S143 operator observation while device-testing.
+
+**Problem:** When a tour waypoint (numbered circle 1/10, 2/10, …) sits at the same lat/lng as a POI (which is the common case — a tour stop IS a POI), the numbered waypoint marker is drawn on top of the POI's category icon at CENTER_CENTER anchor, completely covering it. Users see the waypoint number but lose the POI identity cue (color + category icon) that tells them what kind of place this stop is.
+
+**Root cause (from S143 survey):**
+- POI markers: `MarkerIconHelper.forCategory()` → 28dp tinted bitmap, added via `loadNarrationPointMarkers()` at `SalemMainActivity.kt:2141-2207`.
+- Waypoint badges: `MarkerIconHelper.createNumberedCircle()` (line 1027) → 28dp filled color circle with white border + centered number.
+- Waypoint marker added to `binding.mapView.overlays` AFTER POI markers in `drawTourRoute()` at `SalemMainActivityTour.kt:1004-1022`, with `setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)`.
+- Same lat/lng + same anchor + filled disc = full cover.
+
+**Proposed fix (operator picked option 1 — offset badge):**
+Composite the waypoint number as a smaller badge in the upper-right corner of the POI icon, not a separate marker. One bitmap = POI icon (28dp, centered) + small filled circle (14-16dp, positioned at upper-right quadrant) with number. POI category/color cue stays visible; number remains readable.
+
+**Implementation sketch:**
+- New helper in `MarkerIconHelper`: `compositePoiWithBadge(context, category, number, color, sizeDp = 36)` — bigger canvas to fit icon + corner badge
+- In `drawTourRoute()`, when building the waypoint marker, check the corresponding POI's category and use the composite icon instead of the raw numbered circle
+- Keep `setAnchor(CENTER_CENTER)` — composite bitmap is already laid out correctly
+- Remove the separate numbered-only marker path for tour-stop POIs; keep the raw numbered circle only for waypoints with no associated POI (shouldn't happen in the Salem tours but future-proof)
+
+**Scope:** ~1 session. Canvas composite drawing, badge position math, z-order verify, active-tour vs. preview handling (operator said "just active tour" implicitly by picking option 1 without clarifying — if preview tours also show waypoints, same treatment applies).
+
+**Status:** Parked.
+
+---
+
+### #43 — Splash opening graphic (replace splash_witchkitty.png with Katrina)
+**Origin:** S142 operator direction, formalized to parking lot S143.
+
+**Problem:** Current splash illustration `app-salem/src/main/res/drawable/splash_witchkitty.png` is a generic AI-generated witch-cat cartoon. After the rebrand to "Katrina's Mystic Visitors Guide" (S142 Step 2), the splash illustration should be **Katrina** — the operator's actual cat and the app's namesake — so the brand identity and the visual art match.
+
+**Proposed art direction (TBD):**
+- **Photographic** — a clean photo of Katrina, color-graded to match the splash background (deep purple #2A1B3D · gold accents #C9A84C).
+- **Stylized (SD img2img)** — a real Katrina photo run through Forge/ComfyUI with a witchy/Salem illustration prompt, preserving recognition but matching the existing cartoon-ish splash tone.
+- **Hybrid** — stylized primary pass with a photographic accent crop (operator can pick the final once variants are generated).
+
+**Dependencies:**
+- Operator supplies source photos of Katrina.
+- GPU-caution rule applies (`feedback_gpu_caution.md`) — confirm SalemIntelligence / AudioCraft not running before firing up SD.
+- Final asset replaces `splash_witchkitty.png` in place (keeps the same res id wiring in `activity_splash.xml`).
+
+**Scope:** ~½ session of operator+GPU time to generate candidates, pick, finalize, rebuild APK, device-verify.
+
+**Status:** Parked — content-art session, not bug-fix work.
+
+---
+
+### #44 — Splash voiceover (replace splash_voiceover.wav with screaming-cat)
+**Origin:** S142 operator direction, formalized to parking lot S143.
+
+**Problem:** Current splash audio `app-salem/src/main/res/raw/splash_voiceover.wav` is placeholder TTS. Operator wants a **screaming-cat sound** for the splash (matches the new Katrina-themed splash illustration and the "Mystic" brand tone).
+
+**Proposed approach (TBD):**
+- **Sample-based** — freesound.org screaming-cat recordings run through sox effects pipeline (per `project_voice_audio.md` memory: "commanding witches/warlocks, no hesitation, heavy sox post-processing"). Fast, license-safe if sourced from CC0 packs.
+- **Generative (AudioCraft / AudioGen on RTX 3090)** — prompt "distressed Halloween cat scream with mild reverb." Slower, needs GPU, but fully original.
+- **Hybrid** — sample as base layer + generative pass for extra menace + sox polish on both.
+
+**Dependencies:**
+- GPU-caution rule (`feedback_gpu_caution.md`) — confirm RTX 3090 is idle before kicking off AudioCraft.
+- Output must pass PG-13 / IARC Teen content rule (`feedback_pg13_content_rule.md`) — no gore-coded audio, no suggestive vocalizations.
+- Final asset replaces `splash_voiceover.wav` in place (keeps the same res id wiring in `SplashActivity`).
+
+**Scope:** ~½ session of sox + optional GPU time to generate, audition, pick, drop in, device-verify.
+
+**Status:** Parked — content-art session, paired naturally with #43 (same session = "splash refresh" block).
+
+---
+
+### #45 — Universal audio control at the top menu
+**Origin:** S143 operator direction (2026-04-17) — "next session I want universal audio control at the top menu," then reclassified to parking lot same session.
+
+**Problem:** Audio playback in the app is fragmented across several subsystems (POI narration via `NarrationMgr`, Oracle tile TTS, splash voiceover, voice clips on geofence triggers). There's no single user-facing control to mute / unmute / change volume across all of them. A user who wants silence has to find the right subsystem's toggle or lean on device volume.
+
+**Proposed UX:**
+- New top-bar toolbar icon next to the existing slim-toolbar icons (Home / Alerts / Grid / About) — a speaker icon with on / off state.
+- Tap toggles global mute.
+- Long-press opens a mini volume slider + per-source toggles (narration / Oracle / voice clips / splash) for finer control.
+- State persists to SharedPreferences.
+
+**Dependencies:**
+- `AppBarMenuManager.kt` slim-toolbar wiring (already the pattern used for Weather / TileSource icons that S142 hid).
+- Need to route the global mute state into every playback site: `NarrationMgr`, Oracle-tile TTS starter, voice-clip player, `SplashActivity.playVoiceover()`.
+- Respect Android's `AudioManager.STREAM_MUSIC` volume — global mute should not override explicit device volume, just add an in-app mute layer.
+
+**Scope estimate:** 1 session (toolbar icon + state holder + 4 playback-site wire-ups + device-verify).
+
+**Status:** Parked. Not the S144 starter after all — operator moved it to the lot to prioritize freely.
+
+---
+
+### #46 — Splash screen stale-concept cleanup
+**Origin:** S143 operator direction — "tuning I will need to do to the UI to remove stale concepts (Splash screen for instance)."
+
+**Problem:** S142 retitled the splash (title → "Katrina's Mystic Visitors Guide", subtitle → "Historic Salem Tour App") but other splash surfaces may still carry stale brand/concept residue: layout text, progress hints, any leftover "tour-type chooser" or "witch-tour" copy that predated the V1 posture lock, stale ads/LLM hints, etc. Operator hasn't enumerated specifics — requires a walkthrough of `activity_splash.xml` + `SplashActivity.kt` + referenced strings.
+
+**Investigation needed in S144:**
+- Grep `activity_splash.xml` + `SplashActivity.kt` for every string it uses.
+- Walk the live splash on device and catalog anything that reads wrong / stale.
+- Candidate suspects: the "Wicked Salem" internal module name bleeding into any visible text, pre-V1-posture wording about tiers/ads/LLM, pre-offline-only hints about network.
+
+**Scope:** E-M — likely string swaps + one or two flow tweaks, not a redesign. Budget 1–3 hours.
+
+**Status:** Parked — promoted to Monday must-haves block.
+
+---
+
+### #47 — Opening menu reinforcement
+**Origin:** S143 operator direction — "need to reinforce the opening menu."
+
+**Problem:** The "opening menu" is the hub card reached after splash (the one with "Explore Salem" / "Take a Tour" + "The Salem Witch Trials" card + "Long-press the map to jump to any location" hint). Per S143 device-verify screenshot, it still says "Wicked Salem / Witch City Tour" as its banner (#40 covers that retitle but ONLY the banner). The operator wants this surface **reinforced** — which likely means: brand-forward visuals, clearer entry-point labels, maybe iconography that reads "Katrina / Mystic" rather than the current crystal-ball + map graphics.
+
+**Investigation needed in S144:**
+- Identify the activity/layout file (likely `activity_hub.xml` or similar; find via `grep "Explore Salem"` in `app-salem/src/main/res`).
+- Current entries: "Explore Salem", "Take a Tour", "The Salem Witch Trials" (history / newspapers / people). Confirm these are the final V1 entry points — any missing (e.g., Witch Trials parent tile → child selector)?
+- Operator to spec what "reinforcement" looks like: just text/icon refresh, or layout reflow?
+
+**Scope:** M — 1 session.
+
+**Status:** Parked — promoted to Monday must-haves block.
+
+---
+
+### #48 — Menu keys / grid dropdown reinforcement
+**Origin:** S143 operator direction — "need to reinforce... the menu keys."
+
+**Problem:** The "menu keys" are the grid dropdown tiles (POI / Utility / Find / Go To / Social / Chat / Profile / Legend / Tours / Events / Witch Trials). S142 hid row 1 (online-only: Transit / Webcams / Aircraft / Radar) leaving 11 tiles across 3 rows. Operator wants this grid **reinforced** — likely: brand-appropriate icons (Salem-witchy per the related #13 item), rewording where generic ("Utility" is vague), reordering by likely-use, and possibly dropping tiles that aren't V1-relevant.
+
+**Overlap with #13:** This is effectively the implementation of #13 (top-menu strip redesign, Salem-witchy buttons). Could fold #48 into #13 and execute both as one session, OR keep #48 as the scoped content-rewording pass and #13 as the visual-icon redesign. **Operator to decide S144.**
+
+**Investigation needed in S144:**
+- Audit each tile's live function (Social / Chat / Profile / Legend — which are wired in V1? Any are stubs?).
+- Propose rewording for "Utility" if kept.
+- Icon direction: witchy silhouettes (broom, cauldron, crystal ball, tombstone, book) or clean modern with Creepster gold accents?
+
+**Scope:** M — 1 session if icon-set is already sketched; 1-2 if operator wants generative art for each.
+
+**Status:** Parked — promoted to Monday must-haves block. Pairs with #13.
+
+---
+
+### #49 — Find menu reinforcement
+**Origin:** S143 operator direction — "need to reinforce... the find menu."
+
+**Problem:** The Find modal (search box + 20 category tiles — Favorites, Food & Drink, Fuel & Charging, Transit, Civic & Gov, Parks & Rec, Shopping, Healthcare, Education, Lodging, Parking, Finance, Places of Worship, Historic Sites, Emergency Svc, Auto Services, Entertainment, Offices & Services, Witch & Occult Shops, Psychic & Tarot — per S143 screenshot) includes **online-only categories that V1 should have hidden** — "Fuel & Charging" and "Transit" are network-dependent. Also the tile design is generic-colored-rectangle rather than brand-forward.
+
+**Investigation needed in S144:**
+- Confirm which categories the offline DB actually has POIs for. Those 2 we know (FUEL_CHARGING, TRANSIT) — verify they have zero POIs in offline DB and hide the tiles.
+- Audit category label wording for V1-appropriate Salem-voice (e.g., "Psychic & Tarot" already has Salem voice; "Civic & Gov" is generic).
+- Propose tile icons/art that read consistent with the new brand.
+- Confirm search UX behavior on offline DB (already rewritten S141 to use `SalemPoiDao`).
+- Confirm PG-13 content rule is respected on any category imagery.
+
+**Scope:** M — 1 session.
+
+**Status:** Parked — promoted to Monday must-haves block.
+
+---
+
+### #50 — TTS tuning: pause only at sentence ends
+**Origin:** S143 operator direction — "TTS tuning so we only pause at sentence ends, etc."
+
+**Problem:** Current TTS narration (Piper + Android TTS paths used across `NarrationMgr`, Oracle tile reader, Witch Trials reader) chunks long text into playback segments. Pauses between segments land mid-phrase or at comma boundaries, producing an unnatural cadence. Operator wants pauses restricted to **sentence-final** punctuation (`.`, `!`, `?`, possibly `…` and `;` — to confirm) so the narration reads like a human storyteller rather than a chopped-up feed. The "etc." in the operator ask leaves room for related tuning: volume ducking on interruptions, fade-in/fade-out on chunk boundaries, silence-gap duration between sentences.
+
+**Investigation needed in S144:**
+- Find the TTS chunker. Likely candidates:
+  - `NarrationMgr.kt` — primary narration pipeline (exists per memory `project_voice_clips.md`, S131 "People panel + TTS chunker")
+  - Oracle tile WebView reader (HTML/WebView rendered article, click "▶ Speak" — separate TTS hook, visible in S143 screenshots)
+  - Witch Trials article reader — same family as Oracle
+- Identify the split regex. Current pattern is probably `\b[.,;:!?]\s+\b` or similar; needs to become sentence-boundary-only (`[.!?]+\s+` with lookaround for Mr./Mrs./Dr./abbreviations to avoid false splits).
+- Test with known problematic content: 202 Oracle newspaper articles, primary source quotes (common abbreviation densities), multi-paragraph narration.
+- Confirm pause duration between sentences — is it the current "chunk gap" or a configurable pause value? Operator may want this tunable.
+
+**Scope:** E–M — 1 focused session. Risk: the chunker may serve multiple consumers with different requirements (Oracle reads formal journalism; POI narration reads conversational prose). May need a per-consumer regex config instead of one global.
+
+**Status:** Parked — promoted to Monday must-haves block.
+
+---
+
+**Next action after S143:** S144 walkthrough of the parking lot, **driven by the Monday Must-Haves block**. Operator declared items #10, #11, #13, #27, #40, #43, #44, #45, #46, #47, #48, #49, #50 as committed for the Monday 2026-04-20 lawyer meeting. Parking-lot items #38, #39, #41, #42 + Clusters C/D/E/F/G/H/I defer. Busy weekend ahead.
