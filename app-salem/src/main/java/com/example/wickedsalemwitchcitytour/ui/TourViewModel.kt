@@ -258,8 +258,8 @@ class TourViewModel @Inject constructor(
      * newspaper dispatches (tag "newspaper_1692") so POI narrations can
      * interrupt them via [cancelSegmentsWithTag].
      */
-    fun speakTaggedNarration(tag: String, text: String, label: String, voiceId: String? = null) {
-        narrationManager.speakTaggedHint(tag, text, label, voiceId)
+    fun speakTaggedNarration(tag: String, text: String, label: String, voiceId: String? = null, category: String? = null) {
+        narrationManager.speakTaggedHint(tag, text, label, voiceId, category)
     }
 
     /** Cancel any queued or currently-playing segment whose id starts with [tag]. */
@@ -280,6 +280,40 @@ class TourViewModel @Inject constructor(
     fun cancelSheetReading(tag: String) {
         narrationManager.cancelSegmentsWithTag(tag)
     }
+
+    // ── S145 Must-Have #45 — nav cluster wrappers ──────────────────────
+    /** Replay the oldest entry in the rolling narration history. */
+    fun navFirst(): com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Entry? {
+        val e = com.example.wickedsalemwitchcitytour.audio.NarrationHistory.first() ?: return null
+        narrationManager.replayHistoryEntry(e); return e
+    }
+    /** Step back one entry in the rolling narration history and replay it. */
+    fun navPrev(): com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Entry? {
+        val e = com.example.wickedsalemwitchcitytour.audio.NarrationHistory.prev() ?: return null
+        narrationManager.replayHistoryEntry(e); return e
+    }
+    /** Skip to the next entry (if any) and replay it. If none, skip the current queue item. */
+    fun navNext(): com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Entry? {
+        val e = com.example.wickedsalemwitchcitytour.audio.NarrationHistory.next()
+        if (e != null) {
+            narrationManager.replayHistoryEntry(e)
+        } else {
+            narrationManager.skip()
+        }
+        return e
+    }
+    /** Pause/resume the current TTS utterance. */
+    fun navPauseToggle() {
+        val state = narrationManager.state.value
+        if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Paused) {
+            narrationManager.resume()
+        } else {
+            narrationManager.pause()
+        }
+    }
+    /** The entry currently selected by the nav cluster (for Jump routing). */
+    fun currentNavEntry(): com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Entry? =
+        com.example.wickedsalemwitchcitytour.audio.NarrationHistory.current()
 
     override fun onCleared() {
         super.onCleared()

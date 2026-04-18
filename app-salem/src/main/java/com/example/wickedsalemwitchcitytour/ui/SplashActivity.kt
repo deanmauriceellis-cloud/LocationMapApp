@@ -84,7 +84,7 @@ class SplashActivity : AppCompatActivity() {
         splashImage.setImageResource(pickedSplash)
         DebugLogger.i("SplashActivity", "Katrina splash picked: resId=$pickedSplash (pool size=${KATRINA_SPLASHES.size})")
 
-        // Play voiceover audio
+        // Play voiceover audio — always on per S145 operator direction
         try {
             mediaPlayer = MediaPlayer.create(this, R.raw.splash_voiceover)?.apply {
                 setVolume(1.0f, 1.0f)

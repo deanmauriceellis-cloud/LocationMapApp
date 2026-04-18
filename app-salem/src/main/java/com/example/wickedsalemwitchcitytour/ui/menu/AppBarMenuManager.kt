@@ -27,7 +27,12 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
+import android.widget.CheckBox
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.Toast
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.audio.AudioControl
 import com.example.wickedsalemwitchcitytour.ui.TileSourceManager
 import com.example.locationmapapp.ui.menu.MenuEventListener
 import com.example.locationmapapp.ui.menu.MenuPrefs
@@ -222,6 +227,141 @@ class AppBarMenuManager(
             true
         }
         popup.show()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // S145 — AUDIO + NAV CLUSTER (Must-Have #45)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Callback for the nav cluster and content popup interactions. */
+    interface AudioNavListener {
+        fun onNavFirst()
+        fun onNavPrev()
+        fun onNavNext()
+        fun onNavPauseToggle()
+        fun onNavJump()
+    }
+
+    /**
+     * Wire the nav cluster (First / Prev / Next+Pause / Jump) and the audio
+     * control icon (tap → content popup, long-press → detail-level cycle).
+     *
+     * Nav handlers route into [listener]; audio popup + detail cycle are owned
+     * inside this class because they only mutate [AudioControl] state.
+     */
+    fun setupAudioAndNavCluster(
+        audioIcon: ImageView,
+        navFirst: ImageView,
+        navPrev: ImageView,
+        navNext: ImageView,
+        navJump: ImageView,
+        listener: AudioNavListener
+    ) {
+        AudioControl.init(context)
+
+        navFirst.imageTintList = ColorStateList.valueOf(Color.WHITE)
+        navPrev.imageTintList  = ColorStateList.valueOf(Color.WHITE)
+        navNext.imageTintList  = ColorStateList.valueOf(Color.WHITE)
+        navJump.imageTintList  = ColorStateList.valueOf(Color.WHITE)
+        audioIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+
+        navFirst.setOnClickListener { listener.onNavFirst() }
+        navPrev.setOnClickListener  { listener.onNavPrev() }
+        navNext.setOnClickListener  { listener.onNavNext() }
+        navNext.setOnLongClickListener {
+            listener.onNavPauseToggle()
+            true
+        }
+        navJump.setOnClickListener  { listener.onNavJump() }
+
+        audioIcon.setOnClickListener { showAudioContentPopup() }
+        audioIcon.setOnLongClickListener {
+            val next = AudioControl.cycleDetailLevel()
+            Toast.makeText(context, "Detail: ${next.name.lowercase().replaceFirstChar { it.titlecase() }}", Toast.LENGTH_SHORT).show()
+            DebugLogger.i(TAG, "Detail level cycled → $next")
+            true
+        }
+
+        DebugLogger.i(TAG, "setupAudioAndNavCluster() — nav cluster + audio icon wired")
+    }
+
+    /**
+     * Build and show the content-popup AlertDialog — 5 toggles + detail radio.
+     * Uses plain Android components (CheckBox, RadioGroup) for V1 simplicity.
+     */
+    private fun showAudioContentPopup() {
+        val dp = { v: Int -> (v * context.resources.displayMetrics.density).toInt() }
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(8))
+        }
+
+        fun makeCheckbox(label: String, initial: Boolean, onChange: (Boolean) -> Unit): CheckBox {
+            return CheckBox(context).apply {
+                text = label
+                textSize = 15f
+                isChecked = initial
+                setPadding(dp(4), dp(8), dp(4), dp(8))
+                setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
+            }
+        }
+
+        root.addView(TextView(context).apply {
+            text = "What gets narrated"
+            textSize = 13f
+            setTextColor(Color.parseColor("#888888"))
+            setPadding(dp(2), 0, 0, dp(4))
+        })
+        root.addView(makeCheckbox("Oracle Newspaper",                   AudioControl.isOracleEnabled())     { AudioControl.setOracleEnabled(it) })
+        root.addView(makeCheckbox("Meaningful POIs (Historic + Civic)", AudioControl.isMeaningfulEnabled()) { AudioControl.setMeaningfulEnabled(it) })
+        root.addView(makeCheckbox("Ambient POIs (Parks + Education)",   AudioControl.isAmbientEnabled())    { AudioControl.setAmbientEnabled(it) })
+        root.addView(makeCheckbox("Businesses (Shops & Services)",      AudioControl.isBusinessesEnabled()) { AudioControl.setBusinessesEnabled(it) })
+
+        // Divider
+        root.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                topMargin = dp(12); bottomMargin = dp(8)
+            }
+            setBackgroundColor(Color.parseColor("#22000000"))
+        })
+
+        root.addView(TextView(context).apply {
+            text = "Detail level"
+            textSize = 13f
+            setTextColor(Color.parseColor("#888888"))
+            setPadding(dp(2), 0, 0, dp(4))
+        })
+
+        val radio = RadioGroup(context).apply {
+            orientation = RadioGroup.HORIZONTAL
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        val rbBrief    = RadioButton(context).apply { id = View.generateViewId(); text = "Brief"    }
+        val rbStandard = RadioButton(context).apply { id = View.generateViewId(); text = "Standard" }
+        val rbDeep     = RadioButton(context).apply { id = View.generateViewId(); text = "Deep"     }
+        radio.addView(rbBrief)
+        radio.addView(rbStandard)
+        radio.addView(rbDeep)
+        when (AudioControl.detailLevel()) {
+            AudioControl.DetailLevel.BRIEF    -> rbBrief.isChecked = true
+            AudioControl.DetailLevel.STANDARD -> rbStandard.isChecked = true
+            AudioControl.DetailLevel.DEEP     -> rbDeep.isChecked = true
+        }
+        radio.setOnCheckedChangeListener { _, checkedId ->
+            val level = when (checkedId) {
+                rbBrief.id    -> AudioControl.DetailLevel.BRIEF
+                rbDeep.id     -> AudioControl.DetailLevel.DEEP
+                else          -> AudioControl.DetailLevel.STANDARD
+            }
+            AudioControl.setDetailLevel(level)
+        }
+        root.addView(radio)
+
+        AlertDialog.Builder(context)
+            .setTitle("Audio controls")
+            .setView(root)
+            .setPositiveButton("Done", null)
+            .show()
     }
 
     /** Update the weather alert badge count on the alerts icon. */

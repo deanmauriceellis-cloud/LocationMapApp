@@ -1,0 +1,120 @@
+/*
+ * WickedSalemWitchCityTour v1.0
+ * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ *
+ * This source code is proprietary and confidential.
+ * Unauthorized copying, modification, or distribution is
+ * strictly prohibited.
+ */
+
+package com.example.wickedsalemwitchcitytour.audio
+
+import android.content.Context
+import android.content.SharedPreferences
+
+/**
+ * AudioControl — S145 Must-Have #45 universal audio control singleton.
+ *
+ * Holds the user-facing audio preferences surfaced from the toolbar speaker
+ * icon. SharedPreferences-backed so state persists across launches.
+ *
+ * Four POI/Oracle group toggles + one splash voiceover toggle + one detail
+ * level cycle. Call sites consult [isPoiSpeechEnabled] / [isOracleSpeechEnabled]
+ * before enqueuing narration; the NarrationManager itself stays dumb.
+ *
+ * Grouping per operator direction S145 Q2 Option 1:
+ *   - MEANINGFUL → HISTORICAL_BUILDINGS, CIVIC, WITCH_SHOP, WORSHIP
+ *   - AMBIENT    → PARKS_REC, EDUCATION
+ *   - BUSINESSES → FOOD_DRINK, SHOPPING, LODGING, HEALTHCARE, ENTERTAINMENT,
+ *                  AUTO_SERVICES, OFFICES, TOUR_COMPANIES, PSYCHIC, FINANCE,
+ *                  FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY
+ *
+ * Unknown categories default to MEANINGFUL (safe fallback for historic content
+ * that has not yet been classified).
+ */
+object AudioControl {
+
+    private const val PREFS_NAME = "audio_control_v1"
+
+    private const val PREF_ORACLE      = "oracle_on"
+    private const val PREF_MEANINGFUL  = "meaningful_on"
+    private const val PREF_AMBIENT     = "ambient_on"
+    private const val PREF_BUSINESSES  = "businesses_on"
+    private const val PREF_DETAIL      = "detail_level"
+
+    enum class Group { MEANINGFUL, AMBIENT, BUSINESSES }
+
+    enum class DetailLevel { BRIEF, STANDARD, DEEP }
+
+    interface ChangeListener { fun onAudioControlChanged() }
+
+    private val listeners = mutableListOf<ChangeListener>()
+    private var prefs: SharedPreferences? = null
+
+    fun init(context: Context) {
+        if (prefs != null) return
+        prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    private fun requirePrefs(): SharedPreferences =
+        prefs ?: error("AudioControl.init(context) must be called before use")
+
+    // ── Getters ─────────────────────────────────────────────────────────
+    fun isOracleEnabled(): Boolean     = requirePrefs().getBoolean(PREF_ORACLE, true)
+    fun isMeaningfulEnabled(): Boolean = requirePrefs().getBoolean(PREF_MEANINGFUL, true)
+    fun isAmbientEnabled(): Boolean    = requirePrefs().getBoolean(PREF_AMBIENT, true)
+    fun isBusinessesEnabled(): Boolean = requirePrefs().getBoolean(PREF_BUSINESSES, true)
+
+    fun detailLevel(): DetailLevel =
+        DetailLevel.values().getOrElse(requirePrefs().getInt(PREF_DETAIL, DetailLevel.STANDARD.ordinal)) {
+            DetailLevel.STANDARD
+        }
+
+    // ── Setters ─────────────────────────────────────────────────────────
+    fun setOracleEnabled(on: Boolean)     { requirePrefs().edit().putBoolean(PREF_ORACLE, on).apply(); notifyListeners() }
+    fun setMeaningfulEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_MEANINGFUL, on).apply(); notifyListeners() }
+    fun setAmbientEnabled(on: Boolean)    { requirePrefs().edit().putBoolean(PREF_AMBIENT, on).apply(); notifyListeners() }
+    fun setBusinessesEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_BUSINESSES, on).apply(); notifyListeners() }
+
+    fun setDetailLevel(level: DetailLevel) {
+        requirePrefs().edit().putInt(PREF_DETAIL, level.ordinal).apply()
+        notifyListeners()
+    }
+
+    fun cycleDetailLevel(): DetailLevel {
+        val next = when (detailLevel()) {
+            DetailLevel.BRIEF    -> DetailLevel.STANDARD
+            DetailLevel.STANDARD -> DetailLevel.DEEP
+            DetailLevel.DEEP     -> DetailLevel.BRIEF
+        }
+        setDetailLevel(next)
+        return next
+    }
+
+    // ── Category → group mapping ────────────────────────────────────────
+    fun groupForCategory(categoryRaw: String?): Group {
+        val c = categoryRaw?.uppercase() ?: return Group.MEANINGFUL
+        return when (c) {
+            "HISTORICAL_BUILDINGS", "CIVIC", "WITCH_SHOP", "WORSHIP" -> Group.MEANINGFUL
+            "PARKS_REC", "EDUCATION"                                 -> Group.AMBIENT
+            "FOOD_DRINK", "SHOPPING", "LODGING", "HEALTHCARE",
+            "ENTERTAINMENT", "AUTO_SERVICES", "OFFICES",
+            "TOUR_COMPANIES", "PSYCHIC", "FINANCE",
+            "FUEL_CHARGING", "TRANSIT", "PARKING", "EMERGENCY"      -> Group.BUSINESSES
+            else                                                     -> Group.MEANINGFUL
+        }
+    }
+
+    fun isPoiSpeechEnabled(categoryRaw: String?): Boolean = when (groupForCategory(categoryRaw)) {
+        Group.MEANINGFUL -> isMeaningfulEnabled()
+        Group.AMBIENT    -> isAmbientEnabled()
+        Group.BUSINESSES -> isBusinessesEnabled()
+    }
+
+    fun isOracleSpeechEnabled(): Boolean = isOracleEnabled()
+
+    // ── Listener registration ───────────────────────────────────────────
+    fun addListener(l: ChangeListener)    { if (!listeners.contains(l)) listeners.add(l) }
+    fun removeListener(l: ChangeListener) { listeners.remove(l) }
+    private fun notifyListeners() { for (l in listeners) l.onAudioControlChanged() }
+}

@@ -15,6 +15,8 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.audio.AudioControl
+import com.example.wickedsalemwitchcitytour.audio.NarrationHistory
 import com.example.wickedsalemwitchcitytour.content.SalemContentRepository
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -150,25 +152,41 @@ class NarrationManager @Inject constructor(
 
     // ── Narration API ───────────────────────────────────────────────────
 
+    /**
+     * Pick the narration text variant based on [AudioControl.detailLevel].
+     * S145 Q6 Option 1 — graceful fallback: Deep prefers long, falls back to short, falls back to name.
+     */
+    private fun pickVariantText(poi: TourPoi): String = when (AudioControl.detailLevel()) {
+        AudioControl.DetailLevel.BRIEF    -> poi.name
+        AudioControl.DetailLevel.STANDARD -> poi.shortNarration ?: poi.name
+        AudioControl.DetailLevel.DEEP     -> poi.longNarration ?: poi.shortNarration ?: poi.name
+    }
+
     /** Speak the short approach narration for a POI. */
     fun speakShortNarration(poi: TourPoi) {
-        val text = poi.shortNarration ?: return
+        val text = pickVariantText(poi)
         enqueue(NarrationSegment(
             id = "short_${poi.id}",
             text = text,
             type = SegmentType.SHORT_NARRATION,
-            poiName = poi.name
+            poiName = poi.name,
+            kind = NarrationKind.POI,
+            category = poi.category,
+            refId = poi.id
         ))
     }
 
     /** Speak the full at-location narration for a POI. */
     fun speakLongNarration(poi: TourPoi) {
-        val text = poi.longNarration ?: return
+        val text = pickVariantText(poi)
         enqueue(NarrationSegment(
             id = "long_${poi.id}",
             text = text,
             type = SegmentType.LONG_NARRATION,
-            poiName = poi.name
+            poiName = poi.name,
+            kind = NarrationKind.POI,
+            category = poi.category,
+            refId = poi.id
         ))
     }
 
@@ -193,14 +211,16 @@ class NarrationManager @Inject constructor(
     }
 
     /** Speak arbitrary text (for ambient mode hints). */
-    fun speakHint(text: String, poiName: String, voiceId: String? = null) {
+    fun speakHint(text: String, poiName: String, voiceId: String? = null, category: String? = null) {
         DebugLogger.i(TAG, "speakHint called: poi=$poiName voice=${voiceId ?: "default"} ttsReady=$ttsReady text=${text.take(40)}...")
         enqueue(NarrationSegment(
             id = "hint_${System.currentTimeMillis()}",
             text = text,
             type = SegmentType.HINT,
             poiName = poiName,
-            voiceId = voiceId
+            voiceId = voiceId,
+            kind = if (category != null) NarrationKind.POI else null,
+            category = category
         ))
     }
 
@@ -211,13 +231,24 @@ class NarrationManager @Inject constructor(
      * read-through on user click / sheet dismiss without affecting unrelated
      * ambient narration still queued.
      */
-    fun speakTaggedHint(tag: String, text: String, poiName: String, voiceId: String? = null) {
+    fun speakTaggedHint(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null) {
+        // S145 — infer kind from tag prefix (Witch-Trials / newspaper / oracle = ORACLE;
+        // sheet_* / poi_* = POI). Unknown tags fall through (no gate).
+        val inferredKind = when {
+            tag.startsWith("bio_") || tag.startsWith("newspaper_") ||
+            tag.startsWith("oracle_") || tag.startsWith("witchtrials_") -> NarrationKind.ORACLE
+            tag.startsWith("sheet_") || tag.startsWith("poi_")         -> NarrationKind.POI
+            else -> null
+        }
         enqueue(NarrationSegment(
             id = "${tag}_${System.nanoTime()}",
             text = text,
             type = SegmentType.HINT,
             poiName = poiName,
-            voiceId = voiceId
+            voiceId = voiceId,
+            kind = inferredKind,
+            category = category,
+            refId = tag
         ))
     }
 
@@ -287,6 +318,33 @@ class NarrationManager @Inject constructor(
         playNext()
     }
 
+    /**
+     * S145 #45 — Replay a [NarrationHistory.Entry] (First / Prev / Next nav buttons).
+     * Stops current playback, clears the queue, and speaks the requested entry
+     * without re-pushing it to history (isReplay=true).
+     */
+    fun replayHistoryEntry(entry: com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Entry) {
+        intentionallyStopping = true
+        tts?.stop()
+        queue.clear()
+        currentSegment = null
+        val segment = NarrationSegment(
+            id = "replay_${System.nanoTime()}",
+            text = entry.text,
+            type = SegmentType.HINT,
+            poiName = entry.title,
+            voiceId = entry.voiceId,
+            kind = when (entry.kind) {
+                com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Kind.POI    -> NarrationKind.POI
+                com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Kind.ORACLE -> NarrationKind.ORACLE
+            },
+            refId = entry.refId,
+            isReplay = true
+        )
+        DebugLogger.i(TAG, "Replay from history: ${entry.kind} — ${entry.title}")
+        speak(segment)
+    }
+
     /** True if TTS is currently producing audio. */
     fun isSpeaking(): Boolean = tts?.isSpeaking == true
 
@@ -316,6 +374,23 @@ class NarrationManager @Inject constructor(
             return
         }
 
+        // S145 #45 — AudioControl group/oracle gate.
+        when (segment.kind) {
+            NarrationKind.POI -> {
+                if (!AudioControl.isPoiSpeechEnabled(segment.category)) {
+                    DebugLogger.d(TAG, "AudioControl gate: POI group muted (cat=${segment.category}) — dropping ${segment.id}")
+                    return
+                }
+            }
+            NarrationKind.ORACLE -> {
+                if (!AudioControl.isOracleSpeechEnabled()) {
+                    DebugLogger.d(TAG, "AudioControl gate: Oracle muted — dropping ${segment.id}")
+                    return
+                }
+            }
+            null -> { /* legacy / transition / quote — no gate */ }
+        }
+
         queue.addLast(segment)
         DebugLogger.i(TAG, "Enqueued: ${segment.type} — ${segment.poiName} (queue: ${queue.size})")
 
@@ -339,6 +414,20 @@ class NarrationManager @Inject constructor(
     private fun speak(segment: NarrationSegment) {
         currentSegment = segment
         _state.value = NarrationState.Speaking(segment)
+
+        // S145 #45 — push to rolling history on real narration dispatch (not re-plays).
+        if (segment.kind != null && !segment.isReplay) {
+            NarrationHistory.add(NarrationHistory.Entry(
+                kind = when (segment.kind) {
+                    NarrationKind.POI    -> NarrationHistory.Kind.POI
+                    NarrationKind.ORACLE -> NarrationHistory.Kind.ORACLE
+                },
+                title = segment.poiName,
+                text = segment.text,
+                refId = segment.refId,
+                voiceId = segment.voiceId
+            ))
+        }
 
         // Switch to category voice if specified
         val voiceId = segment.voiceId
@@ -373,8 +462,18 @@ data class NarrationSegment(
     val type: SegmentType,
     val poiName: String,
     /** TTS voice ID to use (null = keep current voice) */
-    val voiceId: String? = null
+    val voiceId: String? = null,
+    /** S145 #45 — kind drives AudioControl gating (POI → category-group; ORACLE → oracle toggle). */
+    val kind: NarrationKind? = null,
+    /** S145 #45 — POI category for group mapping (null = no gate). */
+    val category: String? = null,
+    /** S145 #45 — POI id or Oracle tag identifier, for NarrationHistory reference. */
+    val refId: String? = null,
+    /** S145 #45 — replays from NarrationHistory skip re-adding themselves back to history. */
+    val isReplay: Boolean = false
 )
+
+enum class NarrationKind { POI, ORACLE }
 
 enum class SegmentType {
     SHORT_NARRATION,

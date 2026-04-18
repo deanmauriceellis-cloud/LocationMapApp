@@ -15,15 +15,70 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- Icon row: Weather | Home | spacer | TileSource | Alerts | Grid | About -->
+    <!-- S145 Must-Have #45 — Icon row:
+         nav cluster (First / Prev / Next+Pause / Jump) | Weather | Home | spacer |
+         TileSource | Alerts | Grid | Audio | About -->
     <LinearLayout
         android:id="@+id/toolbarIconRow"
         android:layout_width="match_parent"
         android:layout_height="40dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp">
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <!-- ── S145 nav cluster: First / Prev / Next+Pause / Jump ── -->
+        <ImageView
+            android:id="@+id/toolbarNavFirst"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_nav_first"
+            android:scaleType="centerInside"
+            android:padding="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="First narration"
+            android:tooltipText="First narration" />
+
+        <ImageView
+            android:id="@+id/toolbarNavPrev"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_nav_prev"
+            android:scaleType="centerInside"
+            android:padding="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Previous narration"
+            android:tooltipText="Previous narration" />
+
+        <ImageView
+            android:id="@+id/toolbarNavNext"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_nav_next"
+            android:scaleType="centerInside"
+            android:padding="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Next narration (long-press to pause)"
+            android:tooltipText="Next (long-press to pause)" />
+
+        <ImageView
+            android:id="@+id/toolbarNavJump"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_nav_jump"
+            android:scaleType="centerInside"
+            android:padding="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Open what's playing"
+            android:tooltipText="Open what's playing" />
 
         <ImageView
             android:id="@+id/toolbarWeatherIcon"
@@ -32,6 +87,7 @@
             android:src="@drawable/ic_wx_default"
             android:scaleType="centerInside"
             android:padding="4dp"
+            android:layout_marginStart="4dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
@@ -125,6 +181,21 @@
                 android:background="@drawable/badge_teal"
                 android:visibility="gone" />
         </FrameLayout>
+
+        <!-- S145 #45 — universal audio control (tap = popup, long-press = detail cycle) -->
+        <ImageView
+            android:id="@+id/toolbarAudioIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_audio_control"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginStart="8dp"
+            android:contentDescription="Audio controls"
+            android:tooltipText="Audio (long-press: detail level)" />
 
         <ImageView
             android:id="@+id/toolbarAboutIcon"

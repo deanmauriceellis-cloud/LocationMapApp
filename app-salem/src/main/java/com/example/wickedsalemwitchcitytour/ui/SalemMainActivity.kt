@@ -578,6 +578,40 @@ class SalemMainActivity : AppCompatActivity() {
         favoritesManager = com.example.locationmapapp.util.FavoritesManager(this)
         DebugLogger.i("SalemMainActivity", "Slim toolbar wired — Weather, Home, Alerts, Grid, About + StatusLine")
 
+        // S145 Must-Have #45 — nav cluster + audio control wiring
+        appBarMenuManager.setupAudioAndNavCluster(
+            audioIcon = binding.root.findViewById(R.id.toolbarAudioIcon),
+            navFirst  = binding.root.findViewById(R.id.toolbarNavFirst),
+            navPrev   = binding.root.findViewById(R.id.toolbarNavPrev),
+            navNext   = binding.root.findViewById(R.id.toolbarNavNext),
+            navJump   = binding.root.findViewById(R.id.toolbarNavJump),
+            listener  = object : AppBarMenuManager.AudioNavListener {
+                override fun onNavFirst() {
+                    val e = tourViewModel.navFirst()
+                    if (e == null) android.widget.Toast.makeText(this@SalemMainActivity, "No narration history yet", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                override fun onNavPrev() {
+                    val e = tourViewModel.navPrev()
+                    if (e == null) android.widget.Toast.makeText(this@SalemMainActivity, "No earlier narration", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                override fun onNavNext() { tourViewModel.navNext() }
+                override fun onNavPauseToggle() {
+                    tourViewModel.navPauseToggle()
+                    android.widget.Toast.makeText(this@SalemMainActivity, "Pause/resume", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                override fun onNavJump() {
+                    val e = tourViewModel.currentNavEntry()
+                    if (e == null) {
+                        android.widget.Toast.makeText(this@SalemMainActivity, "Nothing playing", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        android.widget.Toast.makeText(this@SalemMainActivity, "→ ${e.title}", android.widget.Toast.LENGTH_SHORT).show()
+                        DebugLogger.i("SalemMainActivity", "S145 Jump requested: kind=${e.kind} ref=${e.refId} (hero deferred to #27)")
+                    }
+                }
+            }
+        )
+        DebugLogger.i("SalemMainActivity", "S145 #45 nav cluster + audio icon wired")
+
         setupMap()
         buildFabSpeedDial()
         initNarrationSystem()

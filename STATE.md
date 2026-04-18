@@ -2,29 +2,37 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 144 (Samantha-statue out-of-bbox clamp + cold-start tier-first narration + 7 Monday Must-Haves shipped in one session; all device-verified; 1 session-end commit)
+**Last updated:** 2026-04-17 — Session 145 (lawyer packet drafted + V1 Privacy Policy drafted + #45 universal audio control shipped & device-verified; 3 of 5 remaining Monday Must-Haves done + bonus Privacy Policy V1; 1 session-end commit)
 
 ---
 
-## TOP PRIORITY — Next Session (S145)
+## TOP PRIORITY — Next Session (S146)
 
-**Operator-directed starting point:** **finish the remaining 5 Monday Must-Haves** before the 2026-04-20 lawyer C-corp meeting. 7 of 13 shipped in S144. Remaining:
+**Operator-directed starting point:** **finish the last 2 Monday Must-Haves** before the 2026-04-20 lawyer C-corp meeting. 10 of 13 shipped across S144 + S145. Remaining:
 
-- **#10** Legal walkthrough write-up — consolidate COPPA / IARC Teen / Privacy / ads posture / data-collection for counsel (writing, no code).
-- **#11** $19.99 + age-gate counsel-ready write-up — document the S138 posture decision (flat paid → no COPPA via Google Play, no tiers in V1) (writing).
-- **#27** Rebuild top hero view (M code — structural).
-- **#45** Universal audio control at top menu (M code — touches NarrationMgr, Oracle reader, Witch Trials reader, splash voiceover).
-- **#44** Screaming-cat splash voiceover (½ session content-art, pairs with existing Katrina splash work).
+- **#27** Rebuild top hero view (M code — structural). Design dialog locked it as a persistent top-of-map hero banner showing currently-narrating POI title + thumbnail + progress; Jump lives in the nav cluster (S145 #45) not the hero.
+- **#44** Screaming-cat splash voiceover (½ session content-art, GPU-caution). Replaces `app-salem/src/main/res/raw/splash_voiceover.wav`. Options: CC0 sample + sox polish, AudioCraft/AudioGen on RTX 3090, or hybrid. Must pass PG-13 / IARC Teen.
 
-**Background items (not blocking S145):**
+**Background items (not blocking S146):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
 - **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff.
 - **OMEN-004 — first real Kotlin unit test** — deadline 2026-08-30 (~4.5 months out). Small scope.
-- **NOTE-L014 Privacy Policy** — drafted S114, pending OMEN review (31 sessions).
-- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — 18 sessions pending operator decision.
+- **NOTE-L014 Privacy Policy** — V1-minimal artifact shipped S145 at `docs/PRIVACY-POLICY-V1.md` (Posture A). Full OMEN-008-compliant draft at `docs/PRIVACY-POLICY.md` remains pending OMEN review (32 sessions); decoupled from V1 ship because V1 doesn't collect RadioIntelligence Salem data.
+- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — **parked post-V1 per operator direction S145** (reversal of initial "abide" direction). Filesystem check: cutover never executed on this workstation; `~/Development/Salem/` still canonical. Nothing to do LMA-side until the physical move happens; decision is post-V1-ship.
 - **NOTE-L018 PG-13 content rule** — pending OMEN acceptance + upstream relay.
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 - **SalemIntelligence bug report** — `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` drafted S144 for operator to forward to SI. 10 BCS POIs with phantom coords 0.2 m off Samantha statue (geocoding fallback bug).
+
+**Post-S145 key facts:**
+- **Lawyer packet drafted** — `docs/lawyer-packet/10-legal-walkthrough.md` (~260 lines, 12-item open-decision menu: C-corp formation, app name, domain, Privacy Policy pointer, pricing pointer, ToS stub, IP copyright/trademark/4-provisional-patents, Play Store checklist, Data Safety, insurance, timeline). `docs/lawyer-packet/11-pricing-and-age-gate.md` (~220 lines, $19.99 flat paid + corrected age-gate mental model: Teen + 13+ + no-data → Google Family Link, not paid-status).
+- **V1 Privacy Policy drafted** — `docs/PRIVACY-POLICY-V1.md` (Posture A V1-minimal, ~180 lines). 4 TBDs for Monday counsel: operating entity, jurisdiction, contact email, mailing address. Full OMEN-008 draft preserved at `docs/PRIVACY-POLICY.md` for future-state RadioIntelligence Salem collection.
+- **Hosting decision:** DestructiveAIGurus.com subpages. Site redev is follow-on post-V1. Pattern: `destructiveaigurus.com/katrinas-mystic-guide/{privacy,support,terms}`.
+- **Entity decision:** C-corp to be formed at 2026-04-20 counsel meeting; interim fallback = sole proprietor (Dean Maurice Ellis) with entity transfer post-formation if timing slips.
+- **#45 Universal Audio Control shipped** — `audio/AudioControl.kt` + `audio/NarrationHistory.kt` + 6 vector drawables + toolbar_two_row.xml layout + AppBarMenuManager.setupAudioAndNavCluster + content-popup AlertDialog + NarrationManager enqueue-gate + `replayHistoryEntry` + tag-based kind inference + detail-aware `pickVariantText` with graceful fallback + TourViewModel nav wrappers + SalemMainActivity listener + SplashActivity always-on voiceover. Device-verified on Lenovo HNY0CY0W: 4 nav icons + audio icon render at correct bounds; popup opens with 4 group toggles (Oracle / Meaningful / Ambient / Businesses) + Detail radio (Brief/Standard/Deep); First-tap confirmed replay of "Lappin Park"; long-press Audio cycles STANDARD→DEEP. Pause = long-press on Next. Jump shows a Toast for now; real sheet-routing deferred to #27 hero view.
+- **Category→group mapping (#45):** MEANINGFUL = HISTORICAL_BUILDINGS + CIVIC + WITCH_SHOP + WORSHIP; AMBIENT = PARKS_REC + EDUCATION; BUSINESSES = FOOD_DRINK + SHOPPING + LODGING + HEALTHCARE + ENTERTAINMENT + AUTO_SERVICES + OFFICES + TOUR_COMPANIES + PSYCHIC + FINANCE + FUEL_CHARGING + TRANSIT + PARKING + EMERGENCY. Unknown → MEANINGFUL (safe historic default).
+- **Detail level semantics:** Brief = POI name only; Standard = short narration; Deep = long narration with graceful fallback to short then name.
+- **Rolling narration history:** 25-entry ring buffer, session-lifetime (cleared on process death), not persisted. First = oldest live entry; Prev = step back; Next = step forward (or skip current if at tail).
+- **Splash voiceover is always-on** — operator mid-S145 direction "splash is always audio available"; no AudioControl gate. Splash will still be replaced with screaming-cat in #44.
 
 **Post-S144 key facts:**
 - **Samantha clamp shipped** — GPS fixes outside the Salem bbox (42.475–42.545 N × -70.958 to -70.835 W) snap to the Bewitched / Samantha Statue (42.5213319, -70.8958518). New `SalemBounds.kt` helper + clamp at all 4 MainViewModel GPS emission sites. Raw GPS still logs to GPS-OBS for diagnostics; only the `_currentLocation` emission gets replaced. Transition logged once per inside/outside flip.
@@ -72,7 +80,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 144. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 145. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -100,8 +108,8 @@
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **DRAFTED S114 at `docs/PRIVACY-POLICY.md`**. Pending OMEN review. Ball is in OMEN's court (31 sessions).
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** 18 sessions running. Needs OMEN to execute or retract.
+1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **V1-minimal Posture A shipped S145 at `docs/PRIVACY-POLICY-V1.md`** (decoupled from OMEN-008 review for V1 ship; V1 doesn't collect RadioIntelligence Salem data). Full OMEN-008 draft at `docs/PRIVACY-POLICY.md` still pending OMEN review (32 sessions); remains relevant for future RI Salem activation.
+2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** **PARKED POST-V1 per operator S145.** Filesystem check confirmed Salem still at `~/Development/Salem/`; LMA runtime references resolve correctly. Decision deferred until after V1 ships.
 3. **OMEN-002 history rotation** — operator action only.
 4. **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142). Previously 2026-04-30. Surfaced to OMEN in S142 report for amendment or acknowledgment.
 5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.

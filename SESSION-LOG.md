@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 135-144. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 136-145. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 145: 2026-04-17 — Lawyer packet (Privacy Policy V1 + pricing + walkthrough) + #45 universal audio control
+
+Counsel-prep + the biggest Monday Must-Have of the lot. Walked the operator through 4 dialog-style Privacy Policy decisions (Posture A V1-minimal, DestructiveAIGurus.com subpage hosting, contact/mailing TBD for counsel, C-corp-to-be-formed) and 6 design questions for #45 (separate from #27 hero, 4-toggle grouping, Next+Pause combo, rolling 25-entry history, Jump as 4th nav button, graceful detail fallback). Drafted 3 counsel-ready artifacts: **`docs/PRIVACY-POLICY-V1.md`** (V1-minimal Posture A, ~180 lines — only what V1 actually does: GPS on-device, no servers, no SDKs, no ads, no data collection; 4 TBDs flagged for Monday; OMEN-008 full draft preserved at `docs/PRIVACY-POLICY.md` for future-state RI Salem), **`docs/lawyer-packet/11-pricing-and-age-gate.md`** (~220 lines — $19.99 flat paid, Google's 15%/30% commission, IARC Teen 13+ + all-None Data Safety → Google Family Link handles age enforcement, no dev-side age gate; corrected the operator's original "paid → bypass age" mental model to "Teen + 13+ + no-data → bypass age"), and **`docs/lawyer-packet/10-legal-walkthrough.md`** (~260 lines — 12-item open-decision menu covering C-corp formation, app name, domain, Privacy Policy pointer, pricing pointer, ToS stub, IP posture: copyright $65/trademark $300/4 provisional patents $1,280, Play Store checklist, Data Safety, insurance, timeline to Sept 1 ship). Then shipped **#45 Universal Audio Control**: new `audio/AudioControl.kt` singleton (4 group toggles + Detail enum + category→group mapping + listener pattern), new `audio/NarrationHistory.kt` ring buffer (25 entries, session-lifetime), 6 vector drawables, toolbar_two_row.xml layout (4 nav icons top-left, audio icon between Grid and About), `AppBarMenuManager.setupAudioAndNavCluster` with AlertDialog content popup (4 CheckBoxes + RadioGroup for Brief/Standard/Deep) + long-press detail cycle, NarrationManager enqueue-gate + `replayHistoryEntry()` + tag-based kind inference (witchtrials_/newspaper_/oracle_→ORACLE; sheet_/poi_→POI) + detail-aware `pickVariantText` with graceful fallback, TourViewModel nav wrappers, SalemMainActivity listener wiring, SplashActivity reverted to always-on voiceover per mid-build operator direction. NOTE-L015 path cutover investigated but parked post-V1 per operator direction (filesystem check confirmed `~/Development/SalemCommercial/` doesn't exist; Salem still at `~/Development/Salem/`). Device-verified on Lenovo HNY0CY0W — toolbar renders with all 5 new icons at correct bounds, popup opens with 4 toggles + radio, First-tap replays oldest history entry (confirmed "Lappin Park" replay → TTS), long-press Audio cycles detail STANDARD→DEEP (confirmed). Remaining Monday Must-Haves for S146 pre-Monday: #27 hero view (M), #44 screaming-cat voiceover (½ session content-art, GPU-caution). Phase status unchanged (9X still COMPLETE from S140). Session count 144 → 145.
+
+Full session detail: `docs/session-logs/session-145-2026-04-17.md`. Commit: (filled on close-out).
+
+---
 
 ## Session 144: 2026-04-17 — Samantha clamp + 7 Monday Must-Haves (Katrina mascot pass)
 
@@ -80,13 +88,5 @@ Full session detail: `docs/session-logs/session-136-2026-04-16.md`. Commit: `5aa
 
 ---
 
-## Session 135: 2026-04-16 — BCS dedup + ATTRACTION removal + SI sync + newspaper overhaul
-
-Major data quality and narration overhaul. BCS-prioritized POI dedup (39 soft-deleted, 12 tour stops repointed). Removed ATTRACTION tier entirely (PAID/HISTORIC/REST). Fixed Vampfangs historic false-positive (year ≤1860 threshold). Full SalemIntelligence re-sync with corrected geocoords (1,281 enriched, 100 new, 1,928 total). Regenerated Heritage Trail OSRM route (was cutting through buildings). Newspaper dispatch overhaul: Room DB source with dateline+headline+body format, yield-to-POI, 3s delay, fixed S132 tour-active gate that was blocking newspapers during tours. Walk-sim tuned: 3.0 m/s, 2.5s GPS, 15s POI dwell. Publish pipeline hardened (Room-compatible DDL, no DEFAULTs).
-
-Full session detail: `docs/session-logs/session-135-2026-04-16.md`. Commit: `d186ad6`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 134 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 135 and earlier are in SESSION-LOG-ARCHIVE.md -->

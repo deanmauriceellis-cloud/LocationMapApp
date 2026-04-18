@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S134 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S135 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 135: 2026-04-16 — BCS dedup + ATTRACTION removal + SI sync + newspaper overhaul
+
+Major data quality and narration overhaul. BCS-prioritized POI dedup (39 soft-deleted, 12 tour stops repointed). Removed ATTRACTION tier entirely (PAID/HISTORIC/REST). Fixed Vampfangs historic false-positive (year ≤1860 threshold). Full SalemIntelligence re-sync with corrected geocoords (1,281 enriched, 100 new, 1,928 total). Regenerated Heritage Trail OSRM route (was cutting through buildings). Newspaper dispatch overhaul: Room DB source with dateline+headline+body format, yield-to-POI, 3s delay, fixed S132 tour-active gate that was blocking newspapers during tours. Walk-sim tuned: 3.0 m/s, 2.5s GPS, 15s POI dwell. Publish pipeline hardened (Room-compatible DDL, no DEFAULTs).
+
+Full session detail: `docs/session-logs/session-135-2026-04-16.md`. Commit: `d186ad6`.
+
+---
 
 ## Session 134: 2026-04-16 — POI category reclassification + Historic Sites of Salem feature
 
