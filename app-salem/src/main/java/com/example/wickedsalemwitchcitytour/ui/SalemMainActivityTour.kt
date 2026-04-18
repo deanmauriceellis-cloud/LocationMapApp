@@ -347,9 +347,18 @@ private fun SalemMainActivity.populateTourList(
     dialog: Dialog
 ) {
     // ── Group tours by theme ──
+    // S146 — Salem Heritage Trail is the featured / marquee tour: pulled out of
+    // the Extended bucket and shown first with a gold-border "FEATURED" card.
+    val heritageTours = tours.filter { it.theme == "HERITAGE_TRAIL" }
     val witchTrialsTours = tours.filter { it.theme == "essential_highlights" }
-    val otherTours = tours.filter { it.theme != "essential_highlights" }
+    val otherTours = tours.filter { it.theme != "essential_highlights" && it.theme != "HERITAGE_TRAIL" }
 
+    if (heritageTours.isNotEmpty()) {
+        listLayout.addView(sectionHeader("Featured — Salem Heritage Trail", dp))
+        for (tour in heritageTours) {
+            listLayout.addView(buildTourCard(tour, dp, dialog, featured = true))
+        }
+    }
     if (witchTrialsTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Salem Witch Trials", dp))
         for (tour in witchTrialsTours) {
@@ -494,11 +503,13 @@ private fun SalemMainActivity.categoryToggle(
 private fun SalemMainActivity.buildTourCard(
     tour: Tour,
     dp: (Int) -> Int,
-    parentDialog: Dialog
+    parentDialog: Dialog,
+    featured: Boolean = false
 ): LinearLayout {
     val cardBg = GradientDrawable().apply {
-        setColor(Color.parseColor(SALEM_SURFACE))
+        setColor(Color.parseColor(if (featured) "#3F2D1B4E" else SALEM_SURFACE))
         cornerRadius = dp(8).toFloat()
+        if (featured) setStroke(dp(2), Color.parseColor(SALEM_GOLD))
     }
 
     return LinearLayout(this).apply {
@@ -510,10 +521,32 @@ private fun SalemMainActivity.buildTourCard(
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(8) }
 
+        // FEATURED badge (top of card, only when featured)
+        if (featured) {
+            addView(TextView(this@buildTourCard).apply {
+                text = "\u2605 FEATURED"
+                textSize = 10f
+                setTextColor(Color.parseColor(SALEM_DARK))
+                setTypeface(null, Typeface.BOLD)
+                letterSpacing = 0.18f
+                gravity = Gravity.CENTER
+                val badgeBg = GradientDrawable().apply {
+                    setColor(Color.parseColor(SALEM_GOLD))
+                    cornerRadius = dp(3).toFloat()
+                }
+                background = badgeBg
+                setPadding(dp(8), dp(2), dp(8), dp(2))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(6) }
+            })
+        }
+
         // Tour name
         addView(TextView(this@buildTourCard).apply {
             text = tour.name
-            textSize = 16f
+            textSize = if (featured) 18f else 16f
             setTextColor(Color.parseColor(SALEM_GOLD))
             setTypeface(null, Typeface.BOLD)
         })

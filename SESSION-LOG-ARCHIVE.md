@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S135 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S136 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 136: 2026-04-16 — BCS dedup finalization + device verification + newspaper dock mode
+
+BCS re-import from fresh SI export (1,560 entities): 1,375 enriched, 89 orphans soft-deleted, all 7 BCS-vs-BCS dedup groups resolved. Walk-sim speed reverted to 1.4 m/s. Device verification confirmed newspaper dispatches fire during tour mode (S132 gate fix working). Built narration dock newspaper mode — "THE ORACLE" masthead + date on bottom sheet during newspaper playback, tap opens detail dialog. Next: HTML/WebView newspaper renderer (step 2) + SI-generated month tiles (step 3).
+
+Full session detail: `docs/session-logs/session-136-2026-04-16.md`. Commit: `5aa5032`.
+
+---
 
 ## Session 135: 2026-04-16 — BCS dedup + ATTRACTION removal + SI sync + newspaper overhaul
 

@@ -155,6 +155,10 @@ class TourViewModel @Inject constructor(
 
     // ── Narration controls ──────────────────────────────────────────────
 
+    /** S146 #27 — replay a NarrationHistory entry (used by the hero-banner tap). */
+    fun replayNarrationHistory(entry: com.example.wickedsalemwitchcitytour.audio.NarrationHistory.Entry) =
+        narrationManager.replayHistoryEntry(entry)
+
     fun pauseNarration() = narrationManager.pause()
     fun resumeNarration() = narrationManager.resume()
     fun stopNarration() = narrationManager.stop()

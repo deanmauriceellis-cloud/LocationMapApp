@@ -272,6 +272,7 @@ internal fun SalemMainActivity.initNarrationSystem() {
     corridorManager?.loadCorridors(SalemCorridors.all())
 
     // Load narration points from database — ALWAYS ON, no tour selection needed
+    val activityRef = this
     lifecycleScope.launch {
         try {
             val points = tourViewModel.loadNarrationPoints()
@@ -281,6 +282,17 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 proximityDock?.show()
                 // Also load narration point markers on the map
                 loadNarrationPointMarkers()
+                // S146 #27 — build POI index + wire the hero banner.
+                activityRef.salemPoiIndex = points.associateBy { it.id }
+                if (activityRef.narrationHero == null) {
+                    activityRef.narrationHero = NarrationHero(
+                        activity = activityRef,
+                        mapView = activityRef.binding.mapView,
+                        narrationState = activityRef.tourViewModel.narrationState,
+                        poiLookup = { id -> activityRef.salemPoiIndex[id] }
+                    )
+                    DebugLogger.i("SalemMainActivity", "S146 #27 narration hero banner wired")
+                }
                 DebugLogger.i("SalemMainActivity", "Ambient narration ACTIVE: ${points.size} points, ${SalemCorridors.all().size} corridors — no tour selection required")
             } else {
                 DebugLogger.w("SalemMainActivity", "No narration points in database")
@@ -327,6 +339,20 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 }
             }
             if (state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle && narrationAutoPlay) {
+                // S146 POI-priority fix: if this Idle emission is the transient
+                // flash from our own cancelSegmentsWithTag("newspaper_1692")
+                // in enqueueNarration (< 500 ms old), DO NOT clear
+                // currentNarration — a POI is about to start speaking on the
+                // main thread and the activity has already set currentNarration
+                // to the new POI. Clearing here lets silence-fill race in
+                // another newspaper ahead of the POI. Instead, just wait for
+                // the next legitimate Idle (after the POI narration completes).
+                val sinceCancelMs = System.currentTimeMillis() - narrationCancelForPoiAtMs
+                if (sinceCancelMs in 0..500) {
+                    DebugLogger.i("NARR-STATE",
+                        "  Idle suppressed (transient cancel-for-POI ${sinceCancelMs}ms ago) — keeping currentNarration")
+                    return@collectLatest
+                }
                 // Clear currentNarration — TTS is done, allow next entry to play immediately
                 currentNarration = null
                 currentNewspaperHeadline = null
@@ -873,45 +899,25 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
     }
 
     val tier = NarrationTierClassifier.classify(point)
-    // Phase 9R.0: A new POI interrupts whatever is currently playing:
-    //   - Newspaper dispatches (tag "newspaper_1692") — ALWAYS interrupt
-    //   - Prior-POI narration (tag "poi_narration") — only interrupt after
-    //     a 10 s MIN HOLD on the current POI. Without this hold, clustered
-    //     ENTRY events at walk start (several POIs within 40m of the first
-    //     GPS fix all fire simultaneously) cascade-cancel each other and
-    //     no audio ever survives long enough to reach the speaker.
-    val now = System.currentTimeMillis()
-    val priorPoiStartedAgoMs = if (lastPoiNarrationStartMs > 0L) now - lastPoiNarrationStartMs else Long.MAX_VALUE
-    val priorPoiMinHoldMs = 10_000L
+    // S146: auto-ENTRY never preempts an already-playing POI. If currentNarration
+    // is set, the new POI falls through to the queue-append branch below and
+    // plays when the current narration's TTS reports Idle (which clears
+    // currentNarration via the narrationState observer, then playNextNarration
+    // picks the next candidate from narrationQueue via pickNextFromQueue).
+    // Newspapers always yield; jumpToFront (explicit user tap) still preempts.
     val wasInterruptingPriorPoi = currentNarration != null && currentNarration?.id != point.id
 
-    // Newspapers always yield to POIs.
+    // S146 POI-priority fix: stamp the cancel timestamp so the Idle observer
+    // doesn't race with our main-thread enqueue and wipe currentNarration.
+    narrationCancelForPoiAtMs = System.currentTimeMillis()
     tourViewModel.cancelSegmentsWithTag("newspaper_1692")
 
-    if (wasInterruptingPriorPoi && priorPoiStartedAgoMs < priorPoiMinHoldMs) {
+    if (jumpToFront && wasInterruptingPriorPoi) {
         DebugLogger.i("NARR-QUEUE",
-            "DROP ENTRY for ${point.name}: prior POI '${currentNarration?.name}' still in min-hold " +
-                "(${priorPoiStartedAgoMs}ms / ${priorPoiMinHoldMs}ms) — queue instead")
-        // Fall through to the append path below — the new POI becomes a
-        // candidate for the next silence/idle cycle but does NOT kill the
-        // just-started current POI.
-    } else {
-        // Either no prior POI playing, or min-hold elapsed — interrupt cleanly.
+            "User-tap preempt: ${point.name} replaces '${currentNarration?.name}'")
         tourViewModel.cancelSegmentsWithTag("poi_narration")
-        if (wasInterruptingPriorPoi) {
-            DebugLogger.i("NARR-QUEUE",
-                "Interrupting prior POI '${currentNarration?.name}' for new POI '${point.name}' " +
-                    "(prior held for ${priorPoiStartedAgoMs}ms)")
-            currentNarration = null
-        }
+        currentNarration = null
     }
-    // S125: DO NOT stamp lastPoiNarrationStartMs here. The pre-S125 code
-    // stamped on every ENTRY (including DROP-ENTRY append-to-queue), so
-    // a rapid burst of ENTRY events kept refreshing the stamp forward and
-    // the 10 s min-hold never actually expired (field test saw 134 DROP
-    // ENTRIES out of 140 ENTRY events). The stamp is now written only by
-    // the two sites that START a narration: PLAY DIRECT below and
-    // playNextNarration's pick-winner path.
     DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} tier=$tier ad=${point.adPriority} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
     if (point.id == currentNarration?.id) {

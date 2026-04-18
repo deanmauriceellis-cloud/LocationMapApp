@@ -2,16 +2,20 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-17 — Session 145 (lawyer packet drafted + V1 Privacy Policy drafted + #45 universal audio control shipped & device-verified; 3 of 5 remaining Monday Must-Haves done + bonus Privacy Policy V1; 1 session-end commit)
+**Last updated:** 2026-04-18 — Session 146 (narration queue fix + Heritage Trail featured + triptych generator framework + #27 hero banner + POI-priority race fix; 12 of 13 Monday Must-Haves shipped; full triptych campaign running in background at session-end)
 
 ---
 
-## TOP PRIORITY — Next Session (S146)
+## TOP PRIORITY — Next Session (S147)
 
-**Operator-directed starting point:** **finish the last 2 Monday Must-Haves** before the 2026-04-20 lawyer C-corp meeting. 10 of 13 shipped across S144 + S145. Remaining:
+**Operator-directed starting points:**
 
-- **#27** Rebuild top hero view (M code — structural). Design dialog locked it as a persistent top-of-map hero banner showing currently-narrating POI title + thumbnail + progress; Jump lives in the nav cluster (S145 #45) not the hero.
-- **#44** Screaming-cat splash voiceover (½ session content-art, GPU-caution). Replaces `app-salem/src/main/res/raw/splash_voiceover.wav`. Options: CC0 sample + sox polish, AudioCraft/AudioGen on RTX 3090, or hybrid. Must pass PG-13 / IARC Teen.
+1. **Check triptych campaign state.** At S146 close it was running in background: `generate_full.py` (PID 144843 at time of close) + `status_writer.py` (PID 144885), log at `/tmp/claude-1000/-home-witchdoctor-Development-LocationMapApp-v1-5/3d5cab92-89d8-49b5-927e-cff7dfe3f80d/tasks/be2fjchko.output`. S146 finished at 164/1837 @ 3.0/min, ETA ~9.5 h. If completed overnight — browse `tools/hero-triptych/output-full/status.html`, review quality, wire into APK assets. If aborted — use the auto-abort message to diagnose.
+2. **Wire completed triptychs into the APK.** Copy `tools/hero-triptych/output-full/triptychs/*.webp` into `app-salem/src/main/assets/heroes/` + update `NarrationHero.kt`'s `thumb.setImageResource` to load `heroes/{poi.id}.webp` via asset manager. Also update the `PoiDetailSheet` hero image to use the same path. ~30 min task.
+3. **#44 Screaming-cat splash voiceover** — last remaining Monday Must-Have. GPU was busy with triptychs this session; pick this up when triptychs complete. Replaces `app-salem/src/main/res/raw/splash_voiceover.wav`. Options: CC0 sample + sox polish, AudioCraft/AudioGen on RTX 3090, or hybrid. Must pass PG-13 / IARC Teen.
+4. **Device-verify S146 fixes** on the Lenovo (HNY0CY0W has the latest APK): (a) walk past two adjacent POIs — second should queue behind first not interrupt (S146 queue fix); (b) while 1692 newspaper is reading, walk near a historical POI — newspaper should cut off and POI should narrate (S146 POI-priority race fix); (c) hero banner should pop above the map with POI title + thumbnail + gold speaker icon during narration, dim to grey arrow when TTS ends, tap pans + opens sheet (S146 #27); (d) open the tour selection dialog — Salem Heritage Trail should render first with gold border + "★ FEATURED" badge (S146 Heritage Trail featured).
+
+**Cron monitor** — the 10-min status ping cron dies with the Claude session. If you want the pings back in S147, ask and I'll recreate `*/10 * * * *` pointing at the latest campaign log.
 
 **Background items (not blocking S146):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
@@ -117,6 +121,8 @@
 7. **NOTE-L018 — PG-13 standing content rule** proposed to OMEN at S138 via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
 8. **NOTE-L019 — `restrooms_zombie.png` regen** (LOW) — one themed POI icon rsync-skipped during the Session 020 NVMe clone. No deadline, no blocker. Regen during a content-art session.
 9. **NVMe advisory** — LIFTED 2026-04-17 (OMEN S021). Normal commit/push cadence resumes.
+10. **9-dot menu witchy backgrounds + strong foreground titles** — PARKED S146 per operator. Toolbar grid menu (Row A: POI / Find / Go To / Journey; Row B: Tours / Events / Witch Trials / Legend) currently ships plain text items. Design direction: each item gets a witchy illustrated background consistent with Katrina painterly-storybook aesthetic, with a strong readable title in the foreground. UI work for a future session; content-art pipeline reusable from find-tile batch pattern. Full detail in `docs/session-logs/session-146-2026-04-17.md`.
+11. **Cross-project: Oracle + SalemIntelligence burial-grounds-tribute hallucinations** — PARKED S146 per operator. Upstream AI content places Salem Witch Trials victims as interred at the Witch Trials Memorial / Charter Street Cemetery / Old Burying Point; those are monument/cemetery complexes where the 20 executed victims are NOT buried. Pre-Play-Store audit needed: grep the 20 canonical victim names against narration text on the 3–4 tribute POIs, excise any burial/resting-place claims. OMEN to relay upstream for Oracle + SI fix. Full detail in `docs/session-logs/session-146-2026-04-17.md`.
 7. ~~**Cross-project: stale intel_entity_id UUIDs in salem_pois**~~ — **CLOSED S125 2026-04-14 (commit `870733b`).** Self-resolved on LMA's side via `cache-proxy/scripts/dedup-stale-intel-links.js`. Pulled SI's `/api/intel/poi-export` (1597 canonical entities), probed every LMA linkage, fuzzy-matched stale UUIDs by name + coord + `/context` validity, then re-linked survivors and soft-deleted the rest. Outcome: 12 canonicals re-linked (chezcasa, lafayette_hotel, rockafellas_restaurant, the_village + 8 others), 211 soft-deleted with `data_source LIKE '%dedup-stale-uuid-2026-04-14-loser%'` (pending pre-Play-Store hard-delete), 0 stale linkages remaining. Bonus: fixed a `generate-narration-from-intel.js` bug that was aborting on GET 404 instead of falling through to POST `/generate` — any future rerun now correctly synthesizes narrations for SI-known-but-uncached entities. No OMEN action required.
 
 ---

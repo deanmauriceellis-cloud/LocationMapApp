@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 136-145. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 137-146. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 146: 2026-04-17 / 2026-04-18 — Narration queue fix + Heritage Trail featured + triptych pipeline + #27 hero banner + POI-priority race fix
+
+Heavy session spanning into pre-dawn. Opened with operator bug report "POIs interrupt each other, they should queue" — traced to aggressive `cancelSegmentsWithTag("poi_narration")` in `enqueueNarration`; fix preserves the newspaper cancel and the jumpToFront user-tap preempt but deletes the auto-preempt path so auto-ENTRY POIs queue instead. Then operator: "I need the first tour highlighted as being the Salem Heritage tour" → pulled `HERITAGE_TRAIL` theme into its own "Featured — Salem Heritage Trail" section at the top of the tour selection dialog with gold-stroke border + "★ FEATURED" badge + 18 sp title. Then the main event: operator greenlit a full triptych hero-bar pipeline covering all 1,837 active POIs, with each POI rendered as a 3-panel WebP (Katrina cat-POV of the business / exterior with small cat / friendly cartoon monster at work). Built the framework from scratch — `tools/hero-triptych/{prompts_lib.py, generate_full.py, status_writer.py}` with ~105 name-keyword overrides, 11 subcategory maps, 16 category fallbacks, 12 famous-landmark overrides (Witch House / Witch Trials Memorial / Proctor's Ledge etc. with tribute-reverent phrasing that pre-empts OMEN-item-#10 burial-hallucinations). Iterated the anti-text defense through four stages after operator flagged sign-gibberish: stronger prompt → bottom-crop hack → FLUX-dev attempt (produced black images, aborted) → landed on **SDXL Turbo + easyocr retry loop on panel 2 only** with auto-abort if failure rate > 10%. Operator-validated 5-POI preflight (1/5 retry, all clean), launched the full overnight campaign (background PID 144843 at session close, 164/1837 @ 3.0/min, ETA ~9.5 h). Shipped **#27 persistent top-of-map narration hero banner** (design dialog-locked: Jump = pan + sheet, persistent-keeps-last, play/stop icon) — new `NarrationHero.kt` + 2 vector drawables + `activity_main.xml` overlay anchored to AppBarLayout + Jump click rewired from Toast to real routing + `replayNarrationHistory` wrapper on TourViewModel. Shipped **POI-priority race fix** after operator reported "historical POIs not taking priority over Oracle newspaper facts" — traced to the `NarrationState.Idle` observer racing main-thread `enqueueNarration` and stomping `currentNarration` during the transient Idle flash between newspaper cancel and POI speak; fix adds `narrationCancelForPoiAtMs` timestamp + 500 ms suppression guard. Parked two new OMEN items: #10 Oracle/SalemIntelligence burial-grounds-tribute hallucinations (narrowed scope to the 3–4 tribute POIs per operator follow-up), #11 9-dot menu needs witchy illustrated backgrounds with strong foreground titles. Saved `feedback_dialog_questions.md` memory (ask design decisions one-at-a-time via AskUserQuestion, not bulleted-text dumps). Device-verified the queue fix + Heritage Trail featured + hero banner + priority-race fix on Lenovo HNY0CY0W (three install passes across the session). Phase status unchanged (9X still COMPLETE from S140). Session count 145 → 146. Background triptych campaign + status_writer left running at close; cron monitor `ff100bed` dies with the session.
+
+Full session detail: `docs/session-logs/session-146-2026-04-17.md`. Commit: `<pending — S146 session-end>`.
+
+---
 
 ## Session 145: 2026-04-17 — Lawyer packet (Privacy Policy V1 + pricing + walkthrough) + #45 universal audio control
 
@@ -80,13 +88,5 @@ Full session detail: `docs/session-logs/session-137-2026-04-16.md`. Commit: `1d4
 
 ---
 
-## Session 136: 2026-04-16 — BCS dedup finalization + device verification + newspaper dock mode
-
-BCS re-import from fresh SI export (1,560 entities): 1,375 enriched, 89 orphans soft-deleted, all 7 BCS-vs-BCS dedup groups resolved. Walk-sim speed reverted to 1.4 m/s. Device verification confirmed newspaper dispatches fire during tour mode (S132 gate fix working). Built narration dock newspaper mode — "THE ORACLE" masthead + date on bottom sheet during newspaper playback, tap opens detail dialog. Next: HTML/WebView newspaper renderer (step 2) + SI-generated month tiles (step 3).
-
-Full session detail: `docs/session-logs/session-136-2026-04-16.md`. Commit: `5aa5032`.
-
 ---
-
----
-<!-- END OF ROLLING WINDOW — Sessions 135 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 136 and earlier are in SESSION-LOG-ARCHIVE.md -->

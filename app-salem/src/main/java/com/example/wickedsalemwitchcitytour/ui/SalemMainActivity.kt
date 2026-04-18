@@ -97,6 +97,21 @@ class SalemMainActivity : AppCompatActivity() {
     internal lateinit var appBarMenuManager: AppBarMenuManager
     internal val radarScheduler = RadarRefreshScheduler()
     internal lateinit var favoritesManager: com.example.locationmapapp.util.FavoritesManager
+    /** S146 #27 — top-of-map hero banner. Lazily wired once narration points load. */
+    internal var narrationHero: NarrationHero? = null
+    /**
+     * S146 POI-priority fix — timestamp (ms) of the last intentional newspaper
+     * cancel done by `enqueueNarration` so a new POI can take priority. The
+     * `NarrationState.Idle` observer checks this value and SKIPS its
+     * `currentNarration = null` cleanup if the Idle transition happened within
+     * 500 ms of the cancel (i.e., the Idle is transient — a POI is about to
+     * start). Without this guard the observer races the main-thread enqueue and
+     * wipes the POI reference, allowing silence-fill to re-queue a newspaper
+     * ahead of the POI.
+     */
+    internal var narrationCancelForPoiAtMs: Long = 0L
+    /** S146 #27 — POI lookup index built when narration points load. */
+    internal var salemPoiIndex: Map<String, com.example.wickedsalemwitchcitytour.content.model.SalemPoi> = emptyMap()
 
     /**
      * GPS Journey recorder (Phase 9T+, S109). Field-injected by Hilt.
@@ -600,12 +615,20 @@ class SalemMainActivity : AppCompatActivity() {
                     android.widget.Toast.makeText(this@SalemMainActivity, "Pause/resume", android.widget.Toast.LENGTH_SHORT).show()
                 }
                 override fun onNavJump() {
-                    val e = tourViewModel.currentNavEntry()
-                    if (e == null) {
-                        android.widget.Toast.makeText(this@SalemMainActivity, "Nothing playing", android.widget.Toast.LENGTH_SHORT).show()
+                    // S146 #27: Jump routes to the persistent hero-banner handler —
+                    // pans the map + opens PoiDetailSheet on the currently-narrating
+                    // (or last-narrated) POI. Falls back to a Toast if the banner
+                    // isn't yet wired (points still loading).
+                    val hero = narrationHero
+                    if (hero != null) {
+                        hero.onJumpRequested()
                     } else {
-                        android.widget.Toast.makeText(this@SalemMainActivity, "→ ${e.title}", android.widget.Toast.LENGTH_SHORT).show()
-                        DebugLogger.i("SalemMainActivity", "S145 Jump requested: kind=${e.kind} ref=${e.refId} (hero deferred to #27)")
+                        val e = tourViewModel.currentNavEntry()
+                        android.widget.Toast.makeText(
+                            this@SalemMainActivity,
+                            if (e == null) "Nothing playing" else "→ ${e.title}",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }

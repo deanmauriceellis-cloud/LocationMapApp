@@ -1,0 +1,7 @@
+# Virtual env — easyocr + torch, multi-GB, reproducible via pip install in README
+.venv/
+
+# Output from the 10-sample + full campaign runs — derivative WebP files
+# regenerable via generate.py / generate_full.py
+output/
+output-full/
