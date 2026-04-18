@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 138-147. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 139-148. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 148: 2026-04-18 — #44 splash voiceover — screech prototype rejected, friendly-meow direction locked, blocked on Ollama VRAM release
+
+Second session of the day, focused on the last Monday Must-Have (#44 screaming-cat splash voiceover). Built the full AudioGen→sox pipeline end-to-end: 4 cat-screech candidates + 4 haunted-Salem atmospheric underlays generated via AudioCraft on RTX 3090, mixed into 4 stereo-44.1-kHz-PCM candidates via a new `mix.sh` recipe (upsample, pad, attenuate bed to −15 dB, hi-pass 60 Hz, soft-knee compand, plate reverb, fade, peak-normalize to −1 dB). Operator auditioned all 4 through workstation speakers and rejected them as "too jolting" — creative pivot to a long friendly girly-kitty meow instead. Saved `feedback_splash_voiceover_vibe.md` memory capturing the direction (why: operator rejection; how to apply: prefer warm/welcoming prompts over alarm-style). Friendly-meow regen attempted but blocked: Ollama woke up between the first and second AudioGen pass and grabbed 20 GB VRAM, leaving only 8 MiB free — regen requires `sudo systemctl stop ollama` to unblock. Operator did not run it before session end; carries to S149. No code changes to `app-salem/` — all artifacts in `/tmp/splash-voiceover-candidates/` (ephemeral). Phase status unchanged (9X still COMPLETE from S140). Session count 147 → 148.
+
+Full session detail: `docs/session-logs/session-148-2026-04-18.md`. Commit: `<to be set after commit>`.
+
+---
 
 ## Session 147: 2026-04-18 — Triptych campaign complete (1,837/1,837, 0 failed) + APK-wiring plumbing live
 
@@ -80,12 +88,4 @@ Full session detail: `docs/session-logs/session-139-2026-04-16.md`. Commits: `67
 
 ---
 
-## Session 138: 2026-04-16 — 37-item parking lot + V1 commercial posture locked + PG-13 standing content rule
-
-Session pivoted off the planned Oracle tile import / device verify (rolled forward to S139+) into operator-driven strategy work: triaged a 37-item "master review" prep list into `docs/parking-lot-S138-master-review.md` (status / complexity / dependencies per item, 16 clusters, 6 proposed new phases); resolved four decisions via dialog — V1 is **$19.99 flat paid, offline-only, no ads, no LLM, no tiers** (tiered/ads/LLM deferred to V2), operator's William Woodbury house (1676) in Beverly saved as PRIVATE user memory, GPS FAB #34 target confirmed, age-gate posture finalized (accept likely IARC Teen rating). Operator then clarified **PG-13 / Teen content rule** as a standing rule across all channels (narration, text, TTS/sox audio, SD prompts, portraits, external-generator briefs to Oracle / SalemIntelligence / Forge / ComfyUI / Bark / Piper); wrote `feedback_pg13_content_rule.md` memory, indexed at top of MEMORY.md, applied immediately to `docs/oracle-tile-brief.md`. Filed out-of-cycle OMEN notification (`S138-urgent-pg13-content-rule-2026-04-16.md`) asking OMEN to note-ack NOTE-L018 and relay the PG-13 constraint to upstream Salem Oracle / SalemIntelligence / GeoInbox projects.
-
-Full session detail: `docs/session-logs/session-138-2026-04-16.md`. Commits: `b3b16ff`, `cd3393e`, `59b5034`, `c6c3a64`, `746163e`. **Note:** Session 138's end-of-session close-out was executed retroactively at the start of Session 139 (2026-04-16 late-evening) — operator noticed the paperwork had not landed though the commits were already pushed.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 137 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 138 and earlier are in SESSION-LOG-ARCHIVE.md -->
