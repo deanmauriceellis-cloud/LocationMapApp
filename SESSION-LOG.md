@@ -8,7 +8,7 @@
 
 Second session of the day, focused on the last Monday Must-Have (#44 screaming-cat splash voiceover). Built the full AudioGen→sox pipeline end-to-end: 4 cat-screech candidates + 4 haunted-Salem atmospheric underlays generated via AudioCraft on RTX 3090, mixed into 4 stereo-44.1-kHz-PCM candidates via a new `mix.sh` recipe (upsample, pad, attenuate bed to −15 dB, hi-pass 60 Hz, soft-knee compand, plate reverb, fade, peak-normalize to −1 dB). Operator auditioned all 4 through workstation speakers and rejected them as "too jolting" — creative pivot to a long friendly girly-kitty meow instead. Saved `feedback_splash_voiceover_vibe.md` memory capturing the direction (why: operator rejection; how to apply: prefer warm/welcoming prompts over alarm-style). Friendly-meow regen attempted but blocked: Ollama woke up between the first and second AudioGen pass and grabbed 20 GB VRAM, leaving only 8 MiB free — regen requires `sudo systemctl stop ollama` to unblock. Operator did not run it before session end; carries to S149. No code changes to `app-salem/` — all artifacts in `/tmp/splash-voiceover-candidates/` (ephemeral). Phase status unchanged (9X still COMPLETE from S140). Session count 147 → 148.
 
-Full session detail: `docs/session-logs/session-148-2026-04-18.md`. Commit: `<to be set after commit>`.
+Full session detail: `docs/session-logs/session-148-2026-04-18.md`. Commit: `5dc2f58`.
 
 ---
 
