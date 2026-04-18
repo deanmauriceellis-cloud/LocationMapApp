@@ -8,7 +8,7 @@
 
 Ran the full 1,837-POI triptych generation campaign to completion on RTX 3090 (625.8 min, zero failures, OCR retry loop catching every SDXL text hallucination). Built the APK-wiring plumbing while the campaign ran: new `HeroAssetLoader` (LruCache + panel-1 slicing), Tier 0 triptych in `PoiHeroResolver`, `NarrationHero` thumbnail swap, idempotent `sync-to-apk.sh`, `.gitignore` covering `heroes/`. Synced all 1,837 triptychs into `assets/heroes/` (73 MB) and confirmed a clean debug APK build bundles every one. Released Forge WebUI + SD model at session end — 24 GB VRAM free for #44 voiceover or emulator.
 
-Full session detail: `docs/session-logs/session-147-2026-04-18.md`. Commit: `<pending>`.
+Full session detail: `docs/session-logs/session-147-2026-04-18.md`. Commit: `e72b170`.
 
 ---
 
