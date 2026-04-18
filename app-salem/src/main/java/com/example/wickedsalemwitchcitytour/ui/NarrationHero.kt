@@ -114,11 +114,22 @@ class NarrationHero(
         playState.setImageResource(
             if (playing) R.drawable.ic_hero_playing else R.drawable.ic_hero_idle
         )
-        // Thumbnail: keep default Katrina avatar for now. Once the triptych
-        // campaign's output is wired into the APK, swap this for the POI's
-        // hero image lookup. (Deferred from S146 #27 — separate wiring task.)
-        thumb.setImageResource(R.drawable.welcome_katrina_avatar)
+        bindThumbnail(poi?.id ?: seg.refId)
         applyVisibility()
+    }
+
+    /**
+     * Triptych panel 1 if bundled for this POI; generic Katrina avatar otherwise.
+     * Asset path: `heroes/{poi_id}.webp` — populated by
+     * tools/hero-triptych/sync-to-apk.sh after the campaign completes.
+     */
+    private fun bindThumbnail(poiId: String?) {
+        val bmp = poiId?.let { HeroAssetLoader.loadTriptychThumb(activity, it) }
+        if (bmp != null) {
+            thumb.setImageBitmap(bmp)
+        } else {
+            thumb.setImageResource(R.drawable.welcome_katrina_avatar)
+        }
     }
 
     private fun buildSubtitle(poi: SalemPoi?, seg: NarrationSegment): String {

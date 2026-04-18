@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 137-146. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 138-147. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 147: 2026-04-18 — Triptych campaign complete (1,837/1,837, 0 failed) + APK-wiring plumbing live
+
+Ran the full 1,837-POI triptych generation campaign to completion on RTX 3090 (625.8 min, zero failures, OCR retry loop catching every SDXL text hallucination). Built the APK-wiring plumbing while the campaign ran: new `HeroAssetLoader` (LruCache + panel-1 slicing), Tier 0 triptych in `PoiHeroResolver`, `NarrationHero` thumbnail swap, idempotent `sync-to-apk.sh`, `.gitignore` covering `heroes/`. Synced all 1,837 triptychs into `assets/heroes/` (73 MB) and confirmed a clean debug APK build bundles every one. Released Forge WebUI + SD model at session end — 24 GB VRAM free for #44 voiceover or emulator.
+
+Full session detail: `docs/session-logs/session-147-2026-04-18.md`. Commit: `<pending>`.
+
+---
 
 ## Session 146: 2026-04-17 / 2026-04-18 — Narration queue fix + Heritage Trail featured + triptych pipeline + #27 hero banner + POI-priority race fix
 
@@ -80,13 +88,4 @@ Full session detail: `docs/session-logs/session-138-2026-04-16.md`. Commits: `b3
 
 ---
 
-## Session 137: 2026-04-16 — HTML/WebView "The Oracle" newspaper renderer + tile brief
-
-Shipped Step 2 of the newspaper UI enhancement: replaced the native-TextView `showWitchTrialsNewspaperDetailDialog()` with a full HTML/WebView newspaper page — "The Oracle" masthead with double-rule gold border, info row with dateline + crisis phase, ALL-CAPS headline, italic deck, flowing justified paragraphs with first-letter drop cap, gold dotted-underline NPC cross-links handled via `shouldOverrideUrlLoading` custom-scheme interception (npc:// and newspaper://). Added `renderHtmlWithLinks()` (HTML equivalent of Spannable cross-linker) and `buildNewspaperHtml()` (CSS-styled page builder). Wrote `docs/oracle-tile-brief.md` — complete content brief for all 16 History panel tiles (intro + 12 months + fallout + closing + epilogue) for Salem Oracle to generate as Oracle Newspaper Digests.
-
-Full session detail: `docs/session-logs/session-137-2026-04-16.md`. Commit: `1d4e778`.
-
----
-
----
-<!-- END OF ROLLING WINDOW — Sessions 136 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 137 and earlier are in SESSION-LOG-ARCHIVE.md -->

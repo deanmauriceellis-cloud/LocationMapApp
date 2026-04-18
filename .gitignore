@@ -32,6 +32,7 @@ tools/.poi-pdf-venv/
 docs/poi-inventory*.pdf
 # Hero images — generated assets, too large for git
 app-salem/src/main/assets/hero/
+app-salem/src/main/assets/heroes/
 tools/hero-image-gen/output/
 tools/hero-image-gen/hero-prompts.json
 tools/hero-image-gen/__pycache__/
