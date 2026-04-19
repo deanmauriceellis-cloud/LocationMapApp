@@ -8,7 +8,7 @@
 
 Opened with S149 field-test debug. Pulled Lenovo logs and diagnosed seven bugs from the Beverly→Salem drive: (1) "so little historical narration" = `getNarrationForPass` ignored `AudioControl.detailLevel`, hardcoded to `shortNarration` — DEEP setting was a no-op on the ambient walk path (tour-only `pickVariantText` was the only honoring path); (2) every Speaking event was `type=HINT` because `TourViewModel.speakTaggedNarration` delegated to `speakTaggedHint`; (3) "Phillip's house on Chestnut" not narrating = mis-categorized ENTERTAINMENT (stuck in muted BUSINESSES group); (4) GPS trail froze on drive because accelerometer significant-motion sensor doesn't fire in a stable car + 25m escape-hatch meant trail only updated every 25m of travel; (5) GPS polling pinned at 2.5s because `narrationActive=true` hardcoded, making the 60s battery-saver branch unreachable (494 fixes in 90 min, mostly parked); (6) bbox override defaulted to `false` so fresh install from Beverly clamped to Samantha; (7) newspaper panel broken because `salem_witch_trials_newspapers` table was missing from bundled Room DB. Shipped fixes for all seven plus instrumented the still-mysterious AudioControl gate leak (Grace Episcopal / Golden Dawn Contracting bypassed the S149 gate even with Businesses off — no toggle events, no code bypass, reason unknown). Recategorized 23 POIs (12 HISTORICAL_BUILDINGS, 1 CIVIC, 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. Republished assets DB (1,830 POIs + 202 newspaper articles). Build clean. APK installed on Lenovo for operator re-test.
 
-Full session detail: `docs/session-logs/session-150-2026-04-18.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-150-2026-04-18.md`. Commit: `5c833a3`.
 
 ---
 
