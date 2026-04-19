@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 140-149. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 141-150. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 150: 2026-04-18 — Field-test root-cause fixes: detail level flows to long_narration, speakTaggedNarration split, 23 POIs recategorized, GPS trail + polling + bbox defaults
+
+Opened with S149 field-test debug. Pulled Lenovo logs and diagnosed seven bugs from the Beverly→Salem drive: (1) "so little historical narration" = `getNarrationForPass` ignored `AudioControl.detailLevel`, hardcoded to `shortNarration` — DEEP setting was a no-op on the ambient walk path (tour-only `pickVariantText` was the only honoring path); (2) every Speaking event was `type=HINT` because `TourViewModel.speakTaggedNarration` delegated to `speakTaggedHint`; (3) "Phillip's house on Chestnut" not narrating = mis-categorized ENTERTAINMENT (stuck in muted BUSINESSES group); (4) GPS trail froze on drive because accelerometer significant-motion sensor doesn't fire in a stable car + 25m escape-hatch meant trail only updated every 25m of travel; (5) GPS polling pinned at 2.5s because `narrationActive=true` hardcoded, making the 60s battery-saver branch unreachable (494 fixes in 90 min, mostly parked); (6) bbox override defaulted to `false` so fresh install from Beverly clamped to Samantha; (7) newspaper panel broken because `salem_witch_trials_newspapers` table was missing from bundled Room DB. Shipped fixes for all seven plus instrumented the still-mysterious AudioControl gate leak (Grace Episcopal / Golden Dawn Contracting bypassed the S149 gate even with Businesses off — no toggle events, no code bypass, reason unknown). Recategorized 23 POIs (12 HISTORICAL_BUILDINGS, 1 CIVIC, 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. Republished assets DB (1,830 POIs + 202 newspaper articles). Build clean. APK installed on Lenovo for operator re-test.
+
+Full session detail: `docs/session-logs/session-150-2026-04-18.md`. Commit: `<sha>`.
+
+---
 
 ## Session 149: 2026-04-18 — Splash TTS warm-start, businesses narration gate, SI coord sync, Use-Real-GPS override
 
@@ -80,14 +88,6 @@ Full session detail: `docs/session-logs/session-141-2026-04-17.md`. Commits: `e5
 
 ---
 
-## Session 140: 2026-04-16/17 — Phase 9X Step 3 complete; Oracle tiles imported, bundled, device-verified on Lenovo; Phase 9X now COMPLETE
-
-Shipped the twice-deferred Phase 9X Step 3. Discovered Salem Oracle had already generated and SalemIntelligence had already ingested 16 PG-13-compliant Oracle Newspaper Digest tiles (`:8089/api/intel/salem-1692/tiles`); PG-13 spot-checked the two highest-risk months (Aug 1692 Burroughs/Proctor and Sep 1692 Corey pressing) — both passed the IARC Teen bar. Wrote `cache-proxy/scripts/import-witch-trials-tiles-from-intel.js` to pull all 16 from SI into PG `salem_witch_trials_articles` under the new Oracle id convention (`intro_pre_1692` / `month_1692_01..12` / `fallout_1693` / `closing_reckoning` / `epilogue_outcomes`, replacing the stale S128 ids). Patched `bundle-witch-trials-into-db.js` with a DELETE-before-INSERT-OR-REPLACE step to avoid id-convention-change orphans in the bundled SQLite. Re-baked `salem_content.db`, refreshed fallback `articles.json`, built `:app-salem:assembleDebug` (31s, clean). Operator chose Lenovo TB305FU over the emulator for device-verify; unloaded Ollama's gemma3:27b first to free GPU, installed on HNY0CY0W, confirmed `WitchTrialsRepo: existing=16 / articles already hydrated` and `showTileDetail id=month_1692_07 order=8` + `id=month_1692_09 order=10`. HTML/WebView renderer, S133 NPC auto-links, TTS Speak button all working on fresh Oracle content. New feedback memory `feedback_lenovo_over_emulator.md`. **Phase 9X now COMPLETE** (14 actual sessions S127-S140 vs 8 originally planned).
-
-Full session detail: `docs/session-logs/session-140-2026-04-16.md`. Commits: `9374380` (importer) + `c588658` (bundle fix + refreshed assets) + the S140 close-out commit.
-
 ---
 
----
-
-<!-- END OF ROLLING WINDOW — Sessions 138 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 140 and earlier are in SESSION-LOG-ARCHIVE.md -->

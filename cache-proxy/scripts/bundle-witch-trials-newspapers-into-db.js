@@ -34,7 +34,14 @@ if (!process.env.DATABASE_URL) {
   } catch (_) {}
 }
 
-const DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+// S150 fix: bake into the CANONICAL source DB (salem-content/), then copy to
+// assets. Previously only wrote to assets, which `publish-salem-pois.js` would
+// silently clobber on its next run — the exact failure mode seen in the S149
+// field-test log where `salem_witch_trials_newspapers` was missing from the
+// shipped APK.
+const SRC_DB = path.resolve(__dirname, '../../salem-content/salem_content.db');
+const ASSETS_DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+const DB = SRC_DB;
 // S130 Phase 9X.4b — Room schema v7 → v8 identity hash (headline + headline_summary added)
 const ROOM_IDENTITY_V8 = '458bb11df51a54f5284a03ef1d2913aa';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -58,7 +65,36 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = new Database(DB);
   db.pragma('journal_mode = DELETE');
 
-  // ── Schema patch: ensure the two new columns exist (idempotent) ──
+  // ── S150 fix: create the table if missing (the `publish-salem-pois.js`
+  // publish loop rebuilds salem_pois but relies on other tables being present;
+  // if the source DB was regenerated from scratch the newspaper table is gone,
+  // producing the SQLITE_ERROR: no such table seen in the S149 field log). ──
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS salem_witch_trials_newspapers (
+      id TEXT NOT NULL PRIMARY KEY,
+      date TEXT NOT NULL,
+      day_of_week TEXT,
+      long_date TEXT,
+      crisis_phase INTEGER NOT NULL,
+      summary TEXT,
+      lede TEXT,
+      body_points TEXT NOT NULL,
+      tts_full_text TEXT NOT NULL,
+      events_referenced TEXT NOT NULL,
+      event_count INTEGER NOT NULL,
+      fact_count INTEGER NOT NULL,
+      primary_source_count INTEGER NOT NULL,
+      data_source TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      verified_date TEXT,
+      generator_model TEXT,
+      headline TEXT,
+      headline_summary TEXT
+    )
+  `);
+
+  // ── Schema patch: ensure the two new columns exist (idempotent for
+  // pre-existing DBs created before S130). ──
   const cols = db.prepare("PRAGMA table_info(salem_witch_trials_newspapers)").all().map(r => r.name);
   if (!cols.includes('headline')) {
     db.exec("ALTER TABLE salem_witch_trials_newspapers ADD COLUMN headline TEXT");
@@ -112,6 +148,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const count = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_newspapers').get().c;
   db.exec('VACUUM');
   db.close();
-  console.log(`Bundled ${rows.length} newspapers into ${DB}. Post-insert COUNT=${count}.`);
+  // S150: mirror the source DB to the APK assets so the next build picks up
+  // the newspaper table without requiring a separate publish-salem-pois run.
+  fs.copyFileSync(SRC_DB, ASSETS_DB);
+  console.log(`Bundled ${rows.length} newspapers into ${SRC_DB}. Post-insert COUNT=${count}.`);
+  console.log(`Mirrored → ${ASSETS_DB}`);
   await pool.end();
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });

@@ -1059,7 +1059,10 @@ class SalemMainActivity : AppCompatActivity() {
             ?: TileSourceManager.DEFAULT_SOURCE
         // S149: restore the "Use Real GPS Outside Salem" pref so the bbox-clamp
         // bypass persists across app restarts (operator field-test convenience).
-        viewModel.bypassBboxClamp = prefs.getBoolean(MenuPrefs.PREF_GPS_BBOX_OVERRIDE, false)
+        viewModel.bypassBboxClamp = prefs.getBoolean(
+            MenuPrefs.PREF_GPS_BBOX_OVERRIDE,
+            MenuPrefs.PREF_GPS_BBOX_OVERRIDE_DEFAULT
+        )
         DebugLogger.i("SalemMainActivity", "setupMap() — tileSource=$tileSourceId fromSplash=$fromSplash bypassBbox=${viewModel.bypassBboxClamp}")
         binding.mapView.apply {
             setTileSource(TileSourceManager.buildSource(tileSourceId))
@@ -2836,6 +2839,21 @@ class SalemMainActivity : AppCompatActivity() {
             val stationaryFrozen = run {
                 val mt = motionTracker ?: return@run false
                 if (!mt.isStationary()) return@run false
+                // S150 field-test fix: when driving, the accelerometer-based
+                // significant-motion sensor rarely fires (phone is stable on a
+                // seat/mount) so MotionTracker.isStationary() stays true for
+                // the entire trip. The 25m radius escape hatch alone means the
+                // journey trail only updates in 25m hops. Operator reported
+                // "GPS trail shows old coords" — this is why.
+                //
+                // Speed-based escape hatch: if the GPS-reported speed exceeds
+                // ~1 mph, the user is definitely moving regardless of what the
+                // physical sensor says. Unfreeze for the full visible pipeline
+                // (trail, cursor, bearing, trigger rings).
+                val speedMpsVal = update.speedMps ?: 0f
+                if (speedMpsVal > 0.5f) {
+                    return@run false
+                }
                 val lastPt = lastGpsPoint ?: return@run false
                 val distFromLast = distanceBetween(lastPt, point)
                 if (distFromLast > STATIONARY_FREEZE_RADIUS_M) {
@@ -2872,25 +2890,35 @@ class SalemMainActivity : AppCompatActivity() {
             updateUserTriggerRings(point)
 
             // ── 1. Adaptive GPS interval ──
-            //   Driving (>20 mph): 10s — coarse is fine
-            //   Walking with narration active: 5s — need frequent checks for 20-50m geofences
-            //   Stationary/slow without narration: 60s — battery saver
+            //   Driving (>20 mph):   10s — coarse is fine at highway speed
+            //   Walking or slow-drive:  2.5s — tight geofence detection needed
+            //   Stopped + narrating:    2.5s — keep polling while TTS is active
+            //   Truly idle:            30s — battery saver, log-spam reduction
             //
-            //   S110: narration manager is now a Hilt singleton, so it's always present
-            //   while the activity is alive. The old null-check was the proxy for
-            //   "narration system initialized?"; that's now structurally guaranteed.
-            val narrationActive = true
-            // S135: GPS rate doubled (5s→2.5s, min 2s→1s) for tighter
-            // geofence detection and smoother walk-sim tracking.
+            //   S150 field-test fix: previously hard-coded `narrationActive=true`,
+            //   which meant the 60s battery-saver branch was unreachable — stationary
+            //   phones polled at 2.5s forever (494 fixes in a 90-min session, most
+            //   while parked). The comment described the intended 3-state ladder
+            //   but the code only had 2 states. Now driven by actual motion + TTS.
+            val speedMpsNow = update.speedMps ?: 0f
+            val narrating = tourViewModel.isNarrating()
             val desiredInterval = when {
                 (speedMph ?: 0.0) > 20.0 -> 10_000L
-                narrationActive -> 2_500L
-                else -> 60_000L
+                speedMpsNow > 0.5f || narrating -> 2_500L
+                else -> 30_000L
             }
             if (desiredInterval != currentGpsIntervalMs) {
                 currentGpsIntervalMs = desiredInterval
-                val minInterval = if (desiredInterval <= 2_500L) 1_000L else if (desiredInterval == 10_000L) 5_000L else 30_000L
-                DebugLogger.i("SalemMainActivity", "GPS interval → ${desiredInterval}ms (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
+                val minInterval = when (desiredInterval) {
+                    2_500L  -> 1_000L
+                    10_000L -> 5_000L
+                    else    -> 15_000L
+                }
+                DebugLogger.i(
+                    "SalemMainActivity",
+                    "GPS interval → ${desiredInterval}ms " +
+                    "(speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph, narrating=$narrating)"
+                )
                 viewModel.restartLocationUpdates(desiredInterval, minInterval)
             }
 

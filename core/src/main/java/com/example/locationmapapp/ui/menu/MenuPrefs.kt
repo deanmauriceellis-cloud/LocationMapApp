@@ -79,8 +79,14 @@ object MenuPrefs {
     const val PREF_SILENT_FILL_DEBUG     = "silent_fill_debug_on"
     /** S149: when true, disable the out-of-Salem-bbox clamp so the app uses real GPS
      *  positions regardless of whether the fix lands inside the Salem bounding box.
-     *  Default off — preserves the Samantha-statue clamp for demo / testing modes. */
+     *  S150: default flipped to `true` — a real-device user opening the app from
+     *  outside Salem (e.g. driving in from Beverly) should see their real location,
+     *  not the Samantha-statue clamp. Emulator / demo modes can toggle this off
+     *  via Journey → "Use Real GPS Outside Salem". */
     const val PREF_GPS_BBOX_OVERRIDE     = "gps_bbox_override_on"
+    /** Default value for [PREF_GPS_BBOX_OVERRIDE]. Shared between the menu sync and
+     *  the startup pref read so they can't drift. */
+    const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = true
 
     // ── Witch Trials feature (Phase 9X, S127) ─────────────────────────────
     /** When true, detail screens (history tile, newspaper, NPC bio) auto-speak the body 1s after open. */

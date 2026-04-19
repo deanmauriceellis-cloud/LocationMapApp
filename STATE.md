@@ -2,35 +2,40 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-18 — Session 149 (splash voiceover pivoted to Android runtime TTS via new process-scoped `SplashVoice` warm-start + splash-held-until-onDone; businesses narration gate shipped via existing S145 `AudioControl` group system with Businesses toggle default flipped to OFF; SalemIntelligence coord sync shipped as `sync-coords-from-intel.js` — 18 updates including all 10 phantom-Samantha POIs relocated; Samantha-cluster 7 junk duplicates soft-deleted; new Journey menu "Use Real GPS Outside Salem" override toggle; operator headed out for field test at close)
+**Last updated:** 2026-04-18 — Session 150 (seven field-test root-cause fixes: `getNarrationForPass` now detail-aware so DEEP pulls `long_narration`; `speakTaggedNarration` split from `speakTaggedHint` so body segments emit `SegmentType.LONG_NARRATION`; 23 POIs recategorized from ENTERTAINMENT/SHOPPING/CIVIC to HISTORICAL_BUILDINGS / CIVIC / WORSHIP including the Chestnut-St Phillip's House operator reported; `salem_witch_trials_newspapers` table now created by bake script; GPS trail speed-based unfreeze (>0.5 m/s bypasses stuck motion tracker); GPS polling now adaptive to actual motion (30s idle baseline, not hardcoded 2.5s); bbox override default flipped to true; NARR-GATE instrumentation added for the still-mysterious Grace Episcopal / Golden Dawn Contracting gate leak)
 
 ---
 
-## TOP PRIORITY — Next Session (S150)
+## TOP PRIORITY — Next Session (S151)
 
 **Operator-directed starting point:**
 
-0. **DEBUG THE S149 FIELD TEST.** Operator walked out for a drive Beverly → Salem with the new APK (splash TTS warm-start, Businesses audio gate OFF, SI coord sync baked in, "Use Real GPS Outside Salem" toggle on). Session closed with the tour in progress. S150 opens by pulling `adb pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/` and reviewing:
-   - **Splash TTS flow:** `SplashVoice.initEarly` → `TTS engine ready` → `speaking` → `onDone` → `Splash complete → launching SalemMainActivity`. Total splash duration should be ~9 s. Safety cap should never have fired.
-   - **Bbox override:** first fix after launch should log `bypassBboxClamp = true` via the pref restore in `setupMap()`, then `location → bbox clamp BYPASSED` on every real-GPS fix while outside Salem. Transition into the bbox should log `location → inside Salem bbox — using raw GPS`.
-   - **Cold-start narration respects AudioControl gate:** business POIs should all log `SKIP (AudioControl group muted)`; only HISTORICAL_BUILDINGS / CIVIC / EDUCATION / PARKS_REC / WORSHIP / WITCH_SHOP should enter the queue. Cold-start-tier-first should drop automatically once user is >40 m from the Samantha anchor (or from their real entry point if entered via real GPS from outside the bbox — verify which behavior actually happened in the drive).
-   - **Narration queue:** no deadlocks on muted POIs; `playNextNarration: queue empty after filter → silence-fill` should be rare (only when no meaningful POIs are nearby).
-   - **GPS polling:** 60 s interval should hold; no runaway logging.
+0. **FIELD TEST THE S150 FIXES.** Operator closed S150 to re-drive Beverly → Salem with the new APK. S151 opens by pulling `adb pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/` and verifying each of the seven shipped fixes:
+   - **Detail flows to `long_narration`:** set Audio Detail to DEEP before walking; listen for multi-sentence historical narration at each POI (not just "You are at X. X is at Y Street"). Log should show `NARR-PLAY: DIRECT PLAY: … detail=DEEP bodyLen=<large>` and `NARR-STATE → Speaking(… type=LONG_NARRATION …)`.
+   - **Phillip's house narrates:** Historic New England's Phillips House and Hale Farm should now enter the queue (no longer `SKIP (AudioControl group muted)`). Category in log should read `HISTORICAL_BUILDINGS`.
+   - **GPS trail follows live movement:** magenta polyline should grow smoothly at driving and walking speeds. Log should show frequent "STATIONARY speed unfreeze" (or silent passage, since we don't log the speed escape path by default).
+   - **GPS polling adaptive:** `GPS interval →` should show 2500 during motion/narration, 30000 while parked, 10000 above 20 mph. Total fix count over a 60-90 min walk should be ~100-200, not ~500.
+   - **Bbox default ON:** first fix from Beverly should log `bypassBboxClamp = true … setupMap() … bypassBbox=true` and NOT show `snapping to Samantha statue`. `location → bbox clamp BYPASSED` on every outside-Salem fix.
+   - **Newspaper panel works:** tapping the Witch Trials → Newspaper section should load without `HistNewspaper: no such table` errors. 202 headlines bundled.
+   - **NARR-GATE gate-leak diagnosis:** every POI enqueue now logs `NARR-GATE: <name> category=<X> group=<Y> enabled=<Z> jumpToFront=<bool> (M=? A=? B=?)`. If Grace Episcopal / Golden Dawn Contracting narrate again, the log will tell us whether isPoiSpeechEnabled returned true unexpectedly.
 
-1. **Anything the operator reports from the walk** — bugs, UX surprises, missing POI coverage, map-follow misbehaving, narration timing off, whatever surfaced.
+1. **Anything the operator reports from the walk** — any remaining UX surprises, narration timing off, POIs missing, etc.
 
-2. **Carry-forwards from S148 / S149:**
-   - **Webex demo (Monday 2026-04-20)** — emulator + audio routing. Audio routing is operator-side; the app side (splash TTS + runtime narration) should now just work.
-   - **APK size pre-Play-Store audit** — debug APK 780 MB, `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
-   - **SalemIntelligence phantom-coord bug report** at `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` — 10 POIs are now fixed LMA-side via this session's coord sync, but the geocoding-fallback bug in SI itself still needs the report forwarded.
+2. **Carry-forwards from S149 / S150:**
+   - **Webex demo (Monday 2026-04-20)** — app-side should now just work. Audio routing still operator-side.
+   - **APK size pre-Play-Store audit** — debug APK 782 MB, `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
+   - **SalemIntelligence phantom-coord bug report** at `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` — still needs to be forwarded to SI.
 
-**Post-S149 key facts:**
-- **Splash pivoted to runtime TTS** — `SplashVoice.kt` (process-scoped, warm-start in `WickedSalemApp.onCreate`) + `SplashActivity` held until `UtteranceProgressListener.onDone` fires. 15 s safety cap. Welcome line: *"Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App."* `res/raw/splash_voiceover.wav` deleted (1.4 MB saved).
-- **Businesses narration gate** — `AudioControl.isBusinessesEnabled()` default flipped from `true` → `false`. Enqueue-time gate in `enqueueNarration` drops any POI whose AudioControl group is muted (non-jumpToFront path only; user taps still play). Verified on device: 17 business POIs skipped at cold-start.
-- **SI coord sync shipped** — new `cache-proxy/scripts/sync-coords-from-intel.js`. First run applied 18 updates including all 10 phantom-Samantha POIs (AutoZone moved 2.2 km, Starbird Dispensary 1.8 km, St. Nicholas Church 1.0 km, Habanero Cycles 815 m, Salem Tipico 755 m, Lifebridge Thrift 518 m, Notch Brewing 451 m, Witch Side Tavern 442 m, The Village / Salem Witch Village 376 m each) + Salem Common 805 m (centroid refinement), Forest Lore Tour 148 m, Central Wharf 33 m, plus smaller corrections.
-- **Samantha cluster cleanup** — 7 junk rows soft-deleted with `data_source LIKE '%samantha-cluster-cleanup-2026-04-18-loser%'` (3 Ginger duplicates, 2 Blue Fez duplicates, Lappin Park Little Free Library mis-categorized as SHOPPING, Spirits of Salem Museum unlinked). Within 35 m of Samantha: 8 clean rows remain (Statue, Lappin Park, Black Cat Curiosity Shoppe, Black Cat Tours, SnapBooks, Workbar Salem, O'Neills Pub, Laura Lanes Skin Care). All linked to SI.
-- **Journey menu "Use Real GPS Outside Salem" toggle** — new `PREF_GPS_BBOX_OVERRIDE` + `MainViewModel.bypassBboxClamp` flag. Setter re-emits `_currentLocation` via `requestLastKnownLocation()` for instant map refresh on toggle. Startup path reads the pref in `setupMap()`. Log lines: `bypassBboxClamp = <bool>`, `location → bbox clamp BYPASSED`.
-- **POI inventory:** still **1,837 active POIs** (18 coords fixed, 7 soft-deleted from Samantha cluster — soft-deletes don't reduce the visible-active count because those rows were already duplicates of canonical entries; actual active count is now 1,830, but counts in `publish-salem-pois.js` may report differently depending on query filters).
+**Post-S150 key facts:**
+- **Detail level now flows to ambient walk** — `NarrationGeofenceManager.getNarrationForPass()` reads `AudioControl.detailLevel()`. BRIEF → null (skip body), STANDARD → `shortNarration`, DEEP → `longNarration ?: shortNarration`. Historical Mode still preferred when `historical_note` populated. New helper `hasAnyNarrationText()` powers the mode-independent no-narrative gate. `pickVariantText()` in `NarrationManager` remains the TourPoi path (unchanged).
+- **speakTaggedNarration vs speakTaggedHint split** — `NarrationManager.speakTaggedNarration()` is new, emits `SegmentType.LONG_NARRATION` with shared `inferKindFromTag` helper. `TourViewModel.speakTaggedHint` + `speakTaggedNarration` both exposed. DIRECT PLAY + playNextNarration paths in `SalemMainActivityNarration` now use hint for "You are at X" and narration for the body. All 4 `newspaper_1692` callsites automatically promoted to proper LONG_NARRATION.
+- **23 POIs recategorized** (PG + Room) with `data_source … |category-fix-s150-2026-04-18`: 12 HISTORICAL_BUILDINGS (Historic New England's Phillips House, Hale Farm, Ames Memorial Hall, Charter Street / Abbott Street / Greenlawn Cemeteries, Witch Trials Memorial, Salem Maritime NHP + Central Wharf, Colonial Hall, Historic Salem Inc., John Cabot House); 1 CIVIC (Salem City Hall); 10 WORSHIP (First Church in Salem, Grace Episcopal, Remix, 3× St. Peter's, Tabernacle, First Baptist, First United Methodist, Saint Vasilios, Salvation Army). Museums (Salem Witch Museum et al.) intentionally left as ENTERTAINMENT pending a broader MEANINGFUL-vs-BUSINESSES group decision.
+- **GPS trail freeze fix** — speed-based escape hatch in `stationaryFrozen`: `update.speedMps > 0.5` bypasses the 25m radius check. Accelerometer-based significant-motion sensor doesn't fire in a stable car, so before this fix the trail only updated every 25m. Now trail updates on every fix during any real motion.
+- **GPS polling adaptive** — `val desiredInterval = when { speed > 20mph → 10s; speedMps > 0.5 || narrating → 2.5s; else → 30s }`. Previously `narrationActive=true` was hardcoded, making the 60s battery-saver branch unreachable. S149 field log: 494 fixes in 90 min, mostly parked. Expected drop to ~100-200 fixes in the S151 walk.
+- **Bbox override default flipped** — `MenuPrefs.PREF_GPS_BBOX_OVERRIDE_DEFAULT = true`. `SalemMainActivity.setupMap()` reads with this default. Fresh install from Beverly shows real GPS, no Samantha clamp. Emulator / demo can toggle off via Journey menu.
+- **Newspaper table** — `bundle-witch-trials-newspapers-into-db.js` now `CREATE TABLE IF NOT EXISTS` before insert, writes to source DB (`salem-content/`), then mirrors to assets. Operator's S149 field log showed 14+ `no such table: salem_witch_trials_newspapers` errors when opening the Witch Trials newspaper panel — that's fixed.
+- **NARR-GATE instrumentation** — `enqueueNarration` now logs `NARR-GATE: <poi> category=<X> group=<Y> enabled=<bool> jumpToFront=<bool> (M=<bool> A=<bool> B=<bool>)` on every call. S149 log showed Grace Episcopal Church (ENTERTAINMENT at that time) and Golden Dawn Contracting (OFFICES) passed the S149 AudioControl gate despite no toggle events and the correct category in the DB. No code bypass. Added log will reveal whether `isBusinessesEnabled` returns true unexpectedly or `groupForCategory` resolves to a different group.
+- **POI inventory:** **1,830 active POIs** (S149 reported 1,837; post-cleanup actual is 1,830 — 7 Samantha-cluster soft-deletes from S149 now reflected in publish-salem-pois row count). 202 witch-trials newspapers now bundled in assets DB.
 
 **Background items (not blocking S150):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
@@ -99,7 +104,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 149. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 150. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 

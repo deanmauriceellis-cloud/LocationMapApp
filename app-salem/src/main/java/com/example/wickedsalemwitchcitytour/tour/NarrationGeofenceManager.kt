@@ -7,6 +7,7 @@ package com.example.wickedsalemwitchcitytour.tour
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.wickedsalemwitchcitytour.audio.AudioControl
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -284,22 +285,40 @@ class NarrationGeofenceManager @Inject constructor(
     }
 
     /**
-     * Get the narration text for a POI.
+     * Get the narration body text for a POI, honoring [AudioControl.detailLevel].
      *
-     * Default: returns `short_narration` (the geofence walk-by announcement).
+     * S150 field-test fix: the ambient walk path previously hard-coded
+     * `short_narration` regardless of the user's Detail setting, so `DEEP`
+     * never pulled `long_narration`. Operators heard 5-20% of authored content.
      *
-     * Historical Mode (Phase 9R.0): prefers `historical_note` when available so
-     * the tour-guide voice plays. Falls back to `short_narration` if no
-     * historical note has been authored/generated yet. This lets the same
-     * manager serve both the ambient and the immersive narration tracks
-     * without duplicating the per-POI dispatch path.
+     * - `BRIEF`    → null (caller speaks only "You are at X")
+     * - `STANDARD` → `short_narration`
+     * - `DEEP`     → `long_narration` ?: `short_narration`
+     * - Historical Mode (Phase 9R.0) still prefers `historical_note` when present,
+     *   regardless of detail level.
      */
     fun getNarrationForPass(point: SalemPoi): String? {
         if (historicalMode) {
             val hn = point.historicalNote
             if (!hn.isNullOrBlank()) return hn
         }
-        return point.shortNarration
+        return when (AudioControl.detailLevel()) {
+            AudioControl.DetailLevel.BRIEF    -> null
+            AudioControl.DetailLevel.STANDARD -> point.shortNarration
+            AudioControl.DetailLevel.DEEP     -> point.longNarration ?: point.shortNarration
+        }
+    }
+
+    /**
+     * Mode-independent "does this POI have any narration text at all?" check,
+     * used by the enqueue no-narrative gate so BRIEF detail doesn't cause POIs
+     * to be silently dropped from the queue (user may switch detail mid-walk).
+     */
+    fun hasAnyNarrationText(point: SalemPoi): Boolean {
+        return !point.longNarration.isNullOrBlank() ||
+               !point.shortNarration.isNullOrBlank() ||
+               !point.description.isNullOrBlank() ||
+               !point.historicalNote.isNullOrBlank()
     }
 
     /** Record that this POI was narrated today (increments persistent visit count) */

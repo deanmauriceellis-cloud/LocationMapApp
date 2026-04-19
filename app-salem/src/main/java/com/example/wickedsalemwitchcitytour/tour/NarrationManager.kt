@@ -234,12 +234,7 @@ class NarrationManager @Inject constructor(
     fun speakTaggedHint(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null) {
         // S145 — infer kind from tag prefix (Witch-Trials / newspaper / oracle = ORACLE;
         // sheet_* / poi_* = POI). Unknown tags fall through (no gate).
-        val inferredKind = when {
-            tag.startsWith("bio_") || tag.startsWith("newspaper_") ||
-            tag.startsWith("oracle_") || tag.startsWith("witchtrials_") -> NarrationKind.ORACLE
-            tag.startsWith("sheet_") || tag.startsWith("poi_")         -> NarrationKind.POI
-            else -> null
-        }
+        val inferredKind = inferKindFromTag(tag)
         enqueue(NarrationSegment(
             id = "${tag}_${System.nanoTime()}",
             text = text,
@@ -250,6 +245,34 @@ class NarrationManager @Inject constructor(
             category = category,
             refId = tag
         ))
+    }
+
+    /**
+     * S150 field-test fix: full-body narration segment (distinct from [speakTaggedHint]
+     * which was mistakenly used for both the short orientation line AND the
+     * body text, causing every utterance to be tagged `SegmentType.HINT`).
+     * Use for historical body content so history panel / nav cluster
+     * classification, and any future body-vs-hint gating, behave correctly.
+     */
+    fun speakTaggedNarration(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null) {
+        val inferredKind = inferKindFromTag(tag)
+        enqueue(NarrationSegment(
+            id = "${tag}_${System.nanoTime()}",
+            text = text,
+            type = SegmentType.LONG_NARRATION,
+            poiName = poiName,
+            voiceId = voiceId,
+            kind = inferredKind,
+            category = category,
+            refId = tag
+        ))
+    }
+
+    private fun inferKindFromTag(tag: String): NarrationKind? = when {
+        tag.startsWith("bio_") || tag.startsWith("newspaper_") ||
+        tag.startsWith("oracle_") || tag.startsWith("witchtrials_") -> NarrationKind.ORACLE
+        tag.startsWith("sheet_") || tag.startsWith("poi_")         -> NarrationKind.POI
+        else -> null
     }
 
     /**

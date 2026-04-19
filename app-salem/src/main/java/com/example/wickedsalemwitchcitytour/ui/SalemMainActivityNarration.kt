@@ -894,22 +894,31 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
     //
     // User-initiated taps (jumpToFront=true) always fire — explicit intent
     // overrides the ambient default, matching the Audio Control design.
-    if (!jumpToFront &&
-        !com.example.wickedsalemwitchcitytour.audio.AudioControl.isPoiSpeechEnabled(point.category)) {
-        DebugLogger.d("NARR-QUEUE",
-            "SKIP (AudioControl group muted): ${point.name} category=${point.category}")
-        return
+    //
+    // S150: log the full group-resolution chain on every enqueue so the
+    // next field test can show why specific POIs leak past the gate
+    // (Golden Dawn Contracting / Grace Episcopal Church in S149 data).
+    run {
+        val audio = com.example.wickedsalemwitchcitytour.audio.AudioControl
+        val group = audio.groupForCategory(point.category)
+        val enabled = audio.isPoiSpeechEnabled(point.category)
+        DebugLogger.d("NARR-GATE",
+            "${point.name} category=${point.category} group=$group enabled=$enabled " +
+            "jumpToFront=$jumpToFront (M=${audio.isMeaningfulEnabled()} " +
+            "A=${audio.isAmbientEnabled()} B=${audio.isBusinessesEnabled()})")
+        if (!jumpToFront && !enabled) {
+            DebugLogger.d("NARR-QUEUE",
+                "SKIP (AudioControl group muted): ${point.name} category=${point.category}")
+            return
+        }
     }
 
     // S125 (field-test 2026-04-14): EARLY no-narrative gate. If the POI has
-    // no narration text for this mode, drop the ENTRY entirely — no stamp,
-    // no cancel, no queue add. Without this gate a no-text POI would still
-    // refresh the min-hold stamp and block better POIs behind it, AND trip
-    // the "DIRECT PLAY: ... no narration text, skipping" path which leaves
-    // currentNarration set to a silent POI and blocks the next dequeue.
-    val previewText = narrationGeofenceManager.getNarrationForPass(point)
-        ?: point.shortNarration ?: point.description
-    if (previewText.isNullOrBlank()) {
+    // no narration text at all, drop the ENTRY entirely — no stamp, no cancel,
+    // no queue add. S150: gate must be detail-level-independent — BRIEF's
+    // null return from getNarrationForPass would otherwise silently drop POIs
+    // the user might still want to hear after switching to STANDARD / DEEP.
+    if (!narrationGeofenceManager.hasAnyNarrationText(point)) {
         DebugLogger.d("NARR-QUEUE", "SKIP (no narrative): ${point.name}")
         return
     }
@@ -958,24 +967,19 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         showNarrationSheet(point)
         showNarrationHighlight(point)
         val rawText = narrationGeofenceManager.getNarrationForPass(point)
-            ?: point.shortNarration ?: point.description
         val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
-        if (rawText != null) {
-            narrationGeofenceManager.recordVisit(point.id)
-            DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId")
-            // S125: stamp the min-hold clock here (at the actual play-start)
-            // instead of at the top of enqueueNarration.
-            lastPoiNarrationStartMs = System.currentTimeMillis()
-            // Phase 9R.0: chapter break via two separate TTS segments —
-            // "You are at {POI}." plays first, the body plays second. Tagged
-            // "poi_narration" so a subsequent POI ENTRY can interrupt the
-            // prior POI's read once the walker has moved on.
-            tourViewModel.speakTaggedNarration("poi_narration", "You are at ${point.name}.", point.name, voiceId)
+        narrationGeofenceManager.recordVisit(point.id)
+        DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId detail=${com.example.wickedsalemwitchcitytour.audio.AudioControl.detailLevel()} bodyLen=${rawText?.length ?: 0}")
+        // S125: stamp the min-hold clock here (at the actual play-start)
+        // instead of at the top of enqueueNarration.
+        lastPoiNarrationStartMs = System.currentTimeMillis()
+        // Phase 9R.0 / S150: chapter break via two separate TTS segments.
+        // The orientation hint ("You are at X") always plays so the user
+        // always gets an acknowledgment that they've arrived. The body
+        // plays only when STANDARD / DEEP produced text; BRIEF skips the body.
+        tourViewModel.speakTaggedHint("poi_narration", "You are at ${point.name}.", point.name, voiceId)
+        if (!rawText.isNullOrBlank()) {
             tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
-        } else {
-            // S125 — should never fire now that the top of enqueueNarration
-            // rejects no-narrative POIs. Keep the branch as a safety net.
-            DebugLogger.w("NARR-PLAY", "DIRECT PLAY: ${point.name} — no narration text, skipping")
         }
         updateQueueIndicator()
         refreshProximityDockFromQueue()
@@ -1158,26 +1162,27 @@ internal suspend fun SalemMainActivity.playNextNarration() {
     showNarrationSheet(point)
     showNarrationHighlight(point)  // S112+: glowing ring on the POI being announced
 
-    // Auto-play TTS — select narration pass based on lifetime visit count
+    // Auto-play TTS — body text is chosen by AudioControl.detailLevel()
+    // (S150: BRIEF → null → body skipped; STANDARD → short; DEEP → long ?: short).
     val rawText = narrationGeofenceManager.getNarrationForPass(point)
-        ?: point.shortNarration ?: point.description
 
     // Resolve voice: POI override > category default
     val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
-    DebugLogger.i("NARR-PLAY", "  text=${if (rawText != null) "${rawText.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay")
-    if (rawText != null && narrationAutoPlay) {
-        DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakNarration() voice=$voiceId")
+    DebugLogger.i("NARR-PLAY", "  text=${if (!rawText.isNullOrBlank()) "${rawText.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay detail=${com.example.wickedsalemwitchcitytour.audio.AudioControl.detailLevel()}")
+    if (narrationAutoPlay) {
+        DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakTagged{Hint,Narration}() voice=$voiceId")
         // S125: stamp the min-hold clock at the actual play-start, matching
         // the PLAY DIRECT path so bursts of ENTRY events can't keep sliding
         // the stamp forward via the old unconditional write.
         lastPoiNarrationStartMs = System.currentTimeMillis()
-        // Phase 9R.0: chapter break via two separate TTS segments. Tagged
-        // "poi_narration" so the next POI ENTRY can cancel-interrupt this
-        // POI's read once the walker has moved past its CPA.
-        tourViewModel.speakTaggedNarration("poi_narration", "You are at ${point.name}.", point.name, voiceId)
-        tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
+        // Phase 9R.0 / S150: orientation hint always plays; body plays only
+        // when STANDARD / DEEP produced text.
+        tourViewModel.speakTaggedHint("poi_narration", "You are at ${point.name}.", point.name, voiceId)
+        if (!rawText.isNullOrBlank()) {
+            tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
+        }
     } else {
-        DebugLogger.w("NARR-PLAY", "  → NOT speaking: text=${rawText != null} autoPlay=$narrationAutoPlay")
+        DebugLogger.w("NARR-PLAY", "  → NOT speaking: autoPlay=$narrationAutoPlay")
     }
     // Record this visit for next-pass selection on future days
     narrationGeofenceManager.recordVisit(point.id)
@@ -1380,8 +1385,13 @@ internal fun SalemMainActivity.showNarrationSheet(point: SalemPoi) {
         point.category.replace('_', ' ').split(' ')
             .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
-    val narrationText = narrationGeofenceManager.getNarrationForPass(point)
-        ?: point.shortNarration ?: point.description ?: "Narration coming soon."
+    // S150: sheet is a display surface, not TTS — show the richest text we have,
+    // independent of AudioControl.detailLevel. Users reading on-screen want the
+    // full content even when they've set Detail to BRIEF for audio.
+    val narrationText = point.longNarration?.takeIf { it.isNotBlank() }
+        ?: point.shortNarration?.takeIf { it.isNotBlank() }
+        ?: point.description
+        ?: "Narration coming soon."
     sheet.findViewById<TextView>(R.id.narrationText)?.text = narrationText
 
     // Distance

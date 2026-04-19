@@ -258,12 +258,26 @@ class TourViewModel @Inject constructor(
     }
 
     /**
-     * Speak arbitrary text tagged for later cancellation. Used for 1692
-     * newspaper dispatches (tag "newspaper_1692") so POI narrations can
-     * interrupt them via [cancelSegmentsWithTag].
+     * Short orientation / hint utterance (e.g. "You are at Derby House.").
+     * Tagged for later cancellation via [cancelSegmentsWithTag]. Emitted as
+     * `SegmentType.HINT`.
+     */
+    fun speakTaggedHint(tag: String, text: String, label: String, voiceId: String? = null, category: String? = null) {
+        narrationManager.speakTaggedHint(tag, text, label, voiceId, category)
+    }
+
+    /**
+     * Full-body narration (historical content). Tagged for later cancellation
+     * via [cancelSegmentsWithTag]. Emitted as `SegmentType.LONG_NARRATION` so
+     * the history panel / nav cluster can distinguish body from hint.
+     *
+     * S150: previously delegated to [speakTaggedHint], which caused every
+     * narration segment to be tagged HINT. Now routes to the real narration
+     * path so kind inference, replay classification, and any future
+     * body-vs-hint UI gating work as intended.
      */
     fun speakTaggedNarration(tag: String, text: String, label: String, voiceId: String? = null, category: String? = null) {
-        narrationManager.speakTaggedHint(tag, text, label, voiceId, category)
+        narrationManager.speakTaggedNarration(tag, text, label, voiceId, category)
     }
 
     /** Cancel any queued or currently-playing segment whose id starts with [tag]. */
