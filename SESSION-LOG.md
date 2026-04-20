@@ -8,7 +8,7 @@
 
 Pivoted from S150 field-test verification to operator's top priority: produce PDF documents for tomorrow's counsel engagement meeting. Mid-session operator redirected to NDA-gated two-tier disclosure after flagging "don't expose IP without NDA." Shipped three PDFs under `docs/counsel-packet/`: **Tier 1 pre-NDA (46 pages, 176 outline entries, 256 links)** covering cover + NDA request, redacted legal walkthrough (IP §9.3 held), pricing + age gate, Privacy Policy V1, new V1 ToS stub, Data Safety pre-filled answers, Play Store checklist, counsel decision checklist, Tier-2 holdback manifest, and a mutual NDA template with explicit patent-novelty and successors-bind clauses; **Tier 2 post-NDA (133 pages, 462 outline entries)** bundling IP register + GOVERNANCE + COMMERCIALIZATION + DESIGN-REVIEW + future-state Privacy Policy; **Operator prep memo (7 pages)** flagging AI-image copyright post-Thaler, accidental-COPPA store-listing risks, Form TX 3-month statutory-damages window, patent 12-month on-sale bar, Play Store 20-tester/14-day rule, Webex-demo IP hygiene, and the likely need for both a corporate and a patent lawyer. Pipeline: markdown-pdf (PyMuPDF-backed) in ephemeral venv at `/tmp/pdfvenv` (libreoffice HTML→PDF was tested and discarded — only outlined `<h2>`). Reproducible via `docs/counsel-packet/build/build_{tier1,tier2,memo}.py`.
 
-Full session detail: `docs/session-logs/session-151-2026-04-19.md`. Commit: `<sha pending>`.
+Full session detail: `docs/session-logs/session-151-2026-04-19.md`. Commit: `fccf67d`.
 
 ---
 
