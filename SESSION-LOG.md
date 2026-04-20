@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 142-151. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 143-152. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 152: 2026-04-19 — Absorb SalemIntelligence KB rewrite (verified_facts landed; Heritage Trail confabulation cleared)
+
+Operator reported SI had completely rewritten its KB to cure bad AI generalization; LMA re-synced and rebuilt. Ran a 7-step absorption: baseline probe surfaced 3 live fabrication hits + 9 rows still at the 30 Church St GP-rooftop phantom coord; coord sync returned 0 updates (SI export matched LMA — 9 phantom-rooftop rows filed as ANOM-001 for SI); historical_note sync updated 33 rows (including the S021 Black Mary Widow correction landing in `gallows_hill_salem`); narration sync updated 1,399 rows with SI's `1f5e051`-SHA regen (+269 short, +290 long). Audit caught two remaining confabulations: `salem_heritage_trail` had SI's verified_fact propagate only to short_narration ("yellow painted line") while long/medium/historical_note still carried an LLM-invented "In 2020 the trail underwent revisions to remove references to its original 'Red Line' history" narrative (filed as ANOM-002); `national_park_service_visitor_center` (LMA-side legacy, not intel-linked) said "red line painted on the sidewalk" directly. Operator-approved option 1: nulled the 4+2 bad fields on the two POIs (tagged `|overridden-s152-heritage-confabulation`), then fixed the identical fabrication hardcoded at `salem-content/.../SalemBusinessesExpanded.kt:1403` so the legacy JVM pipeline can't resurrect it. Rebaked Room DB: 1,769 narrated POIs (+286 vs S150). Built and installed a fresh 820 MB APK on Lenovo HNY0CY0W; cold-boot log verified S150 fixes 4/5/6 are live (GPS polling emits both 2500/30000ms branches, `setupMap` shows `bypassBbox=true` on first call, zero `no such table` errors — 202 newspapers baked). S150 fixes 1/2/3/7 need a field walk to exercise (pending for S153). Anomaly report for SI filed at `docs/SalemIntelligence-anomalies-s152-2026-04-19.md`.
+
+Full session detail: `docs/session-logs/session-152-2026-04-19.md`. Commits: `d249073` (sync + Room bake + hand-nullings) + `a11a9fd` (Kotlin confabulation fix + APK rebuild).
+
+---
 
 ## Session 151: 2026-04-19 — Counsel packet PDFs (pre-NDA / post-NDA) for 2026-04-20 counsel engagement meeting
 
@@ -78,14 +86,4 @@ Full session detail: `docs/session-logs/session-143-2026-04-17.md`. Commits: (to
 
 ---
 
-## Session 142: 2026-04-17 — V1 UI hide + full rebrand (applicationId + display label)
-
-Two-step session. **Step 1 (UI hide):** operator directed picking up S141's deferred UI hide pass, deferring the 8-12h soak to their own schedule, and moving OMEN-004's deadline from 2026-04-30 to 2026-08-30. Explore subagent found all 7 online-only UI entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) concentrated in `app-salem/.../ui/menu/AppBarMenuManager.kt`. Shipped six surgical edits behind `FeatureFlags.V1_OFFLINE_ONLY`: hid the dead-code top-bar XML items defensively, hid the slim-toolbar weather + tile-source icons, hid grid-dropdown row 1, added early-return guards to all four `show*Menu()` paths, removed `menu_tfr_overlay` from the alerts popup, and stopped `computeActiveLayerCount()` from counting the 8 online-only prefs. Device-verified on Lenovo HNY0CY0W. Combined with S141's data-layer work, V1 now has three-layer offline coverage — OkHttp interceptor + ViewModel gates + UI hide. **Step 2 (full rebrand):** operator directed a Play-Store-ready install identity: `applicationId` changed from `com.example.wickedsalemwitchcitytour` (which Google Play rejects) to `com.destructiveaigurus.katrinasmysticvisitorsguide`, and `app_name` from "Wicked Salem" to "Katrina's Mystic Visitors Guide - Salem". Internal code namespace, class names, themes, module name, and docs intentionally left unchanged per operator direction — rebrand is at the install-identity / display-label layer only. Four file edits: `build.gradle` (applicationId), `strings.xml` (label), `AndroidManifest.xml` (FileProvider authority switched to `${applicationId}.fileprovider` to auto-sync), `SalemMainActivityGeofences.kt:651` (caller switched to `$packageName.fileprovider`). Uninstalled the old package on Lenovo and installed the new APK clean — launcher resolves, FileProvider authority registered as the new `…katrinasmysticvisitorsguide.fileprovider`, no crashes, S141+S142-Step1 V1 offline enforcement intact, 1,837 POIs loaded. `aapt2 dump badging` confirms display label `Katrina's Mystic Visitors Guide - Salem`. `applicationId` is now immutable once we ship; frozen before the submission window.
-
-**Step 3 (splash retitle):** `activity_splash.xml` splash title "Wicked Salem" → "Katrina's Mystic Visitors Guide" (32sp Creepster gold) and subtitle "Witch Tours" → "Historic Salem Tour App" (20sp Creepster white). Font sizes dropped from 42sp/24sp and letter-spacing trimmed to fit the ~3× longer strings; apostrophe encoded as `&apos;`. Device-verified on Lenovo — title renders cleanly on one line, subtitle single-line centered, WitchKitty + voiceover + transition sequence unchanged. Splash illustration and voiceover WAV intentionally left as-is: operator regenerating both in a dedicated content-art session (Katrina photo + screaming-cat voiceover) as part of a broader location-aware art/sound initiative.
-
-Full session detail: `docs/session-logs/session-142-2026-04-17.md`. Commits: `8b4c210` (UI hide) + `c92e1b3` (Step 1 close) + `c69282b` (rebrand) + `88e5687` (Step 2 re-close) + `bc0e778` (splash retitle) + the S142 final-close commit.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 141 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 142 and earlier are in SESSION-LOG-ARCHIVE.md -->

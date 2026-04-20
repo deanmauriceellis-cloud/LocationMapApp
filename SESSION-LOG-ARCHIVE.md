@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S141 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S142 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 142: 2026-04-17 — V1 UI hide + full rebrand (applicationId + display label)
+
+Two-step session. **Step 1 (UI hide):** operator directed picking up S141's deferred UI hide pass, deferring the 8-12h soak to their own schedule, and moving OMEN-004's deadline from 2026-04-30 to 2026-08-30. Explore subagent found all 7 online-only UI entry points (radar, weather, transit, aircraft, webcams, TFR, online tile switcher) concentrated in `app-salem/.../ui/menu/AppBarMenuManager.kt`. Shipped six surgical edits behind `FeatureFlags.V1_OFFLINE_ONLY`: hid the dead-code top-bar XML items defensively, hid the slim-toolbar weather + tile-source icons, hid grid-dropdown row 1, added early-return guards to all four `show*Menu()` paths, removed `menu_tfr_overlay` from the alerts popup, and stopped `computeActiveLayerCount()` from counting the 8 online-only prefs. Device-verified on Lenovo HNY0CY0W. Combined with S141's data-layer work, V1 now has three-layer offline coverage — OkHttp interceptor + ViewModel gates + UI hide. **Step 2 (full rebrand):** operator directed a Play-Store-ready install identity: `applicationId` changed from `com.example.wickedsalemwitchcitytour` (which Google Play rejects) to `com.destructiveaigurus.katrinasmysticvisitorsguide`, and `app_name` from "Wicked Salem" to "Katrina's Mystic Visitors Guide - Salem". Internal code namespace, class names, themes, module name, and docs intentionally left unchanged per operator direction — rebrand is at the install-identity / display-label layer only. Four file edits: `build.gradle` (applicationId), `strings.xml` (label), `AndroidManifest.xml` (FileProvider authority switched to `${applicationId}.fileprovider` to auto-sync), `SalemMainActivityGeofences.kt:651` (caller switched to `$packageName.fileprovider`). Uninstalled the old package on Lenovo and installed the new APK clean — launcher resolves, FileProvider authority registered as the new `…katrinasmysticvisitorsguide.fileprovider`, no crashes, S141+S142-Step1 V1 offline enforcement intact, 1,837 POIs loaded. `aapt2 dump badging` confirms display label `Katrina's Mystic Visitors Guide - Salem`. `applicationId` is now immutable once we ship; frozen before the submission window.
+
+Full session detail: `docs/session-logs/session-142-2026-04-17.md`. Commits: `8b4c210` (UI hide) + `c92e1b3` (Step 1 close) + `c69282b` (rebrand) + `88e5687` (Step 2 re-close) + `bc0e778` (splash retitle) + the S142 final-close commit.
+
+---
 
 ## Session 141: 2026-04-17 — V1 offline-mode enforcement + log tuning
 
