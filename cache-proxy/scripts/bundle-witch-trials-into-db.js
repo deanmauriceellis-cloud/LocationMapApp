@@ -32,7 +32,12 @@ if (!process.env.DATABASE_URL) {
   } catch (_) {}
 }
 
-const DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+// S153 fix: bake into the CANONICAL source DB, then mirror to assets. Previously
+// this script wrote only to assets, which `publish-salem-pois.js` silently
+// clobbers on its next run. Same bug/fix pattern as the S150 newspaper fix.
+const SRC_DB = path.resolve(__dirname, '../../salem-content/salem_content.db');
+const ASSETS_DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+const DB = SRC_DB;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 (async () => {
@@ -51,6 +56,28 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   const db = new Database(DB);
   db.pragma('journal_mode = DELETE');
+
+  // S153 fix: create the table if missing. Schema must match Room @Entity
+  // exactly. Mirrors publish-witch-trials-to-sqlite.js.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS salem_witch_trials_articles (
+      id TEXT NOT NULL PRIMARY KEY,
+      tile_order INTEGER NOT NULL,
+      tile_kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      period_label TEXT,
+      teaser TEXT NOT NULL,
+      body TEXT NOT NULL,
+      related_npc_ids TEXT NOT NULL,
+      related_event_ids TEXT NOT NULL,
+      related_newspaper_dates TEXT NOT NULL,
+      data_source TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      verified_date TEXT,
+      generator_model TEXT
+    )
+  `);
+
   // Full-set replace: clear existing rows so id-convention changes don't
   // leave orphans (e.g. S140 migration from S128 snake_case ids to the
   // Oracle-native intro_pre_1692 / month_1692_NN convention).
@@ -87,6 +114,9 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const count = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_articles').get().c;
   db.exec('VACUUM');
   db.close();
-  console.log(`Cleared ${preBundle} pre-existing rows. Bundled ${rows.length} articles into ${DB}. Post-insert COUNT=${count}.`);
+  // S153: mirror source → assets so the APK build picks up the table.
+  fs.copyFileSync(SRC_DB, ASSETS_DB);
+  console.log(`Cleared ${preBundle} pre-existing rows. Bundled ${rows.length} articles into ${SRC_DB}. Post-insert COUNT=${count}.`);
+  console.log(`Mirrored → ${ASSETS_DB}`);
   await pool.end();
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });

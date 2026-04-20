@@ -1,0 +1,288 @@
+===== log opened 2026-04-19 23:55:39.678 =====
+[1|18357] 23:55:39.663 I/DebugLogger: ════════ process started PID=18357 ════════
+[2|18357] 23:55:39.675 I/DebugLogger: File sink initialized at /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs
+[3|18357] 23:55:39.679 I/WickedSalemApp: onCreate — file sink wired up
+[4|18357] 23:55:39.684 D/OfflineTileManager: externalFilesDir=/storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files, filesDir=/data/user/0/com.destructiveaigurus.katrinasmysticvisitorsguide/files
+[5|18357] 23:55:39.693 I/OfflineTileManager: osmdroid base path configured: /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files
+[6|18357] 23:55:39.713 I/OfflineTileManager: Offline tiles v1 already installed
+[7|18357] 23:55:39.717 I/SplashVoice: initEarly — binding TTS engine
+[8|18357] 23:55:39.884 I/SplashActivity: onCreate() — launching branded splash
+[9|18357] 23:55:40.036 I/SplashActivity: Katrina splash picked: resId=2131165556 (pool size=12)
+[10|18357] 23:55:40.037 I/SplashActivity: requesting splash TTS: Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.
+[11|18357] 23:55:40.039 I/SplashVoice: speak (deferred, engine not ready) — Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.
+[12|18357] 23:55:43.918 I/SplashVoice: TTS engine ready
+[13|18357] 23:55:43.919 I/SplashVoice: flushing deferred speak — Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.
+[14|18357] 23:55:46.014 I/SplashVoice: speaking — utteranceId=splash_welcome
+[15|18357] 23:55:50.523 I/SplashVoice: onDone — utteranceId=splash_welcome
+[16|18357] 23:55:50.524 I/SplashActivity: splash TTS finished → transitioning
+[17|18357] 23:55:50.525 I/SplashVoice: shutdown
+[18|18357] 23:55:50.530 I/SplashActivity: Splash complete → launching SalemMainActivity
+[19|18357] 23:55:50.711 I/NARR-GEO: narratedAt hydrated: loaded=0, dropped=0 (window=60m)
+[20|18357] 23:55:50.726 I/SalemMainActivity: onCreate() start — device=TB305FU SDK=35 savedInstanceState=false
+[21|18357] 23:55:50.739 I/DebugHttp: Listening on port 4303
+[22|18357] 23:55:50.979 I/SalemMainActivity: setSupportActionBar complete — title hidden for slim toolbar
+[23|18357] 23:55:50.990 I/AppBarMenuManager: V1_OFFLINE_ONLY — slim-toolbar weather + alerts icons hidden
+[24|18357] 23:55:50.992 I/AppBarMenuManager: V1_OFFLINE_ONLY — slim-toolbar tile-source icon hidden
+[25|18357] 23:55:50.993 I/AppBarMenuManager: setupSlimToolbar() — icons wired (Weather, Home, TileSource, Alerts, Grid, About)
+[26|18357] 23:55:51.011 I/SalemMainActivity: Slim toolbar wired — Weather, Home, Alerts, Grid, About + StatusLine
+[27|18357] 23:55:51.013 I/AppBarMenuManager: setupAudioAndNavCluster() — nav cluster + audio icon wired
+[28|18357] 23:55:51.013 I/SalemMainActivity: S145 #45 nav cluster + audio icon wired
+[29|18357] 23:55:51.111 I/ViewModel: ViewModel created — waiting for permission before starting GPS
+[30|18357] 23:55:51.112 I/ViewModel: bypassBboxClamp = true (real-GPS-outside-Salem override)
+[31|18357] 23:55:51.113 I/SalemMainActivity: setupMap() — tileSource=SATELLITE fromSplash=true bypassBbox=true
+[32|18357] 23:55:51.113 I/TileSourceManager: buildSource(SATELLITE) v1Offline=true
+[33|18357] 23:55:51.119 I/SalemMainActivity: SalemLocationBallOverlay wired (shows at zoom < 16)
+[34|18357] 23:55:51.121 I/SalemMainActivity: Map configured — overlays=2
+[35|18357] 23:55:51.122 I/SalemMainActivity: buildFabSpeedDial() start
+[36|18357] 23:55:51.127 D/SalemMainActivity:   FAB row: 'Radar'
+[37|18357] 23:55:51.131 D/SalemMainActivity:   FAB row: 'METAR'
+[38|18357] 23:55:51.134 D/SalemMainActivity:   FAB row: 'Aircraft'
+[39|18357] 23:55:51.137 D/SalemMainActivity:   FAB row: 'Search Here'
+[40|18357] 23:55:51.140 D/SalemMainActivity:   FAB row: 'Weather'
+[41|18357] 23:55:51.143 D/SalemMainActivity:   FAB row: 'GPS / Manual'
+[42|18357] 23:55:51.146 D/SalemMainActivity:   FAB row: 'Debug Log'
+[43|18357] 23:55:51.148 D/SalemMainActivity:   FAB row: 'Voices'
+[44|18357] 23:55:51.149 I/SalemMainActivity: FAB container built — 8 rows
+[45|18357] 23:55:51.156 I/SalemMainActivity: initNarrationSystem() — Phase 9T setup
+[46|18357] 23:55:51.187 I/NarrationMgr: TTS initializing…
+[47|18357] 23:55:51.229 I/NARR-STATE: narrationState → Idle (autoPlay=true, queueSize=0)
+[48|18357] 23:55:51.230 I/NARR-STATE:   Idle → currentNarration cleared, queueSize=0
+[49|18357] 23:55:51.232 I/NARR-HEARTBEAT: START — interval=300s
+[50|18357] 23:55:51.232 I/SalemMainActivity: initNarrationSystem() complete
+[51|18357] 23:55:51.233 I/SalemMainActivity: Fresh start — narration history cleared (1h wait reset to 0)
+[52|18357] 23:55:51.246 I/SENSORS: inventory — 18 sensors
+[53|18357] 23:55:51.247 I/SENSORS:   ✓ type=11 (android.sensor.rotation_vector) name='ROTATION_VECTOR' vendor='MTK'
+[54|18357] 23:55:51.247 I/SENSORS:   ✓ type=15 (android.sensor.game_rotation_vector) name='GAME_ROTATION_VECTOR' vendor='MTK'
+[55|18357] 23:55:51.248 I/SENSORS:   ✓ type=20 (android.sensor.geomagnetic_rotation_vector) name='GEOMAGNETIC_ROTATION_VECTOR' vendor='MTK'
+[56|18357] 23:55:51.248 I/SENSORS:   ✗ type=4 — NOT PRESENT
+[57|18357] 23:55:51.249 I/SENSORS:   ✗ type=2 — NOT PRESENT
+[58|18357] 23:55:51.249 I/SENSORS:   ✓ type=1 (android.sensor.accelerometer) name='ACCELEROMETER' vendor='stk83xx_acc'
+[59|18357] 23:55:51.250 I/SENSORS:   ✓ type=18 (android.sensor.step_detector) name='STEP_DETECTOR' vendor='MTK'
+[60|18357] 23:55:51.250 I/SENSORS:   ✓ type=19 (android.sensor.step_counter) name='STEP_COUNTER' vendor='MTK'
+[61|18357] 23:55:51.254 I/DEVICE-ORIENT: init — source=ROTATION_VECTOR (9-axis fused: gyro+accel+mag)
+[62|18357] 23:55:51.279 I/SalemMainActivity: Heading-up FAB hidden (HEADING_UP_ENABLED=false)
+[63|18357] 23:55:51.280 I/SalemMainActivity: observeViewModel() — attaching all observers
+[64|18357] 23:55:51.281 I/GPS-OBS: HEARTBEAT START — tick=10s, stale-threshold=30s, ok-log=60s, stale-backoff=5m→5m cadence, 30m→15m cadence
+[65|18357] 23:55:51.329 I/SalemMainActivity: observeViewModel() complete — all observers attached
+[66|18357] 23:55:51.330 I/SalemMainActivity: requestLocationPermission() — checking current state
+[67|18357] 23:55:51.331 I/SalemMainActivity: requestLocationPermission() — already granted, starting GPS directly
+[68|18357] 23:55:51.332 I/SalemMainActivity: startGpsUpdatesAndCenter() — permission confirmed, starting GMS flow
+[69|18357] 23:55:51.333 I/ViewModel: onPermissionGranted() — starting GMS location flow
+[70|18357] 23:55:51.338 I/GpsTrackRecorder: Pruned 4226 GPS points older than 24h
+[71|18357] 23:55:51.341 I/LocationManager: getLocationUpdates() — building LocationRequest interval=60000ms minInterval=30000ms
+[72|18357] 23:55:51.344 I/LocationManager: Calling requestLocationUpdates on main looper
+[73|18357] 23:55:51.350 I/ViewModel: requestLastKnownLocation() — asking FusedClient for cached fix
+[74|18357] 23:55:51.351 I/LocationManager: getLastKnownLocation() — requesting from FusedClient
+[75|18357] 23:55:51.353 I/SalemMainActivity: onCreate() complete
+[76|18357] 23:55:51.356 I/SalemMainActivity: onStart() toolbar.childCount=1
+[77|18357] 23:55:51.357 I/SalemMainActivity: onStart() radarOn=true interval=5min
+[78|18357] 23:55:51.366 I/SalemMainActivity: Radar overlay added (NWS NEXRAD)
+[79|18357] 23:55:51.367 I/SalemMainActivity: Radar overlay restored from onStart()
+[80|18357] 23:55:51.368 I/RadarRefreshScheduler: Radar refresh stopped
+[81|18357] 23:55:51.368 I/RadarRefreshScheduler: Radar refresh started: every 5 min
+[82|18357] 23:55:51.369 I/SalemMainActivity: Radar scheduler restarted from onStart()
+[83|18357] 23:55:51.370 I/SalemMainActivity: onStart() METAR restore deferred — waiting for GPS fix
+[84|18357] 23:55:51.374 I/SalemMainActivity: onStart() POI restore deferred — waiting for GPS fix
+[85|18357] 23:55:51.375 I/SalemMainActivity: onStart() Webcam restore deferred — waiting for GPS fix
+[86|18357] 23:55:51.375 I/SalemMainActivity: onStart() Geofence overlay restore deferred — waiting for GPS fix
+[87|18357] 23:55:51.392 I/MOTION: start — armed=true warmup=10s threshold=5s
+[88|18357] 23:55:51.393 I/SalemMainActivity: onResume()
+[89|18357] 23:55:51.396 I/LIFECYCLE: onResume
+[90|18357] 23:55:51.419 I/SalemMainActivity: GPS journey overlay seeded — 0 historical + 0 in-flight points (visible=true)
+[91|18357] 23:55:51.745 I/SalemMainActivity: onCreateOptionsMenu() — skipped (using slim toolbar)
+[92|18357] 23:55:51.748 D/LocationManager: onLocationResult #1 — lat=42.5566917 lon=-70.871525 acc=1.7m provider=fused
+[93|18357] 23:55:51.750 D/ViewModel: GPS update: lat=42.5566917 lon=-70.871525 acc=1.7m spd=1.636302m/s
+[94|18357] 23:55:51.752 I/ViewModel: location → bbox clamp BYPASSED (lat=42.5566917 lng=-70.871525 acc=1.7m) — using raw GPS
+[95|18357] 23:55:51.757 I/GPS-OBS: fix lat=42.55669 lng=-70.87153 acc=1.7m speed=1.64mps bearing=235° gap=0ms
+[96|18357] 23:55:51.767 I/SalemMainActivity: User trigger rings created (20m/30m/40m)
+[97|18357] 23:55:51.769 I/SalemMainActivity: GPS interval → 2500ms (speed=3.7mph, narrating=false)
+[98|18357] 23:55:51.769 I/ViewModel: restartLocationUpdates() — interval 60000ms → 2500ms
+[99|18357] 23:55:51.810 I/NARR-GEO: SUMMARY: check#1 pos=42.55669,-70.87153 nearby=0 narrated=0/0 entries=0 approaches=0 skippedNarrated=0 skippedCooldown=0 walkSim=false
+[100|18357] 23:55:51.813 I/NARR-DWELL: ANCHOR SEED — first fix at 42.55669,-70.87153
+[101|18357] 23:55:51.814 I/NARR-QUEUE: cold-start anchor set at 42.5566917,-70.871525 — tier-first dequeue until user moves 40m
+[102|18357] 23:55:51.818 I/SalemMainActivity: currentLocation → lat=42.5566917 lon=-70.871525 — cinematic zoom-in
+[103|18357] 23:55:51.818 I/SalemMainActivity: performCinematicZoom → 42.5566917,-70.871525
+[104|18357] 23:55:51.823 I/SalemMainActivity: POI restore — loading cached POIs for visible area
+[105|18357] 23:55:51.831 I/LocationManager: Flow cancelled — removing location updates after 1 updates received
+[106|18357] 23:55:51.840 I/LocationManager: getLocationUpdates() — building LocationRequest interval=2500ms minInterval=1000ms
+[107|18357] 23:55:51.841 I/LocationManager: Calling requestLocationUpdates on main looper
+[108|18357] 23:55:51.844 I/LocationManager: requestLocationUpdates registered successfully
+[109|18357] 23:55:51.845 I/LocationManager: lastLocation: lat=42.5566917 lon=-70.871525 acc=1.7m age=1s
+[110|18357] 23:55:51.845 I/ViewModel: lastKnownLocation: lat=42.5566917 lon=-70.871525 — centering map now
+[111|18357] 23:55:51.846 I/GPS-OBS: fix lat=42.55669 lng=-70.87153 acc=1.7m speed=? bearing=? gap=93ms
+[112|18357] 23:55:51.856 I/SalemMainActivity: GPS interval → 30000ms (speed=?mph, narrating=false)
+[113|18357] 23:55:51.857 I/ViewModel: restartLocationUpdates() — interval 2500ms → 30000ms
+[114|18357] 23:55:51.858 I/LocationManager: Flow cancelled — removing location updates after 0 updates received
+[115|18357] 23:55:51.860 I/LocationManager: getLocationUpdates() — building LocationRequest interval=30000ms minInterval=15000ms
+[116|18357] 23:55:51.861 I/LocationManager: Calling requestLocationUpdates on main looper
+[117|18357] 23:55:51.862 D/SalemMainActivity: GPS dead zone 5.0m (acc=1.7m) — skipped (map only)
+[118|18357] 23:55:51.866 D/BEARING: still — moved=0.00m (sim, under 1.0m)
+[119|18357] 23:55:51.942 I/LocationManager: requestLocationUpdates registered successfully
+[120|18357] 23:55:51.963 I/SalemMainActivity: refreshPoiMarkerIcons labeled=true
+[121|18357] 23:55:51.967 I/SalemMainActivity: refreshVehicleMarkerIcons labeled=true
+[122|18357] 23:55:52.005 D/LocationManager: onLocationResult #1 — lat=42.55668 lon=-70.8715267 acc=1.783m provider=fused
+[123|18357] 23:55:52.007 D/ViewModel: GPS update: lat=42.55668 lon=-70.8715267 acc=1.783m spd=1.4690173m/s
+[124|18357] 23:55:52.010 I/GPS-OBS: fix lat=42.55668 lng=-70.87153 acc=1.8m speed=1.47mps bearing=203° gap=163ms
+[125|18357] 23:55:52.020 I/SalemMainActivity: GPS interval → 2500ms (speed=3.3mph, narrating=false)
+[126|18357] 23:55:52.021 I/ViewModel: restartLocationUpdates() — interval 30000ms → 2500ms
+[127|18357] 23:55:52.023 D/SalemMainActivity: GPS dead zone 5.0m (acc=1.8m) — skipped (map only)
+[128|18357] 23:55:52.025 D/BEARING: moved=1.3m speed=1.47mps bearing=203° (GPS-Doppler) (first)
+[129|18357] 23:55:52.026 I/LocationManager: Flow cancelled — removing location updates after 1 updates received
+[130|18357] 23:55:52.030 I/LocationManager: getLocationUpdates() — building LocationRequest interval=2500ms minInterval=1000ms
+[131|18357] 23:55:52.031 I/LocationManager: Calling requestLocationUpdates on main looper
+[132|18357] 23:55:52.034 I/LocationManager: requestLocationUpdates registered successfully
+[133|18357] 23:55:52.088 I/LocationManager: requestLocationUpdates registered successfully
+[134|18357] 23:55:52.089 D/LocationManager: onLocationResult #1 — lat=42.55668 lon=-70.8715267 acc=1.783m provider=fused
+[135|18357] 23:55:52.090 D/ViewModel: GPS update: lat=42.55668 lon=-70.8715267 acc=1.783m spd=1.4690173m/s
+[136|18357] 23:55:52.092 I/GPS-OBS: fix lat=42.55668 lng=-70.87153 acc=1.8m speed=1.47mps bearing=203° gap=82ms
+[137|18357] 23:55:52.097 D/SalemMainActivity: GPS dead zone 5.0m (acc=1.8m) — skipped (map only)
+[138|18357] 23:55:52.100 D/BEARING: moved=0.0m speed=1.47mps bearing=203° (GPS-Doppler) (prev=203°, Δ=0°)
+[139|18357] 23:55:52.114 I/SalemMainActivity: refreshPoiMarkerIcons labeled=false
+[140|18357] 23:55:52.115 I/SalemMainActivity: refreshVehicleMarkerIcons labeled=false
+[141|18357] 23:55:52.561 I/TourEngine: Ambient POI cache loaded: 1830 POIs
+[142|18357] 23:55:52.578 I/TourVM: Loaded 5 tours, 1830 POIs
+[143|18357] 23:55:52.873 I/NarrHero: NarrationHero wired
+[144|18357] 23:55:52.877 I/SalemMainActivity: S146 #27 narration hero banner wired
+[145|18357] 23:55:52.877 I/SalemMainActivity: Ambient narration ACTIVE: 1769 points, 10 corridors — no tour selection required
+[146|18357] 23:55:52.924 D/LocationManager: onLocationResult #2 — lat=42.5566667 lon=-70.8715317 acc=6.203m provider=fused
+[147|18357] 23:55:52.926 D/ViewModel: GPS update: lat=42.5566667 lon=-70.8715317 acc=6.203m spd=1.324895m/s
+[148|18357] 23:55:52.928 I/GPS-OBS: fix lat=42.55667 lng=-70.87153 acc=6.2m speed=1.32mps bearing=185° gap=836ms
+[149|18357] 23:55:52.932 D/SalemMainActivity: GPS dead zone 12.4m (acc=6.2m) — skipped (map only)
+[150|18357] 23:55:52.953 D/BEARING: moved=1.5m speed=1.32mps bearing=185° (GPS-Doppler) (prev=203°, Δ=-18°)
+[151|18357] 23:55:53.296 I/SalemMainActivity: Loading 110 narration markers (showAll=false, total=1769, histMode=false)
+[152|18357] 23:55:53.404 I/SalemMainActivity: METAR restore triggered — loading for visible area
+[153|18357] 23:55:53.406 I/SalemMainActivity: onStart() restoring MBTA trains
+[154|18357] 23:55:53.407 I/SalemMainActivity: Starting MBTA train refresh every 30s
+[155|18357] 23:55:53.408 I/SalemMainActivity: onStart() restoring MBTA subway
+[156|18357] 23:55:53.410 I/SalemMainActivity: Starting MBTA subway refresh every 30s
+[157|18357] 23:55:53.830 I/SalemMainActivity: Loading cached POIs for visible area
+[158|18357] 23:55:53.831 I/SalemMainActivity: Webcam restore triggered — loading for visible area
+[159|18357] 23:55:53.833 I/SalemMainActivity: Geofence overlay restore triggered — loading for visible area
+[160|18357] 23:55:53.853 D/LocationManager: onLocationResult #3 — lat=42.55665 lon=-70.8715217 acc=6.461m provider=fused
+[161|18357] 23:55:53.855 D/ViewModel: GPS update: lat=42.55665 lon=-70.8715217 acc=6.461m spd=2.1633775m/s
+[162|18357] 23:55:53.857 I/GPS-OBS: fix lat=42.55665 lng=-70.87152 acc=6.5m speed=2.16mps bearing=164° gap=930ms
+[163|18357] 23:55:54.309 D/SalemMainActivity: GPS dead zone 12.9m (acc=6.5m) — skipped (map only)
+[164|18357] 23:55:54.325 D/BEARING: moved=2.0m speed=2.16mps bearing=164° (GPS-Doppler) (prev=185°, Δ=-21°)
+[165|18357] 23:55:54.361 I/SalemMainActivity: onStart() restoring MBTA buses
+[166|18357] 23:55:54.362 I/SalemMainActivity: Starting MBTA bus refresh every 60s
+[167|18357] 23:55:54.544 I/NarrationMgr: TTS ready — Locale.US, rate=0.9x
+[168|18357] 23:55:54.685 I/NarrationMgr: Voice cache: 16/16 category voices available, 28 total English offline
+[169|18357] 23:55:54.867 D/LocationManager: onLocationResult #4 — lat=42.5566533 lon=-70.8715117 acc=6.761m provider=fused
+[170|18357] 23:55:54.869 D/ViewModel: GPS update: lat=42.5566533 lon=-70.8715117 acc=6.761m spd=0.0m/s
+[171|18357] 23:55:54.872 I/GPS-OBS: fix lat=42.55665 lng=-70.87151 acc=6.8m speed=0.00mps bearing=? gap=1014ms
+[172|18357] 23:55:54.881 I/SalemMainActivity: GPS interval → 30000ms (speed=0.0mph, narrating=false)
+[173|18357] 23:55:54.883 I/ViewModel: restartLocationUpdates() — interval 2500ms → 30000ms
+[174|18357] 23:55:54.884 D/SalemMainActivity: GPS dead zone 13.5m (acc=6.8m) — skipped (map only)
+[175|18357] 23:55:54.892 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.9m, bearing frozen)
+[176|18357] 23:55:54.893 I/LocationManager: Flow cancelled — removing location updates after 4 updates received
+[177|18357] 23:55:54.896 I/LocationManager: getLocationUpdates() — building LocationRequest interval=30000ms minInterval=15000ms
+[178|18357] 23:55:54.897 I/LocationManager: Calling requestLocationUpdates on main looper
+[179|18357] 23:55:54.914 I/SalemMainActivity: refreshNarrationIcons: bucket=1 refreshed=110
+[180|18357] 23:55:54.936 I/SalemMainActivity: onStart() restoring MBTA stations
+[181|18357] 23:55:54.938 D/LocationManager: onLocationResult #1 — lat=42.5566533 lon=-70.8715117 acc=6.761m provider=fused
+[182|18357] 23:55:54.939 D/ViewModel: GPS update: lat=42.5566533 lon=-70.8715117 acc=6.761m spd=0.0m/s
+[183|18357] 23:55:54.940 I/GPS-OBS: fix lat=42.55665 lng=-70.87151 acc=6.8m speed=0.00mps bearing=? gap=68ms
+[184|18357] 23:55:54.943 D/SalemMainActivity: GPS dead zone 13.5m (acc=6.8m) — skipped (map only)
+[185|18357] 23:55:54.950 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[186|18357] 23:55:54.951 I/LocationManager: requestLocationUpdates registered successfully
+[187|18357] 23:55:54.977 I/SalemMainActivity: refreshPoiMarkerIcons labeled=true
+[188|18357] 23:55:54.978 I/SalemMainActivity: refreshVehicleMarkerIcons labeled=true
+[189|18357] 23:55:55.050 I/SalemMainActivity: refreshNarrationIcons: bucket=2 refreshed=110
+[190|18357] 23:55:55.258 I/SalemMainActivity: refreshNarrationIcons: bucket=3 refreshed=110
+[191|18357] 23:55:55.831 I/SalemMainActivity: Silent fill starting at 42.5566917,-70.871525
+[192|18357] 23:55:55.860 W/SalemMainActivity: Silent fill returned null (error)
+[193|18357] 23:55:56.244 I/NARR-DWELL: EXPAND: 20m empty → trying 35m
+[194|18357] 23:55:56.257 I/NARR-DWELL: EXPAND: 35m empty → trying 50m
+[195|18357] 23:55:56.266 I/NARR-STATE:   Nothing within 50m reach-out radius (gpsAge=1293ms, dwellPlayed=0, histMode=false)
+[196|18357] 23:56:01.286 I/GPS-OBS: HEARTBEAT ok — last fix age=6s
+[197|18357] 23:56:08.854 D/LocationManager: onLocationResult #2 — lat=42.556675 lon=-70.8715167 acc=3.08m provider=fused
+[198|18357] 23:56:08.855 D/ViewModel: GPS update: lat=42.556675 lon=-70.8715167 acc=3.08m spd=0.0m/s
+[199|18357] 23:56:08.858 I/GPS-OBS: fix lat=42.55668 lng=-70.87152 acc=3.1m speed=0.00mps bearing=? gap=13918ms
+[200|18357] 23:56:08.859 D/STATIONARY: freeze — stationary (never fired (17s since start), events=0) — skipping visible updates
+[201|18357] 23:56:08.871 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=2.4m, bearing frozen)
+[202|18357] 23:56:22.868 D/LocationManager: onLocationResult #3 — lat=42.5567083 lon=-70.87164 acc=3.02m provider=fused
+[203|18357] 23:56:22.870 D/ViewModel: GPS update: lat=42.5567083 lon=-70.87164 acc=3.02m spd=0.0m/s
+[204|18357] 23:56:22.872 I/GPS-OBS: fix lat=42.55671 lng=-70.87164 acc=3.0m speed=0.00mps bearing=? gap=14014ms
+[205|18357] 23:56:22.874 D/STATIONARY: freeze — stationary (never fired (31s since start), events=0) — skipping visible updates
+[206|18357] 23:56:22.888 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=10.8m, bearing frozen)
+[207|18357] 23:56:36.851 D/LocationManager: onLocationResult #4 — lat=42.5567083 lon=-70.87164 acc=2.966m provider=fused
+[208|18357] 23:56:36.853 D/ViewModel: GPS update: lat=42.5567083 lon=-70.87164 acc=2.966m spd=0.0m/s
+[209|18357] 23:56:36.855 I/GPS-OBS: fix lat=42.55671 lng=-70.87164 acc=3.0m speed=0.00mps bearing=? gap=13983ms
+[210|18357] 23:56:36.856 D/STATIONARY: freeze — stationary (never fired (45s since start), events=0) — skipping visible updates
+[211|18357] 23:56:36.866 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[212|18357] 23:56:50.863 D/LocationManager: onLocationResult #5 — lat=42.5567333 lon=-70.871475 acc=2.8m provider=fused
+[213|18357] 23:56:50.865 D/ViewModel: GPS update: lat=42.5567333 lon=-70.871475 acc=2.8m spd=0.0m/s
+[214|18357] 23:56:50.867 I/GPS-OBS: fix lat=42.55673 lng=-70.87148 acc=2.8m speed=0.00mps bearing=? gap=14012ms
+[215|18357] 23:56:50.868 D/STATIONARY: freeze — stationary (never fired (59s since start), events=0) — skipping visible updates
+[216|18357] 23:56:50.881 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=13.8m, bearing frozen)
+[217|18357] 23:57:01.322 I/GPS-OBS: HEARTBEAT ok — last fix age=10s
+[218|18357] 23:57:04.869 D/LocationManager: onLocationResult #6 — lat=42.5567333 lon=-70.871475 acc=2.066m provider=fused
+[219|18357] 23:57:04.870 D/ViewModel: GPS update: lat=42.5567333 lon=-70.871475 acc=2.066m spd=0.0m/s
+[220|18357] 23:57:04.873 I/GPS-OBS: fix lat=42.55673 lng=-70.87148 acc=2.1m speed=0.00mps bearing=? gap=14006ms
+[221|18357] 23:57:04.875 D/STATIONARY: freeze — stationary (never fired (73s since start), events=0) — skipping visible updates
+[222|18357] 23:57:04.889 I/NARR-GEO: SUMMARY: check#13 pos=42.55673,-70.87148 nearby=0 narrated=0/1769 entries=0 approaches=0 skippedNarrated=0 skippedCooldown=0 walkSim=false
+[223|18357] 23:57:04.890 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[224|18357] 23:57:18.864 D/LocationManager: onLocationResult #7 — lat=42.55669 lon=-70.8713633 acc=2.2m provider=fused
+[225|18357] 23:57:18.865 D/ViewModel: GPS update: lat=42.55669 lon=-70.8713633 acc=2.2m spd=0.0m/s
+[226|18357] 23:57:18.867 I/GPS-OBS: fix lat=42.55669 lng=-70.87136 acc=2.2m speed=0.00mps bearing=? gap=13994ms
+[227|18357] 23:57:18.869 D/STATIONARY: freeze — stationary (never fired (87s since start), events=0) — skipping visible updates
+[228|18357] 23:57:18.884 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=10.3m, bearing frozen)
+[229|18357] 23:57:32.853 D/LocationManager: onLocationResult #8 — lat=42.55669 lon=-70.8713633 acc=1.95m provider=fused
+[230|18357] 23:57:32.854 D/ViewModel: GPS update: lat=42.55669 lon=-70.8713633 acc=1.95m spd=0.0m/s
+[231|18357] 23:57:32.856 I/GPS-OBS: fix lat=42.55669 lng=-70.87136 acc=2.0m speed=0.00mps bearing=? gap=13990ms
+[232|18357] 23:57:32.858 D/STATIONARY: freeze — stationary (never fired (101s since start), events=0) — skipping visible updates
+[233|18357] 23:57:32.869 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[234|18357] 23:57:46.868 D/LocationManager: onLocationResult #9 — lat=42.55669 lon=-70.8713633 acc=1.9m provider=fused
+[235|18357] 23:57:46.870 D/ViewModel: GPS update: lat=42.55669 lon=-70.8713633 acc=1.9m spd=0.0m/s
+[236|18357] 23:57:46.872 I/GPS-OBS: fix lat=42.55669 lng=-70.87136 acc=1.9m speed=0.00mps bearing=? gap=14015ms
+[237|18357] 23:57:46.873 D/STATIONARY: freeze — stationary (never fired (115s since start), events=0) — skipping visible updates
+[238|18357] 23:57:46.887 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[239|18357] 23:58:00.870 D/LocationManager: onLocationResult #10 — lat=42.5566883 lon=-70.8713917 acc=1.38m provider=fused
+[240|18357] 23:58:00.872 D/ViewModel: GPS update: lat=42.5566883 lon=-70.8713917 acc=1.38m spd=0.0m/s
+[241|18357] 23:58:00.874 I/GPS-OBS: fix lat=42.55669 lng=-70.87139 acc=1.4m speed=0.00mps bearing=? gap=14002ms
+[242|18357] 23:58:00.875 D/STATIONARY: freeze — stationary (never fired (129s since start), events=0) — skipping visible updates
+[243|18357] 23:58:00.888 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=2.3m, bearing frozen)
+[244|18357] 23:58:01.361 I/GPS-OBS: HEARTBEAT ok — last fix age=0s
+[245|18357] 23:58:14.865 D/LocationManager: onLocationResult #11 — lat=42.5566883 lon=-70.8713917 acc=1.72m provider=fused
+[246|18357] 23:58:14.866 D/ViewModel: GPS update: lat=42.5566883 lon=-70.8713917 acc=1.72m spd=0.0m/s
+[247|18357] 23:58:14.868 I/GPS-OBS: fix lat=42.55669 lng=-70.87139 acc=1.7m speed=0.00mps bearing=? gap=13995ms
+[248|18357] 23:58:14.870 D/STATIONARY: freeze — stationary (never fired (143s since start), events=0) — skipping visible updates
+[249|18357] 23:58:14.883 I/NARR-GEO: SUMMARY: check#18 pos=42.55669,-70.87139 nearby=0 narrated=0/1769 entries=0 approaches=0 skippedNarrated=0 skippedCooldown=0 walkSim=false
+[250|18357] 23:58:14.884 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[251|18357] 23:58:28.859 D/LocationManager: onLocationResult #12 — lat=42.5566883 lon=-70.8713917 acc=1.6m provider=fused
+[252|18357] 23:58:28.860 D/ViewModel: GPS update: lat=42.5566883 lon=-70.8713917 acc=1.6m spd=0.0m/s
+[253|18357] 23:58:28.862 I/GPS-OBS: fix lat=42.55669 lng=-70.87139 acc=1.6m speed=0.00mps bearing=? gap=13993ms
+[254|18357] 23:58:28.863 D/STATIONARY: freeze — stationary (never fired (157s since start), events=0) — skipping visible updates
+[255|18357] 23:58:28.872 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[256|18357] 23:58:42.863 D/LocationManager: onLocationResult #13 — lat=42.5566883 lon=-70.8713917 acc=1.52m provider=fused
+[257|18357] 23:58:42.864 D/ViewModel: GPS update: lat=42.5566883 lon=-70.8713917 acc=1.52m spd=0.0m/s
+[258|18357] 23:58:42.866 I/GPS-OBS: fix lat=42.55669 lng=-70.87139 acc=1.5m speed=0.00mps bearing=? gap=14004ms
+[259|18357] 23:58:42.868 D/STATIONARY: freeze — stationary (never fired (171s since start), events=0) — skipping visible updates
+[260|18357] 23:58:42.881 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[261|18357] 23:58:56.866 D/LocationManager: onLocationResult #14 — lat=42.5566833 lon=-70.8713633 acc=1.9m provider=fused
+[262|18357] 23:58:56.867 D/ViewModel: GPS update: lat=42.5566833 lon=-70.8713633 acc=1.9m spd=0.0m/s
+[263|18357] 23:58:56.868 I/GPS-OBS: fix lat=42.55668 lng=-70.87136 acc=1.9m speed=0.00mps bearing=? gap=14003ms
+[264|18357] 23:58:56.869 D/STATIONARY: freeze — stationary (never fired (185s since start), events=0) — skipping visible updates
+[265|18357] 23:58:56.874 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=2.4m, bearing frozen)
+[266|18357] 23:59:01.410 I/GPS-OBS: HEARTBEAT ok — last fix age=4s
+[267|18357] 23:59:10.861 D/LocationManager: onLocationResult #15 — lat=42.5566833 lon=-70.8713633 acc=2.42m provider=fused
+[268|18357] 23:59:10.863 D/ViewModel: GPS update: lat=42.5566833 lon=-70.8713633 acc=2.42m spd=0.0m/s
+[269|18357] 23:59:10.865 I/GPS-OBS: fix lat=42.55668 lng=-70.87136 acc=2.4m speed=0.00mps bearing=? gap=13996ms
+[270|18357] 23:59:10.867 D/STATIONARY: freeze — stationary (never fired (199s since start), events=0) — skipping visible updates
+[271|18357] 23:59:10.878 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[272|18357] 23:59:24.865 D/LocationManager: onLocationResult #16 — lat=42.5566833 lon=-70.8713633 acc=1.516m provider=fused
+[273|18357] 23:59:24.866 D/ViewModel: GPS update: lat=42.5566833 lon=-70.8713633 acc=1.516m spd=0.0m/s
+[274|18357] 23:59:24.869 I/GPS-OBS: fix lat=42.55668 lng=-70.87136 acc=1.5m speed=0.00mps bearing=? gap=14004ms
+[275|18357] 23:59:24.870 D/STATIONARY: freeze — stationary (never fired (213s since start), events=0) — skipping visible updates
+[276|18357] 23:59:24.882 I/NARR-GEO: SUMMARY: check#23 pos=42.55668,-70.87136 nearby=0 narrated=0/1769 entries=0 approaches=0 skippedNarrated=0 skippedCooldown=0 walkSim=false
+[277|18357] 23:59:24.884 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[278|18357] 23:59:38.864 D/LocationManager: onLocationResult #17 — lat=42.5566833 lon=-70.8713633 acc=1.36m provider=fused
+[279|18357] 23:59:38.865 D/ViewModel: GPS update: lat=42.5566833 lon=-70.8713633 acc=1.36m spd=0.0m/s
+[280|18357] 23:59:38.867 I/GPS-OBS: fix lat=42.55668 lng=-70.87136 acc=1.4m speed=0.00mps bearing=? gap=13998ms
+[281|18357] 23:59:38.868 D/STATIONARY: freeze — stationary (never fired (227s since start), events=0) — skipping visible updates
+[282|18357] 23:59:38.879 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+[283|18357] 23:59:52.863 D/LocationManager: onLocationResult #18 — lat=42.5566833 lon=-70.8713633 acc=2.22m provider=fused
+[284|18357] 23:59:52.864 D/ViewModel: GPS update: lat=42.5566833 lon=-70.8713633 acc=2.22m spd=0.0m/s
+[285|18357] 23:59:52.866 I/GPS-OBS: fix lat=42.55668 lng=-70.87136 acc=2.2m speed=0.00mps bearing=? gap=13999ms
+[286|18357] 23:59:52.868 D/STATIONARY: freeze — stationary (never fired (241s since start), events=0) — skipping visible updates
+[287|18357] 23:59:52.878 D/BEARING: speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)

@@ -2,57 +2,49 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-20 — Session 152 (absorbed SalemIntelligence KB rewrite: 1,399 narrations + 33 historical_notes resynced from SI `:8089`, verified_fact corrections landed, Heritage Trail "Red Line" confabulation cleared in PG + Room + legacy Kotlin source, Room DB rebaked to 1,769 narrated POIs +286, S152 APK 820 MB installed on Lenovo; cold-boot verified S150 fixes 4/5/6 live; fixes 1/2/3/7 need a field walk; counsel meeting and Webex demo 2026-04-20 upcoming at session close)
+**Last updated:** 2026-04-20 — Session 153 (Webex demo crashed mid-flight on a newspaper-banner tap; root cause = `salem_witch_trials_npc_bios` + `salem_witch_trials_articles` tables missing from bundled Room DB via the S149-class clobber pattern; patched both bundle scripts to the S150 pattern, rebuilt Room DB 8.4→9.2 MB with npc_bios 49 + articles 16 + newspapers 202 rows restored, installed patched APK on Lenovo HNY0CY0W; introduced `ASSETS-MANIFEST.md` + `verify-bundled-assets.js` as permanent guard rails; SI anomaly OMEN relay filed pre-crash; workstation then crashed before commit — full recovery from git working tree, no data loss; counsel meeting + Webex demo outcomes not yet captured)
 
 ---
 
-## TOP PRIORITY — Next Session (S153)
+## TOP PRIORITY — Next Session (S154)
 
 **Operator-directed starting point:**
 
-0. **POST-COUNSEL-MEETING FOLLOW-UP.** The 2026-04-20 counsel engagement meeting happened between S152 and S153. Open S153 by asking the operator:
+0. **POST-COUNSEL-MEETING FOLLOW-UP (still open — computer crashed before capture).** Open S154 by asking the operator:
    - Did counsel sign the mutual NDA (or execute an engagement letter with confidentiality)?
-     - If YES: email Tier 2 PDF to counsel that same day. Confirm receipt. Log it in the live conversation log.
-     - If NO: hold Tier 2. Reassess in a later session if/when the NDA signs.
-   - What did counsel commit to? Engagement scope, fee structure, retainer amount, next-checkpoint date.
-   - Which of the 12 open decisions on the A7 Decision Checklist got signed?
-   - Any homework counsel assigned (TESS search, state-of-incorporation memo, Form TX prep, etc.)?
+     - If YES: email Tier 2 PDF to counsel (`docs/counsel-packet/Katrina-Counsel-Packet-Tier2-Post-NDA.pdf`). Confirm receipt.
+     - If NO: hold Tier 2.
+   - Engagement scope, fee structure, retainer amount, next-checkpoint date.
+   - Which of the 12 A7 Decision Checklist items got signed.
+   - Counsel homework assigned (TESS trademark, state-of-incorporation memo, Form TX prep, etc.).
    - C-corp paperwork status.
-   - Webex demo 2026-04-20 — confirm outcome.
+   - **Webex demo 2026-04-20 outcome** — audience, NDA status, what was/wasn't shown, follow-ups. The demo crashed mid-flight on a newspaper-banner tap; the patched APK now on Lenovo addresses the crash but has not been smoke-tested yet.
 
-1. **FIELD WALK TO EXERCISE THE REMAINING S150 FIXES.** S152 APK is installed on Lenovo HNY0CY0W. Cold-boot already confirmed fixes 4/5/6 live (GPS polling adaptive, bbox default ON, newspaper table baked). Still need a walk with the app running to exercise:
-   - **Fix 1 — detail → long_narration:** before starting, set Audio Detail to DEEP in the settings. Walk into any meaningful POI. Expect log lines: `NARR-PLAY: DIRECT PLAY: … detail=DEEP bodyLen=<large>` and `NARR-STATE → Speaking(… type=LONG_NARRATION …)`.
-   - **Fix 2 — Phillip's house / Hale Farm narrate:** walk into Historic New England's Phillips House or Hale Farm. Log category should read `HISTORICAL_BUILDINGS`; POI should enter the queue (no longer `SKIP (AudioControl group muted)`).
-   - **Fix 3 — GPS trail follows live movement:** magenta polyline should grow smoothly at walking speed. Key log: `speedMps > 0.5` trail updates.
-   - **Fix 7 — NARR-GATE gate-leak diagnosis:** every POI enqueue now logs `NARR-GATE: <poi> category=<X> group=<Y> enabled=<bool> …`. If Grace Episcopal / Golden Dawn Contracting narrate again without the Businesses toggle, log will reveal whether `isPoiSpeechEnabled` returned true unexpectedly or `groupForCategory` resolved wrong.
-   - Pull logs with `adb -s HNY0CY0W pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/`.
+1. **SMOKE-TEST THE PATCHED S153 APK ON LENOVO.** The patched `app-salem-debug.apk` is installed on HNY0CY0W but the smoke-test was interrupted by the computer crash. Open the app, navigate: Witch Trials → **People** tab (queries `salem_witch_trials_npc_bios`) → confirm no SQLiteException, list populates; then Witch Trials → **History 4×4** tiles (queries `salem_witch_trials_articles`) → same check. Also re-open the 1691-11-22 newspaper detail (the exact tap that crashed in the Webex demo).
 
-2. **Forward SI anomaly report to OMEN.** `docs/SalemIntelligence-anomalies-s152-2026-04-19.md` carries four anomalies (ANOM-001 through ANOM-004). Highest-value for SI: ANOM-001 (9 GP-rooftop phantom-coord leaks still live in `/api/intel/poi-export`) and ANOM-002 (Heritage Trail verified_fact only propagated to `short_narration`; long/medium/historical_note tiers still carried a "2020 Red Line revision" confabulation).
+2. **REAL OUTDOOR FIELD WALK — remaining S150 fixes 1/2/3/7.** The walk-sim during the Webex demo incidentally validated Fix 2 (Salem Maritime NHS narrated as HISTORICAL_BUILDINGS / MEANINGFUL) and Fix 7 (NARR-GATE lines emitted, B=false cross-check visible). Still need:
+   - **Fix 1:** toggle **Audio Detail = DEEP** before walking; confirm `detail=DEEP bodyLen=<large>` in log.
+   - **Fix 3:** real GPS motion only — walk-sim emits `speed=?` so MotionTracker escape hatch never fires.
+   - **Fix 2 definitive:** Phillips House or Hale Farm on-foot.
+   - **Fix 7 leak probe:** with Businesses toggle OFF, see if Grace Episcopal / Golden Dawn Contracting narrate anyway. If they do, the new NARR-GATE line will diagnose which gate leaked.
+   - Checklist at `docs/field-walk-s153-checklist.md` still valid. Pull logs with `adb -s HNY0CY0W pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/`.
 
-3. **File Form TX copyright registration within 30 days of 2026-04-20.** $65, unrelated to C-corp formation. Per operator memo §2.1: the 3-month statutory-damages window depends on filing before or within 3 months of first publication.
+3. **File Form TX copyright registration within 30 days of 2026-04-20.** $65, unrelated to C-corp. Per operator memo §2.1: 3-month statutory-damages window. **Hard deadline: 2026-05-20.**
 
-4. **Carry-forwards from S149 / S150 / S151 / S152:**
-   - **APK size pre-Play-Store audit** — debug APK now 820 MB (was 782 MB at S147), `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
-   - **Play Store closed-testing tester recruitment** — per operator memo §2.4: need 20 testers for 14 consecutive days before production release. Start recruiting now.
-   - **1692-victim-tribute POI burial-ground audit** (STATE.md item #9) — hand-grep 20 canonical victim names against tribute-POI narration; Oracle + SI had been placing 1692 victims as "interred at" Witch Trials Memorial / Charter Street / Old Burying Point (incorrect). Not touched S152; separate scope.
-   - **Anything the operator reports from the walk** — any remaining UX surprises, narration timing off, POIs missing, etc.
+4. **Wire `verify-bundled-assets.js` into the build.** Currently manual. Fold into a gradle preBuild task so the asset-clobber class of regression can never silently slip into another AAB. Add to CI when CI lands.
 
-**Post-S152 key facts:**
-- **SalemIntelligence KB absorbed** — re-sync pulled 1,399 narrations (+269 short, +290 long) and 33 historical_notes (+5 net, 28 SHA `e9aeddb` refreshes) from SI `:8089`. 0 coord updates (SI export matched LMA exactly, but 9 rows still at 30 Church St GP-rooftop phantom → SI-side leak filed as ANOM-001 in `docs/SalemIntelligence-anomalies-s152-2026-04-19.md`).
-- **Verified_fact correction landed** — `gallows_hill_salem` historical_note now explicitly frames Black Mary Widow as "a character created by the museum, not a documented figure from the trials."
-- **Heritage Trail confabulation cleared across 3 surfaces** — (a) PG: `salem_heritage_trail` long/desc/histnote NULL'd + tagged `|overridden-s152-heritage-confabulation`; `national_park_service_visitor_center` long/histnote NULL'd (was LMA-side hand-authored legacy "red line painted on the sidewalk"); (b) Room DB rebaked — final "red line" probe = 1 hit (Red Line Cafe, legitimate business name); (c) Legacy Kotlin — `salem-content/.../SalemBusinessesExpanded.kt:1403` rewritten with clean yellow-line narrative so the legacy JVM pipeline cannot resurrect the fabrication.
-- **SI-side anomaly — ANOM-002** — verified_fact layer propagates only to `short_narration`; long/medium/historical_note tiers still confabulate a "2020 Red Line revision" story. Filed for SI to act on.
-- **POI inventory unchanged** — 1,830 active POIs in `salem_pois` (was 1,830 at S150 close). Room DB: **1,769 narrated** (+286 vs S150's 1,483). 1,122 historical_notes (+3).
-- **S152 APK 820 MB installed on Lenovo HNY0CY0W** — S150 fixes 4/5/6 verified from cold boot log (GPS polling emits 2500ms + 30000ms branches, first `setupMap` shows `bypassBbox=true`, zero `no such table` errors). S150 fixes 1/2/3/7 need a field walk to exercise.
-- **Detail level flows to ambient walk** (S150, still current) — `NarrationGeofenceManager.getNarrationForPass()` reads `AudioControl.detailLevel()`. BRIEF → null (skip body), STANDARD → `shortNarration`, DEEP → `longNarration ?: shortNarration`. Historical Mode still preferred when `historical_note` populated.
-- **speakTaggedNarration vs speakTaggedHint split** — `NarrationManager.speakTaggedNarration()` is new, emits `SegmentType.LONG_NARRATION` with shared `inferKindFromTag` helper. `TourViewModel.speakTaggedHint` + `speakTaggedNarration` both exposed. DIRECT PLAY + playNextNarration paths in `SalemMainActivityNarration` now use hint for "You are at X" and narration for the body. All 4 `newspaper_1692` callsites automatically promoted to proper LONG_NARRATION.
-- **23 POIs recategorized** (PG + Room) with `data_source … |category-fix-s150-2026-04-18`: 12 HISTORICAL_BUILDINGS (Historic New England's Phillips House, Hale Farm, Ames Memorial Hall, Charter Street / Abbott Street / Greenlawn Cemeteries, Witch Trials Memorial, Salem Maritime NHP + Central Wharf, Colonial Hall, Historic Salem Inc., John Cabot House); 1 CIVIC (Salem City Hall); 10 WORSHIP (First Church in Salem, Grace Episcopal, Remix, 3× St. Peter's, Tabernacle, First Baptist, First United Methodist, Saint Vasilios, Salvation Army). Museums (Salem Witch Museum et al.) intentionally left as ENTERTAINMENT pending a broader MEANINGFUL-vs-BUSINESSES group decision.
-- **GPS trail freeze fix** — speed-based escape hatch in `stationaryFrozen`: `update.speedMps > 0.5` bypasses the 25m radius check. Accelerometer-based significant-motion sensor doesn't fire in a stable car, so before this fix the trail only updated every 25m. Now trail updates on every fix during any real motion.
-- **GPS polling adaptive** — `val desiredInterval = when { speed > 20mph → 10s; speedMps > 0.5 || narrating → 2.5s; else → 30s }`. Previously `narrationActive=true` was hardcoded, making the 60s battery-saver branch unreachable. S149 field log: 494 fixes in 90 min, mostly parked. Expected drop to ~100-200 fixes in the S151 walk.
-- **Bbox override default flipped** — `MenuPrefs.PREF_GPS_BBOX_OVERRIDE_DEFAULT = true`. `SalemMainActivity.setupMap()` reads with this default. Fresh install from Beverly shows real GPS, no Samantha clamp. Emulator / demo can toggle off via Journey menu.
-- **Newspaper table** — `bundle-witch-trials-newspapers-into-db.js` now `CREATE TABLE IF NOT EXISTS` before insert, writes to source DB (`salem-content/`), then mirrors to assets. Operator's S149 field log showed 14+ `no such table: salem_witch_trials_newspapers` errors when opening the Witch Trials newspaper panel — that's fixed.
-- **NARR-GATE instrumentation** — `enqueueNarration` now logs `NARR-GATE: <poi> category=<X> group=<Y> enabled=<bool> jumpToFront=<bool> (M=<bool> A=<bool> B=<bool>)` on every call. S149 log showed Grace Episcopal Church (ENTERTAINMENT at that time) and Golden Dawn Contracting (OFFICES) passed the S149 AudioControl gate despite no toggle events and the correct category in the DB. No code bypass. Added log will reveal whether `isBusinessesEnabled` returns true unexpectedly or `groupForCategory` resolves to a different group.
-- **POI inventory:** **1,830 active POIs** (S149 reported 1,837; post-cleanup actual is 1,830 — 7 Samantha-cluster soft-deletes from S149 now reflected in publish-salem-pois row count). 202 witch-trials newspapers now bundled in assets DB.
+5. **Carry-forwards from S149 / S150 / S151 / S152 / S153:**
+   - **APK size pre-Play-Store audit** — debug APK 820 MB, `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
+   - **Play Store closed-testing tester recruitment** — 20 testers for 14 consecutive days.
+   - **1692-victim-tribute POI burial-ground audit** (item #9 below) — hand-grep 20 canonical victim names against tribute-POI narration.
+   - **SI anomaly report (ANOM-001 / ANOM-002)** — filed to OMEN in S153 at `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md`. No LMA action unless SI responds.
+
+**Post-S153 key facts:**
+- **S153 demo-crash firefight** — Webex demo crashed on 1691-11-22 newspaper-banner tap. `SQLiteException: no such table: salem_witch_trials_npc_bios`. Diff found **two** tables missing from source DB + assets DB: `salem_witch_trials_npc_bios` (49 rows) and `salem_witch_trials_articles` (16 rows). S149-class clobber bug: bundle scripts wrote assets-only, `publish-salem-pois.js` rebuilt source and copied over assets, silently wiping tables. Fix = S150 pattern applied to `bundle-witch-trials-into-db.js` + `bundle-witch-trials-npc-bios-into-db.js`. Room DB rebuilt 8.4 → 9.2 MB. Patched APK installed on Lenovo.
+- **ASSETS-MANIFEST + verify-bundled-assets.js** — new permanent guard rails against the asset-clobber class of bug. Manifest at `app-salem/src/main/assets/ASSETS-MANIFEST.md` catalogs every required asset + S149/S153 regression history. Verifier at `cache-proxy/scripts/verify-bundled-assets.js` fails non-zero on any missing/undersized asset. Run before every `assembleDebug`/`bundleRelease`. Gradle preBuild wiring is the natural next step (S154 carry-forward).
+- **S152 SalemIntelligence KB absorption still current** — re-sync pulled 1,399 narrations (+269 short, +290 long) and 33 historical_notes from SI `:8089`. Heritage Trail "Red Line" confabulation cleared across 3 surfaces (PG NULL'd with `|overridden-s152-heritage-confabulation` tag, Room rebaked, legacy Kotlin `SalemBusinessesExpanded.kt:1403` rewritten). Verified_fact correction landed on `gallows_hill_salem` (Black Mary Widow framed as museum-created character). `gallows_hill_salem` + `salem_heritage_trail` + `national_park_service_visitor_center` all have clean narration now.
+- **S150 fixes status (as of S153 demo + post-crash verification):** Fix 2 ✅ validated (Salem Maritime NHS as HISTORICAL_BUILDINGS/MEANINGFUL during walk-sim). Fix 7 ✅ validated (NARR-GATE instrumentation emitting). Fix 1 ⚠️ infrastructure confirmed (`type=LONG_NARRATION` emits) but DEEP-detail text flip not exercised (STANDARD was used). Fix 3 🚫 not exercised (walk-sim can't test real-motion escape hatch). Fixes 4/5/6 ✅ cold-boot verified at S152. Real outdoor walk still needed for full 1/3 validation.
+- **S150 mechanics still current** — `NarrationGeofenceManager.getNarrationForPass()` reads `AudioControl.detailLevel()` (BRIEF→null, STANDARD→shortNarration, DEEP→longNarration). `NarrationManager.speakTaggedNarration()` emits `SegmentType.LONG_NARRATION` (split from `speakTaggedHint`). 23 POIs recategorized (12 HISTORICAL_BUILDINGS / 1 CIVIC / 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. GPS trail speed-based escape hatch (`speedMps > 0.5` bypasses 25m). Adaptive polling ladder (10s driving / 2.5s walking-or-narrating / 30s idle). Bbox override default = true. NARR-GATE instrumentation line per-enqueue.
 
 **Background items (not blocking S150):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
@@ -109,7 +101,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 152. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 153. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -141,14 +133,16 @@
 2. **NOTE-L015 — SalemCommercial cutover** — PARKED POST-V1 per operator S145. Salem still at `~/Development/Salem/`; LMA paths resolve correctly.
 3. **OMEN-004 first real Kotlin unit test** — deadline moved to **2026-08-30** (OMEN S023 amendment, 2026-04-19). No action this cycle.
 4. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
-5. **Cross-project: SalemIntelligence** — Phase 1 KB + Phase 2 regen caught up S020/S021 with verified_facts layer battle-tested. LMA absorbed S152 (1,399 narrations + 33 historical_notes). **New anomaly report ready for OMEN relay:** `docs/SalemIntelligence-anomalies-s152-2026-04-19.md` — ANOM-001 (9 GP-rooftop phantom-coord leaks still live in SI export), ANOM-002 (Heritage Trail verified_fact only propagated to short_narration tier; long/medium/historical_note still carried 2020-Red-Line-revision confabulation). Older S144 report `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` is now superseded by ANOM-001 and can be closed.
+5. **Cross-project: SalemIntelligence** — Phase 1 KB + Phase 2 regen caught up S020/S021 with verified_facts layer battle-tested. LMA absorbed S152 (1,399 narrations + 33 historical_notes). **Anomaly relay FILED to OMEN in S153** at `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md` — covers ANOM-001 (9 GP-rooftop phantom-coord leaks still live in SI export), ANOM-002 (Heritage Trail verified_fact only propagated to short_narration tier; long/medium/historical_note still carried 2020-Red-Line-revision confabulation), plus LOW/INFO items. Older S144 report superseded by ANOM-001, asked OMEN to close it.
 6. **NOTE-L018 PG-13 standing content rule** — ACCEPTED by OMEN S023 (2026-04-19). Upstream relays written to Salem / SI / GeoInbox. No LMA action.
 7. **NOTE-L019 restrooms_zombie.png regen** (LOW) — no deadline, no blocker.
 8. **9-dot menu witchy backgrounds + strong foreground titles** — PARKED S146. Design direction: witchy illustrated backgrounds with readable titles for the 8 grid-menu items. Reusable content-art pipeline from find-tile batch pattern. Detail in S146 log.
 9. **Cross-project: Oracle + SalemIntelligence burial-grounds-tribute hallucinations** — PARKED S146. Upstream AI places 1692 victims as interred at Witch Trials Memorial / Charter Street / Old Burying Point (they are NOT buried there). Pre-Play-Store audit needed: grep 20 canonical victim names against tribute-POI narration, excise burial claims. OMEN to relay upstream for Oracle + SI fix.
-10. **APK size pre-Play-Store blocker** — S152 debug APK 820 MB (up from S147's 780 MB after narration content uplift), still dominated by `poi-icons/` 544 MB. Audit required: which category folders are live, downsize to 256×256 or WebP q=75. Must land before first Play Store AAB upload.
-11. **Post-counsel-meeting follow-up (S151, still open)** — if counsel signs NDA at 2026-04-20 meeting, deliver Tier 2 PDF same day. File Form TX within 30 days of 2026-04-20 (unrelated to C-corp; preserves statutory-damages window). Start recruiting 20 Play Store closed-testing testers (14-day rule).
-12. **Field walk to exercise S150 fixes 1/2/3/7 (S152)** — S152 APK installed on Lenovo; cold boot verified fixes 4/5/6. Remaining fixes need a real walk with DEEP detail toggled.
+10. **APK size pre-Play-Store blocker** — S153 debug APK ~820 MB (Room DB grew to 9.2 MB with restored npc_bios + articles tables, still dwarfed by `poi-icons/` 544 MB). Audit required: which category folders are live, downsize to 256×256 or WebP q=75. Must land before first Play Store AAB upload.
+11. **Post-counsel-meeting follow-up** — counsel meeting happened 2026-04-20; outcomes NOT captured before workstation crash. Re-ask at S154 start: NDA / engagement / A7 decisions / homework / entity status / Webex demo outcome. File Form TX by **2026-05-20** (statutory-damages window). Start recruiting 20 Play Store closed-testing testers (14-day rule).
+12. **S150 fixes 1/2/3/7 — walk-sim validated Fix 2 and Fix 7; Fix 1 (needs DEEP toggle) and Fix 3 (needs real GPS motion) still pending a real outdoor walk.** Checklist at `docs/field-walk-s153-checklist.md`.
+13. **Smoke-test patched S153 APK on Lenovo** — installed but not smoke-tested before the computer crash. Verify Witch Trials → People + History + 1691-11-22 newspaper detail all load without SQLiteException.
+14. **Wire `verify-bundled-assets.js` into the build** — currently manual. Gradle preBuild task + CI hook so the asset-clobber class of bug can't silently slip into another AAB.
 
 ---
 
@@ -175,8 +169,9 @@
 ## POI Inventory
 
 - **Current PG:** **1,830 active POIs** in `salem_pois` (**1,769 narrated** post-S152 SI re-sync, up from 1,483 at S150). 1,122 historical_notes. Post-S149 Samantha-cluster cleanup (7 soft-deletes) reflected.
-- **Room DB:** published from PG S152, in sync (1,830 rows, 8.0 MB at `app-salem/src/main/assets/salem_content.db`).
+- **Room DB:** rebuilt S153 after demo-crash firefight — **9.2 MB** at `app-salem/src/main/assets/salem_content.db`. Includes restored `salem_witch_trials_npc_bios` (49 rows) + `salem_witch_trials_articles` (16 rows) + `salem_witch_trials_newspapers` (202 rows) alongside the 1,830 `salem_pois`.
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
+- **Assets manifest + pre-build verifier:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js` (introduced S153).
 
 ---
 
