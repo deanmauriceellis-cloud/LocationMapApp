@@ -2,29 +2,41 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-18 — Session 150 (seven field-test root-cause fixes: `getNarrationForPass` now detail-aware so DEEP pulls `long_narration`; `speakTaggedNarration` split from `speakTaggedHint` so body segments emit `SegmentType.LONG_NARRATION`; 23 POIs recategorized from ENTERTAINMENT/SHOPPING/CIVIC to HISTORICAL_BUILDINGS / CIVIC / WORSHIP including the Chestnut-St Phillip's House operator reported; `salem_witch_trials_newspapers` table now created by bake script; GPS trail speed-based unfreeze (>0.5 m/s bypasses stuck motion tracker); GPS polling now adaptive to actual motion (30s idle baseline, not hardcoded 2.5s); bbox override default flipped to true; NARR-GATE instrumentation added for the still-mysterious Grace Episcopal / Golden Dawn Contracting gate leak)
+**Last updated:** 2026-04-19 — Session 151 (counsel packet PDFs produced for 2026-04-20 counsel engagement meeting: two-tier NDA-gated disclosure — Tier 1 pre-NDA 46-page PDF at `docs/counsel-packet/Katrina-Counsel-Packet-Tier1-Pre-NDA.pdf` hands to counsel Monday; Tier 2 post-NDA 133-page PDF at `docs/counsel-packet/Katrina-Counsel-Packet-Tier2-Post-NDA.pdf` holds until NDA executes; operator prep memo 7 pages at `docs/counsel-packet/Operator-Prep-Memo.pdf`; S150 field-test verification deferred one more session)
 
 ---
 
-## TOP PRIORITY — Next Session (S151)
+## TOP PRIORITY — Next Session (S152)
 
 **Operator-directed starting point:**
 
-0. **FIELD TEST THE S150 FIXES.** Operator closed S150 to re-drive Beverly → Salem with the new APK. S151 opens by pulling `adb pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/` and verifying each of the seven shipped fixes:
-   - **Detail flows to `long_narration`:** set Audio Detail to DEEP before walking; listen for multi-sentence historical narration at each POI (not just "You are at X. X is at Y Street"). Log should show `NARR-PLAY: DIRECT PLAY: … detail=DEEP bodyLen=<large>` and `NARR-STATE → Speaking(… type=LONG_NARRATION …)`.
+0. **POST-COUNSEL-MEETING FOLLOW-UP.** The 2026-04-20 counsel engagement meeting happened between S151 and S152. Open S152 by asking the operator:
+   - Did counsel sign the mutual NDA (or execute an engagement letter with confidentiality)?
+     - If YES: email Tier 2 PDF to counsel that same day. Confirm receipt. Log it in the live conversation log.
+     - If NO: hold Tier 2. Reassess in a later session if/when the NDA signs.
+   - What did counsel commit to? Engagement scope, fee structure, retainer amount, next-checkpoint date.
+   - Which of the 12 open decisions on the A7 Decision Checklist got signed?
+   - Any homework counsel assigned (TESS search, state-of-incorporation memo, Form TX prep, etc.)?
+   - C-corp paperwork status.
+
+1. **FIELD TEST THE S150 FIXES.** Deferred from S151. Pull `adb pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/` and verify the 7 shipped fixes:
+   - **Detail flows to `long_narration`:** set Audio Detail to DEEP before walking; log should show `NARR-PLAY: DIRECT PLAY: … detail=DEEP bodyLen=<large>` and `NARR-STATE → Speaking(… type=LONG_NARRATION …)`.
    - **Phillip's house narrates:** Historic New England's Phillips House and Hale Farm should now enter the queue (no longer `SKIP (AudioControl group muted)`). Category in log should read `HISTORICAL_BUILDINGS`.
-   - **GPS trail follows live movement:** magenta polyline should grow smoothly at driving and walking speeds. Log should show frequent "STATIONARY speed unfreeze" (or silent passage, since we don't log the speed escape path by default).
+   - **GPS trail follows live movement:** magenta polyline should grow smoothly at driving and walking speeds.
    - **GPS polling adaptive:** `GPS interval →` should show 2500 during motion/narration, 30000 while parked, 10000 above 20 mph. Total fix count over a 60-90 min walk should be ~100-200, not ~500.
-   - **Bbox default ON:** first fix from Beverly should log `bypassBboxClamp = true … setupMap() … bypassBbox=true` and NOT show `snapping to Samantha statue`. `location → bbox clamp BYPASSED` on every outside-Salem fix.
-   - **Newspaper panel works:** tapping the Witch Trials → Newspaper section should load without `HistNewspaper: no such table` errors. 202 headlines bundled.
-   - **NARR-GATE gate-leak diagnosis:** every POI enqueue now logs `NARR-GATE: <name> category=<X> group=<Y> enabled=<Z> jumpToFront=<bool> (M=? A=? B=?)`. If Grace Episcopal / Golden Dawn Contracting narrate again, the log will tell us whether isPoiSpeechEnabled returned true unexpectedly.
+   - **Bbox default ON:** first fix from Beverly should log `bypassBboxClamp = true … setupMap() … bypassBbox=true` and NOT show `snapping to Samantha statue`.
+   - **Newspaper panel works:** tapping Witch Trials → Newspaper should load without `HistNewspaper: no such table` errors.
+   - **NARR-GATE gate-leak diagnosis:** every POI enqueue logs category/group/enabled/flags. If Grace Episcopal / Golden Dawn Contracting narrate again, the log will reveal whether isPoiSpeechEnabled returned true unexpectedly.
 
-1. **Anything the operator reports from the walk** — any remaining UX surprises, narration timing off, POIs missing, etc.
+2. **Anything the operator reports from the walk** — any remaining UX surprises, narration timing off, POIs missing, etc.
 
-2. **Carry-forwards from S149 / S150:**
-   - **Webex demo (Monday 2026-04-20)** — app-side should now just work. Audio routing still operator-side.
+3. **File Form TX copyright registration within 30 days of 2026-04-20.** $65, unrelated to C-corp formation. Per operator memo §2.1: the 3-month statutory-damages window depends on filing before or within 3 months of first publication.
+
+4. **Carry-forwards from S149 / S150 / S151:**
+   - **Webex demo 2026-04-20** — happened between S151 and S152. Confirm outcome.
    - **APK size pre-Play-Store audit** — debug APK 782 MB, `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
    - **SalemIntelligence phantom-coord bug report** at `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` — still needs to be forwarded to SI.
+   - **Play Store closed-testing tester recruitment** — per operator memo §2.4: need 20 testers for 14 consecutive days before production release. Start recruiting now.
 
 **Post-S150 key facts:**
 - **Detail level now flows to ambient walk** — `NarrationGeofenceManager.getNarrationForPass()` reads `AudioControl.detailLevel()`. BRIEF → null (skip body), STANDARD → `shortNarration`, DEEP → `longNarration ?: shortNarration`. Historical Mode still preferred when `historical_note` populated. New helper `hasAnyNarrationText()` powers the mode-independent no-narrative gate. `pickVariantText()` in `NarrationManager` remains the TourPoi path (unchanged).
@@ -47,27 +59,17 @@
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 - **SalemIntelligence bug report** — `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` drafted S144 for operator to forward to SI. 10 BCS POIs with phantom coords 0.2 m off Samantha statue (geocoding fallback bug).
 
-**Post-S145 key facts:**
-- **Lawyer packet drafted** — `docs/lawyer-packet/10-legal-walkthrough.md` (~260 lines, 12-item open-decision menu: C-corp formation, app name, domain, Privacy Policy pointer, pricing pointer, ToS stub, IP copyright/trademark/4-provisional-patents, Play Store checklist, Data Safety, insurance, timeline). `docs/lawyer-packet/11-pricing-and-age-gate.md` (~220 lines, $19.99 flat paid + corrected age-gate mental model: Teen + 13+ + no-data → Google Family Link, not paid-status).
-- **V1 Privacy Policy drafted** — `docs/PRIVACY-POLICY-V1.md` (Posture A V1-minimal, ~180 lines). 4 TBDs for Monday counsel: operating entity, jurisdiction, contact email, mailing address. Full OMEN-008 draft preserved at `docs/PRIVACY-POLICY.md` for future-state RadioIntelligence Salem collection.
-- **Hosting decision:** DestructiveAIGurus.com subpages. Site redev is follow-on post-V1. Pattern: `destructiveaigurus.com/katrinas-mystic-guide/{privacy,support,terms}`.
-- **Entity decision:** C-corp to be formed at 2026-04-20 counsel meeting; interim fallback = sole proprietor (Dean Maurice Ellis) with entity transfer post-formation if timing slips.
-- **#45 Universal Audio Control shipped** — `audio/AudioControl.kt` + `audio/NarrationHistory.kt` + 6 vector drawables + toolbar_two_row.xml layout + AppBarMenuManager.setupAudioAndNavCluster + content-popup AlertDialog + NarrationManager enqueue-gate + `replayHistoryEntry` + tag-based kind inference + detail-aware `pickVariantText` with graceful fallback + TourViewModel nav wrappers + SalemMainActivity listener + SplashActivity always-on voiceover. Device-verified on Lenovo HNY0CY0W: 4 nav icons + audio icon render at correct bounds; popup opens with 4 group toggles (Oracle / Meaningful / Ambient / Businesses) + Detail radio (Brief/Standard/Deep); First-tap confirmed replay of "Lappin Park"; long-press Audio cycles STANDARD→DEEP. Pause = long-press on Next. Jump shows a Toast for now; real sheet-routing deferred to #27 hero view.
-- **Category→group mapping (#45):** MEANINGFUL = HISTORICAL_BUILDINGS + CIVIC + WITCH_SHOP + WORSHIP; AMBIENT = PARKS_REC + EDUCATION; BUSINESSES = FOOD_DRINK + SHOPPING + LODGING + HEALTHCARE + ENTERTAINMENT + AUTO_SERVICES + OFFICES + TOUR_COMPANIES + PSYCHIC + FINANCE + FUEL_CHARGING + TRANSIT + PARKING + EMERGENCY. Unknown → MEANINGFUL (safe historic default).
-- **Detail level semantics:** Brief = POI name only; Standard = short narration; Deep = long narration with graceful fallback to short then name.
-- **Rolling narration history:** 25-entry ring buffer, session-lifetime (cleared on process death), not persisted. First = oldest live entry; Prev = step back; Next = step forward (or skip current if at tail).
-- **Splash voiceover is always-on** — operator mid-S145 direction "splash is always audio available"; no AudioControl gate. Splash will still be replaced with screaming-cat in #44.
-
-**Post-S144 key facts:**
-- **Samantha clamp shipped** — GPS fixes outside the Salem bbox (42.475–42.545 N × -70.958 to -70.835 W) snap to the Bewitched / Samantha Statue (42.5213319, -70.8958518). New `SalemBounds.kt` helper + clamp at all 4 MainViewModel GPS emission sites. Raw GPS still logs to GPS-OBS for diagnostics; only the `_currentLocation` emission gets replaced. Transition logged once per inside/outside flip.
-- **Cold-start tier-first narration shipped** — explore-mode narration queue prefers HISTORIC/CIVIC/EDUCATION tier while the user is within 40 m of their initial narration anchor. After crossing the threshold, reverts to S125's closest-first retail-block behavior.
-- **Katrina mascot rollout** — 12 Salem/Halloween-themed splash variants (library-tea, pumpkin patch, moonlit rooftop, cozy bookshop, autumn leaves, jack-o-lantern, crystal orb, lighthouse, fireside, starry bat sky, forest ranger, witchy library tea) at `res/drawable-nodpi/splash_katrina_01..12.jpg` (800×1000 Q80, ~125 KB avg, 1.5 MB total). `SplashActivity.KATRINA_SPLASHES.random()` picks one per launch. Library-tea (#12) is the `splash_katrina_12` fallback referenced by `themes.xml` windowSplashScreenAnimatedIcon and `activity_splash.xml` src.
-- **App icon — library-tea scene** — center-cropped 1024×1024 from `vibe-12-witchy-library-tea`. Mipmap PNGs at all 5 densities for `ic_launcher.png`, `ic_launcher_round.png`, `ic_launcher_foreground.png`. Adaptive icon XMLs updated to reference bitmap foreground; old vector "W" logo deleted. Background vector kept as deep-purple #2D1B4E.
-- **Welcome dialog restructured (#47 + #47b)** — three cards ordered Take-a-Tour (hero, gold border, 84dp icon) → Witch Trials (64dp icon) → Explore (64dp icon). Icons on the left, Katrina avatar medallion + Creepster title at the top for splash continuity. Three pose-specific Katrina icons: `welcome_card_tour` (green velvet colonial coat + brass candle), `welcome_card_trials` (open spellbook + quill), `welcome_card_explore` (teal bowtie + parchment map). All built as local `drawable-nodpi/welcome_card_*.jpg` at 320×320 Q85 (~25 KB each).
-- **Find menu reinforced (#49)** — 4 online/empty tiles hidden (Fuel & Charging, Transit, Parking, Emergency); 15 of 16 remaining tiles relabeled in Salem voice via local override map (Food & Drink → Taverns & Cafés, Healthcare → Apothecaries & Clinics, Worship → Churches & Meetinghouses, etc.); 16 painterly cartoon tile illustrations generated in Forge (`batch-find-tiles.py`) and wired as layered backgrounds with 0x99 black tint + white bold label + shadow for legibility. `FIND_SALEM_LABEL` + `FIND_TILE_ASSET` + `FIND_HIDE_IN_V1` are local to `SalemMainActivityFind.kt` so `PoiCategories.kt` mirror contract to `web/src/config/poiCategories.ts` stays untouched.
-- **TTS tuning (#50)** — replaced naive `[.!?]` chunker regex in `WitchTrialsMenuDialog.chunkForTts` with a character-walker `splitIntoSentences()` that honors 40+ abbreviations (Mr/Mrs/Dr/Rev/Inc/Ltd/a.m./p.m./Jan/Feb/etc/Mass/Ave/…), single-letter initials, and next-char-lowercase continuation. Only splits at real sentence ends. Short text (< 3500 chars) still speaks as one utterance with natural Android TTS prosody.
-- **Top toolbar + grid dropdown (#13 + #48)** — V1 toolbar: Home | [spacer] | Grid | About (Weather, Alerts, MapLayers all hidden). V1 grid: 2 rows of 4 — Row A: POI / Find / Go To / **Journey** (renamed Utility) / Row B: Tours / Events / Witch Trials / Legend. Social/Chat/Profile removed (auth needs online backend). Journey popup slimmed — only user-facing items remain (Record GPS, Build Story, Email GPX, GPS Mode, Narrator Mode, Legend); dev items stripped.
-- **Parking-lot #35 escalated to HARD PRE-V1 RELEASE BLOCKER** per operator direction — all assets encrypted + ProGuard/R8 obfuscation before first Play Store submission. Tracked as task #6.
+**S144-S150 facts still current (compressed):**
+- **Counsel packet shipped S151** — `docs/counsel-packet/` holds Tier 1 pre-NDA PDF (46 pages, for counsel Monday), Tier 2 post-NDA PDF (133 pages, held pending NDA), Operator prep memo PDF (7 pages). Source markdown + reproducible build scripts also in that dir. Old lawyer packet `docs/lawyer-packet/10-legal-walkthrough.md` + `11-pricing-and-age-gate.md` remain as historical source.
+- **V1 Privacy Policy V1-minimal Posture A** at `docs/PRIVACY-POLICY-V1.md` (4 TBDs for Monday counsel). Full OMEN-008 draft at `docs/PRIVACY-POLICY.md` held for future RI Salem activation.
+- **Hosting decision:** DestructiveAIGurus.com subpages `/katrinas-mystic-guide/{privacy,support,terms}`. Entity: C-corp (2026-04-20 counsel meeting); interim fallback sole prop Dean Maurice Ellis.
+- **#45 Universal Audio Control shipped (S145)** — `audio/AudioControl.kt` + `audio/NarrationHistory.kt` with 4 group toggles (Oracle / Meaningful / Ambient / Businesses) + Detail radio (Brief/Standard/Deep). S150 split `speakTaggedNarration` from `speakTaggedHint` so body segments emit `SegmentType.LONG_NARRATION`. Category→group mapping: MEANINGFUL = HISTORICAL_BUILDINGS+CIVIC+WITCH_SHOP+WORSHIP; AMBIENT = PARKS_REC+EDUCATION; BUSINESSES = FOOD_DRINK+SHOPPING+LODGING+HEALTHCARE+ENTERTAINMENT+AUTO_SERVICES+OFFICES+TOUR_COMPANIES+PSYCHIC+FINANCE+FUEL_CHARGING+TRANSIT+PARKING+EMERGENCY. Unknown → MEANINGFUL.
+- **Content-art & UX shipped S144-S146:** 12 Katrina splash variants + library-tea app icon + welcome dialog restructure (Take-a-Tour/Witch Trials/Explore cards) + Find menu rework (4 online tiles hidden, 16 painterly tiles, Salem-voice labels) + V1 toolbar/grid trimming (Home | Grid | About; 2×4 grid rows; Social/Chat/Profile removed) + TTS chunker honoring 40+ abbreviations.
+- **Samantha clamp (S144)** — `SalemBounds.kt`; GPS outside bbox snaps to Samantha Statue. Raw still logs to GPS-OBS. S150 `PREF_GPS_BBOX_OVERRIDE_DEFAULT = true` so fresh install from outside Salem bypasses clamp.
+- **Cold-start tier-first narration (S144)** + S150 detail-aware `getNarrationForPass` (DEEP→long_narration).
+- **23 POIs recategorized S150** (12 HISTORICAL_BUILDINGS + 1 CIVIC + 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. Museums (Salem Witch Museum et al.) intentionally left ENTERTAINMENT pending broader MEANINGFUL-vs-BUSINESSES group decision.
+- **GPS fixes S150:** speed-based stationary-unfreeze (>0.5 m/s bypasses MotionTracker); adaptive polling ladder (10s driving / 2.5s walking-or-narrating / 30s idle). Newspaper table now baked into assets DB via `bundle-witch-trials-newspapers-into-db.js`.
+- **Parking-lot #35 = HARD PRE-V1 RELEASE BLOCKER** — all assets encrypted + ProGuard/R8 obfuscation before first Play Store submission.
 
 **S141 facts still current:**
 - **V1 offline-mode enforcement shipped** — `FeatureFlags.V1_OFFLINE_ONLY = true` (compile-time const in `:core`). Three-layer enforcement: ViewModel gates (early-return) → OkHttp `OfflineModeInterceptor` (hard backstop in all 13 client sites) → offline-only tile sources (empty URL so osmdroid downloader refuses). V2 resumes by flipping one boolean.
@@ -104,7 +106,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 150. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 151. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -132,19 +134,17 @@
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy** — **V1-minimal Posture A shipped S145 at `docs/PRIVACY-POLICY-V1.md`** (decoupled from OMEN-008 review for V1 ship; V1 doesn't collect RadioIntelligence Salem data). Full OMEN-008 draft at `docs/PRIVACY-POLICY.md` still pending OMEN review (32 sessions); remains relevant for future RI Salem activation.
-2. **NOTE-L015 — `~/Development/SalemCommercial/` cutover never executed.** **PARKED POST-V1 per operator S145.** Filesystem check confirmed Salem still at `~/Development/Salem/`; LMA runtime references resolve correctly. Decision deferred until after V1 ships.
-3. **OMEN-002 history rotation** — operator action only.
-4. **OMEN-004 — first real Kotlin unit test** — **deadline moved to 2026-08-30** (operator direction S142). Previously 2026-04-30. Surfaced to OMEN in S142 report for amendment or acknowledgment.
-5. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
-6. **Cross-project: SalemIntelligence** — Phase 1 KB live. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2. **S144 new bug report:** `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` — 10 BCS POIs have phantom coords 0.2 m off the Samantha statue (geocoding fallback anchoring unresolvable POIs to a famous landmark). Operator to forward to SI.
-7. **NOTE-L018 — PG-13 standing content rule** proposed to OMEN at S138 via out-of-cycle notification. Pending OMEN acceptance + relay to upstream Salem Oracle / SalemIntelligence / GeoInbox.
-8. **NOTE-L019 — `restrooms_zombie.png` regen** (LOW) — one themed POI icon rsync-skipped during the Session 020 NVMe clone. No deadline, no blocker. Regen during a content-art session.
-9. **NVMe advisory** — LIFTED 2026-04-17 (OMEN S021). Normal commit/push cadence resumes.
-10. **9-dot menu witchy backgrounds + strong foreground titles** — PARKED S146 per operator. Toolbar grid menu (Row A: POI / Find / Go To / Journey; Row B: Tours / Events / Witch Trials / Legend) currently ships plain text items. Design direction: each item gets a witchy illustrated background consistent with Katrina painterly-storybook aesthetic, with a strong readable title in the foreground. UI work for a future session; content-art pipeline reusable from find-tile batch pattern. Full detail in `docs/session-logs/session-146-2026-04-17.md`.
-11. **Cross-project: Oracle + SalemIntelligence burial-grounds-tribute hallucinations** — PARKED S146 per operator. Upstream AI content places Salem Witch Trials victims as interred at the Witch Trials Memorial / Charter Street Cemetery / Old Burying Point; those are monument/cemetery complexes where the 20 executed victims are NOT buried. Pre-Play-Store audit needed: grep the 20 canonical victim names against narration text on the 3–4 tribute POIs, excise any burial/resting-place claims. OMEN to relay upstream for Oracle + SI fix. Full detail in `docs/session-logs/session-146-2026-04-17.md`.
-12. **APK size pre-Play-Store blocker (new, S147)** — debug APK is 780 MB, dominated by `poi-icons/` 544 MB (pre-existing, gitignored, never in git but bundled at build). S147 triptychs contribute 73 MB / 9% of total. Pre-release-AAB audit required: verify which `poi-icons/` category folders are actually referenced by live code (`PoiHeroResolver.categoryToFolder` + `ProximityDock.categoryToFolder`) and whether downsize to 256×256 or lossy WebP q=75 is acceptable. Must land before first Play Store AAB upload. Full detail in `docs/session-logs/session-147-2026-04-18.md`.
-7. ~~**Cross-project: stale intel_entity_id UUIDs in salem_pois**~~ — **CLOSED S125 2026-04-14 (commit `870733b`).** Self-resolved on LMA's side via `cache-proxy/scripts/dedup-stale-intel-links.js`. Pulled SI's `/api/intel/poi-export` (1597 canonical entities), probed every LMA linkage, fuzzy-matched stale UUIDs by name + coord + `/context` validity, then re-linked survivors and soft-deleted the rest. Outcome: 12 canonicals re-linked (chezcasa, lafayette_hotel, rockafellas_restaurant, the_village + 8 others), 211 soft-deleted with `data_source LIKE '%dedup-stale-uuid-2026-04-14-loser%'` (pending pre-Play-Store hard-delete), 0 stale linkages remaining. Bonus: fixed a `generate-narration-from-intel.js` bug that was aborting on GET 404 instead of falling through to POST `/generate` — any future rerun now correctly synthesizes narrations for SI-known-but-uncached entities. No OMEN action required.
+1. **NOTE-L014 / OMEN-008 — Privacy Policy** — V1-minimal Posture A shipped S145 at `docs/PRIVACY-POLICY-V1.md`. Full OMEN-008 draft at `docs/PRIVACY-POLICY.md` still pending OMEN review (32+ sessions); relevant for future RI Salem activation.
+2. **NOTE-L015 — SalemCommercial cutover** — PARKED POST-V1 per operator S145. Salem still at `~/Development/Salem/`; LMA paths resolve correctly.
+3. **OMEN-004 first real Kotlin unit test** — deadline moved to **2026-08-30** (OMEN S023 amendment, 2026-04-19). No action this cycle.
+4. **Phase 9T.9 walk simulator end-to-end verification** still TODO.
+5. **Cross-project: SalemIntelligence** — Phase 1 KB live at :8089. Phase 2 (narration gen) pending operator gate. Hero regen deferred behind Phase 2. **S144 bug report:** `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` (10 BCS POIs with phantom 0.2m-off-Samantha coords) still pending operator forward to SI.
+6. **NOTE-L018 PG-13 standing content rule** — ACCEPTED by OMEN S023 (2026-04-19). Upstream relays written to Salem / SI / GeoInbox. No LMA action.
+7. **NOTE-L019 restrooms_zombie.png regen** (LOW) — no deadline, no blocker.
+8. **9-dot menu witchy backgrounds + strong foreground titles** — PARKED S146. Design direction: witchy illustrated backgrounds with readable titles for the 8 grid-menu items. Reusable content-art pipeline from find-tile batch pattern. Detail in S146 log.
+9. **Cross-project: Oracle + SalemIntelligence burial-grounds-tribute hallucinations** — PARKED S146. Upstream AI places 1692 victims as interred at Witch Trials Memorial / Charter Street / Old Burying Point (they are NOT buried there). Pre-Play-Store audit needed: grep 20 canonical victim names against tribute-POI narration, excise burial claims. OMEN to relay upstream for Oracle + SI fix.
+10. **APK size pre-Play-Store blocker (S147)** — debug APK 780 MB, dominated by `poi-icons/` 544 MB. Audit required: which category folders are live, downsize to 256×256 or WebP q=75. Must land before first Play Store AAB upload.
+11. **Post-counsel-meeting follow-up (new S151)** — if counsel signs NDA Monday, deliver Tier 2 PDF same day. File Form TX within 30 days (unrelated to C-corp; preserves statutory-damages window). Start recruiting 20 Play Store closed-testing testers (14-day rule).
 
 ---
 

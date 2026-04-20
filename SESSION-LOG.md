@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 141-150. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 142-151. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 151: 2026-04-19 — Counsel packet PDFs (pre-NDA / post-NDA) for 2026-04-20 counsel engagement meeting
+
+Pivoted from S150 field-test verification to operator's top priority: produce PDF documents for tomorrow's counsel engagement meeting. Mid-session operator redirected to NDA-gated two-tier disclosure after flagging "don't expose IP without NDA." Shipped three PDFs under `docs/counsel-packet/`: **Tier 1 pre-NDA (46 pages, 176 outline entries, 256 links)** covering cover + NDA request, redacted legal walkthrough (IP §9.3 held), pricing + age gate, Privacy Policy V1, new V1 ToS stub, Data Safety pre-filled answers, Play Store checklist, counsel decision checklist, Tier-2 holdback manifest, and a mutual NDA template with explicit patent-novelty and successors-bind clauses; **Tier 2 post-NDA (133 pages, 462 outline entries)** bundling IP register + GOVERNANCE + COMMERCIALIZATION + DESIGN-REVIEW + future-state Privacy Policy; **Operator prep memo (7 pages)** flagging AI-image copyright post-Thaler, accidental-COPPA store-listing risks, Form TX 3-month statutory-damages window, patent 12-month on-sale bar, Play Store 20-tester/14-day rule, Webex-demo IP hygiene, and the likely need for both a corporate and a patent lawyer. Pipeline: markdown-pdf (PyMuPDF-backed) in ephemeral venv at `/tmp/pdfvenv` (libreoffice HTML→PDF was tested and discarded — only outlined `<h2>`). Reproducible via `docs/counsel-packet/build/build_{tier1,tier2,memo}.py`.
+
+Full session detail: `docs/session-logs/session-151-2026-04-19.md`. Commit: `<sha pending>`.
+
+---
 
 ## Session 150: 2026-04-18 — Field-test root-cause fixes: detail level flows to long_narration, speakTaggedNarration split, 23 POIs recategorized, GPS trail + polling + bbox defaults
 
@@ -80,14 +88,4 @@ Full session detail: `docs/session-logs/session-142-2026-04-17.md`. Commits: `8b
 
 ---
 
-## Session 141: 2026-04-17 — V1 offline-mode enforcement + log tuning
-
-Operator opened the session with a 12-hour Lenovo logcat dump (the S140 device build still running) and asked for a tuning pass. Log review found no crashes / ANRs / OOMs but five real issues: ~720 cache-proxy circuit-breaker W-lines, 1,208 GPS-OBS stale-heartbeat W-lines, 118 `TransitViewModel` main-thread blocks averaging 1.1s (the MBTA fleet StateFlow recompose), 3 spurious `TTS ERROR` E-lines (cancel-vs-real-error mislogging), and 2 walk-sim `DWELL CAP` hits. Operator directed **disable all outbound network features for V1** (including MBTA, so the 1.1s recompose goes away too), keep the three log-tuning fixes, and for V1 walking directions use pre-computed polylines. S141 shipped seven commits: `FeatureFlags.V1_OFFLINE_ONLY` + `OfflineModeInterceptor` installed in all 13 OkHttpClient sites, ViewModel early-return gates on Transit / Weather / Geofence / Aircraft / Main, `FindViewModel` rewritten to `SalemPoiDao` (A1 — offline Room search over 1,837 bundled POIs), `WalkingDirections` V1 offline path using the already-bundled `assets/tours/{tourId}.json` OSRM polylines from S125, `TileSourceManager` forced to empty-URL offline mode (DARK hidden in V1), GPS-OBS backoff cadence (30s → 5m → 15m by stale age), `NarrationMgr.intentionallyStopping` flag to distinguish cancel vs real TTS error, walk-sim dwell cap 60 → 180s that also waives cap while TTS still speaking. Device-verified on Lenovo HNY0CY0W cold boot: zero outbound-network W-lines, tile source reports `v1Offline=true`, GPS-OBS banner shows new backoff message, tour restored at stop 2/10, 1,837 POIs loaded from Room, no crashes. V2 = flip one boolean in `FeatureFlags`.
-
-Full session detail: `docs/session-logs/session-141-2026-04-17.md`. Commits: `e50966b` (interceptor) + `e5208af` (VM gates) + `0f98b69` (FindVM→Room) + `d68440c` (WalkingDirections offline) + `d10c9d8` (tiles + log tuning) + `7a2e886` (MainVM gates) + `9d412c0` (log finalized) + the S141 close-out commit.
-
----
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 140 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 141 and earlier are in SESSION-LOG-ARCHIVE.md -->
