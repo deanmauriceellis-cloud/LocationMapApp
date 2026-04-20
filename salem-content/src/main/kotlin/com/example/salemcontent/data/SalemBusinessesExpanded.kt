@@ -1400,7 +1400,7 @@ object SalemBusinessesExpanded {
             address = "Essex Street, Salem, MA, 01970",
             businessType = "attraction",
             website = "https://www.SalemHeritageTrail.org",
-            description = "In the 1980’s, the Salem Heritage Trail was born to provide visitors a self-guided walking tour of Salem’s historic sites. The trail is meant to bridge connections between the earliest settlers in Salem, local Indigenous Peoples, Colonial Salem and the Witch Trials, Industrial Heritage, Abolitionism and African American stories, Immigrant Experiences, and more. You’ll find a mix of historical sites and commercial and tourist attractions when walking the trail. In 2020, Salem revised the Salem Heritage Trail, removing its references to its original offensive “Red Line” history to promote more inclusivity within the downtown area and beyond. Learn more at SalemHeritageTrail.org",
+            description = "The Salem Heritage Trail is a yellow painted line on the sidewalk that connects Salem's major historic sites on a self-guided walking tour. The trail links the earliest settlers, local Indigenous Peoples, Colonial Salem and the 1692 Witch Trials, Industrial Heritage, Abolitionism and African American stories, Immigrant Experiences, and more. You'll find a mix of historical sites and commercial and tourist attractions along the route. Learn more at SalemHeritageTrail.org",
             tags = """["ds_subcat_5"]""",
             provenance = Provenance("api_sync", 0.85f, "2026-04-05", now, now,
                 now + 180L * 24 * 60 * 60 * 1000)
