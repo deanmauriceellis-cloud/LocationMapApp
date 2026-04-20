@@ -433,6 +433,11 @@ class SalemMainActivity : AppCompatActivity() {
 
     // Smart GPS position tracking
     internal var lastGpsPoint: GeoPoint? = null
+    /** Wall-clock ms at which [lastGpsPoint] was set. Used by the S154
+     *  derived-speed escape hatch for the stationary-freeze gate so we can
+     *  tell "user is walking" from "GPS drift" when the TYPE_SIGNIFICANT_MOTION
+     *  sensor is unreliable (Lenovo TB305FU never fires it). */
+    internal var lastGpsPointMs: Long = 0L
     internal var lastPoiFetchPoint: GeoPoint? = null
     internal var lastApiCallTime: Long = 0
     internal var currentGpsIntervalMs: Long = 60_000L
@@ -2856,6 +2861,30 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 val lastPt = lastGpsPoint ?: return@run false
                 val distFromLast = distanceBetween(lastPt, point)
+                // S154 derived-speed escape hatch: distance/time between
+                // consecutive fixes. Catches real walking on devices where
+                // the TYPE_SIGNIFICANT_MOTION sensor never fires (Lenovo
+                // TB305FU log shows `events=0` after 5+ minutes of real
+                // walking) AND the GPS provider doesn't populate speedMps
+                // reliably. Before this, the freeze only lifted via the 25 m
+                // distance hatch — meaning the cursor moved in 25 m hops
+                // while the user walked, giving the visceral "map isn't
+                // tracking me" feel. 0.3 m/s ≈ 0.7 mph is the slow-walk
+                // floor; anything faster unfreezes every fix.
+                val lastMs = lastGpsPointMs
+                if (lastMs > 0L) {
+                    val dtS = ((System.currentTimeMillis() - lastMs)
+                        .coerceAtLeast(1L)) / 1000.0
+                    val derivedMps = distFromLast / dtS
+                    if (derivedMps > 0.3) {
+                        DebugLogger.i(
+                            "STATIONARY",
+                            "derived-speed escape — ${"%.2f".format(derivedMps)}mps " +
+                                "(${"%.1f".format(distFromLast)}m / ${"%.1f".format(dtS)}s), unfreezing"
+                        )
+                        return@run false
+                    }
+                }
                 if (distFromLast > STATIONARY_FREEZE_RADIUS_M) {
                     DebugLogger.i(
                         "STATIONARY",
@@ -2996,6 +3025,7 @@ class SalemMainActivity : AppCompatActivity() {
             // ── 3. Update GPS marker ──
             updateGpsMarker(point)
             lastGpsPoint = point
+            lastGpsPointMs = System.currentTimeMillis()
 
             // ── 3a. Feed location to tour engine ──
             updateTourLocation(point, update.speedMps, update.bearing)

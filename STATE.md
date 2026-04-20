@@ -2,49 +2,55 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-20 — Session 153 (Webex demo crashed mid-flight on a newspaper-banner tap; root cause = `salem_witch_trials_npc_bios` + `salem_witch_trials_articles` tables missing from bundled Room DB via the S149-class clobber pattern; patched both bundle scripts to the S150 pattern, rebuilt Room DB 8.4→9.2 MB with npc_bios 49 + articles 16 + newspapers 202 rows restored, installed patched APK on Lenovo HNY0CY0W; introduced `ASSETS-MANIFEST.md` + `verify-bundled-assets.js` as permanent guard rails; SI anomaly OMEN relay filed pre-crash; workstation then crashed before commit — full recovery from git working tree, no data loss; counsel meeting + Webex demo outcomes not yet captured)
+**Last updated:** 2026-04-20 — Session 154 (Three passes after counsel meeting went async: (1) PG-13 content-strip gate — non-licensed commercial POIs render name+address+category-graphic only, SI narration/historical_note hidden; merchant_tier column repurposed as unlock flag; WITCH_SHOP moved to BUSINESSES; (2) 2,301 per-POI hero WebPs pruned for 1,832 commercial POIs, APK 820→739 MB (-81), existing poi-icons/{category}/ art hash-pinned for stripped sheet; (3) GPS cursor-freeze fix — Lenovo TB305FU's TYPE_SIGNIFICANT_MOTION sensor never fires, added derived-speed escape hatch so the map tracks real walking; operator confirmed "working now". SI handoff document shipped at `docs/si-handoff-s154-content-strip-2026-04-20.md`.)
 
 ---
 
-## TOP PRIORITY — Next Session (S154)
+## TOP PRIORITY — Next Session (S155)
 
 **Operator-directed starting point:**
 
-0. **POST-COUNSEL-MEETING FOLLOW-UP (still open — computer crashed before capture).** Open S154 by asking the operator:
-   - Did counsel sign the mutual NDA (or execute an engagement letter with confidentiality)?
-     - If YES: email Tier 2 PDF to counsel (`docs/counsel-packet/Katrina-Counsel-Packet-Tier2-Post-NDA.pdf`). Confirm receipt.
-     - If NO: hold Tier 2.
-   - Engagement scope, fee structure, retainer amount, next-checkpoint date.
-   - Which of the 12 A7 Decision Checklist items got signed.
-   - Counsel homework assigned (TESS trademark, state-of-incorporation memo, Form TX prep, etc.).
-   - C-corp paperwork status.
-   - **Webex demo 2026-04-20 outcome** — audience, NDA status, what was/wasn't shown, follow-ups. The demo crashed mid-flight on a newspaper-banner tap; the patched APK now on Lenovo addresses the crash but has not been smoke-tested yet.
+0. **COUNSEL RESPONSE WATCH (async).** Counsel 2026-04-20 meeting was initial-talk only. Counsel to send cost estimate + retainer letter. When the response lands:
+   - If engagement letter with confidentiality arrives → email Tier 2 PDF (`docs/counsel-packet/Katrina-Counsel-Packet-Tier2-Post-NDA.pdf`).
+   - Reassess the 12 A7 decisions + homework assignments (TESS trademark, state of incorp, Form TX prep, entity type).
+   - Until counsel responds, this is parked — no session-open blocker.
 
-1. **SMOKE-TEST THE PATCHED S153 APK ON LENOVO.** The patched `app-salem-debug.apk` is installed on HNY0CY0W but the smoke-test was interrupted by the computer crash. Open the app, navigate: Witch Trials → **People** tab (queries `salem_witch_trials_npc_bios`) → confirm no SQLiteException, list populates; then Witch Trials → **History 4×4** tiles (queries `salem_witch_trials_articles`) → same check. Also re-open the 1691-11-22 newspaper detail (the exact tap that crashed in the Webex demo).
+1. **File Form TX copyright registration.** $65, unrelated to C-corp. Per operator memo §2.1: 3-month statutory-damages window. **Hard deadline 2026-05-20.** Unblocked by counsel — operator can file independently.
 
-2. **REAL OUTDOOR FIELD WALK — remaining S150 fixes 1/2/3/7.** The walk-sim during the Webex demo incidentally validated Fix 2 (Salem Maritime NHS narrated as HISTORICAL_BUILDINGS / MEANINGFUL) and Fix 7 (NARR-GATE lines emitted, B=false cross-check visible). Still need:
-   - **Fix 1:** toggle **Audio Detail = DEEP** before walking; confirm `detail=DEEP bodyLen=<large>` in log.
-   - **Fix 3:** real GPS motion only — walk-sim emits `speed=?` so MotionTracker escape hatch never fires.
-   - **Fix 2 definitive:** Phillips House or Hale Farm on-foot.
-   - **Fix 7 leak probe:** with Businesses toggle OFF, see if Grace Episcopal / Golden Dawn Contracting narrate anyway. If they do, the new NARR-GATE line will diagnose which gate leaked.
-   - Checklist at `docs/field-walk-s153-checklist.md` still valid. Pull logs with `adb -s HNY0CY0W pull /sdcard/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs/`.
+2. **REAL OUTDOOR FIELD WALK — now unblocked by S154 GPS fix.** Previously unexercised S150 fixes + validate the derived-speed escape hatch at walking pace:
+   - **Fix 1:** toggle Audio Detail = DEEP; confirm `detail=DEEP bodyLen=<large>` in log.
+   - **Fix 3:** real GPS motion — STATIONARY escape should now fire via derived-speed (`derived-speed escape — X.XXmps` log line), not the 25m distance hatch.
+   - **Fix 2 definitive:** Phillips House / Hale Farm on-foot.
+   - **Fix 7 leak probe:** with Businesses OFF, see if any stripped POI narrates. If so, NARR-GATE line diagnoses which gate leaked.
+   - Checklist at `docs/field-walk-s153-checklist.md` still valid.
 
-3. **File Form TX copyright registration within 30 days of 2026-04-20.** $65, unrelated to C-corp. Per operator memo §2.1: 3-month statutory-damages window. **Hard deadline: 2026-05-20.**
+3. **Smoke-test S154 APK on Lenovo** (subsumes S153 smoke test since S154 APK carries the same fixes):
+   - Witch Trials → People panel + History 4×4 tiles + 1691-11-22 newspaper tap → no SQLiteException.
+   - Tap a FOOD_DRINK/SHOPPING POI → stripped full-screen hero + name/address/URL/phone/hours; no narration text; no action buttons; no "Visit Website" button.
+   - Tap Pedrick Store House / a church / a park → per-POI hero + full narration. Unchanged.
+   - Different restaurants in sequence → different hash-pinned painterly variants (hash-pinning works).
+   - Audio Control → Businesses ON → walk past stripped POI → hear only "You are near [Name], at [Address]." No body.
 
-4. **Wire `verify-bundled-assets.js` into the build.** Currently manual. Fold into a gradle preBuild task so the asset-clobber class of regression can never silently slip into another AAB. Add to CI when CI lands.
+4. **Wire `verify-bundled-assets.js` into the build.** Still manual. Gradle preBuild task + CI hook so neither the S149-class asset clobber nor the S154-class commercial-hero leak can silently ship. Now also includes the S154 commercial-hero leak check (fails if any commercial unlicensed POI has a per-POI hero file).
 
-5. **Carry-forwards from S149 / S150 / S151 / S152 / S153:**
-   - **APK size pre-Play-Store audit** — debug APK 820 MB, `poi-icons/` 544 MB dominant. Prune/compress before first release AAB.
+5. **Task #9 — Find detail WebView buttons.** Scope-adjacent from S154. `SalemMainActivityFind.kt` `showPoiDetailDialog` has "Load Website" + "Reviews" buttons that open embedded WebView — violates both V1_OFFLINE_ONLY (WebView bypasses OkHttp interceptor) and the S154 strip policy. Gate for stripped commercial categories: hide buttons, render URL as inert text.
+
+6. **Carry-forwards from S149-S154:**
+   - **APK size pre-Play-Store audit** — debug 820 → 739 MB after S154 hero prune. `poi-icons/` at 544 MB is next dominant target (downsize to 256×256 / WebP q=75).
    - **Play Store closed-testing tester recruitment** — 20 testers for 14 consecutive days.
-   - **1692-victim-tribute POI burial-ground audit** (item #9 below) — hand-grep 20 canonical victim names against tribute-POI narration.
-   - **SI anomaly report (ANOM-001 / ANOM-002)** — filed to OMEN in S153 at `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md`. No LMA action unless SI responds.
+   - **1692-victim-tribute POI burial-ground audit** — hand-grep 20 canonical victim names against tribute-POI narration (now affects 100% of user-visible narration since commercial was stripped).
+   - **SI anomaly reports (ANOM-001 / ANOM-002)** filed via OMEN in S153; SI response pending.
+   - **Backup cleanup:** `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz` (76 MB) — delete in 2-3 weeks once confident nothing needs restoring.
 
-**Post-S153 key facts:**
-- **S153 demo-crash firefight** — Webex demo crashed on 1691-11-22 newspaper-banner tap. `SQLiteException: no such table: salem_witch_trials_npc_bios`. Diff found **two** tables missing from source DB + assets DB: `salem_witch_trials_npc_bios` (49 rows) and `salem_witch_trials_articles` (16 rows). S149-class clobber bug: bundle scripts wrote assets-only, `publish-salem-pois.js` rebuilt source and copied over assets, silently wiping tables. Fix = S150 pattern applied to `bundle-witch-trials-into-db.js` + `bundle-witch-trials-npc-bios-into-db.js`. Room DB rebuilt 8.4 → 9.2 MB. Patched APK installed on Lenovo.
-- **ASSETS-MANIFEST + verify-bundled-assets.js** — new permanent guard rails against the asset-clobber class of bug. Manifest at `app-salem/src/main/assets/ASSETS-MANIFEST.md` catalogs every required asset + S149/S153 regression history. Verifier at `cache-proxy/scripts/verify-bundled-assets.js` fails non-zero on any missing/undersized asset. Run before every `assembleDebug`/`bundleRelease`. Gradle preBuild wiring is the natural next step (S154 carry-forward).
-- **S152 SalemIntelligence KB absorption still current** — re-sync pulled 1,399 narrations (+269 short, +290 long) and 33 historical_notes from SI `:8089`. Heritage Trail "Red Line" confabulation cleared across 3 surfaces (PG NULL'd with `|overridden-s152-heritage-confabulation` tag, Room rebaked, legacy Kotlin `SalemBusinessesExpanded.kt:1403` rewritten). Verified_fact correction landed on `gallows_hill_salem` (Black Mary Widow framed as museum-created character). `gallows_hill_salem` + `salem_heritage_trail` + `national_park_service_visitor_center` all have clean narration now.
-- **S150 fixes status (as of S153 demo + post-crash verification):** Fix 2 ✅ validated (Salem Maritime NHS as HISTORICAL_BUILDINGS/MEANINGFUL during walk-sim). Fix 7 ✅ validated (NARR-GATE instrumentation emitting). Fix 1 ⚠️ infrastructure confirmed (`type=LONG_NARRATION` emits) but DEEP-detail text flip not exercised (STANDARD was used). Fix 3 🚫 not exercised (walk-sim can't test real-motion escape hatch). Fixes 4/5/6 ✅ cold-boot verified at S152. Real outdoor walk still needed for full 1/3 validation.
-- **S150 mechanics still current** — `NarrationGeofenceManager.getNarrationForPass()` reads `AudioControl.detailLevel()` (BRIEF→null, STANDARD→shortNarration, DEEP→longNarration). `NarrationManager.speakTaggedNarration()` emits `SegmentType.LONG_NARRATION` (split from `speakTaggedHint`). 23 POIs recategorized (12 HISTORICAL_BUILDINGS / 1 CIVIC / 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. GPS trail speed-based escape hatch (`speedMps > 0.5` bypasses 25m). Adaptive polling ladder (10s driving / 2.5s walking-or-narrating / 30s idle). Bbox override default = true. NARR-GATE instrumentation line per-enqueue.
+**Post-S154 key facts:**
+- **V1 content-strip policy shipped.** `PoiContentPolicy.shouldStripContent(poi)` gates at every render surface (bottom sheet, geofence TTS, tour detail, ambient hint). Strip condition = category ∈ BUSINESSES group AND `merchant_tier == 0`. Non-licensed commercial POIs render name+address+category-graphic only; merchant unlock via `merchant_tier ≥ 1`. Render-time gate only — no data destruction; SI narrations stay in Room DB for future monetization.
+- **Category line** — KEEP (always render): HISTORICAL_BUILDINGS, CIVIC, WORSHIP, PARKS_REC, EDUCATION. STRIP (unless licensed): FOOD_DRINK, SHOPPING, LODGING, HEALTHCARE, ENTERTAINMENT, AUTO_SERVICES, OFFICES, TOUR_COMPANIES, PSYCHIC, FINANCE, FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY, WITCH_SHOP. ~1,832 strip / 459 keep across 2,291 total rows.
+- **Hero architecture** — `PoiHeroResolver` gained `forceCategoryFallback: Boolean` flag + subcategory-prefix filtering. Stripped sheet uses Tier 2 hash-pinned pick from `poi-icons/{category}/`. 2,301 per-POI WebPs for 1,832 commercial POIs pruned from APK (73 MB on disk, 81 MB APK). Historic POI heroes preserved. Backup at `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz`.
+- **GPS cursor freeze fix** — `MotionTracker.isStationary()` stays true forever on Lenovo TB305FU (TYPE_SIGNIFICANT_MOTION never fires). Added derived-speed escape hatch: `distance/time` between consecutive fixes; unfreeze if ≥ 0.3 m/s. New `lastGpsPointMs` timestamp field. Log signature: `STATIONARY: derived-speed escape — X.XXmps (Ym / Ts), unfreezing`. Operator confirmed "working now."
+- **SI handoff document** at `docs/si-handoff-s154-content-strip-2026-04-20.md` — details what LMA moved/removed + implications for SI generation priorities (kept categories are highest priority; commercial POI narration bundles dormant; ANOM-001/002 reconciliation now affects 100% of user-visible content). Operator to forward to SI team.
+- **Narration repeat-behavior** (operator clarification): one-per-POI per app session is desired; fresh launch re-narrates is expected. No code change.
+- **S152 SalemIntelligence KB absorption still current** — 1,769 narrated POIs (1,399 narrations + 33 historical_notes synced). Heritage Trail confabulation cleared across 3 surfaces.
+- **S150 fixes status** — Fix 2 ✅ / Fix 7 ✅ / Fix 1 ⚠️ (DEEP toggle still needed) / Fix 3 🚫 (real GPS motion still needed, now unblocked by S154 GPS fix). Real outdoor walk unblocked.
 
 **Background items (not blocking S150):**
 - **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
@@ -101,7 +107,7 @@
 | **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
 
-**Sessions completed:** 153. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 154. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
 
 ---
 
@@ -168,10 +174,13 @@
 
 ## POI Inventory
 
-- **Current PG:** **1,830 active POIs** in `salem_pois` (**1,769 narrated** post-S152 SI re-sync, up from 1,483 at S150). 1,122 historical_notes. Post-S149 Samantha-cluster cleanup (7 soft-deletes) reflected.
-- **Room DB:** rebuilt S153 after demo-crash firefight — **9.2 MB** at `app-salem/src/main/assets/salem_content.db`. Includes restored `salem_witch_trials_npc_bios` (49 rows) + `salem_witch_trials_articles` (16 rows) + `salem_witch_trials_newspapers` (202 rows) alongside the 1,830 `salem_pois`.
+- **Current PG:** **1,830 active POIs** in `salem_pois` (**1,769 narrated** post-S152 SI re-sync, up from 1,483 at S150). 1,122 historical_notes. 1,832 commercial POIs (categories in BUSINESSES group) render as stripped; 459 historic/civic/parks/worship/education render in full.
+- **Room DB:** 9.2 MB at `app-salem/src/main/assets/salem_content.db`. Witch Trials tables intact (npc_bios 49 / articles 16 / newspapers 202).
+- **APK size:** 739 MB debug (post-S154 hero prune; 820 → 739). `poi-icons/` at 544 MB is the remaining dominant target for the pre-Play-Store audit.
+- **Hero assets (post-S154 prune):** `heroes/` 18 MB / 395 entries + `hero/` 13 MB / 436 entries (historic + civic + parks + worship + education only). Commercial heroes pruned; backup at `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz` (76 MB, 2,307 files).
 - **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
-- **Assets manifest + pre-build verifier:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js` (introduced S153).
+- **Assets manifest + pre-build verifier:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js` (S153; S154 added commercial-hero leak check).
+- **Commercial-hero prune script:** `cache-proxy/scripts/prune-commercial-heroes.js` (S154, `--dry-run` flag).
 
 ---
 

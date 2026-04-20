@@ -22,12 +22,14 @@ import android.content.SharedPreferences
  * level cycle. Call sites consult [isPoiSpeechEnabled] / [isOracleSpeechEnabled]
  * before enqueuing narration; the NarrationManager itself stays dumb.
  *
- * Grouping per operator direction S145 Q2 Option 1:
- *   - MEANINGFUL → HISTORICAL_BUILDINGS, CIVIC, WITCH_SHOP, WORSHIP
+ * Grouping (S154 amendment: WITCH_SHOP moved MEANINGFUL → BUSINESSES to align
+ * with the PG-13 content-strip policy — witch shops are commercial and strip
+ * unless `merchant_tier >= 1`, same as any other business):
+ *   - MEANINGFUL → HISTORICAL_BUILDINGS, CIVIC, WORSHIP
  *   - AMBIENT    → PARKS_REC, EDUCATION
  *   - BUSINESSES → FOOD_DRINK, SHOPPING, LODGING, HEALTHCARE, ENTERTAINMENT,
  *                  AUTO_SERVICES, OFFICES, TOUR_COMPANIES, PSYCHIC, FINANCE,
- *                  FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY
+ *                  FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY, WITCH_SHOP
  *
  * Unknown categories default to MEANINGFUL (safe fallback for historic content
  * that has not yet been classified).
@@ -99,12 +101,13 @@ object AudioControl {
     fun groupForCategory(categoryRaw: String?): Group {
         val c = categoryRaw?.uppercase() ?: return Group.MEANINGFUL
         return when (c) {
-            "HISTORICAL_BUILDINGS", "CIVIC", "WITCH_SHOP", "WORSHIP" -> Group.MEANINGFUL
+            "HISTORICAL_BUILDINGS", "CIVIC", "WORSHIP"               -> Group.MEANINGFUL
             "PARKS_REC", "EDUCATION"                                 -> Group.AMBIENT
             "FOOD_DRINK", "SHOPPING", "LODGING", "HEALTHCARE",
             "ENTERTAINMENT", "AUTO_SERVICES", "OFFICES",
             "TOUR_COMPANIES", "PSYCHIC", "FINANCE",
-            "FUEL_CHARGING", "TRANSIT", "PARKING", "EMERGENCY"      -> Group.BUSINESSES
+            "FUEL_CHARGING", "TRANSIT", "PARKING", "EMERGENCY",
+            "WITCH_SHOP"                                             -> Group.BUSINESSES
             else                                                     -> Group.MEANINGFUL
         }
     }

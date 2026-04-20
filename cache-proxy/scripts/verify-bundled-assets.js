@@ -193,6 +193,61 @@ if (fs.existsSync(WT_PORTRAITS)) {
   }
 }
 
+// ── S154 commercial-hero leak check ──────────────────────────────────────
+// Per-POI heroes for non-licensed commercial POIs must not ship. They carry
+// legal risk (per-business AI art likely referenced real storefronts) and
+// are bypassed at render time by the PoiDetailSheet stripped path.
+// `prune-commercial-heroes.js` removes them from assets/{heroes,hero}/;
+// this check fails the build if any leaked back in.
+{
+  // Mirror of AudioControl.groupForCategory BUSINESSES bucket (Kotlin source
+  // of truth). Keep in sync with prune-commercial-heroes.js.
+  const BUSINESS_CATEGORIES = new Set([
+    'FOOD_DRINK', 'SHOPPING', 'LODGING', 'HEALTHCARE', 'ENTERTAINMENT',
+    'AUTO_SERVICES', 'OFFICES', 'TOUR_COMPANIES', 'PSYCHIC', 'FINANCE',
+    'FUEL_CHARGING', 'TRANSIT', 'PARKING', 'EMERGENCY', 'WITCH_SHOP',
+  ]);
+
+  let db;
+  try {
+    db = new Database(CONTENT_DB, { readonly: true });
+    const rows = db.prepare(
+      `SELECT id, category, image_asset, merchant_tier
+         FROM salem_pois
+        WHERE merchant_tier IS NULL OR merchant_tier = 0`
+    ).all();
+
+    const heroesDir = path.join(ASSETS, 'heroes');
+    const heroDir = path.join(ASSETS, 'hero');
+    let leaks = 0;
+    for (const r of rows) {
+      if (!BUSINESS_CATEGORIES.has(r.category)) continue;
+
+      const triptych = path.join(heroesDir, `${r.id}.webp`);
+      if (fs.existsSync(triptych)) {
+        fail(`commercial-hero leak: heroes/${r.id}.webp (category=${r.category}, merchant_tier=${r.merchant_tier ?? 0})`);
+        leaks++;
+      }
+
+      if (r.image_asset) {
+        const base = r.image_asset.replace(/^hero\//, '');
+        const celShaded = path.join(heroDir, base);
+        if (fs.existsSync(celShaded)) {
+          fail(`commercial-hero leak: hero/${base} (category=${r.category}, merchant_tier=${r.merchant_tier ?? 0})`);
+          leaks++;
+        }
+      }
+    }
+    if (leaks === 0) {
+      pass('commercial-hero prune: 0 leaks across all unlicensed commercial POIs');
+    }
+  } catch (e) {
+    warn(`commercial-hero check skipped: ${e.message}`);
+  } finally {
+    if (db) db.close();
+  }
+}
+
 // ── report ────────────────────────────────────────────────────────────────
 console.log('\n=== Bundled Assets Verification ===');
 for (const m of ok)       console.log(`  OK    ${m}`);

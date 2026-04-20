@@ -26,6 +26,7 @@ import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.tour.ActiveTour
@@ -1228,13 +1229,19 @@ internal fun SalemMainActivity.showTourStopDetail(poi: TourPoi, stopIndex: Int, 
     }
     val descLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
-    poi.description?.let {
-        descLayout.addView(TextView(this).apply {
-            text = it
-            textSize = 14f
-            setTextColor(Color.parseColor(SALEM_TEXT))
-            setPadding(0, 0, 0, dp(8))
-        })
+    // S154: strip AI-generated description for non-licensed commercial tour
+    // stops. TourPoi is a projection without merchant_tier, so use the
+    // category-only gate — safe for V1 (no merchants licensed yet).
+    val stripped = PoiContentPolicy.shouldStripByCategory(poi.category)
+    if (!stripped) {
+        poi.description?.let {
+            descLayout.addView(TextView(this).apply {
+                text = it
+                textSize = 14f
+                setTextColor(Color.parseColor(SALEM_TEXT))
+                setPadding(0, 0, 0, dp(8))
+            })
+        }
     }
 
     // Admission / hours / contact
@@ -1299,8 +1306,10 @@ internal fun SalemMainActivity.showTourStopDetail(poi: TourPoi, stopIndex: Int, 
         walkTo(GeoPoint(poi.lat, poi.lng))
     })
 
-    // Narrate — speak the long narration on demand
-    if (poi.longNarration != null) {
+    // Narrate — speak the long narration on demand. Hidden for stripped
+    // commercial POIs (S154): their "narration" is just name+address, which
+    // the user already sees, so the on-demand button adds nothing.
+    if (poi.longNarration != null && !stripped) {
         actionBtnRow.addView(detailBtn("\uD83D\uDD0A Narrate", SALEM_SURFACE) {
             tourViewModel.narratePoi(poi)
         })

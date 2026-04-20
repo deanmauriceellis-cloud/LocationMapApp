@@ -12,6 +12,7 @@ package com.example.wickedsalemwitchcitytour.tour
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.SalemContentRepository
 import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
@@ -343,7 +344,14 @@ class TourEngine @Inject constructor(
             val dist = haversineM(point.latitude, point.longitude, poi.lat, poi.lng)
             if (dist <= AMBIENT_RADIUS_M) {
                 ambientHintedPois.add(poi.id)
-                val hint = poi.shortNarration ?: "You're near ${poi.name}."
+                // S154: stripped commercial POIs get the name+address line,
+                // never the SI-generated shortNarration.
+                val hint = if (PoiContentPolicy.shouldStripByCategory(poi.category)) {
+                    val addr = poi.address.takeIf { it.isNotBlank() }
+                    if (addr != null) "You are near ${poi.name}, at $addr." else "You are near ${poi.name}."
+                } else {
+                    poi.shortNarration ?: "You're near ${poi.name}."
+                }
                 narrationManager.speakHint(hint, poi.name)
                 DebugLogger.i(TAG, "Ambient hint: ${poi.name} (${dist.toInt()}m)")
                 break // One hint at a time

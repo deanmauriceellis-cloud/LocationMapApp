@@ -17,6 +17,7 @@ import org.osmdroid.views.overlay.Polygon
 import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.tour.*
 import com.example.wickedsalemwitchcitytour.ui.witchtrials.showWitchTrialsNewspaperDetailDialog
@@ -918,7 +919,10 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
     // no queue add. S150: gate must be detail-level-independent — BRIEF's
     // null return from getNarrationForPass would otherwise silently drop POIs
     // the user might still want to hear after switching to STANDARD / DEEP.
-    if (!narrationGeofenceManager.hasAnyNarrationText(point)) {
+    // S154: stripped POIs bypass this gate — they speak name+address regardless
+    // of whether any SI narration text is populated in the DB.
+    if (!PoiContentPolicy.shouldStripContent(point) &&
+        !narrationGeofenceManager.hasAnyNarrationText(point)) {
         DebugLogger.d("NARR-QUEUE", "SKIP (no narrative): ${point.name}")
         return
     }
@@ -969,16 +973,26 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         val rawText = narrationGeofenceManager.getNarrationForPass(point)
         val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
         narrationGeofenceManager.recordVisit(point.id)
-        DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId detail=${com.example.wickedsalemwitchcitytour.audio.AudioControl.detailLevel()} bodyLen=${rawText?.length ?: 0}")
+        val stripped = PoiContentPolicy.shouldStripContent(point)
+        DebugLogger.i("NARR-PLAY", "DIRECT PLAY: ${point.name} voice=$voiceId detail=${com.example.wickedsalemwitchcitytour.audio.AudioControl.detailLevel()} bodyLen=${rawText?.length ?: 0} stripped=$stripped")
         // S125: stamp the min-hold clock here (at the actual play-start)
         // instead of at the top of enqueueNarration.
         lastPoiNarrationStartMs = System.currentTimeMillis()
         // Phase 9R.0 / S150: chapter break via two separate TTS segments.
-        // The orientation hint ("You are at X") always plays so the user
-        // always gets an acknowledgment that they've arrived. The body
-        // plays only when STANDARD / DEEP produced text; BRIEF skips the body.
-        tourViewModel.speakTaggedHint("poi_narration", "You are at ${point.name}.", point.name, voiceId)
-        if (!rawText.isNullOrBlank()) {
+        // The orientation hint always plays so the user gets an acknowledgment
+        // that they've arrived. The body plays only when STANDARD / DEEP
+        // produced text; BRIEF skips the body.
+        //
+        // S154: stripped POIs (non-licensed commercial) use the name+address
+        // announcement and skip the body entirely, regardless of detail level.
+        // No AI-synthesized narration is spoken for these.
+        val introText = if (stripped) {
+            PoiContentPolicy.strippedAnnouncement(point)
+        } else {
+            "You are at ${point.name}."
+        }
+        tourViewModel.speakTaggedHint("poi_narration", introText, point.name, voiceId)
+        if (!stripped && !rawText.isNullOrBlank()) {
             tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
         }
         updateQueueIndicator()
@@ -1168,17 +1182,24 @@ internal suspend fun SalemMainActivity.playNextNarration() {
 
     // Resolve voice: POI override > category default
     val voiceId = com.example.wickedsalemwitchcitytour.tour.CategoryVoiceMap.voiceForCategory(point.category)
-    DebugLogger.i("NARR-PLAY", "  text=${if (!rawText.isNullOrBlank()) "${rawText.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay detail=${com.example.wickedsalemwitchcitytour.audio.AudioControl.detailLevel()}")
+    val stripped = PoiContentPolicy.shouldStripContent(point)
+    DebugLogger.i("NARR-PLAY", "  text=${if (!rawText.isNullOrBlank()) "${rawText.take(60)}..." else "NULL"} voice=$voiceId narrationAutoPlay=$narrationAutoPlay detail=${com.example.wickedsalemwitchcitytour.audio.AudioControl.detailLevel()} stripped=$stripped")
     if (narrationAutoPlay) {
-        DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakTagged{Hint,Narration}() voice=$voiceId")
+        DebugLogger.i("NARR-PLAY", "  → calling tourViewModel.speakTagged{Hint,Narration}() voice=$voiceId stripped=$stripped")
         // S125: stamp the min-hold clock at the actual play-start, matching
         // the PLAY DIRECT path so bursts of ENTRY events can't keep sliding
         // the stamp forward via the old unconditional write.
         lastPoiNarrationStartMs = System.currentTimeMillis()
-        // Phase 9R.0 / S150: orientation hint always plays; body plays only
-        // when STANDARD / DEEP produced text.
-        tourViewModel.speakTaggedHint("poi_narration", "You are at ${point.name}.", point.name, voiceId)
-        if (!rawText.isNullOrBlank()) {
+        // Phase 9R.0 / S150 / S154: stripped POIs use the short "You are near
+        // Name, at Address" announcement and never play the body. Historic /
+        // licensed POIs play the orientation hint + body per detail level.
+        val introText = if (stripped) {
+            PoiContentPolicy.strippedAnnouncement(point)
+        } else {
+            "You are at ${point.name}."
+        }
+        tourViewModel.speakTaggedHint("poi_narration", introText, point.name, voiceId)
+        if (!stripped && !rawText.isNullOrBlank()) {
             tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
         }
     } else {

@@ -32,6 +32,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONObject
@@ -185,15 +186,107 @@ class PoiDetailSheet : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        DebugLogger.i(TAG, "onViewCreated id=${poi.id}")
+        val stripped = PoiContentPolicy.shouldStripContent(poi)
+        DebugLogger.i(TAG, "onViewCreated id=${poi.id} stripped=$stripped merchantTier=${poi.merchantTier}")
 
-        bindHero(view)
-        bindOverview(view)
-        bindWebsiteButton(view)
-        val (shortText, aboutText, storyText) = bindNarrationSections(view)
-        bindActions(view)
+        if (stripped) {
+            bindStrippedHero(view)
+            bindStrippedOverview(view)
+            hideNarrativeChrome(view)
+            queueStrippedReadThrough()
+        } else {
+            bindHero(view)
+            bindOverview(view)
+            bindWebsiteButton(view)
+            val (shortText, aboutText, storyText) = bindNarrationSections(view)
+            bindActions(view)
+            queueSheetReadThrough(shortText, aboutText, storyText)
+        }
+    }
 
-        queueSheetReadThrough(shortText, aboutText, storyText)
+    // ── Stripped-mode render path (S154, PG-13 / legal-safety) ──────────
+    //
+    // Non-licensed commercial POIs render as: full-screen painterly category
+    // hero + name + category + address + phone + plain-text website + hours.
+    // No narration, no historical_note, no action buttons, no TTS body read.
+    // TTS plays only the POI name so the blind/driving user still gets an
+    // audio confirmation of the tap.
+
+    private fun bindStrippedHero(view: View) {
+        val heroContainer = view.findViewById<ViewGroup>(R.id.heroContainer)
+        val heroImage = view.findViewById<ImageView>(R.id.heroImage)
+        val heroOverlay = view.findViewById<TextView>(R.id.heroOverlayLabel)
+        val btnClose = view.findViewById<TextView>(R.id.btnClose)
+
+        // Painterly category graphic fills a large hero — ~55% of screen,
+        // then overview + contact fields sit below.
+        val screenH = resources.displayMetrics.heightPixels
+        heroContainer.layoutParams.height = (screenH * 0.55).toInt()
+        heroContainer.requestLayout()
+
+        heroImage.scaleType = ImageView.ScaleType.CENTER_CROP
+        // S154 (second pass): use PoiHeroResolver Tier 2 so every stripped
+        // POI gets a hash-pinned category variant from poi-icons/{category}/
+        // — 40-256 existing painterly options per category with subcategory
+        // + spooky-style variants. forceCategoryFallback=true skips the per-
+        // POI Tier 0/1 heroes (which must not ship for non-licensed
+        // commercial POIs; a separate bundle-prune script removes them).
+        val result = PoiHeroResolver.applyTo(requireContext(), poi, heroImage, forceCategoryFallback = true)
+        heroOverlay.visibility =
+            if (result is PoiHeroResolver.HeroResult.RedPlaceholder) View.VISIBLE else View.GONE
+
+        btnClose.setOnClickListener {
+            DebugLogger.i(TAG, "close clicked (stripped) id=${poi.id}")
+            cancelSheetRead()
+            dismiss()
+        }
+    }
+
+    private fun bindStrippedOverview(view: View) {
+        // No overview icon thumbnail — the hero carries the visual weight.
+        view.findViewById<ImageView>(R.id.overviewIcon).visibility = View.GONE
+
+        view.findViewById<TextView>(R.id.overviewName).text = poi.name
+        view.findViewById<TextView>(R.id.overviewType).text = displayCategory(poi.category)
+
+        bindInertText(view, R.id.overviewAddress, poi.address)
+        bindInertText(view, R.id.overviewPhone, poi.phone)
+        bindInertText(view, R.id.overviewWebsite, poi.website)
+        bindInertText(view, R.id.overviewHours, poi.hours ?: poi.hoursText)
+    }
+
+    private fun bindInertText(view: View, id: Int, value: String?) {
+        val tv = view.findViewById<TextView>(id)
+        val v = value?.takeIf { it.isNotBlank() }
+        if (v != null) {
+            tv.text = v
+            tv.visibility = View.VISIBLE
+            tv.setOnClickListener(null)
+            tv.isClickable = false
+        }
+    }
+
+    private fun hideNarrativeChrome(view: View) {
+        // Hide everything below the contact row: dividers, narrative sections,
+        // Things-You-Can-Do header, action button container, and the big
+        // Visit-Website button.
+        intArrayOf(
+            R.id.btnWebsite,
+            R.id.divider1,
+            R.id.labelShort, R.id.bodyShort,
+            R.id.labelAbout, R.id.bodyAbout,
+            R.id.labelStory, R.id.bodyStory,
+            R.id.divider2,
+            R.id.labelActions,
+            R.id.actionsContainer
+        ).forEach { id -> view.findViewById<View>(id)?.visibility = View.GONE }
+    }
+
+    private fun queueStrippedReadThrough() {
+        tourViewModel.cancelSheetReading(SHEET_TAG_PREFIX)
+        val line = PoiContentPolicy.strippedAnnouncement(poi)
+        tourViewModel.speakSheetSection(ttsTag, line, poi.name)
+        DebugLogger.i(TAG, "tts enqueue stripped id=${poi.id} len=${line.length}")
     }
 
     // ── Hero strip ──────────────────────────────────────────────────────
@@ -516,8 +609,10 @@ private fun salemPoiToJson(poi: SalemPoi): String = JSONObject().apply {
     putOpt("phone", poi.phone)
     putOpt("website", poi.website)
     putOpt("hours", poi.hours)
+    putOpt("hours_text", poi.hoursText)
     putOpt("action_buttons", poi.actionButtons)
     put("ad_priority", poi.adPriority)
+    put("merchant_tier", poi.merchantTier)
     put("geofence_radius_m", poi.geofenceRadiusM)
 }.toString()
 
@@ -538,8 +633,10 @@ private fun parseSalemPoi(s: String): SalemPoi? {
             phone = o.optString("phone", "").takeIf { it.isNotEmpty() },
             website = o.optString("website", "").takeIf { it.isNotEmpty() },
             hours = o.optString("hours", "").takeIf { it.isNotEmpty() },
+            hoursText = o.optString("hours_text", "").takeIf { it.isNotEmpty() },
             actionButtons = o.optString("action_buttons", "").takeIf { it.isNotEmpty() },
             adPriority = o.optInt("ad_priority", 0),
+            merchantTier = o.optInt("merchant_tier", 0),
             geofenceRadiusM = o.optInt("geofence_radius_m", 40)
         )
     } catch (_: Exception) {

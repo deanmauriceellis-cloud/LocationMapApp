@@ -75,31 +75,63 @@ object PoiHeroResolver {
         data object RedPlaceholder : HeroResult()
     }
 
-    /** Resolve the hero for this POI. Never throws. */
-    fun resolve(context: Context, poi: SalemPoi): HeroResult {
-        // Priority 0: S147 triptych hero, keyed on slug poi.id
-        if (HeroAssetLoader.hasTriptych(context, poi.id)) {
-            return HeroResult.AssetImage("heroes/${poi.id}.webp")
-        }
+    /**
+     * Resolve the hero for this POI. Never throws.
+     *
+     * @param forceCategoryFallback S154: when true, skip Priority 0 + 1 (the
+     * per-POI tiers) and go straight to the category `poi-icons` bucket. Used
+     * by the stripped PoiDetailSheet rendering path for non-licensed commercial
+     * POIs so we never surface a per-business hero that might reference the
+     * merchant's own photography. Historic / civic / parks / worship POIs
+     * still receive their curated per-POI hero via the default path.
+     */
+    fun resolve(
+        context: Context,
+        poi: SalemPoi,
+        forceCategoryFallback: Boolean = false
+    ): HeroResult {
+        if (!forceCategoryFallback) {
+            // Priority 0: S147 triptych hero, keyed on slug poi.id
+            if (HeroAssetLoader.hasTriptych(context, poi.id)) {
+                return HeroResult.AssetImage("heroes/${poi.id}.webp")
+            }
 
-        // Priority 1: dedicated hero image from S119 generation pipeline
-        poi.imageAsset?.takeIf { it.isNotBlank() }?.let { asset ->
-            return HeroResult.AssetImage(asset)
+            // Priority 1: dedicated hero image from S119 generation pipeline
+            poi.imageAsset?.takeIf { it.isNotBlank() }?.let { asset ->
+                return HeroResult.AssetImage(asset)
+            }
         }
 
         // Priority 2: category-based fallback from poi-icons
         val folder = categoryToFolder[poi.category]
             ?: return HeroResult.RedPlaceholder
-        val files = listingFor(context, folder)
-        if (files.isEmpty()) return HeroResult.RedPlaceholder
 
-        val idx = abs(poi.id.hashCode()) % files.size
-        return HeroResult.AssetImage("poi-icons/$folder/${files[idx]}")
+        // S154: prefer subcategory-scoped files when the POI carries a
+        // subcategory that matches a file-name prefix in the folder. Keeps a
+        // bakery looking like a bakery, a bar looking like a bar, etc.
+        val all = listingFor(context, folder)
+        if (all.isEmpty()) return HeroResult.RedPlaceholder
+
+        val sub = poi.subcategory?.lowercase()?.takeIf { it.isNotBlank() }
+        val pool = if (sub != null) {
+            all.filter { it.startsWith("${sub}_", ignoreCase = true) }
+                .ifEmpty { all }
+        } else {
+            all
+        }
+
+        val idx = abs(poi.id.hashCode()) % pool.size
+        return HeroResult.AssetImage("poi-icons/$folder/${pool[idx]}")
     }
 
     /** Load the resolved hero into an ImageView. Safe on any IO error. */
-    fun applyTo(context: Context, poi: SalemPoi, imageView: ImageView): HeroResult {
-        val result = resolve(context, poi)
+    fun applyTo(
+        context: Context,
+        poi: SalemPoi,
+        imageView: ImageView,
+        forceCategoryFallback: Boolean = false
+    ): HeroResult {
+        val result = resolve(context, poi, forceCategoryFallback)
         when (result) {
             is HeroResult.AssetImage -> {
                 try {
