@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-20 — Session 154 (Three passes after counsel meeting went async: (1) PG-13 content-strip gate — non-licensed commercial POIs render name+address+category-graphic only, SI narration/historical_note hidden; merchant_tier column repurposed as unlock flag; WITCH_SHOP moved to BUSINESSES; (2) 2,301 per-POI hero WebPs pruned for 1,832 commercial POIs, APK 820→739 MB (-81), existing poi-icons/{category}/ art hash-pinned for stripped sheet; (3) GPS cursor-freeze fix — Lenovo TB305FU's TYPE_SIGNIFICANT_MOTION sensor never fires, added derived-speed escape hatch so the map tracks real walking; operator confirmed "working now". SI handoff document shipped at `docs/si-handoff-s154-content-strip-2026-04-20.md`.)
+**Last updated:** 2026-04-20 — Session 155 (Thin investigation session, no code changes. Operator asked to stop all services; resource check revealed no LMA services running, only a 1.9 GiB stale Gradle daemon from S154; ollama holding 20 GiB VRAM at 96% utilization; no kernel OOM events in 7 days. Operator's "almost OOM" traced to WWWatcher on a different workstation — not on this box. Session closed with nothing killed, nothing changed. All S154 carry-forwards unchanged.)
 
 ---
 
