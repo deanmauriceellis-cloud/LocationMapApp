@@ -8,7 +8,7 @@
 
 Same-day continuation after S154 close. Gave TOP-PRIORITY status report (counsel async, Form TX by 2026-05-20, field walk, S154 smoke test, Task #9 Find WebView gate, verify-bundled-assets wiring, APK-size audit). Operator asked to stop all services, then interrupted with "almost OOM checking running projects" — enumerated the box (no LMA services running; only LMA-side resident is a 1.9 GiB Gradle daemon from S154; ollama holding 20 GiB VRAM; 4 concurrent Claude CLI sessions ~1.6 GiB combined; no kernel OOM events in 7 days) and confirmed WWWatcher is not on this workstation. Operator closed with "it was WWWatcher, session end" — memory issue is on a different box, no LMA action. No code changes, no process kills.
 
-Full session detail: `docs/session-logs/session-155-2026-04-20.md`. Commit: paperwork-only (next).
+Full session detail: `docs/session-logs/session-155-2026-04-20.md`. Commit: `a3a7b40`.
 
 ---
 
