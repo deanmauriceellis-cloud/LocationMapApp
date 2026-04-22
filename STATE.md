@@ -2,93 +2,84 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-20 — Session 155 (Thin investigation session, no code changes. Operator asked to stop all services; resource check revealed no LMA services running, only a 1.9 GiB stale Gradle daemon from S154; ollama holding 20 GiB VRAM at 96% utilization; no kernel OOM events in 7 days. Operator's "almost OOM" traced to WWWatcher on a different workstation — not on this box. Session closed with nothing killed, nothing changed. All S154 carry-forwards unchanged.)
+**Last updated:** 2026-04-21 — Session 156 (SI content refresh + TigerLine foundation plan adopted + Step 0 discovery shipped. Refreshed all 1,400 POI narrations from SI's rewrite. Operator committed V1 to TigerLine + MassGIS as the foundational mapping substrate with a historical-maps time-slider; OSM/osmdroid to be retired pre-V1. Phase 9Y + 9Z added. Learned `adb install -r` corrupts Room WAL recovery after asset-DB rebake — use uninstall+install.)
 
 ---
 
-## TOP PRIORITY — Next Session (S155)
+## TOP PRIORITY — Next Session (S157)
 
-**Operator-directed starting point:**
+**Operator-directed starting point (LMA is now on a TigerLine + MassGIS foundation track; most prior carry-forwards deferred):**
 
-0. **COUNSEL RESPONSE WATCH (async).** Counsel 2026-04-20 meeting was initial-talk only. Counsel to send cost estimate + retainer letter. When the response lands:
-   - If engagement letter with confidentiality arrives → email Tier 2 PDF (`docs/counsel-packet/Katrina-Counsel-Packet-Tier2-Post-NDA.pdf`).
-   - Reassess the 12 A7 decisions + homework assignments (TESS trademark, state of incorp, Form TX prep, entity type).
-   - Until counsel responds, this is parked — no session-open blocker.
+1. **Phase 9Y foundation — parallel-track continuation.** PG schema extended S156 with 9 nullable columns (building_footprint_geojson, mhc_*, canonical_address_point_id, local_historic_district, parcel_owner_class). Next Kotlin + Room v8→v9 bump needs a careful identity-hash cascade:
+   - Edit `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/content/model/SalemPoi.kt` — add 9 matching nullable fields
+   - Edit `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/content/db/SalemContentDatabase.kt` — `version = 8` → `version = 9`
+   - Build debug APK; extract new identity_hash from `build/generated/ksp/debug/java/.../SalemContentDatabase_Impl.java`
+   - Update `cache-proxy/scripts/verify-bundled-assets.js` (v8 const → v9 const)
+   - Update `cache-proxy/scripts/bundle-witch-trials-newspapers-into-db.js` (v8 const → v9 const)
+   - Update `cache-proxy/scripts/publish-salem-pois.js` — add 9 columns to CREATE_TABLE_SQL + SELECT + INSERT
+   - Rebake, verify on Lenovo (uninstall+install per `feedback_adb_install_after_db_rebake.md`)
 
-1. **File Form TX copyright registration.** $65, unrelated to C-corp. Per operator memo §2.1: 3-month statutory-damages window. **Hard deadline 2026-05-20.** Unblocked by counsel — operator can file independently.
+2. **Phase 9Y MapSurface abstraction.** `FeatureFlags.MAPLIBRE_RENDERER` flag, `MapSurface` interface in new `ui/map/` package, `OsmdroidMapSurface` wraps current calls, empty `MapLibreMapSurface` skeleton, Gradle add `org.maplibre.gl:android-sdk:11.x`. No user-facing change. Sets scaffolding for per-overlay port in later sessions.
 
-2. **REAL OUTDOOR FIELD WALK — now unblocked by S154 GPS fix.** Previously unexercised S150 fixes + validate the derived-speed escape hatch at walking pace:
-   - **Fix 1:** toggle Audio Detail = DEEP; confirm `detail=DEEP bodyLen=<large>` in log.
-   - **Fix 3:** real GPS motion — STATIONARY escape should now fire via derived-speed (`derived-speed escape — X.XXmps` log line), not the 25m distance hatch.
-   - **Fix 2 definitive:** Phillips House / Hale Farm on-foot.
-   - **Fix 7 leak probe:** with Businesses OFF, see if any stripped POI narrates. If so, NARR-GATE line diagnoses which gate leaked.
-   - Checklist at `docs/field-walk-s153-checklist.md` still valid.
+3. **Phase 9Y polygon geofence runtime.** Extend `NarrationGeofenceManager.checkPosition()` with `pointInPolygon()` path when `geofence_shape == "polygon"`. Test with synthetic data until real MassGIS polygons arrive from TigerLine.
 
-3. **Smoke-test S154 APK on Lenovo** (subsumes S153 smoke test since S154 APK carries the same fixes):
-   - Witch Trials → People panel + History 4×4 tiles + 1691-11-22 newspaper tap → no SQLiteException.
-   - Tap a FOOD_DRINK/SHOPPING POI → stripped full-screen hero + name/address/URL/phone/hours; no narration text; no action buttons; no "Visit Website" button.
-   - Tap Pedrick Store House / a church / a park → per-POI hero + full narration. Unchanged.
-   - Different restaurants in sequence → different hash-pinned painterly variants (hash-pinning works).
-   - Audio Control → Businesses ON → walk past stripped POI → hear only "You are near [Name], at [Address]." No body.
+4. **COUNSEL RESPONSE WATCH (async, unchanged from S155).** When retainer letter arrives, email Tier 2 PDF + reassess 12 A7 decisions. Parked.
 
-4. **Wire `verify-bundled-assets.js` into the build.** Still manual. Gradle preBuild task + CI hook so neither the S149-class asset clobber nor the S154-class commercial-hero leak can silently ship. Now also includes the S154 commercial-hero leak check (fails if any commercial unlicensed POI has a per-POI hero file).
+5. **Form TX copyright registration ($65) — Hard deadline 2026-05-20, 29 days.** Unblocked by counsel. Operator-owed.
 
-5. **Task #9 — Find detail WebView buttons.** Scope-adjacent from S154. `SalemMainActivityFind.kt` `showPoiDetailDialog` has "Load Website" + "Reviews" buttons that open embedded WebView — violates both V1_OFFLINE_ONLY (WebView bypasses OkHttp interceptor) and the S154 strip policy. Gate for stripped commercial categories: hide buttons, render URL as inert text.
+6. **Task #9 — Find WebView buttons** (carry-forward from S154). Still owed. Scope: `SalemMainActivityFind.kt` `showPoiDetailDialog` has "Load Website" + "Reviews" buttons that open WebView (violates V1_OFFLINE_ONLY). Gate for stripped commercial categories.
 
-6. **Carry-forwards from S149-S154:**
-   - **APK size pre-Play-Store audit** — debug 820 → 739 MB after S154 hero prune. `poi-icons/` at 544 MB is next dominant target (downsize to 256×256 / WebP q=75).
-   - **Play Store closed-testing tester recruitment** — 20 testers for 14 consecutive days.
-   - **1692-victim-tribute POI burial-ground audit** — hand-grep 20 canonical victim names against tribute-POI narration (now affects 100% of user-visible narration since commercial was stripped).
-   - **SI anomaly reports (ANOM-001 / ANOM-002)** filed via OMEN in S153; SI response pending.
-   - **Backup cleanup:** `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz` (76 MB) — delete in 2-3 weeks once confident nothing needs restoring.
+7. **Wire `verify-bundled-assets.js` into Gradle preBuild.** Still manual; needed before V1 ship. Now must also handle v9 identity hash after 9Y.2b lands.
 
-**Post-S154 key facts:**
-- **V1 content-strip policy shipped.** `PoiContentPolicy.shouldStripContent(poi)` gates at every render surface (bottom sheet, geofence TTS, tour detail, ambient hint). Strip condition = category ∈ BUSINESSES group AND `merchant_tier == 0`. Non-licensed commercial POIs render name+address+category-graphic only; merchant unlock via `merchant_tier ≥ 1`. Render-time gate only — no data destruction; SI narrations stay in Room DB for future monetization.
-- **Category line** — KEEP (always render): HISTORICAL_BUILDINGS, CIVIC, WORSHIP, PARKS_REC, EDUCATION. STRIP (unless licensed): FOOD_DRINK, SHOPPING, LODGING, HEALTHCARE, ENTERTAINMENT, AUTO_SERVICES, OFFICES, TOUR_COMPANIES, PSYCHIC, FINANCE, FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY, WITCH_SHOP. ~1,832 strip / 459 keep across 2,291 total rows.
-- **Hero architecture** — `PoiHeroResolver` gained `forceCategoryFallback: Boolean` flag + subcategory-prefix filtering. Stripped sheet uses Tier 2 hash-pinned pick from `poi-icons/{category}/`. 2,301 per-POI WebPs for 1,832 commercial POIs pruned from APK (73 MB on disk, 81 MB APK). Historic POI heroes preserved. Backup at `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz`.
-- **GPS cursor freeze fix** — `MotionTracker.isStationary()` stays true forever on Lenovo TB305FU (TYPE_SIGNIFICANT_MOTION never fires). Added derived-speed escape hatch: `distance/time` between consecutive fixes; unfreeze if ≥ 0.3 m/s. New `lastGpsPointMs` timestamp field. Log signature: `STATIONARY: derived-speed escape — X.XXmps (Ym / Ts), unfreezing`. Operator confirmed "working now."
-- **SI handoff document** at `docs/si-handoff-s154-content-strip-2026-04-20.md` — details what LMA moved/removed + implications for SI generation priorities (kept categories are highest priority; commercial POI narration bundles dormant; ANOM-001/002 reconciliation now affects 100% of user-visible content). Operator to forward to SI team.
-- **Narration repeat-behavior** (operator clarification): one-per-POI per app session is desired; fresh launch re-narrates is expected. No code change.
-- **S152 SalemIntelligence KB absorption still current** — 1,769 narrated POIs (1,399 narrations + 33 historical_notes synced). Heritage Trail confabulation cleared across 3 surfaces.
-- **S150 fixes status** — Fix 2 ✅ / Fix 7 ✅ / Fix 1 ⚠️ (DEEP toggle still needed) / Fix 3 🚫 (real GPS motion still needed, now unblocked by S154 GPS fix). Real outdoor walk unblocked.
+8. **APK-size pre-Play-Store audit.** `poi-icons/` 544 MB is next target (downsize to 256×256 / WebP q=75). TigerLine tile bundles will add ~80-150 MB on top; APK budget needs to stay manageable.
 
-**Background items (not blocking S150):**
-- **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait. Operator will walk through the rest post-Monday.
-- **Long-run device soak (8-12 h)** — operator-run at own pace. Confirms S141 GPS-OBS backoff.
-- **OMEN-004 — first real Kotlin unit test** — deadline 2026-08-30 (~4.5 months out). Small scope.
-- **NOTE-L014 Privacy Policy** — V1-minimal artifact shipped S145 at `docs/PRIVACY-POLICY-V1.md` (Posture A). Full OMEN-008-compliant draft at `docs/PRIVACY-POLICY.md` remains pending OMEN review (32 sessions); decoupled from V1 ship because V1 doesn't collect RadioIntelligence Salem data.
-- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — **parked post-V1 per operator direction S145** (reversal of initial "abide" direction). Filesystem check: cutover never executed on this workstation; `~/Development/Salem/` still canonical. Nothing to do LMA-side until the physical move happens; decision is post-V1-ship.
+**Deferred from S155 carry-forward (reprioritized by Phase 9Y foundation shift):**
+- Real outdoor field walk (S150 fixes 1/3 validation) — valuable but not blocking Phase 9Y work
+- Smoke-test S154 APK on Lenovo — covered by S156's successful launch (ambient narration 1770 points loaded cleanly)
+- Play Store closed-testing tester recruitment (20 × 14d) — hold until after 9Y lands
+- 1692-victim-tribute burial-ground audit — still an eventual must-have; no schedule pressure
+- SI ANOM-001 / ANOM-002 response — awaiting upstream
+- Backup cleanup (`/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz`) — 2-3 wk window, not urgent
+
+**TigerLine + SalemIntelligence asks filed via OMEN:** `~/Development/OMEN/reports/locationmapapp/S156-tigerline-asks-2026-04-21.md`. Contains 7 asks to TigerLine (Phase 2 unblock, MassGIS priority, SpatiaLite bundle, routing graph, tile ownership confirmation, projection conventions, schema docs) and 4 to SalemIntelligence (historical-tile ownership decision, V1 Sanborn year slate 1890/1906/1950/1957, manifest stability, stale "503/509" correction).
+
+---
+
+### Post-S156 key facts
+
+- **Phase 9Y (TigerLine+MassGIS Foundation) and Phase 9Z (Historical Maps Time-Slider)** added to master plan. Phase 9Y precedes Phase 9Q / 9R / 10 — they become consumers of the new substrate.
+- **PG `salem_pois` extended** with 9 nullable Phase 9Y columns at S156 close. Backward-compatible; existing code unchanged.
+- **Renderer decision:** MapLibre Native Android replaces osmdroid. Parallel flag rollout (both renderers coexist behind `MAPLIBRE_RENDERER` flag) to de-risk the port of 12+ overlay types. osmdroid ripout at end of Phase 9Y.7.
+- **Time-slider year slate:** 1890, 1906, 1950, 1957 Sanborn atlases (300 sheets total; LoC IIIF metadata provides bbox — no manual GCP work). 1626/1813/1853 embed as static narrative overlays.
+- **TigerLine state** (2026-04-21): Phase 2 import stalled at ~80%; `county/tract/place/cousub/state/faces` at 0 rows despite import_log marking complete. Export scripts for 7a/7b/7c don't exist. MassGIS ingest not started. LMA blocked on these but can progress in parallel on schema / abstraction / runtime scaffolding.
+- **New feedback memory** `feedback_adb_install_after_db_rebake.md` captures: after `publish-salem-pois.js` rebake, deploy via `adb uninstall && adb install`, NEVER `install -r` — SIGKILL during replace corrupts Room WAL recovery and produces false "no such table" crashes.
+- **SI refresh absorbed S156 morning.** 1,400 POI narrations OVERWRITE-updated from SI rewrite + 34 historical_notes + 2 coord drift fixes. Room DB rebaked, 1,830 POIs / 1,770 narrated, bundled at 9.26 MB (up from 9.23 MB).
+
+### Previously current (unchanged unless noted below)
+
+- **V1 content-strip policy shipped (S154).** `PoiContentPolicy.shouldStripContent(poi)` gates every render surface. Strip = BUSINESSES group AND `merchant_tier == 0`. ~1,832 strip / 459 keep.
+- **Category line (S154).** KEEP: HISTORICAL_BUILDINGS, CIVIC, WORSHIP, PARKS_REC, EDUCATION. STRIP (unless licensed): FOOD_DRINK, SHOPPING, LODGING, HEALTHCARE, ENTERTAINMENT, AUTO_SERVICES, OFFICES, TOUR_COMPANIES, PSYCHIC, FINANCE, FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY, WITCH_SHOP.
+- **Hero architecture (S154).** `PoiHeroResolver.forceCategoryFallback` + subcategory-prefix filtering. Commercial hero backup at `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz`.
+- **GPS cursor freeze fix (S154).** Derived-speed escape hatch in `MotionTracker`; operator-confirmed working.
+- **V1 commercial posture (S138):** $19.99 flat paid, fully offline, no ads, no LLM, IARC Teen.
+- **PG-13 standing content rule** in effect.
+- **Device-verify preference:** Lenovo TB305FU (HNY0CY0W) over any emulator.
+- **V1 offline-mode enforcement shipped (S141).** `FeatureFlags.V1_OFFLINE_ONLY = true` + three-layer enforcement (ViewModel gates, OkHttp interceptor, offline-only tile sources).
+- **Find feature offline (S141).** Rewritten to `SalemPoiDao` (Room).
+- **Walking directions offline (S141).** Straight-line + bundled OSRM polylines.
+- **Salem 400+ launch deadline 2026-09-01.** Per operator statement this session: date is aspirational, not hard — quality over schedule.
+
+**Background / deferred items (unchanged):**
+- **37-item parking lot walkthrough** — Clusters C/D/E/F/G/H/I items wait.
+- **Long-run device soak (8-12 h)** — operator-run at own pace.
+- **OMEN-004 — first real Kotlin unit test** — deadline 2026-08-30.
+- **NOTE-L014 Privacy Policy** — V1-minimal shipped S145; full OMEN-008-compliant draft pending OMEN review.
+- **NOTE-L015 `~/Development/SalemCommercial/` cutover** — parked post-V1 per operator S145.
 - **NOTE-L018 PG-13 content rule** — pending OMEN acceptance + upstream relay.
 - **NOTE-L019 restrooms_zombie.png regen** — LOW content-art item, no deadline.
 - **SalemIntelligence bug report** — `docs/SalemIntelligence-report-phantom-samantha-coords-2026-04-17.md` drafted S144 for operator to forward to SI. 10 BCS POIs with phantom coords 0.2 m off Samantha statue (geocoding fallback bug).
 
-**S144-S150 facts still current (compressed):**
-- **Counsel packet shipped S151** — `docs/counsel-packet/` holds Tier 1 pre-NDA PDF (46 pages, for counsel Monday), Tier 2 post-NDA PDF (133 pages, held pending NDA), Operator prep memo PDF (7 pages). Source markdown + reproducible build scripts also in that dir. Old lawyer packet `docs/lawyer-packet/10-legal-walkthrough.md` + `11-pricing-and-age-gate.md` remain as historical source.
-- **V1 Privacy Policy V1-minimal Posture A** at `docs/PRIVACY-POLICY-V1.md` (4 TBDs for Monday counsel). Full OMEN-008 draft at `docs/PRIVACY-POLICY.md` held for future RI Salem activation.
-- **Hosting decision:** DestructiveAIGurus.com subpages `/katrinas-mystic-guide/{privacy,support,terms}`. Entity: C-corp (2026-04-20 counsel meeting); interim fallback sole prop Dean Maurice Ellis.
-- **#45 Universal Audio Control shipped (S145)** — `audio/AudioControl.kt` + `audio/NarrationHistory.kt` with 4 group toggles (Oracle / Meaningful / Ambient / Businesses) + Detail radio (Brief/Standard/Deep). S150 split `speakTaggedNarration` from `speakTaggedHint` so body segments emit `SegmentType.LONG_NARRATION`. Category→group mapping: MEANINGFUL = HISTORICAL_BUILDINGS+CIVIC+WITCH_SHOP+WORSHIP; AMBIENT = PARKS_REC+EDUCATION; BUSINESSES = FOOD_DRINK+SHOPPING+LODGING+HEALTHCARE+ENTERTAINMENT+AUTO_SERVICES+OFFICES+TOUR_COMPANIES+PSYCHIC+FINANCE+FUEL_CHARGING+TRANSIT+PARKING+EMERGENCY. Unknown → MEANINGFUL.
-- **Content-art & UX shipped S144-S146:** 12 Katrina splash variants + library-tea app icon + welcome dialog restructure (Take-a-Tour/Witch Trials/Explore cards) + Find menu rework (4 online tiles hidden, 16 painterly tiles, Salem-voice labels) + V1 toolbar/grid trimming (Home | Grid | About; 2×4 grid rows; Social/Chat/Profile removed) + TTS chunker honoring 40+ abbreviations.
-- **Samantha clamp (S144)** — `SalemBounds.kt`; GPS outside bbox snaps to Samantha Statue. Raw still logs to GPS-OBS. S150 `PREF_GPS_BBOX_OVERRIDE_DEFAULT = true` so fresh install from outside Salem bypasses clamp.
-- **Cold-start tier-first narration (S144)** + S150 detail-aware `getNarrationForPass` (DEEP→long_narration).
-- **23 POIs recategorized S150** (12 HISTORICAL_BUILDINGS + 1 CIVIC + 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. Museums (Salem Witch Museum et al.) intentionally left ENTERTAINMENT pending broader MEANINGFUL-vs-BUSINESSES group decision.
-- **GPS fixes S150:** speed-based stationary-unfreeze (>0.5 m/s bypasses MotionTracker); adaptive polling ladder (10s driving / 2.5s walking-or-narrating / 30s idle). Newspaper table now baked into assets DB via `bundle-witch-trials-newspapers-into-db.js`.
-- **Parking-lot #35 = HARD PRE-V1 RELEASE BLOCKER** — all assets encrypted + ProGuard/R8 obfuscation before first Play Store submission.
-
-**S141 facts still current:**
-- **V1 offline-mode enforcement shipped** — `FeatureFlags.V1_OFFLINE_ONLY = true` (compile-time const in `:core`). Three-layer enforcement: ViewModel gates (early-return) → OkHttp `OfflineModeInterceptor` (hard backstop in all 13 client sites) → offline-only tile sources (empty URL so osmdroid downloader refuses). V2 resumes by flipping one boolean.
-- **Find feature fully offline** — `FindViewModel` rewritten from cache-proxy `FindRepository` to `SalemPoiDao` (Room). Proximity search, text search, category counts, website lookup all served from the bundled 1,837-POI `salem_content.db`. Public API preserved; `SalemMainActivityFind` unchanged. Session-level `hashCode → SalemPoi` cache for `fetchPoiWebsiteDirectly` with name+coord fallback.
-- **Walking directions offline** — `WalkingDirections.getRoute()` returns straight-line, `getMultiStopRoute()` returns multi-segment straight-line, `getBundledTourRoute(tourId)` loads the pre-computed OSRM polyline from `assets/tours/{tourId}.json` (already generated for all 5 tours by S125's `backfill-tour-routes.js`). `TourViewModel.getFullTourRoute` prefers the bundled polyline for the active tour. `WalkingRoute.road` is nullable.
-- **Log tuning shipped:** GPS-OBS stale-heartbeat backoff (30s → 5m → 15m by stale age; S140 showed 1,208 W-lines over 12h — projected to drop to ~15). `NarrationMgr.intentionallyStopping` flag distinguishes cancel vs real TTS error (spurious `E TTS ERROR` gone from cancel paths). `WALK_SIM_DWELL_MAX_MS` 60 → 180s and waives cap while TTS still actively speaking (Oracle tiles of 2-3 min no longer get cut off).
-- **Device-verified** on Lenovo HNY0CY0W: zero outbound-network W-lines at cold boot, `TileSourceManager: buildSource(SATELLITE) v1Offline=true`, tour restored at stop 2/10, 1,837 POIs loaded from Room, no crashes, no ANRs.
-- **Phase 9X COMPLETE** (from S140) — 14 actual sessions (S127-S140) vs 8 originally planned.
-- **V1 commercial posture locked** (S138): $19.99 flat paid, fully offline, no ads, no LLM, no tiers. IARC Teen (PG-13). S141 brought the code into full compliance with the offline-only half.
-- **PG-13 standing content rule** in effect. Rule memory: `feedback_pg13_content_rule.md`.
-- **Device-verify preference:** Lenovo TB305FU (HNY0CY0W) over any emulator. Memory: `feedback_lenovo_over_emulator.md`.
-- **BCS dedup fully resolved** (from S136). Current inventory tracked in POI Inventory section below.
-- **Walk-sim dwell cap** now 180s (was 60s); waived while TTS speaking.
-- **Room `@Insert` silent-drop** from S129 still latent.
-
-**Salem 400+ launch deadline 2026-09-01 still tracks.** 4.5 months runway.
+**Older S141-S150 fact blocks archived to `docs/archive/STATE_removed_2026-04-21.md`** — the live narrative is now the Phase 9Y foundation track. Most of those facts are covered in the "Previously current" block above; the archive preserves the session-level granularity for reference.
 
 ---
 
@@ -97,17 +88,17 @@
 | Phase | Status | Notes |
 |---|---|---|
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
-| **9P.A** Backend Foundation | **COMPLETE** (S98-S101) | Schema, importer, admin auth, write endpoints, duplicates, per-mode visibility |
-| **9P.B** Admin UI | **6/8 done** | 9P.6-9P.10b complete. Pending: 9P.11 (demoted), 9P.13 (folded into 9U). 9P.10a blocked on 9Q. |
-| **9U** Unified POI Table | **DONE (S125-S126)** | Dedup, narration resync, NarrationPoint+SalemBusiness entity removal, TourPoi rerouted to salem_pois, legacy PG schema dropped, inventory PDF tool migrated. |
-| **9X** Salem Witch Trials Feature | **COMPLETE (S127-S140, 14 sessions)** | S127 foundation. S128 history-article LLM gen. S129 History 4×4 tile UI. S130 Oracle Newspaper panel + 202 AI headlines. S131 People panel + TTS chunker. S132 pencil-sketch portraits + bug fixes. S133 cross-linking (1,110+ NPC name auto-links) + Today-in-1692 card + admin integration. S134 Historic Sites feature + category reclass. S135-S136 BCS dedup + newspaper dock mode. S137 HTML/WebView newspaper renderer + Oracle tile brief. S138 V1 posture locked + PG-13 standing rule + parking lot. S139 retroactive paperwork. S140 Oracle tile import + bundled Room bake + Lenovo device-verify. |
-| **9Q** Salem Domain Content Bridge | not started — queued behind 9X | building→POI translation, 425 buildings, 202 newspapers. Simplified by 9U (no `poi_kind` column). |
-| **9R** Historic Tour Mode | not started — queued behind 9X | opt-in chapter-based 1692 tour |
-| **10** Production readiness | DEFERRED behind 9X+9Q+9R | Firebase, photos, DB hardening, emulator verification |
-| **11** Branding, ASO, Play Store | target 2026-09-01 | Salem 400+ launch window |
-| **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Phase 2 (narration gen) pending operator gate. |
+| **9P.A / 9P.B / 9U / 9X** | COMPLETE | Admin UI, unified POI table, Witch Trials feature |
+| **9Y** TigerLine+MassGIS Foundation | **STARTED (S156)** | NEW. Plan + Step 0 discovery shipped. PG schema extended with 9 Phase 9Y columns. Next: Kotlin Room v9 bump, MapSurface abstraction, polygon geofence runtime. Blocked on TigerLine Phase 2 + MassGIS ingest for real data. |
+| **9Z** Historical Maps Time-Slider | **PLANNED (S156)** | NEW. V1 year slate: 1890, 1906, 1950, 1957 Sanborn. Blocked on TigerLine or SI tile generation decision. |
+| **9Q** Salem Domain Content Bridge | DEFERRED — now consumes 9Y substrate | building→POI translation, 425 buildings, 202 newspapers. Simplified further by 9Y's MHC join. |
+| **9R** Historic Tour Mode | DEFERRED — now consumes 9Y substrate | opt-in chapter-based 1692 tour. Feeds off Phase 9Z time-slider. |
+| **10** Production readiness | DEFERRED behind 9Y+9Z+9Q+9R | Firebase, photos, DB hardening, emulator verification. Offline-tile step (10.3) subsumed by 9Y.6. |
+| **11** Branding, ASO, Play Store | Quality over schedule per operator 2026-04-21 | Salem 400+ Oct 2026 is aspirational, not hard. |
+| **Cross-project** TigerLine | **PHASE 2 STALLED (2026-04-21)** | 65.7M edges + 35.5M addrs imported; county/tract/place/cousub/state/faces at 0 rows. MassGIS ingest not started. LMA blocked on their Phase 7a/7b/7c deliverables. |
+| **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | S156 SI-rewrite absorbed (1,400 POIs refreshed). 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 154. Salem 400+ quadricentennial is 2026 — app must be in Play Store by Sept to capture October's 1M+ visitors.
+**Sessions completed:** 156. Salem 400+ target 2026-09-01 now aspirational — operator has committed to quality over schedule for the Phase 9Y foundation.
 
 ---
 
