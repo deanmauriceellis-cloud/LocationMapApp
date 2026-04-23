@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-23 — Session 157 closed (spanned 04-22→04-23). OSM + osmdroid stay as V1 base map; MassGIS + TigerLine are overlays only (MapLibre / osmdroid ripout / tile bundling CANCELLED). Essex L3 Parcels + L3 Assess self-ingested (366,884 + 429,803 rows). Salem QGIS project delivered at `tools/qgis-project/salem-gis.qgz` (13 layers inc. 1,830 LMA POIs with category icons at scale ≤ 1:1000). Cemetery-GPS-per-person path: RadioLogger field capture, not LMA. Salem walking-router design captured in live log (exploratory only, not committed).
+**Last updated:** 2026-04-23 — Session 158 closed. Shipped third offline basemap provider `Salem-Custom` (label "Witchy") alongside Satellite + Mapnik. Full custom-tile-baking pipeline at `tools/tile-bake/` (planetiler + tippecanoe + maplibre-gl-native headless + curated `style-salem.json`, WebP lossless output). Parchment palette, tiered-purple historic buildings (NHL / NRIND / NRDIS / LHD) from MHC Inventory joined to 39,408 MassGIS structures, parcel outlines from L3 Essex (32,727), cemetery + monument + place-of-worship labels, no commercial POI clutter. Block-rendered with 1-tile buffer to eliminate tile seams. Bundle: 206 MB total / 17,777 tiles / three providers. Previous context: S157 OSM-stays pivot + L3 ingest + QGIS project remains foundation.
 
 ---
 

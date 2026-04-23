@@ -36,6 +36,7 @@ object TileSourceManager {
     object Id {
         const val SATELLITE = "SATELLITE"
         const val STREET = "STREET"
+        const val CUSTOM = "CUSTOM"
         const val DARK = "DARK"
     }
 
@@ -46,18 +47,19 @@ object TileSourceManager {
      * All available tile source IDs in display order.
      *
      * V1 offline posture: DARK (CartoDB Dark Matter) is online-only — the
-     * bundled `salem_tiles.sqlite` archive holds only `Esri-WorldImagery`
-     * and `Mapnik` tiles, so DARK would fail silently. V2 can re-add DARK
-     * once online fetching resumes.
+     * bundled `salem_tiles.sqlite` archive holds only `Esri-WorldImagery`,
+     * `Mapnik`, and `Salem-Custom` tiles, so DARK would fail silently. V2
+     * can re-add DARK once online fetching resumes.
      */
     val ALL_IDS: List<String> =
-        if (FeatureFlags.V1_OFFLINE_ONLY) listOf(Id.SATELLITE, Id.STREET)
-        else listOf(Id.SATELLITE, Id.STREET, Id.DARK)
+        if (FeatureFlags.V1_OFFLINE_ONLY) listOf(Id.SATELLITE, Id.STREET, Id.CUSTOM)
+        else listOf(Id.SATELLITE, Id.STREET, Id.CUSTOM, Id.DARK)
 
     /** Human-readable labels for PopupMenu display. */
     fun label(id: String): String = when (id) {
         Id.SATELLITE -> "Satellite"
         Id.STREET -> "Street"
+        Id.CUSTOM -> "Witchy"
         Id.DARK -> "Dark"
         else -> id
     }
@@ -73,6 +75,7 @@ object TileSourceManager {
             return when (id) {
                 Id.SATELLITE -> buildOfflineArchiveSource("Esri-WorldImagery", 0, USGS_MAX_ZOOM)
                 Id.STREET -> buildOfflineArchiveSource("Mapnik", 0, 19)
+                Id.CUSTOM -> buildOfflineArchiveSource("Salem-Custom", 14, 19)
                 Id.DARK -> buildOfflineArchiveSource("Esri-WorldImagery", 0, USGS_MAX_ZOOM) // V2-only; fall back to satellite
                 else -> {
                     DebugLogger.w(TAG, "Unknown tile source ID '$id', falling back to SATELLITE (offline)")
@@ -83,6 +86,7 @@ object TileSourceManager {
         return when (id) {
             Id.SATELLITE -> buildUsgsSource()
             Id.STREET -> TileSourceFactory.MAPNIK
+            Id.CUSTOM -> buildOfflineArchiveSource("Salem-Custom", 14, 19)
             Id.DARK -> buildDarkSource()
             else -> {
                 DebugLogger.w(TAG, "Unknown tile source ID '$id', falling back to SATELLITE")

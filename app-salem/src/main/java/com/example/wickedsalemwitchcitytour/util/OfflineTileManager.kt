@@ -18,19 +18,21 @@ import java.io.File
 /**
  * Manages offline map tile archives for downtown Salem.
  *
- * On first launch, copies the bundled tile archive from APK assets to osmdroid's
- * base path. osmdroid's MapTileFileArchiveProvider auto-discovers .sqlite files
- * and serves tiles from them — no custom tile provider needed.
+ * The tile archive (`salem_tiles.sqlite`, ~200 MB with three providers:
+ * Satellite + Mapnik + Witchy) is NOT bundled in the APK — it's too big for
+ * GitHub (>100 MB) and for a Play Store AAB. It must arrive on the device
+ * out-of-band:
+ *   • Dev (adb):    adb push tools/tile-bake/dist/salem_tiles.sqlite \
+ *                     /sdcard/Android/data/<pkg>/files/salem_tiles.sqlite
+ *   • Prod (future): Play Asset Delivery on-install pack.
  *
- * The archive contains pre-downloaded tiles for the Salem walking tour area
- * (zoom 14-18, satellite + street) so the app works fully offline.
+ * osmdroid's MapTileFileArchiveProvider auto-discovers .sqlite files in the
+ * base path configured here. No runtime copy step needed.
  */
 object OfflineTileManager {
 
     private const val TAG = "OfflineTileManager"
-    private const val ARCHIVE_ASSET = "salem_tiles.sqlite"
-    private const val PREFS_KEY = "offline_tiles_version"
-    private const val CURRENT_VERSION = 1
+    private const val ARCHIVE_NAME = "salem_tiles.sqlite"
 
     /**
      * Set osmdroid's base path to the app's external files directory via
@@ -50,62 +52,27 @@ object OfflineTileManager {
     }
 
     /**
-     * Copy the bundled tile archive from assets to osmdroid's base path.
-     * Call AFTER Configuration.getInstance().load() so paths are resolved.
-     * Uses a version number in SharedPreferences to avoid re-extracting
-     * on every launch and to allow updating the archive in future releases.
+     * Verify the tile archive is present at osmdroid's base path. If missing,
+     * log a clear instruction for the dev adb-push command. No copy, no
+     * extraction — the archive MUST arrive on the device out-of-band.
      */
     fun extractArchiveIfNeeded(context: Context) {
-        val prefs = context.getSharedPreferences("offline_tiles", Context.MODE_PRIVATE)
-        val installedVersion = prefs.getInt(PREFS_KEY, 0)
+        val basePath = Configuration.getInstance().osmdroidBasePath
+        basePath.mkdirs()
+        val archive = File(basePath, ARCHIVE_NAME)
 
-        if (installedVersion >= CURRENT_VERSION) {
-            DebugLogger.i(TAG, "Offline tiles v$CURRENT_VERSION already installed")
+        if (!archive.exists()) {
+            DebugLogger.w(TAG,
+                "Missing $ARCHIVE_NAME at $basePath — push it manually:\n" +
+                "  adb push tools/tile-bake/dist/$ARCHIVE_NAME " +
+                "${basePath.absolutePath}/$ARCHIVE_NAME"
+            )
             return
         }
 
-        val basePath = Configuration.getInstance().osmdroidBasePath
-        DebugLogger.d(TAG, "osmdroidBasePath resolved to: $basePath")
-        DebugLogger.d(TAG, "osmdroidTileCache resolved to: ${Configuration.getInstance().osmdroidTileCache}")
-        basePath.mkdirs()
-
-        val destFile = File(basePath, ARCHIVE_ASSET)
-        DebugLogger.d(TAG, "Archive destination: $destFile (exists=${destFile.exists()})")
-
-        // List existing files in base path for debugging
-        val existingFiles = basePath.listFiles()
-        DebugLogger.d(TAG, "Files in basePath: ${existingFiles?.map { "${it.name} (${it.length()} bytes)" } ?: "null"}")
-
-        try {
-            val assetList = context.assets.list("") ?: emptyArray()
-            DebugLogger.d(TAG, "Assets root contains: ${assetList.filter { it.contains("tile") || it.contains("sqlite") }.joinToString()}")
-            if (ARCHIVE_ASSET !in assetList) {
-                DebugLogger.w(TAG, "No bundled tile archive '$ARCHIVE_ASSET' in assets — asset list: ${assetList.take(20).joinToString()}")
-                return
-            }
-
-            DebugLogger.i(TAG, "Extracting offline tiles from assets → $destFile")
-            val startTime = System.currentTimeMillis()
-
-            context.assets.open(ARCHIVE_ASSET).use { input ->
-                destFile.outputStream().use { output ->
-                    input.copyTo(output, bufferSize = 8192)
-                }
-            }
-
-            val elapsed = System.currentTimeMillis() - startTime
-            val sizeMb = destFile.length() / 1024.0 / 1024.0
-            DebugLogger.i(TAG, "Extracted ${"%.1f".format(sizeMb)} MB in ${elapsed}ms → $destFile")
-
-            // Verify the extracted database
-            verifyArchive(destFile)
-
-            prefs.edit().putInt(PREFS_KEY, CURRENT_VERSION).apply()
-            DebugLogger.i(TAG, "Offline tiles v$CURRENT_VERSION installed successfully")
-        } catch (e: Exception) {
-            DebugLogger.e(TAG, "Failed to extract offline tiles: ${e.message}", e)
-            destFile.delete()
-        }
+        val sizeMb = archive.length() / 1024.0 / 1024.0
+        DebugLogger.i(TAG, "Tile archive present: ${"%.1f".format(sizeMb)} MB at $archive")
+        verifyArchive(archive)
     }
 
     /**

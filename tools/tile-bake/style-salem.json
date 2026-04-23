@@ -1,0 +1,537 @@
+{
+  "version": 8,
+  "name": "Salem Custom — Witchy Parchment",
+  "metadata": {
+    "description": "Curated Salem basemap. Streets + names + parks + water + neighborhoods. No commercial amenity labels. Warm parchment palette for the Wicked Salem Witch City Tour.",
+    "attribution": "© OpenMapTiles © OpenStreetMap contributors"
+  },
+  "sources": {
+    "salem": {
+      "type": "vector",
+      "url": "mbtiles://salem-vector.mbtiles"
+    },
+    "parcels": {
+      "type": "vector",
+      "url": "mbtiles://parcels.mbtiles"
+    },
+    "buildings": {
+      "type": "vector",
+      "url": "mbtiles://buildings.mbtiles"
+    }
+  },
+  "glyphs": "{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": { "background-color": "#F3E9D2" }
+    },
+    {
+      "id": "landcover_wood",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landcover",
+      "filter": ["any",
+        ["==", "class", "wood"],
+        ["==", "class", "grass"]
+      ],
+      "paint": { "fill-color": "#C8D4B0", "fill-opacity": 0.55 }
+    },
+    {
+      "id": "landcover_sand",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landcover",
+      "filter": ["==", "class", "sand"],
+      "paint": { "fill-color": "#EFE3B8", "fill-opacity": 0.85 }
+    },
+    {
+      "id": "landcover_wetland",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landcover",
+      "filter": ["==", "class", "wetland"],
+      "paint": { "fill-color": "#A8B598", "fill-opacity": 0.5 }
+    },
+    {
+      "id": "landuse_residential",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "residential"],
+      "minzoom": 12,
+      "paint": { "fill-color": "#EADFC6", "fill-opacity": 0.4 }
+    },
+    {
+      "id": "landuse_industrial",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "industrial"],
+      "minzoom": 12,
+      "paint": { "fill-color": "#D4CAB6", "fill-opacity": 0.7 }
+    },
+    {
+      "id": "landuse_hospital",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "hospital"],
+      "minzoom": 13,
+      "paint": { "fill-color": "#E8C8C4", "fill-opacity": 0.7 }
+    },
+    {
+      "id": "landuse_education",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["any",
+        ["==", "class", "school"],
+        ["==", "class", "college"],
+        ["==", "class", "university"]
+      ],
+      "minzoom": 13,
+      "paint": { "fill-color": "#E6D7B2", "fill-opacity": 0.75 }
+    },
+    {
+      "id": "landuse_recreation",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["any",
+        ["==", "class", "playground"],
+        ["==", "class", "pitch"]
+      ],
+      "minzoom": 14,
+      "paint": { "fill-color": "#C8D4A8", "fill-opacity": 0.7 }
+    },
+    {
+      "id": "landuse_cemetery",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "cemetery"],
+      "minzoom": 13,
+      "paint": { "fill-color": "#A8B098", "fill-opacity": 0.85 }
+    },
+    {
+      "id": "landuse_cemetery_outline",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "cemetery"],
+      "minzoom": 13,
+      "paint": {
+        "line-color": "#5E6A52",
+        "line-width": 1.2,
+        "line-dasharray": [3, 2]
+      }
+    },
+    {
+      "id": "park",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "park",
+      "paint": { "fill-color": "#B5C9A4", "fill-opacity": 0.65 }
+    },
+    {
+      "id": "park_outline",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "park",
+      "paint": {
+        "line-color": "#8DA379",
+        "line-width": 0.8,
+        "line-dasharray": [2, 2]
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "salem",
+      "source-layer": "water",
+      "paint": { "fill-color": "#6B9DAF" }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "waterway",
+      "paint": { "line-color": "#6B9DAF", "line-width": 1.2 }
+    },
+    {
+      "id": "parcel_line",
+      "type": "line",
+      "source": "parcels",
+      "source-layer": "parcels",
+      "minzoom": 16,
+      "paint": {
+        "line-color": "#B8847A",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.3, 19, 0.9],
+        "line-opacity": ["interpolate", ["linear"], ["zoom"], 16, 0.35, 19, 0.7]
+      }
+    },
+    {
+      "id": "building",
+      "type": "fill",
+      "source": "buildings",
+      "source-layer": "buildings",
+      "minzoom": 14,
+      "paint": {
+        "fill-color": ["match", ["get", "tier"],
+          "nhl", "#4B1D7A",
+          "nrind", "#7B4FA0",
+          "nrdis", "#B799C7",
+          "#D7C9A8"
+        ],
+        "fill-outline-color": ["match", ["get", "tier"],
+          "nhl", "#2E0F55",
+          "nrind", "#4C2B70",
+          "nrdis", "#7A5D92",
+          "#A08F6C"
+        ],
+        "fill-opacity": 0.88
+      }
+    },
+    {
+      "id": "road_minor_casing",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["any",
+        ["==", "class", "minor"],
+        ["==", "class", "service"],
+        ["==", "class", "path"],
+        ["==", "class", "pedestrian"],
+        ["==", "class", "track"]
+      ],
+      "minzoom": 13,
+      "paint": {
+        "line-color": "#8B6F47",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 13, 0.6, 16, 2.2, 19, 7],
+        "line-opacity": 0.6
+      }
+    },
+    {
+      "id": "road_minor",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["any",
+        ["==", "class", "minor"],
+        ["==", "class", "service"],
+        ["==", "class", "path"],
+        ["==", "class", "pedestrian"],
+        ["==", "class", "track"]
+      ],
+      "minzoom": 13,
+      "paint": {
+        "line-color": "#F3E9D2",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 13, 0.3, 16, 1.4, 19, 5]
+      }
+    },
+    {
+      "id": "road_secondary_casing",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["any",
+        ["==", "class", "secondary"],
+        ["==", "class", "tertiary"]
+      ],
+      "minzoom": 11,
+      "paint": {
+        "line-color": "#8B6F47",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.8, 14, 3, 19, 12]
+      }
+    },
+    {
+      "id": "road_secondary",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["any",
+        ["==", "class", "secondary"],
+        ["==", "class", "tertiary"]
+      ],
+      "minzoom": 11,
+      "paint": {
+        "line-color": "#F7EFDA",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.4, 14, 2, 19, 9]
+      }
+    },
+    {
+      "id": "road_primary_casing",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["any",
+        ["==", "class", "primary"],
+        ["==", "class", "trunk"],
+        ["==", "class", "motorway"]
+      ],
+      "minzoom": 8,
+      "paint": {
+        "line-color": "#6B4E2E",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 14, 4, 19, 16]
+      }
+    },
+    {
+      "id": "road_primary",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["any",
+        ["==", "class", "primary"],
+        ["==", "class", "trunk"],
+        ["==", "class", "motorway"]
+      ],
+      "minzoom": 8,
+      "paint": {
+        "line-color": "#E8A857",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 2.8, 19, 13]
+      }
+    },
+    {
+      "id": "road_rail",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "transportation",
+      "filter": ["==", "class", "rail"],
+      "minzoom": 12,
+      "paint": {
+        "line-color": "#8B7355",
+        "line-width": 1.2,
+        "line-dasharray": [3, 3]
+      }
+    },
+    {
+      "id": "admin_line",
+      "type": "line",
+      "source": "salem",
+      "source-layer": "boundary",
+      "filter": ["all", ["==", "admin_level", 8], ["!=", "maritime", 1]],
+      "minzoom": 9,
+      "paint": {
+        "line-color": "#8B6F47",
+        "line-width": 0.6,
+        "line-dasharray": [4, 2],
+        "line-opacity": 0.5
+      }
+    },
+    {
+      "id": "road_label_minor",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "transportation_name",
+      "filter": ["any",
+        ["==", "class", "minor"],
+        ["==", "class", "service"]
+      ],
+      "minzoom": 16,
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": "{name}",
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 16, 10, 19, 13],
+        "text-letter-spacing": 0.02,
+        "text-max-angle": 30
+      },
+      "paint": {
+        "text-color": "#3A2E1F",
+        "text-halo-color": "#F3E9D2",
+        "text-halo-width": 1.4
+      }
+    },
+    {
+      "id": "road_label_major",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "transportation_name",
+      "filter": ["all",
+        ["any",
+          ["==", "class", "primary"],
+          ["==", "class", "secondary"],
+          ["==", "class", "tertiary"],
+          ["==", "class", "trunk"]
+        ],
+        ["!=", "oneway", 1]
+      ],
+      "minzoom": 13,
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": "{name}",
+        "text-font": ["Noto Sans Bold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 13, 11, 19, 15],
+        "text-letter-spacing": 0.05,
+        "text-max-angle": 30,
+        "symbol-spacing": 400
+      },
+      "paint": {
+        "text-color": "#2A1F10",
+        "text-halo-color": "#F3E9D2",
+        "text-halo-width": 1.6
+      }
+    },
+    {
+      "id": "water_label",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "water_name",
+      "minzoom": 10,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Noto Sans Italic"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 10, 11, 18, 16],
+        "text-letter-spacing": 0.15,
+        "text-transform": "uppercase",
+        "symbol-placement": "line-center"
+      },
+      "paint": {
+        "text-color": "#1F3E4E",
+        "text-halo-color": "#9EBBCA",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "place_neighborhood",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "place",
+      "filter": ["any",
+        ["==", "class", "neighbourhood"],
+        ["==", "class", "suburb"],
+        ["==", "class", "quarter"],
+        ["==", "class", "hamlet"]
+      ],
+      "minzoom": 13,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Metropolis Bold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 13, 11, 18, 16],
+        "text-letter-spacing": 0.22,
+        "text-transform": "uppercase",
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#2A1F10",
+        "text-halo-color": "#F3E9D2",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "place_town",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "place",
+      "filter": ["any",
+        ["==", "class", "city"],
+        ["==", "class", "town"],
+        ["==", "class", "village"]
+      ],
+      "minzoom": 8,
+      "maxzoom": 16,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Metropolis Bold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 8, 12, 14, 20],
+        "text-letter-spacing": 0.08,
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#1F1608",
+        "text-halo-color": "#F3E9D2",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "park_label",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "park",
+      "minzoom": 14,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Metropolis Regular Italic"],
+        "text-size": 12,
+        "text-letter-spacing": 0.1,
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#3E5A32",
+        "text-halo-color": "#D7E3C7",
+        "text-halo-width": 1.5
+      }
+    },
+    {
+      "id": "poi_cemetery_label",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "poi",
+      "filter": ["all",
+        ["==", "class", "cemetery"],
+        ["has", "name"]
+      ],
+      "minzoom": 14,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Metropolis Medium Italic"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 19, 14],
+        "text-letter-spacing": 0.08,
+        "text-max-width": 7,
+        "text-anchor": "center"
+      },
+      "paint": {
+        "text-color": "#2E3A24",
+        "text-halo-color": "#D0D8C0",
+        "text-halo-width": 1.6
+      }
+    },
+    {
+      "id": "poi_monument_label",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "poi",
+      "filter": ["all",
+        ["==", "class", "monument"],
+        ["has", "name"]
+      ],
+      "minzoom": 15,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Metropolis Medium Italic"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 15, 10, 19, 13],
+        "text-letter-spacing": 0.08,
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#3A2E1F",
+        "text-halo-color": "#F3E9D2",
+        "text-halo-width": 1.4
+      }
+    },
+    {
+      "id": "poi_worship_label",
+      "type": "symbol",
+      "source": "salem",
+      "source-layer": "poi",
+      "filter": ["all",
+        ["==", "class", "place_of_worship"],
+        ["has", "name"]
+      ],
+      "minzoom": 15,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Metropolis Medium Italic"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 15, 10, 19, 13],
+        "text-letter-spacing": 0.05,
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#3A2E1F",
+        "text-halo-color": "#F3E9D2",
+        "text-halo-width": 1.4
+      }
+    }
+  ]
+}

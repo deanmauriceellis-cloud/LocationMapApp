@@ -1,0 +1,19 @@
+{
+  "name": "tile-bake",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@mapbox/vector-tile": "^2.0.4",
+    "@maplibre/maplibre-gl-native": "^6.4.1",
+    "better-sqlite3": "^12.9.0",
+    "pbf": "^4.0.1",
+    "sharp": "^0.34.5"
+  }
+}

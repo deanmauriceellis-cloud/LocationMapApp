@@ -1,0 +1,27 @@
+# Build-time toolchain (large, downloadable)
+planetiler.jar
+fonts/
+node_modules/
+data/
+
+# Regenerable intermediates
+salem-vector.mbtiles
+parcels.mbtiles
+buildings.mbtiles
+salem-custom.mbtiles
+
+# Final tile bundle (too big for git; push via adb or Play Asset Delivery)
+dist/
+
+# GeoJSON/GeoJSON-L intermediates (produced by psql exports)
+salem-parcels.geojsonl
+salem-buildings.geojsonl
+salem-historic-buildings.geojson
+osm-buildings-salem.geojsonl
+
+# Preview / sample renders
+preview-*.png
+sample-*.png
+stitch-*.png
+cemetery-*.png
+beach-*.png

@@ -190,16 +190,12 @@ class AppBarMenuManager(
             icon.setOnClickListener { menuEventListener.onAboutRequested() }
         }
 
-        // Tile source picker icon — PopupMenu with Satellite/Street/Dark.
-        // V1 hides the picker entirely; tile source is fixed to the default offline SATELLITE.
+        // Tile source picker icon — PopupMenu with Satellite / Street / Witchy.
+        // All three providers are bundled offline in salem_tiles.sqlite, so the picker
+        // is visible under V1_OFFLINE_ONLY.
         tileSourceIcon?.let { icon ->
-            if (FeatureFlags.V1_OFFLINE_ONLY) {
-                icon.visibility = View.GONE
-                DebugLogger.i(TAG, "V1_OFFLINE_ONLY — slim-toolbar tile-source icon hidden")
-            } else {
-                icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
-                icon.setOnClickListener { showTileSourcePopup(icon) }
-            }
+            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            icon.setOnClickListener { showTileSourcePopup(icon) }
         }
 
         DebugLogger.i(TAG, "setupSlimToolbar() — icons wired (Weather, Home, TileSource, Alerts, Grid, About)")

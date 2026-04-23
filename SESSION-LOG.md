@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 147-156. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 149-158. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 158: 2026-04-23 — Custom "Witchy" basemap tile bake (third offline tile source)
+
+Built a complete custom-tile-baking pipeline at `tools/tile-bake/` and shipped a third offline basemap alongside Satellite + Mapnik: `Salem-Custom` (label "Witchy"). Stack: planetiler (Geofabrik MA → OpenMapTiles vector tiles z0-z16) + tippecanoe (massgis.l3_parcels_essex → parcel outlines; massgis.structures JOIN mhc_inventory → 39,408 building footprints tagged with NHL/NRIND/NRDIS/none tier) + maplibre-gl-native headless with a curated `style-salem.json` (parchment palette, tiered-purple historic buildings, no commercial POI labels, narrow cemetery/monument/church carve-out, Metropolis Bold district labels). Iterated on-device through 11 operator-driven refinements: buffered-block rendering to kill tile seams + label fragmentation, divided-boulevard oneway filter, added cemeteries/hospitals/schools/sand/wetlands, unified building source to MassGIS so historic-overlay polygons align perfectly with base buildings, and WebP lossless encoding (158 MB → 112 MB, −29%). Kotlin wire-up: `TileSourceManager.Id.CUSTOM` + un-hid the picker icon under V1_OFFLINE_ONLY. Bundle: 206 MB total (17,777 tiles across three providers). Build-time toolchain (planetiler.jar / fonts / node_modules / intermediate mbtiles + geojsonl) is all gitignored; rebuild instructions in `tools/tile-bake/README.md`.
+
+Full session detail: `docs/session-logs/session-158-2026-04-23.md`. Commit: pending.
+
+---
 
 ## Session 157: 2026-04-22 — OSM-stays pivot + Essex L3 parcels ingest + Salem QGIS project + routing design captured
 
@@ -76,15 +84,7 @@ Full session detail: `docs/session-logs/session-149-2026-04-18.md`. Commit: `dff
 
 ---
 
-## Session 148: 2026-04-18 — #44 splash voiceover — screech prototype rejected, friendly-meow direction locked, blocked on Ollama VRAM release
-
-Second session of the day, focused on the last Monday Must-Have (#44 screaming-cat splash voiceover). Built the full AudioGen→sox pipeline end-to-end: 4 cat-screech candidates + 4 haunted-Salem atmospheric underlays generated via AudioCraft on RTX 3090, mixed into 4 stereo-44.1-kHz-PCM candidates via a new `mix.sh` recipe (upsample, pad, attenuate bed to −15 dB, hi-pass 60 Hz, soft-knee compand, plate reverb, fade, peak-normalize to −1 dB). Operator auditioned all 4 through workstation speakers and rejected them as "too jolting" — creative pivot to a long friendly girly-kitty meow instead. Saved `feedback_splash_voiceover_vibe.md` memory capturing the direction (why: operator rejection; how to apply: prefer warm/welcoming prompts over alarm-style). Friendly-meow regen attempted but blocked: Ollama woke up between the first and second AudioGen pass and grabbed 20 GB VRAM, leaving only 8 MiB free — regen requires `sudo systemctl stop ollama` to unblock. Operator did not run it before session end; carries to S149. No code changes to `app-salem/` — all artifacts in `/tmp/splash-voiceover-candidates/` (ephemeral). Phase status unchanged (9X still COMPLETE from S140). Session count 147 → 148.
-
-Full session detail: `docs/session-logs/session-148-2026-04-18.md`. Commit: `5dc2f58`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 147 and earlier are in SESSION-LOG-ARCHIVE.md -->
-<!-- S147 rolled to archive 2026-04-23 by the session-end protocol -->
+<!-- END OF ROLLING WINDOW — Sessions 148 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S148 rolled to archive 2026-04-23 by the session-end protocol (S158) -->
 
 
