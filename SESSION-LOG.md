@@ -84,15 +84,7 @@ Full session detail: `docs/session-logs/session-148-2026-04-18.md`. Commit: `5dc
 
 ---
 
-## Session 147: 2026-04-18 — Triptych campaign complete (1,837/1,837, 0 failed) + APK-wiring plumbing live
-
-Ran the full 1,837-POI triptych generation campaign to completion on RTX 3090 (625.8 min, zero failures, OCR retry loop catching every SDXL text hallucination). Built the APK-wiring plumbing while the campaign ran: new `HeroAssetLoader` (LruCache + panel-1 slicing), Tier 0 triptych in `PoiHeroResolver`, `NarrationHero` thumbnail swap, idempotent `sync-to-apk.sh`, `.gitignore` covering `heroes/`. Synced all 1,837 triptychs into `assets/heroes/` (73 MB) and confirmed a clean debug APK build bundles every one. Released Forge WebUI + SD model at session end — 24 GB VRAM free for #44 voiceover or emulator.
-
-Full session detail: `docs/session-logs/session-147-2026-04-18.md`. Commit: `e72b170`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 146 and earlier are in SESSION-LOG-ARCHIVE.md -->
-<!-- S146 rolled to archive 2026-04-21 by the session-end protocol -->
+<!-- END OF ROLLING WINDOW — Sessions 147 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S147 rolled to archive 2026-04-23 by the session-end protocol -->
 
 

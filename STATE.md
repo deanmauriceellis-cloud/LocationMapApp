@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-22 — Session 157 (S156 architectural pivot REVERSED: **OSM + osmdroid stay as V1 base map**; MassGIS + TigerLine are now **overlays only**. MapLibre port / osmdroid ripout / TigerLine base-tile bundling all CANCELLED. Phase 9Y re-scoped: schema + ingest + polygon geofence stay; 9Y.5/9Y.6/9Y.7/9Y.8 struck. L3 Parcels + L3 Assess for Essex County self-ingested to `massgis.l3_parcels_essex` (366,884 polygons) + `massgis.l3_assess_essex` (429,803 rows) via new `cache-proxy/scripts/ingest-l3-parcels-essex.py`.)
+**Last updated:** 2026-04-23 — Session 157 closed (spanned 04-22→04-23). OSM + osmdroid stay as V1 base map; MassGIS + TigerLine are overlays only (MapLibre / osmdroid ripout / tile bundling CANCELLED). Essex L3 Parcels + L3 Assess self-ingested (366,884 + 429,803 rows). Salem QGIS project delivered at `tools/qgis-project/salem-gis.qgz` (13 layers inc. 1,830 LMA POIs with category icons at scale ≤ 1:1000). Cemetery-GPS-per-person path: RadioLogger field capture, not LMA. Salem walking-router design captured in live log (exploratory only, not committed).
 
 ---
 
