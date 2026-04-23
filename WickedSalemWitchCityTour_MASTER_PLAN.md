@@ -1976,63 +1976,64 @@ Salem session 044 (2026-04-07) added the newspaper corpus per OMEN-S004. Schema 
 
 ---
 
-## Phase 9Y — TigerLine + MassGIS Foundation (Added S156)
+## Phase 9Y — MassGIS + TigerLine Overlay Integration (Added S156, re-scoped S157)
 
-**Goal:** Replace the osmdroid + OpenStreetMap/Esri substrate with a TigerLine (US Census TIGER/Line 2025) + MassGIS (~198 MA-authoritative layers) foundation rendered via MapLibre Native. POIs evolve from lat/lng points to building-footprint polygons with joined MHC Historic Inventory records, canonical address-point anchors, and a real pedestrian routing graph (TIGER EDGES + MassGIS trails + OSM footways). All bundled offline.
+> **⚠️ S157 AMENDMENT (2026-04-22).** The original S156 scope was to retire osmdroid, adopt MapLibre Native, and bundle TigerLine-produced vector + Sanborn raster tile packs as the base-map substrate. **Operator reversed that decision on 2026-04-22.** OSM + osmdroid **stay** as V1's base map; MassGIS and TigerLine data are consumed as **overlays only** (osmdroid `Polygon` / `Polyline` / `Marker`). Sub-steps 9Y.5 (MapSurface abstraction) / 9Y.6 (MBTiles consumer) / 9Y.7 (per-overlay port) / 9Y.8 (osmdroid ripout) are **STRUCK**. The data-side sub-steps — ingest, schema, enrichment, routing graph reader, polygon geofence runtime — remain valid and active. Project memory `project_osm_stays_as_basemap.md` codifies the reversal.
 
-**Target:** 10 sub-steps, ~12-20 sessions. **Status:** STARTED (S156, PG schema extended). **Priority:** FOUNDATION — precedes 9Q / 9R / 10. **Plan:** `docs/tigerline-integration-plan.md`. **Discovery:** `docs/tigerline-integration-discovery.md`.
+**Goal (re-scoped):** Enrich Salem POIs with MassGIS / TigerLine data — building-footprint polygons, MHC Historic Inventory attributes, L3 parcel/assessor linkage, historic-district membership, cemetery polygons — and render selected overlays on top of the existing osmdroid + OSM base map. Pedestrian routing graph from TIGER EDGES + OSM footways still ships bundled.
 
-### Why before 9Q / 9R / 10
+**Target:** 6 sub-steps (trimmed from 10), ~6-10 sessions. **Status:** IN PROGRESS (S157 L3 ingest). **Priority:** precedes 9Q / 9R / 10. **Plan:** `docs/tigerline-integration-plan.md` (historical — see S157 amendment banner). **Discovery:** `docs/tigerline-integration-discovery.md`.
 
-Operator's 2026-04-21 direction: *"V1 scope = everything. This is the foundation we will use to base all of our foundational mapping and LMA will need to evolve to use it. I want OSM maps and things using it to go away before V1."* Phases 9Q (Salem Domain Content Bridge) and 9R (Historic Tour Mode) become consumers of this substrate rather than parallel tracks. Phase 10's offline-tile item (10.3) is subsumed by 9Y.6.
-
-### Sub-step sequence (10 steps)
+### Sub-step sequence (post-S157)
 
 | Step | Scope | Status | Blocks on |
 |---|---|---|---|
 | **9Y.0** | Step 0 discovery pass (data audit, year slate, scope deltas) | DONE (S156) | — |
-| **9Y.1** | TigerLine ingest pipeline (`cache-proxy/scripts/ingest-tigerline/` — MassGIS priority; MHC inventory, building footprints, address points, historic districts, cemeteries, then TIGER EDGES / cousub / arealm) | BLOCKED | TigerLine's Phase 2 unblock + MassGIS layers live |
+| **9Y.1** | MassGIS / TigerLine local-PG ingest. L3 Parcels + L3 Assess for Essex County landed S157 (`massgis.l3_parcels_essex` 366k polygons / `massgis.l3_assess_essex` 429k rows) via `cache-proxy/scripts/ingest-l3-parcels-essex.py`. Other layers (structures, mhc_inventory, landuse2005, tiger.edges, tiger.arealm) already present in local `tiger` PG DB from TigerLine's import. | PARTIAL (S157) | Optional: TigerLine re-runs MassGIS collector statewide / Salem-slice SpatiaLite for faster-than-JOIN access |
 | **9Y.2a** | PG schema extension — add 9 nullable columns to `salem_pois` (building_footprint_geojson, mhc_*, canonical_address_point_id, local_historic_district, parcel_owner_class) | DONE (S156) | — |
 | **9Y.2b** | Kotlin SalemPoi + Room v8→v9 bump + identity-hash cascade (verify-bundled-assets + bundle scripts + publish-salem-pois) + rebake + Lenovo uninstall+install verify | NEXT | — |
-| **9Y.3** | Cross-join enrichment script (`enrich-pois-from-tigerline.js`) — for each POI, resolve to address_points / structures_poly / mhc_inventory / local_historic_dist and populate the new columns | BLOCKED | 9Y.1 |
+| **9Y.3** | Cross-join enrichment script (`cache-proxy/scripts/enrich-pois-from-massgis.js`) — for each of ~459 historic/civic/parks/worship/education POIs, resolve against: `massgis.structures` (building footprint) · `massgis.mhc_inventory` (year_built / style / NR status) · `massgis.l3_parcels_essex` + `massgis.l3_assess_essex` (LOC_ID / owner class / assessor year / use_code) · `massgis.landuse2005` where lu05_desc='Cemetery' · `tiger.arealm` K2582 (cemetery fallback). Populate the 9 Phase 9Y.2a columns. Preview subset first. | BLOCKED | 9Y.2b (columns surfaced to app via Room v9) |
 | **9Y.4** | Binary pedestrian graph reader + DijkstraRouter in Kotlin. Test against synthetic graph first, real data later. | PARALLEL-READY | TigerLine delivers the binary graph for real use |
-| **9Y.5** | MapLibre Native Android Gradle add + `MapSurface` abstraction + `OsmdroidMapSurface` + `MapLibreMapSurface` skeleton + `FeatureFlags.MAPLIBRE_RENDERER` flag. Both renderers coexist during the port. | PARALLEL-READY | — |
-| **9Y.6** | MBTiles base vector tileset consumer — `TileSourceManager.kt` rewrite to point MapLibre at TigerLine-produced MBTiles | BLOCKED | TigerLine delivers MBTiles |
-| **9Y.7** | Per-overlay port (12+ overlays) from osmdroid to MapLibre — base map + zoom, POI markers, GPS journey polyline, tour route, numbered tour stops, location ball, debug geofence rings, TFR/camera/school/flood polygons, radar tile animation, new building footprints, historic districts, MHC-tagged buildings | BLOCKED | 9Y.5 complete |
-| **9Y.8** | Osmdroid ripout (remove all 3 Gradle deps, delete OsmdroidMapSurface, delete salem_tiles.sqlite asset, replace core/GeoPoint with LmaGeoPoint) | BLOCKED | 9Y.7 fully verified on Lenovo |
+| **9Y.5** | ~~MapLibre Native Gradle add + MapSurface abstraction + renderer flag~~ — **STRUCK S157** | CANCELLED | — |
+| **9Y.6** | ~~MBTiles base vector tileset consumer~~ — **STRUCK S157** | CANCELLED | — |
+| **9Y.7** | ~~Per-overlay port (12+ overlays) from osmdroid to MapLibre~~ — **STRUCK S157** | CANCELLED | — |
+| **9Y.8** | ~~Osmdroid ripout~~ — **STRUCK S157** | CANCELLED | — |
 | **9Y.9** | Polygon geofence runtime — `NarrationGeofenceManager.checkPosition()` gains `pointInPolygon()` branch when `geofence_shape == "polygon"`. Circle fallback preserved for POIs without building footprints. | PARALLEL-READY (synthetic test data) | — |
+| **9Y.Overlay** | osmdroid overlay layer for MassGIS data — building footprints (on narrated historic POIs), cemetery polygons (from `landuse2005`), MHC historic-district boundaries, optional parcel-boundary toggle. Uses osmdroid `Polygon` / `Polyline` — no new renderer. Replaces the spirit of the struck 9Y.6/9Y.7. | READY (after 9Y.3 populates the data) | 9Y.3 |
 | **9Y.10** | ~~Admin tool polygon editor~~ — OUT of V1 per operator S156. Admin tool stays point-only. Polygons flow one-way from MassGIS → PG → Room. | REMOVED | — |
 
 ### Out of scope (V2 follow-ons)
 
-- Live SQL against `tiger.*` / `massgis.*` (brief §9.1d) — requires backend connectivity; V1 is offline-only
-- Multi-city generalization (brief §9.3) — Salem-specific only for V1
-- Phase 10 "Cartoon Cartography" styled MBTiles — ships provisional functional style for V1; polished style post-launch
-- Admin polygon editor (see 9Y.10 above)
+- Live SQL against `tiger.*` / `massgis.*` from the app — requires backend connectivity; V1 is offline-only. Enrichment happens at publish time.
+- Multi-city generalization (brief §9.3) — Salem-specific only for V1.
+- MapLibre renderer adoption — deferred indefinitely. osmdroid's overlay API covers V1 needs.
+- Admin polygon editor (see 9Y.10 above).
 
 ### Verification (end-to-end)
 
-The "Three-Hour Salem Walking Tour" (brief §8.1) on the Lenovo, airplane mode, start-to-finish. Every stop highlights its building polygon, narrates from MHC data, routes over real pedestrian paths. `verify-bundled-assets.js` wired into Gradle preBuild.
+Salem Heritage Trail on the Lenovo, airplane mode, start-to-finish. Narrated historic POIs highlight their building polygon overlay. Narration pulls from MHC year_built / style. Cemetery polygons visible when zoomed in. `verify-bundled-assets.js` wired into Gradle preBuild with v9 identity hash.
 
 ### OMEN coordination
 
-S156 filed `~/Development/OMEN/reports/locationmapapp/S156-tigerline-asks-2026-04-21.md` with 7 asks to TigerLine (unblock Phase 2, prioritize MassGIS, produce 7a/7b/7c, confirm tile ownership, projection conventions) and 4 to SalemIntelligence (historical-tile ownership decision, confirm V1 Sanborn year slate 1890/1906/1950/1957, manifest stability, close stale 503/509 reference).
+S156 filed `~/Development/OMEN/reports/locationmapapp/S156-tigerline-asks-2026-04-21.md`. **Needs S157 amendment** before OMEN actions it — items about TigerLine tile ownership / MapLibre / base-map generation are now obsolete. Items about MassGIS ingest completion, L3 parcel delivery in Salem-slice bundle form, MHC inventory completeness, and historical-maps georeferencing (now for osmdroid TilesOverlay) remain relevant.
 
 ---
 
-## Phase 9Z — Historical Maps Time-Slider (Added S156)
+## Phase 9Z — Historical Maps Time-Slider (Added S156, re-scoped S157)
+
+> **⚠️ S157 AMENDMENT (2026-04-22).** Delivery mechanism changed from MapLibre-rendered MBTiles to **osmdroid `TilesOverlay` with XYZ-tiled Sanborn rasters**, consistent with the S157 decision to keep osmdroid as the V1 base map. Year slate unchanged. Georectification ownership (TigerLine vs SI vs self) still open.
 
 **Goal:** Add a "go back in time on the map" feature backed by the SalemIntelligence public-domain historical maps corpus (509 items at `~/Development/SalemIntelligence/data/historical_maps/`). User drags a time-slider to scrub between Salem as it looked in **1890, 1906, 1950, 1957** (four Sanborn Fire Insurance atlases, 300 sheets total) and today. Narration is time-aware: POIs suppress when the slider is on a year before they existed.
 
-**Target:** 4 sub-steps, ~6-10 sessions. **Status:** PLANNED. **Priority:** after 9Y.5-9Y.7. **Plan:** `docs/tigerline-integration-plan.md`.
+**Target:** 4 sub-steps, ~5-8 sessions (simpler than the MapLibre plan). **Status:** PLANNED. **Priority:** after 9Y.2b/9Y.3. **Plan:** `docs/tigerline-integration-plan.md` (see S157 amendment banner).
 
-### Sub-step sequence
+### Sub-step sequence (post-S157)
 
 | Step | Scope | Status | Blocks on |
 |---|---|---|---|
-| **9Z.1** | Georectification + MBTiles generation — OWNED by TigerLine or SI per S156 OMEN decision. Per-year MBTiles for 1890, 1906, 1950, 1957 from LoC IIIF bbox metadata. LMA consumes. | BLOCKED | Upstream (TigerLine or SI) decision + delivery |
-| **9Z.2** | Client-side `TimeSliderView.kt` — bottom-sheet slider with year tick marks (1890, 1906, 1950, 1957, today). Drives `MapLibreMapSurface.setHistoricalYear()`. Crossfades raster layers. | READY after 9Y.5 | — |
-| **9Z.3** | Ghost-street / lost-building overlay (per vision brief §7.2) — MHC records with "no longer extant" flag render as sepia overlays at their historical-year setting. | V2-slip if scope pressure | 9Y.3 (MHC data landed) |
+| **9Z.1** | Georectification + XYZ-tile generation — OWNED by TigerLine, SI, or self (open). Per-year XYZ tile pyramids (z13–19) for 1890, 1906, 1950, 1957 from LoC IIIF bbox metadata. LMA consumes as on-disk tile archive or sqlite MBTiles via osmdroid's `MBTilesFileArchive`. | BLOCKED | Ownership + delivery |
+| **9Z.2** | Client-side `TimeSliderView.kt` — bottom-sheet slider with year tick marks (1890, 1906, 1950, 1957, today). Drives a `HistoricalTilesOverlay` wrapping osmdroid's `TilesOverlay`. Crossfades between years via overlay alpha. | READY | — |
+| **9Z.3** | Ghost-street / lost-building overlay — MHC records with "no longer extant" flag render as sepia osmdroid `Polygon` overlays at their historical-year setting. | V2-slip if scope pressure | 9Y.3 (MHC data landed) |
 | **9Z.4** | Narration integration — `year_built` / `year_demolished` fields gate narration triggers by slider state. Modern-expansion POIs suppress at 1890; demolished POIs narrate at their original year. | READY | 9Y.3 |
 
 ### V1 year slate (finalized S156)

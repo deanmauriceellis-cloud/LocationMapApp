@@ -37,6 +37,9 @@ tools/hero-image-gen/output/
 tools/hero-image-gen/hero-prompts.json
 tools/hero-image-gen/__pycache__/
 
+# Cache-proxy intermediate outputs (S157 L3 ingest NDJSON ~920 MB, logs, checkpoints)
+cache-proxy/out/
+
 # Bake test logs — large, regenerable
 docs/bake-tests/
 

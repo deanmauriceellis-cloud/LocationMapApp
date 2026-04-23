@@ -1,5 +1,25 @@
 # Plan: TigerLine + MassGIS Foundation + Historical Time-Slider (Phases 9Y + 9Z)
 
+> **⚠️ S157 AMENDMENT — 2026-04-22. Architectural reversal.**
+>
+> This plan was approved on 2026-04-21 with a **"retire osmdroid, adopt MapLibre Native, bundle TigerLine-produced base tiles"** foundation. On 2026-04-22 the operator reversed that decision: **OSM + osmdroid stay as V1's base map. MassGIS and TigerLine data are consumed as overlays only, rendered via osmdroid `Polygon` / `Polyline` / `Marker`.**
+>
+> Sections of this plan that are **no longer active:**
+> - **D1 Renderer decision** (MapLibre Native) — CANCELLED. osmdroid remains.
+> - **D2 Offline delivery shape "Base MBTiles" and "Historical MBTiles" bundle rows** — CANCELLED for V1. Historical maps now ship as XYZ-tile / MBTiles archives consumed by osmdroid's `TilesOverlay`, not by a new renderer.
+> - **D3 TigerLine's delivery contract item 3 (Salem base MBTiles)** — no longer needed for V1. Items 1, 2, 4 (SpatiaLite bundle, routing graph, historical XYZ tiles) remain relevant.
+> - Any Phase 9Y sub-step referring to MapLibre, `MapSurface` abstraction, per-overlay port, or osmdroid ripout — all STRUCK. See the master plan (`WickedSalemWitchCityTour_MASTER_PLAN.md` Phase 9Y) for the trimmed, post-S157 sub-step list.
+>
+> Sections of this plan that remain **ACTIVE:**
+> - D2 Spatial DB bundle row — enrichment + Room v9 columns still ship.
+> - D2 Pedestrian routing graph row — TIGER EDGES + OSM footways bundled still applies.
+> - TigerLine / MassGIS ingest intent, data-model design, join keys, enrichment pipeline sketch.
+> - Phase 9Z year slate (1890 / 1906 / 1950 / 1957 Sanborn).
+>
+> Project memory `project_osm_stays_as_basemap.md` is the canonical record of the reversal. This plan is retained for historical context and for the parts still in force — do not use its D1/D2-MBTiles sections as guidance.
+
+---
+
 ## Context
 
 **Why this is happening now.** TigerLine (sibling project, `~/Research/TigerLine/`) has published a vision brief (`docs/tigerline-salem-tour-reimagined.md`, 937 lines, 2026-04-21) proposing that LMA adopt TIGER/Line 2025 + MassGIS as the ground-truth geometric substrate for the Salem tour. The operator has committed V1 scope: **everything in the brief + a "go back in time on the map" feature sourced from the 5.2 GB of public-domain historical maps SalemIntelligence (`~/Development/SalemIntelligence/data/historical_maps/`) has already catalogued**.

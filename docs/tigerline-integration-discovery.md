@@ -1,8 +1,17 @@
 # TigerLine + MassGIS Integration — Step 0 Discovery Report
 
-**Authored:** 2026-04-21 (LMA Session 156)
+> **⚠️ S157 AMENDMENT — 2026-04-22.** This discovery report is still factually accurate about TigerLine's mid-import state, MassGIS layer inventory, and SI historical-maps corpus. However, the **implementation conclusions** assume an osmdroid→MapLibre renderer port that has since been CANCELLED. Specifically:
+> - The "parallel tracks" paragraph's mention of MapLibre Gradle add / MapSurface abstraction is struck.
+> - Any recommendation to consume MassGIS via MBTiles as a base-map substrate is struck — MassGIS is now consumed as overlay features via osmdroid's Polygon/Polyline/Marker APIs.
+> - S157 ingested **MassGIS L3 Parcels + L3 Assess for Essex County** directly into the local `tiger` PG DB (`massgis.l3_parcels_essex` 366k polygons, `massgis.l3_assess_essex` 429k rows) via `cache-proxy/scripts/ingest-l3-parcels-essex.py` — bypassing the need to wait on TigerLine's Phase 2 unblock for parcel data.
+>
+> Project memory `project_osm_stays_as_basemap.md` is the canonical record of the reversal. The TigerLine and SI data inventories below remain authoritative.
+
+---
+
+**Authored:** 2026-04-21 (LMA Session 156). **S157 amendment added:** 2026-04-22.
 **Scope:** Pre-implementation audit of what the TigerLine project and SalemIntelligence's historical-maps corpus actually contain today. Drives sub-step ordering for Phase 9Y + 9Z.
-**Companion plan:** `~/.claude/plans/foamy-swimming-teacup.md` (operator-approved 2026-04-21).
+**Companion plan:** `~/.claude/plans/foamy-swimming-teacup.md` (operator-approved 2026-04-21, superseded by S157 amendment above).
 
 ---
 
