@@ -134,7 +134,16 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   is_tour_poi INTEGER NOT NULL,
   is_narrated INTEGER NOT NULL,
   default_visible INTEGER NOT NULL,
-  has_announce_narration INTEGER NOT NULL DEFAULT 0
+  has_announce_narration INTEGER NOT NULL DEFAULT 0,
+  building_footprint_geojson TEXT,
+  mhc_id TEXT,
+  mhc_year_built INTEGER,
+  mhc_style TEXT,
+  mhc_nr_status TEXT,
+  mhc_narrative TEXT,
+  canonical_address_point_id TEXT,
+  local_historic_district TEXT,
+  parcel_owner_class TEXT
 )`;
 
 // Update Room version hash table
@@ -172,7 +181,10 @@ async function main() {
         related_figure_ids, related_fact_ids, related_source_ids,
         data_source, confidence,
         is_tour_poi, is_narrated, default_visible,
-        has_announce_narration
+        has_announce_narration,
+        building_footprint_geojson, mhc_id, mhc_year_built,
+        mhc_style, mhc_nr_status, mhc_narrative,
+        canonical_address_point_id, local_historic_district, parcel_owner_class
       FROM salem_pois
       WHERE deleted_at IS NULL
       ORDER BY category, priority, name
@@ -230,7 +242,10 @@ async function main() {
       related_figure_ids, related_fact_ids, related_source_ids,
       data_source, confidence,
       is_tour_poi, is_narrated, default_visible,
-      has_announce_narration
+      has_announce_narration,
+      building_footprint_geojson, mhc_id, mhc_year_built,
+      mhc_style, mhc_nr_status, mhc_narrative,
+      canonical_address_point_id, local_historic_district, parcel_owner_class
     ) VALUES (
       @id, @name, @lat, @lng, @address, @status, @category, @subcategory,
       @short_narration, @long_narration,
@@ -248,7 +263,10 @@ async function main() {
       @related_figure_ids, @related_fact_ids, @related_source_ids,
       @data_source, @confidence,
       @is_tour_poi, @is_narrated, @default_visible,
-      @has_announce_narration
+      @has_announce_narration,
+      @building_footprint_geojson, @mhc_id, @mhc_year_built,
+      @mhc_style, @mhc_nr_status, @mhc_narrative,
+      @canonical_address_point_id, @local_historic_district, @parcel_owner_class
     )
   `);
 
@@ -314,6 +332,15 @@ async function main() {
         is_narrated: r.is_narrated ? 1 : 0,
         default_visible: r.default_visible !== false ? 1 : 0,
         has_announce_narration: r.has_announce_narration ? 1 : 0,
+        building_footprint_geojson: r.building_footprint_geojson || null,
+        mhc_id: r.mhc_id || null,
+        mhc_year_built: r.mhc_year_built || null,
+        mhc_style: r.mhc_style || null,
+        mhc_nr_status: r.mhc_nr_status || null,
+        mhc_narrative: r.mhc_narrative || null,
+        canonical_address_point_id: r.canonical_address_point_id || null,
+        local_historic_district: r.local_historic_district || null,
+        parcel_owner_class: r.parcel_owner_class || null,
       });
     }
   });

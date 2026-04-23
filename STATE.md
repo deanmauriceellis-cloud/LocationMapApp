@@ -2,38 +2,33 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-23 — Session 158 closed. Shipped third offline basemap provider `Salem-Custom` (label "Witchy") alongside Satellite + Mapnik. Full custom-tile-baking pipeline at `tools/tile-bake/` (planetiler + tippecanoe + maplibre-gl-native headless + curated `style-salem.json`, WebP lossless output). Parchment palette, tiered-purple historic buildings (NHL / NRIND / NRDIS / LHD) from MHC Inventory joined to 39,408 MassGIS structures, parcel outlines from L3 Essex (32,727), cemetery + monument + place-of-worship labels, no commercial POI clutter. Block-rendered with 1-tile buffer to eliminate tile seams. Bundle: 206 MB total / 17,777 tiles / three providers. Previous context: S157 OSM-stays pivot + L3 ingest + QGIS project remains foundation.
+**Last updated:** 2026-04-23 — Session 159 closed. Phase 9Y.2b identity-hash cascade complete: SalemPoi.kt + SalemContentDatabase.kt + 3 cache-proxy scripts carried the 9 MassGIS/MHC/L3 nullable columns (building_footprint_geojson, mhc_id/year_built/style/nr_status/narrative, canonical_address_point_id, local_historic_district, parcel_owner_class) through to v9 schema. New Room identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`. Rebaked `salem_content.db` (1,830 POIs, 8.9 MB), Lenovo TB305FU smoke-test passes cleanly — Room opens, DAO queries return rows, narration state machine runs, no SQLite errors. All 9 new columns are NULL until 9Y.3 enrichment populates them. Previous context: S158 Witchy tile bake pipeline at `tools/tile-bake/`, three-provider 206 MB archive (now device-pushed, not in APK).
 
 ---
 
-## TOP PRIORITY — Next Session (S158)
+## TOP PRIORITY — Next Session (S160)
 
-**S157 pivot (2026-04-22):** OSM + osmdroid stay as V1 base map. MassGIS + TigerLine become **overlays only**. MapLibre port, osmdroid ripout, TigerLine tile bundling are CANCELLED. See `project_osm_stays_as_basemap.md` memory.
+**S157 pivot (2026-04-22) still in force:** OSM + osmdroid stay as V1 base map. MassGIS + TigerLine become **overlays only**. MapLibre port, osmdroid ripout, TigerLine tile bundling are CANCELLED. See `project_osm_stays_as_basemap.md` memory.
 
-1. **Phase 9Y.2b — Kotlin + Room v8→v9 bump (identity-hash cascade).** PG schema extended at S156 with 9 nullable columns (building_footprint_geojson, mhc_*, canonical_address_point_id, local_historic_district, parcel_owner_class). The cascade is mechanical:
-   - Edit `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/content/model/SalemPoi.kt` — add 9 matching nullable fields
-   - Edit `app-salem/src/main/java/com/example/wickedsalemwitchcitytour/content/db/SalemContentDatabase.kt` — `version = 8` → `version = 9`
-   - Build debug APK; extract new identity_hash from `build/generated/ksp/debug/java/.../SalemContentDatabase_Impl.java`
-   - Update `cache-proxy/scripts/verify-bundled-assets.js` (v8 const → v9 const)
-   - Update `cache-proxy/scripts/bundle-witch-trials-newspapers-into-db.js` (v8 const → v9 const)
-   - Update `cache-proxy/scripts/publish-salem-pois.js` — add 9 columns to CREATE_TABLE_SQL + SELECT + INSERT
-   - Rebake, verify on Lenovo (uninstall+install per `feedback_adb_install_after_db_rebake.md`)
+1. **Phase 9Y.3 — Cross-join enrichment script.** `cache-proxy/scripts/enrich-pois-from-massgis.js` — for each of ~459 historic/civic/parks/worship/education POIs, resolve against: `massgis.structures` (building footprint), `massgis.mhc_inventory` (year_built / style / NR status / narrative), `massgis.l3_parcels_essex` + `massgis.l3_assess_essex` (LOC_ID / owner class / assessor year_built / use_code), `massgis.landuse2005` (cemeteries). Populate the 9 new columns (Kotlin + publish-script ready as of S159). Preview subset first, then full run and `publish-salem-pois.js` + `bundle-witch-trials-*` to bundle.
 
-2. **Phase 9Y.3 — Cross-join enrichment script.** `cache-proxy/scripts/enrich-pois-from-massgis.js` — for each of ~459 historic/civic/parks/worship/education POIs, resolve against: `massgis.structures` (building footprint), `massgis.mhc_inventory` (year_built / style / NR status), `massgis.l3_parcels_essex` + `massgis.l3_assess_essex` (LOC_ID / owner class / assessor year_built / use_code), `massgis.landuse2005` (cemeteries). Populate the 9 new columns. Preview subset first.
+2. **Phase 9Y.9 — Polygon geofence runtime.** Extend `NarrationGeofenceManager.checkPosition()` with `pointInPolygon()` branch when `geofence_shape == "polygon"`. Synthetic test data first, then real MassGIS footprint polygons once 9Y.3 lands. Osmdroid `Polygon` overlay renders the shape visually.
 
-3. **Phase 9Y.9 — Polygon geofence runtime.** Extend `NarrationGeofenceManager.checkPosition()` with `pointInPolygon()` branch when `geofence_shape == "polygon"`. Synthetic test data first, then real MassGIS footprint polygons once 9Y.3 lands. Osmdroid `Polygon` overlay renders the shape visually.
+3. **osmdroid overlay rendering (9Y.Overlay).** Add a MassGIS overlay layer to the existing osmdroid map: building footprints (for narrated historic POIs), parcel boundaries (optional toggle), cemetery polygons, MHC historic district boundaries. Uses osmdroid `Polygon` / `Polyline` — no renderer change. Option B confirmed by operator in S158 (dynamic overlays, ~2-8 MB subset bundle).
 
-4. **osmdroid overlay rendering (new sub-step 9Y.Overlay).** Add a MassGIS overlay layer to the existing osmdroid map: building footprints (for narrated historic POIs), parcel boundaries (optional toggle), cemetery polygons, MHC historic district boundaries. Uses osmdroid `Polygon` / `Polyline` — no renderer change. Scope this session or next.
+4. **Witchy tile bake bbox extension OR no-coverage UX hint (NEW from S159).** Operator home in Beverly (42.5567, -70.8717) is north of the S158 bake bbox max lat 42.545 → grey osmdroid grid when running the app from home with `bypassBboxClamp=true`. Either (a) extend Witchy + Mapnik + Esri bakes to cover Beverly, or (b) show a "pan south to Salem" hint when the viewport has no tile coverage at the current provider. Per-provider bbox audit owed — run `sqlite3 tools/tile-bake/dist/salem_tiles.sqlite` query to confirm per-provider coverage before deciding.
 
-5. **COUNSEL RESPONSE WATCH (async, unchanged from S155).** When retainer letter arrives, email Tier 2 PDF + reassess 12 A7 decisions. Parked.
+5. **`verify-bundled-assets.js` S158-catchup (NEW from S159).** Script still checks `app-salem/src/main/assets/salem_tiles.sqlite` but tiles are now pushed to `/storage/emulated/0/Android/data/<pkg>/files/salem_tiles.sqlite` (moved out of APK in S158). Script now fails on every build. Redirect the check to `tools/tile-bake/dist/salem_tiles.sqlite` (dev-side) or drop the check entirely.
 
-6. **Form TX copyright registration ($65) — Hard deadline 2026-05-20, 28 days.** Unblocked by counsel. Operator-owed.
+6. **COUNSEL RESPONSE WATCH (async, unchanged from S155).** When retainer letter arrives, email Tier 2 PDF + reassess 12 A7 decisions. Parked.
 
-7. **Task #9 — Find WebView buttons** (carry-forward from S154). Still owed. Scope: `SalemMainActivityFind.kt` `showPoiDetailDialog` has "Load Website" + "Reviews" buttons that open WebView (violates V1_OFFLINE_ONLY). Gate for stripped commercial categories.
+7. **Form TX copyright registration ($65) — Hard deadline 2026-05-20, 27 days.** Unblocked by counsel. Operator-owed.
 
-8. **Wire `verify-bundled-assets.js` into Gradle preBuild.** Still manual; needed before V1 ship. Also must handle v9 identity hash after 9Y.2b lands.
+8. **Task #9 — Find WebView buttons** (carry-forward from S154). Still owed. Scope: `SalemMainActivityFind.kt` `showPoiDetailDialog` has "Load Website" + "Reviews" buttons that open WebView (violates V1_OFFLINE_ONLY). Gate for stripped commercial categories.
 
-9. **APK-size pre-Play-Store audit.** `poi-icons/` 544 MB is next target (downsize to 256×256 / WebP q=75). Tile bundle pressure lifted — no TigerLine/Sanborn raster packs in V1.
+9. **Wire `verify-bundled-assets.js` into Gradle preBuild.** Still manual; needed before V1 ship. (After #5 above: the catch-up fix must land first or preBuild fails every run.)
+
+10. **APK-size pre-Play-Store audit.** `poi-icons/` 544 MB is next target (downsize to 256×256 / WebP q=75). Tile bundle pressure lifted — no TigerLine/Sanborn raster packs in V1.
 
 **Deferred from S155/S156 carry-forward:**
 - Real outdoor field walk (S150 fixes 1/3 validation) — valuable but not blocking
@@ -93,7 +88,7 @@
 |---|---|---|
 | 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
 | **9P.A / 9P.B / 9U / 9X** | COMPLETE | Admin UI, unified POI table, Witch Trials feature |
-| **9Y** MassGIS+TigerLine Overlay Integration (re-scoped S157) | **IN PROGRESS (S157)** | L3 parcels + assess ingested (366k + 429k rows). PG schema extended S156. Next: Kotlin/Room v9 bump, enrichment script, polygon geofence runtime, osmdroid overlay rendering. MapSurface/MapLibre/ripout CANCELLED. |
+| **9Y** MassGIS+TigerLine Overlay Integration (re-scoped S157) | **IN PROGRESS (S159)** | L3 parcels + assess ingested (366k + 429k rows, S157). PG schema extended S156. **S159: Kotlin/Room v8→v9 cascade complete — salem_content.db v9 `4ec9ae3528d8f55529cd6875c7b0adef`, Lenovo-verified.** Next: 9Y.3 enrichment script to populate the 9 columns; 9Y.9 polygon geofence runtime; 9Y.Overlay osmdroid dynamic overlays. MapSurface/MapLibre/ripout CANCELLED. |
 | **9Z** Historical Maps Time-Slider (re-scoped S157) | **PLANNED** | V1 year slate: 1890, 1906, 1950, 1957 Sanborn. Rides on osmdroid `TilesOverlay` (not MapLibre). SI or self-georeferenced rasters as XYZ tiles. |
 | **9Q** Salem Domain Content Bridge | DEFERRED — now consumes 9Y overlay data | building→POI translation, 425 buildings, 202 newspapers. |
 | **9R** Historic Tour Mode | DEFERRED — now consumes 9Y overlay data | opt-in chapter-based 1692 tour. Feeds off Phase 9Z time-slider. |
@@ -102,7 +97,7 @@
 | **Cross-project** TigerLine | **PHASE 2 STALLED (2026-04-21)** | 65.7M edges + 35.5M addrs in their PG. LMA no longer blocked on tile delivery (cancelled). Still desirable: MassGIS ingest completion, Salem slice SpatiaLite bundle for the enrichment script. |
 | **Cross-project** SalemIntelligence | **Phase 1 KB LIVE** at :8089 | S156 SI-rewrite absorbed (1,400 POIs refreshed). 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 157. Salem 400+ target 2026-09-01 now aspirational — operator has committed to quality over schedule.
+**Sessions completed:** 159. Salem 400+ target 2026-09-01 now aspirational — operator has committed to quality over schedule.
 
 ---
 

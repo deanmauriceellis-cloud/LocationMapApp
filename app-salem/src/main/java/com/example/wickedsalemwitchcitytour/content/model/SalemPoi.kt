@@ -112,5 +112,18 @@ data class SalemPoi(
      * check at enqueue time; this column is for reports, admin-tool
      * filtering, and future bulk-generation targeting.
      */
-    @ColumnInfo(name = "has_announce_narration") val hasAnnounceNarration: Boolean = false
+    @ColumnInfo(name = "has_announce_narration") val hasAnnounceNarration: Boolean = false,
+
+    // ── Phase 9Y — MassGIS / MHC Inventory / L3 parcel enrichment ──
+    // Populated by cache-proxy/scripts/enrich-pois-from-massgis.js (9Y.3).
+    // Consumers: polygon geofence runtime (9Y.9), MHC narrative UI, parcel-owner filters.
+    @ColumnInfo(name = "building_footprint_geojson") val buildingFootprintGeojson: String? = null,
+    @ColumnInfo(name = "mhc_id") val mhcId: String? = null,
+    @ColumnInfo(name = "mhc_year_built") val mhcYearBuilt: Int? = null,
+    @ColumnInfo(name = "mhc_style") val mhcStyle: String? = null,
+    @ColumnInfo(name = "mhc_nr_status") val mhcNrStatus: String? = null,
+    @ColumnInfo(name = "mhc_narrative") val mhcNarrative: String? = null,
+    @ColumnInfo(name = "canonical_address_point_id") val canonicalAddressPointId: String? = null,
+    @ColumnInfo(name = "local_historic_district") val localHistoricDistrict: String? = null,
+    @ColumnInfo(name = "parcel_owner_class") val parcelOwnerClass: String? = null
 )

@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 149-158. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 150-159. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 159: 2026-04-23 — Phase 9Y.2b Kotlin + Room v8→v9 identity-hash cascade
+
+Mechanical schema propagation for the 9 MassGIS/MHC/L3 columns that S156 added to PG. Added 9 nullable `@ColumnInfo` fields (`building_footprint_geojson`, `mhc_id/year_built/style/nr_status/narrative`, `canonical_address_point_id`, `local_historic_district`, `parcel_owner_class`) to `SalemPoi.kt`; bumped `SalemContentDatabase` version 8→9; extracted new Room identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`; updated `verify-bundled-assets.js` + `bundle-witch-trials-newspapers-into-db.js` constants; threaded the 9 columns through `publish-salem-pois.js` (CREATE_TABLE + SELECT + INSERT + transaction binding); rebaked `salem_content.db` (1,830 POIs, 8.9 MB); Lenovo TB305FU uninstall+install smoke-test passed cleanly (app launches, POI markers render, narration state machine active, zero SQLite/Room errors). 9Y.3 enrichment script is now unblocked. Pre-existing issue surfaced: `verify-bundled-assets.js` still checks the pre-S158 in-APK `salem_tiles.sqlite` location and fails on every build. Post-session discovery: operator's home GPS in Beverly falls outside the S158 Witchy bake bbox (max lat 42.545 vs Beverly 42.557), so the bundled tiles don't cover the operator's home location — candidate fix for next session is extending bake bounds or adding a UX hint.
+
+Full session detail: `docs/session-logs/session-159-2026-04-23.md`. Commit: pending.
+
+---
 
 ## Session 158: 2026-04-23 — Custom "Witchy" basemap tile bake (third offline tile source)
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-150-2026-04-18.md`. Commit: `5c8
 
 ---
 
-## Session 149: 2026-04-18 — Splash TTS warm-start, businesses narration gate, SI coord sync, Use-Real-GPS override
-
-Pivoted #44 splash voiceover from cat sounds to runtime Android TTS (welcome line "Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App") — new process-scoped `SplashVoice` warms up the TTS engine in `WickedSalemApp.onCreate`, SplashActivity holds the visual splash until `UtteranceProgressListener.onDone` fires (15 s safety cap). Fixed AutoZone narrating at cold-start by gating `enqueueNarration` on the existing S145 `AudioControl` group system and flipping the Businesses toggle default to OFF. Pulled 18 corrected coordinates from SalemIntelligence (all 10 phantom-Samantha POIs relocated to their real positions; Starbird Dispensary moved 1.8 km, AutoZone 2.2 km) via new `sync-coords-from-intel.js`, then soft-deleted 7 Samantha-cluster junk duplicates. Added a "Use Real GPS Outside Salem" toggle to the Journey menu so operator can follow real GPS during drives from Beverly → Salem; setter re-emits `_currentLocation` via `requestLastKnownLocation()` for instant map refresh. Session closed with operator heading out on a field test — S150 will debug the tour log.
-
-Full session detail: `docs/session-logs/session-149-2026-04-18.md`. Commit: `dff701a`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 148 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 149 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S149 rolled to archive 2026-04-23 by the session-end protocol (S159) -->
 <!-- S148 rolled to archive 2026-04-23 by the session-end protocol (S158) -->
 
 

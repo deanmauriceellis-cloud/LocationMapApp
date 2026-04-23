@@ -23,7 +23,7 @@ const Database = require('better-sqlite3');
 
 const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 
-const ROOM_IDENTITY_HASH_V8 = '458bb11df51a54f5284a03ef1d2913aa';
+const ROOM_IDENTITY_HASH_V9 = '4ec9ae3528d8f55529cd6875c7b0adef';
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -98,10 +98,10 @@ if (!fs.existsSync(CONTENT_DB)) {
     const master = db.prepare('SELECT identity_hash FROM room_master_table WHERE id=42').get();
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
-    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V8) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V8} (v8)`);
+    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V9) {
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V9} (v9)`);
     } else {
-      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v8)`);
+      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v9)`);
     }
   } catch (e) {
     fail(`salem_content.db: open/query failed: ${e.message}`);
