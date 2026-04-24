@@ -8,7 +8,7 @@
 
 Recovering from killed S165; committed all S165 work alongside S166. Fixed two gaps that made type-searches like "dentist" find nothing: the per-token `when { }` scoring was exclusive (non-name fields never accumulated once any name tier fired), and there was no synonym coverage between "dentist" and "dental." Added `TYPE_SYNONYMS` map (35 entries: dentist→dental, lawyer→law/attorney, gym→fitness, coffee→cafe, doctor→medical/clinic, etc.), token expansion before per-token scoring, and non-name fields (subcat, cat, desc, hist, addr) now always accumulate independently.
 
-Full session detail: `docs/session-logs/session-166-2026-04-24.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-166-2026-04-24.md`. Commit: `578a3fa`.
 
 ---
 
