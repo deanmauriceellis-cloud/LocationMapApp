@@ -283,17 +283,8 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 proximityDock?.show()
                 // Also load narration point markers on the map
                 loadNarrationPointMarkers()
-                // S146 #27 — build POI index + wire the hero banner.
+                // S168 — banner removed; keep the POI-id index for other lookups.
                 activityRef.salemPoiIndex = points.associateBy { it.id }
-                if (activityRef.narrationHero == null) {
-                    activityRef.narrationHero = NarrationHero(
-                        activity = activityRef,
-                        mapView = activityRef.binding.mapView,
-                        narrationState = activityRef.tourViewModel.narrationState,
-                        poiLookup = { id -> activityRef.salemPoiIndex[id] }
-                    )
-                    DebugLogger.i("SalemMainActivity", "S146 #27 narration hero banner wired")
-                }
                 DebugLogger.i("SalemMainActivity", "Ambient narration ACTIVE: ${points.size} points, ${SalemCorridors.all().size} corridors — no tour selection required")
             } else {
                 DebugLogger.w("SalemMainActivity", "No narration points in database")
@@ -978,22 +969,32 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         // S125: stamp the min-hold clock here (at the actual play-start)
         // instead of at the top of enqueueNarration.
         lastPoiNarrationStartMs = System.currentTimeMillis()
-        // Phase 9R.0 / S150: chapter break via two separate TTS segments.
-        // The orientation hint always plays so the user gets an acknowledgment
-        // that they've arrived. The body plays only when STANDARD / DEEP
-        // produced text; BRIEF skips the body.
-        //
-        // S154: stripped POIs (non-licensed commercial) use the name+address
-        // announcement and skip the body entirely, regardless of detail level.
-        // No AI-synthesized narration is spoken for these.
-        val introText = if (stripped) {
-            PoiContentPolicy.strippedAnnouncement(point)
-        } else {
-            "You are at ${point.name}."
-        }
-        tourViewModel.speakTaggedHint("poi_narration", introText, point.name, voiceId)
-        if (!stripped && !rawText.isNullOrBlank()) {
-            tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
+        // S168 — one narration per visit. Priority (first match wins):
+        //   1. Stripped commercial POI → "You are near Name, at Address." (no body).
+        //   2. Historical / body text from getNarrationForPass — respects
+        //      historicalMode (historical_note) and detailLevel (long → short).
+        //   3. BRIEF fallback → "You are at {name}." orientation hint.
+        // Prior behavior played BOTH the "You are at X" hint AND the body,
+        // so every POI produced two back-to-back clips.
+        when {
+            stripped -> tourViewModel.speakTaggedHint(
+                "poi_narration",
+                PoiContentPolicy.strippedAnnouncement(point),
+                point.name,
+                voiceId,
+            )
+            !rawText.isNullOrBlank() -> tourViewModel.speakTaggedNarration(
+                "poi_narration",
+                rawText,
+                point.name,
+                voiceId,
+            )
+            else -> tourViewModel.speakTaggedHint(
+                "poi_narration",
+                "You are at ${point.name}.",
+                point.name,
+                voiceId,
+            )
         }
         updateQueueIndicator()
         refreshProximityDockFromQueue()
@@ -1190,17 +1191,30 @@ internal suspend fun SalemMainActivity.playNextNarration() {
         // the PLAY DIRECT path so bursts of ENTRY events can't keep sliding
         // the stamp forward via the old unconditional write.
         lastPoiNarrationStartMs = System.currentTimeMillis()
-        // Phase 9R.0 / S150 / S154: stripped POIs use the short "You are near
-        // Name, at Address" announcement and never play the body. Historic /
-        // licensed POIs play the orientation hint + body per detail level.
-        val introText = if (stripped) {
-            PoiContentPolicy.strippedAnnouncement(point)
-        } else {
-            "You are at ${point.name}."
-        }
-        tourViewModel.speakTaggedHint("poi_narration", introText, point.name, voiceId)
-        if (!stripped && !rawText.isNullOrBlank()) {
-            tourViewModel.speakTaggedNarration("poi_narration", rawText, point.name, voiceId)
+        // S168 — one narration per visit. Priority (first match wins):
+        //   1. Stripped commercial POI → "You are near Name, at Address." (no body).
+        //   2. Historical / body text from getNarrationForPass — respects
+        //      historicalMode (historical_note) and detailLevel (long → short).
+        //   3. BRIEF fallback → "You are at {name}." orientation hint.
+        when {
+            stripped -> tourViewModel.speakTaggedHint(
+                "poi_narration",
+                PoiContentPolicy.strippedAnnouncement(point),
+                point.name,
+                voiceId,
+            )
+            !rawText.isNullOrBlank() -> tourViewModel.speakTaggedNarration(
+                "poi_narration",
+                rawText,
+                point.name,
+                voiceId,
+            )
+            else -> tourViewModel.speakTaggedHint(
+                "poi_narration",
+                "You are at ${point.name}.",
+                point.name,
+                voiceId,
+            )
         }
     } else {
         DebugLogger.w("NARR-PLAY", "  → NOT speaking: autoPlay=$narrationAutoPlay")

@@ -77,7 +77,11 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SalemMainAc
  * the same address) individually tappable without any spiderfy UI. Drop
  * back to 19 if the pixelation ever feels worse than the marker-overlap.
  */
-internal const val MAP_MAX_OVERZOOM = 21.0
+internal const val MAP_MAX_OVERZOOM = 20.0
+/** S168 — Salem basemap only ships tiles for z16-19 (operator confirmed: "we
+ *  don't support zooms 1-13"). Lock the map floor to z14 so the slider, pinch,
+ *  and zoom buttons can't scroll into tile-less territory. */
+internal const val MAP_MIN_ZOOM = 14.0
 
 /** Minimum time a candidate GPS interval must persist before the picker
  *  commits to it. Eliminates thrashing when speed drifts across thresholds.
@@ -103,8 +107,6 @@ class SalemMainActivity : AppCompatActivity() {
     internal lateinit var appBarMenuManager: AppBarMenuManager
     internal val radarScheduler = RadarRefreshScheduler()
     internal lateinit var favoritesManager: com.example.locationmapapp.util.FavoritesManager
-    /** S146 #27 — top-of-map hero banner. Lazily wired once narration points load. */
-    internal var narrationHero: NarrationHero? = null
     /**
      * S146 POI-priority fix — timestamp (ms) of the last intentional newspaper
      * cancel done by `enqueueNarration` so a new POI can take priority. The
@@ -611,47 +613,34 @@ class SalemMainActivity : AppCompatActivity() {
         favoritesManager = com.example.locationmapapp.util.FavoritesManager(this)
         DebugLogger.i("SalemMainActivity", "Slim toolbar wired — Weather, Home, Alerts, Grid, About + StatusLine")
 
-        // S145 Must-Have #45 — nav cluster + audio control wiring
-        appBarMenuManager.setupAudioAndNavCluster(
+        // S168 — single speaker button (tap = cancel/replay, long-press = popup)
+        appBarMenuManager.setupAudioSpeaker(
             audioIcon = binding.root.findViewById(R.id.toolbarAudioIcon),
-            navFirst  = binding.root.findViewById(R.id.toolbarNavFirst),
-            navPrev   = binding.root.findViewById(R.id.toolbarNavPrev),
-            navNext   = binding.root.findViewById(R.id.toolbarNavNext),
-            navJump   = binding.root.findViewById(R.id.toolbarNavJump),
-            listener  = object : AppBarMenuManager.AudioNavListener {
-                override fun onNavFirst() {
-                    val e = tourViewModel.navFirst()
-                    if (e == null) android.widget.Toast.makeText(this@SalemMainActivity, "No narration history yet", android.widget.Toast.LENGTH_SHORT).show()
-                }
-                override fun onNavPrev() {
-                    val e = tourViewModel.navPrev()
-                    if (e == null) android.widget.Toast.makeText(this@SalemMainActivity, "No earlier narration", android.widget.Toast.LENGTH_SHORT).show()
-                }
-                override fun onNavNext() { tourViewModel.navNext() }
-                override fun onNavPauseToggle() {
-                    tourViewModel.navPauseToggle()
-                    android.widget.Toast.makeText(this@SalemMainActivity, "Pause/resume", android.widget.Toast.LENGTH_SHORT).show()
-                }
-                override fun onNavJump() {
-                    // S146 #27: Jump routes to the persistent hero-banner handler —
-                    // pans the map + opens PoiDetailSheet on the currently-narrating
-                    // (or last-narrated) POI. Falls back to a Toast if the banner
-                    // isn't yet wired (points still loading).
-                    val hero = narrationHero
-                    if (hero != null) {
-                        hero.onJumpRequested()
-                    } else {
-                        val e = tourViewModel.currentNavEntry()
+            listener  = object : AppBarMenuManager.AudioSpeakerListener {
+                override fun onSpeakerTapped() {
+                    if (tourViewModel.isNarrating()) {
+                        tourViewModel.stopNarration()
                         android.widget.Toast.makeText(
-                            this@SalemMainActivity,
-                            if (e == null) "Nothing playing" else "→ ${e.title}",
-                            android.widget.Toast.LENGTH_SHORT
+                            this@SalemMainActivity, "Muted", android.widget.Toast.LENGTH_SHORT
                         ).show()
+                        DebugLogger.i("SalemMainActivity", "Speaker tap → narration cancelled")
+                    } else {
+                        val entry = com.example.wickedsalemwitchcitytour.audio.NarrationHistory.current()
+                        if (entry != null) {
+                            tourViewModel.replayNarrationHistory(entry)
+                            DebugLogger.i("SalemMainActivity", "Speaker tap → replay ${entry.title}")
+                        } else {
+                            android.widget.Toast.makeText(
+                                this@SalemMainActivity,
+                                "Nothing to replay yet",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 }
             }
         )
-        DebugLogger.i("SalemMainActivity", "S145 #45 nav cluster + audio icon wired")
+        DebugLogger.i("SalemMainActivity", "S168 speaker icon wired (cancel/replay + popup long-press)")
 
         setupMap()
         buildFabSpeedDial()
@@ -1001,7 +990,7 @@ class SalemMainActivity : AppCompatActivity() {
             DebugLogger.i("SalemMainActivity", "Debug: center map at $lat, $lon")
         }
         if (extras.containsKey("zoom")) {
-            val zoom = extras.getInt("zoom").toDouble().coerceIn(1.0, MAP_MAX_OVERZOOM)
+            val zoom = extras.getInt("zoom").toDouble().coerceIn(MAP_MIN_ZOOM, MAP_MAX_OVERZOOM)
             binding.mapView.controller.setZoom(zoom)
             updateZoomBubble()
             DebugLogger.i("SalemMainActivity", "Debug: zoom=$zoom")
@@ -1088,7 +1077,7 @@ class SalemMainActivity : AppCompatActivity() {
             // Disable built-in zoom buttons — we use the custom slider instead
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setBuiltInZoomControls(false)
-            minZoomLevel = 3.0
+            minZoomLevel = MAP_MIN_ZOOM
             // Allow overzoom to 21: tiles top out at z19 (USGS_MAX_ZOOM), osmdroid
             // upsamples beyond that. Trade pixel detail for POI-marker separation
             // at tight clusters downtown.
@@ -1211,34 +1200,28 @@ class SalemMainActivity : AppCompatActivity() {
     }
 
     /**
-     * Cinematic zoom-in animation: US from space → region → city → street level.
-     * Called when arriving from SplashActivity on first GPS fix (or fallback to Salem center).
-     *
-     * Sequence: zoom 4 → 10 (800ms) → GPS at 14 (1200ms) → ease to 16 (800ms)
-     * Final zoom capped at satellite max (16) when using USGS tiles.
+     * Cinematic zoom-in animation from city overview to street level on the
+     * splash → map handoff. S168: compressed to z14 → z16 → z18 since tiles
+     * only cover z16-19 and the map floor is now z14 — a z4 "from space"
+     * opener has no tiles to show.
      */
     internal fun performCinematicZoom(target: GeoPoint) {
         DebugLogger.i("SalemMainActivity", "performCinematicZoom → ${target.latitude},${target.longitude}")
         val map = binding.mapView
-        val maxZoom = map.maxZoomLevel.coerceAtMost(19.0)
 
-        // Phase 1: zoom 4→10, center on target region (800ms)
-        map.controller.animateTo(target, 10.0, 800L)
+        // Phase 1: snap to city-overview z14 and glide to z16 (1000ms)
+        map.controller.setZoom(MAP_MIN_ZOOM)
+        map.controller.animateTo(target, 16.0, 1000L)
 
-        // Phase 2: zoom 10→14, center on exact target (1200ms)
+        // Phase 2: ease to street-level z18 (1000ms)
         map.postDelayed({
-            map.controller.animateTo(target, 14.0, 1200L)
-        }, 900L)
+            map.controller.animateTo(target, 18.0, 1000L)
+        }, 1100L)
 
-        // Phase 3: ease to max zoom — street-level detail (800ms)
-        map.postDelayed({
-            map.controller.animateTo(target, maxZoom, 800L)
-        }, 2200L)
-
-        // Phase 4: show welcome dialog after zoom settles
+        // Phase 3: welcome dialog once the zoom settles
         map.postDelayed({
             showWelcomeDialog()
-        }, 3400L)
+        }, 2300L)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -2248,7 +2231,7 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 // S167: MassGIS landmark toggle — hide massgis_mhc POIs when unchecked
                 val histLandmarkOn = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
-                    .getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, true)
+                    .getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, false)
                 val points = if (histLandmarkOn) histModeFiltered
                              else histModeFiltered.filter { it.dataSource != "massgis_mhc" }
                 DebugLogger.i("SalemMainActivity",
@@ -2621,7 +2604,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     private fun isGpsTrackVisible(): Boolean =
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
-            .getBoolean(GPS_TRACK_PREF_KEY, true)
+            .getBoolean(GPS_TRACK_PREF_KEY, false)
 
     private fun setGpsTrackVisible(visible: Boolean) {
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)

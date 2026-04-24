@@ -136,6 +136,16 @@ class NarrationManager @Inject constructor(
             val needed = CategoryVoiceMap.allUsedVoices
             val found = needed.count { it in voiceCache }
             DebugLogger.i(TAG, "Voice cache: $found/${needed.size} category voices available, ${voiceCache.size} total English offline")
+
+            // S168 — flush any segments that were enqueued during the engine
+            // bind window. Without this kick, the queue sits on a ready engine
+            // forever because the deferred-enqueue path above no longer calls
+            // playNext(). Race window is usually <50ms but can be seconds on
+            // cold-boot if the TTS service was evicted.
+            if (queue.isNotEmpty() && _state.value is NarrationState.Idle) {
+                DebugLogger.i(TAG, "Flushing ${queue.size} deferred segment(s) now that TTS is ready")
+                playNext()
+            }
         } else {
             ttsReady = false
             DebugLogger.e(TAG, "TTS init failed: status=$status")
@@ -388,10 +398,6 @@ class NarrationManager @Inject constructor(
     // ── Queue Management ────────────────────────────────────────────────
 
     private fun enqueue(segment: NarrationSegment) {
-        if (!ttsReady) {
-            DebugLogger.w(TAG, "TTS not ready — skipping: ${segment.id}")
-            return
-        }
         if (!shouldSpeak()) {
             DebugLogger.d(TAG, "Phone silent/vibrate — skipping: ${segment.id}")
             return
@@ -416,6 +422,18 @@ class NarrationManager @Inject constructor(
 
         queue.addLast(segment)
         DebugLogger.i(TAG, "Enqueued: ${segment.type} — ${segment.poiName} (queue: ${queue.size})")
+
+        // S168 — if the TTS engine hasn't finished binding yet (first-POI
+        // race: the splash can fire a geofence ENTRY ~10ms before the engine
+        // reports SUCCESS), leave the segment in the queue. onInit flushes
+        // the queue once it's ready. Previously this path DROPPED the
+        // segment, which worked only because callers enqueued two back-to-back
+        // clips per POI (hint + body). After the S168 "one narration per
+        // visit" collapse, a dropped first segment means silence.
+        if (!ttsReady) {
+            DebugLogger.i(TAG, "TTS not ready yet — deferring ${segment.id} (queue: ${queue.size})")
+            return
+        }
 
         // If nothing is playing, start immediately
         if (_state.value is NarrationState.Idle) {

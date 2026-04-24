@@ -227,7 +227,7 @@ class AppBarMenuManager(
         }
 
         // ── POI filter toggles ────────────────────────────────────────
-        val histLandmarkOn = prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, true)
+        val histLandmarkOn = prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, false)
         val histItem = popup.menu.add(GROUP_POI_FILTER, ITEM_HIST_LANDMARK, nextOrder++, "POIs Hist. Landmark")
         histItem.isCheckable = true
         histItem.isChecked = histLandmarkOn
@@ -242,7 +242,7 @@ class AppBarMenuManager(
                     true
                 }
                 GROUP_POI_FILTER -> {
-                    val newState = !prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, true)
+                    val newState = !prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, false)
                     prefs.edit().putBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, newState).apply()
                     item.isChecked = newState
                     DebugLogger.i(TAG, "POIs Hist. Landmark → $newState")
@@ -265,56 +265,36 @@ class AppBarMenuManager(
     // S145 — AUDIO + NAV CLUSTER (Must-Have #45)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Callback for the nav cluster and content popup interactions. */
-    interface AudioNavListener {
-        fun onNavFirst()
-        fun onNavPrev()
-        fun onNavNext()
-        fun onNavPauseToggle()
-        fun onNavJump()
+    /** Callback for the single speaker-button gesture. */
+    interface AudioSpeakerListener {
+        /** Tap — cancel the currently-speaking segment, or replay the last one
+         *  if we're currently silent. Implementation checks NarrationManager
+         *  state + NarrationHistory. */
+        fun onSpeakerTapped()
     }
 
     /**
-     * Wire the nav cluster (First / Prev / Next+Pause / Jump) and the audio
-     * control icon (tap → content popup, long-press → detail-level cycle).
+     * S168 — wire the single toolbar speaker icon.
+     *   Tap        → listener.onSpeakerTapped()  (cancel or replay)
+     *   Long-press → audio content popup  (Oracle/Meaningful/Ambient/Businesses
+     *                                      mute + detail radio)
      *
-     * Nav handlers route into [listener]; audio popup + detail cycle are owned
-     * inside this class because they only mutate [AudioControl] state.
+     * The prior nav cluster (First/Prev/Next+Pause/Jump) and long-press
+     * detail-level cycle were removed. The popup's detail radio covers the
+     * cycle use-case, and history nav was unused in normal tour flow.
      */
-    fun setupAudioAndNavCluster(
+    fun setupAudioSpeaker(
         audioIcon: ImageView,
-        navFirst: ImageView,
-        navPrev: ImageView,
-        navNext: ImageView,
-        navJump: ImageView,
-        listener: AudioNavListener
+        listener: AudioSpeakerListener,
     ) {
         AudioControl.init(context)
-
-        navFirst.imageTintList = ColorStateList.valueOf(Color.WHITE)
-        navPrev.imageTintList  = ColorStateList.valueOf(Color.WHITE)
-        navNext.imageTintList  = ColorStateList.valueOf(Color.WHITE)
-        navJump.imageTintList  = ColorStateList.valueOf(Color.WHITE)
         audioIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
-
-        navFirst.setOnClickListener { listener.onNavFirst() }
-        navPrev.setOnClickListener  { listener.onNavPrev() }
-        navNext.setOnClickListener  { listener.onNavNext() }
-        navNext.setOnLongClickListener {
-            listener.onNavPauseToggle()
-            true
-        }
-        navJump.setOnClickListener  { listener.onNavJump() }
-
-        audioIcon.setOnClickListener { showAudioContentPopup() }
+        audioIcon.setOnClickListener { listener.onSpeakerTapped() }
         audioIcon.setOnLongClickListener {
-            val next = AudioControl.cycleDetailLevel()
-            Toast.makeText(context, "Detail: ${next.name.lowercase().replaceFirstChar { it.titlecase() }}", Toast.LENGTH_SHORT).show()
-            DebugLogger.i(TAG, "Detail level cycled → $next")
+            showAudioContentPopup()
             true
         }
-
-        DebugLogger.i(TAG, "setupAudioAndNavCluster() — nav cluster + audio icon wired")
+        DebugLogger.i(TAG, "setupAudioSpeaker() — single speaker icon wired (tap=cancel/replay, long-press=popup)")
     }
 
     /**
@@ -1098,7 +1078,11 @@ class AppBarMenuManager(
         return when (prefKey) {
             MenuPrefs.PREF_AIRCRAFT_DISPLAY, MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, MenuPrefs.PREF_POPULATE_POIS, MenuPrefs.PREF_MBTA_BUS_STOPS,
             MenuPrefs.PREF_ALERT_SOUND, MenuPrefs.PREF_CAMERA_OVERLAY, MenuPrefs.PREF_SCHOOL_OVERLAY, MenuPrefs.PREF_FLOOD_OVERLAY, MenuPrefs.PREF_CROSSING_OVERLAY,
-            MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE -> false
+            MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE,
+            // S168: install defaults off — Journey recorder and real-GPS-outside-Salem
+            // both start unchecked so a fresh-install user lands at Samantha's statue
+            // with a clean map and no breadcrumb polyline until they opt in.
+            MenuPrefs.PREF_RECORD_GPS, MenuPrefs.PREF_GPS_BBOX_OVERRIDE -> false
             else -> true
         }
     }

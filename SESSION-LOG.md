@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 158-167. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 159-168. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 168: 2026-04-24 — Install-default sweep + one-narration-per-visit + zoom 14-20 lock + toolbar rework
+
+Install-default sweep across the tourist UX so a first-launch user lands on a sensible default stack: POIs Hist. Landmark off, Record GPS off, Use Real GPS Outside Salem off, GPS-track FAB off, Oracle off, detail level Deep. Narration engine rebuilt to fire exactly one clip per POI visit (priority: stripped-commercial → historical/body text → BRIEF hint) instead of the prior intro-hint + body double. Fixed a first-POI silence bug uncovered by that collapse — `NarrationManager.enqueue()` was dropping segments during the TTS bind race; now defers them and `onInit()` flushes on ready. Map zoom locked to 14-20 (tiles only cover z16-19 + overzoom) with cinematic rewritten to z14 → z16 → z18. Toolbar cluster (First/Prev/Next/Jump) and narration hero banner deleted — single speaker icon on the right now handles tap=cancel/replay and long-press=audio popup; Home moved to the left. Splash-skip bug diagnosed (task-affinity collision brings SalemMainActivity to front instead of SplashActivity) — fix proposal recorded, not applied this session.
+
+Full session detail: `docs/session-logs/session-168-2026-04-24.md`. Commit: pending.
+
+---
 
 ## Session 167: 2026-04-24 — APK packaging audit: poi-icons + tile archive shrink + single-basemap build
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-159-2026-04-23.md`. Commit: `58d
 
 ---
 
-## Session 158: 2026-04-23 — Custom "Witchy" basemap tile bake (third offline tile source)
-
-Built a complete custom-tile-baking pipeline at `tools/tile-bake/` and shipped a third offline basemap alongside Satellite + Mapnik: `Salem-Custom` (label "Witchy"). Stack: planetiler (Geofabrik MA → OpenMapTiles vector tiles z0-z16) + tippecanoe (massgis.l3_parcels_essex → parcel outlines; massgis.structures JOIN mhc_inventory → 39,408 building footprints tagged with NHL/NRIND/NRDIS/none tier) + maplibre-gl-native headless with a curated `style-salem.json` (parchment palette, tiered-purple historic buildings, no commercial POI labels, narrow cemetery/monument/church carve-out, Metropolis Bold district labels). Iterated on-device through 11 operator-driven refinements: buffered-block rendering to kill tile seams + label fragmentation, divided-boulevard oneway filter, added cemeteries/hospitals/schools/sand/wetlands, unified building source to MassGIS so historic-overlay polygons align perfectly with base buildings, and WebP lossless encoding (158 MB → 112 MB, −29%). Kotlin wire-up: `TileSourceManager.Id.CUSTOM` + un-hid the picker icon under V1_OFFLINE_ONLY. Bundle: 206 MB total (17,777 tiles across three providers). Build-time toolchain (planetiler.jar / fonts / node_modules / intermediate mbtiles + geojsonl) is all gitignored; rebuild instructions in `tools/tile-bake/README.md`.
-
-Full session detail: `docs/session-logs/session-158-2026-04-23.md`. Commit: pending.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 157 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 158 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
 <!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->
 <!-- S156 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
 <!-- S155 rolled to archive 2026-04-24 by the session-end protocol (S166) -->

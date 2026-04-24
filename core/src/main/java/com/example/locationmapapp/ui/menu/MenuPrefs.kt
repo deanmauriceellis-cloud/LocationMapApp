@@ -87,14 +87,14 @@ object MenuPrefs {
     const val PREF_SILENT_FILL_DEBUG     = "silent_fill_debug_on"
     /** S149: when true, disable the out-of-Salem-bbox clamp so the app uses real GPS
      *  positions regardless of whether the fix lands inside the Salem bounding box.
-     *  S150: default flipped to `true` — a real-device user opening the app from
-     *  outside Salem (e.g. driving in from Beverly) should see their real location,
-     *  not the Samantha-statue clamp. Emulator / demo modes can toggle this off
-     *  via Journey → "Use Real GPS Outside Salem". */
+     *  S168: install default flipped back to `false` — a user opening the app from
+     *  outside Salem should land at the Samantha statue (the game's home base) so
+     *  narration/POIs work on first launch. Operators can still opt in via
+     *  Journey → "Use Real GPS Outside Salem". */
     const val PREF_GPS_BBOX_OVERRIDE     = "gps_bbox_override_on"
     /** Default value for [PREF_GPS_BBOX_OVERRIDE]. Shared between the menu sync and
      *  the startup pref read so they can't drift. */
-    const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = true
+    const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = false
 
     // ── POI source filters ──────────────────────────────────────────────────
     /** When true, MassGIS historical landmark POIs (data_source = massgis_mhc) are shown on the map. */

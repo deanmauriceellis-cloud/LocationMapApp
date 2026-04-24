@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 157, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 158, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 158: 2026-04-23 — Custom "Witchy" basemap tile bake (third offline tile source)
+
+Built a complete custom-tile-baking pipeline at `tools/tile-bake/` and shipped a third offline basemap alongside Satellite + Mapnik: `Salem-Custom` (label "Witchy"). Stack: planetiler (Geofabrik MA → OpenMapTiles vector tiles z0-z16) + tippecanoe (massgis.l3_parcels_essex → parcel outlines; massgis.structures JOIN mhc_inventory → 39,408 building footprints tagged with NHL/NRIND/NRDIS/none tier) + maplibre-gl-native headless with a curated `style-salem.json` (parchment palette, tiered-purple historic buildings, no commercial POI labels, narrow cemetery/monument/church carve-out, Metropolis Bold district labels). Iterated on-device through 11 operator-driven refinements: buffered-block rendering to kill tile seams + label fragmentation, divided-boulevard oneway filter, added cemeteries/hospitals/schools/sand/wetlands, unified building source to MassGIS so historic-overlay polygons align perfectly with base buildings, and WebP lossless encoding (158 MB → 112 MB, −29%). Kotlin wire-up: `TileSourceManager.Id.CUSTOM` + un-hid the picker icon under V1_OFFLINE_ONLY. Bundle: 206 MB total (17,777 tiles across three providers). Build-time toolchain (planetiler.jar / fonts / node_modules / intermediate mbtiles + geojsonl) is all gitignored; rebuild instructions in `tools/tile-bake/README.md`.
+
+Full session detail: `docs/session-logs/session-158-2026-04-23.md`. Commit: pending.
+
+---
 
 ## Session 157: 2026-04-22 — OSM-stays pivot + Essex L3 parcels ingest + Salem QGIS project + routing design captured
 

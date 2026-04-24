@@ -62,7 +62,10 @@ object AudioControl {
         prefs ?: error("AudioControl.init(context) must be called before use")
 
     // ── Getters ─────────────────────────────────────────────────────────
-    fun isOracleEnabled(): Boolean     = requirePrefs().getBoolean(PREF_ORACLE, true)
+    // S168: Oracle (Witch-Trials newspaper narrations) default OFF — operator
+    // direction. Users opt in via Audio Control → Oracle toggle when they want
+    // the historical-source layer on top of the POI + ambient narration.
+    fun isOracleEnabled(): Boolean     = requirePrefs().getBoolean(PREF_ORACLE, false)
     fun isMeaningfulEnabled(): Boolean = requirePrefs().getBoolean(PREF_MEANINGFUL, true)
     fun isAmbientEnabled(): Boolean    = requirePrefs().getBoolean(PREF_AMBIENT, true)
     // S149: Businesses default OFF — operator direction 2026-04-18. AutoZone,
@@ -71,9 +74,12 @@ object AudioControl {
     // so the historic-tour experience fires out of the box.
     fun isBusinessesEnabled(): Boolean = requirePrefs().getBoolean(PREF_BUSINESSES, false)
 
+    // S168: install default flipped from STANDARD → DEEP so first-launch users
+    // hear `long_narration` (falling back to short when long is missing). They
+    // can dial back via Audio Control (long-press) if they want shorter clips.
     fun detailLevel(): DetailLevel =
-        DetailLevel.values().getOrElse(requirePrefs().getInt(PREF_DETAIL, DetailLevel.STANDARD.ordinal)) {
-            DetailLevel.STANDARD
+        DetailLevel.values().getOrElse(requirePrefs().getInt(PREF_DETAIL, DetailLevel.DEEP.ordinal)) {
+            DetailLevel.DEEP
         }
 
     // ── Setters ─────────────────────────────────────────────────────────
