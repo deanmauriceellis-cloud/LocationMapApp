@@ -70,8 +70,11 @@ const UPDATABLE_FIELDS = [
   'source_id', 'source_categories', 'tags',
   // Provenance
   'data_source', 'confidence', 'verified_date', 'stale_after',
-  // Flags
-  'is_tour_poi', 'is_narrated', 'default_visible',
+  // Operational flags
+  'is_tour_poi', 'is_narrated', 'default_visible', 'has_announce_narration',
+  // Classification flags (S165)
+  'is_historical_property', 'is_witch_trial_site', 'is_free_admission',
+  'is_indoor', 'is_family_friendly',
   // Phase 9Y — MassGIS / MHC Inventory / L3 parcel enrichment (added S159 for schema,
   // exposed to admin S160). `building_footprint_geojson` is polygon-shaped and
   // normally populated by the 9Y.3 enrichment script; manual override allowed.

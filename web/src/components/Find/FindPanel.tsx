@@ -91,17 +91,15 @@ export function FindPanel({
   }
 
   const handleCategoryClick = async (cat: Category) => {
-    if (cat.subtypes && cat.subtypes.length > 0) {
-      setSelectedCategory(cat)
-      setView('subtypes')
-    } else {
-      setBrowseLoading(true)
-      setBrowseLabel(cat.label)
-      setView('results')
-      const tags = getCategoryTags(cat.id)
-      const results = await onFindByCategory(tags)
-      setBrowseResults(results)
-      setBrowseLoading(false)
+    setBrowseLoading(true)
+    setBrowseLabel(cat.label)
+    setView('results')
+    const tags = getCategoryTags(cat.id)
+    const results = await onFindByCategory(tags)
+    setBrowseResults(results)
+    setBrowseLoading(false)
+    if (results.length > 0) {
+      onFilterAndMap(results, cat.label)
     }
   }
 

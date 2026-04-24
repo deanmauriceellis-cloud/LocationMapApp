@@ -60,6 +60,19 @@ class FindViewModel @Inject constructor(
     val findCounts: LiveData<FindCounts?> = _findCounts
 
     /**
+     * Full POI catalog preloaded at ViewModel init so fuzzy search is instant.
+     * 1,837 POIs ≈ <2 MB in memory; load once, reuse forever.
+     */
+    @Volatile private var allPoisCache: List<SalemPoi> = emptyList()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { allPoisCache = salemPoiDao.findAll() }
+                .onFailure { e -> DebugLogger.e(TAG, "POI preload FAILED: ${e.message}", e as? Exception) }
+        }
+    }
+
+    /**
      * Session-level cache of hashed-id → originating SalemPoi. Populated
      * whenever this VM emits FindResult objects. Enables later
      * `fetchPoiWebsiteDirectly` lookups (which only receive the hashed id).
@@ -118,24 +131,28 @@ class FindViewModel @Inject constructor(
     }
 
     /**
-     * Name / description text search. Room DAO does a LIKE %query% match
-     * against name, description, short_description. Results are sorted by
-     * distance from (lat, lon).
+     * Fuzzy name/keyword search using [FuzzySearchEngine].
+     *
+     * Replaces the old `LIKE %query%` DAO call. Results are scored by
+     * multi-tier relevance (exact > prefix > token > Levenshtein > description)
+     * with distance as a secondary tiebreaker. The full POI catalog is held in
+     * [allPoisCache] (preloaded at init) so no DB round-trip is needed per query.
      */
     suspend fun searchPoisByName(
         query: String,
         lat: Double,
         lon: Double,
-        limit: Int = 200
+        limit: Int = 60
     ): SearchResponse? = withContext(Dispatchers.IO) {
         try {
-            val matches = salemPoiDao.search(query, limit)
-            val sorted = matches.sortedBy { distanceM(lat, lon, it.lat, it.lng) }
-            val results = sorted.map { it.toFindResult(lat, lon).also { fr -> idToPoi[fr.id] = it } }
+            val corpus = if (allPoisCache.isNotEmpty()) allPoisCache
+                         else salemPoiDao.findAll().also { allPoisCache = it }
+            val scored = FuzzySearchEngine.search(query, corpus, lat, lon, limit)
+            val results = scored.map { it.poi.toFindResult(lat, lon).also { fr -> idToPoi[fr.id] = it.poi } }
             SearchResponse(
                 results = results,
                 totalCount = results.size,
-                scopeM = Int.MAX_VALUE, // text search is bbox-unbounded
+                scopeM = Int.MAX_VALUE,
                 categoryHint = null
             )
         } catch (e: Exception) {

@@ -1,8 +1,32 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 154-163. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 157-166. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 166: 2026-04-24 — FuzzySearchEngine type/category synonym expansion
+
+Recovering from killed S165; committed all S165 work alongside S166. Fixed two gaps that made type-searches like "dentist" find nothing: the per-token `when { }` scoring was exclusive (non-name fields never accumulated once any name tier fired), and there was no synonym coverage between "dentist" and "dental." Added `TYPE_SYNONYMS` map (35 entries: dentist→dental, lawyer→law/attorney, gym→fitness, coffee→cafe, doctor→medical/clinic, etc.), token expansion before per-token scoring, and non-name fields (subcat, cat, desc, hist, addr) now always accumulate independently.
+
+Full session detail: `docs/session-logs/session-166-2026-04-24.md`. Commit: `<sha>`.
+
+---
+
+## Session 165: 2026-04-24 — Fuzzy Find engine + admin classification flags + FindPanel category fix (killed session)
+
+Session killed before session-end protocol ran; work committed and closed via S166. Shipped: (1) `FuzzySearchEngine.kt` (new) — multi-tier in-memory scorer (10k/5k/3k/600/400/250/120) with subcat/cuisine/desc/hist/addr tiers; `FindViewModel` preloads all POIs on `init {}`, 250ms debounce, tap→animateTo geocoord zoom=18, long-press→detail dialog. (2) `PoiEditDialog.tsx` — new "Flags" tab with toggle-switch UI for 7 operational flags + 5 classification flags (`is_historical_property`, `is_witch_trial_site`, `is_free_admission`, `is_indoor`, `is_family_friendly`). (3) `PoiTree.tsx` — `CategorySelectCtx` context fix for react-arborist category clicks, new flag fields in `PoiRow`. (4) `FindPanel.tsx` — category click skips subtype tree, directly filters map. (5) `admin-pois.js` — 5 new classification flags in `UPDATABLE_FIELDS`.
+
+Full session detail: `docs/session-logs/session-165-2026-04-24.md`. Commit: see S166.
+
+---
+
+## Session 164: 2026-04-24 — Wrong-project detour (LAN recon → RadioLogger)
+
+No LMA work. Operator asked about LAN threat recon tooling; scripts were built here by mistake, then moved to `~/Research/RadioLogger/tools/`. No LMA code, schema, or docs changed. No commit.
+
+Full session detail: `docs/session-logs/session-164-2026-04-24.md`. Commit: none.
+
+---
 
 ## Session 163: 2026-04-23 — MHC hidden POIs with clickable footprints on admin map + category filter; parallel-system detour torn down
 
@@ -60,31 +84,10 @@ Full session detail: `docs/session-logs/session-157-2026-04-22.md`. Commits: `4f
 
 ---
 
-## Session 156: 2026-04-21 — SI content refresh + TigerLine+MassGIS foundation plan + Step 0 discovery + Phase 9Y PG schema extension
-
-Started as a routine SI-rewrite absorption (1,400 POI narrations OVERWRITE + 34 historical_notes + 2 coord drift fixes, Room DB rebaked 9.23 → 9.26 MB, Heritage Trail anchors spot-check clean). Operator then directed the session into a much larger pivot: commit LMA V1 to TigerLine + MassGIS as the foundational mapping substrate, add a "go back in time" time-slider over SalemIntelligence's 509-item public-domain historical maps, and retire OSM/osmdroid entirely before V1. Plan mode engaged — approved plan shipped in-repo at `docs/tigerline-integration-plan.md`, Step 0 discovery at `docs/tigerline-integration-discovery.md` (TigerLine's Phase 2 import is stalled at ~80%; Sanborn atlases 1890/1906/1950/1957 are the V1 slider slate; LoC IIIF provides georef without manual GCP work). Concrete scaffolding landed: PG `salem_pois` extended with 9 nullable Phase 9Y columns (`building_footprint_geojson`, `mhc_*`, `canonical_address_point_id`, `local_historic_district`, `parcel_owner_class`); learned `adb install -r` corrupts Room WAL recovery after asset-DB rebake (`feedback_adb_install_after_db_rebake.md` memory saved); OMEN asks filed for TigerLine (7) + SalemIntelligence (4) at `~/Development/OMEN/reports/locationmapapp/S156-tigerline-asks-2026-04-21.md`. STATE.md trimmed (older S141/S144-S150 fact blocks archived to `docs/archive/STATE_removed_2026-04-21.md`).
-
-Full session detail: `docs/session-logs/session-156-2026-04-21.md`. Commits: `7632961` (SI refresh + Room bake) + `be99c86` (plan + discovery) + `7720837` (session-end paperwork + Phase 9Y PG schema + master plan).
-
----
-
-## Session 155: 2026-04-20 — Thin investigation session: resource check, "almost OOM" traced to WWWatcher on a different box
-
-Same-day continuation after S154 close. Gave TOP-PRIORITY status report (counsel async, Form TX by 2026-05-20, field walk, S154 smoke test, Task #9 Find WebView gate, verify-bundled-assets wiring, APK-size audit). Operator asked to stop all services, then interrupted with "almost OOM checking running projects" — enumerated the box (no LMA services running; only LMA-side resident is a 1.9 GiB Gradle daemon from S154; ollama holding 20 GiB VRAM; 4 concurrent Claude CLI sessions ~1.6 GiB combined; no kernel OOM events in 7 days) and confirmed WWWatcher is not on this workstation. Operator closed with "it was WWWatcher, session end" — memory issue is on a different box, no LMA action. No code changes, no process kills.
-
-Full session detail: `docs/session-logs/session-155-2026-04-20.md`. Commit: `a3a7b40`.
-
----
-
-## Session 154: 2026-04-20 — PG-13 business-strip + merchant-license gate, 73 MB hero prune, GPS cursor-freeze fix (Lenovo motion sensor)
-
-Counsel engagement meeting was initial-talk only (cost estimate + retainer letter pending async); operator redirected to product refinement. Three passes shipped: (1) **PG-13 content-strip render gate** — non-licensed commercial POIs (FOOD_DRINK/SHOPPING/LODGING/HEALTHCARE/ENTERTAINMENT/AUTO_SERVICES/OFFICES/TOUR_COMPANIES/PSYCHIC/FINANCE/FUEL_CHARGING/TRANSIT/PARKING/EMERGENCY/WITCH_SHOP) render name+address+category-graphic only; SI-generated narration/historical_note/description hidden at every surface. Reused the pre-existing `salem_pois.merchant_tier` column as unlock flag (`merchant_tier ≥ 1` → full render); no data destruction — SI content stays bundled in Room for future monetization. WITCH_SHOP moved MEANINGFUL → BUSINESSES in AudioControl. New `PoiContentPolicy.kt` centralizes `shouldStripContent` / `shouldStripByCategory` / `strippedAnnouncement` logic consumed by PoiDetailSheet, SalemMainActivityNarration, SalemMainActivityTour, and TourEngine ambient hint. (2) **Commercial hero prune** — 2,301 per-POI WebP files removed from APK for 1,832 unlicensed commercial POIs (`assets/heroes/{poi.id}.webp` + `assets/hero/{image_asset}`), backed up via `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz` before delete. New `prune-commercial-heroes.js` does the work; `verify-bundled-assets.js` gains a commercial-hero leak check (fails build if any re-leak). `PoiHeroResolver` gained a `forceCategoryFallback` flag + subcategory-prefix filtering so the stripped sheet hash-pins painterly variants from `poi-icons/{category}/` (same business always looks the same; different FOOD_DRINK POIs get different spooky-style variants). APK 820 → 739 MB debug (-81 MB clean rebuild). Historic/civic/parks/worship/education POIs (459 of 2,291) keep their per-POI triptych heroes unchanged. (3) **GPS cursor freeze** — operator reported map doesn't track real walking on Lenovo. Pulled 5.8 MB log, root-caused: Lenovo TB305FU's `TYPE_SIGNIFICANT_MOTION` sensor never fires (`events=0` after 5+ min), so `MotionTracker.isStationary()` pins true, and the stationary-freeze gate only lifted via the 25m distance hatch — cursor moved in 25m hops. Fix: derived-speed escape hatch (`distance/time` between consecutive fixes; unfreeze if ≥ 0.3 m/s) + new `lastGpsPointMs` timestamp field. Operator confirmed "working now." Also shipped: SI handoff document at `docs/si-handoff-s154-content-strip-2026-04-20.md` detailing what LMA moved/removed + implications for SI's generation priorities (for operator to forward). Narration repeat-behavior observation clarified as desired (one-per-POI per app session; fresh launch re-narrates). Carry-forwards: Task #9 (Find-detail WebView gate), Form TX by 2026-05-20, counsel response async, real outdoor walk, verify-bundled-assets gradle wiring.
-
-Full session detail: `docs/session-logs/session-154-2026-04-20.md`. Commit: `4f40de5`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 153 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 156 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S156 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
+<!-- S155 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
+<!-- S154 rolled to archive 2026-04-24 by the session-end protocol (S164) -->
 <!-- S153 rolled to archive 2026-04-24 by the session-end protocol (S163) -->
 <!-- S152 rolled to archive 2026-04-23 by the session-end protocol (S162) -->
 <!-- S151 rolled to archive 2026-04-23 by the session-end protocol (S161) -->

@@ -765,6 +765,7 @@ export function PoiEditDialog({
                 <TabGroup as="div" className="flex-1 min-h-0 flex flex-col">
                   <TabList className="px-4 pt-2 border-b border-slate-200 flex flex-wrap gap-1">
                     <Tab className={tabClass}>General</Tab>
+                    <Tab className={tabClass}>Flags</Tab>
                     <Tab className={tabClass}>Location</Tab>
                     <Tab className={tabClass}>Hours &amp; Contact</Tab>
                     <Tab className={tabClass}>Narration</Tab>
@@ -998,6 +999,77 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
+                    </TabPanel>
+
+                    {/* ─── Flags ───────────────────────────────────────────── */}
+                    <TabPanel className="space-y-6">
+                      {/* Operational flags */}
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                          Operational
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                          {[
+                            { field: 'is_tour_poi',           label: 'Tour POI',              hint: 'Included in walking tour routes' },
+                            { field: 'is_narrated',           label: 'Narrated',              hint: 'Has geofence narration audio' },
+                            { field: 'has_announce_narration',label: 'Announce narration',    hint: 'Plays brief intro when entering geofence' },
+                            { field: 'default_visible',       label: 'Visible by default',    hint: 'Shown on map without filters' },
+                            { field: 'seasonal',              label: 'Seasonal',              hint: 'Only available certain times of year' },
+                            { field: 'requires_transportation',label: 'Requires transport',   hint: 'Not walkable from downtown' },
+                            { field: 'wheelchair_accessible', label: 'Wheelchair accessible', hint: 'ADA accessible' },
+                          ].map(({ field, label, hint }) => (
+                            <label key={field} className="flex items-start gap-3 cursor-pointer group">
+                              <div className="relative mt-0.5 flex-shrink-0">
+                                <input
+                                  type="checkbox"
+                                  {...reg(field)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-9 h-5 rounded-full border border-slate-300 bg-slate-100 peer-checked:bg-teal-500 peer-checked:border-teal-500 transition-colors" />
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</div>
+                                <div className="text-xs text-slate-400">{hint}</div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <hr className="border-slate-200" />
+
+                      {/* Classification flags */}
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                          Classification
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                          {[
+                            { field: 'is_historical_property', label: 'Historical property',  hint: 'Listed or significant historic site' },
+                            { field: 'is_witch_trial_site',    label: 'Witch Trial site',     hint: 'Directly connected to 1692 events' },
+                            { field: 'is_free_admission',      label: 'Free admission',       hint: 'No cost to visit or enter' },
+                            { field: 'is_indoor',              label: 'Indoor venue',         hint: 'Enclosed / weather-independent' },
+                            { field: 'is_family_friendly',     label: 'Family friendly',      hint: 'Suitable for children' },
+                          ].map(({ field, label, hint }) => (
+                            <label key={field} className="flex items-start gap-3 cursor-pointer group">
+                              <div className="relative mt-0.5 flex-shrink-0">
+                                <input
+                                  type="checkbox"
+                                  {...reg(field)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-9 h-5 rounded-full border border-slate-300 bg-slate-100 peer-checked:bg-indigo-500 peer-checked:border-indigo-500 transition-colors" />
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</div>
+                                <div className="text-xs text-slate-400">{hint}</div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </TabPanel>
 
                     {/* ─── Location ────────────────────────────────────────── */}

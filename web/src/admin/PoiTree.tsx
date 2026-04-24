@@ -12,8 +12,13 @@
 // The first call to /api/admin/salem/pois triggers the browser's native
 // HTTP Basic Auth dialog. Single fetch now — no race condition.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Tree, type NodeApi, type NodeRendererProps } from 'react-arborist'
+
+// Context that lets PoiNode call onCategorySelect directly without going
+// through node.activate() → onActivate (which react-arborist doesn't
+// reliably fire for container nodes).
+const CategorySelectCtx = createContext<((cat: string | null) => void) | null>(null)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +35,13 @@ export interface PoiRow {
   is_tour_poi?: boolean
   is_narrated?: boolean
   default_visible?: boolean
+  has_announce_narration?: boolean
+  // Classification flags (S165)
+  is_historical_property?: boolean
+  is_witch_trial_site?: boolean
+  is_free_admission?: boolean
+  is_indoor?: boolean
+  is_family_friendly?: boolean
   deleted_at?: string | null
   // S162 — POI location verification
   lat_proposed?: number | null
@@ -279,14 +291,16 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
   const data = node.data
   const isLeaf = data.type === 'poi'
   const isContainer = !isLeaf
+  const onCategorySelect = useContext(CategorySelectCtx)
 
   const handleClick = () => {
     if (isContainer) {
       node.toggle()
-      // Also emit an activation on category-level containers so AdminLayout
-      // can drive a map category filter from tree clicks.
-      if (data.type === 'category' && !data.poi) {
-        node.activate()
+      // Top-level category nodes (no |sub: segment) drive the map filter.
+      // Call the context callback directly — node.activate() is unreliable
+      // for container nodes in react-arborist.
+      if (data.type === 'category' && !data.poi && !node.data.id.includes('|sub:') && onCategorySelect) {
+        onCategorySelect(data.category ?? null)
       }
     } else {
       node.select()
@@ -372,26 +386,21 @@ export function PoiTree({ onSelect, onCategorySelect, onDataLoaded, externalPois
     })
   }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter])
 
+  // Category toggle handler — called directly from PoiNode via context.
+  const handleCategoryClick = useCallback((cat: string | null) => {
+    if (!cat) return
+    const next = lastCategoryRef.current === cat ? null : cat
+    lastCategoryRef.current = next
+    onCategorySelect?.({ category: next })
+  }, [onCategorySelect])
+
   const handleActivate = useCallback(
     (node: NodeApi<TreeNode>) => {
       if (node.data.type === 'poi' && node.data.poi) {
         onSelect?.({ poi: node.data.poi })
-        return
-      }
-      if (node.data.type === 'category') {
-        // Top-level category nodes only drive map filtering. Ignore subcategory
-        // containers (those have a subcategory label but live under a category
-        // parent; treat only true root categories as filters).
-        const cat = node.data.category
-        if (!cat) return
-        // Top-level category rows have id "cat:<name>" (no "|sub:" segment).
-        if (node.data.id.includes('|sub:')) return
-        const next = lastCategoryRef.current === cat ? null : cat
-        lastCategoryRef.current = next
-        onCategorySelect?.({ category: next })
       }
     },
-    [onSelect, onCategorySelect],
+    [onSelect],
   )
 
   const visibleCount = useMemo(() => {
@@ -472,25 +481,27 @@ export function PoiTree({ onSelect, onCategorySelect, onDataLoaded, externalPois
         ) : !effectivePois ? (
           <p className="p-3 text-xs text-slate-500 italic">Loading POIs…</p>
         ) : size.height === 0 || size.width === 0 ? null : (
-          <Tree<TreeNode>
-            data={treeData}
-            width={size.width}
-            height={size.height}
-            indent={16}
-            rowHeight={24}
-            paddingTop={4}
-            paddingBottom={4}
-            openByDefault={false}
-            disableMultiSelection={true}
-            disableEdit={true}
-            disableDrag={true}
-            disableDrop={true}
-            searchTerm={searchTerm}
-            searchMatch={poiSearchMatch}
-            onActivate={handleActivate}
-          >
-            {PoiNode}
-          </Tree>
+          <CategorySelectCtx.Provider value={handleCategoryClick}>
+            <Tree<TreeNode>
+              data={treeData}
+              width={size.width}
+              height={size.height}
+              indent={16}
+              rowHeight={24}
+              paddingTop={4}
+              paddingBottom={4}
+              openByDefault={false}
+              disableMultiSelection={true}
+              disableEdit={true}
+              disableDrag={true}
+              disableDrop={true}
+              searchTerm={searchTerm}
+              searchMatch={poiSearchMatch}
+              onActivate={handleActivate}
+            >
+              {PoiNode}
+            </Tree>
+          </CategorySelectCtx.Provider>
         )}
       </div>
     </div>

@@ -427,7 +427,7 @@ internal fun SalemMainActivity.showFindCategoryGrid(dialog: android.app.Dialog) 
             searchResultsList.addView(spinner)
 
             searchJob = lifecycleScope.launch {
-                delay(1000)
+                delay(250)
                 val mapCenter = binding.mapView.mapCenter
                 val response = findViewModel.searchPoisByName(query, mapCenter.latitude, mapCenter.longitude)
                 searchResultsList.removeAllViews()
@@ -543,7 +543,16 @@ internal fun SalemMainActivity.showFindCategoryGrid(dialog: android.app.Dialog) 
                     row.addView(infoCol)
                     row.setOnClickListener {
                         dialog.dismiss()
+                        val point = org.osmdroid.util.GeoPoint(result.lat, result.lon)
+                        binding.mapView.controller.animateTo(point, 18.0, 800L)
+                        lifecycleScope.launch {
+                            delay(900)
+                            loadCachedPoisForVisibleArea()
+                        }
+                    }
+                    row.setOnLongClickListener {
                         showPoiDetailDialog(result)
+                        true
                     }
                     searchResultsList.addView(row)
                     searchResultsList.addView(View(this@showFindCategoryGrid).apply {
@@ -905,10 +914,18 @@ internal fun SalemMainActivity.showFindResults(
             row.addView(distText)
             row.addView(infoCol)
 
-            // Tap → POI detail dialog
             row.setOnClickListener {
                 dialog.dismiss()
+                val point = org.osmdroid.util.GeoPoint(result.lat, result.lon)
+                binding.mapView.controller.animateTo(point, 18.0, 800L)
+                lifecycleScope.launch {
+                    delay(900)
+                    loadCachedPoisForVisibleArea()
+                }
+            }
+            row.setOnLongClickListener {
                 showPoiDetailDialog(result)
+                true
             }
 
             resultsList.addView(row)
@@ -1054,7 +1071,16 @@ internal fun SalemMainActivity.showFavoritesResults(dialog: android.app.Dialog) 
             row.addView(infoCol)
             row.setOnClickListener {
                 dialog.dismiss()
+                val point = org.osmdroid.util.GeoPoint(result.lat, result.lon)
+                binding.mapView.controller.animateTo(point, 18.0, 800L)
+                lifecycleScope.launch {
+                    delay(900)
+                    loadCachedPoisForVisibleArea()
+                }
+            }
+            row.setOnLongClickListener {
                 showPoiDetailDialog(result)
+                true
             }
             resultsList.addView(row)
             resultsList.addView(View(this).apply {

@@ -1,7 +1,29 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 110, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 156, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 156: 2026-04-21 — SI content refresh + TigerLine+MassGIS foundation plan + Step 0 discovery + Phase 9Y PG schema extension
+
+Started as a routine SI-rewrite absorption (1,400 POI narrations OVERWRITE + 34 historical_notes + 2 coord drift fixes, Room DB rebaked 9.23 → 9.26 MB). Operator directed the session into a major pivot: commit LMA V1 to TigerLine + MassGIS as the foundational mapping substrate, add a time-slider over public-domain historical maps, and retire OSM/osmdroid entirely before V1. Approved plan at `docs/tigerline-integration-plan.md`; discovery at `docs/tigerline-integration-discovery.md`. PG `salem_pois` extended with 9 nullable Phase 9Y columns; `feedback_adb_install_after_db_rebake.md` memory saved; OMEN asks filed.
+
+Full session detail: `docs/session-logs/session-156-2026-04-21.md`. Commits: `7632961` + `be99c86` + `7720837`.
+
+---
+
+## Session 155: 2026-04-20 — Thin investigation session: resource check, "almost OOM" traced to WWWatcher on a different box
+
+Same-day continuation after S154 close. Resource check: no LMA services running, OOM was on a different box (WWWatcher). No code changes.
+
+Full session detail: `docs/session-logs/session-155-2026-04-20.md`. Commit: `a3a7b40`.
+
+---
+
+## Session 154: 2026-04-20 — PG-13 business-strip + merchant-license gate, 73 MB hero prune, GPS cursor-freeze fix (Lenovo motion sensor)
+
+Counsel engagement meeting was initial-talk only (cost estimate + retainer letter pending async); operator redirected to product refinement. Three passes shipped: (1) **PG-13 content-strip render gate** — non-licensed commercial POIs render name+address+category-graphic only; SI-generated narration/historical_note/description hidden. Reused `merchant_tier` column as unlock flag; new `PoiContentPolicy.kt` centralizes logic. (2) **Commercial hero prune** — 2,301 per-POI WebP files removed from APK (-81 MB). (3) **GPS cursor freeze** — Lenovo `TYPE_SIGNIFICANT_MOTION` never fires; added derived-speed escape hatch (≥ 0.3 m/s → unfreeze).
+
+Full session detail: `docs/session-logs/session-154-2026-04-20.md`. Commit: `4f40de5`.
 
 ---
 
