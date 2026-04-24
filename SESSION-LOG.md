@@ -8,7 +8,7 @@
 
 Shipped the MassGIS MHC inventory as hidden POIs in `salem_pois` — 487 new rows + 16 enrichments via `tools/historical-buildings/import-to-salem-pois.py` (spatial-join L3 assessor for year_built, nearest-+-name-fuzz enrichment, stable `hb_<sha256>` ids, idempotent). Admin map now renders hidden POIs as subtle clickable polygons (outline only, hover-highlight) wired to the existing `PoiEditDialog`; POI-tree category clicks filter the map to that category with a toggle-off and a blue "Filtering: X" pill. Filed research request to SalemIntelligence at `~/Development/SalemIntelligence/docs/lma-mhc-hidden-poi-research-request.md`. Chat gated post-V1 via `ENABLE_CHAT=true` flag. Mid-session detour: first built a parallel `salem_historical_buildings` table + Room v10 entity + admin tab + separate audio toggle; operator corrected the architecture ("just a POI that doesn't present as a POI") and everything was torn down and rebuilt as hidden POIs — Room back to v9 identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`, migration archived. Four new memories shipped, including `feedback_leverage_existing_assets.md` (don't build parallel systems when existing infrastructure can absorb the change).
 
-Full session detail: `docs/session-logs/session-163-2026-04-23.md`. Commit: `<SHA>`.
+Full session detail: `docs/session-logs/session-163-2026-04-23.md`. Commit: `76eec90`.
 
 ---
 
