@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 152-161. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 153-162. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 162: 2026-04-23 — POI location verify scaffolding (DB + admin UI + Android layers); verifier blocked on TigerLine MA ingest
+
+Operator asked for a workflow to verify all POI lat/lng against TigerLine/MassGIS, with TigerLine as ground truth and per-POI "truth of record" override. Probed the data first and found `tiger.addr/addrfeat/edges/featnames` empty for `statefp='25'` (TigerLine MA ingest still in progress per OMEN tigerline session-002) and the `massgis.l3_parcels_essex` polygons loaded but without the joined assessor table — so neither source has usable address-to-coordinate data on this machine right now. Pivoted to ship the additive scaffolding without waiting: (1) PG migration `cache-proxy/scripts/poi-verify-2026-04-23/01-add-location-verify-columns.sql` adds 7 nullable cols + 3 partial indexes to `salem_pois` (lat_proposed/lng_proposed/location_status/location_truth_of_record/location_source/location_drift_m/location_geocoder_rating/location_verified_at) and backfills 60 rows to `no_address`; (2) cache-proxy `admin-pois.js` whitelists `location_truth_of_record`+`location_status` for PUT and adds `POST /admin/salem/pois/:id/accept-proposed-location` (copies lat_proposed→lat, clears proposal, stamps admin_dirty); (3) admin web — `PoiTree.tsx` gets a Location filter `<select>` (any/needs review/no address/no match/unverified/verified/accepted) and a typed `LocationStatus`; `PoiEditDialog.tsx` gets a `LocationVerifyPanel` rendered at the bottom of the existing Location tab — color-coded status badge, current vs proposed coords side-by-side, drift/source/rating/verified_at, "Truth of record" checkbox, "Accept proposed coordinates" button (disabled when no proposal); `tsc --noEmit` clean; (4) Android — new `MenuPrefs.PREF_POI_LOCATION_LAYER`, new `PoiLocationLayerManager` (current/proposed/both), new `MenuEventListener.onPoiLocationLayerChanged` default-method, and `AppBarMenuManager.showTileSourcePopup()` extended to render two radio groups (basemap + POI source) in the same popup with a divider; `compileDebugKotlin` clean. The TigerLine verifier query itself is **deferred** — when MA tables fill (or MassGIS L3 assess loads), it's ~30 lines of SQL to populate the columns we shipped and the rest of the workflow lights up without further schema/UI work. Room migration to expose `lat_proposed`/`lng_proposed` to the Android entity is also deferred until there's data worth migrating for.
+
+Full session detail: `docs/session-logs/session-162-2026-04-23.md`. Commit: `<sha>`.
+
+---
 
 ## Session 161: 2026-04-23 — Car-tour debug-log triage + GPS/V1-offline fixes + repo cleanup
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-153-2026-04-20.md`. Commit: `a3f
 
 ---
 
-## Session 152: 2026-04-19 — Absorb SalemIntelligence KB rewrite (verified_facts landed; Heritage Trail confabulation cleared)
-
-Operator reported SI had completely rewritten its KB to cure bad AI generalization; LMA re-synced and rebuilt. Ran a 7-step absorption: baseline probe surfaced 3 live fabrication hits + 9 rows still at the 30 Church St GP-rooftop phantom coord; coord sync returned 0 updates (SI export matched LMA — 9 phantom-rooftop rows filed as ANOM-001 for SI); historical_note sync updated 33 rows (including the S021 Black Mary Widow correction landing in `gallows_hill_salem`); narration sync updated 1,399 rows with SI's `1f5e051`-SHA regen (+269 short, +290 long). Audit caught two remaining confabulations: `salem_heritage_trail` had SI's verified_fact propagate only to short_narration ("yellow painted line") while long/medium/historical_note still carried an LLM-invented "In 2020 the trail underwent revisions to remove references to its original 'Red Line' history" narrative (filed as ANOM-002); `national_park_service_visitor_center` (LMA-side legacy, not intel-linked) said "red line painted on the sidewalk" directly. Operator-approved option 1: nulled the 4+2 bad fields on the two POIs (tagged `|overridden-s152-heritage-confabulation`), then fixed the identical fabrication hardcoded at `salem-content/.../SalemBusinessesExpanded.kt:1403` so the legacy JVM pipeline can't resurrect it. Rebaked Room DB: 1,769 narrated POIs (+286 vs S150). Built and installed a fresh 820 MB APK on Lenovo HNY0CY0W; cold-boot log verified S150 fixes 4/5/6 are live (GPS polling emits both 2500/30000ms branches, `setupMap` shows `bypassBbox=true` on first call, zero `no such table` errors — 202 newspapers baked). S150 fixes 1/2/3/7 need a field walk to exercise (pending for S153). Anomaly report for SI filed at `docs/SalemIntelligence-anomalies-s152-2026-04-19.md`.
-
-Full session detail: `docs/session-logs/session-152-2026-04-19.md`. Commits: `d249073` (sync + Room bake + hand-nullings) + `a11a9fd` (Kotlin confabulation fix + APK rebuild).
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 151 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 152 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S152 rolled to archive 2026-04-23 by the session-end protocol (S162) -->
 <!-- S151 rolled to archive 2026-04-23 by the session-end protocol (S161) -->
 <!-- S150 rolled to archive 2026-04-23 by the session-end protocol (S160) -->
 <!-- S149 rolled to archive 2026-04-23 by the session-end protocol (S159) -->

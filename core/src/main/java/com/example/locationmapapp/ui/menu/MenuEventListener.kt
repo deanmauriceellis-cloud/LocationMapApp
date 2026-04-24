@@ -123,6 +123,14 @@ interface MenuEventListener {
     /** Switch tile source (SATELLITE, STREET, DARK). Default no-op for backward compat. */
     fun onTileSourceChanged(tileSourceId: String) {}
 
+    /**
+     * S162: Switch which POI coordinate set the map renders.
+     * [layerId] is one of "current" | "proposed" | "both".
+     * Default no-op — implementers opt in when verifier-proposed coords
+     * are available (TigerLine/MassGIS workflow).
+     */
+    fun onPoiLocationLayerChanged(layerId: String) {}
+
     // =========================================================================
     // POINTS OF INTEREST
     // =========================================================================

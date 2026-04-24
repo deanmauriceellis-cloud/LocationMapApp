@@ -31,8 +31,27 @@ export interface PoiRow {
   is_narrated?: boolean
   default_visible?: boolean
   deleted_at?: string | null
+  // S162 — POI location verification
+  lat_proposed?: number | null
+  lng_proposed?: number | null
+  location_status?: LocationStatus
+  location_source?: string | null
+  location_drift_m?: number | null
+  location_geocoder_rating?: number | null
+  location_verified_at?: string | null
+  location_truth_of_record?: boolean
   [key: string]: unknown
 }
+
+export type LocationStatus =
+  | 'unverified'
+  | 'no_address'
+  | 'no_match'
+  | 'needs_review'
+  | 'verified'
+  | 'accepted'
+
+export type LocationFilter = 'all' | LocationStatus
 
 export interface PoiSelection {
   poi: PoiRow
@@ -74,6 +93,7 @@ interface TreeFilter {
   tourOnly: boolean
   narratedOnly: boolean
   visibleOnly: boolean
+  location: LocationFilter
 }
 
 /** Category display names for nicer labels */
@@ -106,6 +126,9 @@ function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
   if (filter.tourOnly) filtered = filtered.filter((r) => r.is_tour_poi)
   if (filter.narratedOnly) filtered = filtered.filter((r) => r.is_narrated)
   if (filter.visibleOnly) filtered = filtered.filter((r) => r.default_visible)
+  if (filter.location !== 'all') {
+    filtered = filtered.filter((r) => (r.location_status ?? 'unverified') === filter.location)
+  }
 
   // Group by category → subcategory
   const byCat = new Map<string, PoiRow[]>()
@@ -306,6 +329,7 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
   const [tourOnly, setTourOnly] = useState(false)
   const [narratedOnly, setNarratedOnly] = useState(false)
   const [visibleOnly, setVisibleOnly] = useState(false)
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>('all')
   const [containerRef, size] = useElementSize()
 
   const effectivePois = externalPois ?? pois
@@ -330,8 +354,10 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
 
   const treeData = useMemo(() => {
     if (!effectivePois) return []
-    return buildTree(effectivePois, { showDeleted, tourOnly, narratedOnly, visibleOnly })
-  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly])
+    return buildTree(effectivePois, {
+      showDeleted, tourOnly, narratedOnly, visibleOnly, location: locationFilter,
+    })
+  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter])
 
   const handleActivate = useCallback(
     (node: NodeApi<TreeNode>) => {
@@ -348,8 +374,11 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
     if (tourOnly) rows = rows.filter((r) => r.is_tour_poi)
     if (narratedOnly) rows = rows.filter((r) => r.is_narrated)
     if (visibleOnly) rows = rows.filter((r) => r.default_visible)
+    if (locationFilter !== 'all') {
+      rows = rows.filter((r) => (r.location_status ?? 'unverified') === locationFilter)
+    }
     return rows.length
-  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly])
+  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter])
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -378,6 +407,22 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
           <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
             <input type="checkbox" checked={visibleOnly} onChange={(e) => setVisibleOnly(e.target.checked)} />
             Visible only
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600">
+            Location:
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value as LocationFilter)}
+              className="text-xs border border-slate-300 rounded px-1 py-0.5 bg-white"
+            >
+              <option value="all">any</option>
+              <option value="needs_review">needs review</option>
+              <option value="no_address">no address</option>
+              <option value="no_match">no match</option>
+              <option value="unverified">unverified</option>
+              <option value="verified">verified</option>
+              <option value="accepted">accepted</option>
+            </select>
           </label>
         </div>
         {visibleCount !== null && (

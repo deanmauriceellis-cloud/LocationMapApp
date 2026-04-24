@@ -61,6 +61,14 @@ object MenuPrefs {
     const val PREF_DARK_MODE = "dark_mode_enabled"
     const val PREF_TILE_SOURCE = "tile_source_id"
 
+    // ── POI Location Layer (S162) ───────────────────────────────────────
+    // Toggles which set of POI coordinates the map renders:
+    //   "current"  — live lat/lng (default)
+    //   "proposed" — lat_proposed/lng_proposed from the verifier
+    //   "both"     — both sets, drawn together for visual diff
+    // Set via the layers icon on the toolbar (alongside the basemap picker).
+    const val PREF_POI_LOCATION_LAYER = "poi_location_layer"
+
     // ── Radar Animation ──────────────────────────────────────────────────
     const val PREF_RADAR_ANIMATE    = "radar_animate_on"
     const val PREF_RADAR_ANIM_SPEED = "radar_anim_speed_ms"

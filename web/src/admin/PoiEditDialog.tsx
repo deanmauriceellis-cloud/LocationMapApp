@@ -51,8 +51,13 @@ import {
   Transition,
   TransitionChild,
 } from '@headlessui/react'
-import { useForm, type FieldValues, type SubmitHandler } from 'react-hook-form'
-import type { PoiRow } from './PoiTree'
+import {
+  useForm,
+  type FieldValues,
+  type SubmitHandler,
+  type UseFormRegisterReturn,
+} from 'react-hook-form'
+import type { PoiRow, LocationStatus } from './PoiTree'
 import {
   UPDATABLE_FIELDS,
   JSONB_FIELDS,
@@ -266,6 +271,137 @@ function FieldRow({ label, htmlFor, hint, children }: FieldRowProps) {
   )
 }
 
+// ─── S162: Location verification panel ──────────────────────────────────────
+//
+// Shows the verifier's proposed coords side-by-side with the live coords,
+// plus the read-only status / drift / source. Two reviewer actions:
+//   - Toggle `location_truth_of_record` (form-bound; persists on Save like
+//     any other field — the verifier will skip this row going forward)
+//   - "Accept proposed coordinates" button — POSTs to the /accept-proposed-
+//     location endpoint, which copies lat_proposed → lat and clears the
+//     proposal columns. Independent of the form's dirty state.
+
+const STATUS_BADGE_CLASS: Record<LocationStatus, string> = {
+  unverified: 'bg-slate-100 text-slate-600 ring-slate-300',
+  no_address: 'bg-amber-50 text-amber-800 ring-amber-300',
+  no_match: 'bg-rose-50 text-rose-800 ring-rose-300',
+  needs_review: 'bg-orange-100 text-orange-900 ring-orange-400',
+  verified: 'bg-emerald-50 text-emerald-800 ring-emerald-300',
+  accepted: 'bg-sky-50 text-sky-800 ring-sky-300',
+}
+
+interface LocationVerifyPanelProps {
+  poi: PoiRow
+  truthOfRecordRegister: UseFormRegisterReturn
+  onAccept: () => void
+  acceptBusy: boolean
+  acceptError: string | null
+}
+
+function LocationVerifyPanel({
+  poi,
+  truthOfRecordRegister,
+  onAccept,
+  acceptBusy,
+  acceptError,
+}: LocationVerifyPanelProps) {
+  const status = (poi.location_status ?? 'unverified') as LocationStatus
+  const hasProposal = poi.lat_proposed != null && poi.lng_proposed != null
+  const drift = poi.location_drift_m
+  const source = poi.location_source
+  const verifiedAt = poi.location_verified_at
+  const rating = poi.location_geocoder_rating
+  const fmt = (n: number | null | undefined, digits = 7): string =>
+    n == null ? '—' : Number(n).toFixed(digits)
+  const fmtDriftM = (n: number | null | undefined): string =>
+    n == null ? '—' : `${Number(n).toFixed(1)} m`
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-slate-700">
+          Location verification
+        </h4>
+        <span
+          className={[
+            'text-[11px] uppercase tracking-wide px-2 py-0.5 rounded ring-1',
+            STATUS_BADGE_CLASS[status],
+          ].join(' ')}
+          title={`location_status = ${status}`}
+        >
+          {status.replace('_', ' ')}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 font-mono">
+        <div>
+          <div className="text-slate-400">Current</div>
+          <div>{fmt(poi.lat)}, {fmt(poi.lng)}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Proposed</div>
+          <div>
+            {hasProposal
+              ? `${fmt(poi.lat_proposed)}, ${fmt(poi.lng_proposed)}`
+              : <span className="text-slate-400 font-sans italic">no proposal</span>}
+          </div>
+        </div>
+        <div>
+          <div className="text-slate-400">Drift</div>
+          <div>{fmtDriftM(drift)}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Source / rating</div>
+          <div>{source ?? '—'}{rating != null ? ` · ${rating}` : ''}</div>
+        </div>
+        {verifiedAt && (
+          <div className="col-span-2">
+            <div className="text-slate-400">Verified at</div>
+            <div className="font-sans">{new Date(verifiedAt).toLocaleString()}</div>
+          </div>
+        )}
+      </div>
+
+      <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+        <input
+          type="checkbox"
+          {...truthOfRecordRegister}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="font-medium">Truth of record</span> — pin this
+          POI's coordinates; the batch verifier will skip it on future runs.
+          Saves with the rest of the form.
+        </span>
+      </label>
+
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onAccept}
+          disabled={!hasProposal || acceptBusy}
+          className={[
+            'px-3 py-1.5 text-xs font-medium rounded',
+            !hasProposal || acceptBusy
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700',
+          ].join(' ')}
+          title={
+            hasProposal
+              ? 'Copy lat_proposed → lat, clear the proposal, mark accepted'
+              : 'Run the verifier first to produce a proposal'
+          }
+        >
+          {acceptBusy ? 'Accepting…' : 'Accept proposed coordinates'}
+        </button>
+        {acceptError && (
+          <span className="text-xs text-rose-700">{acceptError}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function PoiEditDialog({
@@ -303,6 +439,11 @@ export function PoiEditDialog({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // S162 — Accept-proposed-location flow (POST /accept-proposed-location).
+  // Lives outside react-hook-form because it's not a field edit; it's a server
+  // action that copies lat_proposed→lat and clears the proposal columns.
+  const [acceptBusy, setAcceptBusy] = useState(false)
+  const [acceptError, setAcceptError] = useState<string | null>(null)
 
   // ─── Oracle sub-dialog state (9P.10b) ──────────────────────────────────────
   // The "Generate with Salem Oracle" button on the Narration tab (and General
@@ -499,6 +640,42 @@ export function PoiEditDialog({
       setDeleteBusy(false)
     }
   }, [poi, onDeleted, onClose])
+
+  // ─── S162: Accept verifier-proposed coordinates ────────────────────────────
+  const handleAcceptProposed = useCallback(async () => {
+    if (!poi) return
+    setAcceptBusy(true)
+    setAcceptError(null)
+    try {
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}/accept-proposed-location`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try {
+          const body = await res.json()
+          if (body?.error) msg = `${res.status} ${body.error}`
+        } catch { /* not JSON */ }
+        throw new Error(msg)
+      }
+      // Server returns {id, from, to, location_status} — refetch the row so
+      // the dialog (and tree) see the cleared proposal columns + new lat/lng.
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
+        { credentials: 'same-origin' },
+      )
+      if (fresh.ok) {
+        const updated = (await fresh.json()) as PoiRow
+        onSaved(updated)
+        reset(buildDefaults(updated))
+      }
+    } catch (e) {
+      setAcceptError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAcceptBusy(false)
+    }
+  }, [poi, onSaved, reset])
 
   // ─── Render guards ─────────────────────────────────────────────────────────
   if (!poi) return null
@@ -914,6 +1091,15 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
+
+                      {/* S162 — Location verification (TigerLine/MassGIS) */}
+                      <LocationVerifyPanel
+                        poi={poi}
+                        truthOfRecordRegister={reg('location_truth_of_record')}
+                        onAccept={handleAcceptProposed}
+                        acceptBusy={acceptBusy}
+                        acceptError={acceptError}
+                      />
                     </TabPanel>
 
                     {/* ─── Hours & Contact ─────────────────────────────────── */}

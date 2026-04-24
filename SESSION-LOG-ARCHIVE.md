@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S151 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S152 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 152: 2026-04-19 — Absorb SalemIntelligence KB rewrite (verified_facts landed; Heritage Trail confabulation cleared)
+
+Operator reported SI had completely rewritten its KB to cure bad AI generalization; LMA re-synced and rebuilt. Ran a 7-step absorption: baseline probe surfaced 3 live fabrication hits + 9 rows still at the 30 Church St GP-rooftop phantom coord; coord sync returned 0 updates (SI export matched LMA — 9 phantom-rooftop rows filed as ANOM-001 for SI); historical_note sync updated 33 rows (including the S021 Black Mary Widow correction landing in `gallows_hill_salem`); narration sync updated 1,399 rows with SI's `1f5e051`-SHA regen (+269 short, +290 long). Audit caught two remaining confabulations: `salem_heritage_trail` had SI's verified_fact propagate only to short_narration ("yellow painted line") while long/medium/historical_note still carried an LLM-invented "In 2020 the trail underwent revisions to remove references to its original 'Red Line' history" narrative (filed as ANOM-002); `national_park_service_visitor_center` (LMA-side legacy, not intel-linked) said "red line painted on the sidewalk" directly. Operator-approved option 1: nulled the 4+2 bad fields on the two POIs (tagged `|overridden-s152-heritage-confabulation`), then fixed the identical fabrication hardcoded at `salem-content/.../SalemBusinessesExpanded.kt:1403` so the legacy JVM pipeline can't resurrect it. Rebaked Room DB: 1,769 narrated POIs (+286 vs S150). Built and installed a fresh 820 MB APK on Lenovo HNY0CY0W; cold-boot log verified S150 fixes 4/5/6 are live (GPS polling emits both 2500/30000ms branches, `setupMap` shows `bypassBbox=true` on first call, zero `no such table` errors — 202 newspapers baked). S150 fixes 1/2/3/7 need a field walk to exercise (pending for S153). Anomaly report for SI filed at `docs/SalemIntelligence-anomalies-s152-2026-04-19.md`.
+
+Full session detail: `docs/session-logs/session-152-2026-04-19.md`. Commits: `d249073` (sync + Room bake + hand-nullings) + `a11a9fd` (Kotlin confabulation fix + APK rebuild).
+
+---
 
 ## Session 151: 2026-04-19 — Counsel packet PDFs (pre-NDA / post-NDA) for 2026-04-20 counsel engagement meeting
 

@@ -78,6 +78,16 @@ const UPDATABLE_FIELDS = [
   'building_footprint_geojson',
   'mhc_id', 'mhc_year_built', 'mhc_style', 'mhc_nr_status', 'mhc_narrative',
   'canonical_address_point_id', 'local_historic_district', 'parcel_owner_class',
+  // S162 — POI location verification (TigerLine/MassGIS workflow).
+  // `location_truth_of_record` lets a reviewer pin a POI's lat/lng so the
+  // batch verifier never overwrites it. `location_status` is normally set
+  // by the verifier ('verified' | 'needs_review' | 'no_match' | 'no_address')
+  // but exposed here so the admin can re-flag a row manually.
+  // Proposed coords (lat_proposed/lng_proposed) and provenance fields
+  // (location_source/location_drift_m/location_geocoder_rating/location_verified_at)
+  // are verifier-owned and intentionally NOT in the whitelist — use the
+  // /accept-proposed-location endpoint to commit a proposal.
+  'location_truth_of_record', 'location_status',
 ];
 
 // Columns that hold JSONB and must be JSON.stringify'd before binding.
@@ -458,6 +468,59 @@ module.exports = function(app, deps) {
       });
     } catch (err) {
       console.error('[AdminPois] move error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── POST /admin/salem/pois/:id/accept-proposed-location ─────────────────
+  // S162: Commit a verifier-proposed coordinate. Copies lat_proposed/lng_proposed
+  // into lat/lng, marks status='accepted', clears the proposal columns. Mirrors
+  // /move semantics (admin_dirty stamped). 409 if there's no proposal to accept.
+  app.post('/admin/salem/pois/:id/accept-proposed-location', requirePg, async (req, res) => {
+    try {
+      const id = getId(req, res);
+      if (!id) return;
+
+      const existing = await pgPool.query(
+        `SELECT id, lat, lng, lat_proposed, lng_proposed, deleted_at
+           FROM salem_pois WHERE id = $1`,
+        [id]
+      );
+      if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
+      const row = existing.rows[0];
+      if (row.deleted_at) {
+        return res.status(409).json({ error: 'POI is soft-deleted; restore it before accepting' });
+      }
+      if (row.lat_proposed == null || row.lng_proposed == null) {
+        return res.status(409).json({ error: 'No proposed coordinates to accept' });
+      }
+
+      const { rows } = await pgPool.query(
+        `UPDATE salem_pois
+            SET lat = lat_proposed,
+                lng = lng_proposed,
+                location_status = 'accepted',
+                lat_proposed = NULL,
+                lng_proposed = NULL,
+                location_drift_m = NULL,
+                location_geocoder_rating = NULL,
+                location_verified_at = NOW(),
+                admin_dirty = TRUE,
+                admin_dirty_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $1
+          RETURNING lat, lng`,
+        [id]
+      );
+
+      res.json({
+        id,
+        from: { lat: parseFloat(row.lat), lng: parseFloat(row.lng) },
+        to: { lat: parseFloat(rows[0].lat), lng: parseFloat(rows[0].lng) },
+        location_status: 'accepted',
+      });
+    } catch (err) {
+      console.error('[AdminPois] accept-proposed-location error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });

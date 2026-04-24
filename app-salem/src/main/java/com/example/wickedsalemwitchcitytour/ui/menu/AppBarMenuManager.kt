@@ -35,6 +35,7 @@ import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.audio.AudioControl
 import com.example.wickedsalemwitchcitytour.ui.TileSourceManager
 import com.example.locationmapapp.ui.menu.MenuEventListener
+import com.example.wickedsalemwitchcitytour.ui.PoiLocationLayerManager
 import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.locationmapapp.util.DebugLogger
@@ -203,26 +204,69 @@ class AppBarMenuManager(
     }
 
     /**
-     * Show a PopupMenu with tile source options: Satellite, Street, Dark.
-     * Checks the currently active source and fires onTileSourceChanged on selection.
+     * Layers popup — basemap section + POI source section in one popup.
+     * Each section is its own radio group so the basemap and POI-source
+     * selections are independent. S162 added the POI source group; the
+     * basemap group is unchanged from prior sessions.
      */
     private fun showTileSourcePopup(anchor: View) {
         val popup = PopupMenu(context, anchor)
-        val currentId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
+
+        // ── Basemap group (groupId 1) ─────────────────────────────────
+        val currentTileId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
             ?: TileSourceManager.DEFAULT_SOURCE
         TileSourceManager.ALL_IDS.forEachIndexed { index, id ->
-            val item = popup.menu.add(Menu.NONE, index, index, TileSourceManager.label(id))
+            val item = popup.menu.add(GROUP_BASEMAP, index, index, TileSourceManager.label(id))
             item.isCheckable = true
-            item.isChecked = (id == currentId)
+            item.isChecked = (id == currentTileId)
         }
+        popup.menu.setGroupCheckable(GROUP_BASEMAP, true, true)
+
+        // ── Divider header (non-checkable) ────────────────────────────
+        val tileCount = TileSourceManager.ALL_IDS.size
+        popup.menu.add(Menu.NONE, Menu.NONE, tileCount, "─────────")
+            .isEnabled = false
+
+        // ── POI source group (groupId 2) ──────────────────────────────
+        // S162: pick which coordinate set markers render from
+        // (current vs verifier-proposed vs both).
+        val currentPoiLayer = prefs.getString(
+            MenuPrefs.PREF_POI_LOCATION_LAYER,
+            PoiLocationLayerManager.DEFAULT_LAYER,
+        ) ?: PoiLocationLayerManager.DEFAULT_LAYER
+        PoiLocationLayerManager.ALL_IDS.forEachIndexed { index, id ->
+            val itemId = tileCount + 1 + index   // disjoint from basemap itemIds
+            val item = popup.menu.add(GROUP_POI_LAYER, itemId, itemId, PoiLocationLayerManager.label(id))
+            item.isCheckable = true
+            item.isChecked = (id == currentPoiLayer)
+        }
+        popup.menu.setGroupCheckable(GROUP_POI_LAYER, true, true)
+
         popup.setOnMenuItemClickListener { item ->
-            val selectedId = TileSourceManager.ALL_IDS[item.itemId]
-            prefs.edit().putString(MenuPrefs.PREF_TILE_SOURCE, selectedId).apply()
-            DebugLogger.i(TAG, "Tile source selected → $selectedId")
-            menuEventListener.onTileSourceChanged(selectedId)
-            true
+            when (item.groupId) {
+                GROUP_BASEMAP -> {
+                    val selectedId = TileSourceManager.ALL_IDS[item.itemId]
+                    prefs.edit().putString(MenuPrefs.PREF_TILE_SOURCE, selectedId).apply()
+                    DebugLogger.i(TAG, "Tile source selected → $selectedId")
+                    menuEventListener.onTileSourceChanged(selectedId)
+                    true
+                }
+                GROUP_POI_LAYER -> {
+                    val selectedId = PoiLocationLayerManager.ALL_IDS[item.itemId - tileCount - 1]
+                    prefs.edit().putString(MenuPrefs.PREF_POI_LOCATION_LAYER, selectedId).apply()
+                    DebugLogger.i(TAG, "POI location layer selected → $selectedId")
+                    menuEventListener.onPoiLocationLayerChanged(selectedId)
+                    true
+                }
+                else -> false
+            }
         }
         popup.show()
+    }
+
+    private companion object LayerGroups {
+        const val GROUP_BASEMAP = 1
+        const val GROUP_POI_LAYER = 2
     }
 
     // ─────────────────────────────────────────────────────────────────────────

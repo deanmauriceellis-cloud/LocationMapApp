@@ -47,6 +47,12 @@ export const UPDATABLE_FIELDS = [
   'building_footprint_geojson',
   'mhc_id', 'mhc_year_built', 'mhc_style', 'mhc_nr_status', 'mhc_narrative',
   'canonical_address_point_id', 'local_historic_district', 'parcel_owner_class',
+  // S162 — POI location verification (TigerLine/MassGIS workflow). Verifier
+  // owns lat_proposed/lng_proposed and the provenance columns; only the two
+  // human-editable flags are in the PUT whitelist. Use the
+  // POST /admin/salem/pois/:id/accept-proposed-location endpoint to commit
+  // a proposal — it's not a PUT.
+  'location_truth_of_record', 'location_status',
 ] as const
 
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
@@ -62,6 +68,7 @@ export const JSONB_FIELDS: ReadonlySet<string> = new Set([
 export const BOOLEAN_FIELDS: ReadonlySet<string> = new Set([
   'requires_transportation', 'wheelchair_accessible', 'seasonal',
   'is_tour_poi', 'is_narrated', 'default_visible',
+  'location_truth_of_record',
 ])
 
 // Numeric columns (rendered as <input type="number">).
