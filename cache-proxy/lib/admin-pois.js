@@ -72,6 +72,12 @@ const UPDATABLE_FIELDS = [
   'data_source', 'confidence', 'verified_date', 'stale_after',
   // Flags
   'is_tour_poi', 'is_narrated', 'default_visible',
+  // Phase 9Y — MassGIS / MHC Inventory / L3 parcel enrichment (added S159 for schema,
+  // exposed to admin S160). `building_footprint_geojson` is polygon-shaped and
+  // normally populated by the 9Y.3 enrichment script; manual override allowed.
+  'building_footprint_geojson',
+  'mhc_id', 'mhc_year_built', 'mhc_style', 'mhc_nr_status', 'mhc_narrative',
+  'canonical_address_point_id', 'local_historic_district', 'parcel_owner_class',
 ];
 
 // Columns that hold JSONB and must be JSON.stringify'd before binding.

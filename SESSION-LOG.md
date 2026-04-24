@@ -1,14 +1,22 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 150-159. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 151-160. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 160: 2026-04-23 — Master-plan split + admin-tool Witchy tiles + 9Y edit tab
+
+Third session of the calendar day. Three tracks. (1) Split `WickedSalemWitchCityTour_MASTER_PLAN.md` from 3,689 → 1,834 lines by moving completed-phase step-by-step detail (Phases 1-9X), V2-deferred tier infrastructure (Phases 9B/9C/9D), and the pre-S138 tiered business model into `docs/archive/WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md` (1,943 lines), with a new thin completed-phase index and a rewritten V1 Business Model section reflecting the $19.99 flat paid / fully offline / no-ads / no-LLM posture. Zero content deleted — every line is in either the live plan or the archive. (2) Admin tool now serves the same tiles the phone app sees: new cache-proxy endpoint `GET /admin/tiles/:provider/:z/:x/:y` reads from `tools/tile-bake/dist/salem_tiles.sqlite` with osmdroid BigInt key encoding, Content-Type sniffed from magic bytes (WebP / PNG / JPEG), 3 providers (Salem-Custom / Mapnik / Esri-WorldImagery). `AdminMap.tsx` gets a top-right `<select>` picker with localStorage persistence, default Witchy, plus an OSM-online fallback for low-zoom panning. (3) POI edit dialog gets an 8th tab "MassGIS / MHC" with form fields for all 9 S159 Phase 9Y columns; backend `UPDATABLE_FIELDS` whitelist in `admin-pois.js` and mirrored `poiAdminFields.ts` extended (62 → 71 fields); `mhc_year_built` flagged numeric. Type-check clean; backend mock-req/res tested 7 cases happy + edge. Post-session operator reported the tile picker wasn't selectable; diagnostic confirmed both servers live and tile endpoint routes correctly (HTTP 401 without auth = registered), most likely cause is a browser hard-refresh to pick up the new top-level module symbols — queued as the first item for S161 before continuing to 9Y.3.
+
+Full session detail: `docs/session-logs/session-160-2026-04-23.md`. Commit: pending.
+
+---
 
 ## Session 159: 2026-04-23 — Phase 9Y.2b Kotlin + Room v8→v9 identity-hash cascade
 
 Mechanical schema propagation for the 9 MassGIS/MHC/L3 columns that S156 added to PG. Added 9 nullable `@ColumnInfo` fields (`building_footprint_geojson`, `mhc_id/year_built/style/nr_status/narrative`, `canonical_address_point_id`, `local_historic_district`, `parcel_owner_class`) to `SalemPoi.kt`; bumped `SalemContentDatabase` version 8→9; extracted new Room identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`; updated `verify-bundled-assets.js` + `bundle-witch-trials-newspapers-into-db.js` constants; threaded the 9 columns through `publish-salem-pois.js` (CREATE_TABLE + SELECT + INSERT + transaction binding); rebaked `salem_content.db` (1,830 POIs, 8.9 MB); Lenovo TB305FU uninstall+install smoke-test passed cleanly (app launches, POI markers render, narration state machine active, zero SQLite/Room errors). 9Y.3 enrichment script is now unblocked. Pre-existing issue surfaced: `verify-bundled-assets.js` still checks the pre-S158 in-APK `salem_tiles.sqlite` location and fails on every build. Post-session discovery: operator's home GPS in Beverly falls outside the S158 Witchy bake bbox (max lat 42.545 vs Beverly 42.557), so the bundled tiles don't cover the operator's home location — candidate fix for next session is extending bake bounds or adding a UX hint.
 
-Full session detail: `docs/session-logs/session-159-2026-04-23.md`. Commit: pending.
+Full session detail: `docs/session-logs/session-159-2026-04-23.md`. Commit: `58d4c8c`.
 
 ---
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-151-2026-04-19.md`. Commit: `fcc
 
 ---
 
-## Session 150: 2026-04-18 — Field-test root-cause fixes: detail level flows to long_narration, speakTaggedNarration split, 23 POIs recategorized, GPS trail + polling + bbox defaults
-
-Opened with S149 field-test debug. Pulled Lenovo logs and diagnosed seven bugs from the Beverly→Salem drive: (1) "so little historical narration" = `getNarrationForPass` ignored `AudioControl.detailLevel`, hardcoded to `shortNarration` — DEEP setting was a no-op on the ambient walk path (tour-only `pickVariantText` was the only honoring path); (2) every Speaking event was `type=HINT` because `TourViewModel.speakTaggedNarration` delegated to `speakTaggedHint`; (3) "Phillip's house on Chestnut" not narrating = mis-categorized ENTERTAINMENT (stuck in muted BUSINESSES group); (4) GPS trail froze on drive because accelerometer significant-motion sensor doesn't fire in a stable car + 25m escape-hatch meant trail only updated every 25m of travel; (5) GPS polling pinned at 2.5s because `narrationActive=true` hardcoded, making the 60s battery-saver branch unreachable (494 fixes in 90 min, mostly parked); (6) bbox override defaulted to `false` so fresh install from Beverly clamped to Samantha; (7) newspaper panel broken because `salem_witch_trials_newspapers` table was missing from bundled Room DB. Shipped fixes for all seven plus instrumented the still-mysterious AudioControl gate leak (Grace Episcopal / Golden Dawn Contracting bypassed the S149 gate even with Businesses off — no toggle events, no code bypass, reason unknown). Recategorized 23 POIs (12 HISTORICAL_BUILDINGS, 1 CIVIC, 10 WORSHIP) tagged `|category-fix-s150-2026-04-18`. Republished assets DB (1,830 POIs + 202 newspaper articles). Build clean. APK installed on Lenovo for operator re-test.
-
-Full session detail: `docs/session-logs/session-150-2026-04-18.md`. Commit: `5c833a3`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 149 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 150 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S150 rolled to archive 2026-04-23 by the session-end protocol (S160) -->
 <!-- S149 rolled to archive 2026-04-23 by the session-end protocol (S159) -->
 <!-- S148 rolled to archive 2026-04-23 by the session-end protocol (S158) -->
 

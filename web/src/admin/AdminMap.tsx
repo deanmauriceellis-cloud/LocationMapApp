@@ -39,8 +39,50 @@ function categoryColor(category: string | undefined): string {
   return (category && CATEGORY_COLORS[category]) || DEFAULT_COLOR
 }
 
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+// Tile provider choices (S160). Salem-Custom / Mapnik / Esri-WorldImagery come
+// out of tools/tile-bake/dist/salem_tiles.sqlite via cache-proxy's
+// /admin/tiles/:provider/:z/:x/:y endpoint — matches what the phone app sees.
+// OSM is kept as a fallback for zooming out past the bake coverage.
+interface TileProvider {
+  id: string
+  label: string
+  url: string
+  attribution: string
+  maxNativeZoom: number
+}
+
+const TILE_PROVIDERS: TileProvider[] = [
+  {
+    id: 'Salem-Custom',
+    label: 'Witchy (Salem-Custom)',
+    url: '/api/admin/tiles/Salem-Custom/{z}/{x}/{y}',
+    attribution: 'Bundled Witchy tiles — OSM + MassGIS | planetiler + tippecanoe + MapLibre-GL-Native',
+    maxNativeZoom: 19,
+  },
+  {
+    id: 'Mapnik',
+    label: 'OSM Mapnik (bundled)',
+    url: '/api/admin/tiles/Mapnik/{z}/{x}/{y}',
+    attribution: 'Bundled OSM Mapnik tiles &copy; OpenStreetMap contributors',
+    maxNativeZoom: 19,
+  },
+  {
+    id: 'Esri-WorldImagery',
+    label: 'Esri Satellite (bundled)',
+    url: '/api/admin/tiles/Esri-WorldImagery/{z}/{x}/{y}',
+    attribution: 'Bundled Esri World Imagery — Tiles &copy; Esri',
+    maxNativeZoom: 19,
+  },
+  {
+    id: 'OSM',
+    label: 'OSM online (zoom out)',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxNativeZoom: 19,
+  },
+]
+
+const TILE_PROVIDER_STORAGE_KEY = 'lma-admin-tile-provider'
 
 // ─── Marker icon factory ─────────────────────────────────────────────────────
 
@@ -294,6 +336,32 @@ function MoveConfirm({ pending, onConfirm, onCancel, busy, error }: MoveConfirmP
 
 // ─── Legend ──────────────────────────────────────────────────────────────────
 
+function TileProviderPicker({
+  providerId,
+  onChange,
+}: {
+  providerId: string
+  onChange: (id: string) => void
+}) {
+  return (
+    <div className="absolute top-3 right-3 z-[1000] bg-white/95 backdrop-blur rounded-md shadow-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 flex items-center gap-2">
+      <label htmlFor="admin-tile-provider" className="font-medium text-slate-600">
+        Base map:
+      </label>
+      <select
+        id="admin-tile-provider"
+        className="text-xs border border-slate-300 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        value={providerId}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {TILE_PROVIDERS.map(p => (
+          <option key={p.id} value={p.id}>{p.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function Legend({ categoryCounts }: { categoryCounts: [string, number][] }) {
   return (
     <div className="absolute top-2 right-2 z-[100] bg-white/95 border border-slate-300 rounded shadow px-3 py-2 text-xs max-h-80 overflow-y-auto">
@@ -323,6 +391,22 @@ export function AdminMap({
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
+
+  const [tileProviderId, setTileProviderIdState] = useState<string>(() => {
+    try {
+      const stored = localStorage.getItem(TILE_PROVIDER_STORAGE_KEY)
+      if (stored && TILE_PROVIDERS.some(p => p.id === stored)) return stored
+    } catch { /* ignore */ }
+    return 'Salem-Custom'
+  })
+  const setTileProviderId = useCallback((id: string) => {
+    setTileProviderIdState(id)
+    try { localStorage.setItem(TILE_PROVIDER_STORAGE_KEY, id) } catch { /* ignore */ }
+  }, [])
+  const activeProvider = useMemo(
+    () => TILE_PROVIDERS.find(p => p.id === tileProviderId) ?? TILE_PROVIDERS[0],
+    [tileProviderId],
+  )
 
   const selectedKey = selectedPoi?.poi.id ?? null
 
@@ -402,10 +486,11 @@ export function AdminMap({
         zoomControl={true}
       >
         <TileLayer
-          url={TILE_URL}
-          attribution={TILE_ATTR}
+          key={activeProvider.id}
+          url={activeProvider.url}
+          attribution={activeProvider.attribution}
           maxZoom={22}
-          maxNativeZoom={19}
+          maxNativeZoom={activeProvider.maxNativeZoom}
         />
         <MarkerLayer
           pois={pois}
@@ -415,6 +500,10 @@ export function AdminMap({
         />
         <FlyToSelected selectedPoi={selectedPoi} />
       </MapContainer>
+      <TileProviderPicker
+        providerId={tileProviderId}
+        onChange={setTileProviderId}
+      />
       <Legend categoryCounts={categoryCounts} />
       {pending && (
         <MoveConfirm

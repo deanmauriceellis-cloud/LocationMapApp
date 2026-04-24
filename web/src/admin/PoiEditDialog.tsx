@@ -592,6 +592,7 @@ export function PoiEditDialog({
                     <Tab className={tabClass}>Hours &amp; Contact</Tab>
                     <Tab className={tabClass}>Narration</Tab>
                     <Tab className={tabClass}>Provenance</Tab>
+                    <Tab className={tabClass}>MassGIS / MHC</Tab>
                     <Tab className={tabClass}>Linked Historical</Tab>
                     <Tab className={tabClass}>Danger Zone</Tab>
                   </TabList>
@@ -1197,6 +1198,164 @@ export function PoiEditDialog({
                           </div>
                         )}
                       </div>
+                    </TabPanel>
+
+                    {/* ─── MassGIS / MHC (Phase 9Y enrichment, S160) ───────── */}
+                    <TabPanel className="space-y-4">
+                      <div className="p-3 text-xs text-slate-600 bg-indigo-50 border border-indigo-200 rounded">
+                        <p className="font-medium text-indigo-800 mb-1">
+                          Phase 9Y — MassGIS / MHC / L3 parcel enrichment
+                        </p>
+                        <p>
+                          These 9 columns are populated by the Phase 9Y.3
+                          cross-join script against <code className="font-mono">massgis.structures</code>,{' '}
+                          <code className="font-mono">massgis.mhc_inventory</code>,{' '}
+                          <code className="font-mono">massgis.l3_parcels_essex</code>, and{' '}
+                          <code className="font-mono">massgis.l3_assess_essex</code>. Until 9Y.3
+                          runs, every POI's 9 columns are NULL. You can edit
+                          them here to manually override the enrichment (e.g.,
+                          when the auto-match picks the wrong parcel).
+                        </p>
+                      </div>
+
+                      {has('mhc_id') && (
+                        <FieldRow
+                          label="MHC ID"
+                          htmlFor="mhc_id"
+                          hint="MA Historical Commission Inventory key"
+                        >
+                          <input
+                            id="mhc_id"
+                            type="text"
+                            {...reg('mhc_id')}
+                            className="w-48 px-2 py-1 text-sm font-mono border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('mhc_year_built') && (
+                        <FieldRow
+                          label="Year built (MHC)"
+                          htmlFor="mhc_year_built"
+                          hint="Curated from MHC Inventory"
+                        >
+                          <input
+                            id="mhc_year_built"
+                            type="number"
+                            step="1"
+                            min="1600"
+                            max="2100"
+                            {...reg('mhc_year_built')}
+                            className="w-28 px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('mhc_style') && (
+                        <FieldRow
+                          label="Architectural style"
+                          htmlFor="mhc_style"
+                          hint="e.g., Federal, Georgian, McIntire, Colonial Revival"
+                        >
+                          <input
+                            id="mhc_style"
+                            type="text"
+                            {...reg('mhc_style')}
+                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('mhc_nr_status') && (
+                        <FieldRow
+                          label="NR status"
+                          htmlFor="mhc_nr_status"
+                          hint="NHL / NRIND / NRDIS / LHD tier"
+                        >
+                          <input
+                            id="mhc_nr_status"
+                            type="text"
+                            {...reg('mhc_nr_status')}
+                            className="w-40 px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('mhc_narrative') && (
+                        <FieldRow
+                          label="MHC narrative"
+                          htmlFor="mhc_narrative"
+                          hint="Curated blurb from the MHC Inventory record"
+                        >
+                          <textarea
+                            id="mhc_narrative"
+                            rows={5}
+                            {...reg('mhc_narrative')}
+                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-serif leading-relaxed"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('local_historic_district') && (
+                        <FieldRow
+                          label="Local Historic District"
+                          htmlFor="local_historic_district"
+                          hint="Salem LHD / McIntire Historic District / etc."
+                        >
+                          <input
+                            id="local_historic_district"
+                            type="text"
+                            {...reg('local_historic_district')}
+                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('canonical_address_point_id') && (
+                        <FieldRow
+                          label="L3 parcel LOC_ID"
+                          htmlFor="canonical_address_point_id"
+                          hint="Essex County L3 parcel anchor (map_par_id / LOC_ID)"
+                        >
+                          <input
+                            id="canonical_address_point_id"
+                            type="text"
+                            {...reg('canonical_address_point_id')}
+                            className="w-64 px-2 py-1 text-sm font-mono border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('parcel_owner_class') && (
+                        <FieldRow
+                          label="Parcel owner class"
+                          htmlFor="parcel_owner_class"
+                          hint="L3 assessor classification (SFR / MFR / COM / TAX / etc.)"
+                        >
+                          <input
+                            id="parcel_owner_class"
+                            type="text"
+                            {...reg('parcel_owner_class')}
+                            className="w-40 px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+
+                      {has('building_footprint_geojson') && (
+                        <FieldRow
+                          label="Building footprint (GeoJSON)"
+                          htmlFor="building_footprint_geojson"
+                          hint="Polygon source for 9Y.9 point-in-polygon geofencing. Normally auto-populated; paste a GeoJSON Feature or geometry object to override."
+                        >
+                          <textarea
+                            id="building_footprint_geojson"
+                            rows={6}
+                            {...reg('building_footprint_geojson')}
+                            placeholder='{ "type": "Polygon", "coordinates": [[[ -70.89, 42.52 ], ...]] }'
+                            className="w-full px-2 py-1 text-xs font-mono border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
                     </TabPanel>
 
                     {/* ─── Linked Historical Content (9P.10a stub) ─────────── */}

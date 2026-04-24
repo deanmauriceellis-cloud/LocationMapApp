@@ -43,6 +43,10 @@ export const UPDATABLE_FIELDS = [
   'data_source', 'confidence', 'verified_date', 'stale_after',
   // Flags
   'is_tour_poi', 'is_narrated', 'default_visible',
+  // Phase 9Y — MassGIS / MHC Inventory / L3 parcel enrichment
+  'building_footprint_geojson',
+  'mhc_id', 'mhc_year_built', 'mhc_style', 'mhc_nr_status', 'mhc_narrative',
+  'canonical_address_point_id', 'local_historic_district', 'parcel_owner_class',
 ] as const
 
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
@@ -64,6 +68,7 @@ export const BOOLEAN_FIELDS: ReadonlySet<string> = new Set([
 export const NUMERIC_FIELDS: ReadonlySet<string> = new Set([
   'lat', 'lng', 'geofence_radius_m', 'priority', 'wave', 'rating',
   'confidence', 'ad_priority', 'merchant_tier', 'year_established',
+  'mhc_year_built',
 ])
 
 // Date columns (rendered as <input type="date">). PG returns ISO strings;
