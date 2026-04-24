@@ -43,6 +43,13 @@ android {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
     }
+
+    androidResources {
+        // S167: keep pre-compressed assets uncompressed inside the APK so
+        // OfflineTileManager can compare on-disk size to asset size cheaply
+        // via AssetFileDescriptor.getLength().
+        noCompress += ['sqlite']
+    }
 }
 
 dependencies {

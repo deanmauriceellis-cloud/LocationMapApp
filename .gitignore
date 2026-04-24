@@ -46,3 +46,23 @@ docs/bake-tests/
 # Overnight test logcats — too large for git (keep small artifacts)
 docs/session-logs/overnight-*/logcat*.log
 docs/session-logs/overnight-*/logcat*.log.gz
+
+# S167: large tile-archive backup and poi-icon style-variant archive.
+# The README.md inside the archive dir stays tracked so the archive is
+# self-documenting; the 471 MB of PNG files are local-only.
+tools/tile-bake/dist/salem_tiles_preS167.sqlite.bak
+docs/archive/poi-icons-unused-styles_archived_*/**/*.png
+docs/archive/poi-icons-unused-styles_archived_*/**/*.webp
+docs/archive/poi-icons-unused-styles_archived_*/**/*.jpg
+
+# IDE / tool caches
+.kotlin/
+.claude/
+**/__pycache__/
+
+# S167: pipeline staging copy of salem_tiles.sqlite.
+# The canonical copy that ships lives at app-salem/src/main/assets/salem_tiles.sqlite
+# and IS committed — fresh clones need it to build a working APK. The staging
+# copy under tools/tile-bake/dist/ is just the output of trim-to-salem.py and
+# can always be regenerated.
+tools/tile-bake/dist/salem_tiles.sqlite

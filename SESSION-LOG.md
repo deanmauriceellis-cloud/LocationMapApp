@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 157-166. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 158-167. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 167: 2026-04-24 — APK packaging audit: poi-icons + tile archive shrink + single-basemap build
+
+Pre-Play-Store packaging pass plus a stack of quality-of-life fixes. Shipped: (1) Walking Tours hang root-caused to a missing `PRAGMA user_version = 9` in the asset DB triggering `fallbackToDestructiveMigration` on first launch — stamped in both source and asset DBs. (2) Walk simulator smoothness fix — `LocationMode.MANUAL` now bypasses the stationary gate (Lenovo `TYPE_SIGNIFICANT_MOTION` never fires). (3) New `POIs Hist. Landmark` toggle in the layers popup (filters 487 `massgis_mhc` POIs). (4) Dead Current/Proposed/Both POI-location selector removed. (5) `poi-icons/` trimmed to witchcraft-style-only + WebP (544 MB → 3.4 MB, 7 other styles archived with README at `docs/archive/poi-icons-unused-styles_archived_2026-04-24/`). (6) `poi-circle-icons/` converted to 128 WebP (36 MB → 1.2 MB). (7) `salem_tiles.sqlite` trimmed to Witchy-only + Salem city bbox + z16-19 + re-encoded WebP q=78 (207 MB → 30 MB, pipeline at `tools/tile-bake/trim-to-salem.py`). (8) Tile archive bundled in APK assets with first-launch auto-extract via `OfflineTileManager` + `noCompress 'sqlite'`. (9) `TileSourceManager` fully collapsed to single-basemap (Esri/Mapnik/Dark source builders, IDs, and `buildDarkTileSource`/`onDarkModeToggled` delegations all deleted). Layers button in toolbar preserved as the home for future toggles. **APK trajectory: 706 MB → 50 MB → 79 MB (bundled tiles).** Well under Play Store 150 MB base-module limit — no asset pack needed.
+
+Full session detail: `docs/session-logs/session-167-2026-04-24.md`. Commit: pending.
+
+---
 
 ## Session 166: 2026-04-24 — FuzzySearchEngine type/category synonym expansion
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-158-2026-04-23.md`. Commit: pend
 
 ---
 
-## Session 157: 2026-04-22 — OSM-stays pivot + Essex L3 parcels ingest + Salem QGIS project + routing design captured
-
-Operator reversed the S156 TigerLine-foundation/MapLibre/osmdroid-ripout plan: OSM + osmdroid stay as V1 base map; MassGIS + TigerLine become overlays only (osmdroid `Polygon` / `Polyline` / `Marker`). Project memory `project_osm_stays_as_basemap.md` codifies the reversal; STATE.md + master plan + tigerline docs updated. Self-ingested MassGIS L3 Parcels + L3 Assess for Essex County (366,884 polygons + 429,803 assessor rows) via new `cache-proxy/scripts/ingest-l3-parcels-essex.py`; validated end-to-end on 111 Essex St Beverly. Built a portable `.qgz` QGIS project at `tools/qgis-project/salem-gis.qgz` with 13 layers (OSM base + Salem boundary + Open Space + Cemeteries + Civic/Institutional + Land Use 25-cat + Buildings + L3 Parcels + MassDOT Roads + TIGER Edges + MHC Inventory + LMA POIs with category icons at scale ≤ 1:1000). Internal walking-router design captured in live log (Salem-clipped, ~2,200 edges, ~100 KB bundled asset, ~2.75 sessions — **exploratory, not decided**). Operator cautioned at end of session: "nothing is decided yet" — the S157 design discussions beyond the OSM-stays direction are capture-only.
-
-Full session detail: `docs/session-logs/session-157-2026-04-22.md`. Commits: `4fe6bc0` (OSM pivot + L3 ingest) + `d97d0da` (QGIS project). 3 S156 commits + 2 S157 commits remain unpushed pending operator direction.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 156 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 157 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->
 <!-- S156 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
 <!-- S155 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
 <!-- S154 rolled to archive 2026-04-24 by the session-end protocol (S164) -->

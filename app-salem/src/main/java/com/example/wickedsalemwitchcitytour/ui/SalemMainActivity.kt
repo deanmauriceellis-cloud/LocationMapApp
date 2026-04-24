@@ -2241,14 +2241,20 @@ class SalemMainActivity : AppCompatActivity() {
                 // that don't qualify (no historical_note, not a tour stop, not
                 // TOURISM_HISTORY). Tourism-history POIs still show even if
                 // their note hasn't been generated yet — they just stay silent.
-                val points = if (narrationGeofenceManager.isHistoricalMode()) {
+                val histModeFiltered = if (narrationGeofenceManager.isHistoricalMode()) {
                     tierFiltered.filter { narrationGeofenceManager.isVisibleInHistoricalMode(it) }
                 } else {
                     tierFiltered
                 }
+                // S167: MassGIS landmark toggle — hide massgis_mhc POIs when unchecked
+                val histLandmarkOn = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+                    .getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, true)
+                val points = if (histLandmarkOn) histModeFiltered
+                             else histModeFiltered.filter { it.dataSource != "massgis_mhc" }
                 DebugLogger.i("SalemMainActivity",
                     "Loading ${points.size} narration markers (showAll=$showAllPoisActive, " +
-                    "total=${allPoints.size}, histMode=${narrationGeofenceManager.isHistoricalMode()})")
+                    "total=${allPoints.size}, histMode=${narrationGeofenceManager.isHistoricalMode()}, " +
+                    "histLandmark=$histLandmarkOn)")
 
                 // S118: Pre-generate icons on background thread to avoid ANR
                 val zoom = binding.mapView.zoomLevelDouble
@@ -2855,6 +2861,8 @@ class SalemMainActivity : AppCompatActivity() {
             //   tracker state. Catches real GPS drift, teleport-after-pocket,
             //   or any case where the motion sensor missed an event.
             val stationaryFrozen = run {
+                // Walk simulator emits synthetic positions — physical stillness sensor is irrelevant.
+                if (viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL) return@run false
                 val mt = motionTracker ?: return@run false
                 if (!mt.isStationary()) return@run false
                 // S150 field-test fix: when driving, the accelerometer-based
@@ -3831,9 +3839,9 @@ class SalemMainActivity : AppCompatActivity() {
         // ── Dark Mode ────────────────────────────────────────────────────────
 
         override fun onDarkModeToggled(dark: Boolean) {
-            // Legacy toggle — delegate to tile source change
-            val id = if (dark) TileSourceManager.Id.DARK else TileSourceManager.Id.SATELLITE
-            onTileSourceChanged(id)
+            // S167: dark basemap was removed along with the satellite/street
+            // pickers. The app now ships the single Witchy basemap only.
+            DebugLogger.i("SalemMainActivity", "onDarkModeToggled ignored (single-basemap build): dark=$dark")
         }
 
         override fun onTileSourceChanged(tileSourceId: String) {
@@ -3848,6 +3856,11 @@ class SalemMainActivity : AppCompatActivity() {
                 .putString(MenuPrefs.PREF_TILE_SOURCE, tileSourceId)
                 .apply()
             toast("${TileSourceManager.label(tileSourceId)} tiles")
+        }
+
+        override fun onHistLandmarkToggled(enabled: Boolean) {
+            DebugLogger.i("SalemMainActivity", "onHistLandmarkToggled: $enabled")
+            loadNarrationPointMarkers()
         }
 
         // ── Weather ───────────────────────────────────────────────────────────

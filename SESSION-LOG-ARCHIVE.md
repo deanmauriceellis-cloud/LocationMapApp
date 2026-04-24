@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 156, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 157, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 157: 2026-04-22 — OSM-stays pivot + Essex L3 parcels ingest + Salem QGIS project + routing design captured
+
+Operator reversed the S156 TigerLine-foundation/MapLibre/osmdroid-ripout plan: OSM + osmdroid stay as V1 base map; MassGIS + TigerLine become overlays only (osmdroid `Polygon` / `Polyline` / `Marker`). Project memory `project_osm_stays_as_basemap.md` codifies the reversal; STATE.md + master plan + tigerline docs updated. Self-ingested MassGIS L3 Parcels + L3 Assess for Essex County (366,884 polygons + 429,803 assessor rows) via new `cache-proxy/scripts/ingest-l3-parcels-essex.py`; validated end-to-end on 111 Essex St Beverly. Built a portable `.qgz` QGIS project at `tools/qgis-project/salem-gis.qgz` with 13 layers (OSM base + Salem boundary + Open Space + Cemeteries + Civic/Institutional + Land Use 25-cat + Buildings + L3 Parcels + MassDOT Roads + TIGER Edges + MHC Inventory + LMA POIs with category icons at scale ≤ 1:1000). Internal walking-router design captured in live log (Salem-clipped, ~2,200 edges, ~100 KB bundled asset, ~2.75 sessions — **exploratory, not decided**). Operator cautioned at end of session: "nothing is decided yet" — the S157 design discussions beyond the OSM-stays direction are capture-only.
+
+Full session detail: `docs/session-logs/session-157-2026-04-22.md`. Commits: `4fe6bc0` (OSM pivot + L3 ingest) + `d97d0da` (QGIS project). 3 S156 commits + 2 S157 commits remain unpushed pending operator direction.
+
+---
 
 ## Session 156: 2026-04-21 — SI content refresh + TigerLine+MassGIS foundation plan + Step 0 discovery + Phase 9Y PG schema extension
 

@@ -120,7 +120,8 @@ interface MenuEventListener {
     /** Toggle dark map tiles (CartoDB Dark Matter). */
     fun onDarkModeToggled(dark: Boolean)
 
-    /** Switch tile source (SATELLITE, STREET, DARK). Default no-op for backward compat. */
+    /** Switch tile source. Only "CUSTOM" is valid in V1 (Witchy basemap); legacy IDs
+     *  (SATELLITE/STREET/DARK) removed in S167. Default no-op for backward compat. */
     fun onTileSourceChanged(tileSourceId: String) {}
 
     /**
@@ -130,6 +131,9 @@ interface MenuEventListener {
      * are available (TigerLine/MassGIS workflow).
      */
     fun onPoiLocationLayerChanged(layerId: String) {}
+
+    /** Toggle visibility of MassGIS historical landmark POIs (data_source = massgis_mhc). Default no-op. */
+    fun onHistLandmarkToggled(enabled: Boolean) {}
 
     // =========================================================================
     // POINTS OF INTEREST

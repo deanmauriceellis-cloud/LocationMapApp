@@ -96,6 +96,10 @@ object MenuPrefs {
      *  the startup pref read so they can't drift. */
     const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = true
 
+    // ── POI source filters ──────────────────────────────────────────────────
+    /** When true, MassGIS historical landmark POIs (data_source = massgis_mhc) are shown on the map. */
+    const val PREF_POI_HIST_LANDMARK = "poi_hist_landmark_on"
+
     // ── Witch Trials feature (Phase 9X, S127) ─────────────────────────────
     /** When true, detail screens (history tile, newspaper, NPC bio) auto-speak the body 1s after open. */
     const val PREF_NARRATOR_MODE_ENABLED = "narrator_mode_enabled"

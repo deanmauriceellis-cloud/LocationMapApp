@@ -205,7 +205,7 @@ object MarkerIconHelper {
      */
     private fun loadCircleIcon(context: Context, category: String, sizePx: Int): Bitmap? {
         val assetPath = CIRCLE_ICON_MAP[category.lowercase()] ?: return null
-        val fullPath = "poi-circle-icons/$assetPath.png"
+        val fullPath = "poi-circle-icons/$assetPath.webp"
         val key = "$fullPath|$sizePx"
 
         // Check cache (null = tried and failed, don't retry)

@@ -155,7 +155,7 @@ object PoiHeroResolver {
         return folderListingCache.getOrPut(folder) {
             try {
                 context.assets.list("poi-icons/$folder")
-                    ?.filter { it.endsWith(".png", ignoreCase = true) }
+                    ?.filter { it.endsWith(".webp", ignoreCase = true) }
                     ?.sorted()
                     ?: emptyList()
             } catch (_: IOException) {

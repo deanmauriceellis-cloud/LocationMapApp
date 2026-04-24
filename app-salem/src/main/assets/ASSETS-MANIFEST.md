@@ -60,11 +60,14 @@ Extra legacy/test files tolerated (e.g., `downtown_salem_*.json`) — not enforc
 
 One file per `historical_figures.id`. Minimum count: **49** (matches `historical_figures` row count). If count drops below 49, some figure profile views will render a placeholder.
 
-### `poi-icons/<category>/*` and `poi-circle-icons/<category>/*` — POI marker art (~580 MB combined)
+### `poi-icons/<category>/*.webp` and `poi-circle-icons/<category>/*.webp` — POI marker art (~4.6 MB combined, post-S167)
 
 22 category folders. Per `feedback_poi_icon_architecture.md`, Salem supplies its own icon mapping; these files are the map markers. Loss of a category folder degrades markers to a generic pin. Not individually enforced in the verify script (too many files) — the top-level directories must exist and be non-empty.
 
-**Pre-Play-Store audit item:** these two trees are ~580 MB and dominate APK size. STATE.md open item #10 tracks a downsize pass (256×256 WebP q=75) before the first AAB upload.
+**S167 shrink (2026-04-24):**
+- `poi-icons/` — 544 MB PNG → 3.4 MB WebP. Only the `witchcraft` style variant survives (177 files, 512×512 q=80). The other 7 style variants (cute/demon/devil/evil/psycho/undead/zombie) are archived at `docs/archive/poi-icons-unused-styles_archived_2026-04-24/` for possible V2 tier-based monetization. 512 dimension preserved because `PoiDetailSheet.bindStrippedHero` renders these at 55% of screen height.
+- `poi-circle-icons/` — 36 MB PNG → 1.2 MB WebP. 150 files at 128×128 q=80 (they render as ~40 dp map markers).
+- Loaders updated to look for `.webp` suffix: `ProximityDock.kt:188`, `PoiHeroResolver.kt:158`, `MarkerIconHelper.kt:208`. If you ever add more PNG files, either reconvert them or update the filters back.
 
 ### `hero/*.webp` and `heroes/*.webp` — POI hero images
 

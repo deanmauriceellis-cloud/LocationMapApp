@@ -61,10 +61,6 @@ internal fun SalemMainActivity.addRadarOverlay() {
     }
 }
 
-internal fun SalemMainActivity.buildDarkTileSource(): org.osmdroid.tileprovider.tilesource.ITileSource {
-    return TileSourceManager.buildSource(TileSourceManager.Id.DARK)
-}
-
 internal fun SalemMainActivity.refreshRadarOverlay() {
     if (radarTileOverlay != null) {
         binding.mapView.overlays.remove(radarTileOverlay); radarTileOverlay = null

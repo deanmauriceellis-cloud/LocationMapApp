@@ -16,18 +16,19 @@ import org.osmdroid.config.Configuration
 import java.io.File
 
 /**
- * Manages offline map tile archives for downtown Salem.
+ * Manages offline map tile archives for Salem city.
  *
- * The tile archive (`salem_tiles.sqlite`, ~200 MB with three providers:
- * Satellite + Mapnik + Witchy) is NOT bundled in the APK — it's too big for
- * GitHub (>100 MB) and for a Play Store AAB. It must arrive on the device
- * out-of-band:
- *   • Dev (adb):    adb push tools/tile-bake/dist/salem_tiles.sqlite \
- *                     /sdcard/Android/data/<pkg>/files/salem_tiles.sqlite
- *   • Prod (future): Play Asset Delivery on-install pack.
+ * S167: `salem_tiles.sqlite` was shrunk from 207 MB to ~30 MB (Witchy-only,
+ * Salem city bbox, z16-19) and is now bundled in the APK at
+ * `assets/salem_tiles.sqlite`. On first launch (or whenever the on-disk
+ * archive is missing or differs in size from the asset) the archive is
+ * copied to the app's external files dir where osmdroid's
+ * `MapTileFileArchiveProvider` auto-discovers it.
  *
- * osmdroid's MapTileFileArchiveProvider auto-discovers .sqlite files in the
- * base path configured here. No runtime copy step needed.
+ * Asset stays uncompressed in the APK (`noCompress "sqlite"` in
+ * `app-salem/build.gradle`) so `AssetFileDescriptor.getLength()` returns
+ * the true archive size — enabling a cheap first-launch size-based
+ * version check without reading the file.
  */
 object OfflineTileManager {
 
@@ -52,22 +53,40 @@ object OfflineTileManager {
     }
 
     /**
-     * Verify the tile archive is present at osmdroid's base path. If missing,
-     * log a clear instruction for the dev adb-push command. No copy, no
-     * extraction — the archive MUST arrive on the device out-of-band.
+     * Ensure the tile archive is present at osmdroid's base path. Copies
+     * from the bundled APK asset on first launch, or when the on-disk
+     * archive's size differs from the asset's size (upgrade detection).
      */
     fun extractArchiveIfNeeded(context: Context) {
         val basePath = Configuration.getInstance().osmdroidBasePath
         basePath.mkdirs()
         val archive = File(basePath, ARCHIVE_NAME)
 
-        if (!archive.exists()) {
-            DebugLogger.w(TAG,
-                "Missing $ARCHIVE_NAME at $basePath — push it manually:\n" +
-                "  adb push tools/tile-bake/dist/$ARCHIVE_NAME " +
-                "${basePath.absolutePath}/$ARCHIVE_NAME"
+        val assetSize: Long = try {
+            context.assets.openFd(ARCHIVE_NAME).use { it.length }
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "Failed to stat asset $ARCHIVE_NAME: ${e.message}", e)
+            -1L
+        }
+
+        val needsCopy = !archive.exists() ||
+            (assetSize > 0 && archive.length() != assetSize)
+
+        if (needsCopy) {
+            DebugLogger.i(TAG,
+                "Extracting $ARCHIVE_NAME from APK assets (on-disk=${archive.length()}, asset=$assetSize)"
             )
-            return
+            try {
+                context.assets.open(ARCHIVE_NAME).use { input ->
+                    archive.outputStream().use { output ->
+                        input.copyTo(output, bufferSize = 64 * 1024)
+                    }
+                }
+                DebugLogger.i(TAG, "Extracted ${archive.length() / 1024} KB to $archive")
+            } catch (e: Exception) {
+                DebugLogger.e(TAG, "Failed to extract $ARCHIVE_NAME: ${e.message}", e)
+                return
+            }
         }
 
         val sizeMb = archive.length() / 1024.0 / 1024.0

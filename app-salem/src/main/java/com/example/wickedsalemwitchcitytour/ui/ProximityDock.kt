@@ -185,7 +185,7 @@ class ProximityDock(private val context: Context, private val rootView: View) {
         val icons = categoryIcons.getOrPut(folder) {
             try {
                 context.assets.list("poi-icons/$folder")
-                    ?.filter { it.endsWith(".png") }
+                    ?.filter { it.endsWith(".webp") }
                     ?.toList() ?: emptyList()
             } catch (e: IOException) {
                 emptyList()

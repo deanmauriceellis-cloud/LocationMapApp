@@ -204,43 +204,33 @@ class AppBarMenuManager(
     }
 
     /**
-     * Layers popup — basemap section + POI source section in one popup.
-     * Each section is its own radio group so the basemap and POI-source
-     * selections are independent. S162 added the POI source group; the
-     * basemap group is unchanged from prior sessions.
+     * Layers popup — basemap section (when >1 basemap available) + POI
+     * filter toggles. S167: V1 ships only the Witchy basemap, so the
+     * basemap group is hidden when `TileSourceManager.ALL_IDS.size == 1`.
      */
     private fun showTileSourcePopup(anchor: View) {
         val popup = PopupMenu(context, anchor)
+        var nextOrder = 0
 
-        // ── Basemap group (groupId 1) ─────────────────────────────────
-        val currentTileId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
-            ?: TileSourceManager.DEFAULT_SOURCE
-        TileSourceManager.ALL_IDS.forEachIndexed { index, id ->
-            val item = popup.menu.add(GROUP_BASEMAP, index, index, TileSourceManager.label(id))
-            item.isCheckable = true
-            item.isChecked = (id == currentTileId)
+        // ── Basemap group (only when multiple basemaps are available) ──
+        val basemapIds = TileSourceManager.ALL_IDS
+        if (basemapIds.size > 1) {
+            val currentTileId = prefs.getString(MenuPrefs.PREF_TILE_SOURCE, TileSourceManager.DEFAULT_SOURCE)
+                ?: TileSourceManager.DEFAULT_SOURCE
+            basemapIds.forEachIndexed { index, id ->
+                val item = popup.menu.add(GROUP_BASEMAP, index, nextOrder++, TileSourceManager.label(id))
+                item.isCheckable = true
+                item.isChecked = (id == currentTileId)
+            }
+            popup.menu.setGroupCheckable(GROUP_BASEMAP, true, true)
+            popup.menu.add(Menu.NONE, Menu.NONE, nextOrder++, "─────────").isEnabled = false
         }
-        popup.menu.setGroupCheckable(GROUP_BASEMAP, true, true)
 
-        // ── Divider header (non-checkable) ────────────────────────────
-        val tileCount = TileSourceManager.ALL_IDS.size
-        popup.menu.add(Menu.NONE, Menu.NONE, tileCount, "─────────")
-            .isEnabled = false
-
-        // ── POI source group (groupId 2) ──────────────────────────────
-        // S162: pick which coordinate set markers render from
-        // (current vs verifier-proposed vs both).
-        val currentPoiLayer = prefs.getString(
-            MenuPrefs.PREF_POI_LOCATION_LAYER,
-            PoiLocationLayerManager.DEFAULT_LAYER,
-        ) ?: PoiLocationLayerManager.DEFAULT_LAYER
-        PoiLocationLayerManager.ALL_IDS.forEachIndexed { index, id ->
-            val itemId = tileCount + 1 + index   // disjoint from basemap itemIds
-            val item = popup.menu.add(GROUP_POI_LAYER, itemId, itemId, PoiLocationLayerManager.label(id))
-            item.isCheckable = true
-            item.isChecked = (id == currentPoiLayer)
-        }
-        popup.menu.setGroupCheckable(GROUP_POI_LAYER, true, true)
+        // ── POI filter toggles ────────────────────────────────────────
+        val histLandmarkOn = prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, true)
+        val histItem = popup.menu.add(GROUP_POI_FILTER, ITEM_HIST_LANDMARK, nextOrder++, "POIs Hist. Landmark")
+        histItem.isCheckable = true
+        histItem.isChecked = histLandmarkOn
 
         popup.setOnMenuItemClickListener { item ->
             when (item.groupId) {
@@ -251,11 +241,12 @@ class AppBarMenuManager(
                     menuEventListener.onTileSourceChanged(selectedId)
                     true
                 }
-                GROUP_POI_LAYER -> {
-                    val selectedId = PoiLocationLayerManager.ALL_IDS[item.itemId - tileCount - 1]
-                    prefs.edit().putString(MenuPrefs.PREF_POI_LOCATION_LAYER, selectedId).apply()
-                    DebugLogger.i(TAG, "POI location layer selected → $selectedId")
-                    menuEventListener.onPoiLocationLayerChanged(selectedId)
+                GROUP_POI_FILTER -> {
+                    val newState = !prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, true)
+                    prefs.edit().putBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, newState).apply()
+                    item.isChecked = newState
+                    DebugLogger.i(TAG, "POIs Hist. Landmark → $newState")
+                    menuEventListener.onHistLandmarkToggled(newState)
                     true
                 }
                 else -> false
@@ -266,7 +257,8 @@ class AppBarMenuManager(
 
     private companion object LayerGroups {
         const val GROUP_BASEMAP = 1
-        const val GROUP_POI_LAYER = 2
+        const val GROUP_POI_FILTER = 2
+        const val ITEM_HIST_LANDMARK = 100
     }
 
     // ─────────────────────────────────────────────────────────────────────────
