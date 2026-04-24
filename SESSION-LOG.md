@@ -1,14 +1,22 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 151-160. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 152-161. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 161: 2026-04-23 — Car-tour debug-log triage + GPS/V1-offline fixes + repo cleanup
+
+Reviewed 645 KB of car-tour debug log and shipped three rounds of fixes. (1) V1 offline toasts — `searchPoisAt()`, `startSilentFill()`, and `AppBarMenuManager.syncCheckStates` all bypassed the V1_OFFLINE_ONLY gate, producing 7 "POI failed" toasts, 14 "Fill failed" banners, and 4 menu-findItem warnings during the 3-hour drive. All three gated at the caller. (2) GPS "spotty" — root cause was the interval picker thrashing between 10s/2.5s/30s on every fix (19 times in 15 min of driving), each flip doing `locationJob.cancel()` → `removeLocationUpdates` → re-register. Added `LocationManager.updateRequestParams()` that re-calls `requestLocationUpdates` on the live callback (GMS merges, no teardown); `MainViewModel.restartLocationUpdates()` now prefers that path. Interval picker reduced to 2 states (2.5s moving/narrating, 30s idle) with 10s dwell debounce. (3) Confirmed Witchy/Satellite tile alignment — side-by-side blends at 4 landmarks (z=16-18) show building footprints, streets, and piers trace exactly over Esri imagery; drift is not at the bake. (4) Repo cleanup — ~20 stale root + docs/ files archived to `docs/archive/` (CHANGELOG, SOCIAL-PLAN, WEB-APP-PLAN, MASTER_PLAN_ARCHIVE, PLAN-ARCHIVE, REFACTORING-REPORT, all 5 tigerline-* briefs now that TigerLine+MassGIS are in DB, completed SalemIntelligence + si-handoff briefs, etc.); 6 shell scripts moved to `scripts/`; parked master-plan placeholder deleted and pre-park snapshot archived; CLAUDE.md updated accordingly. Deployed twice to Lenovo TB305FU; needs next-drive verification — expected signal is `updateRequestParams — interval Xms → Yms (no teardown)` replacing the old `Flow cancelled — removing location updates after N updates received`.
+
+Full session detail: `docs/session-logs/session-161-2026-04-23.md`. Commit: pending.
+
+---
 
 ## Session 160: 2026-04-23 — Master-plan split + admin-tool Witchy tiles + 9Y edit tab
 
 Third session of the calendar day. Three tracks. (1) Split `WickedSalemWitchCityTour_MASTER_PLAN.md` from 3,689 → 1,834 lines by moving completed-phase step-by-step detail (Phases 1-9X), V2-deferred tier infrastructure (Phases 9B/9C/9D), and the pre-S138 tiered business model into `docs/archive/WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md` (1,943 lines), with a new thin completed-phase index and a rewritten V1 Business Model section reflecting the $19.99 flat paid / fully offline / no-ads / no-LLM posture. Zero content deleted — every line is in either the live plan or the archive. (2) Admin tool now serves the same tiles the phone app sees: new cache-proxy endpoint `GET /admin/tiles/:provider/:z/:x/:y` reads from `tools/tile-bake/dist/salem_tiles.sqlite` with osmdroid BigInt key encoding, Content-Type sniffed from magic bytes (WebP / PNG / JPEG), 3 providers (Salem-Custom / Mapnik / Esri-WorldImagery). `AdminMap.tsx` gets a top-right `<select>` picker with localStorage persistence, default Witchy, plus an OSM-online fallback for low-zoom panning. (3) POI edit dialog gets an 8th tab "MassGIS / MHC" with form fields for all 9 S159 Phase 9Y columns; backend `UPDATABLE_FIELDS` whitelist in `admin-pois.js` and mirrored `poiAdminFields.ts` extended (62 → 71 fields); `mhc_year_built` flagged numeric. Type-check clean; backend mock-req/res tested 7 cases happy + edge. Post-session operator reported the tile picker wasn't selectable; diagnostic confirmed both servers live and tile endpoint routes correctly (HTTP 401 without auth = registered), most likely cause is a browser hard-refresh to pick up the new top-level module symbols — queued as the first item for S161 before continuing to 9Y.3.
 
-Full session detail: `docs/session-logs/session-160-2026-04-23.md`. Commit: pending.
+Full session detail: `docs/session-logs/session-160-2026-04-23.md`. Commit: `f86bc10`.
 
 ---
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-152-2026-04-19.md`. Commits: `d2
 
 ---
 
-## Session 151: 2026-04-19 — Counsel packet PDFs (pre-NDA / post-NDA) for 2026-04-20 counsel engagement meeting
-
-Pivoted from S150 field-test verification to operator's top priority: produce PDF documents for tomorrow's counsel engagement meeting. Mid-session operator redirected to NDA-gated two-tier disclosure after flagging "don't expose IP without NDA." Shipped three PDFs under `docs/counsel-packet/`: **Tier 1 pre-NDA (46 pages, 176 outline entries, 256 links)** covering cover + NDA request, redacted legal walkthrough (IP §9.3 held), pricing + age gate, Privacy Policy V1, new V1 ToS stub, Data Safety pre-filled answers, Play Store checklist, counsel decision checklist, Tier-2 holdback manifest, and a mutual NDA template with explicit patent-novelty and successors-bind clauses; **Tier 2 post-NDA (133 pages, 462 outline entries)** bundling IP register + GOVERNANCE + COMMERCIALIZATION + DESIGN-REVIEW + future-state Privacy Policy; **Operator prep memo (7 pages)** flagging AI-image copyright post-Thaler, accidental-COPPA store-listing risks, Form TX 3-month statutory-damages window, patent 12-month on-sale bar, Play Store 20-tester/14-day rule, Webex-demo IP hygiene, and the likely need for both a corporate and a patent lawyer. Pipeline: markdown-pdf (PyMuPDF-backed) in ephemeral venv at `/tmp/pdfvenv` (libreoffice HTML→PDF was tested and discarded — only outlined `<h2>`). Reproducible via `docs/counsel-packet/build/build_{tier1,tier2,memo}.py`.
-
-Full session detail: `docs/session-logs/session-151-2026-04-19.md`. Commit: `fccf67d`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 150 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 151 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S151 rolled to archive 2026-04-23 by the session-end protocol (S161) -->
 <!-- S150 rolled to archive 2026-04-23 by the session-end protocol (S160) -->
 <!-- S149 rolled to archive 2026-04-23 by the session-end protocol (S159) -->
 <!-- S148 rolled to archive 2026-04-23 by the session-end protocol (S158) -->

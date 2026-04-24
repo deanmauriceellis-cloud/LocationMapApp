@@ -59,9 +59,40 @@ class LocationManager @Inject constructor(
     private val fusedClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
 
+    // Active-subscription bookkeeping for in-place rate updates (S161).
+    // Populated while [getLocationUpdates] is collected; null otherwise.
+    @Volatile private var activeCallback: LocationCallback? = null
+    @Volatile private var activeIntervalMs: Long = 0L
+    @Volatile private var activeMinIntervalMs: Long = 0L
+
     // =========================================================================
     // Public API
     // =========================================================================
+
+    /**
+     * Adjust the interval of the live GPS subscription **without** tearing
+     * down the flow. Calls [FusedLocationProviderClient.requestLocationUpdates]
+     * again with the existing callback — GMS merges this onto the current
+     * subscription, so emissions continue uninterrupted.
+     *
+     * Returns `true` if the live subscription was updated (or already at the
+     * requested rate); `false` if no subscription is active and the caller
+     * must fall back to [getLocationUpdates].
+     */
+    @SuppressLint("MissingPermission")
+    fun updateRequestParams(intervalMs: Long, minIntervalMs: Long): Boolean {
+        val cb = activeCallback ?: return false
+        if (intervalMs == activeIntervalMs && minIntervalMs == activeMinIntervalMs) return true
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+            .setMinUpdateIntervalMillis(minIntervalMs)
+            .build()
+        DebugLogger.i(TAG, "updateRequestParams — interval ${activeIntervalMs}ms → ${intervalMs}ms, " +
+                "minInterval ${activeMinIntervalMs}ms → ${minIntervalMs}ms (no teardown)")
+        fusedClient.requestLocationUpdates(request, cb, Looper.getMainLooper())
+        activeIntervalMs = intervalMs
+        activeMinIntervalMs = minIntervalMs
+        return true
+    }
 
     /**
      * Returns a cold [Flow] that emits [Location] updates from the
@@ -106,6 +137,10 @@ class LocationManager @Inject constructor(
 
         DebugLogger.i(TAG, "Calling requestLocationUpdates on main looper")
 
+        activeCallback = callback
+        activeIntervalMs = intervalMs
+        activeMinIntervalMs = minIntervalMs
+
         fusedClient
             .requestLocationUpdates(request, callback, Looper.getMainLooper())
             .addOnSuccessListener {
@@ -139,6 +174,11 @@ class LocationManager @Inject constructor(
             DebugLogger.i(TAG, "Flow cancelled — removing location updates " +
                     "after $updateCount updates received")
             fusedClient.removeLocationUpdates(callback)
+            if (activeCallback === callback) {
+                activeCallback = null
+                activeIntervalMs = 0L
+                activeMinIntervalMs = 0L
+            }
         }
     }
 

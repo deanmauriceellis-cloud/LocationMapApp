@@ -79,6 +79,12 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SalemMainAc
  */
 internal const val MAP_MAX_OVERZOOM = 21.0
 
+/** Minimum time a candidate GPS interval must persist before the picker
+ *  commits to it. Eliminates thrashing when speed drifts across thresholds.
+ *  Chosen to be long enough to smooth through a 4-6s traffic-light stop
+ *  without flipping to the 30s idle branch. */
+internal const val GPS_INTERVAL_DWELL_MS = 10_000L
+
 @AndroidEntryPoint
 class SalemMainActivity : AppCompatActivity() {
 
@@ -442,6 +448,13 @@ class SalemMainActivity : AppCompatActivity() {
     internal var lastApiCallTime: Long = 0
     internal var currentGpsIntervalMs: Long = 60_000L
     internal var lastGpsSpeedMph: Double? = null
+
+    /** When the interval picker first saw the current `pendingGpsIntervalMs`.
+     *  A transition is only applied once a candidate interval has persisted
+     *  for [GPS_INTERVAL_DWELL_MS]; this kills rapid-fire oscillation when
+     *  speed drifts across thresholds. */
+    internal var pendingGpsIntervalMs: Long = 0L
+    internal var pendingGpsIntervalSinceMs: Long = 0L
 
     /**
      * S115: Device orientation tracker. Drives the heading-up map rotation
@@ -2919,36 +2932,46 @@ class SalemMainActivity : AppCompatActivity() {
             updateUserTriggerRings(point)
 
             // ── 1. Adaptive GPS interval ──
-            //   Driving (>20 mph):   10s — coarse is fine at highway speed
-            //   Walking or slow-drive:  2.5s — tight geofence detection needed
-            //   Stopped + narrating:    2.5s — keep polling while TTS is active
-            //   Truly idle:            30s — battery saver, log-spam reduction
+            //   Moving or narrating:  2.5s — tight geofence detection needed.
+            //                                Same rate at highway speed as at
+            //                                walking pace; the former 10s branch
+            //                                for >20 mph caused constant flip-flop
+            //                                on speed boundaries and tore down
+            //                                the FLP subscription every few sec.
+            //   Truly idle:           30s  — battery saver, log-spam reduction.
             //
-            //   S150 field-test fix: previously hard-coded `narrationActive=true`,
-            //   which meant the 60s battery-saver branch was unreachable — stationary
-            //   phones polled at 2.5s forever (494 fixes in a 90-min session, most
-            //   while parked). The comment described the intended 3-state ladder
-            //   but the code only had 2 states. Now driven by actual motion + TTS.
+            //   Transitions are debounced: a candidate interval must persist
+            //   for [GPS_INTERVAL_DWELL_MS] before the picker commits to it.
+            //   Each commit is applied in place (no FLP teardown) via
+            //   [LocationManager.updateRequestParams].
+            //
+            //   S150 fix kept: the idle branch is reachable (driven by real
+            //   motion + TTS, not hard-coded `narrationActive=true`).
+            //   S161 fix: removed the >20 mph branch and added dwell debounce.
             val speedMpsNow = update.speedMps ?: 0f
             val narrating = tourViewModel.isNarrating()
-            val desiredInterval = when {
-                (speedMph ?: 0.0) > 20.0 -> 10_000L
-                speedMpsNow > 0.5f || narrating -> 2_500L
-                else -> 30_000L
-            }
+            val desiredInterval = if (speedMpsNow > 0.5f || narrating) 2_500L else 30_000L
+
+            val gpsIntervalNowMs = android.os.SystemClock.elapsedRealtime()
             if (desiredInterval != currentGpsIntervalMs) {
-                currentGpsIntervalMs = desiredInterval
-                val minInterval = when (desiredInterval) {
-                    2_500L  -> 1_000L
-                    10_000L -> 5_000L
-                    else    -> 15_000L
+                if (desiredInterval != pendingGpsIntervalMs) {
+                    pendingGpsIntervalMs = desiredInterval
+                    pendingGpsIntervalSinceMs = gpsIntervalNowMs
+                } else if (gpsIntervalNowMs - pendingGpsIntervalSinceMs >= GPS_INTERVAL_DWELL_MS) {
+                    currentGpsIntervalMs = desiredInterval
+                    val minInterval = if (desiredInterval == 2_500L) 1_000L else 15_000L
+                    DebugLogger.i(
+                        "SalemMainActivity",
+                        "GPS interval → ${desiredInterval}ms " +
+                        "(speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph, narrating=$narrating, " +
+                        "dwelled=${gpsIntervalNowMs - pendingGpsIntervalSinceMs}ms)"
+                    )
+                    viewModel.restartLocationUpdates(desiredInterval, minInterval)
+                    pendingGpsIntervalMs = 0L
                 }
-                DebugLogger.i(
-                    "SalemMainActivity",
-                    "GPS interval → ${desiredInterval}ms " +
-                    "(speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph, narrating=$narrating)"
-                )
-                viewModel.restartLocationUpdates(desiredInterval, minInterval)
+            } else if (pendingGpsIntervalMs != 0L) {
+                // Candidate no longer desired — reset dwell so brief excursions don't count.
+                pendingGpsIntervalMs = 0L
             }
 
             // ── 2. Proportional dead zone — drop fixes within 2× reported accuracy ──

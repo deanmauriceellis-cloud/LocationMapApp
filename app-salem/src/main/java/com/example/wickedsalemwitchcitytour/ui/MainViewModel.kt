@@ -155,11 +155,18 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /** Restart GPS flow with a new interval. No-op if interval is unchanged. */
+    /**
+     * Adjust GPS polling interval. Prefers an in-place subscription update
+     * ([LocationManager.updateRequestParams]) so the flow stays open and
+     * emissions continue uninterrupted. Falls back to a fresh subscription
+     * only if no live one exists.
+     */
     fun restartLocationUpdates(intervalMs: Long, minIntervalMs: Long) {
         if (intervalMs == currentIntervalMs) return
         DebugLogger.i(TAG, "restartLocationUpdates() — interval ${currentIntervalMs}ms → ${intervalMs}ms")
         currentIntervalMs = intervalMs
+        if (locationManager.updateRequestParams(intervalMs, minIntervalMs)) return
+        // No live subscription to update — start one fresh.
         locationJob?.cancel()
         locationJob = viewModelScope.launch {
             locationManager.getLocationUpdates(intervalMs = intervalMs, minIntervalMs = minIntervalMs)
@@ -254,6 +261,7 @@ class MainViewModel @Inject constructor(
     // ── Data loads — user-initiated only, never called from init ──────────────
 
     fun searchPoisAt(point: GeoPoint, categories: List<String> = emptyList(), layerId: String = "default") {
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return
         DebugLogger.i(TAG, "searchPoisAt() lat=${point.latitude} lon=${point.longitude} layerId=$layerId categories=$categories")
         viewModelScope.launch {
             runCatching { placesRepository.searchPois(point, categories) }

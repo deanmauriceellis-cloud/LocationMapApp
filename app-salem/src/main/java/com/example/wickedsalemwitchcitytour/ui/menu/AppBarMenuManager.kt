@@ -947,13 +947,18 @@ class AppBarMenuManager(
             }
             true
         }
-        syncCheckStates(popup.menu,
-            R.id.menu_util_record_gps          to MenuPrefs.PREF_RECORD_GPS,
-            R.id.menu_util_gps_mode            to MenuPrefs.PREF_GPS_MODE,
-            R.id.menu_util_gps_bbox_override   to MenuPrefs.PREF_GPS_BBOX_OVERRIDE,
-            R.id.menu_util_silent_fill_debug   to MenuPrefs.PREF_SILENT_FILL_DEBUG,
-            R.id.menu_util_narrator_mode       to MenuPrefs.PREF_NARRATOR_MODE_ENABLED
-        )
+        // menu_util_silent_fill_debug is removed above under V1_OFFLINE_ONLY, so
+        // only sync its check state when the item is actually present.
+        val pairs = buildList {
+            add(R.id.menu_util_record_gps        to MenuPrefs.PREF_RECORD_GPS)
+            add(R.id.menu_util_gps_mode          to MenuPrefs.PREF_GPS_MODE)
+            add(R.id.menu_util_gps_bbox_override to MenuPrefs.PREF_GPS_BBOX_OVERRIDE)
+            if (!FeatureFlags.V1_OFFLINE_ONLY) {
+                add(R.id.menu_util_silent_fill_debug to MenuPrefs.PREF_SILENT_FILL_DEBUG)
+            }
+            add(R.id.menu_util_narrator_mode     to MenuPrefs.PREF_NARRATOR_MODE_ENABLED)
+        }
+        syncCheckStates(popup.menu, *pairs.toTypedArray())
         // Update populate title to reflect running state
         val popRunning = prefs.getBoolean(MenuPrefs.PREF_POPULATE_POIS, false)
         popup.menu.findItem(R.id.menu_util_populate_pois)?.title =

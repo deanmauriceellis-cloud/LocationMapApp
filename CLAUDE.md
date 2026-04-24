@@ -31,9 +31,9 @@ Read these files only when a specific question requires them — never at sessio
 - `~/Development/OMEN/directives/ACTIVE.md` — when an OMEN directive is relevant to current work.
 - Reference docs (`GOVERNANCE.md`, `IP.md`, `COMMERCIALIZATION.md`, `DESIGN-REVIEW.md`, `CURRENT_TESTING.md`) — on demand only.
 
-### Master plan is PARKED
+### No master plan
 
-As of 2026-04-23, `WickedSalemWitchCityTour_MASTER_PLAN.md` is an empty placeholder ("To be decided next session"). A pre-park snapshot exists on disk at `Parked_WickedSalemWitchCityTour_MASTER_PLAN.md` but is **not in use**. Do not reference either as a plan-of-record. If a multi-phase plan is needed, the operator will declare one explicitly or rebuild it in a Plan.
+As of 2026-04-23 (S161), the master plan was deleted and its pre-park snapshot moved to `docs/archive/`. There is no plan-of-record. If a multi-phase plan is needed, the operator declares one explicitly or we rebuild it in a Plan.
 
 ### Recovery from a killed session
 
@@ -76,7 +76,7 @@ Execute in order:
 3. **Roll the SESSION-LOG.md window** — If `SESSION-LOG.md` now contains more than 10 sessions, move the oldest entries to the top of `SESSION-LOG-ARCHIVE.md` (newest archived first). Target: keep the 10 most recent sessions in `SESSION-LOG.md`.
 4. **Update STATE.md only if it changed** — STATE.md is a snapshot, not a changelog. Only update it if (a) the TOP PRIORITY changed, (b) a phase status changed, (c) a carry-forward item was resolved or added, or (d) a new OMEN item appeared. **Do not append session summaries to STATE.md.** Keep it under 200 lines. If the file ever drifts above 200 lines, stop and compress it on the spot.
 5. **Update CLAUDE.md only if structure or protocols changed** — CLAUDE.md should be stable. Touch it ONLY when (a) project structure changes (new module, new key reference file), (b) the session start/end protocol itself changes, or (c) the tech stack changes. Do NOT update CLAUDE.md every session.
-6. **Master plan — skip** (parked 2026-04-23). `WickedSalemWitchCityTour_MASTER_PLAN.md` is an empty placeholder and is not maintained. If the operator asks for a multi-phase plan, it will be declared explicitly rather than written back to the master plan file.
+6. **Master plan — skip** (no master plan as of 2026-04-23). If the operator asks for a multi-phase plan, it is declared explicitly rather than written back to a master plan file.
 7. **Archive removed content** — Anything removed from any tracked .md doc goes to `docs/archive/` with format `FILENAME_removed_YYYY-MM-DD.md`. Never silently delete.
 8. **Commit and push** — Stage all changes, commit with a descriptive message, push to remote. Local and remote must never drift apart.
 9. **Write the OMEN report** — Use the **thin template** below. **Do not duplicate Files Changed or Decisions Made** from the live log — those are already in `git log -p` and in the live log. The OMEN report carries only OMEN-specific content. Write to `~/Development/OMEN/reports/locationmapapp/session-NNN-YYYY-MM-DD.md`.
@@ -171,7 +171,6 @@ LocationMapApp_v1.5/
 ├── docs/                  — Archive, other docs
 ├── STATE.md               — Current project state
 ├── SESSION-LOG.md         — Session history
-├── WickedSalemWitchCityTour_MASTER_PLAN.md — PARKED 2026-04-23 (empty placeholder)
 ├── GOVERNANCE.md          — Legal/compliance framework
 ├── IP.md                  — Intellectual property register
 ├── COMMERCIALIZATION.md   — Monetization strategy
@@ -216,6 +215,6 @@ Under the lean-startup rule (2026-04-23), only `CLAUDE.md` and `MEMORY.md` are r
 | `DESIGN-REVIEW.md` | Architecture decisions | Work touches a design previously reviewed |
 | `CURRENT_TESTING.md` | Test checklist | Entering Phase 10 or running regression |
 
-**Master plan (`WickedSalemWitchCityTour_MASTER_PLAN.md`) is PARKED** — currently a 4-line placeholder. A pre-park snapshot exists at `Parked_WickedSalemWitchCityTour_MASTER_PLAN.md` but is not in use. Do not treat either as a plan-of-record.
+**No master plan** — deleted 2026-04-23 (S161); pre-park snapshot lives at `docs/archive/Parked_WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md`. Do not treat it as a plan-of-record.
 
 _Document Version: 0.3.0 — Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._

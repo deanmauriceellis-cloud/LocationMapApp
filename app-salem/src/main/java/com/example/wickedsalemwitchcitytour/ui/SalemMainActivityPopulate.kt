@@ -58,6 +58,8 @@ internal class IdlePopulateState(
  */
 internal fun SalemMainActivity.startSilentFill(center: org.osmdroid.util.GeoPoint) {
     silentFillJob?.cancel()
+    // V1 offline: no network POI fill — bail before the banner appears.
+    if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return
     // Don't run if full populate scanner is active
     if (populateJob != null) return
     // Don't run if following something (follow has its own POI prefetch)
