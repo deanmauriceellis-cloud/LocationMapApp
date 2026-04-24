@@ -5,7 +5,15 @@
 
 ---
 
-# Sessions S001-S152 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+# Sessions S001-S153 (rolled here from SESSION-LOG.md by the rolling-window protocol introduced in Session 111)
+
+## Session 153: 2026-04-20 — Webex demo crash → npc_bios + articles table fix, ASSETS-MANIFEST + pre-build verifier, SI anomaly relay, computer-crash recovery
+
+Counsel engagement meeting + Webex demo day. Morning work: SI anomaly OMEN relay filed (ANOM-001 GP-rooftop phantom coords, ANOM-002 Heritage Trail verified_fact tier-leak), field walk checklist written, counsel packet verified. Mid-day the Webex demo crashed when the operator tapped a 1691-11-22 newspaper banner — `SQLiteException: no such table: salem_witch_trials_npc_bios`. Diff against `@Entity` declarations surfaced **two** tables missing from both source DB and bundled assets DB (`salem_witch_trials_npc_bios` 49 rows / `salem_witch_trials_articles` 16 rows); same S149 pattern that bit the newspapers table, where the bundle scripts write to assets-only and `publish-salem-pois.js` later clobbers. Fixed both `bundle-witch-trials-*-into-db.js` to the S150 pattern (CREATE TABLE IF NOT EXISTS, write source → mirror to assets) and rebuilt Room DB (8.4 MB → 9.2 MB). Introduced permanent guard rails: `app-salem/src/main/assets/ASSETS-MANIFEST.md` (asset registry + S149/S153 regression history) and `cache-proxy/scripts/verify-bundled-assets.js` (fail-fast pre-build check, 28 OK / 1 WARN / 0 FAIL). APK rebuilt and installed on Lenovo HNY0CY0W. Computer then crashed before commit — full recovery from git working tree (no stash, reflog clean, no data loss). Walk-sim demo log (`docs/session-logs/assets/s153/logs/logs/debug-20260420.log`, 23,456 lines) incidentally exercised the S150 fixes: Fix 2 ✅ (Salem Maritime NHS as HISTORICAL_BUILDINGS/MEANINGFUL), Fix 7 ✅ (NARR-GATE lines emit with B=false cross-check), Fix 1 ⚠️ (infra confirmed via `type=LONG_NARRATION` segments, but detail=DEEP not toggled), Fix 3 🚫 (walk-sim can't exercise real-motion escape hatch). Patched-APK smoke-test + counsel meeting outcome capture + real outdoor walk all carry to S154.
+
+Full session detail: `docs/session-logs/session-153-2026-04-20.md`. Commit: `a3f1569`.
+
+---
 
 ## Session 152: 2026-04-19 — Absorb SalemIntelligence KB rewrite (verified_facts landed; Heritage Trail confabulation cleared)
 

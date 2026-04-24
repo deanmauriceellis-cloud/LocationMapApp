@@ -125,6 +125,9 @@ interface AdminMapProps {
   selectedPoi: PoiSelection | null
   onPoiSelect: (selection: PoiSelection) => void
   onPoiMoved: (id: string, lat: number, lng: number) => void
+  /** When set, only POIs with matching category render on the map. */
+  categoryFilter?: string | null
+  onClearCategoryFilter?: () => void
 }
 
 // ─── Marker layer ────────────────────────────────────────────────────────────
@@ -230,6 +233,191 @@ function MarkerLayer({
     }
     previousSelectedKeyRef.current = selectedKey
   }, [selectedKey])
+
+  return null
+}
+
+// ─── Parcel click hit-test (S163, invisible) ───────────────────────────────
+//
+// Any POI with a populated `building_footprint_geojson` is hit-testable.
+// Hidden POIs (`default_visible=false`) from the MassGIS MHC import have
+// footprints but no visible marker — this lets the operator click "on a
+// parcel" (via the raster Witchy tile rendering) and open the hidden POI's
+// editor. Visible POIs also pick up polygon-click as a second way to select.
+//
+// Nothing is rendered on the map. Uses the existing `pois` array already
+// loaded by AdminLayout, so no additional fetch.
+
+interface FootprintIndexEntry {
+  poi: PoiRow
+  minLat: number
+  maxLat: number
+  minLng: number
+  maxLng: number
+  area: number // bbox area — used to pick the tightest match when nested
+  polygons: Array<Array<Array<[number, number]>>> // [poly][ring][vertex] = [lng, lat]
+}
+
+function pointInRing(lng: number, lat: number, ring: Array<[number, number]>): boolean {
+  // Classic ray-casting even-odd rule.
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const intersect = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+function pointInPolygons(lng: number, lat: number, polys: FootprintIndexEntry['polygons']): boolean {
+  for (const poly of polys) {
+    if (poly.length === 0) continue
+    const outer = poly[0]
+    if (!pointInRing(lng, lat, outer)) continue
+    // Subtract holes.
+    let inHole = false
+    for (let h = 1; h < poly.length; h++) {
+      if (pointInRing(lng, lat, poly[h])) {
+        inHole = true
+        break
+      }
+    }
+    if (!inHole) return true
+  }
+  return false
+}
+
+function buildFootprintIndex(pois: PoiRow[]): FootprintIndexEntry[] {
+  const index: FootprintIndexEntry[] = []
+  for (const poi of pois) {
+    if (poi.deleted_at) continue
+    const raw = poi.building_footprint_geojson
+    if (typeof raw !== 'string' || !raw) continue
+    let geom: { type: string; coordinates: unknown }
+    try {
+      geom = JSON.parse(raw) as { type: string; coordinates: unknown }
+    } catch {
+      continue
+    }
+    let polygons: FootprintIndexEntry['polygons']
+    if (geom.type === 'Polygon') {
+      polygons = [geom.coordinates as Array<Array<[number, number]>>]
+    } else if (geom.type === 'MultiPolygon') {
+      polygons = geom.coordinates as Array<Array<Array<[number, number]>>>
+    } else {
+      continue
+    }
+    let minLat = Infinity
+    let maxLat = -Infinity
+    let minLng = Infinity
+    let maxLng = -Infinity
+    for (const poly of polygons) {
+      for (const ring of poly) {
+        for (const [lng, lat] of ring) {
+          if (lat < minLat) minLat = lat
+          if (lat > maxLat) maxLat = lat
+          if (lng < minLng) minLng = lng
+          if (lng > maxLng) maxLng = lng
+        }
+      }
+    }
+    if (!Number.isFinite(minLat)) continue
+    index.push({
+      poi,
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      area: (maxLat - minLat) * (maxLng - minLng),
+      polygons,
+    })
+  }
+  return index
+}
+
+// Render hidden POIs (default_visible === false) that carry a footprint as
+// subtle polygon outlines on the map. Visible POIs keep their normal marker.
+// Clicking a polygon opens the standard PoiEditDialog via onPoiSelect.
+
+interface HiddenFootprintsProps {
+  pois: PoiRow[]
+  onPoiSelect: (selection: PoiSelection) => void
+}
+
+function HiddenPoiFootprints({ pois, onPoiSelect }: HiddenFootprintsProps) {
+  const map = useMap()
+  useEffect(() => {
+    const group = L.featureGroup()
+    for (const poi of pois) {
+      if (poi.deleted_at) continue
+      if (poi.default_visible !== false) continue
+      const raw = poi.building_footprint_geojson
+      if (typeof raw !== 'string' || !raw) continue
+      let geom: GeoJSON.GeoJsonObject
+      try {
+        geom = JSON.parse(raw)
+      } catch {
+        continue
+      }
+      const layer = L.geoJSON(geom, {
+        style: {
+          color: '#8D6E63',
+          weight: 1,
+          fillColor: '#8D6E63',
+          fillOpacity: 0.08,
+          opacity: 0.7,
+        },
+      })
+      layer.bindTooltip(String(poi.name ?? poi.id), { sticky: true })
+      layer.on('click', () => {
+        onPoiSelect({ poi })
+      })
+      layer.on('mouseover', () => {
+        layer.setStyle({ weight: 2, fillOpacity: 0.25 })
+      })
+      layer.on('mouseout', () => {
+        layer.setStyle({ weight: 1, fillOpacity: 0.08 })
+      })
+      group.addLayer(layer)
+    }
+    group.addTo(map)
+    return () => {
+      map.removeLayer(group)
+    }
+  }, [map, pois, onPoiSelect])
+  return null
+}
+
+interface HitTestProps {
+  pois: PoiRow[]
+  onPoiSelect: (selection: PoiSelection) => void
+}
+
+function ParcelHitTest({ pois, onPoiSelect }: HitTestProps) {
+  const map = useMap()
+  const index = useMemo(() => buildFootprintIndex(pois), [pois])
+
+  useEffect(() => {
+    const handleClick = (e: L.LeafletMouseEvent) => {
+      if (index.length === 0) return
+      const { lat, lng } = e.latlng
+      let best: FootprintIndexEntry | null = null
+      for (const entry of index) {
+        if (lat < entry.minLat || lat > entry.maxLat) continue
+        if (lng < entry.minLng || lng > entry.maxLng) continue
+        if (!pointInPolygons(lng, lat, entry.polygons)) continue
+        if (!best || entry.area < best.area) best = entry
+      }
+      if (best) {
+        onPoiSelect({ poi: best.poi })
+      }
+    }
+    map.on('click', handleClick)
+    return () => {
+      map.off('click', handleClick)
+    }
+  }, [map, index, onPoiSelect])
 
   return null
 }
@@ -387,7 +575,14 @@ export function AdminMap({
   selectedPoi,
   onPoiSelect,
   onPoiMoved,
+  categoryFilter,
+  onClearCategoryFilter,
 }: AdminMapProps) {
+  const filteredPois = useMemo(() => {
+    if (!pois) return pois
+    if (!categoryFilter) return pois
+    return pois.filter((p) => (p.category as string | undefined) === categoryFilter)
+  }, [pois, categoryFilter])
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -492,12 +687,14 @@ export function AdminMap({
           maxZoom={22}
           maxNativeZoom={activeProvider.maxNativeZoom}
         />
+        <HiddenPoiFootprints pois={filteredPois ?? []} onPoiSelect={onPoiSelect} />
         <MarkerLayer
-          pois={pois}
+          pois={filteredPois ?? []}
           selectedKey={selectedKey}
           onPoiSelect={onPoiSelect}
           onDragEnd={handleDragEnd}
         />
+        <ParcelHitTest pois={filteredPois ?? []} onPoiSelect={onPoiSelect} />
         <FlyToSelected selectedPoi={selectedPoi} />
       </MapContainer>
       <TileProviderPicker
@@ -505,6 +702,20 @@ export function AdminMap({
         onChange={setTileProviderId}
       />
       <Legend categoryCounts={categoryCounts} />
+      {categoryFilter && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[500]
+                        bg-indigo-600 text-white text-sm px-3 py-1 rounded-full shadow
+                        flex items-center gap-2">
+          <span>Filtering: <strong>{categoryFilter}</strong></span>
+          <button
+            type="button"
+            onClick={onClearCategoryFilter}
+            className="ml-1 text-white/80 hover:text-white underline text-xs"
+          >
+            clear
+          </button>
+        </div>
+      )}
       {pending && (
         <MoveConfirm
           pending={pending}

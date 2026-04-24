@@ -2,15 +2,19 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-23 — Session 162 closed. Shipped additive scaffolding for an operator-driven POI location verification workflow against TigerLine/MassGIS. (1) `salem_pois` migration adds 7 nullable cols + 3 indexes (lat_proposed/lng_proposed/location_status[default unverified]/location_truth_of_record/location_source/location_drift_m/location_geocoder_rating/location_verified_at); 60 active rows backfilled to `no_address`. (2) cache-proxy `admin-pois.js` whitelists the two human-editable flags + adds `POST /admin/salem/pois/:id/accept-proposed-location` (mirrors `/move`, copies lat_proposed→lat, clears proposal). (3) Admin web — Location filter `<select>` on `PoiTree`, full `LocationVerifyPanel` in `PoiEditDialog` (status badge, current vs proposed side-by-side, drift/source/rating, truth-of-record checkbox, Accept button); `tsc --noEmit` clean. (4) Android — `MenuPrefs.PREF_POI_LOCATION_LAYER`, `PoiLocationLayerManager` (current/proposed/both), `MenuEventListener.onPoiLocationLayerChanged` default-method, `AppBarMenuManager.showTileSourcePopup()` extended to two radio groups (basemap + POI source) in one popup; `compileDebugKotlin` clean. **VERIFIER QUERY DEFERRED — BLOCKED on TigerLine MA ingest:** `tiger.addr/addrfeat/edges/featnames` empty for `statefp='25'`, and MassGIS `l3_parcels_essex` polygons loaded but assessor join missing — no usable address-to-coordinate ground-truth on this machine right now. Room migration to expose proposed coords to the Android entity also deferred until there's data worth migrating for.
+**Last updated:** 2026-04-24 — Session 163 closed. Imported the MassGIS MHC inventory as hidden POIs inside `salem_pois` (NOT a separate table). `tools/historical-buildings/import-to-salem-pois.py` reads `tools/tile-bake/salem-historic-buildings.geojson`, filters to NHL/NRIND/LHD + named (503 records), spatial-joins `tiger.massgis.l3_parcels_essex` (FEE-only) + `l3_assess_essex` for `mhc_year_built`, and does a 15m + name-fuzz dedup against existing `salem_pois` → **enrich** matching rows (populate `building_footprint_geojson` + `mhc_year_built` + `mhc_nr_status` + `mhc_narrative`) OR **insert** new hidden POI (`id = hb_<sha256>`, `category = HISTORICAL_BUILDINGS`, `default_visible=false`, `has_announce_narration=true`, `geofence_radius_m=20`, composed `short_narration`). Result: 487 new hidden POIs + 16 enrichments → `salem_pois` now 2,303 active (1,160 hidden, 503 with footprint). Admin map renders hidden POIs as subtle clickable polygon outlines that open the existing `PoiEditDialog`; POI-tree category clicks filter the map with a toggle-off pill. Chat gated behind `ENABLE_CHAT=true` env flag (post-V1). SI research request filed at `~/Development/SalemIntelligence/docs/lma-mhc-hidden-poi-research-request.md` (Tier A/B/C enrichment ask, non-urgent, iterative). Mid-session burned building a parallel `salem_historical_buildings` table + Room v10 + admin tab; operator corrected the architecture ("just a POI that doesn't present as a POI") and the whole parallel subsystem was torn down — Room back at v9 / identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`. New memory `feedback_leverage_existing_assets.md` pins the rule: don't build parallel systems when existing schema can absorb the change.
 
 ---
 
-## TOP PRIORITY — Next Session (S163)
+## TOP PRIORITY — Next Session (S164)
 
 **S157 pivot (2026-04-22) still in force:** OSM + osmdroid stay as V1 base map. MassGIS + TigerLine become **overlays only**. MapLibre port, osmdroid ripout, TigerLine tile bundling are CANCELLED. See `project_osm_stays_as_basemap.md` memory.
 
-0a. **POI location verifier — UNBLOCK by checking TigerLine MA ingest status (S162 carry-forward).** S162 shipped the schema (`lat_proposed`/`lng_proposed`/`location_status`/`location_truth_of_record`/`location_drift_m`/`location_geocoder_rating`/`location_verified_at` + 3 indexes), backend `accept-proposed-location` endpoint, admin filter+panel, and Android layers-popup POI-source group — all additive, all committed. The verifier itself is blocked: `tiger.addr/addrfeat/edges/featnames` are empty for `statefp='25'` and `massgis.l3_parcels_essex` lacks the joined assessor table. **Ask TigerLine project (or `~/Development/OMEN/notes/tigerline.md`) whether MA tables are populated yet.** If yes → write the verifier (single-pass SQL using `tiger.normalize_address` + `tiger.addrfeat` join with linear interpolation; ~30 lines), run it against 1,761 active addressed POIs (1,821 active − 60 no_address), inspect drift distribution, then add `lat_proposed`/`lng_proposed` to `SalemPoi` Room entity (v9→v10, mirror S159 cascade) and override `onPoiLocationLayerChanged` in `SalemMainActivity` to actually render the proposed markers. If MA still in progress → check whether MassGIS L3 assess for Essex has been loaded (would let us do parcel-centroid lookup via `loc_id` join) — if so, use that path instead.
+**Discipline carry-forward (S163):** Every task starts by locating the existing surface that handles 80% of the concern; only build new when the existing thing genuinely cannot absorb the change. `feedback_leverage_existing_assets.md` memory is load-bearing. The session-163 "parallel table → hidden POI" detour cost about half the session; do not repeat.
+
+0a. **POI location verifier — UNBLOCK by checking TigerLine MA ingest status (S162 carry-forward, still owed).** S162 shipped the schema (`lat_proposed`/`lng_proposed`/`location_status`/`location_truth_of_record`/`location_drift_m`/`location_geocoder_rating`/`location_verified_at` + 3 indexes), backend `accept-proposed-location` endpoint, admin filter+panel, and Android layers-popup POI-source group — all additive, all committed. The verifier itself is blocked: `tiger.addr/addrfeat/edges/featnames` are empty for `statefp='25'`. **Ask TigerLine project (or `~/Development/OMEN/notes/tigerline.md`) whether MA tables are populated yet.** If yes → write the verifier, run it against 1,761 active addressed POIs, inspect drift, add `lat_proposed`/`lng_proposed` to `SalemPoi` Room entity (would bump v9→v10), override `onPoiLocationLayerChanged` in `SalemMainActivity` to render proposed markers. L3 assessor path is **already available and already used** for the MHC year_built join (S163), so an L3-centroid fallback for rows with a matched parcel is viable in parallel.
+
+0b. **S163 MHC hidden POIs — wait for SI enrichment, then ship the companion importer.** SI got the research request this session. When SI produces a first batch (JSON keyed by `lma_id` with Tier A fields at minimum: `historical_note` / `mhc_style` / `origin_story` / `owners`), write `tools/historical-buildings/import-si-enrichment.py` mirroring `import-to-salem-pois.py` — UPDATE `salem_pois` in place, honor `admin_dirty=TRUE` (don't clobber operator edits). No schedule — operator will surface the delivery when it lands.
 
 0. **NEXT: verify S161 GPS + V1-offline fixes on next drive.** Pull Lenovo debug log after a representative car + walk tour. Expected signals: (a) zero "POI failed" / "Fill failed" toasts; (b) zero `AppBarMenuManager: findItem(0x7f09019a) null` warnings; (c) `updateRequestParams — interval Xms → Yms (no teardown)` on the rare genuine interval transition, **NOT** `Flow cancelled — removing location updates after N updates received`; (d) fix cadence ~1-2.5s while moving (no 20-30 s gaps). If any regress, root-cause before stacking more work.
 
@@ -148,35 +152,12 @@
 
 ---
 
-## Salem Oracle & SalemIntelligence Integration
+## POI Inventory (post-S163)
 
-**Two distinct services now available:**
-- **Salem Oracle** at `:8088` — 1692 historical corpus (63 POIs, NPCs, trial events, newspapers). Used by admin tool's "Generate with AI" feature (Phase 9P.10b).
-- **SalemIntelligence** at `:8089` — modern business KB (1,724 BCS entities, 116K total entities, 238 historic buildings, 5.67M relations). Build-time data source for Phase 9U POI import. Integration guide: `~/Development/SalemIntelligence/docs/lma-integration-guide.md`.
-
----
-
-## Expanded vision (updated S123)
-
-- **Phase 9U** — Unified POI Table + BCS Import. 1 session left (S124). Legacy cleanup + heading-up fix + admin historical_note field. **NEXT.**
-- **Phase 9P.C** — Publish loop. Operational (publish-salem-pois.js shipped S118).
-- **Phase 9Q** — Salem Domain Content Bridge. 2-3 sessions. Simplified by 9U unified table.
-- **Phase 9R** — Historic Tour Mode. 4-6 sessions.
-
-**Total runway:** ~9-12 sessions for 9U(cleanup)+9Q+9R. Launch deadline Sept 1, 2026.
-- **S119 parking lot** — 29 items triaged into master plan backlog. See `WickedSalemWitchCityTour_MASTER_PLAN.md` → "Backlog — S119 Parking Lot Triage".
-
----
-
-## POI Inventory
-
-- **Current PG:** **1,830 active POIs** in `salem_pois` (**1,769 narrated** post-S152 SI re-sync, up from 1,483 at S150). 1,122 historical_notes. 1,832 commercial POIs (categories in BUSINESSES group) render as stripped; 459 historic/civic/parks/worship/education render in full.
-- **Room DB:** 9.2 MB at `app-salem/src/main/assets/salem_content.db`. Witch Trials tables intact (npc_bios 49 / articles 16 / newspapers 202).
-- **APK size:** 739 MB debug (post-S154 hero prune; 820 → 739). `poi-icons/` at 544 MB is the remaining dominant target for the pre-Play-Store audit.
-- **Hero assets (post-S154 prune):** `heroes/` 18 MB / 395 entries + `hero/` 13 MB / 436 entries (historic + civic + parks + worship + education only). Commercial heroes pruned; backup at `/tmp/commercial-heroes-backup-S154-2026-04-20.tar.gz` (76 MB, 2,307 files).
-- **Inventory PDF tool:** `tools/generate-poi-inventory-pdf.py`
-- **Assets manifest + pre-build verifier:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js` (S153; S154 added commercial-hero leak check).
-- **Commercial-hero prune script:** `cache-proxy/scripts/prune-commercial-heroes.js` (S154, `--dry-run` flag).
+- **PG `salem_pois`:** **2,303 active** (was 1,816 pre-S163). **1,160 hidden** (`default_visible=false`; was 673) — of which **487 are new MHC-sourced hidden POIs** (`id LIKE 'hb_%'`). **503 with `building_footprint_geojson`**. 1,143 visible. 16 existing POIs enriched in S163 with MHC fields.
+- **Room DB:** 9.2 MB at `app-salem/src/main/assets/salem_content.db`. v9 schema, identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`. Witch Trials tables intact (npc_bios 49 / articles 16 / newspapers 202).
+- **APK size:** ~739 MB debug. `poi-icons/` at 544 MB still the pre-Play-Store audit target.
+- **Assets manifest + pre-build verifier:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js`. Pre-existing `salem_tiles.sqlite` path failure from S158 still unfixed.
 
 ---
 
@@ -187,9 +168,7 @@
 | Recent session summaries (rolling window) | `SESSION-LOG.md` |
 | Older session summaries | `SESSION-LOG-ARCHIVE.md` |
 | Live conversation logs | `docs/session-logs/session-NNN-YYYY-MM-DD.md` |
-| Full build plan | `WickedSalemWitchCityTour_MASTER_PLAN.md` |
-| Phase 9U detail | `WickedSalemWitchCityTour_MASTER_PLAN.md` Phase 9U section |
-| SalemIntelligence integration | `~/Development/SalemIntelligence/docs/lma-integration-guide.md` |
+| SalemIntelligence integration + MHC request | `~/Development/SalemIntelligence/docs/lma-*.md` |
 | Architecture, tech stack | `CLAUDE.md` and the codebase itself |
 | Legal/compliance | `GOVERNANCE.md` |
 | Patentable innovations | `IP.md` |

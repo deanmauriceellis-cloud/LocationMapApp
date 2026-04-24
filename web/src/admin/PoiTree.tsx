@@ -57,6 +57,11 @@ export interface PoiSelection {
   poi: PoiRow
 }
 
+export interface CategorySelection {
+  /** Category key as stored on salem_pois.category, or null to clear. */
+  category: string | null
+}
+
 // ─── Tree node model ─────────────────────────────────────────────────────────
 
 interface TreeNode {
@@ -278,6 +283,11 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
   const handleClick = () => {
     if (isContainer) {
       node.toggle()
+      // Also emit an activation on category-level containers so AdminLayout
+      // can drive a map category filter from tree clicks.
+      if (data.type === 'category' && !data.poi) {
+        node.activate()
+      }
     } else {
       node.select()
       node.activate()
@@ -317,11 +327,14 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
 
 export interface PoiTreeProps {
   onSelect?: (selection: PoiSelection) => void
+  /** Fires when a category node is clicked. Same category twice = toggle off (null). */
+  onCategorySelect?: (selection: CategorySelection) => void
   onDataLoaded?: (pois: PoiRow[]) => void
   externalPois?: PoiRow[] | null
 }
 
-export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) {
+export function PoiTree({ onSelect, onCategorySelect, onDataLoaded, externalPois }: PoiTreeProps) {
+  const lastCategoryRef = useRef<string | null>(null)
   const [pois, setPois] = useState<PoiRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -361,10 +374,24 @@ export function PoiTree({ onSelect, onDataLoaded, externalPois }: PoiTreeProps) 
 
   const handleActivate = useCallback(
     (node: NodeApi<TreeNode>) => {
-      if (node.data.type !== 'poi' || !node.data.poi) return
-      onSelect?.({ poi: node.data.poi })
+      if (node.data.type === 'poi' && node.data.poi) {
+        onSelect?.({ poi: node.data.poi })
+        return
+      }
+      if (node.data.type === 'category') {
+        // Top-level category nodes only drive map filtering. Ignore subcategory
+        // containers (those have a subcategory label but live under a category
+        // parent; treat only true root categories as filters).
+        const cat = node.data.category
+        if (!cat) return
+        // Top-level category rows have id "cat:<name>" (no "|sub:" segment).
+        if (node.data.id.includes('|sub:')) return
+        const next = lastCategoryRef.current === cat ? null : cat
+        lastCategoryRef.current = next
+        onCategorySelect?.({ category: next })
+      }
     },
-    [onSelect],
+    [onSelect, onCategorySelect],
   )
 
   const visibleCount = useMemo(() => {

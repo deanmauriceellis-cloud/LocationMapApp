@@ -174,7 +174,15 @@ deps.sanitizeMultiline = authModule.sanitizeMultiline;
 
 // Social (depends on auth exports)
 require('./lib/comments')(app, deps);
-const chatModule = require('./lib/chat')(app, deps);
+
+// Chat is a post-V1 feature (S163 2026-04-23). Keep the module off by default
+// so it can't throw "relation chat_rooms does not exist" at boot on a V1 DB
+// that doesn't carry the chat schema. Flip ENABLE_CHAT=true to opt in.
+let chatModule = null;
+const CHAT_ENABLED = String(process.env.ENABLE_CHAT || '').toLowerCase() === 'true';
+if (CHAT_ENABLED) {
+  chatModule = require('./lib/chat')(app, deps);
+}
 
 // Salem content (backward compatible — all routes under /salem/*)
 require('./lib/salem')(app, deps);
@@ -196,7 +204,7 @@ require('./lib/admin-tiles')(app, deps);
 // ── Start ───────────────────────────────────────────────────────────────────
 
 server.listen(PORT, '0.0.0.0', () => {
-  chatModule.ensureGlobalRoom();
+  if (chatModule) chatModule.ensureGlobalRoom();
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
   console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft, GET /webcams, GET /weather, GET /tfrs');
   console.log('Zones:  GET /cameras, GET /schools, GET /flood-zones, GET /crossings');
@@ -210,7 +218,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`        OpenSky:    ${opensky.openskyConfigured ? 'OAuth2 configured' : 'anonymous — set OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET'}`);
   console.log(`        OpenSky:    rate limiter active — ${opensky.OPENSKY_EFFECTIVE_LIMIT} req/day (${opensky.OPENSKY_DAILY_LIMIT} limit × ${opensky.OPENSKY_SAFETY_MARGIN} safety), min interval ${opensky.OPENSKY_MIN_INTERVAL_MS}ms`);
   console.log('Auth:   POST /auth/register, /auth/login, /auth/refresh, /auth/logout, GET /auth/me');
-  console.log('Chat:   GET /chat/rooms, POST /chat/rooms, GET /chat/rooms/:id/messages, Socket.IO');
+  if (chatModule) {
+    console.log('Chat:   GET /chat/rooms, POST /chat/rooms, GET /chat/rooms/:id/messages, Socket.IO');
+  } else {
+    console.log('Chat:   disabled (post-V1 feature — set ENABLE_CHAT=true to opt in)');
+  }
   console.log('Social: GET/POST /comments/:osm_type/:osm_id, POST /comments/:id/vote, DELETE /comments/:id');
   console.log(`        JWT: ${process.env.JWT_SECRET ? 'secret configured' : 'WARNING — using random secret'}`);
   console.log('Scan:   GET /scan-cells');

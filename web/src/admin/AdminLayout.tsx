@@ -10,7 +10,7 @@
 //   └──────────────────────┴──────────────────────────────────────────────┘
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PoiTree, type PoiRow, type PoiSelection } from './PoiTree'
+import { PoiTree, type PoiRow, type PoiSelection, type CategorySelection } from './PoiTree'
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog } from './PoiEditDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
@@ -28,6 +28,13 @@ type OraclePillState =
 export function AdminLayout() {
   // View toggle (POIs vs Witch Trials)
   const [view, setView] = useState<AdminView>('pois')
+
+  // Category filter — click a category node in PoiTree to hide all POIs not
+  // in that category. Click the same category again to clear.
+  const [mapCategoryFilter, setMapCategoryFilter] = useState<string | null>(null)
+  const handleCategorySelect = useCallback((sel: CategorySelection) => {
+    setMapCategoryFilter(sel.category)
+  }, [])
 
   // Shared POI dataset — populated by PoiTree's onDataLoaded callback
   const [pois, setPois] = useState<PoiRow[] | null>(null)
@@ -239,6 +246,7 @@ export function AdminLayout() {
               <div className="flex-1 min-h-0">
                 <PoiTree
                   onSelect={handleTreeSelect}
+                  onCategorySelect={handleCategorySelect}
                   onDataLoaded={handleDataLoaded}
                   externalPois={pois}
                 />
@@ -251,6 +259,8 @@ export function AdminLayout() {
                 selectedPoi={selectedPoi}
                 onPoiSelect={handleMapSelect}
                 onPoiMoved={handlePoiMoved}
+                categoryFilter={mapCategoryFilter}
+                onClearCategoryFilter={() => setMapCategoryFilter(null)}
               />
             </main>
           </div>
