@@ -1,0 +1,1516 @@
+--------- beginning of main
+04-24 20:08:47.923 I/icvisitorsguide(27299): Late-enabling -Xcheck:jni
+04-24 20:08:47.965 I/icvisitorsguide(27299): Using CollectorTypeCMC GC.
+04-24 20:08:47.994 D/nativeloader(27299): Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+04-24 20:08:48.113 D/ApplicationLoaders(27299): Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+04-24 20:08:48.113 D/ApplicationLoaders(27299): Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+04-24 20:08:48.116 W/ziparchive(27299): Unable to open '/data/app/~~_aEBS0gbDsjmOo8zJUCnnQ==/com.destructiveaigurus.katrinasmysticvisitorsguide-S0aufyACr4xrVNge_dxJ-Q==/base.dm': No such file or directory
+04-24 20:08:48.116 W/ziparchive(27299): Unable to open '/data/app/~~_aEBS0gbDsjmOo8zJUCnnQ==/com.destructiveaigurus.katrinasmysticvisitorsguide-S0aufyACr4xrVNge_dxJ-Q==/base.dm': No such file or directory
+04-24 20:08:48.618 D/nativeloader(27299): Configuring clns-7 for other apk /data/app/~~_aEBS0gbDsjmOo8zJUCnnQ==/com.destructiveaigurus.katrinasmysticvisitorsguide-S0aufyACr4xrVNge_dxJ-Q==/base.apk. target_sdk_version=35, uses_libraries=, library_path=/data/app/~~_aEBS0gbDsjmOo8zJUCnnQ==/com.destructiveaigurus.katrinasmysticvisitorsguide-S0aufyACr4xrVNge_dxJ-Q==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:48.622 D/CompatChangeReporter(27299): Compat change id reported: 202956589; UID 10277; state: ENABLED
+04-24 20:08:48.643 V/GraphicsEnvironment(27299): Currently set values for:
+04-24 20:08:48.643 V/GraphicsEnvironment(27299):   angle_gl_driver_selection_pkgs=[]
+04-24 20:08:48.643 V/GraphicsEnvironment(27299):   angle_gl_driver_selection_values=[]
+04-24 20:08:48.643 V/GraphicsEnvironment(27299): Global.Settings values are invalid: number of packages: 0, number of values: 0
+04-24 20:08:48.643 V/GraphicsEnvironment(27299): Neither updatable production driver nor prerelease driver is supported.
+04-24 20:08:48.653 I/LoadedApk(27299): No resource references to update in package com.zuisdk
+04-24 20:08:48.705 D/CompatChangeReporter(27299): Compat change id reported: 279646685; UID 10277; state: ENABLED
+--------- beginning of system
+04-24 20:08:48.713 D/MbrainDebugManagerImpl(27299): getService failed
+04-24 20:08:48.716 D/Choreographer(27299): mBindCoreEnabled? true
+04-24 20:08:48.717 D/ZuiPerformanceManager(27299): getAppBindCoreConfigs in!
+04-24 20:08:48.800 D/ZuiPerformanceConfigList(27299): config end
+04-24 20:08:48.802 D/ZuiPerformanceManager(27299): mAppBindCoreConfigs,[Yuanshen:Yuanshen,toStch:Worker Thread:5:240:0:false:-1, LuDaShi:shi.benchmark2:benchmark2,Render Thread:300:15:0:false:-1, pubg:MainThread-UE4,tmgp.pubg:MainThread-UE4,TaskGraphNP,PoolThread,FAsyncLoading,RenderThread:8000:240:0:false:-1, UnityMain:UnityMain:Worker Thread,Job Worker:8000:240:0:false:-1, HuYa:duawan kiwi:[HY] HYMedia,KT RxComputa:10000:15:1000:false:-1, DouYin:ugc.aweme:pop view thread,Render Thread:10000:15:1000:false:-1, JkChess:jkchess:Job Worker, UnityMain:5:240:0:false:-1]
+04-24 20:08:48.802 D/ZuiPerformanceManager(27299): mservice getAppBindCoreConfigs done! [Yuanshen:Yuanshen,toStch:Worker Thread:5:240:0:false:-1, LuDaShi:shi.benchmark2:benchmark2,Render Thread:300:15:0:false:-1, pubg:MainThread-UE4,tmgp.pubg:MainThread-UE4,TaskGraphNP,PoolThread,FAsyncLoading,RenderThread:8000:240:0:false:-1, UnityMain:UnityMain:Worker Thread,Job Worker:8000:240:0:false:-1, HuYa:duawan kiwi:[HY] HYMedia,KT RxComputa:10000:15:1000:false:-1, DouYin:ugc.aweme:pop view thread,Render Thread:10000:15:1000:false:-1, JkChess:jkchess:Job Worker, UnityMain:5:240:0:false:-1]
+04-24 20:08:48.802 D/ZuiPerformanceManager(27299): appbindcoreconfig,Yuanshen:Yuanshen,toStch:Worker Thread:5:240:0:false:-1
+04-24 20:08:48.802 D/ZuiPerformanceManager(27299): appbindcoreconfig,LuDaShi:shi.benchmark2:benchmark2,Render Thread:300:15:0:false:-1
+04-24 20:08:48.803 D/ZuiPerformanceManager(27299): appbindcoreconfig,pubg:MainThread-UE4,tmgp.pubg:MainThread-UE4,TaskGraphNP,PoolThread,FAsyncLoading,RenderThread:8000:240:0:false:-1
+04-24 20:08:48.803 D/ZuiPerformanceManager(27299): appbindcoreconfig,UnityMain:UnityMain:Worker Thread,Job Worker:8000:240:0:false:-1
+04-24 20:08:48.803 D/ZuiPerformanceManager(27299): appbindcoreconfig,HuYa:duawan kiwi:[HY] HYMedia,KT RxComputa:10000:15:1000:false:-1
+04-24 20:08:48.803 D/ZuiPerformanceManager(27299): appbindcoreconfig,DouYin:ugc.aweme:pop view thread,Render Thread:10000:15:1000:false:-1
+04-24 20:08:48.803 D/ZuiPerformanceManager(27299): appbindcoreconfig,JkChess:jkchess:Job Worker, UnityMain:5:240:0:false:-1
+04-24 20:08:48.804 D/Choreographer(27299): targetPkg: shi.benchmark2
+04-24 20:08:48.804 D/Choreographer(27299): pidKey: shi.benchmark2
+04-24 20:08:48.804 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.805 D/Choreographer(27299): pkg LuDaShipid27299 targetpid -1
+04-24 20:08:48.805 D/Choreographer(27299): pkgLuDaShifalsetruefalse
+04-24 20:08:48.805 D/Choreographer(27299): 3d Game policy LuDaShi enabled false
+04-24 20:08:48.805 D/Choreographer(27299): targetPkg: duawan kiwi
+04-24 20:08:48.806 D/Choreographer(27299): pidKey: duawan
+04-24 20:08:48.806 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.806 D/Choreographer(27299): pkg HuYapid27299 targetpid -1
+04-24 20:08:48.806 D/Choreographer(27299): pkgHuYafalsetruefalse
+04-24 20:08:48.806 D/Choreographer(27299): 3d Game policy HuYa enabled false
+04-24 20:08:48.806 D/Choreographer(27299): targetPkg: ugc.aweme
+04-24 20:08:48.807 D/Choreographer(27299): pidKey: ugc.aweme
+04-24 20:08:48.807 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.807 D/Choreographer(27299): pkg DouYinpid27299 targetpid -1
+04-24 20:08:48.807 D/Choreographer(27299): pkgDouYinfalsetruefalse
+04-24 20:08:48.807 D/Choreographer(27299): 3d Game policy DouYin enabled false
+04-24 20:08:48.808 D/Choreographer(27299): targetPkg: jkchess
+04-24 20:08:48.808 D/Choreographer(27299): pidKey: jkchess
+04-24 20:08:48.808 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.808 D/Choreographer(27299): pkg JkChesspid27299 targetpid -1
+04-24 20:08:48.808 D/Choreographer(27299): pkgJkChessfalsetruefalse
+04-24 20:08:48.808 D/Choreographer(27299): 3d Game policy JkChess enabled false
+04-24 20:08:48.809 D/Choreographer(27299): targetPkg: Yuanshen
+04-24 20:08:48.809 D/Choreographer(27299): pidKey: Yuanshen
+04-24 20:08:48.809 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.809 D/Choreographer(27299): targetPkg: toStch
+04-24 20:08:48.809 D/Choreographer(27299): pidKey: toStch
+04-24 20:08:48.809 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.809 D/Choreographer(27299): pkg Yuanshenpid27299 targetpid -1
+04-24 20:08:48.809 D/Choreographer(27299): pkgYuanshenfalsetruefalse
+04-24 20:08:48.809 D/Choreographer(27299): 3d Game policy Yuanshen enabled false
+04-24 20:08:48.810 D/Choreographer(27299): targetPkg: MainThread-UE4
+04-24 20:08:48.810 D/Choreographer(27299): pidKey: MainThread-UE4
+04-24 20:08:48.810 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.810 D/Choreographer(27299): targetPkg: tmgp.pubg
+04-24 20:08:48.810 D/Choreographer(27299): pidKey: tmgp.pubg
+04-24 20:08:48.810 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.810 D/Choreographer(27299): pkg pubgpid27299 targetpid -1
+04-24 20:08:48.810 D/Choreographer(27299): pkgpubgfalsetruefalse
+04-24 20:08:48.810 D/Choreographer(27299): 3d Game policy pubg enabled false
+04-24 20:08:48.811 D/Choreographer(27299): targetPkg: UnityMain
+04-24 20:08:48.811 D/Choreographer(27299): pidKey: UnityMain
+04-24 20:08:48.811 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:48.811 D/Choreographer(27299): pkgUnityMainfalsetruefalse
+04-24 20:08:48.811 D/Choreographer(27299): 3d Game policy UnityMain enabled false
+04-24 20:08:48.837 I/DebugLogger(27299): ════════ process started PID=27299 ════════
+04-24 20:08:48.840 I/DebugLogger(27299): File sink initialized at /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/logs
+04-24 20:08:48.843 I/WickedSalemApp(27299): onCreate — file sink wired up
+04-24 20:08:48.853 D/OfflineTileManager(27299): externalFilesDir=/storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files, filesDir=/data/user/0/com.destructiveaigurus.katrinasmysticvisitorsguide/files
+04-24 20:08:48.863 I/OfflineTileManager(27299): osmdroid base path configured: /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files
+04-24 20:08:48.873 I/StorageUtils(27299): /data/user/0/com.destructiveaigurus.katrinasmysticvisitorsguide/files is writable
+04-24 20:08:48.876 D/CompatChangeReporter(27299): Compat change id reported: 312399441; UID 10277; state: ENABLED
+04-24 20:08:48.880 I/StorageUtils(27299): /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files is writable
+04-24 20:08:48.882 I/StorageUtils(27299): /data/user/0/com.destructiveaigurus.katrinasmysticvisitorsguide/files is writable
+04-24 20:08:48.883 I/StorageUtils(27299): /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files is writable
+04-24 20:08:48.889 I/OfflineTileManager(27299): Tile archive present: 29.2 MB at /storage/emulated/0/Android/data/com.destructiveaigurus.katrinasmysticvisitorsguide/files/salem_tiles.sqlite
+04-24 20:08:48.938 I/OfflineTileManager(27299): Archive verified: Salem-Custom=7975 (29864KB)
+04-24 20:08:48.943 I/SplashVoice(27299): initEarly — binding TTS engine
+04-24 20:08:48.956 I/TextToSpeech(27299): Sucessfully bound to com.google.android.tts
+04-24 20:08:48.972 D/nativeloader(27299): Load libpowerhalwrap_jni.so using system ns (caller=/system_ext/framework/mediatek-framework.jar): ok
+04-24 20:08:48.972 I/PowerHalWrapper(27299): PowerHalWrapper.getInstance 
+04-24 20:08:48.973 I/M-ProMotion(27299): M-ProMotion is disabled
+04-24 20:08:48.992 D/MMUD    (27299): mtk_memory_debug_init com.destructiveaigurus.katrinasmysticvisitorsguide 0xb4000070325c25d0
+04-24 20:08:49.040 D/AppCompatDelegate(27299): Checking for metadata for AppLocalesMetadataHolderService : Service not found
+04-24 20:08:49.057 D/Embedding_ActivityThread(27299): ActivityThread mZuiEmbeddingEnabled true
+04-24 20:08:49.094 D/MMUD    (27299): get_leak_baseline 3246391296
+04-24 20:08:49.107 I/SplashActivity(27299): onCreate() — launching branded splash
+04-24 20:08:49.129 D/CompatChangeReporter(27299): Compat change id reported: 309578419; UID 10277; state: ENABLED
+04-24 20:08:49.130 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.130 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:08:49.132 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.132 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.133 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.133 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.133 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:08:49.133 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.134 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.135 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.135 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:49.135 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.135 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.135 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.159 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.159 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:49.159 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.159 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.159 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.163 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.163 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:49.163 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.163 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.163 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.178 W/icvisitorsguide(27299): Accessing hidden method Landroid/view/View;->computeFitSystemWindows(Landroid/graphics/Rect;Landroid/graphics/Rect;)Z (unsupported, reflection, allowed)
+04-24 20:08:49.178 W/icvisitorsguide(27299): Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (unsupported, reflection, allowed)
+04-24 20:08:49.183 D/skia    (27299): SkJpegCodec::onGetPixels + (800, 1000)
+04-24 20:08:49.197 D/skia    (27299): SkJpegCodec::onGetPixels -
+04-24 20:08:49.215 D/CompatChangeReporter(27299): Compat change id reported: 63938206; UID 10277; state: ENABLED
+04-24 20:08:49.277 D/skia    (27299): SkJpegCodec::onGetPixels + (800, 1000)
+04-24 20:08:49.286 D/skia    (27299): SkJpegCodec::onGetPixels -
+04-24 20:08:49.288 I/SplashActivity(27299): Katrina splash picked: resId=2131165555 (pool size=12)
+04-24 20:08:49.291 I/SplashActivity(27299): requesting splash TTS: Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.
+04-24 20:08:49.293 I/SplashVoice(27299): speak (deferred, engine not ready) — Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.
+04-24 20:08:49.299 D/ActivityThread(27299): handleStartActivity will called startAppLockIfNeeded 
+04-24 20:08:49.299 D/ActivityThread(27299): startAppLockIfNeeded is called
+04-24 20:08:49.307 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.307 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:49.308 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.308 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.308 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:49.322 D/WindowManagerImpl(27299): addView displayId=0 0
+04-24 20:08:49.322 D/WindowManagerImpl(27299): addView displayId33= 0
+04-24 20:08:49.323 I/PowerHalWrapper(27299): PowerHalWrapper.getInstance 
+04-24 20:08:49.328 I/SurfaceFactory(27299): [static] sSurfaceFactory = com.mediatek.view.impl.SurfaceFactoryImpl@a1bb3ab
+04-24 20:08:49.334 D/SystemServiceRegistry(27299):  zuiHandwriting new zuihandwritingmanager
+04-24 20:08:49.334 E/ZuiHandWritingManager(27299): Constructor called
+04-24 20:08:49.359 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:false
+04-24 20:08:49.362 W/HWUI    (27299): Unknown dataspace 0
+04-24 20:08:49.367 D/VRI[SplashActivity](27299): hardware acceleration = true, forceHwAccelerated = false
+04-24 20:08:49.379 D/InputEventReceiver(27299): Input log is disabled in InputEventReceiver.
+04-24 20:08:49.390 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.390 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:08:49.390 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.390 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.390 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.402 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:true
+04-24 20:08:49.403 D/OvCommonUtils(27299): tryApplyFullScreen: Skip hide status bar, because the status bar is no longer visible
+04-24 20:08:49.419 D/BufferQueueConsumer(27299): [](id:6aa300000000,api:0,p:-1,c:27299) connect: controlledByApp=false
+04-24 20:08:49.422 D/BLASTBufferQueue(27299): [VRI[SplashActivity]#0](f:0,a:0) constructor()
+04-24 20:08:49.422 D/BLASTBufferQueue(27299): [VRI[SplashActivity]#0](f:0,a:0) update width=1340 height=800 format=-1 mTransformHint=4
+04-24 20:08:49.426 E/FBI     (27299): Can't load library: dlopen failed: library "libmagtsync.so" not found
+04-24 20:08:49.432 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:true
+04-24 20:08:49.432 D/OvCommonUtils(27299): tryApplyFullScreen: Skip hide status bar, because the status bar is no longer visible
+04-24 20:08:49.435 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.435 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:08:49.435 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.435 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.435 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SplashActivity
+04-24 20:08:49.453 D/icvisitorsguide(27299): Can't load libmbrainSDK
+04-24 20:08:49.456 I/GrallocExtra(27299): gralloc_extra_query:is_SW3D 0
+04-24 20:08:49.493 I/GrallocExtra(27299): gralloc_extra_query:is_SW3D 0
+04-24 20:08:49.493 D/BLASTBufferQueue(27299): [VRI[SplashActivity]#0](f:0,a:1) acquireNextBufferLocked size=1340x800 mFrameNumber=1 applyTransaction=true mTimestamp=1620069038504946(auto) mPendingTransactions.size=0 graphicBufferId=117248312213506 transform=7
+04-24 20:08:49.494 D/icvisitorsguide(27299): Can't load libmbrainSDK
+04-24 20:08:49.511 D/Choreographer(27299): mBindCoreEnabled? true
+04-24 20:08:49.512 D/Choreographer(27299): targetPkg: shi.benchmark2
+04-24 20:08:49.512 D/Choreographer(27299): pidKey: shi.benchmark2
+04-24 20:08:49.512 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.512 D/Choreographer(27299): pkg LuDaShipid27299 targetpid -1
+04-24 20:08:49.512 D/Choreographer(27299): pkgLuDaShifalsetruefalse
+04-24 20:08:49.512 D/Choreographer(27299): 3d Game policy LuDaShi enabled false
+04-24 20:08:49.513 D/Choreographer(27299): targetPkg: duawan kiwi
+04-24 20:08:49.513 D/Choreographer(27299): pidKey: duawan
+04-24 20:08:49.513 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.514 D/Choreographer(27299): pkg HuYapid27299 targetpid -1
+04-24 20:08:49.514 D/Choreographer(27299): pkgHuYafalsetruefalse
+04-24 20:08:49.514 D/Choreographer(27299): 3d Game policy HuYa enabled false
+04-24 20:08:49.515 D/Choreographer(27299): targetPkg: ugc.aweme
+04-24 20:08:49.515 D/Choreographer(27299): pidKey: ugc.aweme
+04-24 20:08:49.515 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.516 D/Choreographer(27299): pkg DouYinpid27299 targetpid -1
+04-24 20:08:49.516 D/Choreographer(27299): pkgDouYinfalsetruefalse
+04-24 20:08:49.516 D/Choreographer(27299): 3d Game policy DouYin enabled false
+04-24 20:08:49.517 D/Choreographer(27299): targetPkg: jkchess
+04-24 20:08:49.517 D/Choreographer(27299): pidKey: jkchess
+04-24 20:08:49.517 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.517 D/Choreographer(27299): pkg JkChesspid27299 targetpid -1
+04-24 20:08:49.518 D/Choreographer(27299): pkgJkChessfalsetruefalse
+04-24 20:08:49.518 D/Choreographer(27299): 3d Game policy JkChess enabled false
+04-24 20:08:49.519 D/Choreographer(27299): targetPkg: Yuanshen
+04-24 20:08:49.520 D/Choreographer(27299): pidKey: Yuanshen
+04-24 20:08:49.520 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.520 D/Choreographer(27299): targetPkg: toStch
+04-24 20:08:49.520 D/Choreographer(27299): pidKey: toStch
+04-24 20:08:49.520 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.520 D/Choreographer(27299): pkg Yuanshenpid27299 targetpid -1
+04-24 20:08:49.520 D/Choreographer(27299): pkgYuanshenfalsetruefalse
+04-24 20:08:49.520 D/Choreographer(27299): 3d Game policy Yuanshen enabled false
+04-24 20:08:49.520 D/Choreographer(27299): targetPkg: MainThread-UE4
+04-24 20:08:49.520 D/Choreographer(27299): pidKey: MainThread-UE4
+04-24 20:08:49.521 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.521 D/Choreographer(27299): targetPkg: tmgp.pubg
+04-24 20:08:49.521 D/Choreographer(27299): pidKey: tmgp.pubg
+04-24 20:08:49.521 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.521 D/Choreographer(27299): pkg pubgpid27299 targetpid -1
+04-24 20:08:49.521 D/Choreographer(27299): pkgpubgfalsetruefalse
+04-24 20:08:49.521 D/Choreographer(27299): 3d Game policy pubg enabled false
+04-24 20:08:49.521 D/Choreographer(27299): targetPkg: UnityMain
+04-24 20:08:49.521 D/Choreographer(27299): pidKey: UnityMain
+04-24 20:08:49.521 D/Choreographer(27299): commvalue: icvisitorsguide
+04-24 20:08:49.522 D/Choreographer(27299): pkgUnityMainfalsetruefalse
+04-24 20:08:49.522 D/Choreographer(27299): 3d Game policy UnityMain enabled false
+04-24 20:08:49.824 W/InteractionJankMonitor(27299): Initializing without READ_DEVICE_CONFIG permission. enabled=false, interval=1, missedFrameThreshold=3, frameTimeThreshold=64, package=com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:50.449 I/icvisitorsguide(27299): Compiler allocated 4250KB to compile void android.widget.TextView.<init>(android.content.Context, android.util.AttributeSet, int, int)
+04-24 20:08:50.889 I/icvisitorsguide(27299): Compiler allocated 7097KB to compile void android.view.ViewRootImpl.performTraversals()
+04-24 20:08:50.944 I/TextToSpeech(27299): Connected to TTS engine
+04-24 20:08:51.571 I/TextToSpeech(27299): Setting up the connection to TTS engine...
+04-24 20:08:51.749 I/SplashVoice(27299): TTS engine ready
+04-24 20:08:51.750 I/SplashVoice(27299): flushing deferred speak — Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.
+04-24 20:08:53.896 I/SplashVoice(27299): speaking — utteranceId=splash_welcome
+04-24 20:08:53.996 D/ProfileInstaller(27299): Installing profile for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.277 I/SplashVoice(27299): onDone — utteranceId=splash_welcome
+04-24 20:08:58.278 I/SplashActivity(27299): splash TTS finished → transitioning
+04-24 20:08:58.280 I/SplashVoice(27299): shutdown
+04-24 20:08:58.285 I/SplashActivity(27299): Splash complete → launching SalemMainActivity
+04-24 20:08:58.291 I/TextToSpeech(27299): Disconnected from TTS engine
+04-24 20:08:58.339 I/icvisitorsguide(27299): Waiting for a blocking GC ClassLinker
+04-24 20:08:58.358 I/icvisitorsguide(27299): WaitForGcToComplete blocked ClassLinker on Background for 19.851ms
+04-24 20:08:58.366 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/base.apk' with 1 weak references
+04-24 20:08:58.366 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/split_config.arm64_v8a.apk' with 1 weak references
+04-24 20:08:58.366 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/split_config.en.apk' with 1 weak references
+04-24 20:08:58.367 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/split_config.tvdpi.apk' with 1 weak references
+04-24 20:08:58.411 D/Embedding_ActivityThread(27299): ActivityThread mZuiEmbeddingEnabled true
+04-24 20:08:58.460 I/NARR-GEO(27299): narratedAt hydrated: loaded=23, dropped=0 (window=60m)
+04-24 20:08:58.475 I/SalemMainActivity(27299): onCreate() start — device=TB305FU SDK=35 savedInstanceState=false
+04-24 20:08:58.487 I/DebugHttp(27299): Listening on port 4303
+04-24 20:08:58.558 I/OsmDroid(27299): Using tile source: Mapnik
+04-24 20:08:58.564 I/OsmDroid(27299): Tile cache increased from 0 to 9
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.668 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.669 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.671 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:58.682 I/SalemMainActivity(27299): setSupportActionBar complete — title hidden for slim toolbar
+04-24 20:08:58.693 I/AppBarMenuManager(27299): V1_OFFLINE_ONLY — slim-toolbar weather + alerts icons hidden
+04-24 20:08:58.695 I/AppBarMenuManager(27299): setupSlimToolbar() — icons wired (Weather, Home, TileSource, Alerts, Grid, About)
+04-24 20:08:58.715 I/SalemMainActivity(27299): Slim toolbar wired — Weather, Home, Alerts, Grid, About + StatusLine
+04-24 20:08:58.717 I/AppBarMenuManager(27299): setupAudioSpeaker() — single speaker icon wired (tap=cancel/replay, long-press=popup)
+04-24 20:08:58.717 I/SalemMainActivity(27299): S168 speaker icon wired (cancel/replay + popup long-press)
+04-24 20:08:58.813 I/ViewModel(27299): ViewModel created — waiting for permission before starting GPS
+04-24 20:08:58.814 I/ViewModel(27299): bypassBboxClamp = false (real-GPS-outside-Salem override)
+04-24 20:08:58.815 I/SalemMainActivity(27299): setupMap() — tileSource=CUSTOM fromSplash=true bypassBbox=false
+04-24 20:08:58.816 I/TileSourceManager(27299): buildSource(CUSTOM) → Salem-Custom
+04-24 20:08:58.821 I/SalemMainActivity(27299): SalemLocationBallOverlay wired (shows at zoom < 16)
+04-24 20:08:58.823 I/SalemMainActivity(27299): Map configured — overlays=2
+04-24 20:08:58.824 I/SalemMainActivity(27299): buildFabSpeedDial() start
+04-24 20:08:58.832 D/SalemMainActivity(27299):   FAB row: 'Radar'
+04-24 20:08:58.836 D/SalemMainActivity(27299):   FAB row: 'METAR'
+04-24 20:08:58.840 D/SalemMainActivity(27299):   FAB row: 'Aircraft'
+04-24 20:08:58.844 D/SalemMainActivity(27299):   FAB row: 'Search Here'
+04-24 20:08:58.847 D/SalemMainActivity(27299):   FAB row: 'Weather'
+04-24 20:08:58.850 D/SalemMainActivity(27299):   FAB row: 'GPS / Manual'
+04-24 20:08:58.853 D/SalemMainActivity(27299):   FAB row: 'Debug Log'
+04-24 20:08:58.855 D/SalemMainActivity(27299):   FAB row: 'Voices'
+04-24 20:08:58.856 I/SalemMainActivity(27299): FAB container built — 8 rows
+04-24 20:08:58.864 I/SalemMainActivity(27299): initNarrationSystem() — Phase 9T setup
+04-24 20:08:58.891 I/TextToSpeech(27299): Sucessfully bound to com.google.android.tts
+04-24 20:08:58.892 I/NarrationMgr(27299): TTS initializing…
+04-24 20:08:58.907 I/TourEngine(27299): Restoring saved tour: tour_salem_heritage_trail
+04-24 20:08:58.938 I/NARR-STATE(27299): narrationState → Idle (autoPlay=true, queueSize=0)
+04-24 20:08:58.938 I/NARR-STATE(27299):   Idle → currentNarration cleared, queueSize=0
+04-24 20:08:58.940 I/NARR-HEARTBEAT(27299): START — interval=300s
+04-24 20:08:58.941 I/SalemMainActivity(27299): initNarrationSystem() complete
+04-24 20:08:58.942 I/SalemMainActivity(27299): Fresh start — narration history cleared (1h wait reset to 0)
+04-24 20:08:58.949 I/SENSORS (27299): inventory — 18 sensors
+04-24 20:08:58.951 I/SENSORS (27299):   ✓ type=11 (android.sensor.rotation_vector) name='ROTATION_VECTOR' vendor='MTK'
+04-24 20:08:58.952 I/SENSORS (27299):   ✓ type=15 (android.sensor.game_rotation_vector) name='GAME_ROTATION_VECTOR' vendor='MTK'
+04-24 20:08:58.953 I/SENSORS (27299):   ✓ type=20 (android.sensor.geomagnetic_rotation_vector) name='GEOMAGNETIC_ROTATION_VECTOR' vendor='MTK'
+04-24 20:08:58.954 I/SENSORS (27299):   ✗ type=4 — NOT PRESENT
+04-24 20:08:58.955 I/SENSORS (27299):   ✗ type=2 — NOT PRESENT
+04-24 20:08:58.955 I/SENSORS (27299):   ✓ type=1 (android.sensor.accelerometer) name='ACCELEROMETER' vendor='stk83xx_acc'
+04-24 20:08:58.956 I/SENSORS (27299):   ✓ type=18 (android.sensor.step_detector) name='STEP_DETECTOR' vendor='MTK'
+04-24 20:08:58.957 I/SENSORS (27299):   ✓ type=19 (android.sensor.step_counter) name='STEP_COUNTER' vendor='MTK'
+04-24 20:08:58.964 I/DEVICE-ORIENT(27299): init — source=ROTATION_VECTOR (9-axis fused: gyro+accel+mag)
+04-24 20:08:58.987 I/SalemMainActivity(27299): Heading-up FAB hidden (HEADING_UP_ENABLED=false)
+04-24 20:08:58.988 I/SalemMainActivity(27299): observeViewModel() — attaching all observers
+04-24 20:08:58.989 I/GPS-OBS (27299): HEARTBEAT START — tick=10s, stale-threshold=30s, ok-log=60s, stale-backoff=5m→5m cadence, 30m→15m cadence
+04-24 20:08:59.039 I/SalemMainActivity(27299): observeViewModel() complete — all observers attached
+04-24 20:08:59.040 I/SalemMainActivity(27299): requestLocationPermission() — checking current state
+04-24 20:08:59.041 I/SalemMainActivity(27299): requestLocationPermission() — already granted, starting GPS directly
+04-24 20:08:59.042 I/SalemMainActivity(27299): startGpsUpdatesAndCenter() — permission confirmed, starting GMS flow
+04-24 20:08:59.043 I/ViewModel(27299): onPermissionGranted() — starting GMS location flow
+04-24 20:08:59.047 I/LocationManager(27299): getLocationUpdates() — building LocationRequest interval=60000ms minInterval=30000ms
+04-24 20:08:59.050 I/LocationManager(27299): Calling requestLocationUpdates on main looper
+04-24 20:08:59.056 I/ViewModel(27299): requestLastKnownLocation() — asking FusedClient for cached fix
+04-24 20:08:59.056 I/LocationManager(27299): getLastKnownLocation() — requesting from FusedClient
+04-24 20:08:59.058 I/SalemMainActivity(27299): onCreate() complete
+04-24 20:08:59.063 D/ActivityThread(27299): handleStartActivity will called startAppLockIfNeeded 
+04-24 20:08:59.063 D/ActivityThread(27299): startAppLockIfNeeded is called
+04-24 20:08:59.066 I/SalemMainActivity(27299): onStart() toolbar.childCount=1
+04-24 20:08:59.067 I/SalemMainActivity(27299): onStart() radarOn=true interval=5min
+04-24 20:08:59.070 I/OsmDroid(27299): Tile cache increased from 0 to 9
+04-24 20:08:59.079 I/SalemMainActivity(27299): Radar overlay added (NWS NEXRAD)
+04-24 20:08:59.080 I/SalemMainActivity(27299): Radar overlay restored from onStart()
+04-24 20:08:59.081 I/RadarRefreshScheduler(27299): Radar refresh stopped
+04-24 20:08:59.082 I/RadarRefreshScheduler(27299): Radar refresh started: every 5 min
+04-24 20:08:59.083 I/SalemMainActivity(27299): Radar scheduler restarted from onStart()
+04-24 20:08:59.084 I/SalemMainActivity(27299): onStart() METAR restore deferred — waiting for GPS fix
+04-24 20:08:59.090 I/SalemMainActivity(27299): onStart() POI restore deferred — waiting for GPS fix
+04-24 20:08:59.091 I/SalemMainActivity(27299): onStart() Webcam restore deferred — waiting for GPS fix
+04-24 20:08:59.092 I/SalemMainActivity(27299): onStart() Geofence overlay restore deferred — waiting for GPS fix
+04-24 20:08:59.094 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:59.095 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ffffffff
+04-24 20:08:59.095 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:59.095 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:59.095 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:08:59.111 I/MOTION  (27299): start — armed=true warmup=10s threshold=5s
+04-24 20:08:59.113 I/SalemMainActivity(27299): onResume()
+04-24 20:08:59.115 I/LIFECYCLE(27299): onResume
+04-24 20:08:59.117 D/WindowManagerImpl(27299): addView displayId=0 0
+04-24 20:08:59.117 D/WindowManagerImpl(27299): addView displayId33= 0
+04-24 20:08:59.120 D/SystemServiceRegistry(27299):  zuiHandwriting new zuihandwritingmanager
+04-24 20:08:59.120 E/ZuiHandWritingManager(27299): Constructor called
+04-24 20:08:59.127 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:false
+04-24 20:08:59.128 D/VRI[SalemMainActivity](27299): hardware acceleration = true, forceHwAccelerated = false
+04-24 20:08:59.135 D/InputEventReceiver(27299): Input log is disabled in InputEventReceiver.
+04-24 20:08:59.179 I/SalemMainActivity(27299): GPS journey overlay seeded — 1392 historical + 0 in-flight points (visible=false)
+04-24 20:08:59.196 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.196 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:08:59.196 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.197 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.197 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.233 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:false
+04-24 20:08:59.234 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.234 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:08:59.234 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.234 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.235 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.250 D/BufferQueueConsumer(27299): [](id:6aa300000001,api:0,p:-1,c:27299) connect: controlledByApp=false
+04-24 20:08:59.250 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#1](f:0,a:0) constructor()
+04-24 20:08:59.250 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#1](f:0,a:0) update width=1340 height=800 format=-1 mTransformHint=4
+04-24 20:08:59.254 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:false
+04-24 20:08:59.255 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.257 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:08:59.257 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.257 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.257 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:08:59.338 I/OsmDroid(27299): Tile cache increased from 9 to 18
+04-24 20:08:59.342 I/OsmDroid(27299): Tile cache increased from 9 to 18
+04-24 20:08:59.398 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#1](f:0,a:1) acquireNextBufferLocked size=1340x800 mFrameNumber=1 applyTransaction=true mTimestamp=1620078942815485(auto) mPendingTransactions.size=0 graphicBufferId=117248312213511 transform=7
+04-24 20:08:59.408 D/LocationManager(27299): onLocationResult #1 — lat=42.5566843 lon=-70.8716047 acc=3.483m provider=fused
+04-24 20:08:59.409 D/ViewModel(27299): GPS update: lat=42.5566843 lon=-70.8716047 acc=3.483m spd=8.15093E-4m/s
+04-24 20:08:59.411 I/ViewModel(27299): location → OUTSIDE Salem bbox (lat=42.5566843 lng=-70.8716047 acc=3.483m) — snapping to Samantha statue 42.5213319,-70.8958518
+04-24 20:08:59.414 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=3.5m speed=0.00mps bearing=? gap=0ms
+04-24 20:08:59.423 I/SalemMainActivity(27299): User trigger rings created (20m/30m/40m)
+04-24 20:08:59.424 W/TextToSpeech(27299): isSpeaking failed: not bound to TTS engine
+04-24 20:08:59.472 I/NARR-GEO(27299): SUMMARY: check#1 pos=42.52133,-70.89585 nearby=0 narrated=0/0 entries=0 approaches=0 skippedNarrated=0 skippedCooldown=0 walkSim=false
+04-24 20:08:59.473 I/NARR-DWELL(27299): ANCHOR SEED — first fix at 42.52133,-70.89585
+04-24 20:08:59.474 I/NARR-QUEUE(27299): cold-start anchor set at 42.5213319,-70.8958518 — tier-first dequeue until user moves 40m
+04-24 20:08:59.476 I/SalemMainActivity(27299): Corridor triggered: Washington Street (9m)
+04-24 20:08:59.477 I/SalemMainActivity(27299): currentLocation → lat=42.5213319 lon=-70.8958518 — cinematic zoom-in
+04-24 20:08:59.477 I/SalemMainActivity(27299): performCinematicZoom → 42.5213319,-70.8958518
+04-24 20:08:59.502 I/SalemMainActivity(27299): POI restore — loading cached POIs for visible area
+04-24 20:08:59.525 I/SalemMainActivity(27299): onCreateOptionsMenu() — skipped (using slim toolbar)
+04-24 20:08:59.543 I/OsmDroid(27299): Tile cache increased from 18 to 28
+04-24 20:08:59.548 I/OsmDroid(27299): Tile cache increased from 18 to 28
+04-24 20:08:59.559 I/LocationManager(27299): requestLocationUpdates registered successfully
+04-24 20:08:59.560 I/LocationManager(27299): lastLocation: lat=42.5566843 lon=-70.8716047 acc=3.483m age=0s
+04-24 20:08:59.562 I/ViewModel(27299): lastKnownLocation: lat=42.5566843 lon=-70.8716047 — centering map now
+04-24 20:08:59.564 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=3.5m speed=? bearing=? gap=150ms
+04-24 20:08:59.572 W/TextToSpeech(27299): isSpeaking failed: not bound to TTS engine
+04-24 20:08:59.573 D/SalemMainActivity(27299): GPS dead zone 7.0m (acc=3.5m) — skipped (map only)
+04-24 20:08:59.575 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:08:59.580 I/TourEngine(27299): Ambient POI cache loaded: 2303 POIs
+04-24 20:08:59.582 I/TourVM  (27299): Loaded 5 tours, 2303 POIs
+04-24 20:08:59.585 I/TourGeofence(27299): Loaded 10 geofence zones
+04-24 20:08:59.591 I/TourEngine(27299): Restored tour: Salem Heritage Trail at stop 1/10
+04-24 20:08:59.592 I/TourVM  (27299): Restored saved tour from SharedPreferences
+04-24 20:08:59.689 I/SalemMainActivity(27299): Ambient narration ACTIVE: 2244 points, 10 corridors — no tour selection required
+04-24 20:08:59.973 D/VRI[SplashActivity](27299): visibilityChanged oldVisibility=true newVisibility=false
+04-24 20:08:59.993 W/WindowOnBackDispatcher(27299): sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@7df5652
+04-24 20:08:59.997 D/BLASTBufferQueue(27299): [VRI[SplashActivity]#0](f:0,a:2) destructor()
+04-24 20:08:59.998 D/BufferQueueConsumer(27299): [VRI[SplashActivity]#0(BLAST Consumer)0](id:6aa300000000,api:0,p:-1,c:27299) disconnect
+04-24 20:08:59.999 D/View    (27299): [Warning] assignParent to null: this = DecorView@61a5aee[SplashActivity]
+04-24 20:09:00.119 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 5633KB AllocSpace bytes, 48(1024KB) LOS objects, 61% free, 22MB/58MB, paused 2.312ms,4.230ms total 142.344ms
+04-24 20:09:00.127 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/base.apk' with 1 weak references
+04-24 20:09:00.128 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/split_config.arm64_v8a.apk' with 1 weak references
+04-24 20:09:00.128 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/split_config.en.apk' with 1 weak references
+04-24 20:09:00.129 W/icvisitorsguide(27299): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~OK8SFNOFdofKFnRhcJjApg==/com.google.android.tts-RZV4Mbp4FGiyjbq8UJuc_w==/split_config.tvdpi.apk' with 1 weak references
+04-24 20:09:00.289 I/SalemMainActivity(27299): Loading 109 narration markers (showAll=false, total=2244, histMode=false, histLandmark=false)
+04-24 20:09:00.360 I/SalemMainActivity(27299): refreshPoiMarkerIcons labeled=true
+04-24 20:09:00.361 I/SalemMainActivity(27299): refreshVehicleMarkerIcons labeled=true
+04-24 20:09:01.009 I/SalemMainActivity(27299): METAR restore triggered — loading for visible area
+04-24 20:09:01.021 I/SalemMainActivity(27299): refreshNarrationIcons: bucket=2 refreshed=109
+04-24 20:09:01.096 I/SalemMainActivity(27299): onStart() restoring MBTA trains
+04-24 20:09:01.097 I/SalemMainActivity(27299): Starting MBTA train refresh every 30s
+04-24 20:09:01.099 I/SalemMainActivity(27299): onStart() restoring MBTA subway
+04-24 20:09:01.100 I/SalemMainActivity(27299): Starting MBTA subway refresh every 30s
+04-24 20:09:01.191 I/TextToSpeech(27299): Connected to TTS engine
+04-24 20:09:01.521 I/SalemMainActivity(27299): refreshNarrationIcons: bucket=3 refreshed=109
+04-24 20:09:01.561 I/SalemMainActivity(27299): Loading cached POIs for visible area
+04-24 20:09:01.562 I/SalemMainActivity(27299): Webcam restore triggered — loading for visible area
+04-24 20:09:01.564 I/SalemMainActivity(27299): Geofence overlay restore triggered — loading for visible area
+04-24 20:09:01.602 I/SalemMainActivity(27299): onStart() restoring MBTA buses
+04-24 20:09:01.603 I/SalemMainActivity(27299): Starting MBTA bus refresh every 60s
+04-24 20:09:01.799 D/skia    (27299): SkJpegCodec::onGetPixels + (400, 400)
+04-24 20:09:01.802 D/skia    (27299): SkJpegCodec::onGetPixels -
+04-24 20:09:01.826 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.826 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:09:01.826 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.826 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.827 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.828 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.828 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ff000000
+04-24 20:09:01.828 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.828 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.829 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.829 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.829 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ff000000
+04-24 20:09:01.829 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.829 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.829 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.829 D/WindowManagerImpl(27299): addView displayId=0 0
+04-24 20:09:01.830 D/WindowManagerImpl(27299): addView displayId33= 0
+04-24 20:09:01.835 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:false
+04-24 20:09:01.836 D/VRI[SalemMainActivity](27299): hardware acceleration = true, forceHwAccelerated = false
+04-24 20:09:01.847 D/InputEventReceiver(27299): Input log is disabled in InputEventReceiver.
+04-24 20:09:01.849 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.849 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ff000000
+04-24 20:09:01.849 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.849 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.849 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.860 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:true
+04-24 20:09:01.860 D/OvCommonUtils(27299): tryApplyFullScreen: Skip hide status bar, because the status bar is no longer visible
+04-24 20:09:01.868 D/BufferQueueConsumer(27299): [](id:6aa300000002,api:0,p:-1,c:27299) connect: controlledByApp=false
+04-24 20:09:01.868 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#2](f:0,a:0) constructor()
+04-24 20:09:01.868 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#2](f:0,a:0) update width=1340 height=800 format=-1 mTransformHint=4
+04-24 20:09:01.870 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:true
+04-24 20:09:01.870 D/OvCommonUtils(27299): tryApplyFullScreen: Skip hide status bar, because the status bar is no longer visible
+04-24 20:09:01.887 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#2](f:0,a:1) acquireNextBufferLocked size=1340x800 mFrameNumber=1 applyTransaction=true mTimestamp=1620081433333947(auto) mPendingTransactions.size=0 graphicBufferId=117248312213515 transform=7
+04-24 20:09:01.895 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.895 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:09:01.895 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.895 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.895 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:09:01.931 D/OvcEditorInfoUtils[OV_IME](27299): bindActivityTokenIfNeeded, create extras for pkgName: com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:09:01.938 I/TextToSpeech(27299): Setting up the connection to TTS engine...
+04-24 20:09:02.050 I/NarrationMgr(27299): TTS ready — Locale.US, rate=0.9x
+04-24 20:09:02.157 I/NarrationMgr(27299): Voice cache: 16/16 category voices available, 28 total English offline
+04-24 20:09:02.164 I/SalemMainActivity(27299): onStart() restoring MBTA stations
+04-24 20:09:03.941 D/NARR-STATE(27299):   REACH-OUT SUPPRESSED: tour active, no historical mode
+04-24 20:09:08.996 I/GPS-OBS (27299): HEARTBEAT ok — last fix age=9s
+04-24 20:09:25.834 D/LocationManager(27299): onLocationResult #2 — lat=42.5567074 lon=-70.8716052 acc=2.54m provider=fused
+04-24 20:09:25.836 D/ViewModel(27299): GPS update: lat=42.5567074 lon=-70.8716052 acc=2.54m spd=0.0013452191m/s
+04-24 20:09:25.838 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=2.5m speed=0.00mps bearing=? gap=26274ms
+04-24 20:09:25.840 D/STATIONARY(27299): freeze — stationary (never fired (26s since start), events=0) — skipping visible updates
+04-24 20:09:25.843 I/NARR-GEO(27299): ENTRY: Bewitched Sculpture – Samantha Statue dist=2m radius=30m walkSim=false
+04-24 20:09:25.844 I/NARR-GEO(27299): ENTRY: Black Cat Tours dist=27m radius=35m walkSim=false
+04-24 20:09:25.845 I/NARR-GEO(27299): ENTRY: Black Cat Curiosity Shoppe dist=22m radius=40m walkSim=false
+04-24 20:09:25.848 I/NARR-GEO(27299): ENTRY: Jimenez Gregory Law, LLC dist=37m radius=40m walkSim=false
+04-24 20:09:25.849 I/NARR-GEO(27299): ENTRY: Lappin Park dist=13m radius=40m walkSim=false
+04-24 20:09:25.850 I/NARR-GEO(27299): ENTRY: O'Neills Pub & Restaurant dist=31m radius=40m walkSim=false
+04-24 20:09:25.851 I/NARR-GEO(27299): ENTRY: Progressive Accounting LLC dist=37m radius=40m walkSim=false
+04-24 20:09:25.851 I/NARR-GEO(27299): ENTRY: Sarah S. Rama, ESQ., LL.M. dist=37m radius=40m walkSim=false
+04-24 20:09:25.852 I/NARR-GEO(27299): ENTRY: SnapBooks dist=30m radius=40m walkSim=false
+04-24 20:09:25.853 I/NARR-GEO(27299): ENTRY: Workbar Salem dist=31m radius=40m walkSim=false
+04-24 20:09:25.865 D/BEARING (27299): speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+04-24 20:09:25.867 I/PoiEncounter(27299): ENC OPEN: Bewitched Sculpture – Samantha Statue (bewitched_sculpture_samantha_statue) dist=2m
+04-24 20:09:25.868 I/PoiEncounter(27299): ENC OPEN: Lappin Park (lappin_park) dist=13m
+04-24 20:09:25.869 I/PoiEncounter(27299): ENC OPEN: Black Cat Curiosity Shoppe (black_cat_curiosity_shoppe) dist=22m
+04-24 20:09:25.869 I/PoiEncounter(27299): ENC OPEN: Black Cat Tours (black_cat_tours) dist=27m
+04-24 20:09:25.870 I/PoiEncounter(27299): ENC OPEN: SnapBooks (snapbooks) dist=30m
+04-24 20:09:25.870 I/PoiEncounter(27299): ENC OPEN: O'Neills Pub & Restaurant (oneills_pub_and_restaurant) dist=31m
+04-24 20:09:25.871 I/PoiEncounter(27299): ENC OPEN: Workbar Salem (workbar_salem) dist=31m
+04-24 20:09:25.871 I/PoiEncounter(27299): ENC OPEN: Laura Lanes Skin Care (laura_lanes_skin_care) dist=33m
+04-24 20:09:25.871 I/PoiEncounter(27299): ENC OPEN: Gulu-Gulu Cafe (gulu_gulu_cafe) dist=35m
+04-24 20:09:25.871 I/PoiEncounter(27299): ENC OPEN: Flying Saucer Pizza Company (flying_saucer_pizza_company) dist=35m
+04-24 20:09:25.872 I/PoiEncounter(27299): ENC OPEN: Jimenez Gregory Law, LLC (jimenez_gregory_law_llc) dist=37m
+04-24 20:09:25.872 I/PoiEncounter(27299): ENC OPEN: Progressive Accounting LLC (progressive_accounting_llc) dist=37m
+04-24 20:09:25.872 I/PoiEncounter(27299): ENC OPEN: Sarah S. Rama, ESQ., LL.M. (sarah_s_rama_esq_ll_m) dist=37m
+04-24 20:09:25.873 I/PoiEncounter(27299): ENC OPEN: Ugly Mug Diner (ugly_mug_diner) dist=37m
+04-24 20:09:25.873 I/PoiEncounter(27299): ENC OPEN: Vampfangs (vampfangs) dist=39m
+04-24 20:09:25.875 I/SalemMainActivity(27299): ENTRY: Bewitched Sculpture – Samantha Statue (2m)
+04-24 20:09:25.876 D/NARR-GATE(27299): Bewitched Sculpture – Samantha Statue category=HISTORICAL_BUILDINGS group=MEANINGFUL enabled=true jumpToFront=false (M=true A=true B=false)
+04-24 20:09:25.879 I/NARR-QUEUE(27299): enqueueNarration: Bewitched Sculpture – Samantha Statue tier=HISTORIC ad=0 jumpToFront=false currentNarration=null queueSize=0
+04-24 20:09:25.880 I/NARR-QUEUE(27299): PLAY DIRECT: Bewitched Sculpture – Samantha Statue (jumpToFront=false, currentNull=true)
+04-24 20:09:25.894 I/SalemMainActivity(27299): HIGHLIGHT drawn at index 0-1 for Bewitched Sculpture – Samantha Statue (below markers)
+04-24 20:09:25.896 I/NARR-PLAY(27299): DIRECT PLAY: Bewitched Sculpture – Samantha Statue voice=en-us-x-tpd-local detail=DEEP bodyLen=749 stripped=false
+04-24 20:09:25.903 I/NarrationMgr(27299): Enqueued: LONG_NARRATION — Bewitched Sculpture – Samantha Statue (queue: 1)
+04-24 20:09:25.903 I/NarrationMgr(27299): playNext: LONG_NARRATION — Bewitched Sculpture – Samantha Statue (0 remaining)
+04-24 20:09:25.911 I/NarrationMgr(27299): Speaking: LONG_NARRATION — Bewitched Sculpture – Samantha Statue voice=en-us-x-tpd-local
+04-24 20:09:25.913 I/SalemMainActivity(27299): ENTRY: Black Cat Tours (27m)
+04-24 20:09:25.914 D/NARR-GATE(27299): Black Cat Tours category=ENTERTAINMENT group=BUSINESSES enabled=false jumpToFront=false (M=true A=true B=false)
+04-24 20:09:25.915 D/NARR-QUEUE(27299): SKIP (AudioControl group muted): Black Cat Tours category=ENTERTAINMENT
+04-24 20:09:25.919 I/NARR-STATE(27299): narrationState → Speaking(segment=NarrationSegment(id=poi_narration_1620105443114871, text=In 1970, the set of the television show ‘Bewitched’ relocated to Salem after a fire forced production out of its Hollywood studios. The city’s historic architecture and atmosphere proved a fitting backdrop for the show’s seventh season. To commemorate this connection, and the show’s 40th anniversary, TV Land gifted the city of Salem with this six-foot-tall bronze statue of Elizabeth Montgomery, who played the iconic Samantha Stephens.\n\nUnveiled in 2005, the statue quickly became a popular attraction and a symbol of Salem’s embrace of its pop-culture connections. Located on Essex Street, it offers a fun and whimsical counterpoint to the city’s more somber historical narratives, and continues to draw fans of the show from around the world., type=LONG_NARRATION, poiName=Bewitched Sculpture – Samantha Statue, voiceId=en-us-x-tpd-local, kind=POI, category=null, refId=poi_narration, isReplay=false)) (autoPlay=true, queueSize=0)
+04-24 20:09:25.933 I/SalemMainActivity(27299): APPROACH: Amanda King, Massage Therapy & Zero Balancing (64m)
+04-24 20:09:25.935 I/SalemMainActivity(27299): ENTRY: Black Cat Curiosity Shoppe (22m)
+04-24 20:09:25.937 D/NARR-GATE(27299): Black Cat Curiosity Shoppe category=SHOPPING group=BUSINESSES enabled=false jumpToFront=false (M=true A=true B=false)
+04-24 20:09:25.938 D/NARR-QUEUE(27299): SKIP (AudioControl group muted): Black Cat Curiosity Shoppe category=SHOPPING
+04-24 20:09:25.941 I/SalemMainActivity(27299): APPROACH: Chagall Performance Art Collaborative (73m)
+04-24 20:09:25.943 I/SalemMainActivity(27299): APPROACH: DiPiano Family Law Group, P.C. (70m)
+04-24 20:09:25.945 I/SalemMainActivity(27299): APPROACH: EcoClean Earth Salem: House Cleaning and Office Cleaning Services (45m)
+04-24 20:09:25.948 I/SalemMainActivity(27299): APPROACH: Festival of the Dead (43m)
+04-24 20:09:25.950 I/SalemMainActivity(27299): APPROACH: Fountain Place Restaurant (43m)
+04-24 20:09:25.952 I/SalemMainActivity(27299): APPROACH: Gargas Michael D (69m)
+04-24 20:09:25.955 I/SalemMainActivity(27299): APPROACH: Haunt Blackcraft (66m)
+04-24 20:09:25.958 I/SalemMainActivity(27299): APPROACH: Honey Dew Donuts (50m)
+04-24 20:09:25.961 I/SalemMainActivity(27299): APPROACH: James M Walsh Law Offices (68m)
+04-24 20:09:25.964 I/SalemMainActivity(27299): APPROACH: Jeff Goldman Immigration (Now Goldman & Partners Immigration Law) (63m)
+04-24 20:09:25.967 I/SalemMainActivity(27299): ENTRY: Jimenez Gregory Law, LLC (37m)
+04-24 20:09:25.968 D/NARR-GATE(27299): Jimenez Gregory Law, LLC category=OFFICES group=BUSINESSES enabled=false jumpToFront=false (M=true A=true B=false)
+04-24 20:09:25.969 D/NARR-QUEUE(27299): SKIP (AudioControl group muted): Jimenez Gregory Law, LLC category=OFFICES
+04-24 20:09:25.970 I/SalemMainActivity(27299): APPROACH: Koto Restaurant Salem (76m)
+04-24 20:09:26.773 D/NarrationMgr(27299): TTS start: poi_narration_1620105443114871
+04-24 20:09:27.329 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 23MB AllocSpace bytes, 696(13MB) LOS objects, 61% free, 22MB/58MB, paused 1.257ms,6.549ms total 145.376ms
+04-24 20:09:33.470 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 17MB AllocSpace bytes, 915(17MB) LOS objects, 60% free, 23MB/59MB, paused 705us,4.897ms total 148.745ms
+04-24 20:09:39.543 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 900(17MB) LOS objects, 60% free, 23MB/59MB, paused 693us,5.871ms total 148.969ms
+04-24 20:09:45.680 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 916(17MB) LOS objects, 59% free, 24MB/60MB, paused 907us,4.530ms total 137.473ms
+04-24 20:09:51.805 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 923(17MB) LOS objects, 60% free, 23MB/59MB, paused 944us,4.293ms total 140.021ms
+04-24 20:09:53.808 D/LocationManager(27299): onLocationResult #3 — lat=42.5567006 lon=-70.8716353 acc=2.76m provider=fused
+04-24 20:09:53.809 D/ViewModel(27299): GPS update: lat=42.5567006 lon=-70.8716353 acc=2.76m spd=6.752822E-4m/s
+04-24 20:09:53.811 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=2.8m speed=0.00mps bearing=? gap=27974ms
+04-24 20:09:53.813 D/STATIONARY(27299): freeze — stationary (never fired (54s since start), events=0) — skipping visible updates
+04-24 20:09:53.831 D/BEARING (27299): speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+04-24 20:09:53.833 I/SalemMainActivity(27299): APPROACH: Amanda King, Massage Therapy & Zero Balancing (64m)
+04-24 20:09:53.835 I/SalemMainActivity(27299): APPROACH: Chagall Performance Art Collaborative (73m)
+04-24 20:09:53.837 I/SalemMainActivity(27299): APPROACH: DiPiano Family Law Group, P.C. (70m)
+04-24 20:09:53.838 I/SalemMainActivity(27299): APPROACH: EcoClean Earth Salem: House Cleaning and Office Cleaning Services (45m)
+04-24 20:09:53.839 I/SalemMainActivity(27299): APPROACH: Festival of the Dead (43m)
+04-24 20:09:53.840 I/SalemMainActivity(27299): APPROACH: Fountain Place Restaurant (43m)
+04-24 20:09:53.842 I/SalemMainActivity(27299): APPROACH: Gargas Michael D (69m)
+04-24 20:09:53.843 I/SalemMainActivity(27299): APPROACH: Haunt Blackcraft (66m)
+04-24 20:09:53.844 I/SalemMainActivity(27299): APPROACH: Honey Dew Donuts (50m)
+04-24 20:09:53.845 I/SalemMainActivity(27299): APPROACH: James M Walsh Law Offices (68m)
+04-24 20:09:53.846 I/SalemMainActivity(27299): APPROACH: Jeff Goldman Immigration (Now Goldman & Partners Immigration Law) (63m)
+04-24 20:09:53.847 I/SalemMainActivity(27299): APPROACH: Koto Restaurant Salem (76m)
+04-24 20:09:53.849 I/SalemMainActivity(27299): APPROACH: Ledger Restaurant (53m)
+04-24 20:09:53.850 I/SalemMainActivity(27299): APPROACH: Libardoni Financial (69m)
+04-24 20:09:53.852 I/SalemMainActivity(27299): APPROACH: Magika-Chapel of Archangel Michael (47m)
+04-24 20:09:53.852 I/SalemMainActivity(27299): APPROACH: Mass Bay Dental - Salem (54m)
+04-24 20:09:57.835 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 19MB AllocSpace bytes, 906(17MB) LOS objects, 60% free, 23MB/59MB, paused 862us,4.203ms total 135.108ms
+04-24 20:10:03.951 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 899(17MB) LOS objects, 60% free, 23MB/59MB, paused 779us,4.825ms total 153.363ms
+04-24 20:10:09.012 I/GPS-OBS (27299): HEARTBEAT ok — last fix age=15s
+04-24 20:10:10.085 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 923(17MB) LOS objects, 59% free, 24MB/60MB, paused 1.094ms,5.406ms total 148.619ms
+04-24 20:10:15.488 I/NarrationMgr(27299): TTS done: poi_narration_1620105443114871 (queue remaining: 0)
+04-24 20:10:15.490 I/NarrationMgr(27299): playNext: queue empty → Idle
+04-24 20:10:15.491 I/NARR-STATE(27299): narrationState → Idle (autoPlay=true, queueSize=0)
+04-24 20:10:15.492 I/NARR-STATE(27299):   Idle → currentNarration cleared, queueSize=0
+04-24 20:10:16.257 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 922(17MB) LOS objects, 60% free, 23MB/59MB, paused 692us,5.846ms total 153.352ms
+04-24 20:10:20.498 D/NARR-STATE(27299):   REACH-OUT SUPPRESSED: tour active, no historical mode
+04-24 20:10:20.817 D/LocationManager(27299): onLocationResult #4 — lat=42.55669 lon=-70.8716183 acc=2.7m provider=fused
+04-24 20:10:20.818 D/ViewModel(27299): GPS update: lat=42.55669 lon=-70.8716183 acc=2.7m spd=8.908176E-18m/s
+04-24 20:10:20.820 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=2.7m speed=0.00mps bearing=? gap=27009ms
+04-24 20:10:20.822 D/STATIONARY(27299): freeze — stationary (never fired (81s since start), events=0) — skipping visible updates
+04-24 20:10:20.834 I/NARR-GEO(27299): SUMMARY: check#5 pos=42.52133,-70.89585 nearby=474 narrated=10/2244 entries=0 approaches=51 skippedNarrated=10 skippedCooldown=0 walkSim=false
+04-24 20:10:20.839 D/BEARING (27299): speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+04-24 20:10:20.841 I/SalemMainActivity(27299): APPROACH: Amanda King, Massage Therapy & Zero Balancing (64m)
+04-24 20:10:20.842 I/SalemMainActivity(27299): APPROACH: Chagall Performance Art Collaborative (73m)
+04-24 20:10:20.843 I/SalemMainActivity(27299): APPROACH: DiPiano Family Law Group, P.C. (70m)
+04-24 20:10:20.844 I/SalemMainActivity(27299): APPROACH: EcoClean Earth Salem: House Cleaning and Office Cleaning Services (45m)
+04-24 20:10:20.845 I/SalemMainActivity(27299): APPROACH: Festival of the Dead (43m)
+04-24 20:10:20.846 I/SalemMainActivity(27299): APPROACH: Fountain Place Restaurant (43m)
+04-24 20:10:20.847 I/SalemMainActivity(27299): APPROACH: Gargas Michael D (69m)
+04-24 20:10:20.848 I/SalemMainActivity(27299): APPROACH: Haunt Blackcraft (66m)
+04-24 20:10:20.849 I/SalemMainActivity(27299): APPROACH: Honey Dew Donuts (50m)
+04-24 20:10:20.850 I/SalemMainActivity(27299): APPROACH: James M Walsh Law Offices (68m)
+04-24 20:10:20.851 I/SalemMainActivity(27299): APPROACH: Jeff Goldman Immigration (Now Goldman & Partners Immigration Law) (63m)
+04-24 20:10:20.852 I/SalemMainActivity(27299): APPROACH: Koto Restaurant Salem (76m)
+04-24 20:10:20.853 I/SalemMainActivity(27299): APPROACH: Ledger Restaurant (53m)
+04-24 20:10:20.854 I/SalemMainActivity(27299): APPROACH: Libardoni Financial (69m)
+04-24 20:10:20.855 I/SalemMainActivity(27299): APPROACH: Magika-Chapel of Archangel Michael (47m)
+04-24 20:10:20.856 I/SalemMainActivity(27299): APPROACH: Mass Bay Dental - Salem (54m)
+04-24 20:10:22.295 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 900(17MB) LOS objects, 60% free, 23MB/59MB, paused 766us,5.957ms total 149.627ms
+04-24 20:10:28.516 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 926(17MB) LOS objects, 59% free, 24MB/60MB, paused 1.816ms,4.592ms total 193.306ms
+04-24 20:10:34.810 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 929(17MB) LOS objects, 60% free, 23MB/59MB, paused 1.181ms,5.979ms total 149.044ms
+04-24 20:10:40.937 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 922(17MB) LOS objects, 59% free, 24MB/60MB, paused 1.188ms,5.312ms total 137.073ms
+04-24 20:10:47.153 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 925(17MB) LOS objects, 59% free, 24MB/60MB, paused 949us,4.968ms total 142.750ms
+04-24 20:10:47.810 D/LocationManager(27299): onLocationResult #5 — lat=42.5567083 lon=-70.8716017 acc=2.64m provider=fused
+04-24 20:10:47.812 D/ViewModel(27299): GPS update: lat=42.5567083 lon=-70.8716017 acc=2.64m spd=7.281978E-21m/s
+04-24 20:10:47.813 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=2.6m speed=0.00mps bearing=? gap=26993ms
+04-24 20:10:47.815 D/STATIONARY(27299): freeze — stationary (never fired (108s since start), events=0) — skipping visible updates
+04-24 20:10:47.833 D/BEARING (27299): speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+04-24 20:10:47.835 I/SalemMainActivity(27299): APPROACH: Amanda King, Massage Therapy & Zero Balancing (64m)
+04-24 20:10:47.836 I/SalemMainActivity(27299): APPROACH: Chagall Performance Art Collaborative (73m)
+04-24 20:10:47.837 I/SalemMainActivity(27299): APPROACH: DiPiano Family Law Group, P.C. (70m)
+04-24 20:10:47.838 I/SalemMainActivity(27299): APPROACH: EcoClean Earth Salem: House Cleaning and Office Cleaning Services (45m)
+04-24 20:10:47.839 I/SalemMainActivity(27299): APPROACH: Festival of the Dead (43m)
+04-24 20:10:47.840 I/SalemMainActivity(27299): APPROACH: Fountain Place Restaurant (43m)
+04-24 20:10:47.842 I/SalemMainActivity(27299): APPROACH: Gargas Michael D (69m)
+04-24 20:10:47.843 I/SalemMainActivity(27299): APPROACH: Haunt Blackcraft (66m)
+04-24 20:10:47.844 I/SalemMainActivity(27299): APPROACH: Honey Dew Donuts (50m)
+04-24 20:10:47.844 I/SalemMainActivity(27299): APPROACH: James M Walsh Law Offices (68m)
+04-24 20:10:47.845 I/SalemMainActivity(27299): APPROACH: Jeff Goldman Immigration (Now Goldman & Partners Immigration Law) (63m)
+04-24 20:10:47.846 I/SalemMainActivity(27299): APPROACH: Koto Restaurant Salem (76m)
+04-24 20:10:47.847 I/SalemMainActivity(27299): APPROACH: Ledger Restaurant (53m)
+04-24 20:10:47.848 I/SalemMainActivity(27299): APPROACH: Libardoni Financial (69m)
+04-24 20:10:47.849 I/SalemMainActivity(27299): APPROACH: Magika-Chapel of Archangel Michael (47m)
+04-24 20:10:47.850 I/SalemMainActivity(27299): APPROACH: Mass Bay Dental - Salem (54m)
+04-24 20:10:53.237 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 19MB AllocSpace bytes, 916(17MB) LOS objects, 59% free, 24MB/60MB, paused 1.117ms,5.674ms total 139.841ms
+04-24 20:10:59.395 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 917(17MB) LOS objects, 60% free, 23MB/59MB, paused 798us,4.699ms total 144.814ms
+04-24 20:11:05.593 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 921(17MB) LOS objects, 59% free, 24MB/60MB, paused 1.131ms,5.077ms total 146.852ms
+04-24 20:11:09.021 I/GPS-OBS (27299): HEARTBEAT ok — last fix age=21s
+04-24 20:11:11.742 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 924(17MB) LOS objects, 60% free, 23MB/59MB, paused 851us,5.971ms total 145.311ms
+04-24 20:11:14.828 D/LocationManager(27299): onLocationResult #6 — lat=42.5567083 lon=-70.8716017 acc=2.7m provider=fused
+04-24 20:11:14.830 D/ViewModel(27299): GPS update: lat=42.5567083 lon=-70.8716017 acc=2.7m spd=0.0m/s
+04-24 20:11:14.832 I/GPS-OBS (27299): fix lat=42.52133 lng=-70.89585 acc=2.7m speed=0.00mps bearing=? gap=27018ms
+04-24 20:11:14.834 D/STATIONARY(27299): freeze — stationary (never fired (135s since start), events=0) — skipping visible updates
+04-24 20:11:14.852 D/BEARING (27299): speed-gated — 0.00mps < 0.30mps (moved=0.0m, bearing frozen)
+04-24 20:11:14.853 I/SalemMainActivity(27299): APPROACH: Amanda King, Massage Therapy & Zero Balancing (64m)
+04-24 20:11:14.854 I/SalemMainActivity(27299): APPROACH: Chagall Performance Art Collaborative (73m)
+04-24 20:11:14.856 I/SalemMainActivity(27299): APPROACH: DiPiano Family Law Group, P.C. (70m)
+04-24 20:11:14.856 I/SalemMainActivity(27299): APPROACH: EcoClean Earth Salem: House Cleaning and Office Cleaning Services (45m)
+04-24 20:11:14.857 I/SalemMainActivity(27299): APPROACH: Festival of the Dead (43m)
+04-24 20:11:14.858 I/SalemMainActivity(27299): APPROACH: Fountain Place Restaurant (43m)
+04-24 20:11:14.859 I/SalemMainActivity(27299): APPROACH: Gargas Michael D (69m)
+04-24 20:11:14.860 I/SalemMainActivity(27299): APPROACH: Haunt Blackcraft (66m)
+04-24 20:11:14.861 I/SalemMainActivity(27299): APPROACH: Honey Dew Donuts (50m)
+04-24 20:11:14.862 I/SalemMainActivity(27299): APPROACH: James M Walsh Law Offices (68m)
+04-24 20:11:14.863 I/SalemMainActivity(27299): APPROACH: Jeff Goldman Immigration (Now Goldman & Partners Immigration Law) (63m)
+04-24 20:11:14.864 I/SalemMainActivity(27299): APPROACH: Koto Restaurant Salem (76m)
+04-24 20:11:14.865 I/SalemMainActivity(27299): APPROACH: Ledger Restaurant (53m)
+04-24 20:11:14.866 I/SalemMainActivity(27299): APPROACH: Libardoni Financial (69m)
+04-24 20:11:14.867 I/SalemMainActivity(27299): APPROACH: Magika-Chapel of Archangel Michael (47m)
+04-24 20:11:14.868 I/SalemMainActivity(27299): APPROACH: Mass Bay Dental - Salem (54m)
+04-24 20:11:17.744 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 900(17MB) LOS objects, 60% free, 23MB/59MB, paused 696us,4.750ms total 139.476ms
+04-24 20:11:23.955 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 930(17MB) LOS objects, 59% free, 24MB/60MB, paused 1.036ms,4.795ms total 133.543ms
+04-24 20:11:30.237 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 930(17MB) LOS objects, 59% free, 24MB/60MB, paused 901us,4.286ms total 136.944ms
+04-24 20:11:36.410 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 18MB AllocSpace bytes, 929(17MB) LOS objects, 60% free, 23MB/59MB, paused 730us,5.938ms total 142.272ms
+04-24 20:11:37.212 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=203.5, y[0]=355.7998, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620236752, downTime=1620236752, deviceId=6, source=0x1002, displayId=0, eventId=322990467 }
+04-24 20:11:37.309 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=210.09961, y[0]=359.9004, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620236852, downTime=1620236752, deviceId=6, source=0x1002, displayId=0, eventId=964775098 }
+04-24 20:11:37.312 W/WindowOnBackDispatcher(27299): sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@781b8af
+04-24 20:11:37.316 D/View    (27299): [Warning] assignParent to null: this = DecorView@11405ee[SalemMainActivity]
+04-24 20:11:37.316 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#2](f:0,a:1) destructor()
+04-24 20:11:37.316 D/BufferQueueConsumer(27299): [VRI[SalemMainActivity]#2(BLAST Consumer)2](id:6aa300000002,api:0,p:-1,c:27299) disconnect
+04-24 20:11:37.353 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.353 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:11:37.353 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.353 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=0
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.354 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ff000000
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide,return window.mNavigationBarColor=ff000000
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.356 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:37.357 D/WindowManagerImpl(27299): addView displayId=0 0
+04-24 20:11:37.357 D/WindowManagerImpl(27299): addView displayId33= 0
+04-24 20:11:37.362 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:false
+04-24 20:11:37.363 D/VRI[SalemMainActivity](27299): hardware acceleration = true, forceHwAccelerated = false
+04-24 20:11:37.372 D/InputEventReceiver(27299): Input log is disabled in InputEventReceiver.
+04-24 20:11:37.374 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.374 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ff000000
+04-24 20:11:37.374 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 0 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.374 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.374 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.388 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:true
+04-24 20:11:37.388 D/OvCommonUtils(27299): tryApplyFullScreen: Skip hide status bar, because the status bar is no longer visible
+04-24 20:11:37.396 D/BufferQueueConsumer(27299): [](id:6aa300000003,api:0,p:-1,c:27299) connect: controlledByApp=false
+04-24 20:11:37.396 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#3](f:0,a:0) constructor()
+04-24 20:11:37.397 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#3](f:0,a:0) update width=1340 height=800 format=-1 mTransformHint=4
+04-24 20:11:37.400 D/OvCommonUtils(27299): tryApplyFullScreen topActivity:ComponentInfo{com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity},  title:com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,  windowMode:1,  applyFullScreen:false,  hasHideStatusBar:true
+04-24 20:11:37.400 D/OvCommonUtils(27299): tryApplyFullScreen: Skip hide status bar, because the status bar is no longer visible
+04-24 20:11:37.415 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#3](f:0,a:1) acquireNextBufferLocked size=1340x800 mFrameNumber=1 applyTransaction=true mTimestamp=1620236960710879(auto) mPendingTransactions.size=0 graphicBufferId=117248312213519 transform=7
+04-24 20:11:37.422 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.422 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:11:37.422 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.422 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.422 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.439 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.439 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:11:37.439 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.440 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.440 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:37.460 D/OvcEditorInfoUtils[OV_IME](27299): bindActivityTokenIfNeeded, create extras for pkgName: com.destructiveaigurus.katrinasmysticvisitorsguide
+04-24 20:11:38.689 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=331.2002, y[0]=760.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620238229, downTime=1620238229, deviceId=6, source=0x1002, displayId=0, eventId=486792139 }
+04-24 20:11:38.819 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=331.2002, y[0]=760.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620238362, downTime=1620238229, deviceId=6, source=0x1002, displayId=0, eventId=635095591 }
+04-24 20:11:38.822 W/WindowOnBackDispatcher(27299): sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@85e6568
+04-24 20:11:38.826 D/View    (27299): [Warning] assignParent to null: this = DecorView@d8afae5[SalemMainActivity]
+04-24 20:11:38.826 D/BLASTBufferQueue(27299): [VRI[SalemMainActivity]#3](f:0,a:2) destructor()
+04-24 20:11:38.827 D/BufferQueueConsumer(27299): [VRI[SalemMainActivity]#3(BLAST Consumer)3](id:6aa300000003,api:0,p:-1,c:27299) disconnect
+04-24 20:11:38.871 I/TourRouteLoader(27299): Loaded 11 route segments, 452 total points
+04-24 20:11:38.874 I/SalemMainActivityTour(27299): Drew tour 'tour_salem_heritage_trail' route: 443 points from 11 legs
+04-24 20:11:38.888 I/TourEngine(27299): Tour resumed: Salem Heritage Trail
+04-24 20:11:38.906 I/DecorViewDelegate(27299): getWindowNavigationBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:38.906 I/DecorViewDelegate(27299): getWindowNavigationBarColor: window has mEdgeToEdgeEnforced com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity,return window.mNavigationBarColor=ffffffff
+04-24 20:11:38.906 I/DecorViewDelegate(27299): getWindowStatusBarColor: appearance is 512 for com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:38.906 I/DecorViewDelegate(27299): getWindowStatusBarColor: legacyPolicy is false, com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:38.906 I/DecorViewDelegate(27299): getWindowStatusBarColor: window has TRANSPARENT com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity
+04-24 20:11:40.329 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=42.200195, y[0]=523.9004, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620239872, downTime=1620239872, deviceId=6, source=0x1002, displayId=0, eventId=875585415 }
+04-24 20:11:40.379 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=42.200195, y[0]=523.9004, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620239922, downTime=1620239872, deviceId=6, source=0x1002, displayId=0, eventId=855849320 }
+04-24 20:11:40.388 I/SalemMainActivity(27299): Walk sim: tour 'Salem Heritage Trail' (theme=HERITAGE_TRAIL) already Active — using as-is
+04-24 20:11:40.388 I/NARR-GEO(27299): historicalMode=true (allowedIds=10)
+04-24 20:11:40.389 I/SalemMainActivity(27299): Historical Mode ON — tour 'Salem Heritage Trail' (10 stops whitelisted)
+04-24 20:11:40.400 I/TourRouteLoader(27299): Loaded 11 route segments, 452 total points
+04-24 20:11:40.401 I/SalemMainActivity(27299): Walk sim using tour route: 'Salem Heritage Trail' (443 points)
+04-24 20:11:40.404 I/SalemMainActivity(27299): Walk sim started: 'Salem Heritage Trail' — 443 route points (narration session reset)
+04-24 20:11:40.410 I/WAKE-LOCK(27299): acquired (WickedSalem:walkSimUi)
+04-24 20:11:40.419 I/SalemMainActivity(27299): Walk sim: 3707 steps at 1.4m/s
+04-24 20:11:40.684 I/WALK-SIM(27299): Historical Mode dwell filter: 602/2244 POIs eligible for LOOK AT pauses
+04-24 20:11:40.685 I/WALK-SIM(27299): Auto-dwell armed: 602 candidate POIs, trigger=15m, hold=20s, cooldown=5s
+04-24 20:11:40.686 I/GPS-OBS (27299): fix lat=42.52253 lng=-70.89216 acc=0.0m speed=? bearing=? gap=25855ms
+04-24 20:11:40.688 I/STATIONARY(27299): derived-speed escape — 2.06mps (331.4m / 161.2s), unfreezing
+04-24 20:11:40.692 I/SalemMainActivity(27299): GPS interval → 30000ms (speed=?mph, narrating=false, dwelled=161267ms)
+04-24 20:11:40.692 I/ViewModel(27299): restartLocationUpdates() — interval 60000ms → 30000ms
+04-24 20:11:40.693 I/LocationManager(27299): updateRequestParams — interval 60000ms → 30000ms, minInterval 30000ms → 15000ms (no teardown)
+04-24 20:11:40.702 I/TourGeofence(27299): ENTRY: National Park Service Visitor Center (16m)
+04-24 20:11:40.704 I/NARR-GEO(27299): ENTRY: National Park Service Visitor Center dist=16m radius=40m walkSim=true
+04-24 20:11:40.706 I/SalemMainActivity(27299): ENTRY: National Park Service Visitor Center (16m)
+04-24 20:11:40.706 D/NARR-GATE(27299): National Park Service Visitor Center category=CIVIC group=MEANINGFUL enabled=true jumpToFront=false (M=true A=true B=false)
+04-24 20:11:40.707 I/NARR-QUEUE(27299): enqueueNarration: National Park Service Visitor Center tier=HISTORIC ad=0 jumpToFront=false currentNarration=null queueSize=0
+04-24 20:11:40.707 I/NARR-QUEUE(27299): PLAY DIRECT: National Park Service Visitor Center (jumpToFront=false, currentNull=true)
+04-24 20:11:40.711 I/SalemMainActivity(27299): HIGHLIGHT drawn at index 0-1 for National Park Service Visitor Center (below markers)
+04-24 20:11:40.712 I/NARR-PLAY(27299): DIRECT PLAY: National Park Service Visitor Center voice=en-us-x-iom-local detail=DEEP bodyLen=98 stripped=false
+04-24 20:11:40.714 I/NarrationMgr(27299): Enqueued: LONG_NARRATION — National Park Service Visitor Center (queue: 1)
+04-24 20:11:40.714 I/NarrationMgr(27299): playNext: LONG_NARRATION — National Park Service Visitor Center (0 remaining)
+04-24 20:11:40.721 I/NarrationMgr(27299): Speaking: LONG_NARRATION — National Park Service Visitor Center voice=en-us-x-iom-local
+04-24 20:11:40.723 I/NARR-STATE(27299): narrationState → Speaking(segment=NarrationSegment(id=poi_narration_1620240258876725, text=The National Park Service Visitor Center is the official starting point for Salem's Heritage Trail, type=LONG_NARRATION, poiName=National Park Service Visitor Center, voiceId=en-us-x-iom-local, kind=POI, category=null, refId=poi_narration, isReplay=false)) (autoPlay=true, queueSize=0)
+04-24 20:11:40.731 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:40.733 I/SalemMainActivity(27299): APPROACH: John Ward House (59m)
+04-24 20:11:40.735 I/NARR-GEO(27299): ENTRY: Salem Armory Regional Visitor Center dist=30m radius=40m walkSim=true
+04-24 20:11:40.736 I/SalemMainActivity(27299): ENTRY: Salem Armory Regional Visitor Center (30m)
+04-24 20:11:40.737 D/NARR-GATE(27299): Salem Armory Regional Visitor Center category=HISTORICAL_BUILDINGS group=MEANINGFUL enabled=true jumpToFront=false (M=true A=true B=false)
+04-24 20:11:40.737 I/NARR-QUEUE(27299): enqueueNarration: Salem Armory Regional Visitor Center tier=HISTORIC ad=0 jumpToFront=false currentNarration=National Park Service Visitor Center queueSize=0
+04-24 20:11:40.739 I/SalemMainActivity(27299): Queued: Salem Armory Regional Visitor Center [tier=HISTORIC ad=0] (1 in queue)
+04-24 20:11:40.742 I/NARR-GEO(27299): SUMMARY: check#8 pos=42.52253,-70.89216 nearby=24 narrated=2/2244 entries=2 approaches=2 skippedNarrated=0 skippedCooldown=0 walkSim=true
+04-24 20:11:40.743 D/BEARING (27299): moved=330.7m bearing=66° (sim) (first)
+04-24 20:11:40.743 D/NARR-DWELL(27299): anchor advance — moved 330m, no state to reset
+04-24 20:11:40.760 I/PoiEncounter(27299): ENC OPEN: National Park Service Visitor Center (national_park_service_visitor_center) dist=16m
+04-24 20:11:40.761 I/PoiEncounter(27299): ENC OPEN: Salem Armory Regional Visitor Center (salem_armory_regional_visitor_center) dist=30m
+04-24 20:11:40.761 I/PoiEncounter(27299): ENC OPEN: Essex Institute Historic District (essex_institute_historic_district) dist=44m
+04-24 20:11:40.762 I/PoiEncounter(27299): ENC OPEN: John Ward House (john_ward_house) dist=59m
+04-24 20:11:40.762 I/PoiEncounter(27299): ENC OPEN: Gardner-Pingree House (gardner_pingree_house) dist=98m
+04-24 20:11:40.763 I/PoiEncounter(27299): ENC CLOSE: Bewitched Sculpture – Samantha Statue (bewitched_sculpture_samantha_statue) duration=108s minDist=2m maxDist=2m fixes=5
+04-24 20:11:40.763 I/PoiEncounter(27299): ENC CLOSE: Lappin Park (lappin_park) duration=108s minDist=13m maxDist=13m fixes=5
+04-24 20:11:40.764 I/PoiEncounter(27299): ENC CLOSE: Black Cat Curiosity Shoppe (black_cat_curiosity_shoppe) duration=108s minDist=22m maxDist=22m fixes=5
+04-24 20:11:40.764 I/PoiEncounter(27299): ENC CLOSE: Black Cat Tours (black_cat_tours) duration=108s minDist=27m maxDist=27m fixes=5
+04-24 20:11:40.765 I/PoiEncounter(27299): ENC CLOSE: SnapBooks (snapbooks) duration=108s minDist=30m maxDist=30m fixes=5
+04-24 20:11:40.766 I/PoiEncounter(27299): ENC CLOSE: O'Neills Pub & Restaurant (oneills_pub_and_restaurant) duration=108s minDist=31m maxDist=31m fixes=5
+04-24 20:11:40.766 I/PoiEncounter(27299): ENC CLOSE: Workbar Salem (workbar_salem) duration=108s minDist=31m maxDist=31m fixes=5
+04-24 20:11:40.767 I/PoiEncounter(27299): ENC CLOSE: Laura Lanes Skin Care (laura_lanes_skin_care) duration=108s minDist=33m maxDist=33m fixes=5
+04-24 20:11:40.768 I/PoiEncounter(27299): ENC CLOSE: Gulu-Gulu Cafe (gulu_gulu_cafe) duration=108s minDist=35m maxDist=35m fixes=5
+04-24 20:11:40.768 I/PoiEncounter(27299): ENC CLOSE: Flying Saucer Pizza Company (flying_saucer_pizza_company) duration=108s minDist=35m maxDist=35m fixes=5
+04-24 20:11:40.769 I/PoiEncounter(27299): ENC CLOSE: Jimenez Gregory Law, LLC (jimenez_gregory_law_llc) duration=108s minDist=37m maxDist=37m fixes=5
+04-24 20:11:40.770 I/PoiEncounter(27299): ENC CLOSE: Progressive Accounting LLC (progressive_accounting_llc) duration=108s minDist=37m maxDist=37m fixes=5
+04-24 20:11:40.770 I/PoiEncounter(27299): ENC CLOSE: Sarah S. Rama, ESQ., LL.M. (sarah_s_rama_esq_ll_m) duration=108s minDist=37m maxDist=37m fixes=5
+04-24 20:11:40.771 I/PoiEncounter(27299): ENC CLOSE: Ugly Mug Diner (ugly_mug_diner) duration=108s minDist=37m maxDist=37m fixes=5
+04-24 20:11:40.772 I/PoiEncounter(27299): ENC CLOSE: Vampfangs (vampfangs) duration=108s minDist=39m maxDist=39m fixes=5
+04-24 20:11:40.773 I/SalemMainActivity(27299): Corridor triggered: Chestnut Street (14m)
+04-24 20:11:40.774 D/SalemMainActivity(27299): currentLocation → lat=42.522532 lon=-70.89216 — following (speed=?mph)
+04-24 20:11:40.776 I/ViewModel(27299): stopLocationPolling() — cancelling GMS provider
+04-24 20:11:40.777 I/LocationManager(27299): Flow cancelled — removing location updates after 6 updates received
+04-24 20:11:40.782 I/ViewModel(27299): Manual location: 42.522532, -70.89216
+04-24 20:11:41.141 D/NarrationMgr(27299): TTS start: poi_narration_1620240258876725
+04-24 20:11:41.321 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 22MB AllocSpace bytes, 698(14MB) LOS objects, 55% free, 28MB/64MB, paused 4.058ms,5.837ms total 282.621ms
+04-24 20:11:41.395 I/SalemMainActivity(27299): Loading 109 narration markers (showAll=false, total=2244, histMode=true, histLandmark=false)
+04-24 20:11:42.004 I/GPS-OBS (27299): fix lat=42.52252 lng=-70.89215 acc=0.0m speed=? bearing=? gap=1317ms
+04-24 20:11:42.013 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:42.015 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:42.023 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=66°, Δ=83°)
+04-24 20:11:42.025 D/SalemMainActivity(27299): currentLocation → lat=42.52252112053949 lon=-70.89215140171669 — following (speed=?mph)
+04-24 20:11:42.026 I/ViewModel(27299): Manual location: 42.52252112053949, -70.89215140171669
+04-24 20:11:42.885 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1326.0, y[0]=72.90039, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620242428, downTime=1620242428, deviceId=6, source=0x1002, displayId=0, eventId=523694891 }
+04-24 20:11:42.984 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1319.7002, y[0]=69.40039, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620242527, downTime=1620242428, deviceId=6, source=0x1002, displayId=0, eventId=657901269 }
+04-24 20:11:43.028 I/WALK-SIM(27299): LOOK AT Salem Armory Regional Visitor Center (dist=30m bearing=347°) — narrating=National Park Service Visitor Center queue=[Salem Armory Regional Visitor Center] — dwelling until queue drains (max 180s)
+04-24 20:11:43.029 I/GPS-OBS (27299): fix lat=42.52252 lng=-70.89215 acc=0.0m speed=? bearing=? gap=1026ms
+04-24 20:11:43.033 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:43.034 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:43.037 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:11:43.050 D/SalemMainActivity(27299): currentLocation → lat=42.52252112053949 lon=-70.89215140171669 — following (speed=?mph)
+04-24 20:11:43.051 I/ViewModel(27299): Manual location: 42.52252112053949, -70.89215140171669
+04-24 20:11:43.649 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1297.0, y[0]=98.09961, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620243191, downTime=1620243191, deviceId=6, source=0x1002, displayId=0, eventId=358294491 }
+04-24 20:11:43.683 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1297.0, y[0]=98.09961, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620243224, downTime=1620243191, deviceId=6, source=0x1002, displayId=0, eventId=311654373 }
+04-24 20:11:44.054 I/GPS-OBS (27299): fix lat=42.52252 lng=-70.89215 acc=0.0m speed=? bearing=? gap=1024ms
+04-24 20:11:44.065 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:44.071 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:44.081 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:11:44.100 D/SalemMainActivity(27299): currentLocation → lat=42.52252112053949 lon=-70.89215140171669 — following (speed=?mph)
+04-24 20:11:44.103 I/ViewModel(27299): Manual location: 42.52252112053949, -70.89215140171669
+04-24 20:11:44.213 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1309.5996, y[0]=60.200195, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620243755, downTime=1620243755, deviceId=6, source=0x1002, displayId=0, eventId=509923527 }
+04-24 20:11:44.246 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1309.5996, y[0]=60.200195, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620243788, downTime=1620243755, deviceId=6, source=0x1002, displayId=0, eventId=277215502 }
+04-24 20:11:44.266 I/NARR-STATE(27299): narrationState → Idle (autoPlay=true, queueSize=1)
+04-24 20:11:44.267 I/NARR-STATE(27299):   Idle → currentNarration cleared, queueSize=1
+04-24 20:11:44.269 I/NARR-STATE(27299):   Queue has 1 → advancing after 500ms
+04-24 20:11:44.273 I/NarrationMgr(27299): Stopped — queue cleared
+04-24 20:11:44.279 I/SalemMainActivity(27299): Speaker tap → narration cancelled
+04-24 20:11:44.629 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 24MB AllocSpace bytes, 808(15MB) LOS objects, 58% free, 25MB/61MB, paused 1.132ms,5.213ms total 135.517ms
+04-24 20:11:44.773 I/NARR-QUEUE(27299): Picked Salem Armory Regional Visitor Center tier=HISTORIC dist=31m (tour-mode, 1 in tier, 1 total survivors)
+04-24 20:11:44.775 I/NARR-PLAY(27299): playNextNarration: Salem Armory Regional Visitor Center (0 remaining in queue)
+04-24 20:11:44.784 I/SalemMainActivity(27299): HIGHLIGHT drawn at index 0-1 for Salem Armory Regional Visitor Center (below markers)
+04-24 20:11:44.789 I/NARR-PLAY(27299):   text=You're standing before the Salem Armory, but this building h... voice=en-us-x-tpd-local narrationAutoPlay=true detail=DEEP stripped=false
+04-24 20:11:44.790 I/NARR-PLAY(27299):   → calling tourViewModel.speakTagged{Hint,Narration}() voice=en-us-x-tpd-local stripped=false
+04-24 20:11:44.792 I/NarrationMgr(27299): Enqueued: LONG_NARRATION — Salem Armory Regional Visitor Center (queue: 1)
+04-24 20:11:44.793 I/NarrationMgr(27299): playNext: LONG_NARRATION — Salem Armory Regional Visitor Center (0 remaining)
+04-24 20:11:44.809 I/NarrationMgr(27299): Speaking: LONG_NARRATION — Salem Armory Regional Visitor Center voice=en-us-x-tpd-local
+04-24 20:11:44.814 I/NARR-STATE(27299): narrationState → Speaking(segment=NarrationSegment(id=poi_narration_1620244336517264, text=You're standing before the Salem Armory, but this building has seen more than just soldiers marching through its doors. Established in 1938, it holds the distinction of being the very first National Historic Site in the United States. Think about that for a moment – this building helped define what we *save* as a nation. While the brick you see is currently undergoing restoration, it’s a testament to the enduring spirit of Salem. For decades, this armory served as a training ground and gathering place for local militia, ready to answer the call should the need arise. Today, it’s a visitor center, welcoming people from around the world to explore Salem’s rich history. As you step inside, imagine the echoes of generations past – the drills, the camaraderie, and the quiet dedication to preserving this corner of American heritage. The National Park Service now cares for this landmark, ensuring its stories continue to be told., type=LONG_NARRATION, poiName=Salem Armory Regional Visitor Center, voiceId=en-us-x-tpd-local, kind=POI, category=null, refId=poi_narration, isReplay=false)) (autoPlay=true, queueSize=0)
+04-24 20:11:45.105 I/GPS-OBS (27299): fix lat=42.52252 lng=-70.89215 acc=0.0m speed=? bearing=? gap=1052ms
+04-24 20:11:45.115 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:45.118 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:45.127 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:11:45.129 D/SalemMainActivity(27299): currentLocation → lat=42.52252112053949 lon=-70.89215140171669 — following (speed=?mph)
+04-24 20:11:45.132 I/ViewModel(27299): Manual location: 42.52252112053949, -70.89215140171669
+04-24 20:11:45.252 D/NarrationMgr(27299): TTS start: poi_narration_1620244336517264
+04-24 20:11:46.136 I/GPS-OBS (27299): fix lat=42.52252 lng=-70.89215 acc=0.0m speed=? bearing=? gap=1030ms
+04-24 20:11:46.144 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:46.146 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:46.149 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:11:46.151 D/SalemMainActivity(27299): currentLocation → lat=42.52252112053949 lon=-70.89215140171669 — following (speed=?mph)
+04-24 20:11:46.153 I/ViewModel(27299): Manual location: 42.52252112053949, -70.89215140171669
+04-24 20:11:46.153 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1292.2002, y[0]=68.40039, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620245680, downTime=1620245680, deviceId=6, source=0x1002, displayId=0, eventId=1049896192 }
+04-24 20:11:46.176 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1292.2002, y[0]=68.40039, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620245713, downTime=1620245680, deviceId=6, source=0x1002, displayId=0, eventId=232570720 }
+04-24 20:11:46.192 I/NARR-STATE(27299): narrationState → Idle (autoPlay=true, queueSize=0)
+04-24 20:11:46.194 I/NARR-STATE(27299):   Idle → currentNarration cleared, queueSize=0
+04-24 20:11:46.197 I/NarrationMgr(27299): Stopped — queue cleared
+04-24 20:11:46.202 I/SalemMainActivity(27299): Speaker tap → narration cancelled
+04-24 20:11:46.745 I/HistNewspaper(27299): loaded 202 1692 newspapers from Room DB
+04-24 20:11:46.747 I/NARR-HEADLINE(27299): TOUR SILENCE FILL: 3s delay then 1692 headline 9/202 — 1692-01-13 Salem 1692 Dispatch — January 13, 1692
+04-24 20:11:47.155 I/GPS-OBS (27299): fix lat=42.52252 lng=-70.89215 acc=0.0m speed=? bearing=? gap=1020ms
+04-24 20:11:47.160 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:11:47.163 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:47.168 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:11:47.170 D/SalemMainActivity(27299): currentLocation → lat=42.52252112053949 lon=-70.89215140171669 — following (speed=?mph)
+04-24 20:11:47.172 I/ViewModel(27299): Manual location: 42.52252112053949, -70.89215140171669
+04-24 20:11:47.173 I/WALK-SIM(27299): TTS idle + queue empty after 4s — ending dwell
+04-24 20:11:47.173 I/WALK-SIM(27299): RESUMING from Salem Armory Regional Visitor Center (held 4s, final narrating=none queueSize=0)
+04-24 20:11:47.174 I/GPS-OBS (27299): fix lat=42.52251 lng=-70.89214 acc=0.0m speed=? bearing=? gap=19ms
+04-24 20:11:47.178 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (43m)
+04-24 20:11:47.180 I/SalemMainActivity(27299): APPROACH: John Ward House (58m)
+04-24 20:11:47.184 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=347°, Δ=161°)
+04-24 20:11:47.185 D/SalemMainActivity(27299): currentLocation → lat=42.522510241078976 lon=-70.89214280343339 — following (speed=?mph)
+04-24 20:11:47.187 I/ViewModel(27299): Manual location: 42.522510241078976, -70.89214280343339
+04-24 20:11:47.757 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 19MB AllocSpace bytes, 780(15MB) LOS objects, 56% free, 27MB/63MB, paused 1.397ms,5.642ms total 147.624ms
+04-24 20:11:48.190 I/GPS-OBS (27299): fix lat=42.52250 lng=-70.89213 acc=0.0m speed=? bearing=? gap=1016ms
+04-24 20:11:48.197 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (43m)
+04-24 20:11:48.199 I/SalemMainActivity(27299): APPROACH: John Ward House (57m)
+04-24 20:11:48.207 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:48.209 D/SalemMainActivity(27299): currentLocation → lat=42.52249936161846 lon=-70.89213420515007 — following (speed=?mph)
+04-24 20:11:48.210 I/ViewModel(27299): Manual location: 42.52249936161846, -70.89213420515007
+04-24 20:11:49.213 I/GPS-OBS (27299): fix lat=42.52249 lng=-70.89213 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:11:49.220 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (42m)
+04-24 20:11:49.222 I/SalemMainActivity(27299): APPROACH: John Ward House (57m)
+04-24 20:11:49.229 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:49.231 D/SalemMainActivity(27299): currentLocation → lat=42.52248848215795 lon=-70.89212560686677 — following (speed=?mph)
+04-24 20:11:49.233 I/ViewModel(27299): Manual location: 42.52248848215795, -70.89212560686677
+04-24 20:11:49.750 D/NarrationMgr(27299): AudioControl gate: Oracle muted — dropping newspaper_1692_1620249294994572
+04-24 20:11:49.751 I/HistNewspaper(27299): advance: 8 → 9 (of 202)
+04-24 20:11:50.237 I/GPS-OBS (27299): fix lat=42.52248 lng=-70.89212 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:11:50.245 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (42m)
+04-24 20:11:50.247 I/SalemMainActivity(27299): APPROACH: John Ward House (57m)
+04-24 20:11:50.253 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:50.255 D/SalemMainActivity(27299): currentLocation → lat=42.522477602697435 lon=-70.89211700858345 — following (speed=?mph)
+04-24 20:11:50.256 I/ViewModel(27299): Manual location: 42.522477602697435, -70.89211700858345
+04-24 20:11:51.248 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 856(16MB) LOS objects, 56% free, 27MB/63MB, paused 1.156ms,5.460ms total 144.190ms
+04-24 20:11:51.259 I/GPS-OBS (27299): fix lat=42.52247 lng=-70.89211 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:11:51.266 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (42m)
+04-24 20:11:51.269 I/SalemMainActivity(27299): APPROACH: John Ward House (56m)
+04-24 20:11:51.275 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:51.277 D/SalemMainActivity(27299): currentLocation → lat=42.522466723236924 lon=-70.89210841030015 — following (speed=?mph)
+04-24 20:11:51.278 I/ViewModel(27299): Manual location: 42.522466723236924, -70.89210841030015
+04-24 20:11:52.280 I/GPS-OBS (27299): fix lat=42.52246 lng=-70.89210 acc=0.0m speed=? bearing=? gap=1021ms
+04-24 20:11:52.285 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (42m)
+04-24 20:11:52.287 I/SalemMainActivity(27299): APPROACH: John Ward House (56m)
+04-24 20:11:52.292 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:52.295 D/SalemMainActivity(27299): currentLocation → lat=42.522455843776406 lon=-70.89209981201684 — following (speed=?mph)
+04-24 20:11:52.297 I/ViewModel(27299): Manual location: 42.522455843776406, -70.89209981201684
+04-24 20:11:53.300 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89209 acc=0.0m speed=? bearing=? gap=1019ms
+04-24 20:11:53.306 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (41m)
+04-24 20:11:53.309 I/SalemMainActivity(27299): APPROACH: John Ward House (56m)
+04-24 20:11:53.315 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:53.317 D/SalemMainActivity(27299): currentLocation → lat=42.522444964315895 lon=-70.89209121373354 — following (speed=?mph)
+04-24 20:11:53.319 I/ViewModel(27299): Manual location: 42.522444964315895, -70.89209121373354
+04-24 20:11:54.321 I/GPS-OBS (27299): fix lat=42.52243 lng=-70.89208 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:11:54.326 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (41m)
+04-24 20:11:54.328 I/SalemMainActivity(27299): APPROACH: John Ward House (55m)
+04-24 20:11:54.335 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:54.336 I/PoiEncounter(27299): ENC OPEN: Peabody Essex Museum (peabody_essex_museum_2) dist=99m
+04-24 20:11:54.338 D/SalemMainActivity(27299): currentLocation → lat=42.522434084855384 lon=-70.89208261545022 — following (speed=?mph)
+04-24 20:11:54.340 I/ViewModel(27299): Manual location: 42.522434084855384, -70.89208261545022
+04-24 20:11:54.524 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 854(16MB) LOS objects, 56% free, 27MB/63MB, paused 1.283ms,5.425ms total 145.890ms
+04-24 20:11:55.344 I/GPS-OBS (27299): fix lat=42.52242 lng=-70.89207 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:11:55.350 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (41m)
+04-24 20:11:55.352 I/SalemMainActivity(27299): APPROACH: John Ward House (55m)
+04-24 20:11:55.359 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:55.361 D/SalemMainActivity(27299): currentLocation → lat=42.52242320539487 lon=-70.8920740171669 — following (speed=?mph)
+04-24 20:11:55.363 I/ViewModel(27299): Manual location: 42.52242320539487, -70.8920740171669
+04-24 20:11:56.367 I/GPS-OBS (27299): fix lat=42.52241 lng=-70.89207 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:11:56.373 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (41m)
+04-24 20:11:56.376 I/SalemMainActivity(27299): APPROACH: John Ward House (55m)
+04-24 20:11:56.382 D/BEARING (27299): moved=1.4m bearing=149° (sim) (prev=149°, Δ=0°)
+04-24 20:11:56.383 D/NARR-DWELL(27299): anchor advance — moved 15m, no state to reset
+04-24 20:11:56.384 I/PoiEncounter(27299): ENC OPEN: Yin Yu Tang House @Peabody Essex Museum (yin_yu_tang_house_peabody_essex_museum) dist=99m
+04-24 20:11:56.385 D/SalemMainActivity(27299): currentLocation → lat=42.522412325934354 lon=-70.8920654188836 — following (speed=?mph)
+04-24 20:11:56.387 I/ViewModel(27299): Manual location: 42.522412325934354, -70.8920654188836
+04-24 20:11:57.390 I/GPS-OBS (27299): fix lat=42.52240 lng=-70.89204 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:11:57.396 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (42m)
+04-24 20:11:57.398 I/SalemMainActivity(27299): APPROACH: John Ward House (54m)
+04-24 20:11:57.404 D/BEARING (27299): moved=2.8m bearing=131° (sim) (prev=149°, Δ=-18°)
+04-24 20:11:57.407 D/SalemMainActivity(27299): currentLocation → lat=42.52239590532479 lon=-70.89204009079327 — following (speed=?mph)
+04-24 20:11:57.408 I/ViewModel(27299): Manual location: 42.52239590532479, -70.89204009079327
+04-24 20:11:57.925 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 862(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.254ms,5.055ms total 148.003ms
+04-24 20:11:58.411 I/GPS-OBS (27299): fix lat=42.52239 lng=-70.89203 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:11:58.416 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (43m)
+04-24 20:11:58.418 I/SalemMainActivity(27299): APPROACH: John Ward House (53m)
+04-24 20:11:58.423 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=131°, Δ=-4°)
+04-24 20:11:58.425 D/SalemMainActivity(27299): currentLocation → lat=42.52238835736162 lon=-70.8920264178436 — following (speed=?mph)
+04-24 20:11:58.427 I/ViewModel(27299): Manual location: 42.52238835736162, -70.8920264178436
+04-24 20:11:59.429 I/GPS-OBS (27299): fix lat=42.52238 lng=-70.89201 acc=0.0m speed=? bearing=? gap=1018ms
+04-24 20:11:59.436 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (43m)
+04-24 20:11:59.438 I/SalemMainActivity(27299): APPROACH: John Ward House (52m)
+04-24 20:11:59.447 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:11:59.448 D/SalemMainActivity(27299): currentLocation → lat=42.52238080939845 lon=-70.8920127448939 — following (speed=?mph)
+04-24 20:11:59.451 I/ViewModel(27299): Manual location: 42.52238080939845, -70.8920127448939
+04-24 20:12:00.455 I/GPS-OBS (27299): fix lat=42.52237 lng=-70.89200 acc=0.0m speed=? bearing=? gap=1025ms
+04-24 20:12:00.461 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (44m)
+04-24 20:12:00.463 I/SalemMainActivity(27299): APPROACH: John Ward House (52m)
+04-24 20:12:00.469 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:00.471 D/SalemMainActivity(27299): currentLocation → lat=42.52237326143528 lon=-70.89199907194423 — following (speed=?mph)
+04-24 20:12:00.473 I/ViewModel(27299): Manual location: 42.52237326143528, -70.89199907194423
+04-24 20:12:01.295 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 869(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.355ms,4.782ms total 146.166ms
+04-24 20:12:01.476 I/GPS-OBS (27299): fix lat=42.52237 lng=-70.89199 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:12:01.480 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (45m)
+04-24 20:12:01.482 I/SalemMainActivity(27299): APPROACH: John Ward House (51m)
+04-24 20:12:01.487 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:01.489 D/SalemMainActivity(27299): currentLocation → lat=42.522365713472105 lon=-70.89198539899455 — following (speed=?mph)
+04-24 20:12:01.491 I/ViewModel(27299): Manual location: 42.522365713472105, -70.89198539899455
+04-24 20:12:02.495 I/GPS-OBS (27299): fix lat=42.52236 lng=-70.89197 acc=0.0m speed=? bearing=? gap=1018ms
+04-24 20:12:02.503 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (46m)
+04-24 20:12:02.506 I/SalemMainActivity(27299): APPROACH: John Ward House (51m)
+04-24 20:12:02.514 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:02.516 D/SalemMainActivity(27299): currentLocation → lat=42.52235816550893 lon=-70.89197172604487 — following (speed=?mph)
+04-24 20:12:02.518 I/ViewModel(27299): Manual location: 42.52235816550893, -70.89197172604487
+04-24 20:12:03.524 I/GPS-OBS (27299): fix lat=42.52235 lng=-70.89196 acc=0.0m speed=? bearing=? gap=1029ms
+04-24 20:12:03.533 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (46m)
+04-24 20:12:03.537 I/SalemMainActivity(27299): APPROACH: John Ward House (50m)
+04-24 20:12:03.544 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:03.547 D/SalemMainActivity(27299): currentLocation → lat=42.52235061754576 lon=-70.8919580530952 — following (speed=?mph)
+04-24 20:12:03.548 I/ViewModel(27299): Manual location: 42.52235061754576, -70.8919580530952
+04-24 20:12:04.552 I/GPS-OBS (27299): fix lat=42.52234 lng=-70.89194 acc=0.0m speed=? bearing=? gap=1028ms
+04-24 20:12:04.557 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (47m)
+04-24 20:12:04.560 I/SalemMainActivity(27299): APPROACH: John Ward House (50m)
+04-24 20:12:04.565 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:04.567 D/SalemMainActivity(27299): currentLocation → lat=42.52234306958259 lon=-70.89194438014552 — following (speed=?mph)
+04-24 20:12:04.569 I/ViewModel(27299): Manual location: 42.52234306958259, -70.89194438014552
+04-24 20:12:04.570 I/WALK-SIM(27299): step 20/3707 at 42.52234,-70.89194
+04-24 20:12:05.009 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 893(17MB) LOS objects, 55% free, 28MB/64MB, paused 1.014ms,5.425ms total 149.098ms
+04-24 20:12:05.575 I/GPS-OBS (27299): fix lat=42.52234 lng=-70.89193 acc=0.0m speed=? bearing=? gap=1024ms
+04-24 20:12:05.582 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (48m)
+04-24 20:12:05.584 I/SalemMainActivity(27299): APPROACH: John Ward House (49m)
+04-24 20:12:05.590 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:05.591 I/PoiEncounter(27299): ENC OPEN: Crowninshield-Bentley House (crowninshield_bentley_house) dist=99m
+04-24 20:12:05.593 D/SalemMainActivity(27299): currentLocation → lat=42.52233552161942 lon=-70.89193070719584 — following (speed=?mph)
+04-24 20:12:05.595 I/ViewModel(27299): Manual location: 42.52233552161942, -70.89193070719584
+04-24 20:12:06.598 I/GPS-OBS (27299): fix lat=42.52233 lng=-70.89192 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:12:06.604 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (49m)
+04-24 20:12:06.606 I/SalemMainActivity(27299): APPROACH: John Ward House (49m)
+04-24 20:12:06.612 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:06.613 D/NARR-DWELL(27299): anchor advance — moved 15m, no state to reset
+04-24 20:12:06.615 D/SalemMainActivity(27299): currentLocation → lat=42.52232797365625 lon=-70.89191703424615 — following (speed=?mph)
+04-24 20:12:06.617 I/ViewModel(27299): Manual location: 42.52232797365625, -70.89191703424615
+04-24 20:12:07.620 I/GPS-OBS (27299): fix lat=42.52232 lng=-70.89190 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:12:07.626 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (50m)
+04-24 20:12:07.628 I/SalemMainActivity(27299): APPROACH: John Ward House (49m)
+04-24 20:12:07.634 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:07.636 D/SalemMainActivity(27299): currentLocation → lat=42.52232042569308 lon=-70.89190336129647 — following (speed=?mph)
+04-24 20:12:07.639 I/ViewModel(27299): Manual location: 42.52232042569308, -70.89190336129647
+04-24 20:12:08.463 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 922(17MB) LOS objects, 56% free, 28MB/64MB, paused 1.174ms,4.757ms total 149.779ms
+04-24 20:12:08.644 I/GPS-OBS (27299): fix lat=42.52231 lng=-70.89189 acc=0.0m speed=? bearing=? gap=1024ms
+04-24 20:12:08.651 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (51m)
+04-24 20:12:08.653 I/SalemMainActivity(27299): APPROACH: John Ward House (48m)
+04-24 20:12:08.660 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:08.662 D/SalemMainActivity(27299): currentLocation → lat=42.52231287772991 lon=-70.8918896883468 — following (speed=?mph)
+04-24 20:12:08.665 I/ViewModel(27299): Manual location: 42.52231287772991, -70.8918896883468
+04-24 20:12:09.025 I/GPS-OBS (27299): HEARTBEAT ok — last fix age=0s
+04-24 20:12:09.670 I/GPS-OBS (27299): fix lat=42.52231 lng=-70.89188 acc=0.0m speed=? bearing=? gap=1025ms
+04-24 20:12:09.677 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (52m)
+04-24 20:12:09.679 I/SalemMainActivity(27299): APPROACH: John Ward House (48m)
+04-24 20:12:09.685 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:09.687 D/SalemMainActivity(27299): currentLocation → lat=42.52230532976674 lon=-70.89187601539712 — following (speed=?mph)
+04-24 20:12:09.689 I/ViewModel(27299): Manual location: 42.52230532976674, -70.89187601539712
+04-24 20:12:10.693 I/GPS-OBS (27299): fix lat=42.52230 lng=-70.89186 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:12:10.698 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (53m)
+04-24 20:12:10.700 I/SalemMainActivity(27299): APPROACH: John Ward House (48m)
+04-24 20:12:10.705 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:10.707 D/SalemMainActivity(27299): currentLocation → lat=42.522297781803566 lon=-70.89186234244744 — following (speed=?mph)
+04-24 20:12:10.709 I/ViewModel(27299): Manual location: 42.522297781803566, -70.89186234244744
+04-24 20:12:11.713 I/GPS-OBS (27299): fix lat=42.52229 lng=-70.89185 acc=0.0m speed=? bearing=? gap=1021ms
+04-24 20:12:11.719 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (54m)
+04-24 20:12:11.721 I/SalemMainActivity(27299): APPROACH: John Ward House (48m)
+04-24 20:12:11.726 D/BEARING (27299): moved=1.4m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:11.729 D/SalemMainActivity(27299): currentLocation → lat=42.522290233840394 lon=-70.89184866949776 — following (speed=?mph)
+04-24 20:12:11.731 I/ViewModel(27299): Manual location: 42.522290233840394, -70.89184866949776
+04-24 20:12:12.101 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 892(17MB) LOS objects, 56% free, 28MB/64MB, paused 1.281ms,4.883ms total 144.761ms
+04-24 20:12:12.735 I/GPS-OBS (27299): fix lat=42.52228 lng=-70.89182 acc=0.0m speed=? bearing=? gap=1021ms
+04-24 20:12:12.743 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (56m)
+04-24 20:12:12.747 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:12.753 D/BEARING (27299): moved=2.8m bearing=126° (sim) (prev=126°, Δ=0°)
+04-24 20:12:12.756 D/SalemMainActivity(27299): currentLocation → lat=42.522275385160675 lon=-70.89182107676311 — following (speed=?mph)
+04-24 20:12:12.758 I/ViewModel(27299): Manual location: 42.522275385160675, -70.89182107676311
+04-24 20:12:13.762 I/GPS-OBS (27299): fix lat=42.52227 lng=-70.89181 acc=0.0m speed=? bearing=? gap=1028ms
+04-24 20:12:13.769 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (57m)
+04-24 20:12:13.772 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:13.779 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=126°, Δ=0°)
+04-24 20:12:13.781 D/SalemMainActivity(27299): currentLocation → lat=42.5222680090069 lon=-70.89180723228986 — following (speed=?mph)
+04-24 20:12:13.784 I/ViewModel(27299): Manual location: 42.5222680090069, -70.89180723228986
+04-24 20:12:14.789 I/GPS-OBS (27299): fix lat=42.52226 lng=-70.89179 acc=0.0m speed=? bearing=? gap=1026ms
+04-24 20:12:14.796 I/TourGeofence(27299): EXIT: National Park Service Visitor Center (41m)
+04-24 20:12:14.800 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (58m)
+04-24 20:12:14.804 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:14.813 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=125°, Δ=0°)
+04-24 20:12:14.816 D/SalemMainActivity(27299): currentLocation → lat=42.52226063285312 lon=-70.89179338781662 — following (speed=?mph)
+04-24 20:12:14.818 I/ViewModel(27299): Manual location: 42.52226063285312, -70.89179338781662
+04-24 20:12:15.345 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 19MB AllocSpace bytes, 921(17MB) LOS objects, 56% free, 27MB/63MB, paused 1.116ms,6.908ms total 150.258ms
+04-24 20:12:15.820 I/GPS-OBS (27299): fix lat=42.52225 lng=-70.89178 acc=0.0m speed=? bearing=? gap=1032ms
+04-24 20:12:15.823 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (59m)
+04-24 20:12:15.824 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:15.827 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=125°, Δ=0°)
+04-24 20:12:15.829 D/SalemMainActivity(27299): currentLocation → lat=42.522253256699344 lon=-70.89177954334338 — following (speed=?mph)
+04-24 20:12:15.831 I/ViewModel(27299): Manual location: 42.522253256699344, -70.89177954334338
+04-24 20:12:16.834 I/GPS-OBS (27299): fix lat=42.52225 lng=-70.89177 acc=0.0m speed=? bearing=? gap=1013ms
+04-24 20:12:16.839 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (60m)
+04-24 20:12:16.841 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:16.846 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=125°, Δ=0°)
+04-24 20:12:16.847 D/NARR-DWELL(27299): anchor advance — moved 15m, no state to reset
+04-24 20:12:16.849 D/SalemMainActivity(27299): currentLocation → lat=42.52224588054557 lon=-70.89176569887013 — following (speed=?mph)
+04-24 20:12:16.851 I/ViewModel(27299): Manual location: 42.52224588054557, -70.89176569887013
+04-24 20:12:17.854 I/GPS-OBS (27299): fix lat=42.52224 lng=-70.89175 acc=0.0m speed=? bearing=? gap=1021ms
+04-24 20:12:17.859 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (61m)
+04-24 20:12:17.861 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:17.866 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=125°, Δ=0°)
+04-24 20:12:17.869 D/SalemMainActivity(27299): currentLocation → lat=42.52223850439179 lon=-70.89175185439689 — following (speed=?mph)
+04-24 20:12:17.871 I/ViewModel(27299): Manual location: 42.52223850439179, -70.89175185439689
+04-24 20:12:18.874 I/GPS-OBS (27299): fix lat=42.52223 lng=-70.89174 acc=0.0m speed=? bearing=? gap=1020ms
+04-24 20:12:18.880 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (62m)
+04-24 20:12:18.882 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:18.887 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=125°, Δ=0°)
+04-24 20:12:18.889 D/SalemMainActivity(27299): currentLocation → lat=42.52223112823801 lon=-70.89173800992364 — following (speed=?mph)
+04-24 20:12:18.892 I/ViewModel(27299): Manual location: 42.52223112823801, -70.89173800992364
+04-24 20:12:19.043 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 855(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.277ms,4.838ms total 140.307ms
+04-24 20:12:19.896 I/GPS-OBS (27299): fix lat=42.52222 lng=-70.89172 acc=0.0m speed=? bearing=? gap=1021ms
+04-24 20:12:19.904 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (63m)
+04-24 20:12:19.908 I/SalemMainActivity(27299): APPROACH: John Ward House (47m)
+04-24 20:12:19.916 D/BEARING (27299): moved=1.4m bearing=125° (sim) (prev=125°, Δ=0°)
+04-24 20:12:19.919 D/SalemMainActivity(27299): currentLocation → lat=42.52222375208424 lon=-70.8917241654504 — following (speed=?mph)
+04-24 20:12:19.921 I/ViewModel(27299): Manual location: 42.52222375208424, -70.8917241654504
+04-24 20:12:20.924 I/GPS-OBS (27299): fix lat=42.52221 lng=-70.89170 acc=0.0m speed=? bearing=? gap=1029ms
+04-24 20:12:20.930 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (66m)
+04-24 20:12:20.932 I/SalemMainActivity(27299): APPROACH: John Ward House (48m)
+04-24 20:12:20.936 D/BEARING (27299): moved=2.8m bearing=122° (sim) (prev=125°, Δ=-2°)
+04-24 20:12:20.938 D/SalemMainActivity(27299): currentLocation → lat=42.52221004214404 lon=-70.89169551888008 — following (speed=?mph)
+04-24 20:12:20.941 I/ViewModel(27299): Manual location: 42.52221004214404, -70.89169551888008
+04-24 20:12:21.944 I/GPS-OBS (27299): fix lat=42.52220 lng=-70.89168 acc=0.0m speed=? bearing=? gap=1019ms
+04-24 20:12:21.949 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (67m)
+04-24 20:12:21.951 I/SalemMainActivity(27299): APPROACH: John Ward House (48m)
+04-24 20:12:21.956 D/BEARING (27299): moved=1.4m bearing=122° (sim) (prev=122°, Δ=0°)
+04-24 20:12:21.959 D/SalemMainActivity(27299): currentLocation → lat=42.52220330670017 lon=-70.89168108578608 — following (speed=?mph)
+04-24 20:12:21.961 I/ViewModel(27299): Manual location: 42.52220330670017, -70.89168108578608
+04-24 20:12:22.415 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 899(17MB) LOS objects, 56% free, 28MB/64MB, paused 1.285ms,5.436ms total 147.922ms
+04-24 20:12:22.964 I/GPS-OBS (27299): fix lat=42.52221 lng=-70.89165 acc=0.0m speed=? bearing=? gap=1020ms
+04-24 20:12:22.969 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (69m)
+04-24 20:12:22.971 I/SalemMainActivity(27299): APPROACH: John Ward House (46m)
+04-24 20:12:22.976 D/BEARING (27299): moved=2.6m bearing=80° (sim) (prev=122°, Δ=-42°)
+04-24 20:12:22.979 D/SalemMainActivity(27299): currentLocation → lat=42.522207225072584 lon=-70.89165015726046 — following (speed=?mph)
+04-24 20:12:22.980 I/ViewModel(27299): Manual location: 42.522207225072584, -70.89165015726046
+04-24 20:12:23.984 I/GPS-OBS (27299): fix lat=42.52221 lng=-70.89163 acc=0.0m speed=? bearing=? gap=1021ms
+04-24 20:12:23.989 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (71m)
+04-24 20:12:23.991 I/SalemMainActivity(27299): APPROACH: John Ward House (45m)
+04-24 20:12:23.996 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=80°, Δ=-12°)
+04-24 20:12:23.997 D/SalemMainActivity(27299): currentLocation → lat=42.52221201286999 lon=-70.89163435752903 — following (speed=?mph)
+04-24 20:12:23.999 I/ViewModel(27299): Manual location: 42.52221201286999, -70.89163435752903
+04-24 20:12:25.002 I/GPS-OBS (27299): fix lat=42.52222 lng=-70.89162 acc=0.0m speed=? bearing=? gap=1018ms
+04-24 20:12:25.007 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (72m)
+04-24 20:12:25.009 I/SalemMainActivity(27299): APPROACH: John Ward House (45m)
+04-24 20:12:25.013 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:12:25.015 D/SalemMainActivity(27299): currentLocation → lat=42.522216800667394 lon=-70.89161855779759 — following (speed=?mph)
+04-24 20:12:25.017 I/ViewModel(27299): Manual location: 42.522216800667394, -70.89161855779759
+04-24 20:12:25.018 I/WALK-SIM(27299): step 40/3707 at 42.52222,-70.89162
+04-24 20:12:26.010 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 869(16MB) LOS objects, 56% free, 27MB/63MB, paused 916us,5.004ms total 147.257ms
+04-24 20:12:26.021 I/GPS-OBS (27299): fix lat=42.52222 lng=-70.89160 acc=0.0m speed=? bearing=? gap=1018ms
+04-24 20:12:26.025 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (59m)
+04-24 20:12:26.029 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (73m)
+04-24 20:12:26.031 I/SalemMainActivity(27299): APPROACH: John Ward House (44m)
+04-24 20:12:26.036 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:12:26.038 D/SalemMainActivity(27299): currentLocation → lat=42.5222215884648 lon=-70.89160275806616 — following (speed=?mph)
+04-24 20:12:26.040 I/ViewModel(27299): Manual location: 42.5222215884648, -70.89160275806616
+04-24 20:12:27.044 I/GPS-OBS (27299): fix lat=42.52223 lng=-70.89159 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:12:27.049 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (58m)
+04-24 20:12:27.052 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (74m)
+04-24 20:12:27.055 I/SalemMainActivity(27299): APPROACH: John Ward House (43m)
+04-24 20:12:27.060 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:12:27.062 D/SalemMainActivity(27299): currentLocation → lat=42.5222263762622 lon=-70.89158695833471 — following (speed=?mph)
+04-24 20:12:27.064 I/ViewModel(27299): Manual location: 42.5222263762622, -70.89158695833471
+04-24 20:12:28.066 I/GPS-OBS (27299): fix lat=42.52224 lng=-70.89156 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:12:28.071 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (55m)
+04-24 20:12:28.074 I/SalemMainActivity(27299): APPROACH: Essex Institute Historic District (77m)
+04-24 20:12:28.076 I/SalemMainActivity(27299): APPROACH: John Ward House (41m)
+04-24 20:12:28.080 D/BEARING (27299): moved=2.8m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:12:28.081 D/NARR-DWELL(27299): anchor advance — moved 17m, no state to reset
+04-24 20:12:28.083 D/SalemMainActivity(27299): currentLocation → lat=42.522236109876765 lon=-70.89155544839436 — following (speed=?mph)
+04-24 20:12:28.085 I/ViewModel(27299): Manual location: 42.522236109876765, -70.89155544839436
+04-24 20:12:29.089 I/GPS-OBS (27299): fix lat=42.52225 lng=-70.89152 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:12:29.095 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (52m)
+04-24 20:12:29.100 I/NARR-GEO(27299): ENTRY: John Ward House dist=39m radius=40m walkSim=true
+04-24 20:12:29.102 I/SalemMainActivity(27299): ENTRY: John Ward House (39m)
+04-24 20:12:29.103 D/NARR-GATE(27299): John Ward House category=HISTORICAL_BUILDINGS group=MEANINGFUL enabled=true jumpToFront=false (M=true A=true B=false)
+04-24 20:12:29.104 I/NARR-QUEUE(27299): enqueueNarration: John Ward House tier=HISTORIC ad=0 jumpToFront=false currentNarration=null queueSize=0
+04-24 20:12:29.105 I/NARR-QUEUE(27299): PLAY DIRECT: John Ward House (jumpToFront=false, currentNull=true)
+04-24 20:12:29.120 I/SalemMainActivity(27299): HIGHLIGHT drawn at index 0-1 for John Ward House (below markers)
+04-24 20:12:29.122 I/NARR-PLAY(27299): DIRECT PLAY: John Ward House voice=en-us-x-tpd-local detail=DEEP bodyLen=1159 stripped=false
+04-24 20:12:29.124 I/NarrationMgr(27299): Enqueued: LONG_NARRATION — John Ward House (queue: 1)
+04-24 20:12:29.125 I/NarrationMgr(27299): playNext: LONG_NARRATION — John Ward House (0 remaining)
+04-24 20:12:29.132 I/NarrationMgr(27299): Speaking: LONG_NARRATION — John Ward House voice=en-us-x-tpd-local
+04-24 20:12:29.134 I/NARR-STATE(27299): narrationState → Speaking(segment=NarrationSegment(id=poi_narration_1620288668598267, text=You're looking at one of the oldest houses in the United States still standing in its original form. The John Ward House, built between 1684 and 1723, is a perfect example of what we call First Period architecture – the building style brought over by the earliest English settlers. Imagine Salem in the early 18th century: a bustling port, but still a small town where everyone knew everyone else. John Ward was a prosperous merchant, and this house reflected his status. Notice the simple, asymmetrical lines, the steep roof, the small windows. It’s a far cry from the grand mansions that would come later. In the early 20th century, antiquarian George Francis Dow meticulously restored the house, preserving its original character. Today, the Peabody Essex Museum owns and operates it as a museum, offering a glimpse into the lives of those who first settled this land. The house was designated a National Historic Landmark in 1968, recognizing its importance to our nation’s story. Stand here a moment and picture the smoke curling from the chimney, the scent of woodsmoke and sea salt in the air, and the voices of a family building a life in a new world., type=LONG_NARRATION, poiName=John Ward House, voiceId=en-us-x-tpd-local, kind=POI, category=null, refId=poi_narration, isReplay=false)) (autoPlay=true, queueSize=0)
+04-24 20:12:29.147 D/BEARING (27299): moved=2.8m bearing=66° (sim) (prev=67°, Δ=0°)
+04-24 20:12:29.148 D/SalemMainActivity(27299): currentLocation → lat=42.5222461285463 lon=-70.89152410364892 — following (speed=?mph)
+04-24 20:12:29.150 I/ViewModel(27299): Manual location: 42.5222461285463, -70.89152410364892
+04-24 20:12:29.486 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 19MB AllocSpace bytes, 872(16MB) LOS objects, 56% free, 27MB/63MB, paused 1.477ms,10.238ms total 276.210ms
+04-24 20:12:29.617 D/NarrationMgr(27299): TTS start: poi_narration_1620288668598267
+04-24 20:12:30.152 I/GPS-OBS (27299): fix lat=42.52225 lng=-70.89151 acc=0.0m speed=? bearing=? gap=1064ms
+04-24 20:12:30.157 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (51m)
+04-24 20:12:30.164 D/BEARING (27299): moved=1.4m bearing=66° (sim) (prev=66°, Δ=0°)
+04-24 20:12:30.166 I/PoiEncounter(27299): ENC OPEN: Andrew Safford House (andrew_safford_house) dist=99m
+04-24 20:12:30.168 D/SalemMainActivity(27299): currentLocation → lat=42.52225119972208 lon=-70.89150846752361 — following (speed=?mph)
+04-24 20:12:30.169 I/ViewModel(27299): Manual location: 42.52225119972208, -70.89150846752361
+04-24 20:12:31.172 I/GPS-OBS (27299): fix lat=42.52226 lng=-70.89148 acc=0.0m speed=? bearing=? gap=1020ms
+04-24 20:12:31.176 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (48m)
+04-24 20:12:31.185 D/BEARING (27299): moved=2.8m bearing=67° (sim) (prev=66°, Δ=1°)
+04-24 20:12:31.187 I/PoiEncounter(27299): ENC OPEN: Nathaniel Hawthorne Statue (hawthorne_statue) dist=99m
+04-24 20:12:31.187 I/PoiEncounter(27299): ENC CLOSE: Peabody Essex Museum (peabody_essex_museum_2) duration=35s minDist=85m maxDist=99m fixes=36
+04-24 20:12:31.188 I/PoiEncounter(27299): ENC CLOSE: Yin Yu Tang House @Peabody Essex Museum (yin_yu_tang_house_peabody_essex_museum) duration=33s minDist=87m maxDist=99m fixes=34
+04-24 20:12:31.190 D/SalemMainActivity(27299): currentLocation → lat=42.52226068138487 lon=-70.89147681719088 — following (speed=?mph)
+04-24 20:12:31.192 I/ViewModel(27299): Manual location: 42.52226068138487, -70.89147681719088
+04-24 20:12:32.194 I/GPS-OBS (27299): fix lat=42.52227 lng=-70.89146 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:12:32.200 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (47m)
+04-24 20:12:32.208 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=67°, Δ=0°)
+04-24 20:12:32.209 D/SalemMainActivity(27299): currentLocation → lat=42.52226539391769 lon=-70.89146097583053 — following (speed=?mph)
+04-24 20:12:32.211 I/ViewModel(27299): Manual location: 42.52226539391769, -70.89146097583053
+04-24 20:12:33.049 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 848(16MB) LOS objects, 56% free, 27MB/63MB, paused 1.253ms,5.303ms total 148.292ms
+04-24 20:12:33.215 I/GPS-OBS (27299): fix lat=42.52227 lng=-70.89145 acc=0.0m speed=? bearing=? gap=1020ms
+04-24 20:12:33.223 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (45m)
+04-24 20:12:33.232 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:33.234 D/SalemMainActivity(27299): currentLocation → lat=42.52227010645052 lon=-70.89144513447019 — following (speed=?mph)
+04-24 20:12:33.236 I/ViewModel(27299): Manual location: 42.52227010645052, -70.89144513447019
+04-24 20:12:34.239 I/GPS-OBS (27299): fix lat=42.52227 lng=-70.89143 acc=0.0m speed=? bearing=? gap=1025ms
+04-24 20:12:34.243 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (44m)
+04-24 20:12:34.249 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:34.250 D/SalemMainActivity(27299): currentLocation → lat=42.52227481898335 lon=-70.89142929310984 — following (speed=?mph)
+04-24 20:12:34.252 I/ViewModel(27299): Manual location: 42.52227481898335, -70.89142929310984
+04-24 20:12:35.255 I/GPS-OBS (27299): fix lat=42.52228 lng=-70.89141 acc=0.0m speed=? bearing=? gap=1016ms
+04-24 20:12:35.260 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (43m)
+04-24 20:12:35.267 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:35.268 D/SalemMainActivity(27299): currentLocation → lat=42.522279531516176 lon=-70.89141345174949 — following (speed=?mph)
+04-24 20:12:35.269 I/ViewModel(27299): Manual location: 42.522279531516176, -70.89141345174949
+04-24 20:12:36.273 I/GPS-OBS (27299): fix lat=42.52228 lng=-70.89140 acc=0.0m speed=? bearing=? gap=1018ms
+04-24 20:12:36.277 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (41m)
+04-24 20:12:36.285 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:36.287 D/SalemMainActivity(27299): currentLocation → lat=42.522284244049 lon=-70.89139761038913 — following (speed=?mph)
+04-24 20:12:36.289 I/ViewModel(27299): Manual location: 42.522284244049, -70.89139761038913
+04-24 20:12:36.577 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 832(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.222ms,5.117ms total 151.420ms
+04-24 20:12:37.298 I/GPS-OBS (27299): fix lat=42.52229 lng=-70.89138 acc=0.0m speed=? bearing=? gap=1024ms
+04-24 20:12:37.305 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (40m)
+04-24 20:12:37.315 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:37.316 D/NARR-DWELL(27299): anchor advance — moved 15m, no state to reset
+04-24 20:12:37.319 D/SalemMainActivity(27299): currentLocation → lat=42.522288956581825 lon=-70.8913817690288 — following (speed=?mph)
+04-24 20:12:37.320 I/ViewModel(27299): Manual location: 42.522288956581825, -70.8913817690288
+04-24 20:12:38.323 I/GPS-OBS (27299): fix lat=42.52229 lng=-70.89137 acc=0.0m speed=? bearing=? gap=1026ms
+04-24 20:12:38.329 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (38m)
+04-24 20:12:38.337 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:38.339 D/SalemMainActivity(27299): currentLocation → lat=42.52229366911465 lon=-70.89136592766845 — following (speed=?mph)
+04-24 20:12:38.340 I/ViewModel(27299): Manual location: 42.52229366911465, -70.89136592766845
+04-24 20:12:39.342 I/GPS-OBS (27299): fix lat=42.52230 lng=-70.89135 acc=0.0m speed=? bearing=? gap=1019ms
+04-24 20:12:39.346 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (37m)
+04-24 20:12:39.351 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:39.353 D/SalemMainActivity(27299): currentLocation → lat=42.52229838164748 lon=-70.8913500863081 — following (speed=?mph)
+04-24 20:12:39.354 I/ViewModel(27299): Manual location: 42.52229838164748, -70.8913500863081
+04-24 20:12:39.926 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 846(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.205ms,5.145ms total 173.959ms
+04-24 20:12:40.357 I/GPS-OBS (27299): fix lat=42.52230 lng=-70.89133 acc=0.0m speed=? bearing=? gap=1015ms
+04-24 20:12:40.361 I/SalemMainActivity(27299): GPS interval → 2500ms (speed=?mph, narrating=true, dwelled=10205ms)
+04-24 20:12:40.362 I/ViewModel(27299): restartLocationUpdates() — interval 30000ms → 2500ms
+04-24 20:12:40.365 I/LocationManager(27299): getLocationUpdates() — building LocationRequest interval=2500ms minInterval=1000ms
+04-24 20:12:40.367 I/LocationManager(27299): Calling requestLocationUpdates on main looper
+04-24 20:12:40.369 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (36m)
+04-24 20:12:40.375 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:40.376 D/SalemMainActivity(27299): currentLocation → lat=42.52230309418031 lon=-70.89133424494776 — following (speed=?mph)
+04-24 20:12:40.378 I/ViewModel(27299): stopLocationPolling() — cancelling GMS provider
+04-24 20:12:40.379 I/LocationManager(27299): Flow cancelled — removing location updates after 0 updates received
+04-24 20:12:40.380 I/ViewModel(27299): Manual location: 42.52230309418031, -70.89133424494776
+04-24 20:12:40.387 I/LocationManager(27299): requestLocationUpdates registered successfully
+04-24 20:12:41.384 I/GPS-OBS (27299): fix lat=42.52231 lng=-70.89132 acc=0.0m speed=? bearing=? gap=1026ms
+04-24 20:12:41.389 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (59m)
+04-24 20:12:41.391 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (34m)
+04-24 20:12:41.397 I/NARR-GEO(27299): SUMMARY: check#68 pos=42.52231,-70.89132 nearby=25 narrated=3/2244 entries=0 approaches=2 skippedNarrated=1 skippedCooldown=0 walkSim=true
+04-24 20:12:41.400 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:41.401 D/SalemMainActivity(27299): currentLocation → lat=42.52230780671313 lon=-70.8913184035874 — following (speed=?mph)
+04-24 20:12:41.403 I/ViewModel(27299): Manual location: 42.52230780671313, -70.8913184035874
+04-24 20:12:42.407 I/GPS-OBS (27299): fix lat=42.52231 lng=-70.89130 acc=0.0m speed=? bearing=? gap=1024ms
+04-24 20:12:42.412 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (58m)
+04-24 20:12:42.414 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (33m)
+04-24 20:12:42.423 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:42.426 D/SalemMainActivity(27299): currentLocation → lat=42.52231251924596 lon=-70.89130256222705 — following (speed=?mph)
+04-24 20:12:42.428 I/ViewModel(27299): Manual location: 42.52231251924596, -70.89130256222705
+04-24 20:12:43.362 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 844(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.047ms,4.873ms total 143.021ms
+04-24 20:12:43.429 I/GPS-OBS (27299): fix lat=42.52232 lng=-70.89129 acc=0.0m speed=? bearing=? gap=1023ms
+04-24 20:12:43.433 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (57m)
+04-24 20:12:43.434 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (32m)
+04-24 20:12:43.440 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:43.441 I/PoiEncounter(27299): ENC CLOSE: Essex Institute Historic District (essex_institute_historic_district) duration=61s minDist=41m maxDist=98m fixes=62
+04-24 20:12:43.443 D/SalemMainActivity(27299): currentLocation → lat=42.522317231778786 lon=-70.8912867208667 — following (speed=?mph)
+04-24 20:12:43.444 I/ViewModel(27299): Manual location: 42.522317231778786, -70.8912867208667
+04-24 20:12:44.448 I/GPS-OBS (27299): fix lat=42.52232 lng=-70.89127 acc=0.0m speed=? bearing=? gap=1018ms
+04-24 20:12:44.453 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (55m)
+04-24 20:12:44.455 I/SalemMainActivity(27299): APPROACH: Gardner-Pingree House (30m)
+04-24 20:12:44.463 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:44.465 D/SalemMainActivity(27299): currentLocation → lat=42.522321944311614 lon=-70.89127087950637 — following (speed=?mph)
+04-24 20:12:44.467 I/ViewModel(27299): Manual location: 42.522321944311614, -70.89127087950637
+04-24 20:12:45.470 I/GPS-OBS (27299): fix lat=42.52233 lng=-70.89126 acc=0.0m speed=? bearing=? gap=1022ms
+04-24 20:12:45.477 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (54m)
+04-24 20:12:45.480 I/NARR-GEO(27299): ENTRY: Gardner-Pingree House dist=29m radius=30m walkSim=true
+04-24 20:12:45.481 I/SalemMainActivity(27299): ENTRY: Gardner-Pingree House (29m)
+04-24 20:12:45.483 D/NARR-GATE(27299): Gardner-Pingree House category=HISTORICAL_BUILDINGS group=MEANINGFUL enabled=true jumpToFront=false (M=true A=true B=false)
+04-24 20:12:45.484 I/NARR-QUEUE(27299): enqueueNarration: Gardner-Pingree House tier=HISTORIC ad=0 jumpToFront=false currentNarration=John Ward House queueSize=0
+04-24 20:12:45.502 I/SalemMainActivity(27299): Queued: Gardner-Pingree House [tier=HISTORIC ad=0] (1 in queue)
+04-24 20:12:45.505 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:45.517 D/SalemMainActivity(27299): currentLocation → lat=42.522326656844434 lon=-70.89125503814601 — following (speed=?mph)
+04-24 20:12:45.518 I/ViewModel(27299): Manual location: 42.522326656844434, -70.89125503814601
+04-24 20:12:45.519 I/WALK-SIM(27299): step 60/3707 at 42.52233,-70.89126
+04-24 20:12:46.522 I/GPS-OBS (27299): fix lat=42.52233 lng=-70.89124 acc=0.0m speed=? bearing=? gap=1052ms
+04-24 20:12:46.527 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (53m)
+04-24 20:12:46.534 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:46.551 D/SalemMainActivity(27299): currentLocation → lat=42.52233136937726 lon=-70.89123919678566 — following (speed=?mph)
+04-24 20:12:46.553 I/ViewModel(27299): Manual location: 42.52233136937726, -70.89123919678566
+04-24 20:12:46.752 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 838(16MB) LOS objects, 55% free, 28MB/64MB, paused 1.951ms,4.951ms total 160.855ms
+04-24 20:12:47.559 I/GPS-OBS (27299): fix lat=42.52234 lng=-70.89122 acc=0.0m speed=? bearing=? gap=1036ms
+04-24 20:12:47.566 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (52m)
+04-24 20:12:47.576 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:47.595 D/SalemMainActivity(27299): currentLocation → lat=42.52233608191009 lon=-70.89122335542532 — following (speed=?mph)
+04-24 20:12:47.597 I/ViewModel(27299): Manual location: 42.52233608191009, -70.89122335542532
+04-24 20:12:48.601 I/GPS-OBS (27299): fix lat=42.52234 lng=-70.89121 acc=0.0m speed=? bearing=? gap=1042ms
+04-24 20:12:48.606 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (51m)
+04-24 20:12:48.616 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:48.617 D/NARR-DWELL(27299): anchor advance — moved 15m, no state to reset
+04-24 20:12:48.630 D/SalemMainActivity(27299): currentLocation → lat=42.52234079444292 lon=-70.89120751406497 — following (speed=?mph)
+04-24 20:12:48.631 I/ViewModel(27299): Manual location: 42.52234079444292, -70.89120751406497
+04-24 20:12:49.637 I/GPS-OBS (27299): fix lat=42.52235 lng=-70.89119 acc=0.0m speed=? bearing=? gap=1036ms
+04-24 20:12:49.644 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (49m)
+04-24 20:12:49.654 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:49.675 D/SalemMainActivity(27299): currentLocation → lat=42.52234550697574 lon=-70.89119167270462 — following (speed=?mph)
+04-24 20:12:49.677 I/ViewModel(27299): Manual location: 42.52234550697574, -70.89119167270462
+04-24 20:12:50.086 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 21MB AllocSpace bytes, 847(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.614ms,5.843ms total 150.513ms
+04-24 20:12:50.680 I/GPS-OBS (27299): fix lat=42.52235 lng=-70.89118 acc=0.0m speed=? bearing=? gap=1044ms
+04-24 20:12:50.685 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (48m)
+04-24 20:12:50.692 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:50.705 I/PoiEncounter(27299): ENC CLOSE: Salem Armory Regional Visitor Center (salem_armory_regional_visitor_center) duration=68s minDist=30m maxDist=99m fixes=69
+04-24 20:12:50.706 D/SalemMainActivity(27299): currentLocation → lat=42.52235021950857 lon=-70.89117583134428 — following (speed=?mph)
+04-24 20:12:50.707 I/ViewModel(27299): Manual location: 42.52235021950857, -70.89117583134428
+04-24 20:12:51.713 I/GPS-OBS (27299): fix lat=42.52235 lng=-70.89116 acc=0.0m speed=? bearing=? gap=1032ms
+04-24 20:12:51.718 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (47m)
+04-24 20:12:51.727 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:51.743 D/SalemMainActivity(27299): currentLocation → lat=42.522354932041395 lon=-70.89115998998393 — following (speed=?mph)
+04-24 20:12:51.744 I/ViewModel(27299): Manual location: 42.522354932041395, -70.89115998998393
+04-24 20:12:52.748 I/GPS-OBS (27299): fix lat=42.52236 lng=-70.89114 acc=0.0m speed=? bearing=? gap=1035ms
+04-24 20:12:52.755 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (46m)
+04-24 20:12:52.763 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:52.777 D/SalemMainActivity(27299): currentLocation → lat=42.52235964457422 lon=-70.89114414862358 — following (speed=?mph)
+04-24 20:12:52.778 I/ViewModel(27299): Manual location: 42.52235964457422, -70.89114414862358
+04-24 20:12:53.274 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 859(16MB) LOS objects, 55% free, 28MB/64MB, paused 1.102ms,5.256ms total 148.267ms
+04-24 20:12:53.783 I/GPS-OBS (27299): fix lat=42.52236 lng=-70.89113 acc=0.0m speed=? bearing=? gap=1034ms
+04-24 20:12:53.789 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (45m)
+04-24 20:12:53.798 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:53.813 D/SalemMainActivity(27299): currentLocation → lat=42.52236435710705 lon=-70.89112830726323 — following (speed=?mph)
+04-24 20:12:53.817 I/ViewModel(27299): Manual location: 42.52236435710705, -70.89112830726323
+04-24 20:12:54.820 I/GPS-OBS (27299): fix lat=42.52237 lng=-70.89111 acc=0.0m speed=? bearing=? gap=1039ms
+04-24 20:12:54.825 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (43m)
+04-24 20:12:54.833 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:54.846 D/SalemMainActivity(27299): currentLocation → lat=42.52236906963987 lon=-70.89111246590289 — following (speed=?mph)
+04-24 20:12:54.848 I/ViewModel(27299): Manual location: 42.52236906963987, -70.89111246590289
+04-24 20:12:55.851 I/GPS-OBS (27299): fix lat=42.52237 lng=-70.89110 acc=0.0m speed=? bearing=? gap=1030ms
+04-24 20:12:55.855 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (42m)
+04-24 20:12:55.863 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:55.875 D/SalemMainActivity(27299): currentLocation → lat=42.5223737821727 lon=-70.89109662454254 — following (speed=?mph)
+04-24 20:12:55.876 I/ViewModel(27299): Manual location: 42.5223737821727, -70.89109662454254
+04-24 20:12:56.604 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 876(17MB) LOS objects, 56% free, 28MB/64MB, paused 1.129ms,5.233ms total 154.504ms
+04-24 20:12:56.879 I/GPS-OBS (27299): fix lat=42.52238 lng=-70.89108 acc=0.0m speed=? bearing=? gap=1029ms
+04-24 20:12:56.883 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (41m)
+04-24 20:12:56.889 D/BEARING (27299): moved=1.4m bearing=68° (sim) (prev=68°, Δ=0°)
+04-24 20:12:56.906 D/SalemMainActivity(27299): currentLocation → lat=42.52237849470553 lon=-70.89108078318219 — following (speed=?mph)
+04-24 20:12:56.908 I/ViewModel(27299): Manual location: 42.52237849470553, -70.89108078318219
+04-24 20:12:57.911 I/GPS-OBS (27299): fix lat=42.52239 lng=-70.89105 acc=0.0m speed=? bearing=? gap=1031ms
+04-24 20:12:57.916 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (39m)
+04-24 20:12:57.924 D/BEARING (27299): moved=2.8m bearing=67° (sim) (prev=68°, Δ=0°)
+04-24 20:12:57.936 D/SalemMainActivity(27299): currentLocation → lat=42.52238812970325 lon=-70.89104921777587 — following (speed=?mph)
+04-24 20:12:57.937 I/ViewModel(27299): Manual location: 42.52238812970325, -70.89104921777587
+04-24 20:12:58.940 I/GPS-OBS (27299): fix lat=42.52239 lng=-70.89103 acc=0.0m speed=? bearing=? gap=1030ms
+04-24 20:12:58.943 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (38m)
+04-24 20:12:58.948 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:12:58.949 D/NARR-DWELL(27299): anchor advance — moved 15m, no state to reset
+04-24 20:12:58.964 D/SalemMainActivity(27299): currentLocation → lat=42.522393009356016 lon=-70.8910334698056 — following (speed=?mph)
+04-24 20:12:58.966 I/ViewModel(27299): Manual location: 42.522393009356016, -70.8910334698056
+04-24 20:12:59.842 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 885(17MB) LOS objects, 56% free, 27MB/63MB, paused 1.060ms,5.612ms total 160.588ms
+04-24 20:12:59.967 I/GPS-OBS (27299): fix lat=42.52240 lng=-70.89102 acc=0.0m speed=? bearing=? gap=1028ms
+04-24 20:12:59.970 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (37m)
+04-24 20:12:59.974 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:12:59.991 D/SalemMainActivity(27299): currentLocation → lat=42.52239788900877 lon=-70.89101772183533 — following (speed=?mph)
+04-24 20:12:59.993 I/ViewModel(27299): Manual location: 42.52239788900877, -70.89101772183533
+04-24 20:13:00.996 I/GPS-OBS (27299): fix lat=42.52240 lng=-70.89100 acc=0.0m speed=? bearing=? gap=1028ms
+04-24 20:13:01.000 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (36m)
+04-24 20:13:01.004 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:01.017 D/SalemMainActivity(27299): currentLocation → lat=42.522402768661536 lon=-70.89100197386504 — following (speed=?mph)
+04-24 20:13:01.019 I/ViewModel(27299): Manual location: 42.522402768661536, -70.89100197386504
+04-24 20:13:02.023 I/GPS-OBS (27299): fix lat=42.52241 lng=-70.89099 acc=0.0m speed=? bearing=? gap=1027ms
+04-24 20:13:02.028 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (35m)
+04-24 20:13:02.035 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:02.052 D/SalemMainActivity(27299): currentLocation → lat=42.5224076483143 lon=-70.89098622589476 — following (speed=?mph)
+04-24 20:13:02.053 I/ViewModel(27299): Manual location: 42.5224076483143, -70.89098622589476
+04-24 20:13:03.057 I/GPS-OBS (27299): fix lat=42.52241 lng=-70.89097 acc=0.0m speed=? bearing=? gap=1034ms
+04-24 20:13:03.062 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (34m)
+04-24 20:13:03.070 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:03.083 D/SalemMainActivity(27299): currentLocation → lat=42.522412527967056 lon=-70.8909704779245 — following (speed=?mph)
+04-24 20:13:03.085 I/ViewModel(27299): Manual location: 42.522412527967056, -70.8909704779245
+04-24 20:13:03.308 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 819(15MB) LOS objects, 55% free, 28MB/64MB, paused 1.347ms,6.282ms total 144.568ms
+04-24 20:13:04.089 I/GPS-OBS (27299): fix lat=42.52242 lng=-70.89095 acc=0.0m speed=? bearing=? gap=1031ms
+04-24 20:13:04.094 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (33m)
+04-24 20:13:04.103 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:04.117 D/SalemMainActivity(27299): currentLocation → lat=42.52241740761982 lon=-70.89095472995422 — following (speed=?mph)
+04-24 20:13:04.119 I/ViewModel(27299): Manual location: 42.52241740761982, -70.89095472995422
+04-24 20:13:05.124 I/GPS-OBS (27299): fix lat=42.52242 lng=-70.89094 acc=0.0m speed=? bearing=? gap=1035ms
+04-24 20:13:05.130 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (32m)
+04-24 20:13:05.139 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:05.156 D/SalemMainActivity(27299): currentLocation → lat=42.52242228727258 lon=-70.89093898198394 — following (speed=?mph)
+04-24 20:13:05.158 I/ViewModel(27299): Manual location: 42.52242228727258, -70.89093898198394
+04-24 20:13:06.161 I/GPS-OBS (27299): fix lat=42.52243 lng=-70.89092 acc=0.0m speed=? bearing=? gap=1038ms
+04-24 20:13:06.166 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (31m)
+04-24 20:13:06.173 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:06.186 D/SalemMainActivity(27299): currentLocation → lat=42.52242716692535 lon=-70.89092323401367 — following (speed=?mph)
+04-24 20:13:06.188 I/ViewModel(27299): Manual location: 42.52242716692535, -70.89092323401367
+04-24 20:13:06.188 I/WALK-SIM(27299): step 80/3707 at 42.52243,-70.89092
+04-24 20:13:06.340 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 894(17MB) LOS objects, 55% free, 28MB/64MB, paused 1.647ms,5.752ms total 187.400ms
+04-24 20:13:07.194 I/GPS-OBS (27299): fix lat=42.52243 lng=-70.89091 acc=0.0m speed=? bearing=? gap=1032ms
+04-24 20:13:07.200 I/SalemMainActivity(27299): APPROACH: Crowninshield-Bentley House (30m)
+04-24 20:13:07.211 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:07.229 D/SalemMainActivity(27299): currentLocation → lat=42.5224320465781 lon=-70.89090748604339 — following (speed=?mph)
+04-24 20:13:07.231 I/ViewModel(27299): Manual location: 42.5224320465781, -70.89090748604339
+04-24 20:13:08.234 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1041ms
+04-24 20:13:08.239 I/NARR-GEO(27299): ENTRY: Crowninshield-Bentley House dist=29m radius=30m walkSim=true
+04-24 20:13:08.240 I/SalemMainActivity(27299): ENTRY: Crowninshield-Bentley House (29m)
+04-24 20:13:08.242 D/NARR-GATE(27299): Crowninshield-Bentley House category=HISTORICAL_BUILDINGS group=MEANINGFUL enabled=true jumpToFront=false (M=true A=true B=false)
+04-24 20:13:08.243 I/NARR-QUEUE(27299): enqueueNarration: Crowninshield-Bentley House tier=HISTORIC ad=0 jumpToFront=false currentNarration=John Ward House queueSize=1
+04-24 20:13:08.268 I/SalemMainActivity(27299): Queued: Crowninshield-Bentley House [tier=HISTORIC ad=0] (2 in queue)
+04-24 20:13:08.271 D/BEARING (27299): moved=1.4m bearing=67° (sim) (prev=67°, Δ=0°)
+04-24 20:13:08.293 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:08.295 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:09.038 I/GPS-OBS (27299): HEARTBEAT ok — last fix age=0s
+04-24 20:13:09.299 I/WALK-SIM(27299): LOOK AT Gardner-Pingree House (dist=7m bearing=309°) — narrating=John Ward House queue=[Gardner-Pingree House, Crowninshield-Bentley House] — dwelling until queue drains (max 180s)
+04-24 20:13:09.301 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1067ms
+04-24 20:13:09.312 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:09.341 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:09.343 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:09.792 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 846(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.244ms,5.027ms total 146.892ms
+04-24 20:13:10.345 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1044ms
+04-24 20:13:10.357 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:10.385 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:10.387 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:11.390 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1044ms
+04-24 20:13:11.398 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:11.429 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:11.430 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:12.433 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1043ms
+04-24 20:13:12.443 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:12.469 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:12.471 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:13.103 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 858(16MB) LOS objects, 55% free, 28MB/64MB, paused 1.132ms,4.860ms total 155.185ms
+04-24 20:13:13.473 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1041ms
+04-24 20:13:13.480 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:13.511 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:13.513 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:14.514 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1041ms
+04-24 20:13:14.525 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:14.554 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:14.556 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:15.558 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1044ms
+04-24 20:13:15.569 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:15.594 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:15.596 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:16.080 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 19MB AllocSpace bytes, 913(17MB) LOS objects, 56% free, 28MB/64MB, paused 1.072ms,4.974ms total 150.635ms
+04-24 20:13:16.600 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1041ms
+04-24 20:13:16.611 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:16.641 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:16.643 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:17.645 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1045ms
+04-24 20:13:17.657 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:17.681 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:17.682 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:18.687 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1042ms
+04-24 20:13:18.695 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:18.721 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:18.723 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:19.472 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 867(16MB) LOS objects, 56% free, 28MB/64MB, paused 1.456ms,7.994ms total 186.277ms
+04-24 20:13:19.725 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1039ms
+04-24 20:13:19.731 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:19.760 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:19.762 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:20.764 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1038ms
+04-24 20:13:20.776 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:20.801 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:20.802 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:21.804 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1042ms
+04-24 20:13:21.810 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:21.834 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:21.836 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:22.838 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1033ms
+04-24 20:13:22.844 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:22.889 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:22.892 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:22.923 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 20MB AllocSpace bytes, 843(16MB) LOS objects, 55% free, 28MB/64MB, paused 1.805ms,4.791ms total 151.585ms
+04-24 20:13:23.894 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1056ms
+04-24 20:13:23.905 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:23.931 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:23.932 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:24.934 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1040ms
+04-24 20:13:24.940 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:24.966 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:24.967 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:25.969 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1034ms
+04-24 20:13:25.982 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:26.012 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:26.013 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:26.331 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 21MB AllocSpace bytes, 843(16MB) LOS objects, 55% free, 28MB/64MB, paused 1.164ms,7.273ms total 159.252ms
+04-24 20:13:26.713 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1315.4004, y[0]=60.40039, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620346256, downTime=1620346256, deviceId=6, source=0x1002, displayId=0, eventId=525062360 }
+04-24 20:13:26.847 V/ViewRootImpl(27299): title = com.destructiveaigurus.katrinasmysticvisitorsguide/com.example.wickedsalemwitchcitytour.ui.SalemMainActivity enqueue motion: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1315.4004, y[0]=60.40039, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1620346389, downTime=1620346256, deviceId=6, source=0x1002, displayId=0, eventId=750470462 }
+04-24 20:13:26.854 I/NARR-STATE(27299): narrationState → Idle (autoPlay=true, queueSize=2)
+04-24 20:13:26.855 I/NARR-STATE(27299):   Idle → currentNarration cleared, queueSize=2
+04-24 20:13:26.856 I/NARR-STATE(27299):   Queue has 2 → advancing after 500ms
+04-24 20:13:26.857 I/NarrationMgr(27299): Stopped — queue cleared
+04-24 20:13:26.866 I/SalemMainActivity(27299): Speaker tap → narration cancelled
+04-24 20:13:27.016 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1047ms
+04-24 20:13:27.027 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:27.052 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:27.054 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:27.357 I/NARR-QUEUE(27299): Picked Gardner-Pingree House tier=HISTORIC dist=7m (tour-mode, 2 in tier, 2 total survivors)
+04-24 20:13:27.357 I/NARR-PLAY(27299): playNextNarration: Gardner-Pingree House (1 remaining in queue)
+04-24 20:13:27.365 I/SalemMainActivity(27299): HIGHLIGHT drawn at index 0-1 for Gardner-Pingree House (below markers)
+04-24 20:13:27.366 I/NARR-PLAY(27299):   text=Look up at those delicate carvings around the door and windo... voice=en-us-x-tpd-local narrationAutoPlay=true detail=DEEP stripped=false
+04-24 20:13:27.366 I/NARR-PLAY(27299):   → calling tourViewModel.speakTagged{Hint,Narration}() voice=en-us-x-tpd-local stripped=false
+04-24 20:13:27.368 I/NarrationMgr(27299): Enqueued: LONG_NARRATION — Gardner-Pingree House (queue: 1)
+04-24 20:13:27.368 I/NarrationMgr(27299): playNext: LONG_NARRATION — Gardner-Pingree House (0 remaining)
+04-24 20:13:27.378 I/NarrationMgr(27299): Speaking: LONG_NARRATION — Gardner-Pingree House voice=en-us-x-tpd-local
+04-24 20:13:27.391 I/NARR-STATE(27299): narrationState → Speaking(segment=NarrationSegment(id=poi_narration_1620346912817578, text=Look up at those delicate carvings around the door and windows — that's the signature of Samuel McIntire, a Salem woodcarver who became one of the most important architects in early America. This house, built in 1804 for the merchant John Gardner, is widely considered McIntire's finest surviving work. Every ornament is hand-carved: the cornice, the fanlight, the garland of flowers above the door. In the early 1800s the house passed to the Pingree family, who lived here for generations. Its most notorious moment came in 1830, when Captain Joseph White was murdered in his bed inside these walls — a crime that shocked all of New England and inspired Nathaniel Hawthorne's story The House of the Seven Gables. Today it's a museum, preserved almost exactly as the Pingrees left it., type=LONG_NARRATION, poiName=Gardner-Pingree House, voiceId=en-us-x-tpd-local, kind=POI, category=null, refId=poi_narration, isReplay=false)) (autoPlay=true, queueSize=1)
+04-24 20:13:28.012 D/NarrationMgr(27299): TTS start: poi_narration_1620346912817578
+04-24 20:13:28.056 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1041ms
+04-24 20:13:28.073 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:28.089 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:28.091 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:29.098 I/GPS-OBS (27299): fix lat=42.52244 lng=-70.89089 acc=0.0m speed=? bearing=? gap=1041ms
+04-24 20:13:29.114 D/BEARING (27299): still — moved=0.00m (sim, under 1.0m)
+04-24 20:13:29.133 D/SalemMainActivity(27299): currentLocation → lat=42.52243692623087 lon=-70.89089173807311 — following (speed=?mph)
+04-24 20:13:29.135 I/ViewModel(27299): Manual location: 42.52243692623087, -70.89089173807311
+04-24 20:13:29.761 I/icvisitorsguide(27299): Background concurrent mark compact GC freed 21MB AllocSpace bytes, 859(16MB) LOS objects, 56% free, 27MB/63MB, paused 1.335ms,8.105ms total 231.914ms

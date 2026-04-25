@@ -1747,52 +1747,22 @@ class SalemMainActivity : AppCompatActivity() {
             walkSimResumeRouteLabel = routeLabel
             walkSimResumeRouteSize = interpolated.size
 
-            // S115: Auto-dwell setup. Load the full narration point set once
-            // at the start of the run so the per-step proximity check is a
-            // pure in-memory scan. Each POI can only trigger a dwell ONCE per
-            // walk sim session — `dwelledIds` tracks the set of already-used
-            // anchors so the simulator doesn't freeze at the same spot twice
-            // as it passes through the same cluster a second time.
-            val narrationPoints = try {
-                val all = tourViewModel.loadNarrationPoints()
-                // Phase 9R.0: in Historical Mode, the walk-sim auto-dwell
-                // (the brief "LOOK AT" pause + map rotation the simulator
-                // triggers near each POI) must ALSO respect the immersive
-                // filter. Without this gate, the walker pauses and rotates
-                // toward every modern shop, restaurant, and tourist trap
-                // within 15m — breaking the illusion even if narration
-                // correctly stays silent. Filter the candidate set down to
-                // what is visible on the map in Historical Mode.
-                if (narrationGeofenceManager.isHistoricalMode()) {
-                    val filtered = all.filter { narrationGeofenceManager.isVisibleInHistoricalMode(it) }
-                    DebugLogger.i("WALK-SIM",
-                        "Historical Mode dwell filter: ${filtered.size}/${all.size} POIs eligible for LOOK AT pauses")
-                    filtered
-                } else {
-                    all
-                }
-            } catch (e: Exception) {
-                DebugLogger.e("WALK-SIM", "Failed to load narration points for auto-dwell", e)
-                emptyList()
-            }
-            val dwelledIds = HashSet<String>()
-            var lastDwellTime = 0L  // S118: rate-limit dwells to one per 30s
-            // S124 Phase 9R.0: closest-point-of-approach (CPA) detection —
-            // key = POI id, value = distance observed on the previous step.
-            // We dwell at the step where the distance stops decreasing and
-            // starts increasing (the walker is about to walk away from the
-            // POI), not on first proximity.
-            val lastDistToPoi = HashMap<String, Double>()
-            // CPA watch radius — wider than the 15m trigger so we start
-            // tracking distance-trends early enough to detect CPA cleanly.
-            val CPA_WATCH_M = 60.0
+            // S169 (2026-04-24): TTS-gated dwell — the walker pauses at
+            // whatever step it's on whenever a POI is speaking or queued,
+            // and resumes once TTS is idle AND the queue is drained. This
+            // replaces the prior CPA (closest-point-of-approach) trigger,
+            // which could miss a narrating POI when a closer POI's CPA
+            // fired on the same step and "consumed" the LOOK AT — leaving
+            // the walker striding through a 60 s narration without pausing.
+            //
+            // Real GPS mode uses its own live strategy in the narration
+            // observer (historical-then-closest, behind-user drop). This
+            // dwell only runs inside startWalkSim.
             DebugLogger.i("WALK-SIM",
-                "Auto-dwell armed: ${narrationPoints.size} candidate POIs, " +
-                "trigger=${WALK_SIM_DWELL_TRIGGER_M.toInt()}m, " +
-                "hold=${WALK_SIM_DWELL_DURATION_MS / 1000}s, " +
-                "cooldown=${WALK_SIM_DWELL_COOLDOWN_MS / 1000}s")
+                "TTS-gated dwell armed — walker pauses while POI TTS is active")
 
             var stepIdx = resumeFromStep
+            var ttsDwellCount = 0
             for (point in interpolated.drop(resumeFromStep)) {
                 if (walkSimJob?.isCancelled == true) break
                 viewModel.setManualLocation(point)
@@ -1818,139 +1788,47 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 kotlinx.coroutines.delay(1000L)
 
-                // S118: Fast proximity check — degree-based bounding box pre-filter.
-                // S124 Phase 9R.0: widen to CPA watch radius (60m) so we see
-                // POIs approaching before they reach the old 15m trigger and
-                // can properly detect the closest-point-of-approach.
-                // ~0.00068° ≈ 60 m at Salem's latitude.
-                val degThreshold = 0.00070
-                val pLat = point.latitude
-                val pLng = point.longitude
-                var bestTrigger: com.example.wickedsalemwitchcitytour.content.model.SalemPoi? = null
-                var bestDist: Double = Double.MAX_VALUE
-                for (np in narrationPoints) {
-                    if (np.id in dwelledIds) continue
-                    // Cheap degree check first — skip POIs clearly out of range
-                    if (kotlin.math.abs(np.lat - pLat) > degThreshold ||
-                        kotlin.math.abs(np.lng - pLng) > degThreshold) continue
-                    val d = com.example.wickedsalemwitchcitytour.tour.TourEngine.haversineM(
-                        pLat, pLng, np.lat, np.lng
+                // TTS-gated dwell. If a POI is currently narrating or the
+                // narration queue has any item, freeze the walker until
+                // both drain. Newspaper (Oracle 1692) dispatches are
+                // ambient and do not pin the walker.
+                val initialState = tourViewModel.narrationState.value
+                val initialSeg = (initialState as? com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking)?.segment
+                val initialNewspaper = initialSeg?.id?.startsWith("newspaper_1692_") == true
+                val initialPoiSpeaking = initialState is com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking && !initialNewspaper
+                val initialQueueNonEmpty = narrationQueue.isNotEmpty()
+                if (initialPoiSpeaking || initialQueueNonEmpty) {
+                    ttsDwellCount++
+                    val dwellStart = System.currentTimeMillis()
+                    val narratingAtStart = currentNarration?.name ?: "none"
+                    val queueAtStart = narrationQueue.map { it.name }
+                    DebugLogger.i("WALK-SIM",
+                        "DWELL (TTS active) at step $stepIdx — " +
+                        "narrating=$narratingAtStart queue=$queueAtStart " +
+                        "(exit on idle+empty, safety cap ${WALK_SIM_DWELL_MAX_MS / 1000}s)"
                     )
-                    if (d > CPA_WATCH_M) {
-                        // Out of watch range — drop any stale tracking
-                        lastDistToPoi.remove(np.id)
-                        continue
-                    }
-                    val prev = lastDistToPoi[np.id]
-                    lastDistToPoi[np.id] = d
-                    // CPA trigger: we were getting closer (prev >= d), but
-                    // on THIS step we just started getting farther. That's
-                    // the moment to dwell. Require a minimum prior-distance
-                    // reading (prev != null) so we don't trigger on the
-                    // very first step a POI enters watch range. Tiny GPS
-                    // jitter tolerance: only trigger if d > prev + 0.5 m.
-                    if (prev != null && d > prev + 0.5) {
-                        // Trigger at CPA (which was `prev`, not `d`).
-                        // Pick the closest CPA among competing POIs.
-                        if (prev < bestDist) {
-                            bestDist = prev
-                            bestTrigger = np
-                        }
-                    }
-                }
-                val trigger = bestTrigger
-                if (trigger != null) {
-                    dwelledIds.add(trigger.id)
-                    val now = System.currentTimeMillis()
-
-                    // S118: Rate-limit dwells — only pause once per 30s.
-                    // Still mark the POI as dwelled (so it won't retrigger)
-                    // but skip the physical pause if we paused recently.
-                    if (now - lastDwellTime < WALK_SIM_DWELL_COOLDOWN_MS) {
-                        DebugLogger.i("WALK-SIM",
-                            "SKIP DWELL ${trigger.name} (${bestDist.toInt()}m) — " +
-                            "cooldown ${(now - lastDwellTime) / 1000}s/${WALK_SIM_DWELL_COOLDOWN_MS / 1000}s")
-                    } else {
-                        lastDwellTime = now
-
-                        val faceBearing = bearingToPoi(
-                            point.latitude, point.longitude,
-                            trigger.lat, trigger.lng
-                        )
-                        setMovementBearing(faceBearing)
-
-                        DebugLogger.i("WALK-SIM",
-                            "LOOK AT ${trigger.name} " +
-                            "(dist=${bestDist.toInt()}m bearing=${faceBearing.toInt()}°) — " +
-                            "dwelling until narration finishes (max ${WALK_SIM_DWELL_MAX_MS / 1000}s)"
-                        )
-                        val dwellStart = System.currentTimeMillis()
-                        // S124 Phase 9R.0: dwell until TTS is actually done
-                        // speaking (not a fixed wall-clock duration). Narrations
-                        // vary from ~30 s (short historical_note) to ~3 min
-                        // (full 1692 newspaper dispatch). Fixed dwells clipped
-                        // the long ones mid-sentence; dynamic dwells wait for
-                        // the narration state to return to Idle AND the queue
-                        // to empty. A minimum hold of 4 s gives TTS a chance
-                        // to actually START (enqueue → dequeue → first audio
-                        // chunk) before we start polling for Idle — without
-                        // this the dwell would exit immediately in the gap
-                        // between "request speak" and "speaking".
-                        // S135: 15s minimum dwell so the walker pauses long
-                        // enough to hear meaningful narration at each POI.
-                        val minHoldMs = 15_000L
-                        while (true) {
-                            if (walkSimJob?.isCancelled == true) break
-                            val elapsed = System.currentTimeMillis() - dwellStart
-                            if (elapsed >= WALK_SIM_DWELL_MAX_MS) {
-                                // S141: waive the cap while TTS is still
-                                // actively speaking. Oracle tiles can run
-                                // 2-3 min; cutting them off produces a
-                                // jarring mid-sentence resume. Only break
-                                // on the cap if narration has genuinely
-                                // stalled (idle or the segment ended).
-                                val state = tourViewModel.narrationState.value
-                                val stillSpeaking = state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking
-                                if (!stillSpeaking) {
-                                    DebugLogger.w("WALK-SIM",
-                                        "DWELL CAP hit (${WALK_SIM_DWELL_MAX_MS / 1000}s, narration idle) — resuming walk")
-                                    break
-                                }
-                                // Otherwise log once and let the inner
-                                // ttsIdle/queueEmpty exit handle it naturally.
-                            }
-                            viewModel.setManualLocation(point)
-                            // Only start checking TTS state after minHoldMs
-                            // so we don't exit before speak even starts.
-                            if (elapsed >= minHoldMs) {
-                                val state = tourViewModel.narrationState.value
-                                val speakingSeg = (state as? com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking)?.segment
-                                // S124 Phase 9R.0: newspaper dispatches are
-                                // AMBIENT content — the walker resumes even
-                                // while they're still reading. Only POI-
-                                // specific narration freezes the walker.
-                                val isNewspaperReading = speakingSeg?.poiName?.startsWith("Salem 1692") == true
-                                val ttsIdle = state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle
-                                val queueEmpty = narrationQueue.isEmpty()
-                                if (isNewspaperReading) {
-                                    DebugLogger.i("WALK-SIM",
-                                        "Newspaper dispatch playing — ending dwell, walk resumes (ambient read continues)")
-                                    break
-                                }
-                                if (ttsIdle && queueEmpty) {
-                                    DebugLogger.i("WALK-SIM",
-                                        "TTS idle + queue empty after ${elapsed / 1000}s — ending dwell")
-                                    break
-                                }
-                            }
-                            kotlinx.coroutines.delay(1000L)
-                        }
-                        if (walkSimJob?.isCancelled != true) {
-                            val held = (System.currentTimeMillis() - dwellStart) / 1000
+                    while (true) {
+                        if (walkSimJob?.isCancelled == true) break
+                        val elapsed = System.currentTimeMillis() - dwellStart
+                        viewModel.setManualLocation(point)
+                        val state = tourViewModel.narrationState.value
+                        val speakingSeg = (state as? com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking)?.segment
+                        val speakingNewspaper = speakingSeg?.id?.startsWith("newspaper_1692_") == true
+                        val ttsIdle = state is com.example.wickedsalemwitchcitytour.tour.NarrationState.Idle
+                        val queueEmpty = narrationQueue.isEmpty()
+                        if ((ttsIdle || speakingNewspaper) && queueEmpty) {
+                            val label = if (speakingNewspaper) "newspaper ambient" else "TTS idle"
                             DebugLogger.i("WALK-SIM",
-                                "RESUMING from ${trigger.name} (held ${held}s for narration)"
-                            )
+                                "DWELL exit after ${elapsed / 1000}s ($label + queue empty)")
+                            break
                         }
+                        if (elapsed >= WALK_SIM_DWELL_MAX_MS) {
+                            DebugLogger.w("WALK-SIM",
+                                "DWELL SAFETY CAP (${WALK_SIM_DWELL_MAX_MS / 1000}s) — " +
+                                "state=$state queueSize=${narrationQueue.size}")
+                            break
+                        }
+                        kotlinx.coroutines.delay(1000L)
                     }
                 }
             }
@@ -1965,7 +1843,7 @@ class SalemMainActivity : AppCompatActivity() {
                 walkSimResumeRouteLabel = null
                 walkSimResumeRouteSize = 0
                 DebugLogger.i("WALK-SIM",
-                    "Walk complete — ${dwelledIds.size} auto-dwell anchors triggered")
+                    "Walk complete — $ttsDwellCount TTS dwells triggered")
                 toast("Walk simulation complete")
             }
         }

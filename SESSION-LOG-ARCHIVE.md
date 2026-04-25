@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 158, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 159, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 159: 2026-04-23 — Phase 9Y.2b Kotlin + Room v8→v9 identity-hash cascade
+
+Mechanical schema propagation for the 9 MassGIS/MHC/L3 columns that S156 added to PG. Added 9 nullable `@ColumnInfo` fields (`building_footprint_geojson`, `mhc_id/year_built/style/nr_status/narrative`, `canonical_address_point_id`, `local_historic_district`, `parcel_owner_class`) to `SalemPoi.kt`; bumped `SalemContentDatabase` version 8→9; extracted new Room identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`; updated `verify-bundled-assets.js` + `bundle-witch-trials-newspapers-into-db.js` constants; threaded the 9 columns through `publish-salem-pois.js` (CREATE_TABLE + SELECT + INSERT + transaction binding); rebaked `salem_content.db` (1,830 POIs, 8.9 MB); Lenovo TB305FU uninstall+install smoke-test passed cleanly (app launches, POI markers render, narration state machine active, zero SQLite/Room errors). 9Y.3 enrichment script is now unblocked. Pre-existing issue surfaced: `verify-bundled-assets.js` still checks the pre-S158 in-APK `salem_tiles.sqlite` location and fails on every build. Post-session discovery: operator's home GPS in Beverly falls outside the S158 Witchy bake bbox (max lat 42.545 vs Beverly 42.557), so the bundled tiles don't cover the operator's home location — candidate fix for next session is extending bake bounds or adding a UX hint.
+
+Full session detail: `docs/session-logs/session-159-2026-04-23.md`. Commit: `58d4c8c`.
+
+---
 
 ## Session 158: 2026-04-23 — Custom "Witchy" basemap tile bake (third offline tile source)
 

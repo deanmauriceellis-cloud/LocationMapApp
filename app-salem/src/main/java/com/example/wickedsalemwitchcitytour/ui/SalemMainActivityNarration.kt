@@ -37,7 +37,7 @@ import java.util.ArrayDeque
  *  → attraction → rest), then closest within tier wins. The dock renders the
  *  same filtered+sorted snapshot so dock order = play order. */
 internal val narrationQueue = ArrayDeque<SalemPoi>()
-private var currentNarration: SalemPoi? = null
+internal var currentNarration: SalemPoi? = null
 private var narrationAutoPlay = true
 
 /**
@@ -350,9 +350,15 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 currentNewspaperHeadline = null
                 DebugLogger.i("NARR-STATE", "  Idle → currentNarration cleared, queueSize=${narrationQueue.size}")
 
-                // S118: Pacing — after every 3rd consecutive narration, cool down 30s
+                // S118: Pacing — after every 3rd consecutive narration, cool
+                // down 30s. S169 (2026-04-24): in walk-sim mode the dwells
+                // themselves are the pacing mechanism — the walker is frozen
+                // at each POI until TTS drains, then physically walks to the
+                // next CPA. A 30s silent breather on top of that makes the
+                // dwell loop see idle+empty and exit mid-route. Skip the
+                // cooldown entirely when walk-sim is running.
                 consecutiveNarrations++
-                if (consecutiveNarrations >= PACING_BURST_SIZE) {
+                if (consecutiveNarrations >= PACING_BURST_SIZE && !walkSimRunning) {
                     DebugLogger.i("NARR-STATE",
                         "  PACING COOLDOWN: $consecutiveNarrations consecutive narrations → " +
                         "breathing ${PACING_COOLDOWN_MS / 1000}s before next")
@@ -1051,7 +1057,16 @@ private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
             "$mode MODE: $nearbyStandard POIs in ${STANDARD_DISCARD_RADIUS_M.toInt()}m, $nearbyHd in ${HIGH_DENSITY_DISCARD_RADIUS_M.toInt()}m → discard=${discardRadius.toInt()}m")
     }
 
-    // Step 1: drop anything > discardRadius (out of range) OR behind the user
+    // Step 1: drop anything > discardRadius (out of range) OR behind the user.
+    // S169 (2026-04-24): the behind-user filter only applies in REAL GPS
+    // mode. In walk-sim mode we dwell at each LOOK AT until the queue
+    // drains (the walker is pinned in place while TTS plays), so a POI
+    // that is "behind" the current cursor is still a POI we just passed
+    // and want to announce before resuming. Dropping behind-user POIs in
+    // walk-sim produced mid-dwell queue starvation (log 2026-04-24:
+    // Gardner-Pingree dropped 23m behind while dwelling at Plummer Hall)
+    // and made it feel like the walker skipped things.
+    val dropBehindUser = !walkSimRunning
     val survivors = mutableListOf<SalemPoi>()
     val droppedNames = mutableListOf<String>()
     val droppedBehind = mutableListOf<String>()
@@ -1061,7 +1076,7 @@ private fun SalemMainActivity.pickNextFromQueue(): SalemPoi? {
             droppedNames.add("${point.name}(${dist.toInt()}m)")
             continue
         }
-        if (!isPoiAhead(point.lat, point.lng)) {
+        if (dropBehindUser && !isPoiAhead(point.lat, point.lng)) {
             droppedBehind.add("${point.name}(${dist.toInt()}m)")
             continue
         }

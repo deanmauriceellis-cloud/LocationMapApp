@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 159-168. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 160-169. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 169: 2026-04-24 — Walk-mode dwell rewritten as TTS-gated (CPA removed)
+
+Operator field test surfaced two bugs in the walk FAB: the walker would freeze for 15 s on POIs that never announced, and would stride straight through full 60 s narrations without pausing. Three field-log iterations traced both to the CPA (closest-point-of-approach) trigger model — too wide on one end (LOOK AT firing on POIs at 45-52 m outside any geofence), too narrow on the other (a closer POI's CPA on the same step "consumed" the LOOK AT slot, leaving the farther narrating POI unmatched). Replaced with TTS-gated dwell: walker pauses at whatever step it's on whenever a POI is speaking or queued, resumes when TTS goes idle and queue empties; newspapers stay ambient. Pacing cooldown also bypassed in walk-sim (the dwells themselves are the pacing). Net delta -154 lines on `SalemMainActivity.kt`. Real GPS strategy unchanged.
+
+Full session detail: `docs/session-logs/session-169-2026-04-24.md`. Commit: TBD.
+
+---
 
 ## Session 168: 2026-04-24 — Install-default sweep + one-narration-per-visit + zoom 14-20 lock + toolbar rework
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-160-2026-04-23.md`. Commit: `f86
 
 ---
 
-## Session 159: 2026-04-23 — Phase 9Y.2b Kotlin + Room v8→v9 identity-hash cascade
-
-Mechanical schema propagation for the 9 MassGIS/MHC/L3 columns that S156 added to PG. Added 9 nullable `@ColumnInfo` fields (`building_footprint_geojson`, `mhc_id/year_built/style/nr_status/narrative`, `canonical_address_point_id`, `local_historic_district`, `parcel_owner_class`) to `SalemPoi.kt`; bumped `SalemContentDatabase` version 8→9; extracted new Room identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`; updated `verify-bundled-assets.js` + `bundle-witch-trials-newspapers-into-db.js` constants; threaded the 9 columns through `publish-salem-pois.js` (CREATE_TABLE + SELECT + INSERT + transaction binding); rebaked `salem_content.db` (1,830 POIs, 8.9 MB); Lenovo TB305FU uninstall+install smoke-test passed cleanly (app launches, POI markers render, narration state machine active, zero SQLite/Room errors). 9Y.3 enrichment script is now unblocked. Pre-existing issue surfaced: `verify-bundled-assets.js` still checks the pre-S158 in-APK `salem_tiles.sqlite` location and fails on every build. Post-session discovery: operator's home GPS in Beverly falls outside the S158 Witchy bake bbox (max lat 42.545 vs Beverly 42.557), so the bundled tiles don't cover the operator's home location — candidate fix for next session is extending bake bounds or adding a UX hint.
-
-Full session detail: `docs/session-logs/session-159-2026-04-23.md`. Commit: `58d4c8c`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 158 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 159 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
 <!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
 <!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->
 <!-- S156 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
