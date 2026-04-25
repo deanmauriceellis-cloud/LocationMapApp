@@ -14,9 +14,11 @@ import { PoiTree, type PoiRow, type PoiSelection, type CategorySelection } from 
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog } from './PoiEditDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
+import { TourTree, type AddStopMode } from './TourTree'
+import type { TourStop, TourSummary } from './tourTypes'
 import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
 
-type AdminView = 'pois' | 'witch-trials'
+type AdminView = 'pois' | 'tours' | 'witch-trials'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -40,6 +42,97 @@ export function AdminLayout() {
   const [pois, setPois] = useState<PoiRow[] | null>(null)
   const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+
+  // Tour-mode state (S174)
+  const [activeTour, setActiveTour] = useState<TourSummary | null>(null)
+  const [tourStops, setTourStops] = useState<TourStop[] | null>(null)
+  const [tourRefreshKey, setTourRefreshKey] = useState(0)
+  const [addStopMode, setAddStopMode] = useState<AddStopMode>('none')
+
+  const handleTourSelect = useCallback((tour: TourSummary, stops: TourStop[]) => {
+    setActiveTour(tour)
+    setTourStops(stops)
+  }, [])
+
+  const handleStopMoved = useCallback((stopId: number, lat: number, lng: number) => {
+    setTourStops((prev) => {
+      if (!prev) return prev
+      return prev.map((s) =>
+        s.stop_id === stopId
+          ? {
+              ...s,
+              override_lat: lat,
+              override_lng: lng,
+              effective_lat: lat,
+              effective_lng: lng,
+            }
+          : s,
+      )
+    })
+    setTourRefreshKey((k) => k + 1)
+  }, [])
+
+  // Add a free waypoint at the clicked map coords. Resets the add mode after
+  // a successful drop so the operator clicks again deliberately.
+  const handleAddFreeStop = useCallback(
+    async (lat: number, lng: number) => {
+      if (!activeTour) return
+      try {
+        const res = await fetch(
+          `/api/admin/salem/tours/${encodeURIComponent(activeTour.id)}/stops`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ lat, lng }),
+          },
+        )
+        if (!res.ok) {
+          let msg = `${res.status} ${res.statusText}`
+          try {
+            const body = await res.json()
+            if (body?.error) msg = `${res.status} ${body.error}`
+          } catch { /* not json */ }
+          throw new Error(msg)
+        }
+        setAddStopMode('none')
+        setTourRefreshKey((k) => k + 1)
+      } catch (e) {
+        window.alert(`Could not add waypoint: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    [activeTour],
+  )
+
+  const handlePickPoiForStop = useCallback(
+    async (poi: PoiRow) => {
+      if (!activeTour) return
+      try {
+        const res = await fetch(
+          `/api/admin/salem/tours/${encodeURIComponent(activeTour.id)}/stops`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ poi_id: poi.id }),
+          },
+        )
+        if (!res.ok) {
+          let msg = `${res.status} ${res.statusText}`
+          try {
+            const body = await res.json()
+            if (body?.error) msg = `${res.status} ${body.error}`
+          } catch { /* not json */ }
+          throw new Error(msg)
+        }
+        setAddStopMode('none')
+        setTourRefreshKey((k) => k + 1)
+      } catch (e) {
+        window.alert(`Could not add POI as stop: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    [activeTour],
+  )
 
   // Oracle health pill
   const [oraclePill, setOraclePill] = useState<OraclePillState>({ kind: 'loading' })
@@ -189,6 +282,15 @@ export function AdminLayout() {
           </button>
           <button
             type="button"
+            onClick={() => setView('tours')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'tours' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            Tours
+          </button>
+          <button
+            type="button"
             onClick={() => setView('witch-trials')}
             className={`px-3 py-1 text-sm transition-colors ${
               view === 'witch-trials' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -234,6 +336,40 @@ export function AdminLayout() {
       {view === 'witch-trials' ? (
         <div className="flex-1 min-h-0">
           <WitchTrialsPanel />
+        </div>
+      ) : view === 'tours' ? (
+        <div className="flex-1 flex min-h-0">
+          <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
+            <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Tours
+            </div>
+            <div className="flex-1 min-h-0">
+              <TourTree
+                selectedTourId={activeTour?.id ?? null}
+                onTourSelect={handleTourSelect}
+                refreshKey={tourRefreshKey}
+                addStopMode={addStopMode}
+                onAddStopModeChange={setAddStopMode}
+              />
+            </div>
+          </aside>
+
+          <main className="flex-1 relative bg-slate-200 min-h-0">
+            <AdminMap
+              pois={pois}
+              selectedPoi={selectedPoi}
+              onPoiSelect={handleMapSelect}
+              onPoiMoved={handlePoiMoved}
+              categoryFilter={mapCategoryFilter}
+              onClearCategoryFilter={() => setMapCategoryFilter(null)}
+              activeTour={activeTour}
+              tourStops={tourStops}
+              onStopMoved={handleStopMoved}
+              addStopMode={addStopMode}
+              onMapClickAddFree={handleAddFreeStop}
+              onPickPoiForStop={handlePickPoiForStop}
+            />
+          </main>
         </div>
       ) : (
         <>

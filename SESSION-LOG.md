@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 164-173. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 165-174. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 174: 2026-04-25 — Web admin tour editor (full CRUD + drag-to-reposition)
+
+Shipped a brand-new Tours tab in the web admin tool so tours can be edited end-to-end ahead of post-TigerLine-cleanup rerouting. Schema migration added `stop_id` PK, nullable `lat`/`lng` (per-tour coord override), and nullable `name`/`poi_id` to `salem_tour_stops`; effective coord at read time = `COALESCE(stop.lat, poi.lat)`. New `cache-proxy/lib/admin-tours.js` adds 7 admin endpoints — list/get tours, create/patch/delete tour, add/patch/delete/reorder stops — with auto-resync of `salem_tours.stop_count` on every stop mutation. Frontend: new `TourTree.tsx` (create form, per-row delete, metadata edit form, waypoint list with ↑/↓/🗑, "+ Free waypoint" map-click-to-add mode, "+ POI as stop" pick-marker mode), generalized `MoveConfirm` modal, new `TourStopLayer` (numbered draggable markers + dashed connecting polyline + amber-vs-indigo for override-vs-fallback), `FitTourBounds`, `MapClickAddListener`. Operator parked at session end pending TigerLine database cleanup before doing the actual rerouting.
+
+Full session detail: `docs/session-logs/session-174-2026-04-25.md`. Commit: pending.
+
+---
 
 ## Session 173: 2026-04-25 — Cemetery firefly alignment investigation (no-op session, reverted)
 
@@ -76,17 +84,10 @@ Full session detail: `docs/session-logs/session-165-2026-04-24.md`. Commit: see 
 
 ---
 
-## Session 164: 2026-04-24 — Wrong-project detour (LAN recon → RadioLogger)
-
-No LMA work. Operator asked about LAN threat recon tooling; scripts were built here by mistake, then moved to `~/Research/RadioLogger/tools/`. No LMA code, schema, or docs changed. No commit.
-
-Full session detail: `docs/session-logs/session-164-2026-04-24.md`. Commit: none.
-
 ---
 
----
-
-<!-- END OF ROLLING WINDOW — Sessions 162 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 163 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S164 rolled to archive 2026-04-25 by the session-end protocol (S174) -->
 <!-- S163 rolled to archive 2026-04-25 by the session-end protocol (S173) -->
 <!-- S162 rolled to archive 2026-04-25 by the session-end protocol (S172) -->
 <!-- S161 rolled to archive 2026-04-25 by the session-end protocol (S171) -->

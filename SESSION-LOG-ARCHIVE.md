@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 163, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 164, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 164: 2026-04-24 — Wrong-project detour (LAN recon → RadioLogger)
+
+No LMA work. Operator asked about LAN threat recon tooling; scripts were built here by mistake, then moved to `~/Research/RadioLogger/tools/`. No LMA code, schema, or docs changed. No commit.
+
+Full session detail: `docs/session-logs/session-164-2026-04-24.md`. Commit: none.
+
+---
 
 ## Session 163: 2026-04-23 — MHC hidden POIs with clickable footprints on admin map + category filter; parallel-system detour torn down
 

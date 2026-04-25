@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import type { PoiRow, PoiSelection } from './PoiTree'
+import type { TourStop, TourSummary } from './tourTypes'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -128,6 +129,24 @@ interface AdminMapProps {
   /** When set, only POIs with matching category render on the map. */
   categoryFilter?: string | null
   onClearCategoryFilter?: () => void
+  /** Tour-mode props (S174). When activeTour is set, the tour-stop layer
+   *  renders numbered draggable waypoints over the basemap. */
+  activeTour?: TourSummary | null
+  tourStops?: TourStop[] | null
+  onStopMoved?: (stopId: number, lat: number, lng: number) => void
+  /** Add-stop mode: 'free' = next map click creates a free waypoint,
+   *  'poi' = next POI marker click adds that POI as a stop. */
+  addStopMode?: 'none' | 'free' | 'poi'
+  onMapClickAddFree?: (lat: number, lng: number) => void
+  onPickPoiForStop?: (poi: PoiRow) => void
+}
+
+export interface PendingStopMove {
+  stop: TourStop
+  label: string
+  from: { lat: number; lng: number }
+  to: { lat: number; lng: number }
+  marker: L.Marker
 }
 
 // ─── Marker layer ────────────────────────────────────────────────────────────
@@ -459,34 +478,48 @@ function metersBetween(a: { lat: number; lng: number }, b: { lat: number; lng: n
 }
 
 interface MoveConfirmProps {
-  pending: PendingMove
+  title: string
+  subjectName: string
+  subjectId: string
+  from: { lat: number; lng: number }
+  to: { lat: number; lng: number }
   onConfirm: () => void
   onCancel: () => void
   busy: boolean
   error: string | null
 }
 
-function MoveConfirm({ pending, onConfirm, onCancel, busy, error }: MoveConfirmProps) {
-  const distance = metersBetween(pending.from, pending.to)
+function MoveConfirm({
+  title,
+  subjectName,
+  subjectId,
+  from,
+  to,
+  onConfirm,
+  onCancel,
+  busy,
+  error,
+}: MoveConfirmProps) {
+  const distance = metersBetween(from, to)
   return (
     <div className="absolute inset-0 z-[500] flex items-center justify-center bg-black/30">
       <div className="bg-white rounded shadow-lg w-96 max-w-[90vw] p-4 text-sm text-slate-800">
-        <h2 className="text-base font-semibold mb-2">Confirm POI move</h2>
+        <h2 className="text-base font-semibold mb-2">{title}</h2>
         <p className="text-xs text-slate-600 mb-3">
-          <span className="font-medium text-slate-800">{pending.poi.name}</span>{' '}
-          (<span className="font-mono text-[10px]">{pending.poi.id}</span>)
+          <span className="font-medium text-slate-800">{subjectName}</span>{' '}
+          (<span className="font-mono text-[10px]">{subjectId}</span>)
         </p>
         <div className="bg-slate-50 border border-slate-200 rounded p-2 text-xs font-mono">
           <div className="flex justify-between">
             <span className="text-slate-500">From:</span>
             <span>
-              {pending.from.lat.toFixed(6)}, {pending.from.lng.toFixed(6)}
+              {from.lat.toFixed(6)}, {from.lng.toFixed(6)}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">To:</span>
             <span>
-              {pending.to.lat.toFixed(6)}, {pending.to.lng.toFixed(6)}
+              {to.lat.toFixed(6)}, {to.lng.toFixed(6)}
             </span>
           </div>
           <div className="flex justify-between mt-1 pt-1 border-t border-slate-200">
@@ -568,6 +601,150 @@ function Legend({ categoryCounts }: { categoryCounts: [string, number][] }) {
   )
 }
 
+// ─── Map-click listener for "+ Free waypoint" mode (S174) ──────────────────
+
+interface MapClickAddProps {
+  active: boolean
+  onClick: (lat: number, lng: number) => void
+}
+
+function MapClickAddListener({ active, onClick }: MapClickAddProps) {
+  const map = useMap()
+  useEffect(() => {
+    if (!active) return
+    const handler = (e: L.LeafletMouseEvent) => {
+      onClick(e.latlng.lat, e.latlng.lng)
+    }
+    map.on('click', handler)
+    return () => {
+      map.off('click', handler)
+    }
+  }, [map, active, onClick])
+  return null
+}
+
+// ─── Tour-stop layer (S174) ─────────────────────────────────────────────────
+//
+// Renders the active tour's waypoints as numbered, draggable markers connected
+// by a translucent polyline in tour-walk order. dragend → emits a pending stop
+// move; the parent shows MoveConfirm and POSTs the PATCH.
+
+const numberedIconCache = new Map<string, L.DivIcon>()
+
+function numberedStopIcon(order: number, overridden: boolean): L.DivIcon {
+  const key = `${order}|${overridden ? 'ov' : 'poi'}`
+  let icon = numberedIconCache.get(key)
+  if (icon) return icon
+  // Amber for per-tour overrides, indigo for fallback-to-POI.
+  const fill = overridden ? '#d97706' : '#4f46e5'
+  const html = `
+    <div style="
+      width:24px;height:24px;border-radius:50%;
+      background:${fill};color:#fff;
+      border:2px solid #ffffff;box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+      display:flex;align-items:center;justify-content:center;
+      font-family:system-ui,-apple-system,sans-serif;
+      font-size:11px;font-weight:700;line-height:1;
+    ">${order}</div>`
+  icon = L.divIcon({
+    html,
+    className: 'admin-tour-stop-marker',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  })
+  numberedIconCache.set(key, icon)
+  return icon
+}
+
+interface TourStopLayerProps {
+  stops: TourStop[]
+  onDragEnd: (move: PendingStopMove) => void
+}
+
+function TourStopLayer({ stops, onDragEnd }: TourStopLayerProps) {
+  const map = useMap()
+  useEffect(() => {
+    const group = L.layerGroup()
+    const latlngs: [number, number][] = []
+    for (const s of stops) {
+      if (typeof s.effective_lat !== 'number' || typeof s.effective_lng !== 'number') continue
+      latlngs.push([s.effective_lat, s.effective_lng])
+    }
+
+    if (latlngs.length >= 2) {
+      L.polyline(latlngs, {
+        color: '#4f46e5',
+        weight: 3,
+        opacity: 0.55,
+        dashArray: '4 6',
+      }).addTo(group)
+    }
+
+    for (const stop of stops) {
+      const lat = stop.effective_lat
+      const lng = stop.effective_lng
+      if (typeof lat !== 'number' || typeof lng !== 'number') continue
+      const overridden = stop.override_lat != null || stop.override_lng != null
+      const label = stop.effective_name ?? `Stop ${stop.stop_order}`
+      const marker = L.marker([lat, lng], {
+        icon: numberedStopIcon(stop.stop_order, overridden),
+        draggable: true,
+        autoPan: true,
+        title: `${stop.stop_order}. ${label}`,
+        zIndexOffset: 1000,
+      })
+      let dragOrigin = { lat, lng }
+      marker.on('dragstart', () => {
+        const ll = marker.getLatLng()
+        dragOrigin = { lat: ll.lat, lng: ll.lng }
+      })
+      marker.on('dragend', () => {
+        const ll = marker.getLatLng()
+        if (ll.lat === dragOrigin.lat && ll.lng === dragOrigin.lng) return
+        onDragEnd({
+          stop,
+          label,
+          from: dragOrigin,
+          to: { lat: ll.lat, lng: ll.lng },
+          marker,
+        })
+      })
+      marker.addTo(group)
+    }
+
+    group.addTo(map)
+    return () => {
+      map.removeLayer(group)
+    }
+  }, [stops, map, onDragEnd])
+  return null
+}
+
+interface FitTourBoundsProps {
+  stops: TourStop[] | null
+  /** Bumps when a different tour is selected so we re-fit. */
+  tourId: string | null
+}
+
+function FitTourBounds({ stops, tourId }: FitTourBoundsProps) {
+  const map = useMap()
+  const lastTourIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!tourId || !stops || tourId === lastTourIdRef.current) return
+    const pts: L.LatLngTuple[] = []
+    for (const s of stops) {
+      if (typeof s.effective_lat === 'number' && typeof s.effective_lng === 'number') {
+        pts.push([s.effective_lat, s.effective_lng])
+      }
+    }
+    if (pts.length === 0) return
+    const bounds = L.latLngBounds(pts)
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 })
+    lastTourIdRef.current = tourId
+  }, [stops, tourId, map])
+  return null
+}
+
 // ─── Top-level component ────────────────────────────────────────────────────
 
 export function AdminMap({
@@ -577,6 +754,12 @@ export function AdminMap({
   onPoiMoved,
   categoryFilter,
   onClearCategoryFilter,
+  activeTour,
+  tourStops,
+  onStopMoved,
+  addStopMode = 'none',
+  onMapClickAddFree,
+  onPickPoiForStop,
 }: AdminMapProps) {
   const filteredPois = useMemo(() => {
     if (!pois) return pois
@@ -586,6 +769,76 @@ export function AdminMap({
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
+
+  // Tour-mode (S174) — drag-to-save state for waypoints.
+  const [pendingStop, setPendingStop] = useState<PendingStopMove | null>(null)
+  const [stopBusy, setStopBusy] = useState(false)
+  const [stopError, setStopError] = useState<string | null>(null)
+
+  const handleStopDragEnd = useCallback((move: PendingStopMove) => {
+    setPendingStop(move)
+    setStopError(null)
+  }, [])
+
+  // In POI-pick mode, marker clicks insert the POI as a tour stop instead of
+  // opening the edit dialog.
+  const effectiveOnPoiSelect = useCallback(
+    (sel: PoiSelection) => {
+      if (addStopMode === 'poi' && onPickPoiForStop) {
+        onPickPoiForStop(sel.poi)
+        return
+      }
+      onPoiSelect(sel)
+    },
+    [addStopMode, onPickPoiForStop, onPoiSelect],
+  )
+
+  const handleMapClickAddFree = useCallback(
+    (lat: number, lng: number) => {
+      if (onMapClickAddFree) onMapClickAddFree(lat, lng)
+    },
+    [onMapClickAddFree],
+  )
+
+  const handleStopCancel = useCallback(() => {
+    if (pendingStop) {
+      pendingStop.marker.setLatLng([pendingStop.from.lat, pendingStop.from.lng])
+    }
+    setPendingStop(null)
+    setStopError(null)
+  }, [pendingStop])
+
+  const handleStopConfirm = useCallback(async () => {
+    if (!pendingStop || !activeTour || !onStopMoved) return
+    setStopBusy(true)
+    setStopError(null)
+    try {
+      const url =
+        `/api/admin/salem/tours/${encodeURIComponent(activeTour.id)}` +
+        `/stops/${pendingStop.stop.stop_id}`
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ lat: pendingStop.to.lat, lng: pendingStop.to.lng }),
+      })
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try {
+          const body = await res.json()
+          if (body?.error) msg = `${res.status} ${body.error}`
+        } catch { /* body wasn't JSON */ }
+        throw new Error(msg)
+      }
+      onStopMoved(pendingStop.stop.stop_id, pendingStop.to.lat, pendingStop.to.lng)
+      setPendingStop(null)
+    } catch (e) {
+      pendingStop.marker.setLatLng([pendingStop.from.lat, pendingStop.from.lng])
+      setStopError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setStopBusy(false)
+    }
+  }, [pendingStop, activeTour, onStopMoved])
 
   const [tileProviderId, setTileProviderIdState] = useState<string>(() => {
     try {
@@ -663,7 +916,7 @@ export function AdminMap({
     }
   }, [pending, onPoiMoved])
 
-  if (!pois) {
+  if (!pois && !tourStops) {
     return (
       <div className="absolute inset-0 flex items-center justify-center text-slate-500">
         <p className="text-sm italic">Loading POI map…</p>
@@ -672,7 +925,15 @@ export function AdminMap({
   }
 
   return (
-    <div className="absolute inset-0">
+    <div className={`absolute inset-0 ${addStopMode !== 'none' ? 'cursor-crosshair' : ''}`}>
+      {addStopMode !== 'none' && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[600]
+                        bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow">
+          {addStopMode === 'free'
+            ? 'Click the map to drop a free waypoint'
+            : 'Click any POI marker to add it as a stop'}
+        </div>
+      )}
       <MapContainer
         center={SALEM_CENTER}
         zoom={INITIAL_ZOOM}
@@ -687,15 +948,25 @@ export function AdminMap({
           maxZoom={22}
           maxNativeZoom={activeProvider.maxNativeZoom}
         />
-        <HiddenPoiFootprints pois={filteredPois ?? []} onPoiSelect={onPoiSelect} />
+        <HiddenPoiFootprints pois={filteredPois ?? []} onPoiSelect={effectiveOnPoiSelect} />
         <MarkerLayer
           pois={filteredPois ?? []}
           selectedKey={selectedKey}
-          onPoiSelect={onPoiSelect}
+          onPoiSelect={effectiveOnPoiSelect}
           onDragEnd={handleDragEnd}
         />
-        <ParcelHitTest pois={filteredPois ?? []} onPoiSelect={onPoiSelect} />
+        {addStopMode !== 'free' && (
+          <ParcelHitTest pois={filteredPois ?? []} onPoiSelect={effectiveOnPoiSelect} />
+        )}
+        <MapClickAddListener
+          active={addStopMode === 'free'}
+          onClick={handleMapClickAddFree}
+        />
         <FlyToSelected selectedPoi={selectedPoi} />
+        {tourStops && tourStops.length > 0 && (
+          <TourStopLayer stops={tourStops} onDragEnd={handleStopDragEnd} />
+        )}
+        <FitTourBounds stops={tourStops ?? null} tourId={activeTour?.id ?? null} />
       </MapContainer>
       <TileProviderPicker
         providerId={tileProviderId}
@@ -718,11 +989,28 @@ export function AdminMap({
       )}
       {pending && (
         <MoveConfirm
-          pending={pending}
+          title="Confirm POI move"
+          subjectName={pending.poi.name}
+          subjectId={pending.poi.id}
+          from={pending.from}
+          to={pending.to}
           busy={moveBusy}
           error={moveError}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
+        />
+      )}
+      {pendingStop && (
+        <MoveConfirm
+          title="Confirm waypoint move"
+          subjectName={pendingStop.label}
+          subjectId={`stop #${pendingStop.stop.stop_id} · order ${pendingStop.stop.stop_order}`}
+          from={pendingStop.from}
+          to={pendingStop.to}
+          busy={stopBusy}
+          error={stopError}
+          onConfirm={handleStopConfirm}
+          onCancel={handleStopCancel}
         />
       )}
     </div>

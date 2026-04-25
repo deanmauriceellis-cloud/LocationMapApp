@@ -169,9 +169,16 @@ CREATE TABLE IF NOT EXISTS salem_tours (
 -- ════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS salem_tour_stops (
+  stop_id                 BIGSERIAL PRIMARY KEY,
   tour_id                 TEXT NOT NULL REFERENCES salem_tours(id),
-  poi_id                  TEXT NOT NULL REFERENCES salem_pois(id),
+  -- Nullable so a tour stop can be a free-floating waypoint (no POI link).
+  poi_id                  TEXT REFERENCES salem_pois(id),
   stop_order              INTEGER NOT NULL,
+  -- Per-tour coord override. Effective coord = COALESCE(stop.lat, poi.lat).
+  lat                     DOUBLE PRECISION,
+  lng                     DOUBLE PRECISION,
+  -- Label override for free-floating waypoints or per-tour rename.
+  name                    TEXT,
   transition_narration    TEXT,
   walking_minutes_from_prev INTEGER,
   distance_m_from_prev    INTEGER,
@@ -180,9 +187,10 @@ CREATE TABLE IF NOT EXISTS salem_tour_stops (
   confidence              REAL NOT NULL DEFAULT 1.0,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  stale_after             TIMESTAMPTZ,
-  PRIMARY KEY (tour_id, poi_id)
+  stale_after             TIMESTAMPTZ
 );
+CREATE INDEX IF NOT EXISTS salem_tour_stops_tour_order_idx
+  ON salem_tour_stops (tour_id, stop_order);
 
 -- ════════════════════════════════════════════════════════════════════
 -- Events Calendar

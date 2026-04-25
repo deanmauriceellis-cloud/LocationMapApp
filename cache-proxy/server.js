@@ -193,6 +193,9 @@ require('./lib/admin')(app, deps);
 // Admin POI write endpoints (Phase 9P.4) — gated by /admin Basic Auth
 require('./lib/admin-pois')(app, deps);
 
+// Admin Tour write endpoints (S174) — gated by /admin Basic Auth
+require('./lib/admin-tours')(app, deps);
+
 // Admin Witch Trials content endpoints (Phase 9X.7) — gated by /admin Basic Auth
 require('./lib/admin-witch-trials')(app, deps);
 
