@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 163-172. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 164-173. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 173: 2026-04-25 — Cemetery firefly alignment investigation (no-op session, reverted)
+
+Investigated the Quaker cemetery firefly bug — fireflies were rendering in a void next to the visible cemetery polygon, not on it. Root cause traced to a polygon-source mismatch: the Witchy basemap renders cemeteries from OSM data (via the planetiler tile bake), while our firefly polygon library queries `massgis.openspace prim_purp='H'`, which has only a 1455 m² 4-vertex sliver in the wrong place for `gid=27152` "Essex Street Cemetery". Tried two fixes — exclusion of the bad gid (operator reversed), then a B1+B2 source-merge (prefer `massgis.landuse lu37_1999=34` when area-comparable, plus a side-car JSON of hand-corrected overrides for problem cases). B1 made the OTHER ~46 cemeteries' polygons drift out of alignment with the basemap render — landuse=34 polygons disagree with OSM more than openspace does despite being the more specific MassGIS class. Operator instructed full revert. Net code change this session: zero. Quaker cemetery firefly bug remains parked; the per-feature override mechanism is a known path forward when operator wants to address it surgically.
+
+Full session detail: `docs/session-logs/session-173-2026-04-25.md`. Commit: pending.
+
+---
 
 ## Session 172: 2026-04-25 — Animations live in Salem app + parks overlay (water visual TBC)
 
@@ -76,20 +84,16 @@ Full session detail: `docs/session-logs/session-164-2026-04-24.md`. Commit: none
 
 ---
 
-## Session 163: 2026-04-23 — MHC hidden POIs with clickable footprints on admin map + category filter; parallel-system detour torn down
-
-Shipped the MassGIS MHC inventory as hidden POIs in `salem_pois` — 487 new rows + 16 enrichments via `tools/historical-buildings/import-to-salem-pois.py` (spatial-join L3 assessor for year_built, nearest-+-name-fuzz enrichment, stable `hb_<sha256>` ids, idempotent). Admin map now renders hidden POIs as subtle clickable polygons (outline only, hover-highlight) wired to the existing `PoiEditDialog`; POI-tree category clicks filter the map to that category with a toggle-off and a blue "Filtering: X" pill. Filed research request to SalemIntelligence at `~/Development/SalemIntelligence/docs/lma-mhc-hidden-poi-research-request.md`. Chat gated post-V1 via `ENABLE_CHAT=true` flag. Mid-session detour: first built a parallel `salem_historical_buildings` table + Room v10 entity + admin tab + separate audio toggle; operator corrected the architecture ("just a POI that doesn't present as a POI") and everything was torn down and rebuilt as hidden POIs — Room back to v9 identity_hash `4ec9ae3528d8f55529cd6875c7b0adef`, migration archived. Four new memories shipped, including `feedback_leverage_existing_assets.md` (don't build parallel systems when existing infrastructure can absorb the change).
-
-Full session detail: `docs/session-logs/session-163-2026-04-23.md`. Commit: `76eec90`.
-
 ---
 
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 161 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 162 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S163 rolled to archive 2026-04-25 by the session-end protocol (S173) -->
 <!-- S162 rolled to archive 2026-04-25 by the session-end protocol (S172) -->
 <!-- S161 rolled to archive 2026-04-25 by the session-end protocol (S171) -->
+<!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
+<!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
+<!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
+<!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->
 <!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
 <!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
 <!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
