@@ -203,6 +203,7 @@ Under the lean-startup rule (2026-04-23), only `CLAUDE.md` and `MEMORY.md` are r
 |------|---------|-----------|
 | `CLAUDE.md` | This file | Auto-loaded |
 | `MEMORY.md` (user-config) | Persistent feedback, project, reference, user memories | Auto-loaded |
+| `MASTER_SESSION_REFERENCE.md` | Topic-indexed lookup of prior work — phrasing index + per-topic markers + paths | Operator says "read MASTER_SESSION_REFERENCE about [topic]" — read THIS file + only the one live log it points to (keeps context small and directed) |
 | `STATE.md` | Current snapshot — TOP PRIORITY, phase status, carry-forwards | Operator asks for status, or current phase needs confirming |
 | `docs/session-logs/session-NNN-*.md` | Per-session live log | Recovering from a killed session, or operator asks about a specific past session |
 | `SESSION-LOG.md` | Rolling 10-session summary | Reconstructing recent work — NEVER at session start |

@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 160-169. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 161-170. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 170: 2026-04-24 — Map sprite pipeline (rotation-only baseline shipped, walking deferred to V2)
+
+Long off-repo sprite-system exploration: built a working SDXL→TripoSR→headless-render→animated-WebP pipeline that produces 7 cartoon characters (witch, owl, black-cat, katrina-kitty, skeleton, mouse, rat) as 16-angle rotation frames packed at **992 KB total** for the eventual map-overlay system. Three approaches to walking animation all failed (AI 2-pose generation lost identity, AnimateDiff is for motion-not-rotation with no rotate-LoRA, procedural Blender mesh deformation crumples AI meshes) — operator chose to leave it as is and defer skeletal rigging to V2. Side deliverable: `MASTER_SESSION_REFERENCE.md` at repo root, a topic-indexed lookup so future sessions can find prior work without loading every log. Repo footprint: only the live log + this entry + MSR + CLAUDE.md key-reference table update; all sprite work lives under `~/AI-Studio/`.
+
+Full session detail: `docs/session-logs/session-170-2026-04-24.md`. Commit: _pending_.
+
+---
 
 ## Session 169: 2026-04-24 — Walk-mode dwell rewritten as TTS-gated (CPA removed)
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-161-2026-04-23.md`. Commit: `262
 
 ---
 
-## Session 160: 2026-04-23 — Master-plan split + admin-tool Witchy tiles + 9Y edit tab
-
-Third session of the calendar day. Three tracks. (1) Split `WickedSalemWitchCityTour_MASTER_PLAN.md` from 3,689 → 1,834 lines by moving completed-phase step-by-step detail (Phases 1-9X), V2-deferred tier infrastructure (Phases 9B/9C/9D), and the pre-S138 tiered business model into `docs/archive/WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md` (1,943 lines), with a new thin completed-phase index and a rewritten V1 Business Model section reflecting the $19.99 flat paid / fully offline / no-ads / no-LLM posture. Zero content deleted — every line is in either the live plan or the archive. (2) Admin tool now serves the same tiles the phone app sees: new cache-proxy endpoint `GET /admin/tiles/:provider/:z/:x/:y` reads from `tools/tile-bake/dist/salem_tiles.sqlite` with osmdroid BigInt key encoding, Content-Type sniffed from magic bytes (WebP / PNG / JPEG), 3 providers (Salem-Custom / Mapnik / Esri-WorldImagery). `AdminMap.tsx` gets a top-right `<select>` picker with localStorage persistence, default Witchy, plus an OSM-online fallback for low-zoom panning. (3) POI edit dialog gets an 8th tab "MassGIS / MHC" with form fields for all 9 S159 Phase 9Y columns; backend `UPDATABLE_FIELDS` whitelist in `admin-pois.js` and mirrored `poiAdminFields.ts` extended (62 → 71 fields); `mhc_year_built` flagged numeric. Type-check clean; backend mock-req/res tested 7 cases happy + edge. Post-session operator reported the tile picker wasn't selectable; diagnostic confirmed both servers live and tile endpoint routes correctly (HTTP 401 without auth = registered), most likely cause is a browser hard-refresh to pick up the new top-level module symbols — queued as the first item for S161 before continuing to 9Y.3.
-
-Full session detail: `docs/session-logs/session-160-2026-04-23.md`. Commit: `f86bc10`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 159 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 160 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
 <!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
 <!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
 <!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->

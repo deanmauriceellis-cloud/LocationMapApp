@@ -2,11 +2,11 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-24 — Session 169 closed. Walk FAB dwell rewritten as TTS-gated. Three iterations on field logs from the Lenovo to converge: (1) narration-gate + tightened CPA + walk-sim-aware behind-user drop, (2) suppress PACING COOLDOWN in walk-sim, (3) **drop CPA entirely** — walker now pauses at whatever step it's on whenever a POI is speaking or queued, resumes on `idle + queueEmpty`. Newspapers (segment.id `newspaper_1692_*`) stay ambient and don't pin the walker. Real GPS strategy untouched. Net delta -154 lines on `SalemMainActivity.kt`. Old `com.example.wickedsalemwitchcitytour` package on HNY0CY0W is in DELETE_FAILED_INTERNAL_ERROR — operator should manually uninstall via settings when convenient (does not block testing of the new `com.destructiveaigurus.katrinasmysticvisitorsguide` applicationId).
+**Last updated:** 2026-04-24 — Session 170 closed. Off-repo sprite-pipeline exploration (no in-repo source touched). Built working SDXL→TripoSR→headless-render→animated-WebP pipeline producing 7 cartoon characters (witch, owl, black-cat, katrina-kitty, skeleton, mouse, rat) as 16-angle rotation frames packed at 992 KB total for the eventual map-overlay system. Three approaches to walking animation all failed (AI 2-pose generation lost identity, AnimateDiff is for motion-not-rotation, procedural Blender mesh deformation crumples AI meshes); operator chose to defer skeletal rigging to V2. New repo-root file: **`MASTER_SESSION_REFERENCE.md`** — topic-indexed lookup so future sessions can find prior work without loading every log; CLAUDE.md key-reference table updated to reference it. **All TOP PRIORITY items below are unchanged — S170 was a deviation from the planned priorities.**
 
 ---
 
-## TOP PRIORITY — Next Session (S170)
+## TOP PRIORITY — Next Session (S171)
 
 1. **Field-test S169 TTS-gated dwell.** The big simplification needs a real walk to confirm: walker dwells on EVERY narrating POI (not just CPA winners), dwell exits cleanly on idle+empty, manual speaker-tap skip auto-advances to next queued POI then resumes when queue drains, newspapers don't pin the walker.
 
@@ -173,6 +173,7 @@
 
 | What | Where |
 |---|---|
+| **Topic-indexed lookup of prior work (use first when operator references past work by name)** | **`MASTER_SESSION_REFERENCE.md`** |
 | Recent session summaries (rolling window) | `SESSION-LOG.md` |
 | Older session summaries | `SESSION-LOG-ARCHIVE.md` |
 | Live conversation logs | `docs/session-logs/session-NNN-YYYY-MM-DD.md` |

@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 159, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 160, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 160: 2026-04-23 — Master-plan split + admin-tool Witchy tiles + 9Y edit tab
+
+Third session of the calendar day. Three tracks. (1) Split `WickedSalemWitchCityTour_MASTER_PLAN.md` from 3,689 → 1,834 lines by moving completed-phase step-by-step detail (Phases 1-9X), V2-deferred tier infrastructure (Phases 9B/9C/9D), and the pre-S138 tiered business model into `docs/archive/WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md` (1,943 lines), with a new thin completed-phase index and a rewritten V1 Business Model section reflecting the $19.99 flat paid / fully offline / no-ads / no-LLM posture. Zero content deleted — every line is in either the live plan or the archive. (2) Admin tool now serves the same tiles the phone app sees: new cache-proxy endpoint `GET /admin/tiles/:provider/:z/:x/:y` reads from `tools/tile-bake/dist/salem_tiles.sqlite` with osmdroid BigInt key encoding, Content-Type sniffed from magic bytes (WebP / PNG / JPEG), 3 providers (Salem-Custom / Mapnik / Esri-WorldImagery). `AdminMap.tsx` gets a top-right `<select>` picker with localStorage persistence, default Witchy, plus an OSM-online fallback for low-zoom panning. (3) POI edit dialog gets an 8th tab "MassGIS / MHC" with form fields for all 9 S159 Phase 9Y columns; backend `UPDATABLE_FIELDS` whitelist in `admin-pois.js` and mirrored `poiAdminFields.ts` extended (62 → 71 fields); `mhc_year_built` flagged numeric. Type-check clean; backend mock-req/res tested 7 cases happy + edge.
+
+Full session detail: `docs/session-logs/session-160-2026-04-23.md`. Commit: `f86bc10`.
+
+---
 
 ## Session 159: 2026-04-23 — Phase 9Y.2b Kotlin + Room v8→v9 identity-hash cascade
 
