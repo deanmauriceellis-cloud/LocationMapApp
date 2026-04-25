@@ -8,7 +8,7 @@
 
 Operator field test surfaced two bugs in the walk FAB: the walker would freeze for 15 s on POIs that never announced, and would stride straight through full 60 s narrations without pausing. Three field-log iterations traced both to the CPA (closest-point-of-approach) trigger model — too wide on one end (LOOK AT firing on POIs at 45-52 m outside any geofence), too narrow on the other (a closer POI's CPA on the same step "consumed" the LOOK AT slot, leaving the farther narrating POI unmatched). Replaced with TTS-gated dwell: walker pauses at whatever step it's on whenever a POI is speaking or queued, resumes when TTS goes idle and queue empties; newspapers stay ambient. Pacing cooldown also bypassed in walk-sim (the dwells themselves are the pacing). Net delta -154 lines on `SalemMainActivity.kt`. Real GPS strategy unchanged.
 
-Full session detail: `docs/session-logs/session-169-2026-04-24.md`. Commit: TBD.
+Full session detail: `docs/session-logs/session-169-2026-04-24.md`. Commit: `53a2b7b`.
 
 ---
 
