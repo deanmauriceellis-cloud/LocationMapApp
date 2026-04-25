@@ -8,7 +8,7 @@
 
 S172 deliverable shipped: animations now run in the live `SalemMainActivity` osmdroid map via `WickedAnimationOverlay` (a thin osmdroid `Overlay` wrapper around our `MapOverlay` system, 30fps throttled). Three overlay kinds wired — water whitecaps, cemetery fireflies, and a NEW `RollingGrassOverlay` for parks (extracted from `massgis.openspace prim_purp IN ('R','B')`, 427 polygons). Polygon library tightened with inward buffers (water 12m, cemeteries 10m) so animations stay strictly inside basemap-rendered shapes — no edge bleed onto streets/buildings during pan. Architecture: world-anchored lat/lon grid (~110m step, 14185 water anchors / 1481 grass anchors), per-anchor short-burst duty cycle (1.5-2.5s active), random position jitter to break grid pattern. Water visual went through 11 iterations this session and operator's final read is "not the best" — visual tuning continues S173. Carry-forward: try short irregular dash bundles, frame-animation drawables, or denser grid. Cemetery fireflies confirmed working (continuous per-fly pulse). All builds tested on Lenovo TB305FU; one runtime ANR (cap=1500 + dense parks) and one init-time ANR (33m grid → 700k anchors) — both rolled back to safe values.
 
-Full session detail: `docs/session-logs/session-172-2026-04-25.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-172-2026-04-25.md`. Commit: `00081d7`.
 
 ---
 
