@@ -55,6 +55,11 @@ import com.example.wickedsalemwitchcitytour.util.DebugEndpoints
 import com.example.wickedsalemwitchcitytour.util.DebugHttpServer
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.userdata.GpsTrackRecorder
+import com.example.wickedsalemwitchcitytour.wickedmap.AnimatedWaterOverlay
+import com.example.wickedsalemwitchcitytour.wickedmap.FireflyOverlay
+import com.example.wickedsalemwitchcitytour.wickedmap.PolygonLibrary
+import com.example.wickedsalemwitchcitytour.wickedmap.RollingGrassOverlay
+import com.example.wickedsalemwitchcitytour.wickedmap.WickedAnimationOverlay
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import org.osmdroid.config.Configuration
@@ -168,6 +173,13 @@ class SalemMainActivity : AppCompatActivity() {
      * zoom >= 16 inside its own draw().
      */
     private var salemLocationBall: SalemLocationBallOverlay? = null
+
+    /**
+     * S172: WickedMap animation overlays (whitecaps over water polygons,
+     * ghostly orbs over cemeteries) hosted inside the osmdroid MapView via
+     * [WickedAnimationOverlay] until the full WickedMapView migration lands.
+     */
+    private var wickedAnimationOverlay: WickedAnimationOverlay? = null
 
     // Phase 9T: Narration system
     /**
@@ -1110,6 +1122,31 @@ class SalemMainActivity : AppCompatActivity() {
             salemLocationBall = SalemLocationBallOverlay()
             binding.mapView.overlays.add(0, salemLocationBall)
             DebugLogger.i("SalemMainActivity", "SalemLocationBallOverlay wired (shows at zoom < 16)")
+        }
+        // S172: WickedMap animation overlays (whitecaps + cemetery orbs).
+        // Inserted at the bottom of the overlay stack — operator z-order rule
+        // (feedback_basemap_priority_over_animation): roads / paths / buildings
+        // / POI markers / GPS dot must render OVER animations. Animations are
+        // background atmosphere only.
+        if (wickedAnimationOverlay == null) {
+            PolygonLibrary.load(this)
+            val water = PolygonLibrary.byKind("water")
+            val cemeteries = PolygonLibrary.byKind("cemetery")
+            val parks = PolygonLibrary.byKind("park")
+            val animations = mutableListOf<com.example.wickedsalemwitchcitytour.wickedmap.MapOverlay>()
+            if (water.isNotEmpty()) animations += AnimatedWaterOverlay(water)
+            if (cemeteries.isNotEmpty()) animations += FireflyOverlay(cemeteries)
+            if (parks.isNotEmpty()) animations += RollingGrassOverlay(parks)
+            if (animations.isNotEmpty()) {
+                wickedAnimationOverlay = WickedAnimationOverlay(animations)
+                binding.mapView.overlays.add(0, wickedAnimationOverlay)
+                DebugLogger.i(
+                    "SalemMainActivity",
+                    "WickedAnimationOverlay wired — water=${water.size} cemeteries=${cemeteries.size} parks=${parks.size}",
+                )
+            } else {
+                DebugLogger.w("SalemMainActivity", "WickedAnimationOverlay skipped — PolygonLibrary returned no water/cemetery/park polygons")
+            }
         }
         setupZoomSlider()
         setupZoomToggle()

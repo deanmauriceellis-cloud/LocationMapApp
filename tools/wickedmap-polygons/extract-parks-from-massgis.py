@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-Extract Salem-area cemetery polygons from massgis.openspace into the same
-GeoJSON FeatureCollection used by the WickedMap PolygonLibrary. Filter:
-prim_purp = 'H' (Historical/Cultural in MassGIS OpenSpace) AND site_name
-matches a cemetery/burial-ground pattern.
+Extract Salem-area park / recreation polygons from massgis.openspace into the
+WickedMap PolygonLibrary GeoJSON FeatureCollection. Filter:
+prim_purp IN ('R','B') — Recreation, or both Recreation+Conservation.
 
-This script *appends* to the existing polygons.json (preserving water and
-any other previously-extracted kinds). Re-running drops only the existing
-'cemetery' features and adds them fresh.
+Mirrors extract-cemeteries-from-massgis.py — appends kind='park' features to
+the existing polygons.json (preserving water + cemetery + others). Re-running
+drops only the existing 'park' features and adds them fresh.
 
 Usage:
-    python3 extract-cemeteries-from-massgis.py
+    python3 extract-parks-from-massgis.py
 """
 import json
 import os
@@ -31,45 +30,26 @@ OUT_PATH = os.path.join(
 )
 
 SQL = """
-WITH base AS (
-    SELECT
-        gid,
-        COALESCE(NULLIF(site_name, ''), 'Unnamed Burial Ground') AS name,
-        COALESCE(prim_purp, '') AS prim_purp,
-        -- Inward buffer 10m via Mass State Plane (SRID 26986, meters) keeps
-        -- firefly halos visually inside the basemap-rendered cemetery shape.
-        -- The MassGIS legal-boundary polygon is typically a few meters
-        -- larger than what the Witchy tile paints, so halos at the polygon
-        -- edge bled into adjacent streets/buildings.
-        ST_Transform(
-            ST_Buffer(ST_Transform(geom, 26986), -10),
-            ST_SRID(geom)
-        ) AS buffered_geom
-    FROM massgis.openspace
-    WHERE geom && ST_Transform(
-            ST_MakeEnvelope({min_lon}, {min_lat}, {max_lon}, {max_lat}, 4326),
-            ST_SRID(geom)
-        )
-      AND ST_IsValid(geom)
-      AND prim_purp = 'H'
-      AND (
-        site_name ILIKE '%cemetery%'
-        OR site_name ILIKE '%burying%'
-        OR site_name ILIKE '%burial%'
-        OR site_name ILIKE '%graveyard%'
-        OR site_name ILIKE '%memorial park%'
-      )
-)
 SELECT
     gid,
-    name,
-    prim_purp,
+    COALESCE(NULLIF(site_name, ''), 'Unnamed Park') AS name,
+    COALESCE(prim_purp, '') AS prim_purp,
     ST_AsGeoJSON(
-        ST_SimplifyPreserveTopology(buffered_geom, 0.00003),
+        ST_SimplifyPreserveTopology(geom, 0.00003),
         6
     ) AS geometry_json
-FROM base
-WHERE NOT ST_IsEmpty(buffered_geom)
+FROM massgis.openspace
+WHERE geom && ST_Transform(
+        ST_MakeEnvelope({min_lon}, {min_lat}, {max_lon}, {max_lat}, 4326),
+        ST_SRID(geom)
+    )
+  AND ST_IsValid(geom)
+  AND prim_purp IN ('R','B')
+  -- Exclude cemeteries / burying grounds (covered by extract-cemeteries-…)
+  AND site_name NOT ILIKE '%cemetery%'
+  AND site_name NOT ILIKE '%burying%'
+  AND site_name NOT ILIKE '%burial%'
+  AND site_name NOT ILIKE '%graveyard%'
 ORDER BY gid;
 """.format(
     min_lon=BBOX_MIN_LON, min_lat=BBOX_MIN_LAT,
@@ -79,7 +59,7 @@ ORDER BY gid;
 
 def run():
     cmd = ["psql", "-d", DB_NAME, "-tA", "-F", "\t", "-c", SQL]
-    print("Querying massgis.openspace...", file=sys.stderr)
+    print("Querying massgis.openspace for parks...", file=sys.stderr)
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         print("psql failed:", proc.stderr, file=sys.stderr)
@@ -102,15 +82,14 @@ def run():
             "type": "Feature",
             "geometry": geometry,
             "properties": {
-                "kind": "cemetery",
-                "subkind": "historic",
+                "kind": "park",
+                "subkind": "recreation" if prim_purp == "R" else "rec_conservation",
                 "name": name,
                 "source": "massgis.openspace",
                 "massgis_gid": int(gid),
             },
         })
 
-    # Load existing FC, drop old cemetery features, append new.
     if os.path.exists(OUT_PATH):
         with open(OUT_PATH) as f:
             fc = json.load(f)
@@ -121,21 +100,21 @@ def run():
     before = len(fc["features"])
     fc["features"] = [
         f for f in fc["features"]
-        if f.get("properties", {}).get("kind") != "cemetery"
+        if f.get("properties", {}).get("kind") != "park"
     ]
     pruned = before - len(fc["features"])
     fc["features"].extend(new_features)
 
     fc.setdefault("metadata", {})
-    fc["metadata"]["cemetery_count"] = len(new_features)
-    fc["metadata"]["cemetery_source"] = "massgis.openspace WHERE prim_purp='H' AND name~cemetery"
+    fc["metadata"]["park_count"] = len(new_features)
+    fc["metadata"]["park_source"] = "massgis.openspace WHERE prim_purp IN ('R','B') minus cemeteries"
 
     with open(OUT_PATH, "w") as f:
         json.dump(fc, f, separators=(",", ":"))
 
     size_kb = os.path.getsize(OUT_PATH) / 1024
     print(
-        f"Wrote {len(new_features)} cemeteries (replaced {pruned}) → "
+        f"Wrote {len(new_features)} parks (replaced {pruned}) → "
         f"{OUT_PATH} ({size_kb:.1f} KB total). skipped={skipped}",
         file=sys.stderr,
     )

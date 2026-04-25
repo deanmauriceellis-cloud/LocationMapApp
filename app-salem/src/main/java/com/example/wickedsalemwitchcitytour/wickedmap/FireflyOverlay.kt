@@ -10,7 +10,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import kotlin.math.cos
-import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -55,10 +54,19 @@ class FireflyOverlay(
     }
 
     private val frameCount = 5
-    // ~4.5s base cycle — slow rise, slow fall. Per-fly speed jitter (0.6–1.0)
-    // gives individual fireflies cycles of ~4.5s to ~7.5s. Spread + smooth
-    // intensity curve = ghostly haunting feel rather than firefly blink.
-    private val frameDurationMs = 900L
+    private val frameDurationMs = 350L
+
+    // S172 round-3: per-cemetery duty cycle. Each cemetery animates for ~3s
+    // then sits quiet for ~10s, with a randomized phase offset so cemeteries
+    // don't all flash together. Operator directive: animations should not
+    // continuously hammer the screen.
+    private val cemeteryActiveMs = 3_000L
+    private val cemeteryIdleMs = 10_000L
+    private val cemeteryCycleMs = cemeteryActiveMs + cemeteryIdleMs
+    private val cemeteryOffsetMs: LongArray = run {
+        val r = kotlin.random.Random(0xF12EA110)
+        LongArray(polygons.size) { r.nextLong(cemeteryCycleMs) }
+    }
     private var phase = 0.0
     private var lastTimeMs = 0L
 
@@ -90,9 +98,10 @@ class FireflyOverlay(
             polyMaxLon[idx] = maxLon
 
             val area = (maxLat - minLat) * (maxLon - minLon)
-            // Fireflies are small + numerous: higher target than wisps.
-            val raw = area * 3_000_000 * densityScale
-            val target = raw.toInt().coerceIn(20, 400)
+            // S172 ANR rollback: 6M / cap 700 was overdraw. 4M / cap 250 / floor
+            // 30 stays angry but doesn't freeze the UI thread.
+            val raw = area * 4_000_000 * densityScale
+            val target = raw.toInt().coerceIn(30, 250)
             val maxTries = target * 12
 
             var added = 0
@@ -108,12 +117,12 @@ class FireflyOverlay(
                         lon = lon,
                         phaseOffset = rng.nextDouble(),
                         driftAngleRad = rng.nextDouble(0.0, Math.PI * 2),
-                        // Slightly larger orbs to read as "ghostly" not "spark".
-                        coreRadiusPx = rng.nextDouble(2.0, 3.4).toFloat(),
-                        haloRadiusPx = rng.nextDouble(6.0, 11.0).toFloat(),
-                        speed = rng.nextDouble(0.6, 1.0).toFloat(),
-                        // Bigger drift across the longer cycle — visibly travels.
-                        driftPx = rng.nextDouble(35.0, 75.0).toFloat(),
+                        // Larger + brighter orbs for the "angry" read.
+                        coreRadiusPx = rng.nextDouble(3.0, 5.5).toFloat(),
+                        haloRadiusPx = rng.nextDouble(9.0, 16.0).toFloat(),
+                        speed = rng.nextDouble(0.9, 1.6).toFloat(),
+                        // Drift sized for ~1.5s cycle; not as far as before.
+                        driftPx = rng.nextDouble(20.0, 50.0).toFloat(),
                     )
                 )
                 polyIdxList.add(idx)
@@ -149,6 +158,10 @@ class FireflyOverlay(
         val vMaxLat = MercatorMath.tileYToLat(cTileY - halfTilesY, z)
         val vMinLat = MercatorMath.tileYToLat(cTileY + halfTilesY, z)
 
+        // Per-cemetery viewport visibility. Each firefly within a visible
+        // cemetery has its OWN independent pulse phase — no polygon-wide
+        // burst gating. Many small isolated fireflies, each on its own
+        // rhythm, is the right read for a haunted graveyard.
         var anyVisible = false
         for (i in polygons.indices) {
             val visible = polyMaxLat[i] >= vMinLat && polyMinLat[i] <= vMaxLat &&
@@ -184,12 +197,13 @@ class FireflyOverlay(
             val f = flies[k]
             val local = (phase * f.speed + f.phaseOffset) % 1.0
 
-            // Smooth ghostly fade-in / hold / fade-out. Quadratic of sin
-            // gives slow rise from invisible, brief peak, slow fall back to
-            // invisible — the spectral haunting feel, not a firefly blink.
+            // S172 angry-orbs tuning: sharp flash curve. Linear sin keeps
+            // orbs visible across most of the cycle; the squared-sin curve
+            // we used previously kept too many fireflies dim. Sharp short
+            // off-phase comes from the < 0.05 cull below.
             val s = sin(local * Math.PI * 2) * 0.5 + 0.5
-            val intensity = s * s
-            if (intensity < 0.02) continue
+            val intensity = s
+            if (intensity < 0.05) continue
 
             val proj = camera.project(f.lat, f.lon)
             // Drift: small smooth motion, constant speed across cycle.

@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 162-171. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 163-172. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 172: 2026-04-25 — Animations live in Salem app + parks overlay (water visual TBC)
+
+S172 deliverable shipped: animations now run in the live `SalemMainActivity` osmdroid map via `WickedAnimationOverlay` (a thin osmdroid `Overlay` wrapper around our `MapOverlay` system, 30fps throttled). Three overlay kinds wired — water whitecaps, cemetery fireflies, and a NEW `RollingGrassOverlay` for parks (extracted from `massgis.openspace prim_purp IN ('R','B')`, 427 polygons). Polygon library tightened with inward buffers (water 12m, cemeteries 10m) so animations stay strictly inside basemap-rendered shapes — no edge bleed onto streets/buildings during pan. Architecture: world-anchored lat/lon grid (~110m step, 14185 water anchors / 1481 grass anchors), per-anchor short-burst duty cycle (1.5-2.5s active), random position jitter to break grid pattern. Water visual went through 11 iterations this session and operator's final read is "not the best" — visual tuning continues S173. Carry-forward: try short irregular dash bundles, frame-animation drawables, or denser grid. Cemetery fireflies confirmed working (continuous per-fly pulse). All builds tested on Lenovo TB305FU; one runtime ANR (cap=1500 + dense parks) and one init-time ANR (33m grid → 700k anchors) — both rolled back to safe values.
+
+Full session detail: `docs/session-logs/session-172-2026-04-25.md`. Commit: `<sha>`.
+
+---
 
 ## Session 171: 2026-04-24 — Custom 2D map engine prototype (osmdroid replacement, in-progress)
 
@@ -76,15 +84,11 @@ Full session detail: `docs/session-logs/session-163-2026-04-23.md`. Commit: `76e
 
 ---
 
-## Session 162: 2026-04-23 — POI location verify scaffolding (DB + admin UI + Android layers); verifier blocked on TigerLine MA ingest
-
-Operator asked for a workflow to verify all POI lat/lng against TigerLine/MassGIS, with TigerLine as ground truth and per-POI "truth of record" override. Probed the data first and found `tiger.addr/addrfeat/edges/featnames` empty for `statefp='25'` (TigerLine MA ingest still in progress per OMEN tigerline session-002) and the `massgis.l3_parcels_essex` polygons loaded but without the joined assessor table — so neither source has usable address-to-coordinate data on this machine right now. Pivoted to ship the additive scaffolding without waiting: (1) PG migration `cache-proxy/scripts/poi-verify-2026-04-23/01-add-location-verify-columns.sql` adds 7 nullable cols + 3 partial indexes to `salem_pois` (lat_proposed/lng_proposed/location_status/location_truth_of_record/location_source/location_drift_m/location_geocoder_rating/location_verified_at) and backfills 60 rows to `no_address`; (2) cache-proxy `admin-pois.js` whitelists `location_truth_of_record`+`location_status` for PUT and adds `POST /admin/salem/pois/:id/accept-proposed-location` (copies lat_proposed→lat, clears proposal, stamps admin_dirty); (3) admin web — `PoiTree.tsx` gets a Location filter `<select>` (any/needs review/no address/no match/unverified/verified/accepted) and a typed `LocationStatus`; `PoiEditDialog.tsx` gets a `LocationVerifyPanel` rendered at the bottom of the existing Location tab — color-coded status badge, current vs proposed coords side-by-side, drift/source/rating/verified_at, "Truth of record" checkbox, "Accept proposed coordinates" button (disabled when no proposal); `tsc --noEmit` clean; (4) Android — new `MenuPrefs.PREF_POI_LOCATION_LAYER`, new `PoiLocationLayerManager` (current/proposed/both), new `MenuEventListener.onPoiLocationLayerChanged` default-method, and `AppBarMenuManager.showTileSourcePopup()` extended to render two radio groups (basemap + POI source) in the same popup with a divider; `compileDebugKotlin` clean. The TigerLine verifier query itself is **deferred** — when MA tables fill (or MassGIS L3 assess loads), it's ~30 lines of SQL to populate the columns we shipped and the rest of the workflow lights up without further schema/UI work. Room migration to expose `lat_proposed`/`lng_proposed` to the Android entity is also deferred until there's data worth migrating for.
-
-Full session detail: `docs/session-logs/session-162-2026-04-23.md`. Commit: `7396c7d`.
 
 ---
 
 <!-- END OF ROLLING WINDOW — Sessions 161 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S162 rolled to archive 2026-04-25 by the session-end protocol (S172) -->
 <!-- S161 rolled to archive 2026-04-25 by the session-end protocol (S171) -->
 <!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
 <!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->

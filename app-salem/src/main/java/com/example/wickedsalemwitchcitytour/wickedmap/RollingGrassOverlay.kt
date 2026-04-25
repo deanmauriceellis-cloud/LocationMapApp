@@ -8,73 +8,54 @@ package com.example.wickedsalemwitchcitytour.wickedmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import kotlin.math.sin
-import kotlin.random.Random
 
 /**
- * World-anchored whitecap overlay (S172 final v3).
+ * Per-blade grass overlay (S172 final v3 — "isolated tufts in wind").
  *
- * At init time, scans a regular lat/lon grid (~33 m steps) across the
- * water-polygon bbox and keeps only grid cells that fall inside any water
- * polygon. The result is a flat list of (lat, lon, phaseOffset) anchors
- * locked to world coordinates.
+ * Same world-anchored grid pattern as [AnimatedWaterOverlay]: at init,
+ * scan a regular lat/lon grid and keep only points that fall inside a
+ * park polygon. Each anchor is a single blade-of-grass with its own
+ * continuous sin pulse and a deterministic per-anchor phase offset.
  *
- * Each frame: iterate the anchors, project each to screen, skip those
- * outside the viewport. Surviving anchors render a small wavy white "~"
- * crest stroke whose intensity follows a continuous sin pulse with a
- * deterministic per-anchor phase offset.
- *
- * Why this shape: anchors at fixed lat/lon means whitecaps **pan with
- * the map** (no detached "screen overlay" feel), and the dense grid
- * ensures plenty are visible at any zoom. No clipPath rebuild per
- * frame — the in-water filter happens once, at init.
+ * No polygon-wide rolling sweep. Each blade animates independently. The
+ * eye sees small isolated tufts swaying — the way wind on a lawn looks,
+ * not a coordinated wave.
  */
-class AnimatedWaterOverlay(
+class RollingGrassOverlay(
     private val polygons: List<WickedPolygon>,
 ) : MapOverlay {
 
     private val anchors: FloatArray  // packed [lat0, lon0, phase0, lat1, lon1, phase1, ...]
     private val anchorCount: Int
 
-    private val crestPaint = Paint().apply {
+    private val bladePaint = Paint().apply {
         style = Paint.Style.STROKE
-        strokeWidth = 3.2f
+        strokeWidth = 2.4f
         strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-        color = Color.argb(255, 255, 255, 255)
+        // Vivid grass green that reads against the basemap's muted park fill.
+        color = Color.argb(255, 60, 210, 80)
         isAntiAlias = true
     }
-    private val crestPath = Path()
 
-    // Per-anchor short-burst duty cycle: each anchor lights up for ~2.5s
-    // out of every 8s (~31% duty). At any moment plenty of crests visible
-    // in viewport, never all of them, never the same ones.
-    private val activeMs = 2_500L
-    private val cycleMs = 8_000L
+    // Per-blade short-burst duty cycle: each blade sways for ~1.5s out of
+    // every 14s. Scattered isolated tufts, never the whole park at once.
+    private val activeMs = 1_500L
+    private val cycleMs = 14_000L
 
     init {
         val started = android.os.SystemClock.uptimeMillis()
 
-        // ~110 m grid step at Salem latitude. Coarser than first attempt,
-        // which ANR'd. Plenty for "always something visible."
+        // ~110 m grid step at Salem latitude — same density as water anchors.
         val stepLat = 0.001
         val stepLon = 0.0013
 
-        // Skip absurdly large polygons (the Atlantic Ocean polygon is
-        // ~0.148 deg² and almost entirely off-screen anyway). Anything
-        // bigger than 0.01 deg² (~110 km²) is excluded — covers any
-        // realistic user view, leaves the open ocean unanimated.
-        val maxBboxArea = 0.01
-
-        // Per-polygon bboxes for fast first-pass exclusion.
+        // Precompute polygon bboxes.
         val polyCount = polygons.size
         val pMinLat = DoubleArray(polyCount)
         val pMaxLat = DoubleArray(polyCount)
         val pMinLon = DoubleArray(polyCount)
         val pMaxLon = DoubleArray(polyCount)
-        val polyKeep = BooleanArray(polyCount)
-        var keptCount = 0
         var combinedMinLat = Double.POSITIVE_INFINITY
         var combinedMaxLat = Double.NEGATIVE_INFINITY
         var combinedMinLon = Double.POSITIVE_INFINITY
@@ -92,27 +73,20 @@ class AnimatedWaterOverlay(
             }
             pMinLat[idx] = pmnLat; pMaxLat[idx] = pmxLat
             pMinLon[idx] = pmnLon; pMaxLon[idx] = pmxLon
-            val bboxArea = (pmxLat - pmnLat) * (pmxLon - pmnLon)
-            if (bboxArea <= maxBboxArea) {
-                polyKeep[idx] = true
-                keptCount++
-                if (pmnLat < combinedMinLat) combinedMinLat = pmnLat
-                if (pmxLat > combinedMaxLat) combinedMaxLat = pmxLat
-                if (pmnLon < combinedMinLon) combinedMinLon = pmnLon
-                if (pmxLon > combinedMaxLon) combinedMaxLon = pmxLon
-            }
+            if (pmnLat < combinedMinLat) combinedMinLat = pmnLat
+            if (pmxLat > combinedMaxLat) combinedMaxLat = pmxLat
+            if (pmnLon < combinedMinLon) combinedMinLon = pmnLon
+            if (pmxLon > combinedMaxLon) combinedMaxLon = pmxLon
         }
 
-        val builder = ArrayList<Float>(4000)
-        val rng = Random(0xCAFEBABE)
-        if (keptCount > 0 && combinedMinLat.isFinite()) {
+        val builder = ArrayList<Float>(2000)
+        if (polyCount > 0 && combinedMinLat.isFinite()) {
             var lat = combinedMinLat
             while (lat <= combinedMaxLat) {
                 var lon = combinedMinLon
                 while (lon <= combinedMaxLon) {
                     var inside = false
                     for (i in polygons.indices) {
-                        if (!polyKeep[i]) continue
                         if (lat < pMinLat[i] || lat > pMaxLat[i] ||
                             lon < pMinLon[i] || lon > pMaxLon[i]) continue
                         if (pointInRing(lat, lon, polygons[i].outerRing)) {
@@ -121,26 +95,17 @@ class AnimatedWaterOverlay(
                         }
                     }
                     if (inside) {
-                        // Jitter each anchor within its grid cell so the
-                        // resulting pattern looks scattered, not gridded.
-                        val jLat = (lat + rng.nextDouble(-stepLat * 0.5, stepLat * 0.5))
-                        val jLon = (lon + rng.nextDouble(-stepLon * 0.5, stepLon * 0.5))
-                        val hash = (jLat * 1_000_000.0).toLong() xor
-                            (jLon * 1_000_000.0).toLong() * 31L
+                        val hash = (lat * 1_000_000.0).toLong() xor
+                            (lon * 1_000_000.0).toLong() * 31L
                         val phase = ((hash and 0x3FFFFFFF).toFloat() / 0x3FFFFFFF.toFloat())
-                        builder.add(jLat.toFloat())
-                        builder.add(jLon.toFloat())
+                        builder.add(lat.toFloat())
+                        builder.add(lon.toFloat())
                         builder.add(phase)
                     }
                     lon += stepLon
                 }
                 lat += stepLat
             }
-        } else {
-            android.util.Log.w(
-                "WickedMap.Water",
-                "no eligible water polygons (all > $maxBboxArea deg² bbox)",
-            )
         }
 
         anchorCount = builder.size / 3
@@ -149,8 +114,8 @@ class AnimatedWaterOverlay(
 
         val elapsed = android.os.SystemClock.uptimeMillis() - started
         android.util.Log.i(
-            "WickedMap.Water",
-            "anchors built — count=$anchorCount step=${stepLat}lat/${stepLon}lon polysKept=$keptCount/${polygons.size} elapsed=${elapsed}ms",
+            "WickedMap.Grass",
+            "anchors built — count=$anchorCount step=${stepLat}lat/${stepLon}lon polygons=$polyCount elapsed=${elapsed}ms",
         )
     }
 
@@ -179,31 +144,26 @@ class AnimatedWaterOverlay(
             val phase = anchors[i + 2]
             i += 3
 
-            // Per-anchor duty cycle: phase 0..1 maps to phaseOffset in ms.
-            // cycleTime is where we are in the 16s cycle for this anchor.
-            // Skip if outside the 1.5s active window.
             val phaseOffsetMs = (phase * cycleMs.toFloat()).toLong()
             val cycleTime = (now + phaseOffsetMs) % cycleMs
             if (cycleTime >= activeMs) continue
             val activePhase = cycleTime / activeMs.toDouble()
             val s = sin(activePhase * piConst)
             val intensity = (s * s).toFloat()
-            if (intensity < 0.06f) continue
+            if (intensity < 0.05f) continue
 
             val proj = camera.project(lat, lon)
             val cx = proj[0]
             val cy = proj[1]
             if (cx < -margin || cx > w + margin || cy < -margin || cy > h + margin) continue
 
-            crestPaint.alpha = (intensity * 235).toInt().coerceIn(0, 255)
+            bladePaint.alpha = (intensity * 230).toInt().coerceIn(0, 255)
 
-            val len = 13f + intensity * 6f
-            val bend = 3.5f + intensity * 2.0f
-            crestPath.rewind()
-            crestPath.moveTo(cx - len, cy)
-            crestPath.quadTo(cx - len * 0.5f, cy - bend, cx, cy)
-            crestPath.quadTo(cx + len * 0.5f, cy + bend, cx + len, cy)
-            canvas.drawPath(crestPath, crestPaint)
+            // Each blade is a short vertical-ish stroke that bends with a
+            // wind angle modulated by intensity (peak intensity = max bend).
+            val height = 6f + intensity * 4f
+            val bend = (intensity - 0.5f) * 5f  // -2.5 → +2.5 across cycle
+            canvas.drawLine(cx, cy, cx + bend, cy - height, bladePaint)
         }
     }
 

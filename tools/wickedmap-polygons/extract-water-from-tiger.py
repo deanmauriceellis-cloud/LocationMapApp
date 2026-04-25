@@ -50,16 +50,34 @@ OUT_PATH = os.path.join(
 # on the geometry to skip parsing WKB ourselves, and we filter by bbox via the
 # spatial index.
 SQL = """
+WITH base AS (
+    SELECT
+        gid,
+        COALESCE(NULLIF(fullname, ''), 'unnamed') AS name,
+        COALESCE(mtfcc, '') AS mtfcc,
+        awater,
+        -- Inward buffer 12m via Mass State Plane (SRID 26986). Keeps the
+        -- WickedMap whitecap animation strictly inside what the basemap
+        -- paints as water — TIGER legal-boundary polygons run a few meters
+        -- onto land vs the Witchy basemap rendering, which makes whitecaps
+        -- briefly clip over streets/buildings during pan.
+        ST_Transform(
+            ST_Buffer(ST_Transform(geom, 26986), -12),
+            ST_SRID(geom)
+        ) AS buffered_geom
+    FROM tiger.areawater
+    WHERE geom && ST_MakeEnvelope({min_lon}, {min_lat}, {max_lon}, {max_lat}, 4269)
+      AND ST_IsValid(geom)
+      AND awater > 0
+)
 SELECT
     gid,
-    COALESCE(NULLIF(fullname, ''), 'unnamed') AS name,
-    COALESCE(mtfcc, '') AS mtfcc,
+    name,
+    mtfcc,
     awater,
-    ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.00005), 6) AS geometry_json
-FROM tiger.areawater
-WHERE geom && ST_MakeEnvelope({min_lon}, {min_lat}, {max_lon}, {max_lat}, 4269)
-  AND ST_IsValid(geom)
-  AND awater > 0
+    ST_AsGeoJSON(ST_SimplifyPreserveTopology(buffered_geom, 0.00005), 6) AS geometry_json
+FROM base
+WHERE NOT ST_IsEmpty(buffered_geom)
 ORDER BY awater DESC;
 """.format(
     min_lon=BBOX_MIN_LON, min_lat=BBOX_MIN_LAT,
@@ -106,24 +124,37 @@ def run():
             },
         })
 
-    fc = {
-        "type": "FeatureCollection",
-        "metadata": {
-            "generator": "tools/wickedmap-polygons/extract-water-from-tiger.py",
-            "source": "tiger.areawater",
-            "bbox": [BBOX_MIN_LON, BBOX_MIN_LAT, BBOX_MAX_LON, BBOX_MAX_LAT],
-            "feature_count": len(features),
-        },
-        "features": features,
-    }
+    # Append-style merge: load existing polygons.json (preserve cemetery,
+    # park, etc.), drop existing 'water' kind, add fresh.
+    if os.path.exists(OUT_PATH):
+        with open(OUT_PATH) as f:
+            fc = json.load(f)
+    else:
+        fc = {"type": "FeatureCollection", "metadata": {}, "features": []}
+
+    fc.setdefault("features", [])
+    before = len(fc["features"])
+    fc["features"] = [
+        f for f in fc["features"]
+        if f.get("properties", {}).get("kind") != "water"
+    ]
+    pruned = before - len(fc["features"])
+    fc["features"].extend(features)
+
+    fc.setdefault("metadata", {})
+    fc["metadata"]["water_count"] = len(features)
+    fc["metadata"]["water_source"] = "tiger.areawater (12m inward buffer)"
 
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w") as f:
         json.dump(fc, f, separators=(",", ":"))
 
     size_kb = os.path.getsize(OUT_PATH) / 1024
-    print(f"Wrote {len(features)} water features to {OUT_PATH} ({size_kb:.1f} KB), {skipped} skipped",
-          file=sys.stderr)
+    print(
+        f"Wrote {len(features)} water features (replaced {pruned}) → "
+        f"{OUT_PATH} ({size_kb:.1f} KB total). skipped={skipped}",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
