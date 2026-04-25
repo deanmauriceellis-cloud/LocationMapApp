@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 160, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 161, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 161: 2026-04-23 — Car-tour debug-log triage + GPS/V1-offline fixes + repo cleanup
+
+Reviewed 645 KB of car-tour debug log and shipped three rounds of fixes. (1) V1 offline toasts — `searchPoisAt()`, `startSilentFill()`, and `AppBarMenuManager.syncCheckStates` all bypassed the V1_OFFLINE_ONLY gate, producing 7 "POI failed" toasts, 14 "Fill failed" banners, and 4 menu-findItem warnings during the 3-hour drive. All three gated at the caller. (2) GPS "spotty" — root cause was the interval picker thrashing between 10s/2.5s/30s on every fix (19 times in 15 min of driving), each flip doing `locationJob.cancel()` → `removeLocationUpdates` → re-register. Added `LocationManager.updateRequestParams()` that re-calls `requestLocationUpdates` on the live callback (GMS merges, no teardown); `MainViewModel.restartLocationUpdates()` now prefers that path. Interval picker reduced to 2 states (2.5s moving/narrating, 30s idle) with 10s dwell debounce. (3) Confirmed Witchy/Satellite tile alignment — side-by-side blends at 4 landmarks (z=16-18) show building footprints, streets, and piers trace exactly over Esri imagery; drift is not at the bake. (4) Repo cleanup — ~20 stale root + docs/ files archived to `docs/archive/` (CHANGELOG, SOCIAL-PLAN, WEB-APP-PLAN, MASTER_PLAN_ARCHIVE, PLAN-ARCHIVE, REFACTORING-REPORT, all 5 tigerline-* briefs now that TigerLine+MassGIS are in DB, completed SalemIntelligence + si-handoff briefs, etc.); 6 shell scripts moved to `scripts/`; parked master-plan placeholder deleted and pre-park snapshot archived; CLAUDE.md updated accordingly. Deployed twice to Lenovo TB305FU; needs next-drive verification — expected signal is `updateRequestParams — interval Xms → Yms (no teardown)` replacing the old `Flow cancelled — removing location updates after N updates received`.
+
+Full session detail: `docs/session-logs/session-161-2026-04-23.md`. Commit: `2621c05`.
+
+---
 
 ## Session 160: 2026-04-23 — Master-plan split + admin-tool Witchy tiles + 9Y edit tab
 

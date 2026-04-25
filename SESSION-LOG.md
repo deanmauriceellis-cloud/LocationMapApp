@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 161-170. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 162-171. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 171: 2026-04-24 — Custom 2D map engine prototype (osmdroid replacement, in-progress)
+
+Major architectural pivot, reversing the S157 OSM-stays decision: operator opted to stop using osmdroid and own the map engine. Built `app-salem/.../wickedmap/` from scratch — `WickedMapView` (`SurfaceView` + render thread + gestures + tile draw), `MercatorMath`, `TileArchive` (osmdroid `SqliteArchive` decoder, no library dep), `MapCamera` (lat/lon-based after a coordinate-drift bug parked the map in the Atlantic mid-pinch), `PolygonLibrary` (loads GeoJSON FeatureCollection at app start, indexes by kind), and two animation overlays — `AnimatedWaterOverlay` (sea whitecaps) and `FireflyOverlay` (spectral cemetery orbs). Polygon source data extracted entirely from local TigerLine + MassGIS (operator HARD RULE: never OSM): `tools/wickedmap-polygons/extract-water-from-tiger.py` produces 545 named water polygons from `tiger.areawater`, `extract-cemeteries-from-massgis.py` produces 97 cemeteries from `massgis.openspace WHERE prim_purp='H'`. Whitecaps + ghost orbs render at 30 fps on Lenovo TB305FU with full 642-polygon library loaded. The custom engine is reachable via the new "WickedMap" FAB inside the running Salem app and a standalone "WickedMap Proto" launcher icon. **Migration of `SalemMainActivity` from osmdroid is the next-session work** — counted 338 compile errors when the layout was swapped, scoped honestly as 2-3 focused sessions (tile rendering swap → POI markers → per-feature overlay migration). Tonight's Salem app is functionally unchanged from S170; the engine work ships as a parallel system with FAB access. Memories saved this session: `reference_master_session_reference.md`, `feedback_no_osm_use_local_geo.md` (HARD RULE), `feedback_basemap_priority_over_animation.md` (HARD RULE — explicit 3-layer z-order: base graphic / animation / "real" features), `project_lively_map.md` (extended: active animation always).
+
+Full session detail: `docs/session-logs/session-171-2026-04-24.md`. Commit: `<pending>`.
+
+---
 
 ## Session 170: 2026-04-24 — Map sprite pipeline (rotation-only baseline shipped, walking deferred to V2)
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-162-2026-04-23.md`. Commit: `739
 
 ---
 
-## Session 161: 2026-04-23 — Car-tour debug-log triage + GPS/V1-offline fixes + repo cleanup
-
-Reviewed 645 KB of car-tour debug log and shipped three rounds of fixes. (1) V1 offline toasts — `searchPoisAt()`, `startSilentFill()`, and `AppBarMenuManager.syncCheckStates` all bypassed the V1_OFFLINE_ONLY gate, producing 7 "POI failed" toasts, 14 "Fill failed" banners, and 4 menu-findItem warnings during the 3-hour drive. All three gated at the caller. (2) GPS "spotty" — root cause was the interval picker thrashing between 10s/2.5s/30s on every fix (19 times in 15 min of driving), each flip doing `locationJob.cancel()` → `removeLocationUpdates` → re-register. Added `LocationManager.updateRequestParams()` that re-calls `requestLocationUpdates` on the live callback (GMS merges, no teardown); `MainViewModel.restartLocationUpdates()` now prefers that path. Interval picker reduced to 2 states (2.5s moving/narrating, 30s idle) with 10s dwell debounce. (3) Confirmed Witchy/Satellite tile alignment — side-by-side blends at 4 landmarks (z=16-18) show building footprints, streets, and piers trace exactly over Esri imagery; drift is not at the bake. (4) Repo cleanup — ~20 stale root + docs/ files archived to `docs/archive/` (CHANGELOG, SOCIAL-PLAN, WEB-APP-PLAN, MASTER_PLAN_ARCHIVE, PLAN-ARCHIVE, REFACTORING-REPORT, all 5 tigerline-* briefs now that TigerLine+MassGIS are in DB, completed SalemIntelligence + si-handoff briefs, etc.); 6 shell scripts moved to `scripts/`; parked master-plan placeholder deleted and pre-park snapshot archived; CLAUDE.md updated accordingly. Deployed twice to Lenovo TB305FU; needs next-drive verification — expected signal is `updateRequestParams — interval Xms → Yms (no teardown)` replacing the old `Flow cancelled — removing location updates after N updates received`.
-
-Full session detail: `docs/session-logs/session-161-2026-04-23.md`. Commit: `2621c05`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 160 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 161 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S161 rolled to archive 2026-04-25 by the session-end protocol (S171) -->
 <!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
 <!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
 <!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->

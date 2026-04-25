@@ -78,6 +78,20 @@
             android:exported="true"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
+        <!-- S171: custom 2D map prototype (no osmdroid). Standalone launcher
+             so we can field-test WickedMapView pan/pinch/animation bones
+             without touching SalemMainActivity. Remove or gate before V1 ship. -->
+        <activity
+            android:name=".wickedmap.WickedMapPrototypeActivity"
+            android:exported="true"
+            android:label="WickedMap Proto"
+            android:theme="@style/Theme.AppCompat.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
     </application>
 
 </manifest>

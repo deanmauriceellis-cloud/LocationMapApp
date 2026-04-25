@@ -40,7 +40,11 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Map fills remaining space below toolbar -->
+    <!-- Map fills remaining space below toolbar.
+         S171: WickedMapView prototype is live at the WickedMap FAB and the
+         standalone "WickedMap Proto" launcher icon. Migration from osmdroid
+         to WickedMapView in this layout is planned for the next 2-3 sessions
+         (338 osmdroid call sites across SalemMainActivity*.kt). -->
     <org.osmdroid.views.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"

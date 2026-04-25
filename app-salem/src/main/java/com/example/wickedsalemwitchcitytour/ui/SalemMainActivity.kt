@@ -2287,7 +2287,11 @@ class SalemMainActivity : AppCompatActivity() {
             FabDef("Weather",      R.drawable.ic_wx_default,    "#006064") { showWeatherDialog() },
             FabDef("GPS / Manual", R.drawable.ic_gps,           "#37474F") { toggleLocationMode() },
             FabDef("Debug Log",    R.drawable.ic_debug,         "#424242") { startActivity(Intent(this, DebugLogActivity::class.java)) },
-            FabDef("Voices",       R.drawable.ic_debug,         "#6A1B9A") { startActivity(Intent(this, com.example.wickedsalemwitchcitytour.debug.VoiceTestActivity::class.java)) }
+            FabDef("Voices",       R.drawable.ic_debug,         "#6A1B9A") { startActivity(Intent(this, com.example.wickedsalemwitchcitytour.debug.VoiceTestActivity::class.java)) },
+            // S171 — WickedMap prototype: custom 2D map engine + animated water/cemetery overlays.
+            // Launches the standalone prototype activity so it can be tested in-context from the
+            // running Salem app (without leaving SalemMainActivity's state).
+            FabDef("WickedMap",    R.drawable.ic_debug,         "#1B5E20") { startActivity(Intent(this, com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity::class.java)) }
         )
 
         val container = binding.fabMenu
