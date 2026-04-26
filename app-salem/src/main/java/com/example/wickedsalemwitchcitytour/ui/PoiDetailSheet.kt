@@ -31,6 +31,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.FeatureFlags
 import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
@@ -351,6 +352,12 @@ class PoiDetailSheet : DialogFragment() {
 
     private fun bindWebsiteButton(view: View) {
         val btn = view.findViewById<TextView>(R.id.btnWebsite)
+        // S180: V1 zero-network — Visit Website button is hidden entirely.
+        // Re-enable for V2 by flipping FeatureFlags.V1_OFFLINE_ONLY.
+        if (FeatureFlags.V1_OFFLINE_ONLY) {
+            btn.visibility = View.GONE
+            return
+        }
         val site = poi.website?.takeIf { it.isNotBlank() } ?: return
         btn.visibility = View.VISIBLE
         btn.setOnClickListener {
@@ -499,7 +506,10 @@ class PoiDetailSheet : DialogFragment() {
         cancelSheetRead()
         when (action) {
             is PoiActionSynthesizer.Action.VisitWebsite -> {
-                (activity as? SalemMainActivity)?.showFullScreenWebView(action.url, poi.name)
+                // S180: V1 zero-network — never launch the embedded browser.
+                if (!FeatureFlags.V1_OFFLINE_ONLY) {
+                    (activity as? SalemMainActivity)?.showFullScreenWebView(action.url, poi.name)
+                }
             }
             is PoiActionSynthesizer.Action.Call -> {
                 try {
@@ -516,7 +526,9 @@ class PoiDetailSheet : DialogFragment() {
                 if (host != null) {
                     host.walkTo(org.osmdroid.util.GeoPoint(action.lat, action.lng))
                     dismiss()
-                } else {
+                } else if (!FeatureFlags.V1_OFFLINE_ONLY) {
+                    // S180: V1 zero-network — geo: ACTION_VIEW fallback gated.
+                    // (No-op in V1; on-device walkTo is the only path.)
                     val label = Uri.encode(poi.name)
                     val geo = Uri.parse("geo:${action.lat},${action.lng}?q=${action.lat},${action.lng}($label)")
                     try {

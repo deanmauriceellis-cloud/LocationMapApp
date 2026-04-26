@@ -9,6 +9,7 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import com.example.locationmapapp.util.FeatureFlags
 import android.content.Context
 import android.graphics.Color
 import com.example.locationmapapp.ui.menu.MenuPrefs
@@ -37,6 +38,12 @@ fun SalemMainActivity.toggleRadar() {
 }
 
 internal fun SalemMainActivity.addRadarOverlay() {
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        // S180: V1 zero-network — radar overlay tiles require Iowa State
+        // Mesonet HTTPS fetch. Disabled in V1.
+        DebugLogger.i("SalemMainActivity", "Radar overlay skipped — V1 offline mode")
+        return
+    }
     try {
         // NWS NEXRAD composite radar via Iowa State Mesonet (no API key, no timestamp fetch)
         val src = org.osmdroid.tileprovider.tilesource.XYTileSource(
@@ -97,6 +104,11 @@ internal fun SalemMainActivity.startRadarAnimation() {
     radarTileOverlay = null
     radarScheduler.stop()
 
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        // S180: V1 zero-network — radar animation requires HTTPS tile fetch.
+        DebugLogger.i("SalemMainActivity", "Radar animation skipped — V1 offline mode")
+        return
+    }
     // Read speed from prefs
     val prefs = getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
     radarAnimSpeedMs = prefs.getInt(MenuPrefs.PREF_RADAR_ANIM_SPEED, MenuPrefs.DEFAULT_RADAR_ANIM_SPEED)

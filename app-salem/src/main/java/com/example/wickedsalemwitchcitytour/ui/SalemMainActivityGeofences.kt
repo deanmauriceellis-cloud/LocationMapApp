@@ -9,6 +9,7 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import com.example.locationmapapp.util.FeatureFlags
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -933,7 +934,9 @@ internal fun SalemMainActivity.showWebcamPreviewDialog(webcam: com.example.locat
     }
 
     // ── View Live button ──
-    val liveBtn = if (webcam.playerUrl.isNotBlank()) {
+    // S180: V1 zero-network — webcam playerUrl is a remote video stream.
+    // In V1, the View Live button is never created.
+    val liveBtn = if (!FeatureFlags.V1_OFFLINE_ONLY && webcam.playerUrl.isNotBlank()) {
         android.widget.Button(this, null, android.R.attr.buttonBarButtonStyle).apply {
             text = "View Live"
             textSize = 15f

@@ -40,6 +40,7 @@ import com.example.locationmapapp.data.model.GeocodeSuggestion
 import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategories
 import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategory
 import com.example.locationmapapp.util.DebugLogger
+import com.example.locationmapapp.util.FeatureFlags
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1319,12 +1320,26 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         setPadding(0, dp(8), 0, 0)
     })
     websiteArea.addView(loadingLayout)
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        // V1: replace spinner immediately with offline placeholder.
+        websiteArea.removeAllViews()
+        websiteArea.addView(TextView(this).apply {
+            text = "Website unavailable offline"
+            textSize = 13f
+            setTextColor(Color.parseColor("#616161"))
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        })
+    }
 
     // Resolved URL stored here for Reviews button fallback
     var resolvedUrl: String? = null
 
-    // Async resolve → show big button or "no website"
-    lifecycleScope.launch {
+    // S180: V1 zero-network gate. R8 strips the V2 branch from release.
+    if (!FeatureFlags.V1_OFFLINE_ONLY) lifecycleScope.launch {
         val websiteInfo = findViewModel.fetchPoiWebsiteDirectly(
             result.type, result.id, result.name, result.lat, result.lon
         )
@@ -1379,17 +1394,11 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         layoutParams = buttonLp
         setPadding(dp(4), dp(8), dp(4), dp(8))
         setOnClickListener {
-            val dest = if (result.name != null) {
-                Uri.encode("${result.name}, ${result.lat},${result.lon}")
-            } else {
-                "${result.lat},${result.lon}"
-            }
-            val mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=$dest"
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
-                })
-            } catch (_: Exception) {}
+            // S180: V1 zero-network — route via the bundled Salem walking
+            // graph (S175 on-device router) instead of launching Google Maps.
+            // Same path PoiDetailSheet's Directions action takes.
+            dialog.dismiss()
+            walkTo(GeoPoint(result.lat, result.lon))
         }
     })
 
@@ -1415,23 +1424,25 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         }
     })
 
-    // Reviews button
-    buttonContainer.addView(TextView(this).apply {
-        text = "Reviews"
-        textSize = 11f
-        setTextColor(Color.WHITE)
-        setTypeface(null, android.graphics.Typeface.BOLD)
-        gravity = android.view.Gravity.CENTER
-        setBackgroundColor(Color.parseColor("#F57F17"))
-        layoutParams = buttonLp
-        setPadding(dp(4), dp(8), dp(4), dp(8))
-        setOnClickListener {
-            val name = Uri.encode(result.name ?: "")
-            val loc = Uri.encode("${result.lat},${result.lon}")
-            val yelpUrl = "https://www.yelp.com/search?find_desc=$name&find_loc=$loc"
-            showFullScreenWebView(yelpUrl, "Reviews")
-        }
-    })
+    // Reviews button (gated S180: V1 zero-network — Yelp launch removed)
+    if (!FeatureFlags.V1_OFFLINE_ONLY) {
+        buttonContainer.addView(TextView(this).apply {
+            text = "Reviews"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#F57F17"))
+            layoutParams = buttonLp
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            setOnClickListener {
+                val name = Uri.encode(result.name ?: "")
+                val loc = Uri.encode("${result.lat},${result.lon}")
+                val yelpUrl = "https://www.yelp.com/search?find_desc=$name&find_loc=$loc"
+                showFullScreenWebView(yelpUrl, "Reviews")
+            }
+        })
+    }
 
     // Map button
     buttonContainer.addView(TextView(this).apply {
@@ -1470,7 +1481,9 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
                 if (result.address != null) append("\n${result.address}")
                 if (result.phone != null) append("\nPhone: ${result.phone}")
                 if (result.openingHours != null) append("\nHours: ${result.openingHours}")
-                append("\nhttps://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}")
+                // S180: V1 zero-network — Google Maps URL dropped from share text.
+                // Coordinates inline are universal and don't require web access.
+                append("\n${result.lat}, ${result.lon}")
             }
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -1524,7 +1537,8 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
     // Load comments from server
     val osmType = result.type
     val osmId = result.id
-    socialViewModel.loadComments(osmType, osmId)
+    // S180: V1 zero-network gate.
+    if (!FeatureFlags.V1_OFFLINE_ONLY) socialViewModel.loadComments(osmType, osmId)
 
     fun renderComments(comments: List<com.example.locationmapapp.data.model.PoiComment>) {
         commentsList.removeAllViews()
@@ -1665,7 +1679,7 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         }
     }
 
-    socialViewModel.poiComments.observe(this) { comments ->
+    if (!FeatureFlags.V1_OFFLINE_ONLY) socialViewModel.poiComments.observe(this) { comments ->
         renderComments(comments ?: emptyList())
     }
 
@@ -1679,7 +1693,10 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         orientation = LinearLayout.VERTICAL
         addView(infoContainer)
         addView(websiteArea)
-        addView(commentsSection)
+        // S180: V1 zero-network — Comments section relies on socialViewModel
+        // (loadComments + voting + auth). Hidden in V1; section is still
+        // constructed above but never rendered. R8 may strip it in release.
+        if (!FeatureFlags.V1_OFFLINE_ONLY) addView(commentsSection)
         addView(buttonContainer)
     }
     val scrollView = android.widget.ScrollView(this).apply {
