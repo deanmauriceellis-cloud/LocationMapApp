@@ -30,7 +30,6 @@ import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.tour.ActiveTour
-import com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
 import com.example.wickedsalemwitchcitytour.tour.GeofenceEventType
 import com.example.wickedsalemwitchcitytour.tour.NarrationState
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceEvent
@@ -58,11 +57,17 @@ private const val SALEM_TEXT_DIM = "#B8AFA0"
 private const val COLOR_COMPLETED = "#4CAF50"  // green
 private const val COLOR_CURRENT   = "#2196F3"  // blue
 private const val COLOR_UPCOMING  = "#9E9E9E"  // gray
-private const val COLOR_ROUTE     = "#C9A84C"  // gold
+
+// S179: tour polyline visually identical to point-to-point directions.
+// Mirrors DIR_ROUTE_COLOR / DIR_ROUTE_BORDER in SalemMainActivityDirections.
+private const val TOUR_ROUTE_COLOR  = "#22C55E"
+private const val TOUR_ROUTE_BORDER = "#15803D"
 
 // Tour HUD overlay markers and polyline
 internal var tourRoutePolyline: Polyline? = null
+internal var tourRouteBorderPolyline: Polyline? = null
 internal val tourStopMarkers = mutableListOf<Marker>()
+internal val tourTurnMarkers = mutableListOf<Marker>()
 internal var narrationBarView: View? = null
 internal var tourHudView: View? = null
 internal var welcomeShown = false
@@ -975,66 +980,67 @@ internal fun SalemMainActivity.removeNarrationBar() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 @SuppressLint("SetTextI18n")
-internal fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
+internal suspend fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
     clearTourOverlays()
 
-    // S124 Phase 9R.0: prefer the tour's own OSRM-generated geometry so the
-    // drawn yellow-line overlay actually matches where the walk simulator
-    // walks. The prior behavior (unconditional fallback to
-    // `downtown_salem_route.json` whenever that asset existed) left every
-    // tour — Heritage Trail included — drawing an unrelated downtown loop
-    // on the map while the GPS followed a different path. Walker appeared
-    // "off-route" because the visible line wasn't the actual route.
-    //
-    // Order: try the tour's per-leg segments first. Fall back to the legacy
-    // downtown route only for tours that lack their own geometry (e.g.
-    // tour_essentials, which was designed as an ambient walk without a
-    // bundled OSRM route JSON).
-    val segments = TourRouteLoader.loadRouteSegments(this, activeTour.tour.id)
-    if (segments.isNotEmpty()) {
-        val allRoutePoints = mutableListOf<GeoPoint>()
-        for (seg in segments) {
-            if (allRoutePoints.isEmpty()) {
-                allRoutePoints.addAll(seg.points)
-            } else if (seg.points.isNotEmpty()) {
-                allRoutePoints.addAll(seg.points.drop(1))
-            }
-        }
-        val polyline = Polyline().apply {
-            setPoints(allRoutePoints)
-            outlinePaint.color = Color.parseColor(COLOR_ROUTE)
-            outlinePaint.strokeWidth = 5f
+    // S179: tour polyline is computed live against the bundled Salem walking
+    // graph via the same Router used for point-to-point directions. The
+    // pre-baked routeToNext / tour_legs assets from S178 are no longer
+    // consulted at runtime — geometry comes straight from
+    // WalkingDirections.getMultiStopRoute. Internal polyline waypoints stay
+    // hidden; only numbered stop markers and turn-by-turn intersection
+    // markers are drawn.
+    val route = tourViewModel.computeTourPolyline(activeTour)
+    if (route != null && route.polyline.isNotEmpty()) {
+        val border = Polyline().apply {
+            setPoints(route.polyline)
+            outlinePaint.color = Color.parseColor(TOUR_ROUTE_BORDER)
+            outlinePaint.strokeWidth = 10f
             outlinePaint.isAntiAlias = true
             outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
             outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
         }
-        binding.mapView.overlays.add(polyline)
-        tourRoutePolyline = polyline
-        DebugLogger.i("SalemMainActivityTour",
-            "Drew tour '${activeTour.tour.id}' route: ${allRoutePoints.size} points from ${segments.size} legs")
-        binding.mapView.invalidate()
-        // Fall through so numbered stop markers get added below.
-    } else {
-        // Legacy fallback for tours shipped without their own route geometry.
-        val downtownRoute = TourRouteLoader.loadDowntownRoute(this)
-        if (downtownRoute.isNotEmpty()) {
-            val polyline = Polyline().apply {
-                setPoints(downtownRoute)
-                outlinePaint.color = Color.parseColor(COLOR_ROUTE)
-                outlinePaint.strokeWidth = 5f
-                outlinePaint.isAntiAlias = true
-                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
-            }
-            binding.mapView.overlays.add(polyline)
-            tourRoutePolyline = polyline
-            DebugLogger.i("SalemMainActivityTour",
-                "Drew fallback downtown route for '${activeTour.tour.id}': ${downtownRoute.size} points")
-            binding.mapView.invalidate()
+        binding.mapView.overlays.add(border)
+        tourRouteBorderPolyline = border
+
+        val routeLine = Polyline().apply {
+            setPoints(route.polyline)
+            outlinePaint.color = Color.parseColor(TOUR_ROUTE_COLOR)
+            outlinePaint.strokeWidth = 6f
+            outlinePaint.isAntiAlias = true
+            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
         }
+        binding.mapView.overlays.add(routeLine)
+        tourRoutePolyline = routeLine
+
+        // Intersection / turn markers along the route — same treatment as
+        // point-to-point directions. Skip plain "continue" steps to avoid
+        // clutter on long multi-leg tours.
+        for (instruction in route.instructions) {
+            if (instruction.text.isBlank()) continue
+            if (instruction.text.lowercase().contains("continue")) continue
+            val marker = Marker(binding.mapView).apply {
+                position = instruction.location
+                title = instruction.text
+                snippet = "%.0f m".format(instruction.distanceM)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = MarkerIconHelper.dot(this@drawTourRoute, Color.parseColor(TOUR_ROUTE_COLOR))
+            }
+            binding.mapView.overlays.add(marker)
+            tourTurnMarkers.add(marker)
+        }
+
+        DebugLogger.i("SalemMainActivityTour",
+            "Drew tour '${activeTour.tour.id}' live route: ${route.polyline.size} pts, %.1fkm, ${route.instructions.size} turns".format(route.distanceKm))
+    } else {
+        DebugLogger.w("SalemMainActivityTour",
+            "Tour '${activeTour.tour.id}': could not compute multi-stop route")
     }
 
-    // Stop markers — only for tours with OSRM route segments
+    // Numbered stop markers — drawn above the polyline regardless of
+    // whether the router produced geometry, so the user always sees the
+    // ordered tour stops on the map.
     for ((i, stop) in activeTour.stops.withIndex()) {
         val poi = activeTour.pois.firstOrNull { it.id == stop.poiId } ?: continue
         val isCompleted = i in activeTour.progress.completedStops
@@ -1073,8 +1079,12 @@ internal fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
 internal fun SalemMainActivity.clearTourOverlays() {
     tourRoutePolyline?.let { binding.mapView.overlays.remove(it) }
     tourRoutePolyline = null
+    tourRouteBorderPolyline?.let { binding.mapView.overlays.remove(it) }
+    tourRouteBorderPolyline = null
     for (m in tourStopMarkers) binding.mapView.overlays.remove(m)
     tourStopMarkers.clear()
+    for (m in tourTurnMarkers) binding.mapView.overlays.remove(m)
+    tourTurnMarkers.clear()
     binding.mapView.invalidate()
 }
 

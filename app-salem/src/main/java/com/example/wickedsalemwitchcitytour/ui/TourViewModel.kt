@@ -17,6 +17,7 @@ import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.tour.NarrationManager
 import com.example.wickedsalemwitchcitytour.tour.NarrationState
+import com.example.wickedsalemwitchcitytour.tour.ActiveTour
 import com.example.wickedsalemwitchcitytour.tour.TourEngine
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceManager
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceEvent
@@ -223,17 +224,31 @@ class TourViewModel @Inject constructor(
 
     /** Get multi-stop route preview for the entire active tour. */
     fun getFullTourRoute() {
-        val tourId = (tourEngine.tourState.value as? TourState.Active)?.activeTour?.tour?.id
         val points = tourEngine.getAllStopLocations()
         if (points.size < 2) return
         viewModelScope.launch {
-            // Prefer the pre-computed bundled polyline for the active tour —
-            // straight-line fallback if the asset is missing or no active tour.
-            val bundled = tourId?.let { walkingDirections.getBundledTourRoute(it) }
-            _walkingRoute.value = bundled ?: walkingDirections.getMultiStopRoute(points)
+            // S179: tour geometry comes from the live bundled-graph router —
+            // same engine as point-to-point directions. Pre-baked tour_legs
+            // / routeToNext is no longer consulted at runtime.
+            _walkingRoute.value = walkingDirections.getMultiStopRoute(points)
             // Multi-stop preview has no single destination → no live session.
             directionsSession = null
         }
+    }
+
+    /**
+     * S179: compute the full multi-leg walking polyline for an active tour.
+     * Routes consecutive POI pairs through the bundled Salem walking graph
+     * via [WalkingDirections.getMultiStopRoute] — identical engine to the
+     * point-to-point "Get directions" flow. Returns null if the tour has
+     * fewer than two stops or the router can't snap the endpoints.
+     */
+    suspend fun computeTourPolyline(activeTour: ActiveTour): WalkingRoute? {
+        val points = activeTour.stops.mapNotNull { stop ->
+            activeTour.pois.firstOrNull { it.id == stop.poiId }?.let { GeoPoint(it.lat, it.lng) }
+        }
+        if (points.size < 2) return null
+        return walkingDirections.getMultiStopRoute(points)
     }
 
     /** Clear the walking route display and any active directions session. */

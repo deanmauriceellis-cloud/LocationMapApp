@@ -113,8 +113,8 @@ class WalkingDirections @Inject constructor(
 
         // V1 offline: route each consecutive pair on the bundled Salem graph
         // (S175) and concatenate. Falls back to straight-line stitching if
-        // the bundle didn't load. Callers wanting a richer pre-computed tour
-        // polyline should still use [getBundledTourRoute] with a tour_id.
+        // the bundle didn't load. S179: this is now the sole tour-route
+        // engine — pre-baked tour-leg geometry is no longer consulted.
         if (FeatureFlags.V1_OFFLINE_ONLY) {
             return@withContext bundleMultiRoute(waypoints) ?: straightLineMultiRoute(waypoints)
         }
@@ -167,44 +167,6 @@ class WalkingDirections @Inject constructor(
     }
 
     // ── V1 offline helpers ─────────────────────────────────────────────────
-
-    /**
-     * V1 offline: load the full pre-computed tour polyline from the bundled
-     * assets/tours/{tourId}.json produced by `backfill-tour-routes.js`. Stops
-     * are concatenated in order via their `routeToNext` polylines. Distance
-     * and duration sum the per-stop `routeDistanceM`/`routeDurationS` stamps.
-     *
-     * Returns null if the tour asset is missing or has no route geometry.
-     */
-    suspend fun getBundledTourRoute(tourId: String): WalkingRoute? = withContext(Dispatchers.IO) {
-        val segments = TourRouteLoader.loadRouteSegments(context, tourId)
-        if (segments.isEmpty()) {
-            DebugLogger.w(TAG, "Bundled tour route missing for $tourId")
-            return@withContext null
-        }
-
-        // Concatenate segment polylines, dropping the first point of every
-        // segment after the first to avoid duplicates at the stop joins.
-        val polyline = ArrayList<GeoPoint>()
-        for ((idx, seg) in segments.withIndex()) {
-            if (idx == 0 || polyline.isEmpty()) polyline.addAll(seg.points)
-            else if (seg.points.isNotEmpty()) polyline.addAll(seg.points.drop(1))
-        }
-
-        val totalDistanceM = segments.sumOf { it.distanceM }.toDouble()
-        val totalDurationS = segments.sumOf { it.durationS }.toDouble()
-
-        DebugLogger.i(TAG, "Bundled tour route $tourId: ${polyline.size} points, " +
-            "%.1fkm, %dmin".format(totalDistanceM / 1000.0, (totalDurationS / 60.0).toInt()))
-
-        WalkingRoute(
-            polyline = polyline,
-            distanceKm = totalDistanceM / 1000.0,
-            durationMinutes = (totalDurationS / 60.0).toInt(),
-            instructions = emptyList(),
-            road = null
-        )
-    }
 
     /**
      * Great-circle distance in meters (Haversine). Used by the V1 straight-line

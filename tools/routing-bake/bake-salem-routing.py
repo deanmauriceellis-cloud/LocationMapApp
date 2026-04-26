@@ -25,6 +25,7 @@ Usage:
 """
 
 import argparse
+import math
 import os
 import sqlite3
 import sys
@@ -47,9 +48,165 @@ DEFAULT_OUT = os.path.join(
 
 SCHEMA_VERSION = 1
 
+# S179: edge-splitting parameters. TIGER edges run uninterrupted from
+# intersection to intersection, leaving 100-300m gaps between graph
+# vertices on long blocks. Mid-block POIs (e.g. Phillips House at 34
+# Chestnut St) snap to the nearest cross-street vertex, which is far
+# enough off that the WalkingDirections tail-approach exceeds its 60m
+# safety cap and the polyline visibly stops short of the destination.
+# Splitting long edges every ~SPLIT_TARGET_M metres densifies the vertex
+# grid so mid-block destinations land within snap range.
+SPLIT_MIN_M = 60.0       # only split edges longer than this
+SPLIT_TARGET_M = 40.0    # nominal sub-segment length after splitting
+SPLIT_NODE_ID_BASE = 20_000_000_000   # synthetic node IDs use this offset
+SPLIT_EDGE_ID_BASE = 5_000_000_000    # synthetic edge IDs use this offset
+
 
 def log(msg):
     print(f"[bake] {msg}", flush=True)
+
+
+def haversine_m(p1, p2):
+    """Great-circle distance in meters between (lat, lng) tuples."""
+    lat1, lng1 = p1
+    lat2, lng2 = p2
+    R = 6_371_000.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(dlng / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def parse_polyline(s):
+    """Parse 'lat,lng;lat,lng;...' to [(lat, lng), ...]."""
+    if not s:
+        return []
+    out = []
+    for pair in s.split(";"):
+        if not pair:
+            continue
+        lat_str, lng_str = pair.split(",")
+        out.append((float(lat_str), float(lng_str)))
+    return out
+
+
+def encode_polyline(pts):
+    return ";".join(f"{p[0]:.6f},{p[1]:.6f}" for p in pts)
+
+
+def split_long_edges(edges, nodes):
+    """Densify the graph by inserting walkable nodes mid-edge on any edge
+    longer than SPLIT_MIN_M. Returns (new_edges, new_nodes) where
+    new_nodes augments the original nodes list with synthetic split
+    vertices (IDs above SPLIT_NODE_ID_BASE). Pre-existing short edges
+    pass through untouched.
+
+    Conventions:
+      - Split nodes are always walkable=1 (they sit on a walkable parent).
+      - Sub-edge walk_cost == sub-edge length_m (1:1, matches parent for
+        any S1400/local-road edge in the current graph).
+      - Sub-edge mtfcc/fullname inherit from the parent — the road has
+        the same name and class along its length.
+      - Sub-edge geom_polyline is the slice of the parent polyline up to
+        and including the split point, so the rendered route still
+        follows the parent road's curve.
+    """
+    next_node_id = SPLIT_NODE_ID_BASE
+    next_edge_id = SPLIT_EDGE_ID_BASE
+    new_edges = []
+    new_nodes = []  # appended to original nodes
+    split_count = 0
+    sub_count = 0
+
+    for edge in edges:
+        gid, src, tgt, length_m, walk_cost, mtfcc, fullname, polyline_str = edge
+        pts = parse_polyline(polyline_str)
+        if length_m <= SPLIT_MIN_M or len(pts) < 2:
+            new_edges.append(edge)
+            continue
+
+        # Cumulative distance along the polyline.
+        cum = [0.0]
+        for i in range(1, len(pts)):
+            cum.append(cum[-1] + haversine_m(pts[i - 1], pts[i]))
+        total = cum[-1]
+        if total <= SPLIT_MIN_M:
+            new_edges.append(edge)
+            continue
+
+        n_pieces = max(2, round(total / SPLIT_TARGET_M))
+        # n_pieces - 1 split points, evenly spaced by parent length.
+        targets = [total * i / n_pieces for i in range(1, n_pieces)]
+
+        # Resolve each target distance to a split point on the polyline.
+        # Each entry: (segment_index_i, point_after_split).
+        splits = []
+        ti = 0
+        for tl in targets:
+            while ti < len(cum) - 1 and cum[ti + 1] < tl:
+                ti += 1
+            seg_len = cum[ti + 1] - cum[ti]
+            if seg_len < 1e-6:
+                pt = pts[ti]
+            else:
+                t = (tl - cum[ti]) / seg_len
+                pt = (
+                    pts[ti][0] + (pts[ti + 1][0] - pts[ti][0]) * t,
+                    pts[ti][1] + (pts[ti + 1][1] - pts[ti][1]) * t,
+                )
+            splits.append((ti, pt))
+
+        # Walk the parent polyline, emitting one sub-edge per split.
+        prev_node = src
+        prev_pt = pts[0]
+        cursor_seg = 0  # last segment we fully consumed
+        for (seg_i, split_pt) in splits:
+            new_node_id = next_node_id
+            next_node_id += 1
+            new_nodes.append((new_node_id, split_pt[0], split_pt[1], 1))
+
+            sub_pts = [prev_pt]
+            ci = cursor_seg
+            while ci < seg_i:
+                sub_pts.append(pts[ci + 1])
+                ci += 1
+            sub_pts.append(split_pt)
+
+            sub_len = sum(haversine_m(sub_pts[k], sub_pts[k + 1]) for k in range(len(sub_pts) - 1))
+            new_edges.append((
+                next_edge_id, prev_node, new_node_id,
+                sub_len, sub_len,
+                mtfcc, fullname, encode_polyline(sub_pts),
+            ))
+            next_edge_id += 1
+            sub_count += 1
+
+            prev_node = new_node_id
+            prev_pt = split_pt
+            cursor_seg = seg_i
+
+        # Tail piece: from the last split point through any remaining
+        # geometry vertices to the parent's target node.
+        sub_pts = [prev_pt]
+        ci = cursor_seg
+        while ci < len(pts) - 1:
+            sub_pts.append(pts[ci + 1])
+            ci += 1
+        sub_len = sum(haversine_m(sub_pts[k], sub_pts[k + 1]) for k in range(len(sub_pts) - 1))
+        new_edges.append((
+            next_edge_id, prev_node, tgt,
+            sub_len, sub_len,
+            mtfcc, fullname, encode_polyline(sub_pts),
+        ))
+        next_edge_id += 1
+        sub_count += 1
+        split_count += 1
+
+    log(f"  split {split_count} long edges into {sub_count} sub-edges, "
+        f"+{len(new_nodes)} synthetic nodes")
+    return new_edges, nodes + new_nodes
 
 
 def fetch_edges(pg_cur, bbox):
@@ -262,9 +419,14 @@ def main():
 
     pg.close()
 
+    log(f"densifying long edges (split >{SPLIT_MIN_M:.0f}m, target {SPLIT_TARGET_M:.0f}m)…")
+    edges, nodes = split_long_edges(edges, nodes)
+    log(f"  post-split: {len(edges)} edges, {len(nodes)} nodes")
+
     source_summary = (
         f"salem.edges intersect bbox @ {datetime.now(timezone.utc).date().isoformat()} "
-        f"(TigerLine source — see SalemTourMapRouting.md)"
+        f"(TigerLine source — see SalemTourMapRouting.md); "
+        f"S179 edge-split min={SPLIT_MIN_M:.0f}m target={SPLIT_TARGET_M:.0f}m"
     )
 
     log("writing sqlite…")
