@@ -6,46 +6,57 @@
 
 ---
 
-## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S180 close, 2026-04-26)
+## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S181 close, 2026-04-26)
 
 > **Operator override of lean-startup rule.** Read this block at session start *before* the lean greeting. Pinned here because CLAUDE.md auto-loads and these items are time-sensitive or load-bearing for V1 ship. Once an item is done, remove it from this block and move it to STATE.md.
 
-### State as of S180 close
+### State as of S181 close
 
-- **First signed AAB built and verified.** `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Signed APK installed and running on Lenovo TB305FU.
-- **The V1.0.0 first-AAB build path is no longer blocked by technical chores.** It is blocked by the operator-side commercial chores listed below.
-- Last commit: `afac394` on `master`, in sync with `origin/master`. OMEN repo also in sync.
+- **S180 first signed AAB still standing.** `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Signed APK installed and running on Lenovo TB305FU.
+- **OSM policy reversed for routing-graph use (S181).** Memory `feedback_no_osm_use_local_geo.md` amended; broad pedestrian-network OSM ingest into `salem.edges` now permitted (build-time only, app stays offline). S178 surgical-allowlist superseded.
+- **No code changes shipped S181** — paperwork session (memory amendment + plan doc + keystore backup).
+- **Upload signing key — one off-machine copy on USB**, second-medium copy still owed before first Play Console upload.
+- Last LMA commit: `<S181-close-sha>` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
 
-### S181 next steps — in priority order
+### S182 next steps — in priority order
+
+**Claude-side technical work (load-bearing):**
+
+1. **EXECUTE the OSM pedestrian merge plan** at `docs/plans/S182-osm-pedestrian-routing-merge.md`. 4 phases (node resolution → edge ingest with `pgr_strongComponents ≤ 5` hard gate → re-bake routing bundle + parity test → rebuild AAB + Lenovo eyes-on). 2-3 sessions estimated. Scope locked to OSM `highway IN ('footway','path','pedestrian','steps')` from `osm.salem_pedestrian_edges_resolved` (1,882 rows ready to merge). **Do NOT use bulk pgr_createTopology — S178 first attempt produced 608 disconnected components.** Open at S182 start: confirm tour parity tolerance (currently ±10% per-leg), decide whether to fold in admin→build auto-bake (#4 below), confirm OSM PBF refresh cadence (current 2026-04-22 vintage).
+
+2. **Continue eyes-on smoke test on Lenovo** (S180 carry-forward, S181 only tested tour routing — surfaced the OSM-policy work above). Remaining items, all should be visually invisible in V1 release:
+   - POI detail Visit Website button: appears when POI has URL, click hands off to Chrome via ACTION_VIEW (per S180 P3).
+   - Find dialog → POI detail: Reviews button NOT rendered. Comments section NOT rendered. Website area shows "Website unavailable offline" placeholder.
+   - Find dialog → Directions: uses on-device walking router (green/dark-green polyline like point-to-point), NOT Google Maps.
+   - Toolbar: NO Weather/Transit/CAMs/Aircraft/Radar buttons (V1-gated by AppBarMenuManager from S141/S144).
+   - Webcam dialog (if reached via geofence): "View Live" button NOT rendered.
+   - Worth interleaving with #1 since the OSM merge will rebuild the AAB anyway.
+
+3. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` is 600m off (sits at 42.5203,-70.8816 instead of ~42.5232,-70.8908); `salem_willows` is mid-parking-lot at 42.535,-70.86945. Fix via `UPDATE salem_pois`, re-bake `salem_content.db`, rebuild AAB. Heritage Trail tour also references 6 POIs not in curated tour-POI set.
+
+4. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG. Could fold into S182 Plan P3 since both involve re-baking.
+
+5. **Pre-AAB hard-delete dedup losers.** S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
+
+6. **Deferred from S179** (still valid, lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; water-aware approach segments.
 
 **Operator-side (Claude cannot do these for you):**
 
-1. **CRITICAL — Back up `~/keys/wickedsalem-upload.jks` off-machine BEFORE first Play Console upload.** Mode 0600, 2728 bytes. Password is in `~/.gradle/gradle.properties` (mode 0600, off-repo). Both files are documented in OMEN credential audit Amendment 2026-04-26. Losing this pair = losing the ability to ship updates without going through Google's "lost upload key" recovery. Back to at least one off-machine location (USB key in a safe, encrypted cloud, etc.).
-2. **CRITICAL — Form TX copyright registration.** $65, hard deadline **2026-05-20** (statutory damages window). Operator-owed.
-3. **Google Play Developer Account + identity verification.** $25 one-time at play.google.com/console. Multi-week lead time on identity verification. Hasn't been started.
-4. **Privacy Policy public hosting + in-app link.** V1-minimal Posture A drafted at `docs/PRIVACY-POLICY-V1.md`. Needs public URL (DestructiveAIGurus.com page, GitHub Pages, or dedicated domain). Full OMEN-008-compliant draft at `docs/PRIVACY-POLICY.md` still pending OMEN review (32+ sessions).
-5. **Merchant / payments profile** in Play Console. Required to receive paid-app revenue.
-
-**Claude-side technical work (in dependency order):**
-
-6. **Interactive eyes-on smoke test of the V1 release APK on Lenovo.** S180 confirmed install + launch + 60fps SalemMainActivity for 12s with no crash. Did NOT interactively test:
-   - POI detail Visit Website button: should still appear when POI has URL, click should hand off to Chrome via ACTION_VIEW (per S180 P3).
-   - Find dialog → POI detail: Reviews button should NOT render. Comments section should NOT render. Website area should show "Website unavailable offline" placeholder.
-   - Find dialog → Directions: should use on-device walking router (green/dark-green polyline like point-to-point), NOT launch Google Maps.
-   - Toolbar: should NOT show Weather/Transit/CAMs/Aircraft/Radar buttons (already V1-gated by AppBarMenuManager from S141/S144).
-   - Webcam dialog (if reached via geofence): "View Live" button should NOT render in V1.
-7. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG.
-8. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` is 600m off (sits at 42.5203,-70.8816 instead of ~42.5232,-70.8908); `salem_willows` is mid-parking-lot at 42.535,-70.86945. Fix via `UPDATE salem_pois`, re-bake `salem_content.db`, rebuild AAB. Heritage Trail tour also references 6 POIs not in curated tour-POI set; decide whether to drop the tour for V1 or add the missing POIs.
-9. **Pre-AAB hard-delete dedup losers.** S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload, `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
-10. **Deferred from S179** (still valid, lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; water-aware approach segments.
+7. **CRITICAL — second-medium copy of upload signing key.** USB copy on `/media/witchdoctor/writable/wickedsalem-upload-key-backup-2026-04-26/` exists. Recommend encrypted cloud or second USB stored elsewhere. Single-medium backups fail. Run `sudo bash ~/keys/backup-staging/copy-to-usb.sh` against second USB if going that route.
+8. **Form TX copyright registration** — lawyer is handling, hard deadline **2026-05-20** (statutory damages window).
+9. **Google Play Developer Account + identity verification.** $25 one-time at play.google.com/console. Multi-week lead time. Operator deferred to a later session.
+10. **Privacy Policy public hosting + in-app link.** Waiting on lawyer approval. V1-minimal Posture A draft at `docs/PRIVACY-POLICY-V1.md`.
+11. **Merchant / payments profile** in Play Console.
 
 ### Key paths to remember
 
-- Upload keystore: `~/keys/wickedsalem-upload.jks`
+- Upload keystore: `~/keys/wickedsalem-upload.jks` (off-machine backup at `/media/witchdoctor/writable/...` USB, currently disconnected)
+- Backup staging dir: `~/keys/backup-staging/` (run `sudo bash copy-to-usb.sh` for additional media)
 - Signing properties: `~/.gradle/gradle.properties` (mode 0600)
 - AAB build artifact: `app-salem/build/outputs/bundle/release/app-salem-release.aab`
 - APK build artifact: `app-salem/build/outputs/apk/release/app-salem-release.apk`
-- OMEN credential audit: `~/Development/OMEN/docs/credential-audit-2026-04-05.md` (Amendment 2026-04-26 has the upload key entry)
+- S182 plan: `docs/plans/S182-osm-pedestrian-routing-merge.md`
+- OMEN credential audit: `~/Development/OMEN/docs/credential-audit-2026-04-05.md` (Amendment 2026-04-26)
 - Build commands: `./gradlew :app-salem:bundleRelease` (AAB) / `:app-salem:assembleRelease` (APK)
 
 ---

@@ -1,7 +1,13 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 170, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 171, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 170, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 171, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 171: 2026-04-24 — Custom 2D map engine prototype (osmdroid replacement, in-progress)
+
+Major architectural pivot, reversing the S157 OSM-stays decision: operator opted to stop using osmdroid and own the map engine. Built `app-salem/.../wickedmap/` from scratch — `WickedMapView` (`SurfaceView` + render thread + gestures + tile draw), `MercatorMath`, `TileArchive` (osmdroid `SqliteArchive` decoder, no library dep), `MapCamera` (lat/lon-based after a coordinate-drift bug parked the map in the Atlantic mid-pinch), `PolygonLibrary` (loads GeoJSON FeatureCollection at app start, indexes by kind), and two animation overlays — `AnimatedWaterOverlay` (sea whitecaps) and `FireflyOverlay` (spectral cemetery orbs). Polygon source data extracted entirely from local TigerLine + MassGIS (operator HARD RULE: never OSM): `tools/wickedmap-polygons/extract-water-from-tiger.py` produces 545 named water polygons from `tiger.areawater`, `extract-cemeteries-from-massgis.py` produces 97 cemeteries from `massgis.openspace WHERE prim_purp='H'`. Whitecaps + ghost orbs render at 30 fps on Lenovo TB305FU with full 642-polygon library loaded. The custom engine is reachable via the new "WickedMap" FAB inside the running Salem app and a standalone "WickedMap Proto" launcher icon. **Migration of `SalemMainActivity` from osmdroid is the next-session work** — counted 338 compile errors when the layout was swapped, scoped honestly as 2-3 focused sessions (tile rendering swap → POI markers → per-feature overlay migration). Tonight's Salem app is functionally unchanged from S170; the engine work ships as a parallel system with FAB access. Memories saved this session: `reference_master_session_reference.md`, `feedback_no_osm_use_local_geo.md` (HARD RULE), `feedback_basemap_priority_over_animation.md` (HARD RULE — explicit 3-layer z-order: base graphic / animation / "real" features), `project_lively_map.md` (extended: active animation always).
+
+Full session detail: `docs/session-logs/session-171-2026-04-24.md`. Commit: `a93a86e`.
 
 ## Session 170: 2026-04-24 — Map sprite pipeline (rotation-only baseline shipped, walking deferred to V2)
 

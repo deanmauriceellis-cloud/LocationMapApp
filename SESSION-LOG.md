@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 171-180. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 172-181. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 181: 2026-04-26 — Routing-data OSM policy reversal + S182 plan; one-medium keystore backup
+
+Operator picked S180 carry-forward #1 (off-machine keystore backup) and #6 (eyes-on smoke test). Backup: created staging dir + sudo script that SHA-256-verifies before/after copy and chowns USB destination back to user; one-medium copy landed on `/media/witchdoctor/writable`, second copy on a different medium still owed before first Play Console upload. Smoke test surfaced one issue (Salem Heritage Trail polyline visually grazing historic-building polygons in downtown), which became a five-step diagnostic rabbit hole: logcat confirmed router output was correct (47,704-edge bundle, 21-turn `routeMulti` route, no fallbacks); PostGIS against `massgis.buildingfp` found zero downtown overlaps; against the actual rendered `salem-historic-buildings.geojson` set found 14 walkable edges that cut historic buildings (worst: St Peter St → Gardner Block 57m, Salem Green cluster grazing 3 polygons). Operator reframed: "why isn't it following the sidewalk?" — exposed that downtown `salem.edges` is ~92% TIGER street centerlines and only ~8% pedestrian, with `osm.salem_pedestrian_edges_resolved` (1,030 downtown footway/path/pedestrian/steps edges, ~120km Salem-area total) sitting unused. After full Witchy-tile-bake source review (~90% OSM-rendered, ~10% MassGIS, with documented S158 carve-out), operator reversed the prior surgical-only OSM constraint: "if we require OSM to do this right, then let's change our direction and allow OSM for our routing needs." Memory `feedback_no_osm_use_local_geo.md` amended (S178 surgical-allowlist superseded for pedestrian network; broad pedestrian-network ingest permitted under topological-merge constraints with `pgr_strongComponents ≤ 5` hard gate). Plan written at `docs/plans/S182-osm-pedestrian-routing-merge.md` — 4 phases / 2-3 sessions / risk register / rollback. **No code changes shipped this session.** Smoke test interrupted before items 2-N (POI detail Visit Website ACTION_VIEW handoff, Find dialog Reviews/Comments hidden, Find Directions on-device router, toolbar gating, webcam dialog gating) — carry-forward.
+
+Full session detail: `docs/session-logs/session-181-2026-04-26.md`. Commit: `<filled-by-close>`.
+
+---
 
 ## Session 180: 2026-04-26 — V1 Play Store gating chores + first signed AAB on Lenovo
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-172-2026-04-25.md`. Commit: `000
 
 ---
 
-## Session 171: 2026-04-24 — Custom 2D map engine prototype (osmdroid replacement, in-progress)
-
-Major architectural pivot, reversing the S157 OSM-stays decision: operator opted to stop using osmdroid and own the map engine. Built `app-salem/.../wickedmap/` from scratch — `WickedMapView` (`SurfaceView` + render thread + gestures + tile draw), `MercatorMath`, `TileArchive` (osmdroid `SqliteArchive` decoder, no library dep), `MapCamera` (lat/lon-based after a coordinate-drift bug parked the map in the Atlantic mid-pinch), `PolygonLibrary` (loads GeoJSON FeatureCollection at app start, indexes by kind), and two animation overlays — `AnimatedWaterOverlay` (sea whitecaps) and `FireflyOverlay` (spectral cemetery orbs). Polygon source data extracted entirely from local TigerLine + MassGIS (operator HARD RULE: never OSM): `tools/wickedmap-polygons/extract-water-from-tiger.py` produces 545 named water polygons from `tiger.areawater`, `extract-cemeteries-from-massgis.py` produces 97 cemeteries from `massgis.openspace WHERE prim_purp='H'`. Whitecaps + ghost orbs render at 30 fps on Lenovo TB305FU with full 642-polygon library loaded. The custom engine is reachable via the new "WickedMap" FAB inside the running Salem app and a standalone "WickedMap Proto" launcher icon. **Migration of `SalemMainActivity` from osmdroid is the next-session work** — counted 338 compile errors when the layout was swapped, scoped honestly as 2-3 focused sessions (tile rendering swap → POI markers → per-feature overlay migration). Tonight's Salem app is functionally unchanged from S170; the engine work ships as a parallel system with FAB access. Memories saved this session: `reference_master_session_reference.md`, `feedback_no_osm_use_local_geo.md` (HARD RULE), `feedback_basemap_priority_over_animation.md` (HARD RULE — explicit 3-layer z-order: base graphic / animation / "real" features), `project_lively_map.md` (extended: active animation always).
-
-Full session detail: `docs/session-logs/session-171-2026-04-24.md`. Commit: `a93a86e`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 170 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 171 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S171 rolled to archive 2026-04-26 by the session-end protocol (S181) -->
 <!-- S170 rolled to archive 2026-04-26 by the session-end protocol (S180) -->
 <!-- S169 rolled to archive 2026-04-26 by the session-end protocol (S179) -->
 <!-- S168 rolled to archive 2026-04-26 by the session-end protocol (S178) -->
