@@ -6,35 +6,34 @@
 
 ---
 
-## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S181 close, 2026-04-26)
+## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S182 open, 2026-04-26)
 
 > **Operator override of lean-startup rule.** Read this block at session start *before* the lean greeting. Pinned here because CLAUDE.md auto-loads and these items are time-sensitive or load-bearing for V1 ship. Once an item is done, remove it from this block and move it to STATE.md.
 
-### State as of S181 close
+### State as of S182 open (S181 reversal retracted)
 
 - **S180 first signed AAB still standing.** `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Signed APK installed and running on Lenovo TB305FU.
-- **OSM policy reversed for routing-graph use (S181).** Memory `feedback_no_osm_use_local_geo.md` amended; broad pedestrian-network OSM ingest into `salem.edges` now permitted (build-time only, app stays offline). S178 surgical-allowlist superseded.
-- **No code changes shipped S181** — paperwork session (memory amendment + plan doc + keystore backup).
+- **S181 OSM policy reversal RETRACTED at S182 open.** S181's "broad pedestrian-network OSM ingest" decision was based on a misdiagnosis: per-leg Find→Directions on the same graph routes cleanly between the same POIs, so the fault is in the tour-rendering path (`routeMulti` / Heritage tour polyline builder), not the graph and not the data sources. `feedback_no_osm_use_local_geo.md` restored to the S178 surgical-only constraint. Plan `docs/plans/S182-osm-pedestrian-routing-merge.md` archived to `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md` — do not execute.
 - **Upload signing key — one off-machine copy on USB**, second-medium copy still owed before first Play Console upload.
-- Last LMA commit: `<S181-close-sha>` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
+- Last LMA commit: `<S182-open-sha>` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
 
 ### S182 next steps — in priority order
 
 **Claude-side technical work (load-bearing):**
 
-1. **EXECUTE the OSM pedestrian merge plan** at `docs/plans/S182-osm-pedestrian-routing-merge.md`. 4 phases (node resolution → edge ingest with `pgr_strongComponents ≤ 5` hard gate → re-bake routing bundle + parity test → rebuild AAB + Lenovo eyes-on). 2-3 sessions estimated. Scope locked to OSM `highway IN ('footway','path','pedestrian','steps')` from `osm.salem_pedestrian_edges_resolved` (1,882 rows ready to merge). **Do NOT use bulk pgr_createTopology — S178 first attempt produced 608 disconnected components.** Open at S182 start: confirm tour parity tolerance (currently ±10% per-leg), decide whether to fold in admin→build auto-bake (#4 below), confirm OSM PBF refresh cadence (current 2026-04-22 vintage).
+1. **Investigate the tour-rendering code path.** Locate `routeMulti` / `TourRouteLoader` / Heritage Trail polyline builder. Compare what the tour does to what per-leg Find→Directions does on the same graph. Identify why the multi-stop tour polyline appears to cross buildings while single P2P does not. Likely candidates: tour stops connected via straight-line interpolation between graph hits, `routeMulti` snapping/concatenating in a way that diverges from per-leg routing, or per-leg results being post-processed into a smoothed polyline that loses the road-graph fidelity. Once root cause is identified, fix the tour path (likely in `:routing-jvm` and/or `WalkingDirections` / `TourRouteLoader`).
 
-2. **Continue eyes-on smoke test on Lenovo** (S180 carry-forward, S181 only tested tour routing — surfaced the OSM-policy work above). Remaining items, all should be visually invisible in V1 release:
+2. **Continue eyes-on smoke test on Lenovo** (S180 carry-forward). Remaining items, all should be visually invisible in V1 release:
    - POI detail Visit Website button: appears when POI has URL, click hands off to Chrome via ACTION_VIEW (per S180 P3).
    - Find dialog → POI detail: Reviews button NOT rendered. Comments section NOT rendered. Website area shows "Website unavailable offline" placeholder.
    - Find dialog → Directions: uses on-device walking router (green/dark-green polyline like point-to-point), NOT Google Maps.
    - Toolbar: NO Weather/Transit/CAMs/Aircraft/Radar buttons (V1-gated by AppBarMenuManager from S141/S144).
    - Webcam dialog (if reached via geofence): "View Live" button NOT rendered.
-   - Worth interleaving with #1 since the OSM merge will rebuild the AAB anyway.
+   - Worth interleaving with #1 since the tour-rendering fix will rebuild the AAB anyway.
 
 3. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` is 600m off (sits at 42.5203,-70.8816 instead of ~42.5232,-70.8908); `salem_willows` is mid-parking-lot at 42.535,-70.86945. Fix via `UPDATE salem_pois`, re-bake `salem_content.db`, rebuild AAB. Heritage Trail tour also references 6 POIs not in curated tour-POI set.
 
-4. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG. Could fold into S182 Plan P3 since both involve re-baking.
+4. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG.
 
 5. **Pre-AAB hard-delete dedup losers.** S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
 
@@ -55,7 +54,7 @@
 - Signing properties: `~/.gradle/gradle.properties` (mode 0600)
 - AAB build artifact: `app-salem/build/outputs/bundle/release/app-salem-release.aab`
 - APK build artifact: `app-salem/build/outputs/apk/release/app-salem-release.apk`
-- S182 plan: `docs/plans/S182-osm-pedestrian-routing-merge.md`
+- Archived (do-not-execute) OSM merge plan: `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md`
 - OMEN credential audit: `~/Development/OMEN/docs/credential-audit-2026-04-05.md` (Amendment 2026-04-26)
 - Build commands: `./gradlew :app-salem:bundleRelease` (AAB) / `:app-salem:assembleRelease` (APK)
 

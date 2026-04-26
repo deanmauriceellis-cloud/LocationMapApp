@@ -1,5 +1,7 @@
 # S182+ Plan — OSM Pedestrian Network Merge into salem.edges
 
+> **ARCHIVED 2026-04-26 (S182 open) — DO NOT EXECUTE.** This plan was based on a misdiagnosis. The S181 screenshot complaint (Heritage tour polyline crossing buildings) was attributed to the routing graph, but per-leg Find→Directions on the same graph routes cleanly between the same POIs. The fault is in the tour-rendering path (`routeMulti` / Heritage tour polyline builder), not the graph and not the data sources. The S181 OSM-policy reversal in `feedback_no_osm_use_local_geo.md` has been retracted. Kept here only as a record of the (wrong) direction taken.
+
 **Status:** drafted S181 (2026-04-26), pending operator approval at S182 start.
 **Scope:** add 1,882 OSM footway/path/pedestrian/steps edges to the runtime routing graph so the router prefers actual pedestrian infrastructure (sidewalks, alleys, park paths, stairs) over TIGER street centerlines where available.
 **Estimated cost:** 2-3 sessions if topology merge goes cleanly; +1 session if connectivity tuning is needed.

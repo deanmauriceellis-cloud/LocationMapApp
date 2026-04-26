@@ -2,21 +2,21 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-04-26 — Session 181 closed. Two paperwork-only outcomes: (a) one-medium off-machine backup of upload signing key landed on `/media/witchdoctor/writable/wickedsalem-upload-key-backup-2026-04-26/` via SHA-256-verifying sudo script; second-medium copy still owed before first Play Console upload. (b) **OSM policy reversed for routing-graph use** — operator approved broad pedestrian-network OSM ingest into `salem.edges` after eyes-on smoke test surfaced the streets-only routing producing visually wrong-looking polylines that grazed historic-building polygons in downtown Salem. Investigation: route was *functionally correct* (router output was right; visual artifact was misregistration of TIGER street centerlines vs. OSM-rendered Witchy basemap), but exposed that downtown `salem.edges` is ~92% TIGER street centerlines and ~8% pedestrian, with 1,030 OSM downtown footway/path edges sitting unused. Memory `feedback_no_osm_use_local_geo.md` amended; S178 surgical-allowlist superseded for pedestrian network ingest. Plan written at `docs/plans/S182-osm-pedestrian-routing-merge.md` — 4 phases, 2-3 sessions, hard `pgr_strongComponents ≤ 5` connectivity gate, parity test against existing tour legs. **No code changes shipped this session.** Smoke test interrupted after first item. Full detail in `docs/session-logs/session-181-2026-04-26.md`.
+**Last updated:** 2026-04-26 — Session 182 closed. **S181's OSM-merge policy reversal was retracted at S182 open.** Operator confirmed (after a fresh comparison test) that single P2P "tap POI → directions" routes cleanly between two Heritage Trail stops while the multi-stop tour render of consecutive stops crosses buildings. Trace through `Router.routeMulti` showed it is literally per-leg `route()` calls + `concat()` — same algorithm as P2P. The divergence is the input lat/lng: tour legs feed POI centroids (often inside/behind a building polygon, snap can land on the wrong side), P2P feeds the user's GPS (already on a sidewalk). S181's "rebake routing graph from OSM" plan was archived to `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md`. Memory `feedback_no_osm_use_local_geo.md` restored to S178 surgical-only framing. Feasibility-checked an address-anchored alternative (TIGER address-range interpolation on `salem_pois.address`, ≈12 m offset on a verified sample) — operator rejected: hand-curates tours instead. New HARD RULE `feedback_tour_routing_is_content_not_engineering.md` saved to prevent re-entering this loop. Cache-proxy (4300) and Vite admin (4302) brought up at session end for the operator's curation work. **No code changes shipped this session.** Full detail in `docs/session-logs/session-182-2026-04-26.md`.
 
 S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First signed AAB at `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Manifest network surface stripped, V1 feature gates R8-stripped from binary, Room migrations locked, signingConfigs wired, upload keystore generated + OMEN-registered. S179: tour routing unified to live `Router.route()` against bundled walking graph; bake-time edge splitting (47,704 edges / 44,223 walkable nodes; asset 11.2 MB). S178: `:routing-jvm` extraction + 60m approach cap + surgical OSM ingest. S175: on-device Salem router. S174: web admin Tours tab CRUD. S172: animations live in SalemMainActivity. S171: custom WickedMap engine (replaces osmdroid; migration in progress, 338 osmdroid call sites still extant).
 
 ---
 
-## TOP PRIORITY — Next Session (S182)
+## TOP PRIORITY — Next Session (S183)
 
-1. **EXECUTE the OSM pedestrian merge plan** at `docs/plans/S182-osm-pedestrian-routing-merge.md`. P1 = node resolution at scale. P2 = edge ingest with `pgr_strongComponents ≤ 5` hard gate (catches the S178 608-component failure mode). P3 = re-bake routing bundle + parity test against existing tour legs. P4 = rebuild AAB + Lenovo eyes-on. **Three open questions for operator at S182 start:** tour parity tolerance (currently ±10% per-leg), fold in admin→build auto-bake from S180 carry-forward, OSM PBF refresh cadence (currently 2026-04-22 vintage).
+1. **OPERATOR-SIDE: hand-curate tour stops in the web admin** to fix the "tour polyline crosses buildings" visual issue. Cache-proxy (4300) and Vite admin (4302) were left running at S182 close — re-start with `bin/restart-proxy.sh` + `bin/start-web.sh` if down. Mapping engineering is **parked** per `feedback_tour_routing_is_content_not_engineering.md`; if a future session reopens routing/anchor work, it must be at the operator's explicit instruction.
 
-2. **Continue eyes-on smoke test on Lenovo** (S180 carry-forward, S181 partial). Only tour routing was tested. Remaining items: POI detail Visit Website ACTION_VIEW external browser handoff, Find dialog Reviews/Comments hidden in V1, Find dialog Directions on-device router visible, toolbar gating (no Weather/Transit/CAMs/Aircraft/Radar buttons), webcam dialog "View Live" hidden. Worth interleaving with S182 since the OSM merge will rebuild the AAB anyway.
+2. **Continue eyes-on smoke test on Lenovo** (S180 carry-forward, S181 partial). Only tour routing was tested in S181, surfacing the now-retracted OSM rabbit hole. Remaining items: POI detail Visit Website ACTION_VIEW external browser handoff, Find dialog Reviews/Comments hidden in V1, Find dialog Directions on-device router visible, toolbar gating (no Weather/Transit/CAMs/Aircraft/Radar buttons), webcam dialog "View Live" hidden.
 
-3. **OPERATOR-SIDE — second-medium copy of upload keystore.** One USB copy exists. Recommend encrypted cloud or a second USB stored elsewhere before first Play Console upload. Single-medium backups fail.
+3. **OPERATOR-SIDE — second-medium copy of upload keystore.** One USB copy exists at `/media/witchdoctor/writable/wickedsalem-upload-key-backup-2026-04-26/`. Recommend encrypted cloud or a second USB stored elsewhere before first Play Console upload. Single-medium backups fail. Run `sudo bash ~/keys/backup-staging/copy-to-usb.sh` against a different mounted medium.
 
-4. **Tier 2 — admin → build pipeline auto-bake** (S180 carry-forward). Per `feedback_admin_changes_propagate_to_builds.md`. Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG. Could fold into S182 P3 since both involve re-baking.
+4. **Tier 2 — admin → build pipeline auto-bake** (S180 carry-forward). Per `feedback_admin_changes_propagate_to_builds.md`. Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG. Higher priority once the operator finishes hand-curating tour stops, since those edits sit in PG and need to land in the next AAB.
 
 5. **Tier 3 — Content-data fixes for outlier POIs** (S178 carry-forward). Two POIs have wrong coords causing >60m snap gaps even with S179's densified graph: `salem_common_2` at (42.5203, -70.8816) is 600m from actual Salem Common (~42.5232, -70.8908); `salem_willows` at (42.535, -70.86945) is mid-parking-lot. SQL UPDATE + re-bake + rebuild AAB. Heritage Trail tour also references 6 POIs not in curated tour-POI set.
 
@@ -24,7 +24,7 @@ S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First 
 
 7. **OPERATOR-SIDE async** (no Claude action): Form TX copyright (lawyer handling, hard deadline 2026-05-20), Play Developer Account verification (multi-week lead time, will tackle in a later session), Privacy Policy public hosting (waiting on lawyer approval).
 
-8. **DEFERRED from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water-aware approach segments (post-V1).
+8. **DEFERRED from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water-aware approach segments (post-V1). **Do not propose** as part of routing-quality work — see new content-not-engineering rule.
 
 9. **DirectionsSession JVM tests** (still deferred). Convenience-not-correctness.
 
@@ -54,7 +54,8 @@ S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First 
 
 ## Architectural pivots & rule changes (recent → older)
 
-- **2026-04-26 (S181):** OSM allowed for routing graph (broad pedestrian-network ingest), build-time only. `feedback_no_osm_use_local_geo.md` amended. Plan at `docs/plans/S182-osm-pedestrian-routing-merge.md`.
+- **2026-04-26 (S182):** Tour route fidelity declared content-authoring, not engineering. New HARD RULE `feedback_tour_routing_is_content_not_engineering.md` — operator hand-curates tour stops; routing graph, geocoder, anchor schema, and Router changes are parked for V1.
+- **2026-04-26 (S182):** S181 OSM-policy reversal RETRACTED. Diagnosis was wrong (`Router.routeMulti` is per-leg P2P + concat; visual divergence is from POI-centroid input, not from a graph deficiency). Plan archived to `docs/archive/`. `feedback_no_osm_use_local_geo.md` restored to S178 surgical-only constraint.
 - **2026-04-26 (S180):** V1 manifest stripped of network permissions; V1 feature gates R8-stripped from binary. App network-incapable at OS level. Rule: `feedback_v1_no_external_contact.md` (zero outside contact except GPS).
 - **2026-04-25 (S178):** Surgical 3-osm_id allowlist for wharf walkways added to `salem.edges` (Derby Wharf, Pickering Wharf, Seven Gables). Superseded by S181 broader policy.
 - **2026-04-25 (S175):** On-device Salem router shipped (TIGER bake → APK + Directions UI). End of OSRM/online-tile dependency for routing.
@@ -79,7 +80,7 @@ S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First 
 | **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
 | **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 181. Salem 400+ target 2026-09-01 aspirational.
+**Sessions completed:** 182. Salem 400+ target 2026-09-01 aspirational.
 
 ---
 
