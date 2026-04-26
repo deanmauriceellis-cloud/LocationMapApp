@@ -352,17 +352,24 @@ class PoiDetailSheet : DialogFragment() {
 
     private fun bindWebsiteButton(view: View) {
         val btn = view.findViewById<TextView>(R.id.btnWebsite)
-        // S180: V1 zero-network — Visit Website button is hidden entirely.
-        // Re-enable for V2 by flipping FeatureFlags.V1_OFFLINE_ONLY.
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
-            btn.visibility = View.GONE
-            return
-        }
         val site = poi.website?.takeIf { it.isNotBlank() } ?: return
         btn.visibility = View.VISIBLE
         btn.setOnClickListener {
             DebugLogger.i(TAG, "website clicked id=${poi.id} url=$site")
             cancelSheetRead()
+            // S180: V1 zero-network — handed off to external browser via
+            // ACTION_VIEW. Our app does not load the URL itself (no INTERNET
+            // permission, no in-app WebView). Whatever browser the user has
+            // installed handles the network request with its own permission.
+            // V2 reverts to in-app WebView via showFullScreenWebView.
+            if (FeatureFlags.V1_OFFLINE_ONLY) {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site)))
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "External browser launch failed: ${e.message}")
+                }
+                return@setOnClickListener
+            }
             val hostActivity = this.activity as? SalemMainActivity
             if (hostActivity != null) {
                 hostActivity.showFullScreenWebView(site, poi.name)
@@ -506,8 +513,14 @@ class PoiDetailSheet : DialogFragment() {
         cancelSheetRead()
         when (action) {
             is PoiActionSynthesizer.Action.VisitWebsite -> {
-                // S180: V1 zero-network — never launch the embedded browser.
-                if (!FeatureFlags.V1_OFFLINE_ONLY) {
+                if (FeatureFlags.V1_OFFLINE_ONLY) {
+                    // V1: hand off to external browser via ACTION_VIEW.
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(action.url)))
+                    } catch (e: Exception) {
+                        DebugLogger.w(TAG, "External browser launch failed: ${e.message}")
+                    }
+                } else {
                     (activity as? SalemMainActivity)?.showFullScreenWebView(action.url, poi.name)
                 }
             }

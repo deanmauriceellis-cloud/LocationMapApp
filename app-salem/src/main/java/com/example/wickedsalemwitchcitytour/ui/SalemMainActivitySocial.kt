@@ -9,6 +9,7 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import com.example.locationmapapp.util.FeatureFlags
 import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.Outline
@@ -38,6 +39,13 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MainActivit
 // =========================================================================
 
 internal fun SalemMainActivity.showAuthDialog() {
+    // S180: V1 zero-network defensive gate. Entry points are already
+    // stripped (AppBarMenuManager grid omits Social/Chat/Profile in V1)
+    // but guard the dialog body too — defence-in-depth.
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        DebugLogger.i("SalemMainActivity", "showAuthDialog suppressed — V1 zero-network")
+        return
+    }
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -204,6 +212,13 @@ internal fun SalemMainActivity.showAuthDialog() {
 }
 
 internal fun SalemMainActivity.showChatDialog() {
+    // S180: V1 zero-network defensive gate. Entry points are already
+    // stripped (AppBarMenuManager grid omits Social/Chat/Profile in V1)
+    // but guard the dialog body too — defence-in-depth.
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        DebugLogger.i("SalemMainActivity", "showChatDialog suppressed — V1 zero-network")
+        return
+    }
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -410,6 +425,13 @@ internal fun SalemMainActivity.showChatDialog() {
 }
 
 internal fun SalemMainActivity.showChatRoomDialog(roomId: String, roomName: String) {
+    // S180: V1 zero-network defensive gate. Entry points are already
+    // stripped (AppBarMenuManager grid omits Social/Chat/Profile in V1)
+    // but guard the dialog body too — defence-in-depth.
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        DebugLogger.i("SalemMainActivity", "showChatRoomDialog suppressed — V1 zero-network")
+        return
+    }
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -588,6 +610,13 @@ internal fun SalemMainActivity.showChatRoomDialog(roomId: String, roomName: Stri
 }
 
 internal fun SalemMainActivity.showAddCommentDialog(osmType: String, osmId: Long) {
+    // S180: V1 zero-network defensive gate. Entry points are already
+    // stripped (AppBarMenuManager grid omits Social/Chat/Profile in V1)
+    // but guard the dialog body too — defence-in-depth.
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        DebugLogger.i("SalemMainActivity", "showAddCommentDialog suppressed — V1 zero-network")
+        return
+    }
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -739,6 +768,13 @@ internal fun SalemMainActivity.showAddCommentDialog(osmType: String, osmId: Long
 }
 
 internal fun SalemMainActivity.showProfileDialog() {
+    // S180: V1 zero-network defensive gate. Entry points are already
+    // stripped (AppBarMenuManager grid omits Social/Chat/Profile in V1)
+    // but guard the dialog body too — defence-in-depth.
+    if (FeatureFlags.V1_OFFLINE_ONLY) {
+        DebugLogger.i("SalemMainActivity", "showProfileDialog suppressed — V1 zero-network")
+        return
+    }
     val user = socialViewModel.authUser.value
     if (user == null) {
         showAuthDialog()
