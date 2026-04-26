@@ -41,6 +41,38 @@ function validateLatLng(lat, lng) {
 module.exports = function(app, deps) {
   const { pgPool, requirePg } = deps;
 
+  // ─── Helpers for the S183 "Compute Route" tool ─────────────────────────────
+  //
+  // salemRoute / salemBundle come from lib/salem-router.js (captured into
+  // deps in server.js). They drive the same SQLite bundle the APK ships, so
+  // a leg routed here matches what the on-device router would produce.
+  function routerAvailable() {
+    return typeof deps.salemRoute === 'function' && typeof deps.salemBundle === 'function' && !!deps.salemBundle();
+  }
+  function routerVersion() {
+    const b = deps.salemBundle && deps.salemBundle();
+    if (!b || !b.meta) return null;
+    return b.meta.built_at || `schema_v${b.meta.schema_version}-nodes${b.nodeCount}-edges${b.edgeCount}`;
+  }
+  // SELECT effective stops for a tour in walk order. Each row has stop_id +
+  // effective_lat/lng (override → POI fallback). Drops stops with no usable
+  // coords from the leg list (they can't be routed).
+  async function fetchEffectiveStops(client, tourId) {
+    const { rows } = await client.query(
+      `SELECT s.stop_id,
+              s.stop_order,
+              COALESCE(s.lat, p.lat) AS lat,
+              COALESCE(s.lng, p.lng) AS lng,
+              COALESCE(s.name, p.name) AS name
+         FROM salem_tour_stops s
+    LEFT JOIN salem_pois p ON p.id = s.poi_id
+        WHERE s.tour_id = $1
+     ORDER BY s.stop_order ASC, s.stop_id ASC`,
+      [tourId]
+    );
+    return rows;
+  }
+
   // ─── GET /admin/salem/tours ─────────────────────────────────────────────────
   app.get('/admin/salem/tours', requirePg, async (_req, res) => {
     try {
@@ -493,6 +525,255 @@ module.exports = function(app, deps) {
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       console.error('[AdminTours] reorder error:', err.message);
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ─── GET /admin/salem/tours/:tour_id/legs ──────────────────────────────────
+  // Returns all precomputed legs for the tour in leg_order. Empty array if
+  // the route hasn't been computed yet.
+  app.get('/admin/salem/tours/:tour_id/legs', requirePg, async (req, res) => {
+    try {
+      const tourId = req.params.tour_id;
+      const { rows } = await pgPool.query(
+        `SELECT tour_id, leg_order, from_stop_id, to_stop_id,
+                polyline_json, distance_m, duration_s,
+                router_version, manual_edits, computed_at
+           FROM salem_tour_legs
+          WHERE tour_id = $1
+       ORDER BY leg_order ASC`,
+        [tourId]
+      );
+      res.json({ tour_id: tourId, count: rows.length, legs: rows });
+    } catch (err) {
+      console.error('[AdminTours] list legs error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── POST /admin/salem/tours/:tour_id/compute-route ────────────────────────
+  // Routes every consecutive (stop_order n → n+1) pair via the bundle router
+  // and persists the result to salem_tour_legs. Replaces any existing legs
+  // for the tour. Skips legs whose endpoints have no usable coords (effective
+  // lat/lng null) — those rows simply won't have a leg.
+  //
+  // By default, legs with manual_edits set are PRESERVED (their polyline isn't
+  // overwritten). Pass { force: true } in the body to recompute everything.
+  app.post('/admin/salem/tours/:tour_id/compute-route', requirePg, async (req, res) => {
+    if (!routerAvailable()) {
+      return res.status(503).json({ error: 'Salem routing bundle not loaded' });
+    }
+    const client = await pgPool.connect();
+    try {
+      const tourId = req.params.tour_id;
+      const force = !!(req.body && req.body.force === true);
+
+      const tourQ = await client.query(`SELECT id FROM salem_tours WHERE id = $1`, [tourId]);
+      if (!tourQ.rows.length) {
+        client.release();
+        return res.status(404).json({ error: 'Tour not found' });
+      }
+
+      const stops = await fetchEffectiveStops(client, tourId);
+      if (stops.length < 2) {
+        client.release();
+        return res.status(400).json({ error: 'tour has fewer than 2 stops with coords; nothing to route' });
+      }
+
+      // Snapshot existing legs so we can preserve manual_edits unless force.
+      const prevQ = await client.query(
+        `SELECT leg_order, manual_edits, polyline_json, distance_m, duration_s, router_version
+           FROM salem_tour_legs WHERE tour_id = $1`,
+        [tourId]
+      );
+      const prevByOrder = new Map();
+      for (const r of prevQ.rows) prevByOrder.set(r.leg_order, r);
+
+      const version = routerVersion();
+      const legs = [];
+      const skipped = [];
+      for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i];
+        const b = stops[i + 1];
+        const legOrder = i + 1;
+        if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) {
+          skipped.push({ leg_order: legOrder, reason: 'missing coords' });
+          continue;
+        }
+
+        const prev = prevByOrder.get(legOrder);
+        if (!force && prev && prev.manual_edits != null) {
+          // Preserve hand-edited leg. Echo it back unchanged.
+          legs.push({
+            leg_order: legOrder,
+            from_stop_id: a.stop_id,
+            to_stop_id: b.stop_id,
+            polyline_json: prev.polyline_json,
+            distance_m: prev.distance_m,
+            duration_s: prev.duration_s,
+            router_version: prev.router_version,
+            manual_edits: prev.manual_edits,
+            preserved: true,
+          });
+          continue;
+        }
+
+        let r;
+        try {
+          r = deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
+        } catch (err) {
+          skipped.push({ leg_order: legOrder, reason: `router error: ${err.message}` });
+          continue;
+        }
+        if (!r || !r.geometry || r.geometry.length < 2) {
+          skipped.push({ leg_order: legOrder, reason: 'no route found' });
+          continue;
+        }
+
+        legs.push({
+          leg_order: legOrder,
+          from_stop_id: a.stop_id,
+          to_stop_id: b.stop_id,
+          polyline_json: r.geometry, // [[lat,lng], ...]
+          distance_m: r.distanceM,
+          duration_s: r.durationS,
+          router_version: version,
+          manual_edits: null,
+          preserved: false,
+        });
+      }
+
+      // Replace-and-write inside a transaction.
+      await client.query('BEGIN');
+      await client.query(`DELETE FROM salem_tour_legs WHERE tour_id = $1`, [tourId]);
+      for (const leg of legs) {
+        await client.query(
+          `INSERT INTO salem_tour_legs
+             (tour_id, leg_order, from_stop_id, to_stop_id,
+              polyline_json, distance_m, duration_s,
+              router_version, manual_edits, computed_at)
+           VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb, NOW())`,
+          [
+            tourId, leg.leg_order, leg.from_stop_id, leg.to_stop_id,
+            JSON.stringify(leg.polyline_json),
+            leg.distance_m, leg.duration_s,
+            leg.router_version,
+            leg.manual_edits == null ? null : JSON.stringify(leg.manual_edits),
+          ]
+        );
+      }
+      // Roll up totals onto salem_tours so the list view stays accurate.
+      let totalM = 0, totalS = 0;
+      for (const leg of legs) { totalM += leg.distance_m; totalS += leg.duration_s; }
+      await client.query(
+        `UPDATE salem_tours
+            SET distance_km = $1,
+                estimated_minutes = $2,
+                updated_at = NOW()
+          WHERE id = $3`,
+        [Math.round((totalM / 1000) * 100) / 100, Math.round(totalS / 60), tourId]
+      );
+      await client.query('COMMIT');
+
+      res.json({
+        tour_id: tourId,
+        leg_count: legs.length,
+        skipped,
+        total_distance_m: totalM,
+        total_duration_s: totalS,
+        router_version: version,
+        force,
+        legs,
+      });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('[AdminTours] compute-route error:', err.message);
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ─── POST /admin/salem/tours/:tour_id/legs/:leg_order/recompute ────────────
+  // Recompute a single leg. Preserves other legs, and (by default) refuses to
+  // overwrite a leg with manual_edits unless force=true.
+  app.post('/admin/salem/tours/:tour_id/legs/:leg_order/recompute', requirePg, async (req, res) => {
+    if (!routerAvailable()) {
+      return res.status(503).json({ error: 'Salem routing bundle not loaded' });
+    }
+    const client = await pgPool.connect();
+    try {
+      const tourId = req.params.tour_id;
+      const legOrder = parseInt(req.params.leg_order, 10);
+      if (!Number.isInteger(legOrder) || legOrder <= 0) {
+        return res.status(400).json({ error: 'leg_order must be a positive integer' });
+      }
+      const force = !!(req.body && req.body.force === true);
+
+      const stops = await fetchEffectiveStops(client, tourId);
+      const a = stops[legOrder - 1];
+      const b = stops[legOrder];
+      if (!a || !b) {
+        return res.status(400).json({ error: `leg_order ${legOrder} out of range (tour has ${stops.length} stops)` });
+      }
+      if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) {
+        return res.status(400).json({ error: 'one or both endpoints have no coords' });
+      }
+
+      const prevQ = await client.query(
+        `SELECT manual_edits FROM salem_tour_legs
+          WHERE tour_id = $1 AND leg_order = $2`,
+        [tourId, legOrder]
+      );
+      const prevManual = prevQ.rows[0] ? prevQ.rows[0].manual_edits : null;
+      if (!force && prevManual != null) {
+        return res.status(409).json({
+          error: 'leg has manual edits — pass { force: true } to overwrite',
+        });
+      }
+
+      const r = deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
+      if (!r || !r.geometry || r.geometry.length < 2) {
+        return res.status(404).json({ error: 'no route found for this leg' });
+      }
+
+      const version = routerVersion();
+      await client.query(
+        `INSERT INTO salem_tour_legs
+           (tour_id, leg_order, from_stop_id, to_stop_id,
+            polyline_json, distance_m, duration_s,
+            router_version, manual_edits, computed_at)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,NULL,NOW())
+         ON CONFLICT (tour_id, leg_order) DO UPDATE
+           SET from_stop_id   = EXCLUDED.from_stop_id,
+               to_stop_id     = EXCLUDED.to_stop_id,
+               polyline_json  = EXCLUDED.polyline_json,
+               distance_m     = EXCLUDED.distance_m,
+               duration_s     = EXCLUDED.duration_s,
+               router_version = EXCLUDED.router_version,
+               manual_edits   = NULL,
+               computed_at    = NOW()`,
+        [
+          tourId, legOrder, a.stop_id, b.stop_id,
+          JSON.stringify(r.geometry),
+          r.distanceM, r.durationS,
+          version,
+        ]
+      );
+
+      const out = await client.query(
+        `SELECT tour_id, leg_order, from_stop_id, to_stop_id,
+                polyline_json, distance_m, duration_s,
+                router_version, manual_edits, computed_at
+           FROM salem_tour_legs
+          WHERE tour_id = $1 AND leg_order = $2`,
+        [tourId, legOrder]
+      );
+      res.json(out.rows[0]);
+    } catch (err) {
+      console.error('[AdminTours] recompute leg error:', err.message);
       res.status(500).json({ error: err.message });
     } finally {
       client.release();

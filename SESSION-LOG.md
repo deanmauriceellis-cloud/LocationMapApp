@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 173-182. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 174-183. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 183: 2026-04-26 — Tour walking-route content tool: per-leg compute + admin overlay
+
+Different path from S182's "hand-curate stop coords" framing. Operator created a fresh `tour_WD1` (15 free waypoints) and asked for a one-click admin tool to convert waypoints into per-leg walking polylines, persist them, and render the whole path as a saved overlay. New PG table `salem_tour_legs` (per-leg `polyline_json` JSONB + distance/duration + `router_version` + nullable `manual_edits` JSONB), 3 new admin endpoints under `/admin/salem/tours/:tour_id` (`GET /legs`, `POST /compute-route` with manual-edits preservation unless `force:true`, `POST /legs/:leg_order/recompute`). `cache-proxy/server.js` captures the salem-router module into `deps.salemRoute`/`deps.salemBundle` so admin-tours calls the same in-process bundle Find→Directions uses (44,223 nodes / 47,704 edges). Web admin: new "Walking route" panel above the Waypoints list (Compute / Recompute, Force-all, per-leg list with distance + ↻ recompute, stale indicator), and a green outlined polyline overlay on the Leaflet map matching the in-app `DirectionsLayer` style. CLI verification: `tour_WD1` computed cleanly to 14 legs / 6815.5 m / 4868.2 s, no skipped legs, router_version `2026-04-26T04:47:09+00:00`. TypeScript clean (`tsc --noEmit` exit 0); Vite HMR fired through TourTree → AdminLayout → AdminMap. Salem-content bake to include `salem_tour_legs` and the app-side switch (`TourViewModel.computeTourPolyline()` reads baked legs first, falls back to runtime `routeMulti`) are deferred to follow-up sessions — that's what closes the loop into the AAB. S182's content-not-engineering rule still holds: route work is now entirely authoring-time (admin one-click), zero runtime engine change in the APK.
+
+Full session detail: `docs/session-logs/session-183-2026-04-26.md`. Commit: `<S183-close-sha>`.
+
+---
 
 ## Session 182: 2026-04-26 — S181 OSM-policy reversal RETRACTED; tour-rendering declared content-not-engineering
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-174-2026-04-25.md`. Commit: `42f
 
 ---
 
-## Session 173: 2026-04-25 — Cemetery firefly alignment investigation (no-op session, reverted)
-
-Investigated the Quaker cemetery firefly bug — fireflies were rendering in a void next to the visible cemetery polygon, not on it. Root cause traced to a polygon-source mismatch: the Witchy basemap renders cemeteries from OSM data (via the planetiler tile bake), while our firefly polygon library queries `massgis.openspace prim_purp='H'`, which has only a 1455 m² 4-vertex sliver in the wrong place for `gid=27152` "Essex Street Cemetery". Tried two fixes — exclusion of the bad gid (operator reversed), then a B1+B2 source-merge (prefer `massgis.landuse lu37_1999=34` when area-comparable, plus a side-car JSON of hand-corrected overrides for problem cases). B1 made the OTHER ~46 cemeteries' polygons drift out of alignment with the basemap render — landuse=34 polygons disagree with OSM more than openspace does despite being the more specific MassGIS class. Operator instructed full revert. Net code change this session: zero. Quaker cemetery firefly bug remains parked; the per-feature override mechanism is a known path forward when operator wants to address it surgically.
-
-Full session detail: `docs/session-logs/session-173-2026-04-25.md`. Commit: pending.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 172 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 173 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S173 rolled to archive 2026-04-26 by the session-end protocol (S183) -->
 <!-- S172 rolled to archive 2026-04-26 by the session-end protocol (S182) -->
 <!-- S171 rolled to archive 2026-04-26 by the session-end protocol (S181) -->
 <!-- S170 rolled to archive 2026-04-26 by the session-end protocol (S180) -->

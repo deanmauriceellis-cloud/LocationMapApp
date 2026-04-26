@@ -189,7 +189,11 @@ require('./lib/salem')(app, deps);
 
 // Salem walking router (S177 P4) — same SQLite bundle the APK ships,
 // optional ?source=live fall-through to TigerLine for verification.
-require('./lib/salem-router')(app, deps);
+// Capture the module's return so admin-tours can call the bundle router
+// in-process (S183 — admin "Compute Route" tool for per-leg tour polylines).
+const salemRouterModule = require('./lib/salem-router')(app, deps);
+deps.salemRoute = salemRouterModule._route;
+deps.salemBundle = salemRouterModule._bundle;
 
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);

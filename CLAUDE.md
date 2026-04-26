@@ -6,46 +6,51 @@
 
 ---
 
-## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S182 open, 2026-04-26)
+## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S183 close, 2026-04-26)
 
 > **Operator override of lean-startup rule.** Read this block at session start *before* the lean greeting. Pinned here because CLAUDE.md auto-loads and these items are time-sensitive or load-bearing for V1 ship. Once an item is done, remove it from this block and move it to STATE.md.
 
-### State as of S182 open (S181 reversal retracted)
+### State as of S183 close
 
 - **S180 first signed AAB still standing.** `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Signed APK installed and running on Lenovo TB305FU.
-- **S181 OSM policy reversal RETRACTED at S182 open.** S181's "broad pedestrian-network OSM ingest" decision was based on a misdiagnosis: per-leg Find→Directions on the same graph routes cleanly between the same POIs, so the fault is in the tour-rendering path (`routeMulti` / Heritage tour polyline builder), not the graph and not the data sources. `feedback_no_osm_use_local_geo.md` restored to the S178 surgical-only constraint. Plan `docs/plans/S182-osm-pedestrian-routing-merge.md` archived to `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md` — do not execute.
+- **S183 shipped: per-leg tour walking-route admin tool (backend + UI).** New PG table `salem_tour_legs` (per-leg JSONB polyline + distance/duration + router_version + nullable manual_edits). 3 cache-proxy admin endpoints (`GET /admin/salem/tours/:id/legs`, `POST /compute-route`, `POST /legs/:n/recompute`). Web admin: "Walking route" panel + green polyline overlay matching the in-app `DirectionsLayer` style. CLI-verified on `tour_WD1` (14 legs / 6.82 km / 81 min, no skipped legs). Operator hasn't yet eyeballed the admin map render — that's S184 step 1.
+- **App-side consumption is NOT yet shipped.** `TourViewModel` still calls runtime `routeMulti`. Salem-content bake does not yet include `salem_tour_legs`. Those two pieces are what land S183 work into the AAB.
 - **Upload signing key — one off-machine copy on USB**, second-medium copy still owed before first Play Console upload.
-- Last LMA commit: `<S182-open-sha>` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
+- Last LMA commit: `<S183-close-sha>` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
 
-### S182 next steps — in priority order
+### S184 next steps — in priority order
 
 **Claude-side technical work (load-bearing):**
 
-1. **Investigate the tour-rendering code path.** Locate `routeMulti` / `TourRouteLoader` / Heritage Trail polyline builder. Compare what the tour does to what per-leg Find→Directions does on the same graph. Identify why the multi-stop tour polyline appears to cross buildings while single P2P does not. Likely candidates: tour stops connected via straight-line interpolation between graph hits, `routeMulti` snapping/concatenating in a way that diverges from per-leg routing, or per-leg results being post-processed into a smoothed polyline that loses the road-graph fidelity. Once root cause is identified, fix the tour path (likely in `:routing-jvm` and/or `WalkingDirections` / `TourRouteLoader`).
+1. **Operator browser-test the S183 admin walking-route tool first.** Refresh `http://localhost:4302/admin/tours`, pick `tour_WD1`. Should see "Walking route" panel populated (`14 legs · 6.82 km · 81 min`) and a green polyline weaving through the 15 numbered waypoints. Per-leg ↻ recompute should work without disturbing other legs. If overlay alignment / leg count / button states look wrong, fix that before moving on. Cache-proxy (4300) and Vite (4302) were left running at S183 close — re-start with `bin/restart-proxy.sh` + `bin/start-web.sh` if down.
 
-2. **Continue eyes-on smoke test on Lenovo** (S180 carry-forward). Remaining items, all should be visually invisible in V1 release:
+2. **Bake `salem_tour_legs` into `salem_content.db`.** Extend the `salem-content` JVM pipeline (mirror the existing `salem_tours` / `salem_tour_stops` bake pattern). Add a new Room entity + DAO (`TourLeg`, `TourLegDao`) on the app side. First half of "land S183 in the AAB."
+
+3. **Switch `TourViewModel.computeTourPolyline()` to baked legs.** When baked legs exist for the active tour, concatenate their `polyline_json` arrays and render directly — skip `routeMulti` entirely. Fall back to runtime `routeMulti` only if legs are missing for the tour (transitional safety). Second half of "land S183 in the AAB" and what eliminates the runtime "tour polyline crosses buildings" issue.
+
+4. **Continue eyes-on smoke test on Lenovo** (S180/S181/S182 carry-forward). All items should be invisible in V1 release:
    - POI detail Visit Website button: appears when POI has URL, click hands off to Chrome via ACTION_VIEW (per S180 P3).
    - Find dialog → POI detail: Reviews button NOT rendered. Comments section NOT rendered. Website area shows "Website unavailable offline" placeholder.
-   - Find dialog → Directions: uses on-device walking router (green/dark-green polyline like point-to-point), NOT Google Maps.
+   - Find dialog → Directions: uses on-device walking router (green/dark-green polyline), NOT Google Maps.
    - Toolbar: NO Weather/Transit/CAMs/Aircraft/Radar buttons (V1-gated by AppBarMenuManager from S141/S144).
    - Webcam dialog (if reached via geofence): "View Live" button NOT rendered.
-   - Worth interleaving with #1 since the tour-rendering fix will rebuild the AAB anyway.
+   - Worth interleaving with #2/#3 since the next AAB rebuilds anyway.
 
-3. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` is 600m off (sits at 42.5203,-70.8816 instead of ~42.5232,-70.8908); `salem_willows` is mid-parking-lot at 42.535,-70.86945. Fix via `UPDATE salem_pois`, re-bake `salem_content.db`, rebuild AAB. Heritage Trail tour also references 6 POIs not in curated tour-POI set.
+5. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Gradle task that re-runs `salem-content` JVM bake from PG (`salem_pois` + `salem_tours` + `salem_tour_stops` + `salem_tour_legs`) → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG. More important now that tour-leg authoring lands in PG.
 
-4. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG.
+6. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` is 600m off (sits at 42.5203,-70.8816 instead of ~42.5232,-70.8908); `salem_willows` is mid-parking-lot at 42.535,-70.86945. Fix via `UPDATE salem_pois`, re-bake `salem_content.db`, rebuild AAB.
 
-5. **Pre-AAB hard-delete dedup losers.** S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
+7. **Pre-AAB hard-delete dedup losers.** S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
 
-6. **Deferred from S179** (still valid, lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; water-aware approach segments.
+8. **Deferred from S179/S183** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; water-aware approach segments; admin vertex hand-editing for `salem_tour_legs` (drag-to-edit polyline → PATCH `/legs/:n` with `manual_edits`).
 
 **Operator-side (Claude cannot do these for you):**
 
-7. **CRITICAL — second-medium copy of upload signing key.** USB copy on `/media/witchdoctor/writable/wickedsalem-upload-key-backup-2026-04-26/` exists. Recommend encrypted cloud or second USB stored elsewhere. Single-medium backups fail. Run `sudo bash ~/keys/backup-staging/copy-to-usb.sh` against second USB if going that route.
-8. **Form TX copyright registration** — lawyer is handling, hard deadline **2026-05-20** (statutory damages window).
-9. **Google Play Developer Account + identity verification.** $25 one-time at play.google.com/console. Multi-week lead time. Operator deferred to a later session.
-10. **Privacy Policy public hosting + in-app link.** Waiting on lawyer approval. V1-minimal Posture A draft at `docs/PRIVACY-POLICY-V1.md`.
-11. **Merchant / payments profile** in Play Console.
+9. **CRITICAL — second-medium copy of upload signing key.** USB copy on `/media/witchdoctor/writable/wickedsalem-upload-key-backup-2026-04-26/` exists. Recommend encrypted cloud or second USB stored elsewhere. Single-medium backups fail. Run `sudo bash ~/keys/backup-staging/copy-to-usb.sh` against second USB if going that route.
+10. **Form TX copyright registration** — lawyer is handling, hard deadline **2026-05-20** (statutory damages window).
+11. **Google Play Developer Account + identity verification.** $25 one-time at play.google.com/console. Multi-week lead time. Operator deferred to a later session.
+12. **Privacy Policy public hosting + in-app link.** Waiting on lawyer approval. V1-minimal Posture A draft at `docs/PRIVACY-POLICY-V1.md`.
+13. **Merchant / payments profile** in Play Console.
 
 ### Key paths to remember
 
@@ -54,6 +59,9 @@
 - Signing properties: `~/.gradle/gradle.properties` (mode 0600)
 - AAB build artifact: `app-salem/build/outputs/bundle/release/app-salem-release.aab`
 - APK build artifact: `app-salem/build/outputs/apk/release/app-salem-release.apk`
+- S183 migration: `cache-proxy/scripts/2026-04-26-tour-legs.sql` (idempotent, already applied to PG)
+- Admin walking-route endpoints: `cache-proxy/lib/admin-tours.js` (compute-route + recompute + GET /legs)
+- Web admin route panel: `web/src/admin/TourTree.tsx` `RouteSection` + `web/src/admin/AdminMap.tsx` `TourLegsLayer`
 - Archived (do-not-execute) OSM merge plan: `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md`
 - OMEN credential audit: `~/Development/OMEN/docs/credential-audit-2026-04-05.md` (Amendment 2026-04-26)
 - Build commands: `./gradlew :app-salem:bundleRelease` (AAB) / `:app-salem:assembleRelease` (APK)

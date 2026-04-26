@@ -12,7 +12,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
+  ComputeRouteResponse,
   TourDetailResponse,
+  TourLeg,
+  TourLegsResponse,
   TourStop,
   TourSummary,
   ToursListResponse,
@@ -28,6 +31,8 @@ interface TourTreeProps {
   /** Add-stop interaction mode. Forwarded to the map. */
   addStopMode: AddStopMode
   onAddStopModeChange: (mode: AddStopMode) => void
+  /** Notifies the parent (AdminLayout) so AdminMap can render the legs. */
+  onLegsChange?: (legs: TourLeg[] | null) => void
 }
 
 const ENDPOINT = '/api/admin/salem/tours'
@@ -51,13 +56,21 @@ export function TourTree({
   refreshKey,
   addStopMode,
   onAddStopModeChange,
+  onLegsChange,
 }: TourTreeProps) {
   const [tours, setTours] = useState<TourSummary[] | null>(null)
   const [tour, setTour] = useState<TourSummary | null>(null)
   const [stops, setStops] = useState<TourStop[] | null>(null)
+  const [legs, setLegs] = useState<TourLeg[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [computing, setComputing] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+
+  // Push legs up to AdminLayout whenever they change so AdminMap can render.
+  useEffect(() => {
+    onLegsChange?.(legs)
+  }, [legs, onLegsChange])
 
   const loadTours = useCallback(async () => {
     setError(null)
@@ -66,6 +79,19 @@ export function TourTree({
       setTours(body.tours)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
+  const loadLegs = useCallback(async (tourId: string) => {
+    try {
+      const body = await fetchJson<TourLegsResponse>(
+        `${ENDPOINT}/${encodeURIComponent(tourId)}/legs`,
+      )
+      setLegs(body.legs)
+    } catch (e) {
+      // Legs endpoint failure is non-fatal — operator may not have computed yet.
+      console.warn('[TourTree] loadLegs:', e instanceof Error ? e.message : e)
+      setLegs(null)
     }
   }, [])
 
@@ -79,11 +105,64 @@ export function TourTree({
         setTour(body.tour)
         setStops(body.stops)
         onTourSelect(body.tour, body.stops)
+        // Fetch legs in parallel — won't block the stops view.
+        void loadLegs(tourId)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       }
     },
-    [onTourSelect],
+    [onTourSelect, loadLegs],
+  )
+
+  const handleComputeRoute = useCallback(
+    async (force = false) => {
+      if (!tour) return
+      setComputing(true)
+      setError(null)
+      try {
+        const body = await fetchJson<ComputeRouteResponse>(
+          `${ENDPOINT}/${encodeURIComponent(tour.id)}/compute-route`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force }),
+          },
+        )
+        setLegs(body.legs)
+        // Roll-up may have updated tour.distance_km / estimated_minutes.
+        await loadTours()
+        await loadTour(tour.id)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setComputing(false)
+      }
+    },
+    [tour, loadTour, loadTours],
+  )
+
+  const handleRecomputeLeg = useCallback(
+    async (legOrder: number, force = false) => {
+      if (!tour) return
+      setBusy(true)
+      setError(null)
+      try {
+        await fetchJson(
+          `${ENDPOINT}/${encodeURIComponent(tour.id)}/legs/${legOrder}/recompute`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force }),
+          },
+        )
+        await loadLegs(tour.id)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [tour, loadLegs],
   )
 
   useEffect(() => {
@@ -343,6 +422,16 @@ export function TourTree({
             )}
           </div>
 
+          <RouteSection
+            tour={tour}
+            stopCount={stops?.length ?? 0}
+            legs={legs}
+            computing={computing}
+            busy={busy}
+            onCompute={handleComputeRoute}
+            onRecomputeLeg={handleRecomputeLeg}
+          />
+
           <ol className="text-xs">
             {stops?.map((s, idx) => {
               const overridden = s.override_lat != null || s.override_lng != null
@@ -409,6 +498,144 @@ export function TourTree({
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Route section (S183) ──────────────────────────────────────────────────
+//
+// Compute Route button + per-leg list. Computes walking polylines for every
+// consecutive pair of stops via the on-device router (cache-proxy bundle),
+// and persists them to salem_tour_legs. The operator can then recompute a
+// single leg if a waypoint moved.
+interface RouteSectionProps {
+  tour: TourSummary
+  stopCount: number
+  legs: TourLeg[] | null
+  computing: boolean
+  busy: boolean
+  onCompute: (force?: boolean) => void | Promise<void>
+  onRecomputeLeg: (legOrder: number, force?: boolean) => void | Promise<void>
+}
+
+function RouteSection({
+  tour,
+  stopCount,
+  legs,
+  computing,
+  busy,
+  onCompute,
+  onRecomputeLeg,
+}: RouteSectionProps) {
+  const totalDistance = useMemo(
+    () => (legs ?? []).reduce((s, l) => s + l.distance_m, 0),
+    [legs],
+  )
+  const totalDuration = useMemo(
+    () => (legs ?? []).reduce((s, l) => s + l.duration_s, 0),
+    [legs],
+  )
+  const expectedLegs = Math.max(0, stopCount - 1)
+  const haveLegs = (legs?.length ?? 0) > 0
+  const stale = haveLegs && (legs?.length ?? 0) !== expectedLegs
+
+  return (
+    <details className="border-y border-slate-200" open>
+      <summary className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 cursor-pointer bg-slate-50 flex items-center justify-between gap-2">
+        <span>Walking route</span>
+        <span className="text-[10px] font-normal text-slate-500 normal-case">
+          {haveLegs
+            ? `${legs!.length} legs · ${(totalDistance / 1000).toFixed(2)} km · ${Math.round(
+                totalDuration / 60,
+              )} min`
+            : 'not computed'}
+        </span>
+      </summary>
+      <div className="px-3 py-2 space-y-2 text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => void onCompute(false)}
+            disabled={computing || busy || stopCount < 2}
+            className="text-xs px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40"
+          >
+            {computing ? 'Computing…' : haveLegs ? 'Recompute route' : 'Compute walking route'}
+          </button>
+          {haveLegs && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Force-recompute every leg, including any with manual edits? This will discard hand-edited polylines.')) {
+                  void onCompute(true)
+                }
+              }}
+              disabled={computing || busy}
+              className="text-xs px-2 py-1 rounded bg-rose-100 text-rose-700 border border-rose-300 hover:bg-rose-200 disabled:opacity-40"
+              title="Force overwrite legs that have manual edits"
+            >
+              Force all
+            </button>
+          )}
+          {stopCount < 2 && (
+            <span className="text-amber-700">Add at least 2 waypoints to route.</span>
+          )}
+          {stale && (
+            <span className="text-amber-700">
+              Legs out of date — {legs!.length} legs vs {expectedLegs} expected
+            </span>
+          )}
+        </div>
+
+        {haveLegs && (
+          <ol className="border border-slate-200 rounded divide-y divide-slate-100 bg-white">
+            {legs!.map((leg) => {
+              const edited = leg.manual_edits != null
+              return (
+                <li key={leg.leg_order} className="px-2 py-1 flex items-baseline gap-2">
+                  <span className="font-mono text-slate-400 w-6 shrink-0 tabular-nums">
+                    {leg.leg_order}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-700 tabular-nums">
+                      {leg.distance_m.toFixed(0)} m · {Math.round(leg.duration_s)} s
+                      {edited && (
+                        <span className="ml-1 text-amber-600" title="Hand-edited polyline">
+                          (edited)
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">
+                      {leg.polyline_json.length} pts
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (edited) {
+                        if (!window.confirm('This leg has manual edits. Recomputing will discard them. Continue?')) return
+                        void onRecomputeLeg(leg.leg_order, true)
+                      } else {
+                        void onRecomputeLeg(leg.leg_order, false)
+                      }
+                    }}
+                    disabled={busy || computing}
+                    title="Recompute this leg"
+                    className="px-1.5 py-0.5 rounded text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                  >
+                    ↻
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+
+        {haveLegs && tour.id && (
+          <div className="text-[10px] text-slate-400 font-mono">
+            router: {legs![0]?.router_version ?? '—'}
+          </div>
+        )}
+      </div>
+    </details>
   )
 }
 

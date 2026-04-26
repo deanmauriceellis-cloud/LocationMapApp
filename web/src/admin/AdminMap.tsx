@@ -10,7 +10,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.markercluster'
 import type { PoiRow, PoiSelection } from './PoiTree'
-import type { TourStop, TourSummary } from './tourTypes'
+import type { TourLeg, TourStop, TourSummary } from './tourTypes'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -133,6 +133,9 @@ interface AdminMapProps {
    *  renders numbered draggable waypoints over the basemap. */
   activeTour?: TourSummary | null
   tourStops?: TourStop[] | null
+  /** Precomputed walking legs (S183). When set, rendered as a green polyline
+   *  overlay underneath the waypoints. */
+  tourLegs?: TourLeg[] | null
   onStopMoved?: (stopId: number, lat: number, lng: number) => void
   /** Add-stop mode: 'free' = next map click creates a free waypoint,
    *  'poi' = next POI marker click adds that POI as a stop. */
@@ -724,6 +727,46 @@ function TourStopLayer({ stops, onDragEnd }: TourStopLayerProps) {
   return null
 }
 
+// ─── Tour legs layer (S183) ────────────────────────────────────────────────
+//
+// Renders the precomputed walking polyline for a tour as a green outline +
+// fill (matching the in-app directions style). Renders BELOW the numbered
+// stop markers and ABOVE the basemap. Each leg is a separate Leaflet
+// polyline (we keep them separate so future hand-vertex editing can target
+// one leg at a time).
+interface TourLegsLayerProps {
+  legs: TourLeg[]
+}
+
+function TourLegsLayer({ legs }: TourLegsLayerProps) {
+  const map = useMap()
+  useEffect(() => {
+    const group = L.layerGroup()
+    for (const leg of legs) {
+      const pts = leg.polyline_json
+      if (!Array.isArray(pts) || pts.length < 2) continue
+      // Outline (darker, wider) + fill (matches Android #22C55E walking-route).
+      L.polyline(pts as L.LatLngTuple[], {
+        color: '#0f5132',
+        weight: 8,
+        opacity: 0.45,
+        interactive: false,
+      }).addTo(group)
+      L.polyline(pts as L.LatLngTuple[], {
+        color: '#22C55E',
+        weight: 5,
+        opacity: 0.95,
+        interactive: false,
+      }).addTo(group)
+    }
+    group.addTo(map)
+    return () => {
+      map.removeLayer(group)
+    }
+  }, [legs, map])
+  return null
+}
+
 interface FitTourBoundsProps {
   stops: TourStop[] | null
   /** Bumps when a different tour is selected so we re-fit. */
@@ -963,6 +1006,7 @@ export function AdminMap({
   onClearCategoryFilter,
   activeTour,
   tourStops,
+  tourLegs,
   onStopMoved,
   addStopMode = 'none',
   onMapClickAddFree,
@@ -1190,6 +1234,9 @@ export function AdminMap({
           onClick={handleMapClickAddFree}
         />
         <FlyToSelected selectedPoi={selectedPoi} />
+        {tourLegs && tourLegs.length > 0 && (
+          <TourLegsLayer legs={tourLegs} />
+        )}
         {tourStops && tourStops.length > 0 && (
           <TourStopLayer stops={tourStops} onDragEnd={handleStopDragEnd} />
         )}

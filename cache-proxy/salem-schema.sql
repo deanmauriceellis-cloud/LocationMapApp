@@ -193,6 +193,37 @@ CREATE INDEX IF NOT EXISTS salem_tour_stops_tour_order_idx
   ON salem_tour_stops (tour_id, stop_order);
 
 -- ════════════════════════════════════════════════════════════════════
+-- Tour Legs (S183) — precomputed walking polylines between consecutive
+-- stops. Authored once via the admin "Compute Route" tool against the
+-- same on-device router the APK ships, persisted as content, and baked
+-- into salem_content.db so the runtime never has to route at all.
+-- One row per consecutive (stop_order n → n+1) pair.
+-- ════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS salem_tour_legs (
+  tour_id        TEXT    NOT NULL REFERENCES salem_tours(id) ON DELETE CASCADE,
+  leg_order      INTEGER NOT NULL,
+  from_stop_id   BIGINT  NOT NULL REFERENCES salem_tour_stops(stop_id) ON DELETE CASCADE,
+  to_stop_id     BIGINT  NOT NULL REFERENCES salem_tour_stops(stop_id) ON DELETE CASCADE,
+  -- Polyline as a JSONB array of [lat, lng] pairs (matches the bundle
+  -- router's geometry output and the Android renderer's input format).
+  polyline_json  JSONB   NOT NULL,
+  distance_m     REAL    NOT NULL,
+  duration_s     REAL    NOT NULL,
+  -- Bundle identifier so we can detect stale legs after a router refresh.
+  router_version TEXT,
+  -- Null until an operator hand-edits vertices in the admin tool. When
+  -- set, "recompute" leaves the row alone unless force-recompute is asked.
+  manual_edits   JSONB,
+  computed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tour_id, leg_order)
+);
+CREATE INDEX IF NOT EXISTS salem_tour_legs_from_idx
+  ON salem_tour_legs (from_stop_id);
+CREATE INDEX IF NOT EXISTS salem_tour_legs_to_idx
+  ON salem_tour_legs (to_stop_id);
+
+-- ════════════════════════════════════════════════════════════════════
 -- Events Calendar
 -- ════════════════════════════════════════════════════════════════════
 

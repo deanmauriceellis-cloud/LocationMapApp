@@ -50,3 +50,40 @@ export interface TourDetailResponse {
   tour: TourSummary
   stops: TourStop[]
 }
+
+// ─── Tour legs (S183) ───────────────────────────────────────────────────────
+//
+// One row per consecutive (stop_order n → n+1) pair on a tour. Authored
+// once via the admin "Compute Route" tool against the on-device router and
+// baked into salem_content.db so the APK never has to route at runtime.
+export interface TourLeg {
+  tour_id: string
+  leg_order: number
+  from_stop_id: number
+  to_stop_id: number
+  /** Array of [lat, lng] pairs — the rendered walking polyline. */
+  polyline_json: Array<[number, number]>
+  distance_m: number
+  duration_s: number
+  router_version: string | null
+  /** Null until vertices are hand-edited. */
+  manual_edits: unknown | null
+  computed_at: string
+}
+
+export interface TourLegsResponse {
+  tour_id: string
+  count: number
+  legs: TourLeg[]
+}
+
+export interface ComputeRouteResponse {
+  tour_id: string
+  leg_count: number
+  skipped: Array<{ leg_order: number; reason: string }>
+  total_distance_m: number
+  total_duration_s: number
+  router_version: string | null
+  force: boolean
+  legs: TourLeg[]
+}

@@ -1,7 +1,15 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 172, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 173, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 172, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 173, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 173: 2026-04-25 — Cemetery firefly alignment investigation (no-op session, reverted)
+
+Investigated the Quaker cemetery firefly bug — fireflies were rendering in a void next to the visible cemetery polygon, not on it. Root cause traced to a polygon-source mismatch: the Witchy basemap renders cemeteries from OSM data (via the planetiler tile bake), while our firefly polygon library queries `massgis.openspace prim_purp='H'`, which has only a 1455 m² 4-vertex sliver in the wrong place for `gid=27152` "Essex Street Cemetery". Tried two fixes — exclusion of the bad gid (operator reversed), then a B1+B2 source-merge (prefer `massgis.landuse lu37_1999=34` when area-comparable, plus a side-car JSON of hand-corrected overrides for problem cases). B1 made the OTHER ~46 cemeteries' polygons drift out of alignment with the basemap render — landuse=34 polygons disagree with OSM more than openspace does despite being the more specific MassGIS class. Operator instructed full revert. Net code change this session: zero. Quaker cemetery firefly bug remains parked; the per-feature override mechanism is a known path forward when operator wants to address it surgically.
+
+Full session detail: `docs/session-logs/session-173-2026-04-25.md`. Commit: pending.
+
+---
 
 ## Session 172: 2026-04-25 — Animations live in Salem app + parks overlay (water visual TBC)
 

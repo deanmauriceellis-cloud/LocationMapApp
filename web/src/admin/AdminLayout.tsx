@@ -15,7 +15,7 @@ import { AdminMap } from './AdminMap'
 import { PoiEditDialog } from './PoiEditDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
 import { TourTree, type AddStopMode } from './TourTree'
-import type { TourStop, TourSummary } from './tourTypes'
+import type { TourLeg, TourStop, TourSummary } from './tourTypes'
 import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
 
 type AdminView = 'pois' | 'tours' | 'witch-trials'
@@ -55,12 +55,21 @@ export function AdminLayout() {
   // Tour-mode state (S174)
   const [activeTour, setActiveTour] = useState<TourSummary | null>(null)
   const [tourStops, setTourStops] = useState<TourStop[] | null>(null)
+  // S183 — precomputed walking legs for the active tour, lifted from TourTree
+  // so AdminMap can render them as a polyline overlay.
+  const [tourLegs, setTourLegs] = useState<TourLeg[] | null>(null)
   const [tourRefreshKey, setTourRefreshKey] = useState(0)
   const [addStopMode, setAddStopMode] = useState<AddStopMode>('none')
 
   const handleTourSelect = useCallback((tour: TourSummary, stops: TourStop[]) => {
     setActiveTour(tour)
     setTourStops(stops)
+    // Don't clear legs here — TourTree will fetch fresh legs for the new tour
+    // and push them up via onLegsChange.
+  }, [])
+
+  const handleLegsChange = useCallback((legs: TourLeg[] | null) => {
+    setTourLegs(legs)
   }, [])
 
   const handleStopMoved = useCallback((stopId: number, lat: number, lng: number) => {
@@ -359,6 +368,7 @@ export function AdminLayout() {
                 refreshKey={tourRefreshKey}
                 addStopMode={addStopMode}
                 onAddStopModeChange={setAddStopMode}
+                onLegsChange={handleLegsChange}
               />
             </div>
           </aside>
@@ -373,6 +383,7 @@ export function AdminLayout() {
               onClearCategoryFilter={() => setMapCategoryFilter(null)}
               activeTour={activeTour}
               tourStops={tourStops}
+              tourLegs={tourLegs}
               onStopMoved={handleStopMoved}
               addStopMode={addStopMode}
               onMapClickAddFree={handleAddFreeStop}
