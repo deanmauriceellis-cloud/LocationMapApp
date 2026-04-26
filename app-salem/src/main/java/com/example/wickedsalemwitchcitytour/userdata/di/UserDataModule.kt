@@ -33,7 +33,12 @@ object UserDataModule {
             UserDataDatabase::class.java,
             "user_data.db"
         )
-            .fallbackToDestructiveMigration()
+            // S180: v1.0.0 paid Play Store release floor. fallbackToDestructiveMigration
+            // REMOVED — every future schema bump must register a real Room Migration
+            // object via .addMigrations(...). Without this discipline, paying users
+            // lose their POI encounter history on every app update.
+            // Schema is locked at v2; the next bump (v3) is the first one that must
+            // add a Migration. See UserDataDatabase.kt for the contract.
             .build()
 
     @Provides

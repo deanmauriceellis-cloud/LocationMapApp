@@ -32,6 +32,13 @@ object SalemModule {
             "salem_content.db"
         )
             .createFromAsset("salem_content.db")
+            // S180 — fallbackToDestructiveMigration is INTENTIONAL for this DB.
+            // salem_content.db is read-only bundled content (createFromAsset).
+            // When the schema bumps in a new APK, the new asset replaces the
+            // user's local copy — destructive is the correct semantic. The
+            // user has no editable state in this DB to preserve.
+            // Contrast: UserDataDatabase has user-generated state and must use
+            // real migrations (S180 lockdown — fallback removed there).
             .fallbackToDestructiveMigration()
             .build()
 

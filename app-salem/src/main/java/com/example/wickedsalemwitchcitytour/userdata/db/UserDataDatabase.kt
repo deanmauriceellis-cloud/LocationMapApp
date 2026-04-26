@@ -24,9 +24,12 @@ import com.example.wickedsalemwitchcitytour.userdata.dao.PoiEncounterDao
  *   - [PoiEncounter]: POI proximity encounters with min/max/duration (Session 110)
  *
  * Schema version: bumped 1 → 2 in S110 to add the `poi_encounters` table.
- * Migration uses `fallbackToDestructiveMigration` because the only existing
- * table holds 24h-rolling GPS points; losing them on schema upgrade is
- * acceptable (next fix re-seeds the journey log).
+ *
+ * S180 lockdown: schema is now the v1.0.0 paid Play Store FLOOR. Every
+ * future schema bump (v3+) MUST register a real Room Migration object via
+ * UserDataModule.addMigrations(...). fallbackToDestructiveMigration was
+ * removed in S180 — paying users would lose their poi_encounters history
+ * on every app update, which is unacceptable for a paid product.
  *
  * Provided by [com.example.wickedsalemwitchcitytour.userdata.di.UserDataModule].
  */
