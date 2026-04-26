@@ -178,6 +178,25 @@ CREATE TABLE IF NOT EXISTS tour_stops (
   PRIMARY KEY (tour_id, poi_id)
 );
 
+CREATE TABLE IF NOT EXISTS tour_legs (
+  tour_id TEXT NOT NULL,
+  from_stop_order INTEGER NOT NULL,
+  to_stop_order INTEGER NOT NULL,
+  from_poi_id TEXT NOT NULL,
+  to_poi_id TEXT NOT NULL,
+  distance_m REAL NOT NULL,
+  duration_s REAL NOT NULL,
+  edge_count INTEGER NOT NULL,
+  geometry TEXT NOT NULL,
+  data_source TEXT NOT NULL DEFAULT 'router_bake_v1',
+  confidence REAL NOT NULL DEFAULT 1.0,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT 0,
+  stale_after INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (tour_id, from_stop_order)
+);
+CREATE INDEX IF NOT EXISTS idx_tour_legs_tour ON tour_legs(tour_id, from_stop_order);
+
 CREATE TABLE IF NOT EXISTS events_calendar (
   id TEXT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,

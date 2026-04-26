@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 168-177. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 169-178. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 178: 2026-04-25/26 — P6 tour-leg pre-bake + :routing-jvm extraction + surgical OSM pedestrian ingest
+
+S175's last carry-forward shipped: tour-leg polylines pre-baked from the same TigerLine bundle the runtime Router uses (P6). New `:routing-jvm` module extracted from `:core` so both Android and the JVM `:salem-content` pipeline consume one routing engine; `salem-content` grew a `TourLegBaker` that writes the new `tour_legs` table AND regenerates the runtime `assets/tours/*.json` files (replacing S125's OSRM-baked content). Live "Get directions" routes got first/last-approach segments capped at 60m (over-water fix); for pier/peninsular destinations TIGER doesn't reach, surgical OSM ingest of 11 hand-picked osm_ids (Derby Wharf, Seven Gables waterfront, Charter Cemetery interior paths, Salem Willows) with verified per-feature TIGER hookup — Derby Wharf Light snap dropped 349.3m → 5.3m, Charter Cemetery 83.8m → 5.5m. Two new memories: `feedback_v1_no_external_contact.md` (Android app makes ZERO outside contact except GPS — V1 mandate), `feedback_internal_db_single_source.md` (internal DB is canonical; web admin may validate against PG, runtime app makes no validation calls); `feedback_no_osm_use_local_geo.md` got an addendum that allows surgical-allowlist OSM ingest when nothing internal covers a feature, and forbids broad bbox imports (the first attempt produced 608 disconnected components and broke 57 tour legs before rollback).
+
+Full session detail: `docs/session-logs/session-178-2026-04-25.md`. Commit: `<sha>`.
+
+---
 
 ## Session 177: 2026-04-25 — Web walking router + Leaflet Directions UI
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-169-2026-04-24.md`. Commit: `53a
 
 ---
 
-## Session 168: 2026-04-24 — Install-default sweep + one-narration-per-visit + zoom 14-20 lock + toolbar rework
-
-Install-default sweep across the tourist UX so a first-launch user lands on a sensible default stack: POIs Hist. Landmark off, Record GPS off, Use Real GPS Outside Salem off, GPS-track FAB off, Oracle off, detail level Deep. Narration engine rebuilt to fire exactly one clip per POI visit (priority: stripped-commercial → historical/body text → BRIEF hint) instead of the prior intro-hint + body double. Fixed a first-POI silence bug uncovered by that collapse — `NarrationManager.enqueue()` was dropping segments during the TTS bind race; now defers them and `onInit()` flushes on ready. Map zoom locked to 14-20 (tiles only cover z16-19 + overzoom) with cinematic rewritten to z14 → z16 → z18. Toolbar cluster (First/Prev/Next/Jump) and narration hero banner deleted — single speaker icon on the right now handles tap=cancel/replay and long-press=audio popup; Home moved to the left. Splash-skip bug diagnosed (task-affinity collision brings SalemMainActivity to front instead of SplashActivity) — fix proposal recorded, not applied this session.
-
-Full session detail: `docs/session-logs/session-168-2026-04-24.md`. Commit: `d289efc`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 167 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 168 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S168 rolled to archive 2026-04-26 by the session-end protocol (S178) -->
 <!-- S167 rolled to archive 2026-04-25 by the session-end protocol (S177) -->
 <!-- S166 rolled to archive 2026-04-25 by the session-end protocol (S176) -->
 <!-- S165 rolled to archive 2026-04-25 by the session-end protocol (S175) -->

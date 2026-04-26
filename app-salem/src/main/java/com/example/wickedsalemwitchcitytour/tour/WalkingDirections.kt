@@ -225,13 +225,21 @@ class WalkingDirections @Inject constructor(
      * Returns null if the bundle isn't loaded or the router can't snap either
      * endpoint to a walkable node — caller is expected to fall back to a
      * straight-line route in that case.
+     *
+     * The router snaps both endpoints to the nearest walkable TigerLine node,
+     * which can sit dozens or hundreds of metres from the user's actual GPS
+     * or from a destination POI on a pier / set back from the road / inside
+     * a park. We stitch a straight-line **first-approach** from [from] to the
+     * route's first polyline point and a **last-approach** to [to] so the
+     * drawn line visibly reaches both endpoints; distance and duration
+     * include those approach segments.
      */
     private fun bundleRoute(from: GeoPoint, to: GeoPoint): WalkingRoute? {
         val router = salemRouterProvider.routerOrNull() ?: return null
         val result = router.route(from.latitude, from.longitude, to.latitude, to.longitude)
             ?: return null
         if (result.geometry.isEmpty()) return null
-        return routeResultToWalkingRoute(result)
+        return routeResultToWalkingRoute(result, leadingApproachFrom = from, trailingApproachTo = to)
     }
 
     private fun bundleMultiRoute(waypoints: List<GeoPoint>): WalkingRoute? {
@@ -239,14 +247,76 @@ class WalkingDirections @Inject constructor(
         val stops = waypoints.map { RoutingLatLng(it.latitude, it.longitude) }
         val result = router.routeMulti(stops) ?: return null
         if (result.geometry.isEmpty()) return null
-        return routeResultToWalkingRoute(result)
+        return routeResultToWalkingRoute(
+            result,
+            leadingApproachFrom = waypoints.first(),
+            trailingApproachTo = waypoints.last(),
+        )
     }
 
-    private fun routeResultToWalkingRoute(result: RouteResult): WalkingRoute {
-        val polyline = ArrayList<GeoPoint>(result.geometry.size)
+    /**
+     * Below this many metres we treat the snap gap as GPS noise and don't add
+     * an approach segment — drawing a 3-metre line to the marker just adds
+     * visual clutter.
+     */
+    private val APPROACH_MIN_M = 8.0
+
+    /**
+     * Above this many metres we refuse to draw a straight-line approach, because
+     * it would almost certainly cross unmappable terrain (harbor, private
+     * grounds, buildings) — Salem peninsula POIs like Seven Gables or Derby
+     * Wharf are 200–400 m from the nearest TigerLine walkable node, and a
+     * straight line from the snap point goes over open water. The polyline
+     * ends at the snap node; the POI marker shows the user the remaining
+     * distance honestly. A future improvement would consult the MassGIS
+     * coastline polygon at bake time and stitch a piece-wise water-avoiding
+     * approach when the straight line crosses ocean.
+     */
+    private val APPROACH_MAX_M = 60.0
+
+    private fun routeResultToWalkingRoute(
+        result: RouteResult,
+        leadingApproachFrom: GeoPoint? = null,
+        trailingApproachTo: GeoPoint? = null,
+    ): WalkingRoute {
+        val polyline = ArrayList<GeoPoint>(result.geometry.size + 2)
         for (p in result.geometry) polyline.add(GeoPoint(p.lat, p.lng))
-        val turnSteps = TurnByTurn.synthesize(result)
+
         val paceMps = salemRouterProvider.routerOrNull()?.bundlePaceMps() ?: 1.4
+        var approachLeadM = 0.0
+        var approachTailM = 0.0
+
+        if (leadingApproachFrom != null && polyline.isNotEmpty()) {
+            val gapM = distanceM(leadingApproachFrom, polyline.first())
+            when {
+                gapM < APPROACH_MIN_M -> { /* GPS noise — ignore */ }
+                gapM > APPROACH_MAX_M -> {
+                    DebugLogger.w(TAG, "Lead approach skipped: ${gapM.toInt()}m gap likely crosses non-walkable terrain")
+                }
+                else -> {
+                    polyline.add(0, leadingApproachFrom)
+                    approachLeadM = gapM
+                }
+            }
+        }
+        if (trailingApproachTo != null && polyline.isNotEmpty()) {
+            val gapM = distanceM(polyline.last(), trailingApproachTo)
+            when {
+                gapM < APPROACH_MIN_M -> { /* GPS noise — ignore */ }
+                gapM > APPROACH_MAX_M -> {
+                    DebugLogger.w(TAG, "Tail approach skipped: ${gapM.toInt()}m gap likely crosses non-walkable terrain")
+                }
+                else -> {
+                    polyline.add(trailingApproachTo)
+                    approachTailM = gapM
+                }
+            }
+        }
+
+        val totalDistanceM = result.distanceM + approachLeadM + approachTailM
+        val totalDurationS = result.durationS + (approachLeadM + approachTailM) / paceMps
+
+        val turnSteps = TurnByTurn.synthesize(result)
         val instructions = turnSteps.map { step ->
             val anchor = step.polyline.firstOrNull() ?: result.geometry.first()
             WalkingInstruction(
@@ -257,13 +327,16 @@ class WalkingDirections @Inject constructor(
                 maneuverType = maneuverCode(step.maneuver),
             )
         }
-        DebugLogger.i(TAG, "Bundled route: %.0fm, %.0fs, ${polyline.size} pts, ${instructions.size} turns".format(
-            result.distanceM, result.durationS
-        ))
+        DebugLogger.i(
+            TAG,
+            "Bundled route: %.0fm bundle + %.0fm lead + %.0fm tail = %.0fm, %.0fs, ${polyline.size} pts, ${instructions.size} turns".format(
+                result.distanceM, approachLeadM, approachTailM, totalDistanceM, totalDurationS
+            )
+        )
         return WalkingRoute(
             polyline = polyline,
-            distanceKm = result.distanceM / 1000.0,
-            durationMinutes = (result.durationS / 60.0).toInt(),
+            distanceKm = totalDistanceM / 1000.0,
+            durationMinutes = (totalDurationS / 60.0).toInt(),
             instructions = instructions,
             road = null,
         )

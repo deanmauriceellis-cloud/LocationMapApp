@@ -23,17 +23,18 @@
       "distanceMFromPrev": 0,
       "transitionNarration": "Welcome to the Grand Salem Tour, the most comprehensive walking tour of Salem's historic sites. Over the next three and a half hours, you will visit every major landmark, from the waterfront wharves to Proctor's Ledge, the confirmed site where nineteen innocent people were hanged in 1692. Let us begin by heading toward the harbor.",
       "shortNarration": "The National Park Service Regional Visitor Center is the official starting point for the Salem Heritage Trail. Rangers provide maps, information, and orientation to Salem's historic sites.",
-      "longNarration": null,
       "description": "Official NPS visitor center and start of the Heritage Trail. Free maps, brochures, film, and ranger information. Start your Salem visit here.",
-      "historicalPeriod": null,
       "admissionInfo": "Free",
       "hours": "9:00 AM - 5:00 PM daily",
       "phone": "(978) 740-1650",
-      "website": null,
       "routeToNext": [
         [
-          42.521556,
-          -70.886866
+          42.521513,
+          -70.886966
+        ],
+        [
+          42.52152,
+          -70.88695
         ],
         [
           42.521615,
@@ -72,56 +73,24 @@
           -70.885855
         ],
         [
-          42.521951,
-          -70.885815
-        ],
-        [
-          42.521981,
-          -70.885747
-        ],
-        [
-          42.522088,
-          -70.885503
-        ],
-        [
           42.522245,
           -70.885149
-        ],
-        [
-          42.522379,
-          -70.884846
         ],
         [
           42.522394,
           -70.884811
         ],
         [
-          42.521865,
-          -70.884354
+          42.522676,
+          -70.884194
         ],
         [
-          42.52195,
-          -70.884181
-        ],
-        [
-          42.52198,
-          -70.8841
-        ],
-        [
-          42.52217,
-          -70.88371
-        ],
-        [
-          42.521697,
-          -70.883256
-        ],
-        [
-          42.5216,
-          -70.883163
+          42.521705,
+          -70.883262
         ]
       ],
-      "routeDistanceM": 410,
-      "routeDurationS": 328
+      "routeDistanceM": 401,
+      "routeDurationS": 287
     },
     {
       "order": 2,
@@ -143,16 +112,7 @@
       "hours": "10:00 AM - 5:00 PM daily",
       "phone": "(978) 744-0991",
       "website": "https://www.7gables.org",
-      "routeToNext": [
-        [
-          42.521694,
-          -70.882549
-        ],
-        [
-          42.521694,
-          -70.882549
-        ]
-      ],
+      "routeToNext": [],
       "routeDistanceM": 0,
       "routeDurationS": 0
     },
@@ -169,490 +129,69 @@
       "distanceMFromPrev": 0,
       "transitionNarration": "Nathaniel Hawthorne's birthplace is on the same campus. He was born here on July 4, 1804. The house was originally on Union Street and moved to this site in 1958.",
       "shortNarration": "Nathaniel Hawthorne was born in this house on July 4, 1804. It was originally located on Union Street and was moved to the House of the Seven Gables campus in 1958.",
-      "longNarration": null,
       "description": "Birth home of Nathaniel Hawthorne (1804). Moved to Seven Gables campus in 1958. Period furnishings from the Federal era.",
       "historicalPeriod": "1750 (house) / Hawthorne born 1804",
       "admissionInfo": "Included with House of the Seven Gables admission",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.5216,
-          -70.883163
-        ],
-        [
-          42.5216,
-          -70.883163
-        ],
-        [
-          42.521697,
-          -70.883256
-        ],
-        [
-          42.52217,
-          -70.88371
-        ],
-        [
-          42.522417,
-          -70.883946
+          42.521705,
+          -70.883262
         ],
         [
           42.522676,
           -70.884194
-        ],
-        [
-          42.522806,
-          -70.883902
-        ],
-        [
-          42.522969,
-          -70.883545
-        ],
-        [
-          42.52303,
-          -70.883405
-        ],
-        [
-          42.523211,
-          -70.883014
-        ],
-        [
-          42.523239,
-          -70.882952
-        ],
-        [
-          42.523205,
-          -70.88291
-        ],
-        [
-          42.523147,
-          -70.882837
-        ],
-        [
-          42.52308,
-          -70.882748
-        ],
-        [
-          42.5229,
-          -70.882489
-        ],
-        [
-          42.522882,
-          -70.882514
-        ],
-        [
-          42.522866,
-          -70.882495
-        ],
-        [
-          42.522743,
-          -70.882338
-        ],
-        [
-          42.522646,
-          -70.882187
-        ],
-        [
-          42.522632,
-          -70.882072
-        ],
-        [
-          42.52267,
-          -70.882
-        ],
-        [
-          42.522676,
-          -70.88195
-        ],
-        [
-          42.522638,
-          -70.881899
-        ],
-        [
-          42.521817,
-          -70.880821
-        ],
-        [
-          42.521715,
-          -70.880687
-        ],
-        [
-          42.521755,
-          -70.880632
-        ],
-        [
-          42.521721,
-          -70.880585
-        ],
-        [
-          42.521746,
-          -70.880551
-        ],
-        [
-          42.52171,
-          -70.880503
-        ],
-        [
-          42.521778,
-          -70.880339
-        ],
-        [
-          42.52186,
-          -70.880225
-        ],
-        [
-          42.521882,
-          -70.880195
-        ],
-        [
-          42.521907,
-          -70.880161
-        ],
-        [
-          42.521851,
-          -70.880086
-        ],
-        [
-          42.521818,
-          -70.880131
-        ],
-        [
-          42.521792,
-          -70.880166
-        ],
-        [
-          42.521762,
-          -70.880117
-        ],
-        [
-          42.521766,
-          -70.880113
-        ],
-        [
-          42.521744,
-          -70.880078
-        ],
-        [
-          42.521737,
-          -70.880087
-        ],
-        [
-          42.521651,
-          -70.879945
-        ],
-        [
-          42.521666,
-          -70.879928
-        ],
-        [
-          42.521631,
-          -70.87987
-        ],
-        [
-          42.521623,
-          -70.879879
-        ],
-        [
-          42.521612,
-          -70.879892
-        ],
-        [
-          42.52156,
-          -70.879803
-        ],
-        [
-          42.521537,
-          -70.87983
-        ],
-        [
-          42.521472,
-          -70.87973
-        ],
-        [
-          42.521353,
-          -70.87955
-        ],
-        [
-          42.521353,
-          -70.87955
-        ]
-      ],
-      "routeDistanceM": 686,
-      "routeDurationS": 551
-    },
-    {
-      "order": 4,
-      "poiId": "salem_ferry_terminal",
-      "name": "Salem Ferry Terminal",
-      "lat": 42.5185,
-      "lng": -70.8789,
-      "address": "10 Blaney St, Salem, MA 01970",
-      "category": "visitor_services",
-      "geofenceRadiusM": 40,
-      "walkingMinutesFromPrev": 4,
-      "distanceMFromPrev": 340,
-      "transitionNarration": "Walk south along the waterfront. The Salem Ferry terminal is ahead. In season, a high-speed catamaran connects Salem to Boston's Long Wharf in about fifty minutes. The scenic harbor crossing is an attraction in itself.",
-      "shortNarration": "The Salem Ferry provides seasonal high-speed catamaran service to Boston's Long Wharf. The scenic fifty-minute ride across the harbor is an attraction in itself.",
-      "longNarration": null,
-      "description": "Seasonal high-speed ferry to Boston's Long Wharf (~50 min). Operates late June through October. Scenic harbor crossing.",
-      "historicalPeriod": null,
-      "admissionInfo": null,
-      "hours": "Seasonal — June through October",
-      "phone": null,
-      "website": "https://www.salemferry.com",
-      "routeToNext": [
-        [
-          42.521353,
-          -70.87955
-        ],
-        [
-          42.521353,
-          -70.87955
-        ],
-        [
-          42.521472,
-          -70.87973
-        ],
-        [
-          42.521537,
-          -70.87983
-        ],
-        [
-          42.52156,
-          -70.879803
-        ],
-        [
-          42.521612,
-          -70.879892
-        ],
-        [
-          42.521623,
-          -70.879879
-        ],
-        [
-          42.521631,
-          -70.87987
-        ],
-        [
-          42.521666,
-          -70.879928
-        ],
-        [
-          42.521651,
-          -70.879945
-        ],
-        [
-          42.521737,
-          -70.880087
-        ],
-        [
-          42.521744,
-          -70.880078
-        ],
-        [
-          42.521766,
-          -70.880113
-        ],
-        [
-          42.521762,
-          -70.880117
-        ],
-        [
-          42.521792,
-          -70.880166
-        ],
-        [
-          42.521818,
-          -70.880131
-        ],
-        [
-          42.521851,
-          -70.880086
-        ],
-        [
-          42.521907,
-          -70.880161
-        ],
-        [
-          42.521882,
-          -70.880195
-        ],
-        [
-          42.52186,
-          -70.880225
-        ],
-        [
-          42.521778,
-          -70.880339
-        ],
-        [
-          42.52171,
-          -70.880503
-        ],
-        [
-          42.521746,
-          -70.880551
-        ],
-        [
-          42.521721,
-          -70.880585
-        ],
-        [
-          42.521755,
-          -70.880632
-        ],
-        [
-          42.521715,
-          -70.880687
-        ],
-        [
-          42.521817,
-          -70.880821
-        ],
-        [
-          42.522638,
-          -70.881899
-        ],
-        [
-          42.522676,
-          -70.88195
-        ],
-        [
-          42.52267,
-          -70.882
-        ],
-        [
-          42.522632,
-          -70.882072
-        ],
-        [
-          42.522646,
-          -70.882187
-        ],
-        [
-          42.522743,
-          -70.882338
-        ],
-        [
-          42.522866,
-          -70.882495
-        ],
-        [
-          42.522882,
-          -70.882514
-        ],
-        [
-          42.5229,
-          -70.882489
-        ],
-        [
-          42.52308,
-          -70.882748
-        ],
-        [
-          42.523147,
-          -70.882837
-        ],
-        [
-          42.523205,
-          -70.88291
-        ],
-        [
-          42.523239,
-          -70.882952
-        ],
-        [
-          42.523211,
-          -70.883014
-        ],
-        [
-          42.52303,
-          -70.883405
-        ],
-        [
-          42.522969,
-          -70.883545
-        ],
-        [
-          42.522806,
-          -70.883902
-        ],
-        [
-          42.522676,
-          -70.884194
-        ],
-        [
-          42.522643,
-          -70.884267
-        ],
-        [
-          42.522613,
-          -70.884333
-        ],
-        [
-          42.522547,
-          -70.884479
-        ],
-        [
-          42.522541,
-          -70.884492
-        ],
-        [
-          42.522473,
-          -70.88464
         ],
         [
           42.522394,
           -70.884811
         ],
         [
-          42.522379,
-          -70.884846
-        ],
-        [
           42.522245,
           -70.885149
         ],
         [
-          42.522088,
-          -70.885503
+          42.521911,
+          -70.88587
         ],
         [
           42.521981,
-          -70.885747
+          -70.885922
         ],
         [
-          42.521951,
-          -70.885815
+          42.52196,
+          -70.885973
         ],
         [
-          42.521896,
-          -70.885774
+          42.521933,
+          -70.885987
         ],
         [
-          42.521868,
-          -70.885845
+          42.521906,
+          -70.886032
         ],
         [
-          42.521713,
-          -70.886226
+          42.521869,
+          -70.886115
         ],
         [
-          42.521653,
-          -70.886362
+          42.521757,
+          -70.886388
         ],
         [
-          42.521609,
-          -70.886445
+          42.521674,
+          -70.886591
         ],
         [
-          42.521543,
-          -70.886608
+          42.521615,
+          -70.886726
         ],
         [
-          42.521369,
-          -70.886998
+          42.52152,
+          -70.88695
+        ],
+        [
+          42.521513,
+          -70.886966
         ],
         [
           42.520536,
@@ -668,7 +207,7 @@
         ],
         [
           42.520235,
-          -70.886331
+          -70.88633
         ],
         [
           42.520127,
@@ -676,7 +215,7 @@
         ],
         [
           42.520088,
-          -70.886253
+          -70.886252
         ],
         [
           42.51955,
@@ -687,12 +226,68 @@
           -70.885848
         ],
         [
-          42.518225,
-          -70.885028
+          42.51775,
+          -70.884699
+        ],
+        [
+          42.517291,
+          -70.884388
+        ],
+        [
+          42.516876,
+          -70.884096
+        ],
+        [
+          42.516797,
+          -70.884027
+        ],
+        [
+          42.516739,
+          -70.883965
+        ],
+        [
+          42.516708,
+          -70.883926
+        ],
+        [
+          42.516576,
+          -70.883661
+        ],
+        [
+          42.516572,
+          -70.883627
+        ],
+        [
+          42.516582,
+          -70.883594
+        ],
+        [
+          42.516616,
+          -70.883571
         ]
       ],
-      "routeDistanceM": 1203,
-      "routeDurationS": 1051
+      "routeDistanceM": 1014,
+      "routeDurationS": 725
+    },
+    {
+      "order": 4,
+      "poiId": "salem_ferry_terminal",
+      "name": "Salem Ferry Terminal",
+      "lat": 42.5185,
+      "lng": -70.8789,
+      "address": "10 Blaney St, Salem, MA 01970",
+      "category": "visitor_services",
+      "geofenceRadiusM": 40,
+      "walkingMinutesFromPrev": 4,
+      "distanceMFromPrev": 340,
+      "transitionNarration": "Walk south along the waterfront. The Salem Ferry terminal is ahead. In season, a high-speed catamaran connects Salem to Boston's Long Wharf in about fifty minutes. The scenic harbor crossing is an attraction in itself.",
+      "shortNarration": "The Salem Ferry provides seasonal high-speed catamaran service to Boston's Long Wharf. The scenic fifty-minute ride across the harbor is an attraction in itself.",
+      "description": "Seasonal high-speed ferry to Boston's Long Wharf (~50 min). Operates late June through October. Scenic harbor crossing.",
+      "hours": "Seasonal — June through October",
+      "website": "https://www.salemferry.com",
+      "routeToNext": [],
+      "routeDistanceM": 0,
+      "routeDurationS": 0
     },
     {
       "order": 5,
@@ -707,25 +302,150 @@
       "distanceMFromPrev": 340,
       "transitionNarration": "Walk west along the waterfront path. Derby Wharf stretches half a mile into the harbor. Built by Elias Hasket Derby, once the richest man in America, this wharf was the center of Salem's global trading empire. The Derby Wharf Light Station stands at the far end.",
       "shortNarration": "Derby Wharf extends nearly half a mile into Salem Harbor. Built by the wealthy merchant Elias Hasket Derby, it was once the center of Salem's international trade empire.",
-      "longNarration": null,
       "description": "Half-mile wharf built by merchant Elias Hasket Derby. Friendship tall ship replica moored here. Derby Wharf Light Station at the end. Part of Salem Maritime NHP.",
       "historicalPeriod": "1762",
       "admissionInfo": "Free",
       "hours": "Open dawn to dusk",
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.518225,
-          -70.885028
+          42.516616,
+          -70.883571
         ],
         [
-          42.51903,
-          -70.885584
+          42.516582,
+          -70.883594
+        ],
+        [
+          42.516572,
+          -70.883627
+        ],
+        [
+          42.516576,
+          -70.883661
+        ],
+        [
+          42.516708,
+          -70.883926
+        ],
+        [
+          42.516739,
+          -70.883965
+        ],
+        [
+          42.516797,
+          -70.884027
+        ],
+        [
+          42.516876,
+          -70.884096
+        ],
+        [
+          42.517291,
+          -70.884388
+        ],
+        [
+          42.51775,
+          -70.884699
+        ],
+        [
+          42.519411,
+          -70.885848
+        ],
+        [
+          42.51955,
+          -70.885938
+        ],
+        [
+          42.520088,
+          -70.886252
+        ],
+        [
+          42.520127,
+          -70.886273
+        ],
+        [
+          42.520235,
+          -70.88633
+        ],
+        [
+          42.520245,
+          -70.886335
+        ],
+        [
+          42.520402,
+          -70.886411
+        ],
+        [
+          42.520536,
+          -70.886485
+        ],
+        [
+          42.521369,
+          -70.886998
+        ],
+        [
+          42.52152,
+          -70.88695
+        ],
+        [
+          42.521615,
+          -70.886726
+        ],
+        [
+          42.521674,
+          -70.886591
+        ],
+        [
+          42.521757,
+          -70.886388
+        ],
+        [
+          42.521869,
+          -70.886115
+        ],
+        [
+          42.521906,
+          -70.886032
+        ],
+        [
+          42.521933,
+          -70.885987
+        ],
+        [
+          42.52196,
+          -70.885973
+        ],
+        [
+          42.521981,
+          -70.885922
+        ],
+        [
+          42.522002,
+          -70.885855
+        ],
+        [
+          42.521257,
+          -70.885434
+        ],
+        [
+          42.521108,
+          -70.885329
+        ],
+        [
+          42.521232,
+          -70.884985
+        ],
+        [
+          42.521129,
+          -70.884904
+        ],
+        [
+          42.521048,
+          -70.884841
         ]
       ],
-      "routeDistanceM": 100,
-      "routeDurationS": 103
+      "routeDistanceM": 875,
+      "routeDurationS": 625
     },
     {
       "order": 6,
@@ -740,25 +460,12 @@
       "distanceMFromPrev": 160,
       "transitionNarration": "Walk to the base of the wharf. The Custom House stands before you. Hawthorne worked here as surveyor and claimed to have found the original scarlet letter in its upper stories.",
       "shortNarration": "The Custom House is where Nathaniel Hawthorne worked as surveyor from 1846 to 1849. It was here, he claimed, that he discovered the scarlet letter that inspired his famous novel.",
-      "longNarration": null,
       "description": "Federal-era custom house where Nathaniel Hawthorne worked as surveyor. Inspired the opening of The Scarlet Letter. Part of Salem Maritime NHP.",
       "historicalPeriod": "1819",
       "admissionInfo": "Free (within Salem Maritime NHP)",
-      "hours": null,
-      "phone": null,
-      "website": null,
-      "routeToNext": [
-        [
-          42.51903,
-          -70.885584
-        ],
-        [
-          42.519238,
-          -70.885729
-        ]
-      ],
-      "routeDistanceM": 26,
-      "routeDurationS": 27
+      "routeToNext": [],
+      "routeDistanceM": 0,
+      "routeDurationS": 0
     },
     {
       "order": 7,
@@ -782,172 +489,132 @@
       "website": "https://www.nps.gov/sama",
       "routeToNext": [
         [
-          42.519238,
-          -70.885729
+          42.521048,
+          -70.884841
         ],
         [
-          42.519411,
-          -70.885848
+          42.521129,
+          -70.884904
         ],
         [
-          42.51955,
-          -70.885938
+          42.521232,
+          -70.884985
         ],
         [
-          42.520088,
-          -70.886253
+          42.521108,
+          -70.885329
         ],
         [
-          42.520127,
-          -70.886273
+          42.521257,
+          -70.885434
         ],
         [
-          42.520235,
-          -70.886331
+          42.521911,
+          -70.88587
         ],
         [
-          42.520245,
-          -70.886335
+          42.521981,
+          -70.885922
         ],
         [
-          42.520402,
-          -70.886411
+          42.52196,
+          -70.885973
         ],
         [
-          42.520536,
-          -70.886485
+          42.521933,
+          -70.885987
         ],
         [
-          42.521369,
-          -70.886998
+          42.521906,
+          -70.886032
         ],
         [
-          42.521268,
-          -70.887246
+          42.521869,
+          -70.886115
         ],
         [
-          42.521035,
-          -70.887781
+          42.521757,
+          -70.886388
         ],
         [
-          42.520928,
-          -70.88803
+          42.521674,
+          -70.886591
         ],
         [
-          42.520908,
-          -70.888078
+          42.521615,
+          -70.886726
         ],
         [
-          42.520808,
-          -70.888323
+          42.52152,
+          -70.88695
         ],
         [
-          42.520771,
-          -70.888298
+          42.521513,
+          -70.886966
         ],
         [
-          42.52072,
-          -70.88826
+          42.521058,
+          -70.887927
         ],
         [
-          42.520667,
-          -70.888228
+          42.520997,
+          -70.88807
         ],
         [
-          42.52059,
-          -70.888185
+          42.520951,
+          -70.888179
         ],
         [
-          42.52053,
-          -70.888155
+          42.520869,
+          -70.888385
         ],
         [
-          42.520347,
-          -70.888043
+          42.520798,
+          -70.888557
         ],
         [
-          42.520316,
-          -70.888023
+          42.520762,
+          -70.888667
         ],
         [
-          42.520281,
-          -70.887977
+          42.520749,
+          -70.88876
         ],
         [
-          42.520263,
-          -70.887957
+          42.520535,
+          -70.8887
         ],
         [
-          42.52021,
-          -70.887905
+          42.520242,
+          -70.888608
         ],
         [
-          42.520176,
-          -70.887873
+          42.520115,
+          -70.888589
         ],
         [
-          42.520147,
-          -70.887854
+          42.519955,
+          -70.888553
         ],
         [
-          42.520063,
-          -70.887794
+          42.519841,
+          -70.888522
         ],
         [
-          42.52002,
-          -70.887775
+          42.519774,
+          -70.888498
         ],
         [
-          42.519966,
-          -70.887762
+          42.519741,
+          -70.88845
         ],
         [
-          42.519902,
-          -70.887779
-        ],
-        [
-          42.519862,
-          -70.887807
-        ],
-        [
-          42.519772,
-          -70.887887
-        ],
-        [
-          42.519762,
-          -70.887871
-        ],
-        [
-          42.519732,
-          -70.887833
-        ],
-        [
-          42.519708,
-          -70.887795
-        ],
-        [
-          42.519688,
-          -70.887767
-        ],
-        [
-          42.519676,
-          -70.887734
-        ],
-        [
-          42.519675,
-          -70.88771
-        ],
-        [
-          42.51966,
-          -70.887735
-        ],
-        [
-          42.519656,
-          -70.887749
+          42.519726,
+          -70.888382
         ]
       ],
-      "routeDistanceM": 536,
-      "routeDurationS": 488
+      "routeDistanceM": 525,
+      "routeDurationS": 375
     },
     {
       "order": 8,
@@ -962,197 +629,125 @@
       "distanceMFromPrev": 250,
       "transitionNarration": "Walk west along Derby Street. You will pass several restaurants along the waterfront. Sea Level Oyster Bar and Finz Seafood are at Pickering Wharf to your left, excellent choices for a meal after the tour. The Pirate Museum is ahead on your right.",
       "shortNarration": "The New England Pirate Museum explores the Golden Age of Piracy and Salem's connections to buccaneering. Walk through recreated scenes including a ship and a pirate's cave.",
-      "longNarration": null,
       "description": "Museum exploring Salem's pirate connections and the Golden Age of Piracy. Includes walk-through recreations of ship and cave scenes.",
-      "historicalPeriod": null,
       "admissionInfo": "Check website for current admission",
       "hours": "Seasonal",
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.519656,
-          -70.887749
+          42.519726,
+          -70.888382
         ],
         [
-          42.519656,
-          -70.887749
+          42.519741,
+          -70.88845
         ],
         [
-          42.519652,
-          -70.887776
+          42.519774,
+          -70.888498
         ],
         [
-          42.519676,
-          -70.888085
+          42.519841,
+          -70.888522
         ],
         [
-          42.519687,
-          -70.888224
+          42.519955,
+          -70.888553
         ],
         [
-          42.519633,
-          -70.888274
+          42.520115,
+          -70.888589
         ],
         [
-          42.51967,
-          -70.888511
+          42.520242,
+          -70.888608
         ],
         [
-          42.51971,
-          -70.888527
+          42.520535,
+          -70.8887
         ],
         [
-          42.519712,
-          -70.888585
+          42.520749,
+          -70.88876
         ],
         [
-          42.51971,
-          -70.888616
+          42.520729,
+          -70.888907
         ],
         [
-          42.519683,
-          -70.888699
+          42.520722,
+          -70.889177
         ],
         [
-          42.519621,
-          -70.888875
+          42.520719,
+          -70.889513
         ],
         [
-          42.519621,
-          -70.888893
+          42.520709,
+          -70.889884
         ],
         [
-          42.519675,
-          -70.888913
+          42.520699,
+          -70.890113
         ],
         [
-          42.519567,
-          -70.889666
+          42.520517,
+          -70.890055
         ],
         [
-          42.519332,
-          -70.889594
+          42.519842,
+          -70.889865
         ],
         [
-          42.51909,
-          -70.889517
+          42.51957,
+          -70.889772
         ],
         [
-          42.519056,
-          -70.889508
+          42.519443,
+          -70.88974
         ],
         [
-          42.51883,
-          -70.889446
+          42.519378,
+          -70.88972
         ],
         [
-          42.518534,
-          -70.889352
+          42.518517,
+          -70.88946
         ],
         [
-          42.518464,
-          -70.88933
+          42.518307,
+          -70.889406
         ],
         [
-          42.518473,
-          -70.889264
+          42.518217,
+          -70.889384
         ],
         [
-          42.518486,
-          -70.889179
+          42.518107,
+          -70.889368
         ],
         [
-          42.518493,
-          -70.889129
-        ],
-        [
-          42.518429,
-          -70.889117
-        ],
-        [
-          42.51837,
-          -70.889108
-        ],
-        [
-          42.518295,
-          -70.8891
-        ],
-        [
-          42.518243,
-          -70.889096
-        ],
-        [
-          42.518183,
-          -70.889092
-        ],
-        [
-          42.518118,
-          -70.889088
-        ],
-        [
-          42.518102,
-          -70.889083
-        ],
-        [
-          42.518073,
-          -70.889071
-        ],
-        [
-          42.518048,
-          -70.889061
-        ],
-        [
-          42.51801,
-          -70.889044
-        ],
-        [
-          42.517946,
-          -70.889051
-        ],
-        [
-          42.517898,
-          -70.888985
-        ],
-        [
-          42.517868,
-          -70.888939
+          42.517885,
+          -70.889356
         ],
         [
           42.517662,
-          -70.888936
+          -70.889354
         ],
         [
-          42.51752,
-          -70.888928
-        ],
-        [
-          42.517519,
-          -70.888286
-        ],
-        [
-          42.517447,
-          -70.888287
-        ],
-        [
-          42.517347,
-          -70.888287
+          42.517345,
+          -70.88935
         ],
         [
           42.517346,
-          -70.888421
+          -70.888911
         ],
         [
-          42.51695,
+          42.517338,
           -70.888421
-        ],
-        [
-          42.5167,
-          -70.88842
         ]
       ],
-      "routeDistanceM": 583,
-      "routeDurationS": 466
+      "routeDistanceM": 689,
+      "routeDurationS": 492
     },
     {
       "order": 9,
@@ -1176,108 +771,64 @@
       "website": "https://thewitchhouse.org",
       "routeToNext": [
         [
-          42.5167,
-          -70.88842
-        ],
-        [
-          42.51695,
+          42.517338,
           -70.888421
         ],
         [
           42.517346,
-          -70.888421
+          -70.888911
         ],
         [
           42.517345,
           -70.88935
         ],
         [
-          42.517672,
-          -70.889351
+          42.517662,
+          -70.889354
         ],
         [
-          42.517672,
-          -70.88948
+          42.517659,
+          -70.889633
         ],
         [
-          42.517627,
-          -70.889478
+          42.517663,
+          -70.889862
         ],
         [
-          42.517618,
-          -70.889485
+          42.517663,
+          -70.889902
         ],
         [
-          42.517614,
-          -70.889497
+          42.517663,
+          -70.890201
         ],
         [
-          42.517615,
-          -70.889598
+          42.517668,
+          -70.890585
         ],
         [
-          42.517619,
-          -70.889947
+          42.517674,
+          -70.891102
         ],
         [
-          42.517607,
-          -70.890543
+          42.517664,
+          -70.891614
         ],
         [
-          42.51761,
-          -70.890602
+          42.517669,
+          -70.892129
         ],
         [
-          42.517615,
-          -70.890679
+          42.517659,
+          -70.892527
         ],
         [
-          42.517604,
-          -70.89108
-        ],
-        [
-          42.517606,
-          -70.891112
-        ],
-        [
-          42.517607,
-          -70.891126
-        ],
-        [
-          42.517608,
-          -70.891142
-        ],
-        [
-          42.517615,
-          -70.891148
-        ],
-        [
-          42.517619,
-          -70.891156
-        ],
-        [
-          42.517618,
-          -70.891543
-        ],
-        [
-          42.517615,
-          -70.89162
-        ],
-        [
-          42.517612,
-          -70.891683
-        ],
-        [
-          42.517614,
-          -70.892019
-        ],
-        [
-          42.517616,
-          -70.8924
+          42.517656,
+          -70.893055
         ]
       ],
-      "routeDistanceM": 442,
-      "routeDurationS": 353
+      "routeDistanceM": 416,
+      "routeDurationS": 297
     },
     {
       "order": 10,
@@ -1292,129 +843,41 @@
       "distanceMFromPrev": 310,
       "transitionNarration": "Walk west along Essex Street, then south on North Street to Federal Street. Near here stood the old Salem jail. Conditions were appalling. Accused witches were chained in dark, filthy cells. Sarah Osborne and Ann Foster died in custody before ever reaching trial.",
       "shortNarration": "Near this location stood the Salem jail where accused witches were held in 1692. Conditions were appalling. Several accused died in custody before trial.",
-      "longNarration": null,
       "description": "Site of the 1692 jail where accused witches were held. Multiple accused died in these terrible conditions before ever reaching trial.",
       "historicalPeriod": "1692",
       "admissionInfo": "Free (exterior site marker)",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.517616,
-          -70.8924
+          42.517656,
+          -70.893055
         ],
         [
-          42.517618,
-          -70.892812
+          42.517248,
+          -70.892992
         ],
         [
-          42.517635,
-          -70.892844
+          42.516886,
+          -70.892923
         ],
         [
-          42.517626,
-          -70.892898
+          42.516454,
+          -70.892834
         ],
         [
-          42.517623,
-          -70.892912
+          42.516202,
+          -70.892795
         ],
         [
-          42.51761,
-          -70.89295
+          42.515942,
+          -70.892755
         ],
         [
-          42.517587,
-          -70.892949
-        ],
-        [
-          42.517253,
-          -70.892891
-        ],
-        [
-          42.516922,
-          -70.892828
-        ],
-        [
-          42.516853,
-          -70.892812
-        ],
-        [
-          42.516718,
-          -70.89278
-        ],
-        [
-          42.516642,
-          -70.892765
-        ],
-        [
-          42.516516,
-          -70.89274
-        ],
-        [
-          42.516518,
-          -70.892689
-        ],
-        [
-          42.516459,
-          -70.892678
-        ],
-        [
-          42.51643,
-          -70.892671
-        ],
-        [
-          42.516424,
-          -70.89272
-        ],
-        [
-          42.51638,
-          -70.892711
-        ],
-        [
-          42.515921,
-          -70.892629
-        ],
-        [
-          42.515533,
-          -70.892559
-        ],
-        [
-          42.515529,
-          -70.892541
-        ],
-        [
-          42.515522,
-          -70.892617
-        ],
-        [
-          42.515516,
-          -70.892683
-        ],
-        [
-          42.515512,
-          -70.892726
-        ],
-        [
-          42.515506,
-          -70.892792
-        ],
-        [
-          42.515456,
-          -70.892784
-        ],
-        [
-          42.515406,
-          -70.892774
-        ],
-        [
-          42.515305,
-          -70.892754
+          42.515462,
+          -70.892663
         ]
       ],
-      "routeDistanceM": 332,
-      "routeDurationS": 266
+      "routeDistanceM": 246,
+      "routeDurationS": 176
     },
     {
       "order": 11,
@@ -1429,77 +892,53 @@
       "distanceMFromPrev": 190,
       "transitionNarration": "Continue south on Washington Street. The Court of Oyer and Terminer met near this location. Here, Chief Justice William Stoughton presided over the proceedings that sent nineteen people to the gallows and pressed one man to death.",
       "shortNarration": "Near this spot on Washington Street, the Court of Oyer and Terminer convened in 1692 to try the accused witches. It was here that the condemned were sentenced to death.",
-      "longNarration": null,
       "description": "Site where the Court of Oyer and Terminer tried accused witches in 1692. The original building no longer stands.",
       "historicalPeriod": "1692",
       "admissionInfo": "Free (exterior marker)",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.515305,
-          -70.892754
+          42.515462,
+          -70.892663
         ],
         [
-          42.515248,
-          -70.892743
+          42.515192,
+          -70.892615
         ],
         [
-          42.515183,
-          -70.892731
+          42.514928,
+          -70.892568
         ],
         [
-          42.515127,
-          -70.892721
+          42.514519,
+          -70.892483
         ],
         [
-          42.515113,
-          -70.892711
+          42.514415,
+          -70.893421
         ],
         [
-          42.514566,
-          -70.89261
+          42.514298,
+          -70.894284
         ],
         [
-          42.514507,
-          -70.892601
+          42.514242,
+          -70.894835
         ],
         [
-          42.514473,
-          -70.892591
+          42.514056,
+          -70.894811
         ],
         [
-          42.5142,
-          -70.89475
+          42.513862,
+          -70.894787
         ],
         [
-          42.513566,
-          -70.89466
-        ],
-        [
-          42.513565,
-          -70.894732
-        ],
-        [
-          42.513564,
-          -70.894822
-        ],
-        [
-          42.513496,
-          -70.894815
-        ],
-        [
-          42.513435,
-          -70.894809
-        ],
-        [
-          42.513425,
-          -70.895113
+          42.5135,
+          -70.894721
         ]
       ],
-      "routeDistanceM": 397,
-      "routeDurationS": 318
+      "routeDistanceM": 385,
+      "routeDurationS": 275
     },
     {
       "order": 12,
@@ -1519,60 +958,34 @@
       "historicalPeriod": "1637",
       "admissionInfo": "Free",
       "hours": "Daylight hours",
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.513425,
-          -70.895113
+          42.5135,
+          -70.894721
         ],
         [
-          42.513405,
-          -70.895766
+          42.513489,
+          -70.894915
         ],
         [
-          42.513389,
-          -70.896187
+          42.513474,
+          -70.895532
         ],
         [
-          42.51338,
-          -70.896244
+          42.513439,
+          -70.896322
         ],
         [
-          42.513353,
-          -70.896255
-        ],
-        [
-          42.513182,
-          -70.896285
-        ],
-        [
-          42.512978,
-          -70.896308
-        ],
-        [
-          42.512696,
-          -70.896344
-        ],
-        [
-          42.512686,
-          -70.896332
-        ],
-        [
-          42.512641,
-          -70.896339
+          42.513078,
+          -70.896385
         ],
         [
           42.512637,
           -70.896434
-        ],
-        [
-          42.512603,
-          -70.896438
         ]
       ],
-      "routeDistanceM": 188,
-      "routeDurationS": 150
+      "routeDistanceM": 221,
+      "routeDurationS": 158
     },
     {
       "order": 13,
@@ -1592,156 +1005,78 @@
       "historicalPeriod": "1692 / dedicated 1992",
       "admissionInfo": "Free",
       "hours": "Open 24 hours",
-      "phone": null,
-      "website": null,
       "routeToNext": [
-        [
-          42.512603,
-          -70.896438
-        ],
         [
           42.512637,
           -70.896434
         ],
         [
-          42.512641,
-          -70.896339
+          42.513078,
+          -70.896385
         ],
         [
-          42.512686,
-          -70.896332
+          42.513439,
+          -70.896322
         ],
         [
-          42.512696,
-          -70.896344
+          42.514002,
+          -70.896243
         ],
         [
-          42.512978,
-          -70.896308
+          42.514388,
+          -70.896178
         ],
         [
-          42.513182,
-          -70.896285
+          42.514394,
+          -70.895587
         ],
         [
-          42.513353,
-          -70.896255
-        ],
-        [
-          42.51338,
-          -70.896244
-        ],
-        [
-          42.513442,
-          -70.896232
-        ],
-        [
-          42.513512,
-          -70.896218
-        ],
-        [
-          42.513526,
-          -70.896224
-        ],
-        [
-          42.513698,
-          -70.896199
-        ],
-        [
-          42.513957,
-          -70.896151
-        ],
-        [
-          42.514006,
-          -70.89614
-        ],
-        [
-          42.514058,
-          -70.896127
-        ],
-        [
-          42.514082,
-          -70.896148
-        ],
-        [
-          42.514096,
-          -70.896145
-        ],
-        [
-          42.514145,
-          -70.896137
-        ],
-        [
-          42.51417,
-          -70.896122
-        ],
-        [
-          42.51433,
-          -70.896097
-        ],
-        [
-          42.514392,
-          -70.896081
-        ],
-        [
-          42.514432,
-          -70.89607
+          42.514409,
+          -70.895337
         ],
         [
           42.514431,
-          -70.89602
+          -70.895061
         ],
         [
-          42.514447,
-          -70.895719
+          42.514442,
+          -70.894866
         ],
         [
-          42.514491,
-          -70.894953
+          42.514671,
+          -70.894901
         ],
         [
-          42.51495,
-          -70.895031
+          42.514998,
+          -70.894943
         ],
         [
-          42.514958,
-          -70.894938
+          42.515027,
+          -70.894675
         ],
         [
-          42.51501,
-          -70.894945
+          42.515047,
+          -70.8943
         ],
         [
-          42.515123,
-          -70.893502
+          42.51508,
+          -70.893903
         ],
         [
-          42.515255,
-          -70.893527
-        ],
-        [
-          42.51536,
-          -70.893541
-        ],
-        [
-          42.515506,
-          -70.893562
+          42.515106,
+          -70.8935
         ],
         [
           42.515764,
           -70.893602
         ],
         [
-          42.515759,
-          -70.893667
-        ],
-        [
-          42.515901,
-          -70.89369
+          42.51613,
+          -70.893617
         ]
       ],
-      "routeDistanceM": 583,
-      "routeDurationS": 466
+      "routeDistanceM": 599,
+      "routeDurationS": 428
     },
     {
       "order": 14,
@@ -1765,152 +1100,60 @@
       "website": "https://salemwitchmuseum.com",
       "routeToNext": [
         [
-          42.515901,
-          -70.89369
+          42.51613,
+          -70.893617
         ],
         [
-          42.516101,
-          -70.893722
+          42.51614,
+          -70.893547
         ],
         [
-          42.516105,
-          -70.893664
+          42.516151,
+          -70.893363
         ],
         [
-          42.516152,
-          -70.893624
+          42.516202,
+          -70.892795
         ],
         [
-          42.516196,
-          -70.893594
+          42.516454,
+          -70.892834
         ],
         [
-          42.516214,
-          -70.893591
+          42.516886,
+          -70.892923
         ],
         [
-          42.516354,
-          -70.893633
+          42.517248,
+          -70.892992
         ],
         [
-          42.516474,
-          -70.893724
+          42.517656,
+          -70.893055
         ],
         [
-          42.516967,
-          -70.894218
+          42.518116,
+          -70.893146
         ],
         [
-          42.517211,
-          -70.893697
+          42.518454,
+          -70.893198
         ],
         [
-          42.517242,
-          -70.893716
+          42.518974,
+          -70.893314
         ],
         [
-          42.517277,
-          -70.893738
+          42.518913,
+          -70.894251
         ],
         [
-          42.517371,
-          -70.893832
-        ],
-        [
-          42.517583,
-          -70.894031
-        ],
-        [
-          42.517629,
-          -70.894076
-        ],
-        [
-          42.517664,
-          -70.894108
-        ],
-        [
-          42.517725,
-          -70.894208
-        ],
-        [
-          42.517776,
-          -70.894299
-        ],
-        [
-          42.517822,
-          -70.894434
-        ],
-        [
-          42.51784,
-          -70.894486
-        ],
-        [
-          42.517848,
-          -70.894509
-        ],
-        [
-          42.517875,
-          -70.894563
-        ],
-        [
-          42.517929,
-          -70.894511
-        ],
-        [
-          42.517947,
-          -70.894494
-        ],
-        [
-          42.518008,
-          -70.894435
-        ],
-        [
-          42.518108,
-          -70.894641
-        ],
-        [
-          42.518128,
-          -70.894709
-        ],
-        [
-          42.518158,
-          -70.894831
-        ],
-        [
-          42.518192,
-          -70.895005
-        ],
-        [
-          42.518206,
-          -70.895038
-        ],
-        [
-          42.518249,
-          -70.895102
-        ],
-        [
-          42.518292,
-          -70.895122
-        ],
-        [
-          42.518312,
-          -70.895132
-        ],
-        [
-          42.518362,
-          -70.895127
-        ],
-        [
-          42.518501,
-          -70.895171
-        ],
-        [
-          42.518574,
-          -70.895189
+          42.518872,
+          -70.895011
         ]
       ],
-      "routeDistanceM": 413,
-      "routeDurationS": 330
+      "routeDistanceM": 519,
+      "routeDurationS": 371
     },
     {
       "order": 15,
@@ -1925,161 +1168,105 @@
       "distanceMFromPrev": 120,
       "transitionNarration": "Cross to the southeast corner of Salem Common. The cloaked figure of Roger Conant, who founded Salem in 1626, is one of the most photographed landmarks in the city.",
       "shortNarration": "This statue of Roger Conant, the founder of Salem in 1626, is one of the most photographed landmarks in the city. Visitors often mistake his Puritan cloak for a witch's outfit.",
-      "longNarration": null,
       "description": "Statue of Salem's founder Roger Conant (1626). Often mistaken for a witch due to his Puritan cloak. One of Salem's most photographed landmarks.",
       "historicalPeriod": "Statue 1913 / Conant founded Salem 1626",
       "admissionInfo": "Free",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.518574,
-          -70.895189
+          42.518872,
+          -70.895011
         ],
         [
-          42.518501,
-          -70.895171
+          42.518913,
+          -70.894251
         ],
         [
-          42.518362,
-          -70.895127
+          42.518976,
+          -70.894254
         ],
         [
-          42.518312,
-          -70.895132
+          42.519243,
+          -70.89429
         ],
         [
-          42.518292,
-          -70.895122
+          42.519518,
+          -70.894299
         ],
         [
-          42.518288,
-          -70.895186
+          42.519551,
+          -70.894525
         ],
         [
-          42.518286,
-          -70.895221
+          42.519599,
+          -70.894817
         ],
         [
-          42.518283,
-          -70.895273
+          42.519597,
+          -70.895044
         ],
         [
-          42.518281,
-          -70.895299
+          42.519619,
+          -70.895235
         ],
         [
-          42.518283,
-          -70.895322
+          42.519667,
+          -70.89541
         ],
         [
-          42.518289,
-          -70.895401
+          42.519733,
+          -70.895592
         ],
         [
-          42.518298,
-          -70.895511
+          42.519751,
+          -70.895648
         ],
         [
-          42.518279,
-          -70.895516
+          42.519802,
+          -70.895808
         ],
         [
-          42.518276,
-          -70.895519
+          42.519861,
+          -70.896035
         ],
         [
-          42.518177,
-          -70.895503
+          42.519232,
+          -70.896183
         ],
         [
-          42.518153,
-          -70.8955
+          42.518849,
+          -70.89627
         ],
         [
-          42.518134,
-          -70.895499
+          42.518745,
+          -70.896292
         ],
         [
-          42.518075,
-          -70.895494
+          42.518432,
+          -70.896362
         ],
         [
-          42.518016,
-          -70.895491
+          42.518245,
+          -70.896416
         ],
         [
-          42.518037,
-          -70.895689
+          42.51802,
+          -70.896472
         ],
         [
-          42.518078,
-          -70.896044
+          42.517904,
+          -70.896506
         ],
         [
-          42.518078,
-          -70.89611
+          42.517813,
+          -70.896736
         ],
         [
-          42.518036,
-          -70.896232
-        ],
-        [
-          42.518015,
-          -70.896263
-        ],
-        [
-          42.517992,
-          -70.896298
-        ],
-        [
-          42.517977,
-          -70.896312
-        ],
-        [
-          42.518012,
-          -70.896324
-        ],
-        [
-          42.518073,
-          -70.896344
-        ],
-        [
-          42.518103,
-          -70.896379
-        ],
-        [
-          42.518111,
-          -70.896448
-        ],
-        [
-          42.518123,
-          -70.896549
-        ],
-        [
-          42.517972,
-          -70.896573
-        ],
-        [
-          42.517888,
-          -70.896583
-        ],
-        [
-          42.517843,
-          -70.89659
-        ],
-        [
-          42.517845,
-          -70.896604
-        ],
-        [
-          42.517486,
-          -70.897283
+          42.517665,
+          -70.897024
         ]
       ],
-      "routeDistanceM": 298,
-      "routeDurationS": 238
+      "routeDistanceM": 550,
+      "routeDurationS": 393
     },
     {
       "order": 16,
@@ -2094,185 +1281,161 @@
       "distanceMFromPrev": 200,
       "transitionNarration": "Walk south toward Chestnut Street. You are entering one of the most beautiful streets in America. Grand Federal-style mansions line both sides, built by Salem's sea captains when the city was one of the wealthiest ports in the nation. Architect Samuel McIntire designed many of these homes.",
       "shortNarration": "Chestnut Street is often called one of the most beautiful streets in America. Lined with grand Federal-style mansions built by Salem's wealthy sea captains in the early eighteen hundreds.",
-      "longNarration": null,
       "description": "One of America's most beautiful streets. Grand Federal-style mansions built by sea captains in the early 1800s. Part of the McIntire Historic District.",
       "historicalPeriod": "Early 1800s",
       "admissionInfo": "Free (public street, private homes)",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.517486,
-          -70.897283
+          42.517665,
+          -70.897024
         ],
         [
-          42.517406,
-          -70.897434
+          42.518071,
+          -70.89717
         ],
         [
-          42.517275,
-          -70.897672
+          42.518285,
+          -70.897226
         ],
         [
-          42.517259,
-          -70.897706
+          42.518437,
+          -70.897254
         ],
         [
-          42.517221,
-          -70.897787
+          42.518625,
+          -70.897239
         ],
         [
-          42.517193,
-          -70.89785
+          42.518748,
+          -70.897243
         ],
         [
-          42.516954,
-          -70.89935
+          42.518792,
+          -70.897265
         ],
         [
-          42.51699,
-          -70.899374
+          42.51879,
+          -70.897306
         ],
         [
-          42.517043,
-          -70.899407
+          42.518789,
+          -70.897331
         ],
         [
-          42.517051,
-          -70.899427
+          42.519279,
+          -70.897376
         ],
         [
-          42.517461,
-          -70.899672
+          42.519635,
+          -70.897495
         ],
         [
-          42.517472,
-          -70.899665
+          42.520009,
+          -70.89755
         ],
         [
-          42.517497,
-          -70.899682
+          42.520038,
+          -70.898026
         ],
         [
-          42.517484,
-          -70.899761
+          42.520007,
+          -70.898278
         ],
         [
-          42.517728,
-          -70.899909
+          42.520042,
+          -70.898429
         ],
         [
-          42.517916,
-          -70.900019
+          42.519957,
+          -70.8987
         ],
         [
-          42.518114,
-          -70.900127
+          42.519853,
+          -70.899099
         ],
         [
-          42.51817,
-          -70.900164
+          42.519765,
+          -70.899468
         ],
         [
-          42.518154,
-          -70.900241
+          42.519635,
+          -70.899955
         ],
         [
-          42.518147,
-          -70.900284
+          42.519485,
+          -70.900602
         ],
         [
-          42.518183,
-          -70.900435
+          42.51991,
+          -70.900685
         ],
         [
-          42.518101,
-          -70.900607
+          42.520173,
+          -70.900727
         ],
         [
-          42.518276,
-          -70.900749
+          42.520252,
+          -70.900735
         ],
         [
-          42.518429,
-          -70.900843
+          42.520317,
+          -70.900759
         ],
         [
-          42.518627,
-          -70.90099
+          42.520368,
+          -70.900809
         ],
         [
-          42.518872,
-          -70.901144
+          42.520402,
+          -70.900836
         ],
         [
-          42.519062,
-          -70.901266
+          42.520605,
+          -70.900872
         ],
         [
-          42.519307,
-          -70.901427
+          42.520597,
+          -70.901244
         ],
         [
-          42.519169,
-          -70.901935
+          42.520597,
+          -70.901332
         ],
         [
-          42.519057,
-          -70.902415
+          42.520592,
+          -70.901439
         ],
         [
-          42.518928,
-          -70.902977
+          42.520575,
+          -70.901593
         ],
         [
-          42.518841,
-          -70.903379
+          42.520545,
+          -70.901736
         ],
         [
-          42.518788,
-          -70.90369
+          42.520509,
+          -70.901878
         ],
         [
-          42.518928,
-          -70.903731
+          42.520453,
+          -70.902066
         ],
         [
-          42.519034,
-          -70.903778
+          42.520386,
+          -70.902242
         ],
         [
-          42.51917,
-          -70.903876
+          42.520313,
+          -70.902407
         ],
         [
-          42.519186,
-          -70.903889
-        ],
-        [
-          42.519289,
-          -70.90377
-        ],
-        [
-          42.519362,
-          -70.903685
-        ],
-        [
-          42.519491,
-          -70.903534
-        ],
-        [
-          42.519668,
-          -70.90333
-        ],
-        [
-          42.519737,
-          -70.903241
+          42.520241,
+          -70.90253
         ]
       ],
-      "routeDistanceM": 853,
-      "routeDurationS": 685
+      "routeDistanceM": 806,
+      "routeDurationS": 575
     },
     {
       "order": 17,
@@ -2292,156 +1455,110 @@
       "historicalPeriod": "1692 / memorial 2017",
       "admissionInfo": "Free",
       "hours": "Open dawn to dusk",
-      "phone": null,
-      "website": null,
       "routeToNext": [
-        [
-          42.519737,
-          -70.903241
-        ],
-        [
-          42.519875,
-          -70.903065
-        ],
-        [
-          42.520042,
-          -70.902829
-        ],
-        [
-          42.520137,
-          -70.902687
-        ],
         [
           42.520241,
           -70.90253
         ],
         [
-          42.520448,
-          -70.902661
+          42.520313,
+          -70.902407
         ],
         [
-          42.520635,
-          -70.902779
+          42.520386,
+          -70.902242
         ],
         [
-          42.520869,
-          -70.902926
+          42.520453,
+          -70.902066
         ],
         [
-          42.521021,
-          -70.90303
+          42.520509,
+          -70.901878
         ],
         [
-          42.521066,
-          -70.902936
+          42.520545,
+          -70.901736
         ],
         [
-          42.521138,
-          -70.902784
+          42.520575,
+          -70.901593
         ],
         [
-          42.521294,
-          -70.90244
+          42.520592,
+          -70.901439
         ],
         [
-          42.521536,
-          -70.901907
+          42.520597,
+          -70.901332
         ],
         [
-          42.521819,
-          -70.901289
+          42.520597,
+          -70.901244
         ],
         [
-          42.521857,
-          -70.901206
+          42.520782,
+          -70.901197
         ],
         [
-          42.522116,
-          -70.900631
+          42.521829,
+          -70.901288
         ],
         [
-          42.522389,
-          -70.900027
+          42.522146,
+          -70.900567
         ],
         [
-          42.522456,
-          -70.900036
+          42.522307,
+          -70.900214
         ],
         [
-          42.522588,
-          -70.899756
+          42.522385,
+          -70.900017
         ],
         [
-          42.522776,
-          -70.899341
+          42.522534,
+          -70.899681
         ],
         [
-          42.522828,
-          -70.899208
+          42.522656,
+          -70.899438
         ],
         [
-          42.522916,
-          -70.899023
+          42.522734,
+          -70.899268
         ],
         [
-          42.522955,
-          -70.898933
+          42.522851,
+          -70.898945
         ],
         [
-          42.522957,
-          -70.898861
+          42.522896,
+          -70.898844
         ],
         [
-          42.523106,
-          -70.898861
+          42.523177,
+          -70.898837
         ],
         [
-          42.523216,
-          -70.898856
+          42.523337,
+          -70.898828
         ],
         [
-          42.523296,
-          -70.898851
+          42.523434,
+          -70.898829
         ],
         [
-          42.523297,
-          -70.898898
+          42.523873,
+          -70.898827
         ],
         [
-          42.523297,
-          -70.898922
-        ],
-        [
-          42.523328,
-          -70.898971
-        ],
-        [
-          42.523372,
-          -70.899021
-        ],
-        [
-          42.523425,
-          -70.898953
-        ],
-        [
-          42.52351,
-          -70.898906
-        ],
-        [
-          42.52387,
-          -70.898887
-        ],
-        [
-          42.523972,
-          -70.898893
-        ],
-        [
-          42.524,
-          -70.898897
+          42.523939,
+          -70.898838
         ]
       ],
-      "routeDistanceM": 714,
-      "routeDurationS": 572
+      "routeDistanceM": 602,
+      "routeDurationS": 430
     },
     {
       "order": 18,
@@ -2456,245 +1573,109 @@
       "distanceMFromPrev": 440,
       "transitionNarration": "Return east on Pope Street, then walk north on Margin Street to Bridge Street. The MBTA commuter rail station is ahead. This is where the train from Boston arrives, making Salem an easy day trip. We are now looping back toward the center of the city.",
       "shortNarration": "Salem's MBTA commuter rail station connects the city to Boston's North Station. The Newburyport and Rockport lines stop here, making Salem an easy day trip from Boston.",
-      "longNarration": null,
       "description": "Commuter rail station connecting Salem to Boston's North Station via Newburyport/Rockport line. ~30 minute ride. Seasonal express service in October.",
-      "historicalPeriod": null,
-      "admissionInfo": null,
       "hours": "Per MBTA schedule",
-      "phone": null,
       "website": "https://www.mbta.com/stops/place-ER-0168",
       "routeToNext": [
         [
-          42.524,
-          -70.898897
+          42.523939,
+          -70.898838
         ],
         [
-          42.523972,
-          -70.898893
+          42.523952,
+          -70.898718
         ],
         [
-          42.52387,
-          -70.898887
+          42.523962,
+          -70.898627
         ],
         [
-          42.52351,
-          -70.898906
+          42.523966,
+          -70.898546
         ],
         [
-          42.523425,
-          -70.898953
+          42.523968,
+          -70.898512
         ],
         [
-          42.523372,
-          -70.899021
+          42.52394,
+          -70.898228
         ],
         [
-          42.523328,
-          -70.898971
+          42.523904,
+          -70.89792
         ],
         [
-          42.523297,
-          -70.898922
+          42.523795,
+          -70.89697
         ],
         [
-          42.523297,
-          -70.898898
+          42.523767,
+          -70.896814
         ],
         [
-          42.523296,
-          -70.898851
+          42.523738,
+          -70.896599
         ],
         [
-          42.523296,
-          -70.898795
+          42.523713,
+          -70.896483
         ],
         [
-          42.523296,
-          -70.89878
+          42.523693,
+          -70.896387
         ],
         [
-          42.523296,
-          -70.898739
+          42.523665,
+          -70.896311
         ],
         [
-          42.523295,
-          -70.898661
+          42.523632,
+          -70.896256
         ],
         [
-          42.523204,
-          -70.898666
+          42.523569,
+          -70.896178
         ],
         [
-          42.523112,
-          -70.898668
+          42.523501,
+          -70.896112
         ],
         [
-          42.523075,
-          -70.898651
+          42.523369,
+          -70.896029
         ],
         [
-          42.523036,
-          -70.898606
+          42.523015,
+          -70.895976
         ],
         [
-          42.522978,
-          -70.898616
+          42.522957,
+          -70.895962
         ],
         [
-          42.522945,
-          -70.898622
+          42.522758,
+          -70.895897
         ],
         [
-          42.522952,
-          -70.898665
+          42.522474,
+          -70.895834
         ],
         [
-          42.522948,
-          -70.89868
+          42.522313,
+          -70.895812
         ],
         [
-          42.522932,
-          -70.898683
+          42.52193,
+          -70.89576
         ],
         [
-          42.522834,
-          -70.898702
-        ],
-        [
-          42.522757,
-          -70.898714
-        ],
-        [
-          42.522704,
-          -70.898701
-        ],
-        [
-          42.522658,
-          -70.898684
-        ],
-        [
-          42.522623,
-          -70.898663
-        ],
-        [
-          42.52259,
-          -70.898617
-        ],
-        [
-          42.522578,
-          -70.898584
-        ],
-        [
-          42.522566,
-          -70.898523
-        ],
-        [
-          42.522544,
-          -70.898214
-        ],
-        [
-          42.522503,
-          -70.897621
-        ],
-        [
-          42.522443,
-          -70.896937
-        ],
-        [
-          42.5224,
-          -70.89638
-        ],
-        [
-          42.522377,
-          -70.896162
-        ],
-        [
-          42.522382,
-          -70.896053
-        ],
-        [
-          42.5224,
-          -70.895944
-        ],
-        [
-          42.522421,
-          -70.895826
-        ],
-        [
-          42.522439,
-          -70.895722
-        ],
-        [
-          42.522479,
-          -70.895444
-        ],
-        [
-          42.522467,
-          -70.895441
-        ],
-        [
-          42.522311,
-          -70.895399
-        ],
-        [
-          42.522304,
-          -70.895395
-        ],
-        [
-          42.522299,
-          -70.895391
-        ],
-        [
-          42.522294,
-          -70.895384
-        ],
-        [
-          42.522291,
-          -70.895374
-        ],
-        [
-          42.522283,
-          -70.895354
-        ],
-        [
-          42.522275,
-          -70.895332
-        ],
-        [
-          42.522261,
-          -70.895295
-        ],
-        [
-          42.522246,
-          -70.895303
-        ],
-        [
-          42.522231,
-          -70.895303
-        ],
-        [
-          42.522016,
-          -70.895256
-        ],
-        [
-          42.522001,
-          -70.895249
-        ],
-        [
-          42.521991,
-          -70.895234
-        ],
-        [
-          42.521984,
-          -70.895215
-        ],
-        [
-          42.521984,
-          -70.895215
+          42.521963,
+          -70.895152
         ]
       ],
-      "routeDistanceM": 520,
-      "routeDurationS": 415
+      "routeDistanceM": 464,
+      "routeDurationS": 331
     },
     {
       "order": 19,
@@ -2709,73 +1690,46 @@
       "distanceMFromPrev": 350,
       "transitionNarration": "Walk south on Washington Street toward Salem Common. This nine-acre park has served as public green since the sixteen thirties. The grand homes lining the square were built during Salem's maritime golden age.",
       "shortNarration": "Salem Common is a nine-acre park in the heart of Salem. Used as common grazing land since the sixteen thirties, it is now surrounded by grand homes and anchored by the Witch Museum and Hawthorne Hotel.",
-      "longNarration": null,
       "description": "Nine-acre historic common in downtown Salem. Used since the 1630s. Surrounded by grand architecture, museums, and the Hawthorne Hotel.",
       "historicalPeriod": "1630s",
       "admissionInfo": "Free",
       "hours": "Open 24 hours",
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.521984,
-          -70.895215
+          42.521963,
+          -70.895152
         ],
         [
-          42.521983,
-          -70.895194
+          42.521488,
+          -70.89512
         ],
         [
-          42.522001,
-          -70.89501
-        ],
-        [
-          42.521528,
-          -70.894911
-        ],
-        [
-          42.521556,
-          -70.894644
-        ],
-        [
-          42.521471,
+          42.52154,
           -70.894639
         ],
         [
-          42.521165,
-          -70.894622
+          42.521571,
+          -70.894351
         ],
         [
-          42.521168,
-          -70.894472
+          42.521604,
+          -70.894133
         ],
         [
-          42.521136,
-          -70.894471
+          42.521636,
+          -70.893766
         ],
         [
-          42.520857,
-          -70.894458
+          42.521348,
+          -70.89371
         ],
         [
-          42.520805,
-          -70.894455
-        ],
-        [
-          42.520824,
-          -70.893607
-        ],
-        [
-          42.520707,
-          -70.893585
-        ],
-        [
-          42.520705,
-          -70.893601
+          42.520632,
+          -70.893583
         ]
       ],
-      "routeDistanceM": 273,
-      "routeDurationS": 218
+      "routeDistanceM": 275,
+      "routeDurationS": 196
     },
     {
       "order": 20,
@@ -2790,177 +1744,83 @@
       "distanceMFromPrev": 80,
       "transitionNarration": "The Hawthorne Hotel stands on the west side of Salem Common. Built in 1925, it has hosted presidents and celebrities. Staff and guests report numerous ghost sightings, particularly on the sixth floor.",
       "shortNarration": "The Hawthorne Hotel, built in 1925, is one of the grand Federal-style hotels of New England. Reputedly one of the most haunted hotels in America, it overlooks Salem Common.",
-      "longNarration": null,
       "description": "Historic 1925 hotel overlooking Salem Common. Named for Nathaniel Hawthorne. Reportedly one of America's most haunted hotels.",
       "historicalPeriod": "1925",
       "admissionInfo": "Hotel (public areas accessible)",
-      "hours": null,
       "phone": "(978) 744-4080",
       "website": "https://www.hawthornehotel.com",
       "routeToNext": [
         [
-          42.520705,
-          -70.893601
+          42.520632,
+          -70.893583
         ],
         [
-          42.520707,
-          -70.893585
+          42.521348,
+          -70.89371
         ],
         [
-          42.520853,
-          -70.893612
+          42.521636,
+          -70.893766
         ],
         [
-          42.52112,
-          -70.89366
+          42.521709,
+          -70.893472
         ],
         [
-          42.521214,
-          -70.893677
+          42.521766,
+          -70.893137
         ],
         [
-          42.521256,
-          -70.893685
+          42.521801,
+          -70.892965
         ],
         [
-          42.521295,
-          -70.893692
+          42.52183,
+          -70.8928
         ],
         [
-          42.521657,
-          -70.893753
+          42.521865,
+          -70.89262
         ],
         [
-          42.521796,
-          -70.892952
+          42.521916,
+          -70.892412
         ],
         [
-          42.521798,
-          -70.892939
+          42.521958,
+          -70.892239
         ],
         [
-          42.521852,
-          -70.892627
+          42.522006,
+          -70.89203
         ],
         [
-          42.521869,
-          -70.892571
+          42.522138,
+          -70.891638
         ],
         [
-          42.52199,
-          -70.892104
+          42.522236,
+          -70.891297
         ],
         [
-          42.521998,
-          -70.892086
+          42.522446,
+          -70.890678
         ],
         [
-          42.522011,
-          -70.892072
+          42.522489,
+          -70.890502
         ],
         [
-          42.522046,
-          -70.892052
+          42.522953,
+          -70.890601
         ],
         [
-          42.522056,
-          -70.892046
-        ],
-        [
-          42.522091,
-          -70.892025
-        ],
-        [
-          42.522158,
-          -70.891979
-        ],
-        [
-          42.522143,
-          -70.891942
-        ],
-        [
-          42.52214,
-          -70.891903
-        ],
-        [
-          42.522147,
-          -70.891844
-        ],
-        [
-          42.5222,
-          -70.891674
-        ],
-        [
-          42.52223,
-          -70.891575
-        ],
-        [
-          42.52224,
-          -70.891543
-        ],
-        [
-          42.522252,
-          -70.891506
-        ],
-        [
-          42.522382,
-          -70.891069
-        ],
-        [
-          42.522514,
-          -70.890643
-        ],
-        [
-          42.522533,
-          -70.890552
-        ],
-        [
-          42.522548,
-          -70.890485
-        ],
-        [
-          42.522563,
-          -70.890391
-        ],
-        [
-          42.522752,
-          -70.890438
-        ],
-        [
-          42.522907,
-          -70.890469
-        ],
-        [
-          42.522966,
-          -70.890467
-        ],
-        [
-          42.523035,
-          -70.890473
-        ],
-        [
-          42.52307,
-          -70.890476
-        ],
-        [
-          42.523119,
-          -70.890445
-        ],
-        [
-          42.523179,
-          -70.89039
-        ],
-        [
-          42.523384,
-          -70.890201
-        ],
-        [
-          42.523385,
-          -70.8903
+          42.52336,
+          -70.890679
         ]
       ],
-      "routeDistanceM": 517,
-      "routeDurationS": 413
+      "routeDistanceM": 496,
+      "routeDurationS": 354
     },
     {
       "order": 21,
@@ -2975,113 +1835,54 @@
       "distanceMFromPrev": 310,
       "transitionNarration": "Walk east along the north side of the common, then turn south on Lynde Street. The Witch Dungeon Museum features live reenactments of a 1692 trial, performed by professional actors using actual court transcripts.",
       "shortNarration": "The Witch Dungeon Museum features a live reenactment of a 1692 witch trial, adapted from actual court transcripts. After the show, tour the recreated dungeon.",
-      "longNarration": null,
       "description": "Live reenactment of a 1692 witch trial based on court transcripts. Includes tour of recreated dungeon where accused were held.",
-      "historicalPeriod": null,
       "admissionInfo": "$14 adults, $12 children",
       "hours": "10:00 AM - 5:00 PM (seasonal)",
       "phone": "(978) 741-3570",
-      "website": null,
       "routeToNext": [
         [
-          42.523385,
-          -70.8903
+          42.52336,
+          -70.890679
         ],
         [
-          42.523384,
-          -70.890201
+          42.522953,
+          -70.890601
         ],
         [
-          42.523179,
-          -70.89039
+          42.522489,
+          -70.890502
         ],
         [
-          42.523119,
-          -70.890445
+          42.522301,
+          -70.890475
         ],
         [
-          42.52307,
-          -70.890476
+          42.521988,
+          -70.890412
         ],
         [
-          42.523035,
-          -70.890473
+          42.521769,
+          -70.890374
         ],
         [
-          42.522966,
-          -70.890467
+          42.521281,
+          -70.890265
         ],
         [
-          42.522907,
-          -70.890469
+          42.521271,
+          -70.890505
         ],
         [
-          42.522752,
-          -70.890438
+          42.521251,
+          -70.890847
         ],
         [
-          42.522563,
-          -70.890391
-        ],
-        [
-          42.522548,
-          -70.890485
-        ],
-        [
-          42.522533,
-          -70.890552
-        ],
-        [
-          42.522514,
-          -70.890643
-        ],
-        [
-          42.522382,
-          -70.891069
-        ],
-        [
-          42.522252,
-          -70.891506
-        ],
-        [
-          42.52224,
-          -70.891543
-        ],
-        [
-          42.52223,
-          -70.891575
-        ],
-        [
-          42.52218,
-          -70.891548
-        ],
-        [
-          42.522172,
-          -70.891577
-        ],
-        [
-          42.522165,
-          -70.891602
-        ],
-        [
-          42.52214,
-          -70.891686
-        ],
-        [
-          42.521785,
-          -70.891526
-        ],
-        [
-          42.521632,
-          -70.891452
-        ],
-        [
-          42.521614,
-          -70.891449
+          42.521113,
+          -70.891713
         ]
       ],
-      "routeDistanceM": 291,
-      "routeDurationS": 233
+      "routeDistanceM": 354,
+      "routeDurationS": 253
     },
     {
       "order": 22,
@@ -3096,65 +1897,42 @@
       "distanceMFromPrev": 190,
       "transitionNarration": "Walk south to Essex Street and turn left. The Ropes Mansion on your right dates to 1727. Its formal gardens are free to visit. Film fans will recognize it as the Allison house from the 1993 movie Hocus Pocus.",
       "shortNarration": "The Ropes Mansion is a grand Colonial and Federal-style house dating to the seventeen twenties. Film fans may recognize it as the Allison house from the 1993 movie Hocus Pocus.",
-      "longNarration": null,
       "description": "1727 mansion with beautiful formal gardens. Famous as the Allison house in Hocus Pocus (1993). Owned by Peabody Essex Museum.",
       "historicalPeriod": "1727",
       "admissionInfo": "Free (exterior and gardens)",
       "hours": "Gardens open daylight hours",
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.521614,
-          -70.891449
+          42.521113,
+          -70.891713
         ],
         [
-          42.521511,
-          -70.891432
+          42.521251,
+          -70.890847
         ],
         [
-          42.521176,
-          -70.891376
+          42.521271,
+          -70.890505
         ],
         [
-          42.521179,
-          -70.891358
+          42.521281,
+          -70.890265
         ],
         [
-          42.521191,
-          -70.891274
+          42.520859,
+          -70.89014
         ],
         [
-          42.521157,
-          -70.891263
+          42.520721,
+          -70.89012
         ],
         [
-          42.521192,
-          -70.891046
-        ],
-        [
-          42.521224,
-          -70.890824
-        ],
-        [
-          42.521212,
-          -70.890622
-        ],
-        [
-          42.521239,
-          -70.890401
-        ],
-        [
-          42.521241,
-          -70.890359
-        ],
-        [
-          42.520903,
-          -70.890277
+          42.520699,
+          -70.890113
         ]
       ],
-      "routeDistanceM": 175,
-      "routeDurationS": 140
+      "routeDistanceM": 187,
+      "routeDurationS": 133
     },
     {
       "order": 23,
@@ -3169,101 +1947,33 @@
       "distanceMFromPrev": 120,
       "transitionNarration": "Continue east on Essex Street. You are walking through Salem's witch shop district. Crow Haven Corner, HEX Old World Witchery, and Omen are all along this block. The seated statue of Hawthorne is just ahead.",
       "shortNarration": "This bronze statue of Nathaniel Hawthorne depicts Salem's most famous author seated with a book. He was born in Salem in 1804 and set several of his most famous works here.",
-      "longNarration": null,
       "description": "Bronze statue of Salem's most famous author. Hawthorne's works include The Scarlet Letter, The House of the Seven Gables, and Young Goodman Brown.",
       "historicalPeriod": "Statue erected 1925",
       "admissionInfo": "Free",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.520903,
-          -70.890277
+          42.520699,
+          -70.890113
         ],
         [
-          42.520844,
-          -70.890263
+          42.520721,
+          -70.89012
         ],
         [
-          42.520843,
-          -70.890167
+          42.520859,
+          -70.89014
         ],
         [
-          42.52086,
-          -70.890077
+          42.521281,
+          -70.890265
         ],
         [
-          42.520818,
-          -70.89004
-        ],
-        [
-          42.520798,
-          -70.889982
-        ],
-        [
-          42.520825,
-          -70.889929
-        ],
-        [
-          42.520821,
-          -70.889761
-        ],
-        [
-          42.52082,
-          -70.889747
-        ],
-        [
-          42.520817,
-          -70.889618
-        ],
-        [
-          42.520903,
-          -70.889707
-        ],
-        [
-          42.520952,
-          -70.889633
-        ],
-        [
-          42.520955,
-          -70.889618
-        ],
-        [
-          42.521006,
-          -70.889408
-        ],
-        [
-          42.521065,
-          -70.889185
-        ],
-        [
-          42.521085,
-          -70.888961
-        ],
-        [
-          42.521114,
-          -70.888975
-        ],
-        [
-          42.52145,
-          -70.88918
-        ],
-        [
-          42.521648,
-          -70.889301
-        ],
-        [
-          42.521616,
-          -70.889474
-        ],
-        [
-          42.521591,
-          -70.889496
+          42.521245,
+          -70.890066
         ]
       ],
-      "routeDistanceM": 228,
-      "routeDurationS": 182
+      "routeDistanceM": 83,
+      "routeDurationS": 59
     },
     {
       "order": 24,
@@ -3287,316 +1997,96 @@
       "website": "https://www.pem.org",
       "routeToNext": [
         [
-          42.521591,
-          -70.889496
+          42.521245,
+          -70.890066
         ],
         [
-          42.521616,
-          -70.889474
+          42.521281,
+          -70.890265
         ],
         [
-          42.521648,
-          -70.889301
+          42.520859,
+          -70.89014
         ],
         [
-          42.52145,
-          -70.88918
+          42.520721,
+          -70.89012
         ],
         [
-          42.521114,
-          -70.888975
+          42.520699,
+          -70.890113
         ],
         [
-          42.521085,
-          -70.888961
+          42.520664,
+          -70.890281
         ],
         [
-          42.520987,
-          -70.888913
+          42.520623,
+          -70.890424
         ],
         [
-          42.520833,
-          -70.888836
+          42.520566,
+          -70.890558
         ],
         [
-          42.520822,
-          -70.88884
+          42.520304,
+          -70.891083
         ],
         [
-          42.520808,
-          -70.889456
+          42.520175,
+          -70.891396
         ],
         [
-          42.520816,
-          -70.889475
+          42.520086,
+          -70.891626
         ],
         [
-          42.520762,
-          -70.88948
-        ],
-        [
-          42.520713,
-          -70.889478
-        ],
-        [
-          42.52069,
-          -70.889477
-        ],
-        [
-          42.520637,
-          -70.889476
-        ],
-        [
-          42.520633,
-          -70.889551
-        ],
-        [
-          42.520634,
-          -70.889619
-        ],
-        [
-          42.520635,
-          -70.889667
-        ],
-        [
-          42.520634,
-          -70.889864
-        ],
-        [
-          42.520592,
-          -70.889957
-        ],
-        [
-          42.520549,
-          -70.88998
-        ],
-        [
-          42.52054,
-          -70.890079
-        ],
-        [
-          42.520532,
-          -70.890174
-        ],
-        [
-          42.520544,
-          -70.8902
-        ],
-        [
-          42.520557,
-          -70.890236
-        ],
-        [
-          42.520558,
-          -70.890253
-        ],
-        [
-          42.52056,
-          -70.8903
-        ],
-        [
-          42.520539,
-          -70.890366
-        ],
-        [
-          42.520415,
-          -70.890593
-        ],
-        [
-          42.520352,
-          -70.890682
-        ],
-        [
-          42.520274,
-          -70.890863
-        ],
-        [
-          42.52017,
-          -70.891109
-        ],
-        [
-          42.520143,
-          -70.891187
-        ],
-        [
-          42.520076,
-          -70.891387
-        ],
-        [
-          42.520047,
-          -70.891476
-        ],
-        [
-          42.52001,
-          -70.891584
-        ],
-        [
-          42.519961,
-          -70.891709
-        ],
-        [
-          42.519916,
-          -70.891843
-        ],
-        [
-          42.519888,
-          -70.891914
-        ],
-        [
-          42.519927,
-          -70.89194
-        ],
-        [
-          42.519974,
-          -70.891971
-        ],
-        [
-          42.519958,
-          -70.892017
-        ],
-        [
-          42.519949,
-          -70.892042
+          42.520001,
+          -70.891891
         ],
         [
           42.519891,
           -70.892212
         ],
         [
-          42.519865,
-          -70.892283
-        ],
-        [
           42.519749,
           -70.892607
-        ],
-        [
-          42.519684,
-          -70.892786
-        ],
-        [
-          42.519652,
-          -70.892876
         ],
         [
           42.519644,
           -70.892897
         ],
         [
-          42.519626,
-          -70.89295
-        ],
-        [
           42.519576,
           -70.893097
         ],
         [
-          42.519537,
-          -70.893228
+          42.51949,
+          -70.893391
         ],
         [
-          42.519488,
-          -70.893219
+          42.519391,
+          -70.893386
         ],
         [
-          42.519445,
-          -70.89321
+          42.518974,
+          -70.893314
         ],
         [
-          42.519434,
-          -70.893209
+          42.518454,
+          -70.893198
         ],
         [
-          42.519397,
-          -70.893239
-        ],
-        [
-          42.519364,
-          -70.893248
-        ],
-        [
-          42.519303,
-          -70.893237
-        ],
-        [
-          42.519218,
-          -70.893224
-        ],
-        [
-          42.518889,
-          -70.893172
-        ],
-        [
-          42.518741,
+          42.518116,
           -70.893146
         ],
         [
-          42.518536,
-          -70.893109
-        ],
-        [
-          42.518506,
-          -70.893104
-        ],
-        [
-          42.518463,
-          -70.893096
-        ],
-        [
-          42.518428,
-          -70.893089
-        ],
-        [
-          42.518178,
-          -70.893046
-        ],
-        [
-          42.518126,
-          -70.893039
-        ],
-        [
-          42.518106,
-          -70.893038
-        ],
-        [
-          42.51781,
-          -70.893003
-        ],
-        [
-          42.517761,
-          -70.892996
-        ],
-        [
-          42.517729,
-          -70.892975
-        ],
-        [
-          42.517723,
-          -70.892906
-        ],
-        [
-          42.517668,
-          -70.892902
-        ],
-        [
-          42.517626,
-          -70.892898
-        ],
-        [
-          42.517635,
-          -70.892844
-        ],
-        [
-          42.517618,
-          -70.892812
-        ],
-        [
-          42.517616,
-          -70.8924
+          42.517656,
+          -70.893055
         ]
       ],
-      "routeDistanceM": 802,
-      "routeDurationS": 642
+      "routeDistanceM": 590,
+      "routeDurationS": 422
     },
     {
       "order": 25,
@@ -3611,353 +2101,133 @@
       "distanceMFromPrev": 200,
       "transitionNarration": "Walk south on Washington Street. You are passing through the commercial heart of Salem. Rockafellas gastropub and Flying Saucer Pizza are along this stretch if you are ready for a well-deserved meal. Turner's Seafood in the historic Lyceum Hall, where Alexander Graham Bell first publicly demonstrated the telephone in 1877, is nearby on Church Street.",
       "shortNarration": "Near this location stood the Salem jail where accused witches were held in 1692. Conditions were appalling. Several accused died in custody before trial.",
-      "longNarration": null,
       "description": "Site of the 1692 jail where accused witches were held. Multiple accused died in these terrible conditions before ever reaching trial.",
       "historicalPeriod": "1692",
       "admissionInfo": "Free (exterior site marker)",
-      "hours": null,
-      "phone": null,
-      "website": null,
       "routeToNext": [
         [
-          42.517616,
-          -70.8924
+          42.517656,
+          -70.893055
         ],
         [
-          42.517618,
-          -70.892812
-        ],
-        [
-          42.517635,
-          -70.892844
-        ],
-        [
-          42.517626,
-          -70.892898
-        ],
-        [
-          42.517668,
-          -70.892902
-        ],
-        [
-          42.517723,
-          -70.892906
-        ],
-        [
-          42.517729,
-          -70.892975
-        ],
-        [
-          42.517761,
-          -70.892996
-        ],
-        [
-          42.51781,
-          -70.893003
-        ],
-        [
-          42.518106,
-          -70.893038
-        ],
-        [
-          42.518126,
-          -70.893039
-        ],
-        [
-          42.518178,
-          -70.893046
-        ],
-        [
-          42.518428,
-          -70.893089
-        ],
-        [
-          42.518463,
-          -70.893096
-        ],
-        [
-          42.518506,
-          -70.893104
-        ],
-        [
-          42.518536,
-          -70.893109
-        ],
-        [
-          42.518741,
+          42.518116,
           -70.893146
         ],
         [
-          42.518889,
-          -70.893172
+          42.518454,
+          -70.893198
         ],
         [
-          42.519218,
-          -70.893224
+          42.518974,
+          -70.893314
         ],
         [
-          42.519303,
-          -70.893237
+          42.519391,
+          -70.893386
         ],
         [
-          42.519364,
-          -70.893248
-        ],
-        [
-          42.519397,
-          -70.893239
-        ],
-        [
-          42.519434,
-          -70.893209
-        ],
-        [
-          42.519445,
-          -70.89321
-        ],
-        [
-          42.519488,
-          -70.893219
-        ],
-        [
-          42.519537,
-          -70.893228
+          42.51949,
+          -70.893391
         ],
         [
           42.519576,
           -70.893097
         ],
         [
-          42.519626,
-          -70.89295
-        ],
-        [
           42.519644,
           -70.892897
-        ],
-        [
-          42.519652,
-          -70.892876
-        ],
-        [
-          42.519684,
-          -70.892786
         ],
         [
           42.519749,
           -70.892607
         ],
         [
-          42.519865,
-          -70.892283
-        ],
-        [
           42.519891,
           -70.892212
         ],
         [
-          42.519949,
-          -70.892042
+          42.520001,
+          -70.891891
         ],
         [
-          42.519958,
-          -70.892017
+          42.520086,
+          -70.891626
         ],
         [
-          42.519974,
-          -70.891971
+          42.520175,
+          -70.891396
         ],
         [
-          42.519927,
-          -70.89194
+          42.520304,
+          -70.891083
         ],
         [
-          42.519888,
-          -70.891914
+          42.520566,
+          -70.890558
         ],
         [
-          42.519916,
-          -70.891843
-        ],
-        [
-          42.519961,
-          -70.891709
-        ],
-        [
-          42.52001,
-          -70.891584
-        ],
-        [
-          42.520047,
-          -70.891476
-        ],
-        [
-          42.520076,
-          -70.891387
-        ],
-        [
-          42.520143,
-          -70.891187
-        ],
-        [
-          42.52017,
-          -70.891109
-        ],
-        [
-          42.520274,
-          -70.890863
-        ],
-        [
-          42.520352,
-          -70.890682
-        ],
-        [
-          42.520415,
-          -70.890593
-        ],
-        [
-          42.520539,
-          -70.890366
-        ],
-        [
-          42.52056,
-          -70.8903
-        ],
-        [
-          42.520558,
-          -70.890253
-        ],
-        [
-          42.520557,
-          -70.890236
-        ],
-        [
-          42.520544,
-          -70.8902
-        ],
-        [
-          42.520532,
-          -70.890174
-        ],
-        [
-          42.52054,
-          -70.890079
-        ],
-        [
-          42.520549,
-          -70.88998
-        ],
-        [
-          42.520592,
-          -70.889957
-        ],
-        [
-          42.520634,
-          -70.889864
-        ],
-        [
-          42.520635,
-          -70.889667
-        ],
-        [
-          42.520634,
-          -70.889619
-        ],
-        [
-          42.520633,
-          -70.889551
-        ],
-        [
-          42.520637,
-          -70.889476
-        ],
-        [
-          42.520649,
-          -70.889203
-        ],
-        [
-          42.52065,
-          -70.889161
-        ],
-        [
-          42.520652,
-          -70.889102
+          42.520623,
+          -70.890424
         ],
         [
           42.520664,
-          -70.888814
+          -70.890281
         ],
         [
-          42.520668,
-          -70.888738
+          42.520699,
+          -70.890113
         ],
         [
-          42.52067,
-          -70.888678
+          42.520709,
+          -70.889884
         ],
         [
-          42.520764,
-          -70.888433
+          42.520719,
+          -70.889513
         ],
         [
-          42.520788,
-          -70.888372
+          42.520722,
+          -70.889177
         ],
         [
-          42.520808,
-          -70.888323
+          42.520729,
+          -70.888907
         ],
         [
-          42.520908,
-          -70.888078
+          42.520749,
+          -70.88876
         ],
         [
-          42.520928,
-          -70.88803
+          42.520762,
+          -70.888667
         ],
         [
-          42.521035,
-          -70.887781
+          42.520798,
+          -70.888557
         ],
         [
-          42.521268,
-          -70.887246
+          42.520869,
+          -70.888385
         ],
         [
-          42.521369,
-          -70.886998
+          42.520951,
+          -70.888179
         ],
         [
-          42.521427,
-          -70.887051
+          42.520997,
+          -70.88807
         ],
         [
-          42.521454,
-          -70.887075
+          42.521058,
+          -70.887927
         ],
         [
-          42.521474,
-          -70.887025
-        ],
-        [
-          42.521495,
-          -70.886971
-        ],
-        [
-          42.521513,
-          -70.886966
-        ],
-        [
-          42.52152,
-          -70.88695
-        ],
-        [
-          42.521556,
-          -70.886866
+          42.521335,
+          -70.887237
         ]
       ],
-      "routeDistanceM": 869,
-      "routeDurationS": 695
+      "routeDistanceM": 761,
+      "routeDurationS": 543
     },
     {
       "order": 26,
@@ -3972,13 +2242,10 @@
       "distanceMFromPrev": 190,
       "transitionNarration": "Walk east back to the NPS Visitor Center. You have completed the Grand Salem Tour. You have walked over five kilometers through more than four centuries of Salem history, from the founding in 1626 to the tragedy of 1692 to the vibrant city of today. Thank you for exploring Salem with us.",
       "shortNarration": "The National Park Service Regional Visitor Center is the official starting point for the Salem Heritage Trail. Rangers provide maps, information, and orientation to Salem's historic sites.",
-      "longNarration": null,
       "description": "Official NPS visitor center and start of the Heritage Trail. Free maps, brochures, film, and ranger information. Start your Salem visit here.",
-      "historicalPeriod": null,
       "admissionInfo": "Free",
       "hours": "9:00 AM - 5:00 PM daily",
       "phone": "(978) 740-1650",
-      "website": null,
       "routeToNext": [],
       "routeDistanceM": 0,
       "routeDurationS": 0

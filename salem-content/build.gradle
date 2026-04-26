@@ -19,4 +19,7 @@ kotlin {
 dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+
+    // Pure-JVM routing engine for tour-leg pre-bake (Router, JdbcRoutingBundleLoader).
+    implementation project(':routing-jvm')
 }

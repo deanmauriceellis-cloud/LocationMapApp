@@ -1,0 +1,21 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+dependencies {
+    // sqlite-jdbc is a runtime API dependency: callers that load a bundle from
+    // a sqlite file (JdbcRoutingBundleLoader) need the driver on their classpath.
+    api 'org.xerial:sqlite-jdbc:3.46.0.0'
+
+    testImplementation 'junit:junit:4.13.2'
+}

@@ -18,6 +18,7 @@ data class PipelineOutput(
     val primarySources: List<OutputPrimarySource>,
     val tours: List<OutputTour>,
     val tourStops: List<OutputTourStop>,
+    val tourLegs: List<OutputTourLeg>,
     val events: List<OutputEvent>
 )
 
@@ -110,6 +111,29 @@ data class OutputTourStop(
     val walkingMinutesFromPrev: Int? = null,
     val distanceMFromPrev: Int? = null,
     val provenance: Provenance = Provenance(dataSource = "manual_curated")
+)
+
+/**
+ * Pre-computed walking leg between two consecutive stops in a tour, baked
+ * from the same `salem-routing-graph.sqlite` bundle that the runtime Router
+ * uses. Lets the tour player render the polyline + distance/duration without
+ * loading the routing bundle or running Dijkstra at runtime.
+ *
+ * Geometry is encoded as `"lat,lng;lat,lng;..."` to match the bundle's
+ * `edges.geom_polyline` text format and the Android router's parsing
+ * expectations.
+ */
+data class OutputTourLeg(
+    val tourId: String,
+    val fromStopOrder: Int,
+    val toStopOrder: Int,
+    val fromPoiId: String,
+    val toPoiId: String,
+    val distanceM: Double,
+    val durationS: Double,
+    val edgeCount: Int,
+    val geometry: String,
+    val provenance: Provenance = Provenance(dataSource = "router_bake_v1")
 )
 
 data class OutputEvent(

@@ -93,6 +93,37 @@ object ContentValidator {
             }
         }
 
+        // Tour leg validation: each leg must reference a real tour and the
+        // (from, to) stop_orders must both exist for that tour and be
+        // consecutive.
+        val stopsByTour = output.tourStops.groupBy { it.tourId }
+            .mapValues { (_, ss) -> ss.map { it.stopOrder }.toSet() }
+        output.tourLegs.forEach { leg ->
+            if (leg.tourId !in tourIds) {
+                errors.add("TourLeg references non-existent tour: ${leg.tourId}")
+                return@forEach
+            }
+            val orders = stopsByTour[leg.tourId] ?: emptySet()
+            if (leg.fromStopOrder !in orders || leg.toStopOrder !in orders) {
+                errors.add(
+                    "TourLeg ${leg.tourId} ${leg.fromStopOrder}->${leg.toStopOrder}: " +
+                        "stop_order(s) not found in tour"
+                )
+            }
+            if (leg.toStopOrder != leg.fromStopOrder + 1) {
+                warnings.add(
+                    "TourLeg ${leg.tourId} ${leg.fromStopOrder}->${leg.toStopOrder}: " +
+                        "non-consecutive stop_orders"
+                )
+            }
+            if (leg.distanceM <= 0.0) {
+                errors.add("TourLeg ${leg.tourId} ${leg.fromStopOrder}: non-positive distance ${leg.distanceM}")
+            }
+            if (leg.geometry.isBlank()) {
+                errors.add("TourLeg ${leg.tourId} ${leg.fromStopOrder}: empty geometry")
+            }
+        }
+
         // Basic counts
         if (output.tourPois.isEmpty()) errors.add("No tour POIs generated")
         if (output.figures.isEmpty()) errors.add("No historical figures generated")

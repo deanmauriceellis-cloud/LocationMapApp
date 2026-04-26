@@ -38,6 +38,8 @@ fun main(args: Array<String>) {
     println("Tour POIs:       ${output.tourPois.size} (Phase 5)")
     println("Businesses:      ${output.businesses.size} (Phase 5)")
     println("Tours:           ${output.tours.size} (Phase 6)")
+    println("Tour stops:      ${output.tourStops.size}")
+    println("Tour legs:       ${output.tourLegs.size} (pre-baked walking polylines)")
     println("Events calendar: ${output.events.size} (Phase 9)")
 
     pipeline.writeSql(output, outputFile)

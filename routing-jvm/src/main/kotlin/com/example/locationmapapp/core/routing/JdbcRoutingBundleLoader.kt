@@ -4,15 +4,15 @@ import java.io.File
 import java.sql.DriverManager
 
 /**
- * JVM-only loader that mirrors [RoutingBundleLoader] semantics but uses
- * sqlite-jdbc instead of Android's `SQLiteDatabase`. Lives in `src/test/` so
- * it never ships with the production library.
+ * JVM-only loader that mirrors the Android `RoutingBundleLoader` (in `:core`)
+ * but uses sqlite-jdbc instead of `SQLiteDatabase`. Used by the
+ * `:salem-content` bake pipeline and by `:routing-jvm`'s parity tests.
  *
- * If [RoutingBundleLoader] changes its schema expectations or column reads,
- * this loader must be updated to match — otherwise the unit-test parity
- * checks become meaningless.
+ * If the Android-side `RoutingBundleLoader` changes its schema expectations
+ * or column reads, this loader must be updated to match — otherwise the
+ * parity checks become meaningless and the bake will diverge from runtime.
  */
-internal object JdbcRoutingBundleLoader {
+object JdbcRoutingBundleLoader {
 
     private const val EXPECTED_SCHEMA_VERSION = 1
 

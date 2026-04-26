@@ -15,7 +15,11 @@ import com.example.salemcontent.model.*
 import com.example.salemcontent.narration.NarrationGenerator
 import com.example.salemcontent.reader.*
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonArray
+import com.google.gson.JsonParser
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * Orchestrates the full Salem content pipeline:
@@ -82,6 +86,12 @@ class ContentPipeline(private val salemRoot: File) {
         val tourStops = SalemTours.allStops()
         println("  Tour stops: ${tourStops.size}")
 
+        println("\n[5b/8] Pre-baking tour-leg polylines...")
+        val tourLegs = bakeTourLegs(tourPois, tourStops)
+
+        println("\n[5c/8] Updating tour JSON assets with internal-router geometry...")
+        writeTourJsonAssets(tourLegs)
+
         println("\n[6/8] Loading events calendar...")
         val calendarEvents = SalemEvents.all()
         println("  Calendar events: ${calendarEvents.size}")
@@ -101,6 +111,7 @@ class ContentPipeline(private val salemRoot: File) {
             primarySources = outputSources,
             tours = tours,
             tourStops = tourStops,
+            tourLegs = tourLegs,
             events = calendarEvents
         )
 
@@ -295,6 +306,13 @@ class ContentPipeline(private val salemRoot: File) {
                 w.newLine()
             }
 
+            // Tour Legs (pre-baked walking polylines between consecutive stops)
+            w.write("\n-- Tour Legs (${output.tourLegs.size})\n")
+            for (l in output.tourLegs) {
+                w.write("""INSERT OR REPLACE INTO tour_legs (tour_id, from_stop_order, to_stop_order, from_poi_id, to_poi_id, distance_m, duration_s, edge_count, geometry, data_source, confidence, created_at, updated_at, stale_after) VALUES (${esc(l.tourId)}, ${l.fromStopOrder}, ${l.toStopOrder}, ${esc(l.fromPoiId)}, ${esc(l.toPoiId)}, ${l.distanceM}, ${l.durationS}, ${l.edgeCount}, ${esc(l.geometry)}, ${esc(l.provenance.dataSource)}, ${l.provenance.confidence}, ${l.provenance.createdAt}, ${l.provenance.updatedAt}, ${l.provenance.staleAfter});""")
+                w.newLine()
+            }
+
             // Events Calendar
             w.write("\n-- Events Calendar (${output.events.size})\n")
             for (e in output.events) {
@@ -308,5 +326,119 @@ class ContentPipeline(private val salemRoot: File) {
     private fun esc(value: String?): String {
         if (value == null) return "NULL"
         return "'" + value.replace("'", "''") + "'"
+    }
+
+    /**
+     * Locate the runtime routing bundle and bake one leg per consecutive
+     * stop pair, per tour. The bundle path resolution mirrors
+     * `RouterParityTest`: try the standard relative paths from common run
+     * locations (project root / module dir). Failure to find the bundle is
+     * a build-environment error — we don't silently skip.
+     */
+    private fun bakeTourLegs(
+        tourPois: List<OutputTourPoi>,
+        tourStops: List<OutputTourStop>,
+    ): List<OutputTourLeg> {
+        val bundleFile = locateRoutingBundle()
+        val result = TourLegBaker.bake(tourPois, tourStops, bundleFile)
+        println("  Tour legs baked: ${result.legs.size}")
+        if (result.skippedNoCoords > 0) println("  Skipped (no coords):   ${result.skippedNoCoords}")
+        if (result.skippedNoRoute > 0)  println("  Skipped (no route):    ${result.skippedNoRoute}")
+        if (result.skippedDegenerate > 0) println("  Skipped (degenerate):  ${result.skippedDegenerate}")
+        return result.legs
+    }
+
+    private fun locateRoutingBundle(): File {
+        val rel = "app-salem/src/main/assets/routing/salem-routing-graph.sqlite"
+        val candidates = listOf(
+            File(rel),
+            File("../$rel"),
+            File("../../$rel"),
+        )
+        return candidates.firstOrNull { it.exists() }
+            ?: error(
+                "Routing bundle not found; checked: " +
+                    candidates.joinToString { it.absolutePath }
+            )
+    }
+
+    /**
+     * Update each tour's JSON asset under `app-salem/src/main/assets/tours/` so
+     * the `routeToNext` polyline (+ `routeDistanceM`, `routeDurationS`) on every
+     * stop reflects the internal TigerLine bake. Curator-owned fields (name,
+     * narration, address, etc.) are preserved untouched.
+     *
+     * Stops without a baked leg (last stop in a tour, degenerate snap, missing
+     * coords) get an empty `routeToNext` so the tree never carries leftover
+     * externally-routed geometry — V1 is internal-only (see
+     * `feedback_v1_no_external_contact.md`).
+     */
+    private fun writeTourJsonAssets(legs: List<OutputTourLeg>) {
+        val toursDir = locateToursAssetDir()
+        val legsByTour = legs.groupBy { it.tourId }
+        val gson = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
+        var filesWritten = 0
+        for ((tourId, tourLegs) in legsByTour) {
+            val file = File(toursDir, "$tourId.json")
+            if (!file.exists()) {
+                println("  [tour-json] $tourId.json not present, skipping")
+                continue
+            }
+            val root = JsonParser.parseString(file.readText()).asJsonObject
+            val stopsArr = root.getAsJsonArray("stops")
+            if (stopsArr == null) {
+                println("  [tour-json] $tourId.json has no stops array, skipping")
+                continue
+            }
+
+            val legByFrom = tourLegs.associateBy { it.fromStopOrder }
+            var updated = 0
+            var cleared = 0
+            for (i in 0 until stopsArr.size()) {
+                val stop = stopsArr[i].asJsonObject
+                val order = stop.get("order")?.asInt ?: continue
+                val leg = legByFrom[order]
+                if (leg != null) {
+                    val polyArr = JsonArray()
+                    for (pair in leg.geometry.split(';')) {
+                        val comma = pair.indexOf(',')
+                        if (comma <= 0) continue
+                        val coord = JsonArray()
+                        coord.add(pair.substring(0, comma).toDouble())
+                        coord.add(pair.substring(comma + 1).toDouble())
+                        polyArr.add(coord)
+                    }
+                    stop.add("routeToNext", polyArr)
+                    stop.addProperty("routeDistanceM", leg.distanceM.roundToInt())
+                    stop.addProperty("routeDurationS", leg.durationS.roundToInt())
+                    updated++
+                } else {
+                    // No baked leg for this from-stop (last stop, degenerate, or data gap).
+                    // Clear any prior externally-routed geometry instead of preserving it.
+                    stop.add("routeToNext", JsonArray())
+                    stop.addProperty("routeDistanceM", 0)
+                    stop.addProperty("routeDurationS", 0)
+                    cleared++
+                }
+            }
+            file.writeText(gson.toJson(root) + "\n")
+            filesWritten++
+            println("  [tour-json] $tourId.json: $updated routes updated, $cleared cleared")
+        }
+        if (filesWritten == 0) println("  (no tour JSON files updated)")
+    }
+
+    private fun locateToursAssetDir(): File {
+        val rel = "app-salem/src/main/assets/tours"
+        val candidates = listOf(
+            File(rel),
+            File("../$rel"),
+            File("../../$rel"),
+        )
+        return candidates.firstOrNull { it.isDirectory }
+            ?: error(
+                "Tours asset dir not found; checked: " +
+                    candidates.joinToString { it.absolutePath }
+            )
     }
 }
