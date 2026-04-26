@@ -1,6 +1,6 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 172-181. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 173-182. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
 
@@ -8,7 +8,7 @@
 
 Operator opened with "I don't like your solution from the last session" — pushed back on S181's OSM-merge plan after testing P2P "tap POI → directions" between two Heritage Trail stops and getting a clean route, which the multi-stop tour render of consecutive stops can't reproduce. Traced both code paths: `Router.routeMulti` is literally per-leg `route()` calls + `concat()`, byte-for-byte equivalent to N P2P calls. The actual divergence is in the input — tour legs feed POI centroids (often inside/behind a building polygon, KNN snap can land on the wrong side), P2P feeds the user's GPS (already on a sidewalk). Same algorithm, different start node, different shortest path, one crosses the building and one doesn't. S181's proposed broad OSM pedestrian merge wouldn't have fixed it. Reverted: memory `feedback_no_osm_use_local_geo.md` restored to S178 surgical-only constraint, MEMORY.md index reverted, `docs/plans/S182-osm-pedestrian-routing-merge.md` archived to `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md` with banner, CLAUDE.md pinned next-steps block reframed. Feasibility-checked an address-anchored alternative — `salem_pois.address` has 97.5% coverage, TIGER `lfromadd/ltoadd/rfromadd/rtoadd` interpolation works (sample "237 Essex St" geocoded to 12 m offset on Essex St centerline) — but ≈half the Heritage Trail stops have addresses that fall through (intersection / square-only / no-number / TIGER coverage gap), so the resolver would need a layered fallback. Operator rejected the whole engineering path: "I need to do that tour by hand, I don't want to muck more with the mapping, wasting too much time on that." Saved a new HARD RULE memory `feedback_tour_routing_is_content_not_engineering.md` to prevent this loop in future sessions. Cache-proxy (4300) and Vite admin (4302) brought up at session end for the operator's curation work. **No code changes shipped this session.**
 
-Full session detail: `docs/session-logs/session-182-2026-04-26.md`. Commit: `<S182-close-sha>`.
+Full session detail: `docs/session-logs/session-182-2026-04-26.md`. Commit: `9efc931`.
 
 ---
 
