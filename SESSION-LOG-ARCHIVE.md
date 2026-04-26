@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 110, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 164, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 165, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 165: 2026-04-24 — Fuzzy Find engine + admin classification flags + FindPanel category fix (killed session)
+
+Session killed before session-end protocol ran; work committed and closed via S166. Shipped: (1) `FuzzySearchEngine.kt` (new) — multi-tier in-memory scorer (10k/5k/3k/600/400/250/120) with subcat/cuisine/desc/hist/addr tiers; `FindViewModel` preloads all POIs on `init {}`, 250ms debounce, tap→animateTo geocoord zoom=18, long-press→detail dialog. (2) `PoiEditDialog.tsx` — new "Flags" tab with toggle-switch UI for 7 operational flags + 5 classification flags (`is_historical_property`, `is_witch_trial_site`, `is_free_admission`, `is_indoor`, `is_family_friendly`). (3) `PoiTree.tsx` — `CategorySelectCtx` context fix for react-arborist category clicks, new flag fields in `PoiRow`. (4) `FindPanel.tsx` — category click skips subtype tree, directly filters map. (5) `admin-pois.js` — 5 new classification flags in `UPDATABLE_FIELDS`.
+
+Full session detail: `docs/session-logs/session-165-2026-04-24.md`. Commit: see S166.
+
+---
 
 ## Session 164: 2026-04-24 — Wrong-project detour (LAN recon → RadioLogger)
 

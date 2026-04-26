@@ -33,9 +33,9 @@ import org.osmdroid.views.overlay.Polyline
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SalemMainActivityDirections.kt"
 
-private const val DIR_ROUTE_COLOR = "#C9A84C"    // Salem gold
-private const val DIR_ROUTE_BORDER = "#8A7234"   // Darker gold
-private const val DIR_COMPLETED_COLOR = "#66C9A84C" // Faded gold
+private const val DIR_ROUTE_COLOR = "#22C55E"    // Green (S175 — operator)
+private const val DIR_ROUTE_BORDER = "#15803D"   // Darker green
+private const val DIR_COMPLETED_COLOR = "#6622C55E" // Faded green
 
 // Walking directions overlays
 internal var directionsPolyline: Polyline? = null

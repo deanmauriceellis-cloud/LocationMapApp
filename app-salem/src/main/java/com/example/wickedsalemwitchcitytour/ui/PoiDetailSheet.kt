@@ -509,12 +509,21 @@ class PoiDetailSheet : DialogFragment() {
                 }
             }
             is PoiActionSynthesizer.Action.Directions -> {
-                val label = Uri.encode(poi.name)
-                val geo = Uri.parse("geo:${action.lat},${action.lng}?q=${action.lat},${action.lng}($label)")
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, geo))
-                } catch (e: Exception) {
-                    DebugLogger.w(TAG, "No maps app available: ${e.message}")
+                // S175: route on the bundled Salem graph and draw the polyline
+                // on the in-app map. Falls back to a straight-line route inside
+                // WalkingDirections if the bundle isn't loaded.
+                val host = activity as? SalemMainActivity
+                if (host != null) {
+                    host.walkTo(org.osmdroid.util.GeoPoint(action.lat, action.lng))
+                    dismiss()
+                } else {
+                    val label = Uri.encode(poi.name)
+                    val geo = Uri.parse("geo:${action.lat},${action.lng}?q=${action.lat},${action.lng}($label)")
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, geo))
+                    } catch (e: Exception) {
+                        DebugLogger.w(TAG, "No maps app available: ${e.message}")
+                    }
                 }
             }
             is PoiActionSynthesizer.Action.Hours -> { /* inline display only */ }

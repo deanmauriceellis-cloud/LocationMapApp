@@ -10,8 +10,12 @@
 package com.example.wickedsalemwitchcitytour.tour
 
 import android.content.Context
+import com.example.locationmapapp.core.routing.RouteResult
+import com.example.locationmapapp.core.routing.RoutingLatLng
+import com.example.locationmapapp.core.routing.TurnByTurn
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.FeatureFlags
+import com.example.wickedsalemwitchcitytour.routing.SalemRouterProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,7 +43,8 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WalkingDire
  */
 @Singleton
 class WalkingDirections @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val salemRouterProvider: SalemRouterProvider,
 ) {
     private val TAG = "WalkingDir"
 
@@ -57,11 +62,11 @@ class WalkingDirections @Inject constructor(
      * @return WalkingRoute with polyline, distance, duration, and turn instructions
      */
     suspend fun getRoute(from: GeoPoint, to: GeoPoint): WalkingRoute? = withContext(Dispatchers.IO) {
-        // V1 offline: no OSRM. Return a straight-line WalkingRoute — the map
-        // draws a polyline from user → destination, distance is great-circle,
-        // duration assumes 1.4 m/s walking pace. No turn-by-turn.
+        // V1 offline: route on the bundled Salem graph (S175). Falls back to a
+        // straight-line route only if the bundle didn't load — otherwise we
+        // get a real road-following polyline plus turn-by-turn.
         if (FeatureFlags.V1_OFFLINE_ONLY) {
-            return@withContext straightLineRoute(from, to)
+            return@withContext bundleRoute(from, to) ?: straightLineRoute(from, to)
         }
 
         val cacheKey = "${from.latitude.hashCode()}_${from.longitude.hashCode()}_" +
@@ -106,11 +111,12 @@ class WalkingDirections @Inject constructor(
     suspend fun getMultiStopRoute(waypoints: List<GeoPoint>): WalkingRoute? = withContext(Dispatchers.IO) {
         if (waypoints.size < 2) return@withContext null
 
-        // V1 offline: stitch straight-line segments between waypoints. Callers
-        // wanting the richer pre-computed tour polyline should use
-        // [getBundledTourRoute] with a tour_id.
+        // V1 offline: route each consecutive pair on the bundled Salem graph
+        // (S175) and concatenate. Falls back to straight-line stitching if
+        // the bundle didn't load. Callers wanting a richer pre-computed tour
+        // polyline should still use [getBundledTourRoute] with a tour_id.
         if (FeatureFlags.V1_OFFLINE_ONLY) {
-            return@withContext straightLineMultiRoute(waypoints)
+            return@withContext bundleMultiRoute(waypoints) ?: straightLineMultiRoute(waypoints)
         }
 
         try {
@@ -212,6 +218,71 @@ class WalkingDirections @Inject constructor(
                 cos(Math.toRadians(a.latitude)) * cos(Math.toRadians(b.latitude)) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2)
         return R * 2 * Math.atan2(sqrt(h), sqrt(1 - h))
+    }
+
+    /**
+     * V1 offline: route on the bundled Salem graph via [SalemRouterProvider].
+     * Returns null if the bundle isn't loaded or the router can't snap either
+     * endpoint to a walkable node — caller is expected to fall back to a
+     * straight-line route in that case.
+     */
+    private fun bundleRoute(from: GeoPoint, to: GeoPoint): WalkingRoute? {
+        val router = salemRouterProvider.routerOrNull() ?: return null
+        val result = router.route(from.latitude, from.longitude, to.latitude, to.longitude)
+            ?: return null
+        if (result.geometry.isEmpty()) return null
+        return routeResultToWalkingRoute(result)
+    }
+
+    private fun bundleMultiRoute(waypoints: List<GeoPoint>): WalkingRoute? {
+        val router = salemRouterProvider.routerOrNull() ?: return null
+        val stops = waypoints.map { RoutingLatLng(it.latitude, it.longitude) }
+        val result = router.routeMulti(stops) ?: return null
+        if (result.geometry.isEmpty()) return null
+        return routeResultToWalkingRoute(result)
+    }
+
+    private fun routeResultToWalkingRoute(result: RouteResult): WalkingRoute {
+        val polyline = ArrayList<GeoPoint>(result.geometry.size)
+        for (p in result.geometry) polyline.add(GeoPoint(p.lat, p.lng))
+        val turnSteps = TurnByTurn.synthesize(result)
+        val paceMps = salemRouterProvider.routerOrNull()?.bundlePaceMps() ?: 1.4
+        val instructions = turnSteps.map { step ->
+            val anchor = step.polyline.firstOrNull() ?: result.geometry.first()
+            WalkingInstruction(
+                text = step.instruction,
+                distanceM = step.lengthM,
+                durationSec = step.lengthM / paceMps,
+                location = GeoPoint(anchor.lat, anchor.lng),
+                maneuverType = maneuverCode(step.maneuver),
+            )
+        }
+        DebugLogger.i(TAG, "Bundled route: %.0fm, %.0fs, ${polyline.size} pts, ${instructions.size} turns".format(
+            result.distanceM, result.durationS
+        ))
+        return WalkingRoute(
+            polyline = polyline,
+            distanceKm = result.distanceM / 1000.0,
+            durationMinutes = (result.durationS / 60.0).toInt(),
+            instructions = instructions,
+            road = null,
+        )
+    }
+
+    /** Map [com.example.locationmapapp.core.routing.Maneuver] to OSRM-style codes
+     *  for compatibility with the existing turn-by-turn dialog. The dialog
+     *  doesn't switch behavior on these — they're informational. */
+    private fun maneuverCode(m: com.example.locationmapapp.core.routing.Maneuver): Int = when (m) {
+        com.example.locationmapapp.core.routing.Maneuver.DEPART -> 24
+        com.example.locationmapapp.core.routing.Maneuver.CONTINUE -> 1
+        com.example.locationmapapp.core.routing.Maneuver.SLIGHT_LEFT -> 5
+        com.example.locationmapapp.core.routing.Maneuver.LEFT -> 6
+        com.example.locationmapapp.core.routing.Maneuver.SHARP_LEFT -> 7
+        com.example.locationmapapp.core.routing.Maneuver.SLIGHT_RIGHT -> 2
+        com.example.locationmapapp.core.routing.Maneuver.RIGHT -> 3
+        com.example.locationmapapp.core.routing.Maneuver.SHARP_RIGHT -> 4
+        com.example.locationmapapp.core.routing.Maneuver.U_TURN -> 8
+        com.example.locationmapapp.core.routing.Maneuver.ARRIVE -> 25
     }
 
     /** V1 offline: straight-line route between two points, 1.4 m/s pace. */

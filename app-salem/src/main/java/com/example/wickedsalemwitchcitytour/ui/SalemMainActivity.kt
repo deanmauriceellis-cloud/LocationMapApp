@@ -146,6 +146,10 @@ class SalemMainActivity : AppCompatActivity() {
     @Inject
     internal lateinit var poiEncounterTracker: com.example.wickedsalemwitchcitytour.userdata.PoiEncounterTracker
 
+    /** S175: Salem on-device walking router. Lazy-loads `assets/routing/salem-routing-graph.sqlite`. */
+    @Inject
+    internal lateinit var salemRouterProvider: com.example.wickedsalemwitchcitytour.routing.SalemRouterProvider
+
     /**
      * Magenta polyline that paints the user's recent GPS journey on the map.
      * Lazy-created in [initGpsTrackOverlay] during onCreate. Lives in the activity

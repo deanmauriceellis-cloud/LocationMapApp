@@ -4,6 +4,14 @@
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
 
+## Session 175: 2026-04-25 — On-device Salem walking router (TigerLine bake → APK + Directions UI)
+
+Shipped a fully on-device walking router for the Salem app. New bake pipeline at `tools/routing-bake/` clips TigerLine's `salem.edges` + `salem.edges_vertices_pgr` to a 3-mile-buffer Salem bbox (16,226 walkable edges, 12,742 nodes, 4.1 MB SQLite bundle in `app-salem/src/main/assets/routing/`). New `:core` routing module: `RoutingBundle` (CSR adjacency + grid spatial index), `RoutingBundleLoader` (Android SQLite reader), `Router` (pure-Kotlin Dijkstra + planar SRID-4269 KNN matching TigerLine's `<->` semantic), `TurnByTurn` (per-edge bearing-change synthesis with imperial distances). Salem-app wiring: `SalemRouterProvider` lazy-loads the bundle on first call (~80-150ms warm-up); `WalkingDirections` swaps its V1_OFFLINE_ONLY straight-line fallback for real bundled-graph routing while keeping the existing `WalkingRoute` contract so `SalemMainActivityDirections` overlays + the turn-by-turn dialog inherit the upgrade with no UI change. `PoiDetailSheet`'s Directions action now calls `walkTo(GeoPoint)` instead of launching the external `geo:` intent. On-device verification on Lenovo TB305FU via new `/route-test` debug endpoint: 3 reference routes match TigerLine's live `tiger.route_walking()` to the millimetre (0.000m delta), 32ms cold first call, 4-6ms warm calls. Two memories locked: WickedMapView is the sole basemap (Esri+Mapnik dropped), MBTA Salem station is the simulated walk origin when GPS-Salem isn't available. Carry-forward to S176: live re-routing on path-drift, walk-sim FAB integration, web-side router in cache-proxy with `?source=live` override, web Leaflet polyline UI, and tour-leg pre-bake.
+
+Full session detail: `docs/session-logs/session-175-2026-04-25.md`. Commit: pending.
+
+---
+
 ## Session 174: 2026-04-25 — Web admin tour editor (full CRUD + drag-to-reposition)
 
 Shipped a brand-new Tours tab in the web admin tool so tours can be edited end-to-end ahead of post-TigerLine-cleanup rerouting. Schema migration added `stop_id` PK, nullable `lat`/`lng` (per-tour coord override), and nullable `name`/`poi_id` to `salem_tour_stops`; effective coord at read time = `COALESCE(stop.lat, poi.lat)`. New `cache-proxy/lib/admin-tours.js` adds 7 admin endpoints — list/get tours, create/patch/delete tour, add/patch/delete/reorder stops — with auto-resync of `salem_tours.stop_count` on every stop mutation. Frontend: new `TourTree.tsx` (create form, per-row delete, metadata edit form, waypoint list with ↑/↓/🗑, "+ Free waypoint" map-click-to-add mode, "+ POI as stop" pick-marker mode), generalized `MoveConfirm` modal, new `TourStopLayer` (numbered draggable markers + dashed connecting polyline + amber-vs-indigo for override-vs-fallback), `FitTourBounds`, `MapClickAddListener`. Operator parked at session end pending TigerLine database cleanup before doing the actual rerouting.
@@ -76,17 +84,8 @@ Full session detail: `docs/session-logs/session-166-2026-04-24.md`. Commit: `578
 
 ---
 
-## Session 165: 2026-04-24 — Fuzzy Find engine + admin classification flags + FindPanel category fix (killed session)
-
-Session killed before session-end protocol ran; work committed and closed via S166. Shipped: (1) `FuzzySearchEngine.kt` (new) — multi-tier in-memory scorer (10k/5k/3k/600/400/250/120) with subcat/cuisine/desc/hist/addr tiers; `FindViewModel` preloads all POIs on `init {}`, 250ms debounce, tap→animateTo geocoord zoom=18, long-press→detail dialog. (2) `PoiEditDialog.tsx` — new "Flags" tab with toggle-switch UI for 7 operational flags + 5 classification flags (`is_historical_property`, `is_witch_trial_site`, `is_free_admission`, `is_indoor`, `is_family_friendly`). (3) `PoiTree.tsx` — `CategorySelectCtx` context fix for react-arborist category clicks, new flag fields in `PoiRow`. (4) `FindPanel.tsx` — category click skips subtype tree, directly filters map. (5) `admin-pois.js` — 5 new classification flags in `UPDATABLE_FIELDS`.
-
-Full session detail: `docs/session-logs/session-165-2026-04-24.md`. Commit: see S166.
-
----
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 163 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 164 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S165 rolled to archive 2026-04-25 by the session-end protocol (S175) -->
 <!-- S164 rolled to archive 2026-04-25 by the session-end protocol (S174) -->
 <!-- S163 rolled to archive 2026-04-25 by the session-end protocol (S173) -->
 <!-- S162 rolled to archive 2026-04-25 by the session-end protocol (S172) -->

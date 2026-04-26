@@ -2,17 +2,33 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — it should stay under 200 lines.
 
-**Last updated:** 2026-04-25 — Session 174 closed. **S174 deliverable SHIPPED**: web admin **Tours** tab with full CRUD. Schema migration on `salem_tour_stops` adds `stop_id` PK, nullable `lat`/`lng` (per-tour coord override), nullable `name`, nullable `poi_id` (free-floating waypoints supported). 7 new admin endpoints in `cache-proxy/lib/admin-tours.js`. New `web/src/admin/TourTree.tsx` panel: create/delete tour, edit metadata (name/theme/description/etc.), waypoint list with ↑/↓/🗑, "+ Free waypoint" map-click mode, "+ POI as stop" pick-marker mode. `AdminMap.tsx`: numbered draggable waypoints + dashed connecting polyline + drag-to-save (per-tour override only — never moves the underlying POI). All 5 tours / 87 stops preserved through migration; CRUD round-trip exercised end-to-end via curl. Tour rerouting itself is parked pending TigerLine database cleanup. Full detail in `docs/session-logs/session-174-2026-04-25.md`.
+**Last updated:** 2026-04-25 — Session 175 closed. **S175 deliverable SHIPPED**: on-device Salem walking router. New `tools/routing-bake/` Python pipeline clips TigerLine `salem.edges` + `salem.edges_vertices_pgr` to a 3-mile-buffer Salem bbox → 4.1 MB SQLite bundle in APK assets (16,226 walkable edges, 12,742 walkable nodes). New `:core` routing module (`RoutingBundle` CSR + grid spatial index, `RoutingBundleLoader` Android SQLite reader, `Router` pure-Kotlin Dijkstra with planar SRID-4269 KNN matching TigerLine `<->` semantic, `TurnByTurn` bearing-change synthesis). Salem-app wiring: `SalemRouterProvider` lazy-loads bundle, `WalkingDirections` swaps V1_OFFLINE_ONLY straight-line fallback for real bundled-graph routing while preserving the existing `WalkingRoute` contract — all downstream UI (`SalemMainActivityDirections` overlays + turn-by-turn dialog) inherits the upgrade. `PoiDetailSheet` Directions action now uses the in-app router instead of an external `geo:` intent. **On-device parity**: 3 reference routes match TigerLine's live `tiger.route_walking()` to 0.000m delta, 32ms cold first call / 4-6ms warm. Polyline color set to green. Two memories locked: `project_basemap_wickedmapview_only` (WickedMapView is THE basemap, Esri+Mapnik dropped), `project_simulated_walk_origin_mbta` (MBTA Salem station is simulated walk origin when GPS-Salem unavailable). Full detail in `docs/session-logs/session-175-2026-04-25.md`.
 
-S173 (cemetery firefly alignment) was a no-op session — operator instructed full revert. S172 deliverable still standing: animations live in `SalemMainActivity` (water whitecaps + cemetery fireflies + parks rolling-grass overlay). Water visual is "not the best" per operator and is still owed.
+S174 standing: web admin Tours tab with full CRUD. S172 standing: animations live in `SalemMainActivity` (water whitecaps + cemetery fireflies + parks rolling-grass). Water visual is "not the best" per operator and is still owed.
 
 ---
 
-## TOP PRIORITY — Next Session (S175)
+## TOP PRIORITY — Next Session (S176)
 
-0. **TOUR REROUTING — BLOCKED on TigerLine cleanup.** S174 shipped the editor; the actual reroute work waits on the TigerLine project finishing its database cleanup (separate workstream). When that unblocks, the operator will use the Tours tab in the web admin (`http://localhost:4302/`) to drag, add, delete, and reorder waypoints across the 5 active tours: Heritage Trail (10), Grand (24), Essentials (14), Explorer (20), Witch Trials (19). To resume: `bash bin/restart-proxy.sh` + `cd web && npm run dev`. Drag = per-tour coord override (never moves underlying POI); free waypoints supported (no POI link); reorder uses two-phase negate-rewrite to dodge unique-constraint windows.
+0. **DEBUG / VISUAL POLISH ON DIRECTIONS POLYLINE** — operator parked at session end with "directions should be in green, we will debug this next session." Color is already changed to `#22C55E` (green) in `SalemMainActivityDirections.kt` and the green build is on the Lenovo. Operator will manually walk through tap-POI → tap-Directions and report what to fix (line width, opacity, label visibility, route start marker, etc.). The on-device router engine itself is verified to mm-precision parity with TigerLine — any visual issue is in `drawWalkingRoute` / `showDirectionsInfo` / `showTurnByTurnDialog`, not the routing math.
 
-1. **Water animation visual tuning — operator's final S172 verdict was "not the best."** Carry-forward, untouched in S173/S174. The infrastructure is all there (world-anchored lat/lon grid, 14185 anchors, per-anchor duty cycle, jitter, ANR-safe), but the `~` curved-stroke shape doesn't sell as wave crests. Three directions to try at next animation session:
+1. **P3b — Live re-routing on path drift.** Operator green-lit in-scope. Implementation plan: new `DirectionsSession` class watches the location stream during an active route, computes per-fix distance from user to nearest point on the active polyline, recomputes the route after >25m drift sustained over 2 fixes (debounce). Emit a "rerouting…" toast/banner. Retire the session on arrival (within ~10m of destination) or user-cancel.
+
+2. **P3c — Walk-sim FAB integration with Directions.** When user is outside Salem (>3km from tour zone, no GPS-Salem fix) and taps Directions on a POI: kick off the walk-sim from the **MBTA Salem Commuter Rail station** (per `project_simulated_walk_origin_mbta`) toward the tapped POI. Reuse existing `walkMutex` + `cancelAndJoin` pattern in `SalemMainActivity.startWalkSim()`. Heritage-Trail default behavior preserved when no POI is targeted.
+
+3. **P4 + P5 — Web router + UI in cache-proxy.** New `cache-proxy/lib/salem-router.js` opens the same `salem-routing-graph.sqlite` via `better-sqlite3`, exposes `GET /api/salem/route?from_lat&from_lng&to_lat&to_lng[&source=live]` and `POST /api/salem/route-multi`. `?source=live` falls through to TigerLine's live `tiger.route_walking()` for verification only — logs divergence warning if results differ by >5%. Web admin POI popup gets a "Directions" button → Leaflet polyline overlay. Same single graph the APK uses, so web and Android produce identical routes.
+
+4. **P2c — Router unit tests.** Either Android instrumented (loads real asset and asserts vs TigerLine reference distances) or JVM tests using sqlite-jdbc. CI gate so future bake changes can't break parity silently.
+
+5. **P6 (deferred) — Pre-bake tour-leg polylines.** For each `salem_tour_stops` row, pre-compute polyline + distance + turn-by-turn between consecutive stops and store in new `route_geom_to_next` + `turns_to_next` (TEXT JSON) columns. Eliminates router calls during guided tours; admin tour editor can preview polylines immediately when a stop is dragged.
+
+---
+
+## TOP PRIORITY — Carry-forward (still owed from S171/S172/S174)
+
+- **TOUR REROUTING is now UNBLOCKED on the routing-engine side** — S175 shipped both an on-device router and the web-side path is straightforward (P4 above). When TigerLine database cleanup completes, the operator can use the Tours tab in the web admin (`http://localhost:4302/`) to drag/add/delete/reorder waypoints across the 5 tours, AND the routes will be computed against the same bundled graph that ships in the APK, with `?source=live` available as a verification override.
+
+1. **Water animation visual tuning — operator's final S172 verdict was "not the best."** Carry-forward, untouched in S173/S174/S175. The infrastructure is all there (world-anchored lat/lon grid, 14185 anchors, per-anchor duty cycle, jitter, ANR-safe), but the `~` curved-stroke shape doesn't sell as wave crests. Three directions to try at next animation session:
    - **Different shape**: short irregular dash bundles (3-4 white dashes clustered), filled-elliptical foam patches, or per-anchor angle parallel-to-coast.
    - **Pre-rendered animated drawable**: frame-animation PNG/WebP whitecap drawn at each anchor — less mathy, more "graphics," reuses the AI Studio image pipeline.
    - **Density bump**: 110m grid → 70m grid (watch ANR; total anchor count budget is the constraint).
@@ -138,18 +154,10 @@ S173 (cemetery firefly alignment) was a no-op session — operator instructed fu
 - **Splash voiceover (#44)** — replace `splash_voiceover.wav` with a screaming-cat sound. Monday must-have per S143 operator direction. GPU-caution rule applies.
 - **Location-aware art/sound initiative** — broader operator theme; no formal scope yet. Candidate for new phase entry post-launch.
 
-**Still pending (carry into S120+):**
-- **Heading-up rotation smoothness** — root cause identified in S115 (100 Hz sensor + main-thread saturation). Plan: cut log chatter, rate-limit apply, move sensor processing to background HandlerThread, switch static detection to wall-clock. **Scheduled for S120 Step 9U.17.**
-- **`DWELL_MS = 3_000L` dead code** in `NarrationGeofenceManager` — declared, never wired.
-- **GPS journey line backgrounding bug** — diagnosed S112; fix options proposed but not implemented.
-- **DB wipe across APK reinstalls** — `fallbackToDestructiveMigration`. Replace with real Room migrations before Play Store.
-- **walkSimMode gap-timing differences** — revisit if walk-sim should be 100% indistinguishable from real GPS.
-- **Bearing filter cone is 90°** — operator may want to tighten.
-- **Admin tool POI creation** — currently only edits existing POIs; Phase 9U BCS import adds 900+ new POIs which partially addresses this.
-- **POI encounter review screen** — future in-app debug menu feature.
-- **Pre-existing GPS log redundancy** — 4 lines from 4 layers per fix.
-- **Narration sheet has no `setPeekHeight`** — 168dp workaround handles common case.
-- **PRE-PRODUCTION HARD-DELETE: dedup loser rows** — S123 soft-deleted **110 duplicate POIs** across two passes: 86 from name-based pass (`data_source LIKE '%dedup-2026-04-13-loser%'`) + 24 from address-based pass (`data_source LIKE '%address-dedup-2026-04-13-loser%'`). Before Play Store APK build, hard-delete these so they don't ship in the bundled Room DB. Plan: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Dedup scripts: `cache-proxy/scripts/dedup-2026-04-13/`. Operator rule applied: rows with unique `intel_entity_id` (BCS) are kept regardless of address collision.
+**Pre-Play-Store hardening (still owed):**
+- **DB wipe across APK reinstalls** — `fallbackToDestructiveMigration`. Replace with real Room migrations before AAB upload.
+- **PRE-PRODUCTION HARD-DELETE: dedup loser rows** — S123 soft-deleted 110 duplicate POIs (86 name-pass + 24 address-pass, all marked in `data_source`). Before AAB upload, `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
+- **`DWELL_MS = 3_000L` dead code** in `NarrationGeofenceManager` (declared, never wired); GPS journey line backgrounding bug (S112); narration sheet `setPeekHeight` (168dp workaround handles common case).
 
 ---
 

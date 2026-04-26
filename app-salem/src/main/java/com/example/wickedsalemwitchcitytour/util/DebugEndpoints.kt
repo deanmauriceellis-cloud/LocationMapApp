@@ -98,6 +98,7 @@ class DebugEndpoints(
             "/geofences/alerts" -> handleGeofenceAlerts()
             "/walk-tour"        -> handleWalkTour(params)
             "/walk-stop"        -> handleWalkStop()
+            "/route-test"       -> handleRouteTest(params)
             else                -> EndpointResult(404, body = gson.toJson(mapOf("error" to "Not found: $path")))
         }
     }
@@ -795,6 +796,34 @@ class DebugEndpoints(
         return EndpointResult(body = gson.toJson(mapOf(
             "status" to "stopped",
             "wasActive" to wasActive
+        )))
+    }
+
+    /**
+     * S175: Quick smoke test of the bundled SalemRouter.
+     * GET /route-test?from_lat=..&from_lng=..&to_lat=..&to_lng=..
+     * Defaults to Salem Common -> 7 Gables (matches verify-parity reference).
+     */
+    private fun handleRouteTest(params: Map<String, String>): EndpointResult {
+        val flat = params["from_lat"]?.toDoubleOrNull() ?: 42.5219
+        val flng = params["from_lng"]?.toDoubleOrNull() ?: -70.8967
+        val tlat = params["to_lat"]?.toDoubleOrNull() ?: 42.5226
+        val tlng = params["to_lng"]?.toDoubleOrNull() ?: -70.8845
+        val provider = activity.salemRouterProvider
+        val router = provider.routerOrNull()
+            ?: return EndpointResult(503, body = gson.toJson(mapOf("error" to "router unavailable")))
+        val t0 = System.currentTimeMillis()
+        val result = router.route(flat, flng, tlat, tlng)
+            ?: return EndpointResult(body = gson.toJson(mapOf("error" to "no path", "from" to listOf(flat, flng), "to" to listOf(tlat, tlng))))
+        val tookMs = System.currentTimeMillis() - t0
+        return EndpointResult(body = gson.toJson(mapOf(
+            "from" to listOf(flat, flng),
+            "to" to listOf(tlat, tlng),
+            "distance_m" to result.distanceM,
+            "duration_s" to result.durationS,
+            "geometry_pts" to result.geometry.size,
+            "edges" to result.edges.size,
+            "took_ms" to tookMs,
         )))
     }
 
