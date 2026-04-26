@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 170-179. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 171-180. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 180: 2026-04-26 — V1 Play Store gating chores + first signed AAB on Lenovo
+
+Tier 1 of the S180 ship-readiness review shipped end-to-end. **P1** stripped the manifest network surface (INTERNET / ACCESS_NETWORK_STATE / cleartextTraffic gone, WickedMap LAUNCHER intent removed, VoiceTest narrowed to exported=false). **P2** hard-gated 10 V1-disabled UI sites that bypassed the OkHttp `OfflineModeInterceptor` via WebView, osmdroid online tile sources, and external Intents — all behind `if (!FeatureFlags.V1_OFFLINE_ONLY)` so R8 + const dead-code-eliminates them from the V1 release binary; Find dialog Directions button permanently switched to on-device `walkTo()` instead of Google Maps URL. **P3** revised V1 website behaviour per operator: Visit Website button stays visible, click hands off to external browser via ACTION_VIEW (no in-app WebView); defensive gates on every social dialog body. **P4** locked `UserDataDatabase` migrations — removed `fallbackToDestructiveMigration` so paying users no longer lose POI encounter history on every update; schema v2 is the v1.0.0 floor, future bumps need real Migration objects. **P5** versionCode 1 → 10000, minifyEnabled+shrinkResources, new conservative `proguard-rules.pro` (with -dontwarn for sqlite-jdbc/slf4j leaking from `:routing-jvm`), `signingConfigs.release` block reading from `~/.gradle/gradle.properties`, and `verifyBundledAssets` Gradle Exec task wired to preBuild (catches the silent rebake-wipe class of bug). Generated upload keystore at `~/keys/wickedsalem-upload.jks` (PKCS12, RSA-2048, 10000-day validity, 32-char random pw); registered in OMEN credential audit (committed + pushed to OMEN remote). First signed AAB built (78 MB) + signed release APK (87 MB) installed on Lenovo TB305FU; SalemMainActivity at 60fps with no AndroidRuntime errors. Two new memories saved: `feedback_admin_changes_propagate_to_builds.md` + `feedback_v1_feature_scope_explicit.md`. Operator-side carry-forward: keystore off-machine backup before first Play Console upload, Form TX copyright (24 days to 2026-05-20), Play Developer Account verification, public Privacy Policy hosting.
+
+Full session detail: `docs/session-logs/session-180-2026-04-26.md`. Commit: `04c99e3`.
+
+---
 
 ## Session 179: 2026-04-26 — Tour routing unified to live engine + bake-time edge splitting
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-171-2026-04-24.md`. Commit: `a93
 
 ---
 
-## Session 170: 2026-04-24 — Map sprite pipeline (rotation-only baseline shipped, walking deferred to V2)
-
-Long off-repo sprite-system exploration: built a working SDXL→TripoSR→headless-render→animated-WebP pipeline that produces 7 cartoon characters (witch, owl, black-cat, katrina-kitty, skeleton, mouse, rat) as 16-angle rotation frames packed at **992 KB total** for the eventual map-overlay system. Three approaches to walking animation all failed (AI 2-pose generation lost identity, AnimateDiff is for motion-not-rotation with no rotate-LoRA, procedural Blender mesh deformation crumples AI meshes) — operator chose to leave it as is and defer skeletal rigging to V2. Side deliverable: `MASTER_SESSION_REFERENCE.md` at repo root, a topic-indexed lookup so future sessions can find prior work without loading every log. Repo footprint: only the live log + this entry + MSR + CLAUDE.md key-reference table update; all sprite work lives under `~/AI-Studio/`.
-
-Full session detail: `docs/session-logs/session-170-2026-04-24.md`. Commit: `3dbcfdd`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 169 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 170 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S170 rolled to archive 2026-04-26 by the session-end protocol (S180) -->
 <!-- S169 rolled to archive 2026-04-26 by the session-end protocol (S179) -->
 <!-- S168 rolled to archive 2026-04-26 by the session-end protocol (S178) -->
 <!-- S167 rolled to archive 2026-04-25 by the session-end protocol (S177) -->
