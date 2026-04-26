@@ -21,6 +21,7 @@ import com.example.wickedsalemwitchcitytour.tour.TourEngine
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceManager
 import com.example.wickedsalemwitchcitytour.tour.TourGeofenceEvent
 import com.example.wickedsalemwitchcitytour.tour.TourState
+import com.example.wickedsalemwitchcitytour.routing.DirectionsSession
 import com.example.wickedsalemwitchcitytour.tour.WalkingDirections
 import com.example.wickedsalemwitchcitytour.tour.WalkingRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -118,7 +119,10 @@ class TourViewModel @Inject constructor(
 
     fun removeStop(poiId: String) = tourEngine.removeStop(poiId)
 
-    fun onLocationUpdate(point: GeoPoint) = tourEngine.onLocationUpdate(point)
+    fun onLocationUpdate(point: GeoPoint) {
+        tourEngine.onLocationUpdate(point)
+        handleActiveDirectionsLocation(point)
+    }
 
     // ── Custom tour builder ──────────────────────────────────────────────
 
@@ -194,12 +198,21 @@ class TourViewModel @Inject constructor(
     private val _walkingRoute = MutableStateFlow<WalkingRoute?>(null)
     val walkingRoute: StateFlow<WalkingRoute?> = _walkingRoute.asStateFlow()
 
+    /**
+     * Active directions session (S176 P3b) — tracks drift off the polyline
+     * and arrival at the destination. Null whenever no point-to-point route
+     * is shown (multi-stop tour previews don't get a session). Replaced
+     * wholesale on reroute.
+     */
+    private var directionsSession: DirectionsSession? = null
+
+    /** Mutex flag — true while a reroute is in flight. Drift is muted in this window. */
+    private var isRerouting: Boolean = false
+
     /** Get walking directions from user's current location to a POI. */
     fun getDirectionsTo(destination: GeoPoint) {
         val from = tourEngine.lastLocation ?: return
-        viewModelScope.launch {
-            _walkingRoute.value = walkingDirections.getRoute(from, destination)
-        }
+        viewModelScope.launch { computeAndApplyRoute(from, destination) }
     }
 
     /** Get walking directions to the current tour stop. */
@@ -218,12 +231,117 @@ class TourViewModel @Inject constructor(
             // straight-line fallback if the asset is missing or no active tour.
             val bundled = tourId?.let { walkingDirections.getBundledTourRoute(it) }
             _walkingRoute.value = bundled ?: walkingDirections.getMultiStopRoute(points)
+            // Multi-stop preview has no single destination → no live session.
+            directionsSession = null
         }
     }
 
-    /** Clear the walking route display. */
+    /** Clear the walking route display and any active directions session. */
     fun clearDirections() {
         _walkingRoute.value = null
+        directionsSession = null
+        isRerouting = false
+    }
+
+    /**
+     * S176 P3b — feed each GPS fix into the active directions session and
+     * react to drift / arrival. Multi-stop previews and tour-wide overlays
+     * skip this path because they leave [directionsSession] null.
+     */
+    private fun handleActiveDirectionsLocation(point: GeoPoint) {
+        if (isRerouting) return
+        val session = directionsSession ?: return
+        when (val action = session.onLocation(point)) {
+            DirectionsSession.SessionAction.OnPath -> Unit
+            DirectionsSession.SessionAction.Arrived -> {
+                DebugLogger.i(TAG, "Directions: arrived at destination, clearing route")
+                clearDirections()
+            }
+            is DirectionsSession.SessionAction.Reroute -> {
+                DebugLogger.i(
+                    TAG,
+                    "Directions: drift %.1fm > threshold for ${DirectionsSession.DRIFT_FIXES} fixes — recomputing".format(action.driftM)
+                )
+                val dest = session.destination
+                isRerouting = true
+                viewModelScope.launch {
+                    try {
+                        computeAndApplyRoute(action.from, dest)
+                    } finally {
+                        isRerouting = false
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Compute a route, emit it on [_walkingRoute], and replace
+     * [directionsSession]. Returns true on success.
+     */
+    private suspend fun computeAndApplyRoute(from: GeoPoint, destination: GeoPoint): Boolean {
+        val route = walkingDirections.getRoute(from, destination)
+        _walkingRoute.value = route
+        directionsSession = if (route != null && route.polyline.isNotEmpty()) {
+            DirectionsSession(destination, route.polyline)
+        } else {
+            null
+        }
+        return route != null
+    }
+
+    /**
+     * S176 P3c — compute a walk route between two arbitrary points. Returns
+     * the polyline (ArrayList<GeoPoint>) or null if no route can be built.
+     * Does **not** publish the route on [_walkingRoute] or arm a session —
+     * that's the caller's job via [publishWalkRoute] once they're ready to
+     * commit. This split lets the activity decide whether to display + walk
+     * or just inspect.
+     */
+    suspend fun computeWalkRoute(from: GeoPoint, to: GeoPoint): java.util.ArrayList<GeoPoint>? {
+        val route = walkingDirections.getRoute(from, to) ?: return null
+        return if (route.polyline.isEmpty()) null else route.polyline
+    }
+
+    /**
+     * S176 P3c — display a polyline as the active walking route AND arm a
+     * P3b directions session against it. Used by the out-of-Salem simulated
+     * walk path so the same arrival/drift logic that drives real-GPS routes
+     * also applies to simulated ones.
+     */
+    fun publishWalkRoute(destination: GeoPoint, polyline: java.util.ArrayList<GeoPoint>) {
+        if (polyline.isEmpty()) {
+            clearDirections()
+            return
+        }
+        // Build a minimal WalkingRoute so observeWalkingRoute → drawWalkingRoute fires.
+        val route = WalkingRoute(
+            polyline = polyline,
+            distanceKm = polylineLengthM(polyline) / 1000.0,
+            durationMinutes = (polylineLengthM(polyline) / 1.4 / 60.0).toInt(),
+            instructions = emptyList(),
+            road = null,
+        )
+        _walkingRoute.value = route
+        directionsSession = DirectionsSession(destination, polyline)
+        isRerouting = false
+    }
+
+    /** Sum of consecutive haversine segment lengths in meters. */
+    private fun polylineLengthM(poly: List<GeoPoint>): Double {
+        if (poly.size < 2) return 0.0
+        val R = 6_371_000.0
+        var total = 0.0
+        for (i in 1 until poly.size) {
+            val a = poly[i - 1]; val b = poly[i]
+            val dLat = Math.toRadians(b.latitude - a.latitude)
+            val dLon = Math.toRadians(b.longitude - a.longitude)
+            val h = kotlin.math.sin(dLat / 2).let { it * it } +
+                    kotlin.math.cos(Math.toRadians(a.latitude)) * kotlin.math.cos(Math.toRadians(b.latitude)) *
+                    kotlin.math.sin(dLon / 2).let { it * it }
+            total += R * 2 * kotlin.math.atan2(kotlin.math.sqrt(h), kotlin.math.sqrt(1 - h))
+        }
+        return total
     }
 
     // ── Ambient mode ─────────────────────────────────────────────────────

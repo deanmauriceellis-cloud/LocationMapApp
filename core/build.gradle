@@ -70,4 +70,7 @@ dependencies {
     implementation 'io.socket:socket.io-client:2.1.0'
 
     testImplementation 'junit:junit:4.13.2'
+    // S176 P2c — JVM unit tests for Router load `salem-routing-graph.sqlite`
+    // outside Android via JDBC.
+    testImplementation 'org.xerial:sqlite-jdbc:3.46.0.0'
 }

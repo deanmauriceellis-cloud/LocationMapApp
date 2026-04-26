@@ -26,6 +26,7 @@ import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.tour.WalkingRoute
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
@@ -36,6 +37,16 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SalemMainAc
 private const val DIR_ROUTE_COLOR = "#22C55E"    // Green (S175 — operator)
 private const val DIR_ROUTE_BORDER = "#15803D"   // Darker green
 private const val DIR_COMPLETED_COLOR = "#6622C55E" // Faded green
+
+// S176 P3c — out-of-Salem simulated origin.
+// MBTA Salem Commuter Rail Station (Bridge St / Riley Plaza area).
+// >50% of Salem visitors arrive by rail, so this is the canonical "you just
+// got to Salem" starting point when the user opens directions while still
+// at home / at the airport / elsewhere outside the city.
+private val MBTA_SALEM_STATION = GeoPoint(42.524, -70.8989)
+
+/** Threshold beyond which walkTo() switches into simulated-from-MBTA mode. */
+private const val OUT_OF_SALEM_KM = 3.0
 
 // Walking directions overlays
 internal var directionsPolyline: Polyline? = null
@@ -340,6 +351,103 @@ internal fun SalemMainActivity.walkTo(destination: GeoPoint) {
         Toast.makeText(this, "Waiting for GPS fix…", Toast.LENGTH_SHORT).show()
         return
     }
+    // S176 P3c: if the user is well outside Salem, simulate the walk from
+    // the MBTA Salem Commuter Rail station. >50% of visitors arrive by rail
+    // so the station is the canonical "I just stepped off the train" origin.
+    val distToMbtaKm = distanceBetween(current, MBTA_SALEM_STATION) / 1000.0
+    if (distToMbtaKm > OUT_OF_SALEM_KM) {
+        startSimulatedWalkFromMbta(destination)
+        return
+    }
     tourViewModel.getDirectionsTo(destination)
     Toast.makeText(this, "Calculating route…", Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * S176 P3c — drive a simulated walk along an arbitrary polyline. Lighter
+ * than [SalemMainActivity.startWalkSim] — no tour state, no Historical Mode
+ * toggle, no narration dwell — it just emits one `setManualLocation` per
+ * second along the interpolated polyline. The drift/arrival logic in
+ * [TourViewModel.onLocationUpdate] (S176 P3b) is what causes the route to
+ * disappear when the simulator gets within 15 m of the destination.
+ *
+ * Reuses the same `walkMutex` + `walkSimJob` + `walkSimRunning` plumbing
+ * as the tour walk-sim so the FAB button state and HTTP cancellation
+ * paths stay coherent across both flavors of walk.
+ */
+internal fun SalemMainActivity.walkSimAlongPolyline(polyline: List<GeoPoint>, label: String) {
+    if (polyline.size < 2) return
+    lifecycleScope.launch {
+        walkMutex.withLock {
+            // Cancel any in-flight walk (HTTP-triggered or UI-triggered).
+            com.example.wickedsalemwitchcitytour.util.DebugHttpServer.endpoints?.cancelWalkAndJoin()
+            stopWalkSimExternalAndJoin()
+
+            walkSimRunning = true
+            binding.btnWalkSim.text = "Stop"
+            binding.btnWalkSim.setBackgroundResource(
+                com.example.wickedsalemwitchcitytour.R.drawable.zoom_button_active_bg
+            )
+            DebugLogger.i(
+                "WALK-SIM",
+                "P3c walkSimAlongPolyline: '$label' — ${polyline.size} input points"
+            )
+
+            walkSimJob = lifecycleScope.launch {
+                acquireWalkWakeLock("WickedSalem:walkSimP3c")
+                val interpolated = interpolateWalkRoute(polyline, 1.4f)
+                DebugLogger.i(
+                    "WALK-SIM",
+                    "P3c interpolated to ${interpolated.size} steps at 1.4 m/s"
+                )
+                for ((idx, point) in interpolated.withIndex()) {
+                    if (walkSimJob?.isCancelled == true) break
+                    viewModel.setManualLocation(point)
+                    if (idx % 30 == 0) {
+                        DebugLogger.i(
+                            "WALK-SIM",
+                            "P3c step $idx/${interpolated.size}"
+                        )
+                    }
+                    kotlinx.coroutines.delay(1000L)
+                }
+                if (walkSimJob?.isCancelled != true) {
+                    walkSimRunning = false
+                    binding.btnWalkSim.text = "Walk"
+                    binding.btnWalkSim.setBackgroundResource(
+                        com.example.wickedsalemwitchcitytour.R.drawable.zoom_toggle_bg
+                    )
+                    DebugLogger.i("WALK-SIM", "P3c walk complete: '$label'")
+                }
+            }
+            walkSimJob?.invokeOnCompletion { releaseWalkWakeLock() }
+        }
+    }
+}
+
+/**
+ * S176 P3c — out-of-Salem path. Builds a route from MBTA Salem station to
+ * the destination POI, draws it (so the user sees the proposed walk), and
+ * kicks off a simulated walk along that polyline. The simulator emits
+ * `setManualLocation` for each step, which feeds the same `onLocationUpdate`
+ * pipeline that drives geofence narration and the P3b drift/arrival logic.
+ */
+internal fun SalemMainActivity.startSimulatedWalkFromMbta(destination: GeoPoint) {
+    Toast.makeText(this, "Outside Salem — simulating from MBTA Station", Toast.LENGTH_SHORT).show()
+    lifecycleScope.launch {
+        val polyline = tourViewModel.computeWalkRoute(MBTA_SALEM_STATION, destination)
+        if (polyline == null || polyline.size < 2) {
+            Toast.makeText(
+                this@startSimulatedWalkFromMbta,
+                "Could not build a route from MBTA Station",
+                Toast.LENGTH_SHORT
+            ).show()
+            return@launch
+        }
+        // Display the route + arm the P3b session so arrival within 15 m of
+        // destination clears the polyline once the simulator gets there.
+        tourViewModel.publishWalkRoute(destination, polyline)
+        // Run the simulator along the polyline. 1.4 m/s, 1 fix per second.
+        walkSimAlongPolyline(polyline, "MBTA → POI")
+    }
 }

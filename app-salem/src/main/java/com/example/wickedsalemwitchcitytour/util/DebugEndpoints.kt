@@ -31,6 +31,7 @@ import com.example.wickedsalemwitchcitytour.ui.debugStopFollow
 import com.example.wickedsalemwitchcitytour.ui.debugTapMarker
 import com.example.wickedsalemwitchcitytour.ui.debugTogglePref
 import com.example.wickedsalemwitchcitytour.ui.debugVehicles
+import com.example.wickedsalemwitchcitytour.ui.walkTo
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
 import com.google.gson.Gson
@@ -99,6 +100,8 @@ class DebugEndpoints(
             "/walk-tour"        -> handleWalkTour(params)
             "/walk-stop"        -> handleWalkStop()
             "/route-test"       -> handleRouteTest(params)
+            "/directions-session-test" -> handleDirectionsSessionTest()
+            "/p3c-test"         -> handleP3cTest(params)
             else                -> EndpointResult(404, body = gson.toJson(mapOf("error" to "Not found: $path")))
         }
     }
@@ -824,6 +827,108 @@ class DebugEndpoints(
             "geometry_pts" to result.geometry.size,
             "edges" to result.edges.size,
             "took_ms" to tookMs,
+        )))
+    }
+
+    /**
+     * S176 P3c: Drive the full out-of-Salem walkTo() path. Forces the
+     * activity's location to a far-away point (Boston by default), waits
+     * one tick for `lastGpsPoint` to update, then triggers `walkTo(dest)`.
+     * The activity should detect distance > 3 km from MBTA and kick off
+     * a simulated walk from the station along a router-built polyline.
+     *
+     * GET /p3c-test?dest_lat=..&dest_lng=..&fake_lat=..&fake_lng=..
+     * Defaults: dest = 7 Gables (42.5226,-70.8845), fake = Boston (42.36,-71.06)
+     */
+    private suspend fun handleP3cTest(params: Map<String, String>): EndpointResult {
+        val destLat = params["dest_lat"]?.toDoubleOrNull() ?: 42.5226
+        val destLng = params["dest_lng"]?.toDoubleOrNull() ?: -70.8845
+        val fakeLat = params["fake_lat"]?.toDoubleOrNull() ?: 42.36
+        val fakeLng = params["fake_lng"]?.toDoubleOrNull() ?: -71.06
+
+        val destination = GeoPoint(destLat, destLng)
+        val fakeOrigin = GeoPoint(fakeLat, fakeLng)
+
+        runOnMain { viewModel.setManualLocation(fakeOrigin) }
+        // Brief delay so observeViewModel populates lastGpsPoint from the new manual fix.
+        delay(500L)
+        runOnMain { activity.walkTo(destination) }
+
+        return EndpointResult(body = gson.toJson(mapOf(
+            "test" to "P3c",
+            "fake_origin" to listOf(fakeLat, fakeLng),
+            "destination" to listOf(destLat, destLng),
+            "expected" to "walk-sim from MBTA Salem Station to destination",
+            "see" to "logcat WALK-SIM tag, /state for current map+follow, /overlays for polyline",
+        )))
+    }
+
+    /**
+     * S176 P3b: Deterministic self-test of [com.example.wickedsalemwitchcitytour.routing.DirectionsSession].
+     * Builds a synthetic 500m east-west polyline at Salem latitude, feeds a
+     * scripted sequence of fixes, and reports each action plus the cross-track
+     * distance the session computed. Pass criteria are listed in `expected`.
+     */
+    private fun handleDirectionsSessionTest(): EndpointResult {
+        val lat = 42.5219
+        // Build a straight east-going polyline ~500m across (5 vertices).
+        val poly = listOf(
+            GeoPoint(lat, -70.8967),
+            GeoPoint(lat, -70.8950),
+            GeoPoint(lat, -70.8930),
+            GeoPoint(lat, -70.8915),
+            GeoPoint(lat, -70.8895),
+        )
+        val destination = poly.last()
+        val session = com.example.wickedsalemwitchcitytour.routing.DirectionsSession(
+            destination = destination,
+            polyline = poly,
+        )
+
+        // ~30m corresponds to ~0.00027 deg of latitude at Salem.
+        val offPathLat = lat + 0.00027 // ~30m north of the polyline
+        val onPathLat = lat + 0.00005  // ~5m north — within threshold
+        val arrivalLat = destination.latitude + 0.00009 // ~10m north of destination
+
+        data class Step(val tag: String, val pt: GeoPoint, val expect: String)
+        val script = listOf(
+            Step("on-path-1",  GeoPoint(onPathLat, -70.8965), "OnPath"),
+            Step("off-1",      GeoPoint(offPathLat, -70.8950), "OnPath"),    // first off-path → driftCount=1
+            Step("off-2",      GeoPoint(offPathLat, -70.8945), "Reroute"),   // 2nd consecutive → reroute
+            Step("on-path-2",  GeoPoint(onPathLat, -70.8935), "OnPath"),     // back on path → driftCount reset
+            Step("off-once",   GeoPoint(offPathLat, -70.8925), "OnPath"),    // single off-path → no reroute yet
+            Step("on-path-3",  GeoPoint(onPathLat, -70.8920), "OnPath"),     // back on → reset
+            Step("arrived",    GeoPoint(arrivalLat, destination.longitude), "Arrived"),
+        )
+
+        val results = script.map { step ->
+            val action = session.onLocation(step.pt)
+            val actual = when (action) {
+                is com.example.wickedsalemwitchcitytour.routing.DirectionsSession.SessionAction.OnPath -> "OnPath"
+                is com.example.wickedsalemwitchcitytour.routing.DirectionsSession.SessionAction.Arrived -> "Arrived"
+                is com.example.wickedsalemwitchcitytour.routing.DirectionsSession.SessionAction.Reroute -> "Reroute"
+            }
+            mapOf(
+                "step" to step.tag,
+                "fix" to listOf(step.pt.latitude, step.pt.longitude),
+                "expected" to step.expect,
+                "actual" to actual,
+                "pass" to (actual == step.expect),
+                "drift_m" to "%.2f".format(session.lastDriftM),
+            )
+        }
+        val allPass = results.all { it["pass"] as Boolean }
+        return EndpointResult(body = gson.toJson(mapOf(
+            "test" to "DirectionsSession",
+            "thresholds" to mapOf(
+                "drift_m" to com.example.wickedsalemwitchcitytour.routing.DirectionsSession.DRIFT_THRESHOLD_M,
+                "drift_fixes" to com.example.wickedsalemwitchcitytour.routing.DirectionsSession.DRIFT_FIXES,
+                "arrival_m" to com.example.wickedsalemwitchcitytour.routing.DirectionsSession.ARRIVAL_M,
+            ),
+            "polyline_pts" to poly.size,
+            "destination" to listOf(destination.latitude, destination.longitude),
+            "all_pass" to allPass,
+            "steps" to results,
         )))
     }
 

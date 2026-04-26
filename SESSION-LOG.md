@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 165-174. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 167-176. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 176: 2026-04-25 — Live re-routing + MBTA-origin walk-sim + Router JVM parity tests
+
+Three S175 carry-forwards shipped on the on-device walking router. **P3b (live re-routing):** new `DirectionsSession` class watches the location stream during an active route, fires a recompute after >25 m drift sustained for 2 consecutive fixes, and clears the route on arrival within 15 m of destination. Wired into `TourViewModel` so every GPS update flows through the session; mute flag prevents re-entry while a reroute is in flight. Verified on Lenovo TB305FU via new deterministic `/directions-session-test` endpoint (7 scripted fixes, all pass: drift detection requires two consecutive off-path fixes, single-fix tolerated, arrival fires inside 15 m). **P3c (MBTA-origin walk-sim):** when `lastGpsPoint` is >3 km from MBTA Salem station, `walkTo(POI)` now forks to `startSimulatedWalkFromMbta` — computes the bundled-router route from the station to the POI, publishes it as the active walking route (so the P3b session arms automatically), and drives a `walkSimAlongPolyline` simulator at 1.4 m/s. Lenovo verification (Boston as fake origin → 7 Gables): bundled route 1510 m / 11 turns, simulator interpolated to 1013 steps, step counter advancing cleanly at 1 Hz. In-Salem branch verified untouched. **P2c (Router JVM parity tests):** new `core/src/test/` source set with `JdbcRoutingBundleLoader` (sqlite-jdbc, JVM-only mirror of `RoutingBundleLoader`) and `RouterParityTest` (10 tests, all pass: four S175 reference routes pinned bit-exact to ±1 mm, plus degenerate same-point, KNN snap, multi-stop concat, pace→duration). Carry-forward to S177: P4 (web router in cache-proxy consuming the same SQLite bundle) and P5 (web Leaflet directions UI).
+
+Full session detail: `docs/session-logs/session-176-2026-04-25.md`. Commit: pending.
+
+---
 
 ## Session 175: 2026-04-25 — On-device Salem walking router (TigerLine bake → APK + Directions UI)
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-167-2026-04-24.md`. Commit: `8d2
 
 ---
 
-## Session 166: 2026-04-24 — FuzzySearchEngine type/category synonym expansion
-
-Recovering from killed S165; committed all S165 work alongside S166. Fixed two gaps that made type-searches like "dentist" find nothing: the per-token `when { }` scoring was exclusive (non-name fields never accumulated once any name tier fired), and there was no synonym coverage between "dentist" and "dental." Added `TYPE_SYNONYMS` map (35 entries: dentist→dental, lawyer→law/attorney, gym→fitness, coffee→cafe, doctor→medical/clinic, etc.), token expansion before per-token scoring, and non-name fields (subcat, cat, desc, hist, addr) now always accumulate independently.
-
-Full session detail: `docs/session-logs/session-166-2026-04-24.md`. Commit: `578a3fa`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 164 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 166 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S166 rolled to archive 2026-04-25 by the session-end protocol (S176) -->
 <!-- S165 rolled to archive 2026-04-25 by the session-end protocol (S175) -->
 <!-- S164 rolled to archive 2026-04-25 by the session-end protocol (S174) -->
 <!-- S163 rolled to archive 2026-04-25 by the session-end protocol (S173) -->

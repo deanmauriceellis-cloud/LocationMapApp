@@ -2004,7 +2004,7 @@ class SalemMainActivity : AppCompatActivity() {
         binding.mapView.invalidate()
     }
 
-    private fun interpolateWalkRoute(points: List<org.osmdroid.util.GeoPoint>, speedMps: Float): List<org.osmdroid.util.GeoPoint> {
+    internal fun interpolateWalkRoute(points: List<org.osmdroid.util.GeoPoint>, speedMps: Float): List<org.osmdroid.util.GeoPoint> {
         if (points.size < 2) return points
         val result = mutableListOf(points[0])
         var residualM = 0.0
