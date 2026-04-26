@@ -187,6 +187,10 @@ if (CHAT_ENABLED) {
 // Salem content (backward compatible — all routes under /salem/*)
 require('./lib/salem')(app, deps);
 
+// Salem walking router (S177 P4) — same SQLite bundle the APK ships,
+// optional ?source=live fall-through to TigerLine for verification.
+require('./lib/salem-router')(app, deps);
+
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);
 
@@ -230,6 +234,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`        JWT: ${process.env.JWT_SECRET ? 'secret configured' : 'WARNING — using random secret'}`);
   console.log('Scan:   GET /scan-cells');
   console.log('Salem:  GET /salem/pois, /salem/businesses, /salem/figures, /salem/timeline, /salem/sources, /salem/tours, /salem/events, /salem/sync, /salem/stats');
+  console.log('Router: GET /salem/route?from_lat&from_lng&to_lat&to_lng[&source=live], POST /salem/route-multi, GET /salem/route/meta');
   console.log('Admin:  GET /cache/stats, POST /cache/clear (Basic Auth), GET /admin/ping (Basic Auth)');
   console.log('AdminPOI: GET /admin/salem/pois?kind=tour|business|narration, GET /admin/salem/pois/duplicates?radius=, GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)');
   console.log(`        Admin auth: ${adminAuthConfigured ? 'configured' : 'NOT CONFIGURED — set ADMIN_USER and ADMIN_PASS'}`);

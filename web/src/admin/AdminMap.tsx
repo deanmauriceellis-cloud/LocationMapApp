@@ -139,6 +139,10 @@ interface AdminMapProps {
   addStopMode?: 'none' | 'free' | 'poi'
   onMapClickAddFree?: (lat: number, lng: number) => void
   onPickPoiForStop?: (poi: PoiRow) => void
+  /** S177 P5 — when set, draw a walking route from current map center to
+   *  this POI using /api/salem/route. */
+  directionsTarget?: PoiRow | null
+  onClearDirections?: () => void
 }
 
 export interface PendingStopMove {
@@ -745,6 +749,209 @@ function FitTourBounds({ stops, tourId }: FitTourBoundsProps) {
   return null
 }
 
+// ─── Directions layer (S177 P5) ────────────────────────────────────────────
+//
+// Draws a walking route from the current map center to a target POI using
+// /api/salem/route (the cache-proxy router from P4). Re-fetches whenever the
+// target or selected source changes; origin is captured at fetch time so the
+// route doesn't re-flow as the operator pans afterwards.
+
+interface RouteResponse {
+  source: 'bundle' | 'live'
+  distance_m: number
+  duration_s: number
+  pace_mps: number
+  geometry: Array<[number, number]> // [lat, lng]
+  edges: Array<{ edge_id: number; fullname: string; mtfcc: string | null; length_m: number }>
+}
+
+interface DirectionsLayerProps {
+  target: PoiRow
+  source: 'bundle' | 'live'
+  onResult: (r: RouteResponse | null, err: string | null) => void
+}
+
+function DirectionsLayer({ target, source, onResult }: DirectionsLayerProps) {
+  const map = useMap()
+  const polylineRef = useRef<L.Polyline | null>(null)
+  const originMarkerRef = useRef<L.CircleMarker | null>(null)
+  const fitDoneRef = useRef<string | null>(null) // key per (target.id, source) to fit only once
+
+  useEffect(() => {
+    let cancelled = false
+    // Capture origin at fetch time so panning after doesn't re-route.
+    const c = map.getCenter()
+    const fromLat = c.lat
+    const fromLng = c.lng
+    const toLat = target.lat as number
+    const toLng = target.lng as number
+
+    const url =
+      `/api/salem/route?from_lat=${fromLat}&from_lng=${fromLng}` +
+      `&to_lat=${toLat}&to_lng=${toLng}&source=${source}`
+
+    onResult(null, null) // clear panel while fetching
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(async (res) => {
+        const body = (await res.json()) as RouteResponse | { error?: string }
+        if (!res.ok) {
+          const msg = (body as { error?: string }).error || `${res.status} ${res.statusText}`
+          throw new Error(msg)
+        }
+        return body as RouteResponse
+      })
+      .then((r) => {
+        if (cancelled) return
+        // Clear any prior overlay.
+        if (polylineRef.current) { map.removeLayer(polylineRef.current); polylineRef.current = null }
+        if (originMarkerRef.current) { map.removeLayer(originMarkerRef.current); originMarkerRef.current = null }
+
+        if (!r.geometry.length) {
+          onResult(r, null)
+          return
+        }
+        // Polyline (matches Android #22C55E, 5px, with a wider darker outline for legibility).
+        const pts = r.geometry as L.LatLngExpression[]
+        const outline = L.polyline(pts, { color: '#0f5132', weight: 8, opacity: 0.45, interactive: false })
+        const line = L.polyline(pts, { color: '#22C55E', weight: 5, opacity: 0.95, interactive: false })
+        outline.addTo(map)
+        line.addTo(map)
+        // Pair the outline with the line by overwriting the ref to a layer group.
+        polylineRef.current = L.layerGroup([outline, line]).addTo(map) as unknown as L.Polyline
+
+        // Origin marker — small green-bordered dot at the captured map center.
+        originMarkerRef.current = L.circleMarker([fromLat, fromLng], {
+          radius: 6, color: '#0f5132', weight: 2, fillColor: '#22C55E', fillOpacity: 1,
+        }).addTo(map)
+
+        // Fit bounds on the first render for this (target, source) only — re-fitting
+        // on every update fights the operator if they pan in to inspect.
+        const fitKey = `${target.id}|${source}`
+        if (fitDoneRef.current !== fitKey) {
+          fitDoneRef.current = fitKey
+          const bounds = L.latLngBounds(pts).extend([fromLat, fromLng])
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 18 })
+        }
+        onResult(r, null)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        onResult(null, e instanceof Error ? e.message : String(e))
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.id, target.lat, target.lng, source, map])
+
+  // Final cleanup when the layer unmounts (target cleared).
+  useEffect(() => {
+    return () => {
+      if (polylineRef.current) { map.removeLayer(polylineRef.current); polylineRef.current = null }
+      if (originMarkerRef.current) { map.removeLayer(originMarkerRef.current); originMarkerRef.current = null }
+    }
+  }, [map])
+
+  return null
+}
+
+interface DirectionsPanelProps {
+  target: PoiRow
+  source: 'bundle' | 'live'
+  onSourceChange: (s: 'bundle' | 'live') => void
+  result: RouteResponse | null
+  error: string | null
+  onClose: () => void
+}
+
+function DirectionsPanel({
+  target, source, onSourceChange, result, error, onClose,
+}: DirectionsPanelProps) {
+  function fmtDistance(m: number): string {
+    if (m < 1000) return `${m.toFixed(0)} m`
+    return `${(m / 1000).toFixed(2)} km`
+  }
+  function fmtDuration(s: number): string {
+    const mins = Math.round(s / 60)
+    if (mins < 60) return `${mins} min`
+    const h = Math.floor(mins / 60); const r = mins % 60
+    return r === 0 ? `${h} h` : `${h} h ${r} min`
+  }
+
+  return (
+    <div className="absolute top-2 right-2 z-[600] bg-white border border-emerald-300 rounded shadow-lg
+                    px-3 py-2 text-xs min-w-[220px] max-w-[320px]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-semibold text-emerald-900">
+          Directions to <span className="text-slate-900">{target.name}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-slate-500 hover:text-slate-900 leading-none -mt-0.5"
+          aria-label="Clear directions"
+          title="Clear"
+        >
+          ×
+        </button>
+      </div>
+      <div className="mt-1 text-slate-600 text-[11px]">
+        Origin: current map center at request time
+      </div>
+      {error && (
+        <div className="mt-2 text-rose-700 bg-rose-50 px-2 py-1 rounded">
+          {error}
+        </div>
+      )}
+      {!error && !result && (
+        <div className="mt-2 text-slate-500 italic">Computing route…</div>
+      )}
+      {result && (
+        <div className="mt-2 space-y-1">
+          <div>
+            <span className="font-mono text-emerald-700">{fmtDistance(result.distance_m)}</span>
+            <span className="text-slate-500"> · </span>
+            <span className="font-mono">{fmtDuration(result.duration_s)}</span>
+            <span className="text-slate-500"> walking @ {result.pace_mps} m/s</span>
+          </div>
+          <div className="text-[11px] text-slate-500">
+            {result.geometry.length} pts · {result.edges.length} edges
+          </div>
+        </div>
+      )}
+      <div className="mt-2 flex items-center gap-1 text-[11px]">
+        <span className="text-slate-500">Source:</span>
+        <button
+          type="button"
+          onClick={() => onSourceChange('bundle')}
+          className={`px-2 py-0.5 rounded ${
+            source === 'bundle'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+          }`}
+          title="Bundled SQLite (same data the APK ships)"
+        >
+          bundle
+        </button>
+        <button
+          type="button"
+          onClick={() => onSourceChange('live')}
+          className={`px-2 py-0.5 rounded ${
+            source === 'live'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+          }`}
+          title="TigerLine live tiger.route_walking() — verification path"
+        >
+          live
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Top-level component ────────────────────────────────────────────────────
 
 export function AdminMap({
@@ -760,6 +967,8 @@ export function AdminMap({
   addStopMode = 'none',
   onMapClickAddFree,
   onPickPoiForStop,
+  directionsTarget,
+  onClearDirections,
 }: AdminMapProps) {
   const filteredPois = useMemo(() => {
     if (!pois) return pois
@@ -874,6 +1083,24 @@ export function AdminMap({
     setMoveError(null)
   }, [])
 
+  // S177 P5 — Directions overlay state.
+  const [directionsSource, setDirectionsSource] = useState<'bundle' | 'live'>('bundle')
+  const [directionsResult, setDirectionsResult] = useState<RouteResponse | null>(null)
+  const [directionsError, setDirectionsError] = useState<string | null>(null)
+  const handleDirectionsResult = useCallback(
+    (r: RouteResponse | null, err: string | null) => {
+      setDirectionsResult(r)
+      setDirectionsError(err)
+    },
+    [],
+  )
+  // Reset transient state when the target POI changes (avoid showing stale
+  // distance from the previous target while the new one is fetching).
+  useEffect(() => {
+    setDirectionsResult(null)
+    setDirectionsError(null)
+  }, [directionsTarget?.id])
+
   const handleCancel = useCallback(() => {
     if (pending) {
       pending.marker.setLatLng([pending.from.lat, pending.from.lng])
@@ -967,6 +1194,13 @@ export function AdminMap({
           <TourStopLayer stops={tourStops} onDragEnd={handleStopDragEnd} />
         )}
         <FitTourBounds stops={tourStops ?? null} tourId={activeTour?.id ?? null} />
+        {directionsTarget && Number.isFinite(directionsTarget.lat) && Number.isFinite(directionsTarget.lng) && (
+          <DirectionsLayer
+            target={directionsTarget}
+            source={directionsSource}
+            onResult={handleDirectionsResult}
+          />
+        )}
       </MapContainer>
       <TileProviderPicker
         providerId={tileProviderId}
@@ -998,6 +1232,16 @@ export function AdminMap({
           error={moveError}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
+        />
+      )}
+      {directionsTarget && (
+        <DirectionsPanel
+          target={directionsTarget}
+          source={directionsSource}
+          onSourceChange={setDirectionsSource}
+          result={directionsResult}
+          error={directionsError}
+          onClose={() => { onClearDirections?.() }}
         />
       )}
       {pendingStop && (

@@ -142,6 +142,12 @@ export interface PoiEditDialogProps {
   onDeleted: (id: string, deletedAt: string) => void
   /** Called when the dialog should close (Cancel, ESC, backdrop, post-save). */
   onClose: () => void
+  /**
+   * S177 P5 — when set, "Directions" button is shown. Calling it asks
+   * AdminLayout to mark this POI as the directions target; AdminMap then
+   * fetches /api/salem/route from the map center and draws the polyline.
+   */
+  onShowDirections?: (poi: PoiRow) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -413,6 +419,7 @@ export function PoiEditDialog({
   onSaved,
   onDeleted,
   onClose,
+  onShowDirections,
 }: PoiEditDialogProps) {
   // ─── Form state ────────────────────────────────────────────────────────────
   // We rebuild defaults from scratch each time the dialog opens for a different
@@ -1715,6 +1722,17 @@ export function PoiEditDialog({
                         ? `${Object.keys(dirtyFields).length} field(s) modified`
                         : 'No changes'}
                     </div>
+                  )}
+                  {onShowDirections && poi && Number.isFinite(poi.lat) && Number.isFinite(poi.lng) && (
+                    <button
+                      type="button"
+                      onClick={() => { onShowDirections(poi); onClose() }}
+                      disabled={isSubmitting}
+                      className="px-3 py-1 text-sm rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 disabled:opacity-50"
+                      title="Draw walking route from map center to this POI on the map"
+                    >
+                      Directions
+                    </button>
                   )}
                   <button
                     type="button"

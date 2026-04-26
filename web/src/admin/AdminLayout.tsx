@@ -42,6 +42,15 @@ export function AdminLayout() {
   const [pois, setPois] = useState<PoiRow[] | null>(null)
   const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  // S177 P5 — Directions overlay target. When set, AdminMap fetches a route
+  // from the current map center to this POI and renders a polyline.
+  const [directionsTarget, setDirectionsTarget] = useState<PoiRow | null>(null)
+  const handleShowDirections = useCallback((poi: PoiRow) => {
+    setDirectionsTarget(poi)
+  }, [])
+  const handleClearDirections = useCallback(() => {
+    setDirectionsTarget(null)
+  }, [])
 
   // Tour-mode state (S174)
   const [activeTour, setActiveTour] = useState<TourSummary | null>(null)
@@ -368,6 +377,8 @@ export function AdminLayout() {
               addStopMode={addStopMode}
               onMapClickAddFree={handleAddFreeStop}
               onPickPoiForStop={handlePickPoiForStop}
+              directionsTarget={directionsTarget}
+              onClearDirections={handleClearDirections}
             />
           </main>
         </div>
@@ -397,6 +408,8 @@ export function AdminLayout() {
                 onPoiMoved={handlePoiMoved}
                 categoryFilter={mapCategoryFilter}
                 onClearCategoryFilter={() => setMapCategoryFilter(null)}
+                directionsTarget={directionsTarget}
+                onClearDirections={handleClearDirections}
               />
             </main>
           </div>
@@ -413,6 +426,7 @@ export function AdminLayout() {
         onSaved={handlePoiSaved}
         onDeleted={handlePoiDeleted}
         onClose={handleEditClose}
+        onShowDirections={handleShowDirections}
       />
     </div>
   )

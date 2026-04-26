@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 167-176. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 168-177. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 177: 2026-04-25 — Web walking router + Leaflet Directions UI
+
+Two final S175 carry-forwards shipped. **P4:** new `cache-proxy/lib/salem-router.js` is a JS port of `RoutingBundle.kt` + `Router.kt` reading the same `salem-routing-graph.sqlite` the APK ships — CSR adjacency, expanding-ring grid KNN with planar SRID-4269 distance, binary-heap Dijkstra, undirected pedestrian graph. Endpoints: `GET /salem/route?from_lat&from_lng&to_lat&to_lng[&source=live|bundle]`, `POST /salem/route-multi`, `GET /salem/route/meta`. `?source=live` falls through to `tiger.route_walking()` over a lazy-init unix-socket pg.Pool (peer auth) and stitches the returned MultiLineString into travel order by walking endpoints. Smoke-tested against the four `RouterParityTest.kt` reference fixtures — all four match bit-exact (Common→7G 1240.7187 m, Commuter Rail→Museum Place 509.8629 m, Witch House→Burying Point 413.7483 m, Peabody→Derby Wharf 1078 m sanity). Bundle vs live cross-check produces ±0 mm; the `DIVERGENCE` warning would fire above 5%. **P5:** new optional `onShowDirections` prop on `PoiEditDialog` adds a Directions button; AdminLayout owns the `directionsTarget` state; AdminMap renders `<DirectionsLayer>` (Polyline #22C55E w/ #0f5132 outer casing, origin CircleMarker, fits bounds once per target+source) and a `<DirectionsPanel>` (distance/duration/pace + bundle/live source toggle + close ×). TS clean, Vite production build clean, end-to-end data path verified through the Vite `/api` → cache-proxy `/salem` proxy. Visual click-flow verification deferred to operator. The S175 five-task queue (P3b/P3c/P2c/P4/P5) is now fully drained.
+
+Full session detail: `docs/session-logs/session-177-2026-04-25.md`. Commit: `<filled at commit>`.
+
+---
 
 ## Session 176: 2026-04-25 — Live re-routing + MBTA-origin walk-sim + Router JVM parity tests
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-168-2026-04-24.md`. Commit: `d28
 
 ---
 
-## Session 167: 2026-04-24 — APK packaging audit: poi-icons + tile archive shrink + single-basemap build
-
-Pre-Play-Store packaging pass plus a stack of quality-of-life fixes. Shipped: (1) Walking Tours hang root-caused to a missing `PRAGMA user_version = 9` in the asset DB triggering `fallbackToDestructiveMigration` on first launch — stamped in both source and asset DBs. (2) Walk simulator smoothness fix — `LocationMode.MANUAL` now bypasses the stationary gate (Lenovo `TYPE_SIGNIFICANT_MOTION` never fires). (3) New `POIs Hist. Landmark` toggle in the layers popup (filters 487 `massgis_mhc` POIs). (4) Dead Current/Proposed/Both POI-location selector removed. (5) `poi-icons/` trimmed to witchcraft-style-only + WebP (544 MB → 3.4 MB, 7 other styles archived with README at `docs/archive/poi-icons-unused-styles_archived_2026-04-24/`). (6) `poi-circle-icons/` converted to 128 WebP (36 MB → 1.2 MB). (7) `salem_tiles.sqlite` trimmed to Witchy-only + Salem city bbox + z16-19 + re-encoded WebP q=78 (207 MB → 30 MB, pipeline at `tools/tile-bake/trim-to-salem.py`). (8) Tile archive bundled in APK assets with first-launch auto-extract via `OfflineTileManager` + `noCompress 'sqlite'`. (9) `TileSourceManager` fully collapsed to single-basemap (Esri/Mapnik/Dark source builders, IDs, and `buildDarkTileSource`/`onDarkModeToggled` delegations all deleted). Layers button in toolbar preserved as the home for future toggles. **APK trajectory: 706 MB → 50 MB → 79 MB (bundled tiles).** Well under Play Store 150 MB base-module limit — no asset pack needed.
-
-Full session detail: `docs/session-logs/session-167-2026-04-24.md`. Commit: `8d209b8`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 166 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 167 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S167 rolled to archive 2026-04-25 by the session-end protocol (S177) -->
 <!-- S166 rolled to archive 2026-04-25 by the session-end protocol (S176) -->
 <!-- S165 rolled to archive 2026-04-25 by the session-end protocol (S175) -->
 <!-- S164 rolled to archive 2026-04-25 by the session-end protocol (S174) -->
