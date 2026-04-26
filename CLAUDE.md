@@ -6,6 +6,50 @@
 
 ---
 
+## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S180 close, 2026-04-26)
+
+> **Operator override of lean-startup rule.** Read this block at session start *before* the lean greeting. Pinned here because CLAUDE.md auto-loads and these items are time-sensitive or load-bearing for V1 ship. Once an item is done, remove it from this block and move it to STATE.md.
+
+### State as of S180 close
+
+- **First signed AAB built and verified.** `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Signed APK installed and running on Lenovo TB305FU.
+- **The V1.0.0 first-AAB build path is no longer blocked by technical chores.** It is blocked by the operator-side commercial chores listed below.
+- Last commit: `afac394` on `master`, in sync with `origin/master`. OMEN repo also in sync.
+
+### S181 next steps — in priority order
+
+**Operator-side (Claude cannot do these for you):**
+
+1. **CRITICAL — Back up `~/keys/wickedsalem-upload.jks` off-machine BEFORE first Play Console upload.** Mode 0600, 2728 bytes. Password is in `~/.gradle/gradle.properties` (mode 0600, off-repo). Both files are documented in OMEN credential audit Amendment 2026-04-26. Losing this pair = losing the ability to ship updates without going through Google's "lost upload key" recovery. Back to at least one off-machine location (USB key in a safe, encrypted cloud, etc.).
+2. **CRITICAL — Form TX copyright registration.** $65, hard deadline **2026-05-20** (statutory damages window). Operator-owed.
+3. **Google Play Developer Account + identity verification.** $25 one-time at play.google.com/console. Multi-week lead time on identity verification. Hasn't been started.
+4. **Privacy Policy public hosting + in-app link.** V1-minimal Posture A drafted at `docs/PRIVACY-POLICY-V1.md`. Needs public URL (DestructiveAIGurus.com page, GitHub Pages, or dedicated domain). Full OMEN-008-compliant draft at `docs/PRIVACY-POLICY.md` still pending OMEN review (32+ sessions).
+5. **Merchant / payments profile** in Play Console. Required to receive paid-app revenue.
+
+**Claude-side technical work (in dependency order):**
+
+6. **Interactive eyes-on smoke test of the V1 release APK on Lenovo.** S180 confirmed install + launch + 60fps SalemMainActivity for 12s with no crash. Did NOT interactively test:
+   - POI detail Visit Website button: should still appear when POI has URL, click should hand off to Chrome via ACTION_VIEW (per S180 P3).
+   - Find dialog → POI detail: Reviews button should NOT render. Comments section should NOT render. Website area should show "Website unavailable offline" placeholder.
+   - Find dialog → Directions: should use on-device walking router (green/dark-green polyline like point-to-point), NOT launch Google Maps.
+   - Toolbar: should NOT show Weather/Transit/CAMs/Aircraft/Radar buttons (already V1-gated by AppBarMenuManager from S141/S144).
+   - Webcam dialog (if reached via geofence): "View Live" button should NOT render in V1.
+7. **Tier 2 — admin → build pipeline auto-bake.** Per `feedback_admin_changes_propagate_to_builds.md` (S180). Add a Gradle task that re-runs `salem-content` JVM bake from PG `salem_pois` → `salem_content.db` before `assembleRelease`/`bundleRelease`. Surface a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG.
+8. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` is 600m off (sits at 42.5203,-70.8816 instead of ~42.5232,-70.8908); `salem_willows` is mid-parking-lot at 42.535,-70.86945. Fix via `UPDATE salem_pois`, re-bake `salem_content.db`, rebuild AAB. Heritage Trail tour also references 6 POIs not in curated tour-POI set; decide whether to drop the tour for V1 or add the missing POIs.
+9. **Pre-AAB hard-delete dedup losers.** S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload, `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first). Scripts at `cache-proxy/scripts/dedup-2026-04-13/`.
+10. **Deferred from S179** (still valid, lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; water-aware approach segments.
+
+### Key paths to remember
+
+- Upload keystore: `~/keys/wickedsalem-upload.jks`
+- Signing properties: `~/.gradle/gradle.properties` (mode 0600)
+- AAB build artifact: `app-salem/build/outputs/bundle/release/app-salem-release.aab`
+- APK build artifact: `app-salem/build/outputs/apk/release/app-salem-release.apk`
+- OMEN credential audit: `~/Development/OMEN/docs/credential-audit-2026-04-05.md` (Amendment 2026-04-26 has the upload key entry)
+- Build commands: `./gradlew :app-salem:bundleRelease` (AAB) / `:app-salem:assembleRelease` (APK)
+
+---
+
 ## Session Start Protocol — lean (2026-04-23)
 
 Operator rule: **startup reads must be kept minimal to conserve tokens.** At session start, rely on what the harness auto-loads (`CLAUDE.md` + `MEMORY.md`). Everything else is deferred until a specific question requires it.
