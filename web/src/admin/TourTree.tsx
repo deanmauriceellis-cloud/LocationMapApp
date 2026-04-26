@@ -33,6 +33,12 @@ interface TourTreeProps {
   onAddStopModeChange: (mode: AddStopMode) => void
   /** Notifies the parent (AdminLayout) so AdminMap can render the legs. */
   onLegsChange?: (legs: TourLeg[] | null) => void
+  /** Currently-selected leg (highlighted red on the map). null = none. */
+  selectedLegOrder?: number | null
+  /** Click handler for a leg row (toggles selection). */
+  onLegSelect?: (legOrder: number) => void
+  /** Click handler for a waypoint row — recenters the map on that stop. */
+  onFocusStop?: (stopId: number) => void
 }
 
 const ENDPOINT = '/api/admin/salem/tours'
@@ -57,6 +63,9 @@ export function TourTree({
   addStopMode,
   onAddStopModeChange,
   onLegsChange,
+  selectedLegOrder = null,
+  onLegSelect,
+  onFocusStop,
 }: TourTreeProps) {
   const [tours, setTours] = useState<TourSummary[] | null>(null)
   const [tour, setTour] = useState<TourSummary | null>(null)
@@ -430,6 +439,8 @@ export function TourTree({
             busy={busy}
             onCompute={handleComputeRoute}
             onRecomputeLeg={handleRecomputeLeg}
+            selectedLegOrder={selectedLegOrder}
+            onLegSelect={onLegSelect}
           />
 
           <ol className="text-xs">
@@ -439,7 +450,9 @@ export function TourTree({
               return (
                 <li
                   key={s.stop_id}
-                  className="px-3 py-1.5 border-b border-slate-100 flex items-baseline gap-2"
+                  onClick={() => onFocusStop?.(s.stop_id)}
+                  className="px-3 py-1.5 border-b border-slate-100 flex items-baseline gap-2 cursor-pointer hover:bg-slate-50"
+                  title="Click to center the map on this waypoint"
                 >
                   <span className="font-mono text-slate-400 w-6 shrink-0 tabular-nums">
                     {s.stop_order}
@@ -465,7 +478,7 @@ export function TourTree({
                   <div className="flex items-center gap-0.5 text-slate-500">
                     <button
                       type="button"
-                      onClick={() => moveStop(s.stop_id, -1)}
+                      onClick={(e) => { e.stopPropagation(); moveStop(s.stop_id, -1) }}
                       disabled={idx === 0 || busy}
                       title="Move up"
                       className="px-1.5 py-0.5 rounded hover:bg-slate-100 disabled:opacity-30"
@@ -474,7 +487,7 @@ export function TourTree({
                     </button>
                     <button
                       type="button"
-                      onClick={() => moveStop(s.stop_id, 1)}
+                      onClick={(e) => { e.stopPropagation(); moveStop(s.stop_id, 1) }}
                       disabled={idx === (stops?.length ?? 0) - 1 || busy}
                       title="Move down"
                       className="px-1.5 py-0.5 rounded hover:bg-slate-100 disabled:opacity-30"
@@ -483,7 +496,7 @@ export function TourTree({
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleDeleteStop(s.stop_id)}
+                      onClick={(e) => { e.stopPropagation(); void handleDeleteStop(s.stop_id) }}
                       disabled={busy}
                       title="Delete waypoint"
                       className="px-1.5 py-0.5 rounded text-rose-500 hover:bg-rose-50 disabled:opacity-30"
@@ -515,6 +528,8 @@ interface RouteSectionProps {
   busy: boolean
   onCompute: (force?: boolean) => void | Promise<void>
   onRecomputeLeg: (legOrder: number, force?: boolean) => void | Promise<void>
+  selectedLegOrder: number | null
+  onLegSelect?: (legOrder: number) => void
 }
 
 function RouteSection({
@@ -525,6 +540,8 @@ function RouteSection({
   busy,
   onCompute,
   onRecomputeLeg,
+  selectedLegOrder,
+  onLegSelect,
 }: RouteSectionProps) {
   const totalDistance = useMemo(
     () => (legs ?? []).reduce((s, l) => s + l.distance_m, 0),
@@ -589,13 +606,29 @@ function RouteSection({
           <ol className="border border-slate-200 rounded divide-y divide-slate-100 bg-white">
             {legs!.map((leg) => {
               const edited = leg.manual_edits != null
+              const isSelected = selectedLegOrder === leg.leg_order
               return (
-                <li key={leg.leg_order} className="px-2 py-1 flex items-baseline gap-2">
-                  <span className="font-mono text-slate-400 w-6 shrink-0 tabular-nums">
+                <li
+                  key={leg.leg_order}
+                  onClick={() => onLegSelect?.(leg.leg_order)}
+                  className={`px-2 py-1 flex items-baseline gap-2 cursor-pointer ${
+                    isSelected ? 'bg-rose-100 hover:bg-rose-100' : 'hover:bg-slate-50'
+                  }`}
+                  title="Click to highlight this leg on the map"
+                >
+                  <span
+                    className={`font-mono w-6 shrink-0 tabular-nums ${
+                      isSelected ? 'text-rose-700 font-semibold' : 'text-slate-400'
+                    }`}
+                  >
                     {leg.leg_order}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-slate-700 tabular-nums">
+                    <div
+                      className={`tabular-nums ${
+                        isSelected ? 'text-rose-800' : 'text-slate-700'
+                      }`}
+                    >
                       {leg.distance_m.toFixed(0)} m · {Math.round(leg.duration_s)} s
                       {edited && (
                         <span className="ml-1 text-amber-600" title="Hand-edited polyline">
@@ -609,7 +642,8 @@ function RouteSection({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       if (edited) {
                         if (!window.confirm('This leg has manual edits. Recomputing will discard them. Continue?')) return
                         void onRecomputeLeg(leg.leg_order, true)

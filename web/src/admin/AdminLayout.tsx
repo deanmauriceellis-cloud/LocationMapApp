@@ -58,18 +58,38 @@ export function AdminLayout() {
   // S183 — precomputed walking legs for the active tour, lifted from TourTree
   // so AdminMap can render them as a polyline overlay.
   const [tourLegs, setTourLegs] = useState<TourLeg[] | null>(null)
+  // S184 — selected leg in the side panel highlights red on the map; clicking
+  // a leg polyline on the map selects the matching row.
+  const [selectedLegOrder, setSelectedLegOrder] = useState<number | null>(null)
+  // S184 — clicking a waypoint row pans the map to that stop. The nonce bumps
+  // on every click (even repeat clicks of the same stop) so FlyToStop re-fires.
+  const [focusedStopId, setFocusedStopId] = useState<number | null>(null)
+  const [focusedStopNonce, setFocusedStopNonce] = useState(0)
   const [tourRefreshKey, setTourRefreshKey] = useState(0)
   const [addStopMode, setAddStopMode] = useState<AddStopMode>('none')
 
   const handleTourSelect = useCallback((tour: TourSummary, stops: TourStop[]) => {
     setActiveTour(tour)
     setTourStops(stops)
+    // Reset leg/waypoint selection when switching tours; the new tour's
+    // legs will arrive shortly via onLegsChange.
+    setSelectedLegOrder(null)
+    setFocusedStopId(null)
     // Don't clear legs here — TourTree will fetch fresh legs for the new tour
     // and push them up via onLegsChange.
   }, [])
 
   const handleLegsChange = useCallback((legs: TourLeg[] | null) => {
     setTourLegs(legs)
+  }, [])
+
+  const handleLegSelect = useCallback((legOrder: number) => {
+    setSelectedLegOrder((prev) => (prev === legOrder ? null : legOrder))
+  }, [])
+
+  const handleFocusStop = useCallback((stopId: number) => {
+    setFocusedStopId(stopId)
+    setFocusedStopNonce((n) => n + 1)
   }, [])
 
   const handleStopMoved = useCallback((stopId: number, lat: number, lng: number) => {
@@ -369,6 +389,9 @@ export function AdminLayout() {
                 addStopMode={addStopMode}
                 onAddStopModeChange={setAddStopMode}
                 onLegsChange={handleLegsChange}
+                selectedLegOrder={selectedLegOrder}
+                onLegSelect={handleLegSelect}
+                onFocusStop={handleFocusStop}
               />
             </div>
           </aside>
@@ -384,8 +407,13 @@ export function AdminLayout() {
               activeTour={activeTour}
               tourStops={tourStops}
               tourLegs={tourLegs}
+              selectedLegOrder={selectedLegOrder}
+              onLegSelect={handleLegSelect}
+              focusedStopId={focusedStopId}
+              focusedStopNonce={focusedStopNonce}
               onStopMoved={handleStopMoved}
               addStopMode={addStopMode}
+              onCancelAddStopMode={() => setAddStopMode('none')}
               onMapClickAddFree={handleAddFreeStop}
               onPickPoiForStop={handlePickPoiForStop}
               directionsTarget={directionsTarget}

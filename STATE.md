@@ -2,15 +2,17 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-04-26 — Session 183 closed. **Per-leg tour walking-route admin tool shipped (backend + UI).** Operator pivoted from S182's "hand-curate stop coords" path to a one-click compute path: new PG table `salem_tour_legs` (per-leg JSONB polyline + distance/duration + router_version + nullable manual_edits), 3 cache-proxy endpoints (`GET /legs`, `POST /compute-route`, `POST /legs/:n/recompute`) calling the same in-process bundle router that powers Find→Directions, plus a "Walking route" panel + green polyline overlay in the web admin. CLI-verified end-to-end on `tour_WD1`: 14 legs / 6.82 km / 81 min / no skipped legs. Operator hasn't yet eyeballed the admin map; that's the first thing to confirm next session. App-side consumption (Salem-content bake includes `salem_tour_legs` → `TourViewModel.computeTourPolyline()` reads baked legs, falls back to runtime `routeMulti`) is deferred to follow-up sessions and is what closes the loop into the AAB. S182's "tour routing is content not engineering" rule still stands — S183 satisfies it by moving the route work entirely into authoring, zero runtime engine change in the APK. Full detail in `docs/session-logs/session-183-2026-04-26.md`.
+**Last updated:** 2026-04-26 — Session 184 closed. **Admin walking-route UX polish shipped — pure web admin work, no backend / bake / AAB impact.** Each leg's polyline now anchors to its from/to waypoint markers (eliminates the 1.1–25.1 m road-snap gap that read as "missing legs") AND clips the routed geometry to the polyline-points closest to each marker (eliminates overshoot / corner-and-back doglegs); click a leg row in the side panel highlights that leg in red on the map (custom Leaflet pane at z 450 sits above the dashed connector, below the numbered markers); click a waypoint row pans+zooms to that stop; "+ Free waypoint" / "+ POI as stop" modes now have a × button on the banner + Esc handler + side-panel toggle to cancel. Operator dragged Common-area waypoints onto streets per `feedback_tour_routing_is_content_not_engineering.md` (legs 10/12 of `tour_WD1` were 2082 m / 1850 m for waypoints 80–108 m apart because Salem Common has no pedestrian edges in the bundled graph). Files: `web/src/admin/{AdminMap,AdminLayout,TourTree}.tsx`. TypeScript clean throughout. Full detail in `docs/session-logs/session-184-2026-04-26.md`.
+
+S183 standing (still valid): Per-leg tour walking-route admin tool shipped end-to-end (backend + UI). PG table `salem_tour_legs` + 3 cache-proxy endpoints (`GET /legs`, `POST /compute-route`, `POST /legs/:n/recompute`) calling the same in-process bundle router as Find→Directions. App-side consumption (Salem-content bake includes `salem_tour_legs` → `TourViewModel.computeTourPolyline()` reads baked legs, falls back to runtime `routeMulti`) still deferred — that's what closes the loop into the AAB.
 
 S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First signed AAB at `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB). Manifest network surface stripped, V1 feature gates R8-stripped from binary, Room migrations locked, signingConfigs wired, upload keystore generated + OMEN-registered. S179: tour routing unified to live `Router.route()` against bundled walking graph; bake-time edge splitting (47,704 edges / 44,223 walkable nodes; asset 11.2 MB). S178: `:routing-jvm` extraction + 60m approach cap + surgical OSM ingest. S175: on-device Salem router. S174: web admin Tours tab CRUD. S172: animations live in SalemMainActivity. S171: custom WickedMap engine (replaces osmdroid; migration in progress, 338 osmdroid call sites still extant).
 
 ---
 
-## TOP PRIORITY — Next Session (S184)
+## TOP PRIORITY — Next Session (S185)
 
-1. **Operator browser-test the S183 admin walking-route tool.** Refresh `http://localhost:4302/admin/tours`, pick `tour_WD1`. Should see the new "Walking route" panel populated (`14 legs · 6.82 km · 81 min`), a green polyline weaving through the 15 numbered waypoints, per-leg ↻ recompute working. Cache-proxy (4300) and Vite (4302) left running at S183 close. If overlay alignment / leg count / button states look wrong, that's the first thing to fix.
+1. **Continue refining the Android app + web admin tool.** Operator's stated direction at S184 close. No specific blockers — pick from #2-4 below or follow operator direction.
 
 2. **Bake `salem_tour_legs` into `salem_content.db`** (S183 follow-up, blocks the AAB). Add a new bake step in the `salem-content` JVM pipeline that copies `salem_tour_legs` rows from PG → SQLite. Mirror the `salem_tours` / `salem_tour_stops` baking pattern. New Room entity + DAO (`TourLeg`, `TourLegDao`) on the app side.
 
@@ -58,6 +60,7 @@ S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First 
 
 ## Architectural pivots & rule changes (recent → older)
 
+- **2026-04-26 (S184):** Admin walking-route rendering uses **anchor + clip** for marker continuity. Each leg's polyline is anchored to its from/to waypoint markers AND clipped to the polyline-points closest to those markers, eliminating both road-snap gaps and overshoot doglegs. The selected leg renders into a custom Leaflet pane (z 450) so it stacks above the green legs and the dashed connector but below the numbered waypoint markers. Pure rendering policy — no engine change.
 - **2026-04-26 (S183):** Tour walking polylines become **authored content**, not runtime computation. New PG table `salem_tour_legs` stores per-leg polylines computed at admin time via the same on-device router; runtime APK reads baked legs directly (S184 follow-up). Satisfies S182's content-not-engineering rule by moving the work entirely to authoring time.
 - **2026-04-26 (S182):** Tour route fidelity declared content-authoring, not engineering. New HARD RULE `feedback_tour_routing_is_content_not_engineering.md` — operator hand-curates tour stops; routing graph, geocoder, anchor schema, and Router changes are parked for V1.
 - **2026-04-26 (S182):** S181 OSM-policy reversal RETRACTED. Diagnosis was wrong (`Router.routeMulti` is per-leg P2P + concat; visual divergence is from POI-centroid input, not from a graph deficiency). Plan archived to `docs/archive/`. `feedback_no_osm_use_local_geo.md` restored to S178 surgical-only constraint.
@@ -85,7 +88,7 @@ S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First 
 | **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
 | **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 183. Salem 400+ target 2026-09-01 aspirational.
+**Sessions completed:** 184. Salem 400+ target 2026-09-01 aspirational.
 
 ---
 

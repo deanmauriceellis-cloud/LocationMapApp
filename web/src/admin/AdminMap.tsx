@@ -136,10 +136,20 @@ interface AdminMapProps {
   /** Precomputed walking legs (S183). When set, rendered as a green polyline
    *  overlay underneath the waypoints. */
   tourLegs?: TourLeg[] | null
+  /** When set, the matching leg renders in red instead of green and a click
+   *  on any leg polyline reports the leg_order via onLegSelect. */
+  selectedLegOrder?: number | null
+  onLegSelect?: (legOrder: number) => void
+  /** When set (with a fresh nonce on each request), the map flies to the
+   *  matching stop's coords. The nonce lets repeat-clicks re-fire. */
+  focusedStopId?: number | null
+  focusedStopNonce?: number
   onStopMoved?: (stopId: number, lat: number, lng: number) => void
   /** Add-stop mode: 'free' = next map click creates a free waypoint,
    *  'poi' = next POI marker click adds that POI as a stop. */
   addStopMode?: 'none' | 'free' | 'poi'
+  /** Exit add-stop mode (banner close button + Esc key). */
+  onCancelAddStopMode?: () => void
   onMapClickAddFree?: (lat: number, lng: number) => void
   onPickPoiForStop?: (poi: PoiRow) => void
   /** S177 P5 — when set, draw a walking route from current map center to
@@ -471,6 +481,32 @@ function FlyToSelected({ selectedPoi }: FlyToProps) {
   return null
 }
 
+// Pans the map to a tour stop when its row is clicked in the side panel.
+// `nonce` must change on every click (even re-clicks of the same stop) so the
+// effect re-fires; the stops array provides the coords by id.
+interface FlyToStopProps {
+  stopId: number | null
+  nonce: number
+  stops: TourStop[] | null
+}
+
+function FlyToStop({ stopId, nonce, stops }: FlyToStopProps) {
+  const map = useMap()
+  useEffect(() => {
+    if (stopId == null || !stops) return
+    const target = stops.find((s) => s.stop_id === stopId)
+    if (!target) return
+    const lat = target.effective_lat
+    const lng = target.effective_lng
+    if (typeof lat !== 'number' || typeof lng !== 'number') return
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    const targetZoom = Math.max(map.getZoom(), 18)
+    map.flyTo([lat, lng], targetZoom, { duration: 0.5 })
+    // nonce intentionally listed so re-clicks re-fire the effect.
+  }, [stopId, nonce, stops, map])
+  return null
+}
+
 // ─── Move-confirm modal ─────────────────────────────────────────────────────
 
 function metersBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
@@ -736,34 +772,139 @@ function TourStopLayer({ stops, onDragEnd }: TourStopLayerProps) {
 // one leg at a time).
 interface TourLegsLayerProps {
   legs: TourLeg[]
+  /** Stops are used to anchor each leg's polyline to the from/to marker coords
+   *  so the rendered route visually touches the numbered waypoint dots (no
+   *  road-snap gap). */
+  stops: TourStop[] | null
+  /** Highlight a single leg in red when its row is selected in the side panel.
+   *  null = no leg highlighted. */
+  selectedLegOrder: number | null
+  /** Click anywhere on a leg polyline to select it (mirrors clicking the
+   *  leg row in the side panel). */
+  onLegSelect: (legOrder: number) => void
 }
 
-function TourLegsLayer({ legs }: TourLegsLayerProps) {
+const SELECTED_LEG_PANE = 'tour-selected-leg-pane'
+
+function TourLegsLayer({ legs, stops, selectedLegOrder, onLegSelect }: TourLegsLayerProps) {
   const map = useMap()
+
   useEffect(() => {
-    const group = L.layerGroup()
-    for (const leg of legs) {
-      const pts = leg.polyline_json
-      if (!Array.isArray(pts) || pts.length < 2) continue
-      // Outline (darker, wider) + fill (matches Android #22C55E walking-route).
-      L.polyline(pts as L.LatLngTuple[], {
-        color: '#0f5132',
-        weight: 8,
-        opacity: 0.45,
-        interactive: false,
-      }).addTo(group)
-      L.polyline(pts as L.LatLngTuple[], {
-        color: '#22C55E',
-        weight: 5,
-        opacity: 0.95,
-        interactive: false,
-      }).addTo(group)
+    // Custom pane for the selected leg so it stacks ABOVE TourStopLayer's
+    // dashed inter-stop polyline (overlayPane = 400) but BELOW the numbered
+    // waypoint markers (markerPane = 600). Created here (not in a separate
+    // effect) to guarantee the pane exists before any polyline references it.
+    let pane = map.getPane(SELECTED_LEG_PANE)
+    if (!pane) {
+      pane = map.createPane(SELECTED_LEG_PANE)
+      pane.style.pointerEvents = 'auto'
     }
+    // Re-assert z-index every render in case Leaflet recreated the pane.
+    // 450 sits between overlayPane (400) and shadowPane (500), so the
+    // selected leg renders above the green legs + dashed connector but
+    // below shadows / waypoint markers.
+    pane.style.zIndex = '450'
+
+    const group = L.layerGroup()
+    // Build a stop_id → [lat,lng] lookup so we can anchor each leg's polyline
+    // at the marker positions, matching Find→Directions visual style.
+    const stopById = new Map<number, [number, number]>()
+    for (const s of stops ?? []) {
+      if (typeof s.effective_lat === 'number' && typeof s.effective_lng === 'number') {
+        stopById.set(s.stop_id, [s.effective_lat, s.effective_lng])
+      }
+    }
+
+    // Build anchored polylines for every leg first; defer drawing the selected
+    // one so it lands on top of all the green legs. The selected leg also
+    // renders in a higher-z pane so it sits above the dashed inter-stop line.
+    // Squared-degree distance — fine for tiny intra-tour comparisons (sub-km).
+    const sq = (ax: number, ay: number, bx: number, by: number) => {
+      const dx = ax - bx
+      const dy = ay - by
+      return dx * dx + dy * dy
+    }
+    // Index of the closest polyline point to `target`.
+    const closestIdx = (poly: L.LatLngTuple[], target: [number, number]) => {
+      let best = 0
+      let bestD = Infinity
+      for (let i = 0; i < poly.length; i++) {
+        const p = poly[i]
+        const d = sq(p[0] as number, p[1] as number, target[0], target[1])
+        if (d < bestD) {
+          bestD = d
+          best = i
+        }
+      }
+      return best
+    }
+
+    const drawLeg = (leg: TourLeg, selected: boolean) => {
+      const routed = leg.polyline_json as L.LatLngTuple[] | unknown
+      if (!Array.isArray(routed) || routed.length < 2) return
+      const from = stopById.get(leg.from_stop_id)
+      const to = stopById.get(leg.to_stop_id)
+      // Clip the routed polyline to the segment closest to from/to markers
+      // before anchoring. Without clipping, an appended to_marker that sits
+      // BEFORE the polyline's last routed point reads as an overshoot dogleg
+      // (router snapped past the waypoint). Same for from_marker undershoots.
+      let startIdx = 0
+      let endIdx = routed.length - 1
+      if (from) startIdx = closestIdx(routed, from)
+      if (to) endIdx = closestIdx(routed, to)
+      // Degenerate (e.g. very short legs where both anchors map to one point):
+      // fall back to the full routed geometry.
+      if (startIdx > endIdx) {
+        startIdx = 0
+        endIdx = routed.length - 1
+      }
+      const pts: L.LatLngTuple[] = []
+      if (from) pts.push(from)
+      for (let i = startIdx; i <= endIdx; i++) pts.push(routed[i])
+      if (to) pts.push(to)
+      if (pts.length < 2) return
+
+      const outlineColor = selected ? '#7f1d1d' : '#0f5132'
+      const fillColor = selected ? '#ef4444' : '#22C55E'
+      const outlineWeight = selected ? 12 : 8
+      const fillWeight = selected ? 7 : 5
+      const baseOpts: L.PolylineOptions = {
+        interactive: true,
+        bubblingMouseEvents: false,
+      }
+      if (selected) baseOpts.pane = SELECTED_LEG_PANE
+      L.polyline(pts, {
+        ...baseOpts,
+        color: outlineColor,
+        weight: outlineWeight,
+        opacity: selected ? 0.85 : 0.45,
+      })
+        .on('click', () => onLegSelect(leg.leg_order))
+        .addTo(group)
+      L.polyline(pts, {
+        ...baseOpts,
+        color: fillColor,
+        weight: fillWeight,
+        opacity: 1.0,
+      })
+        .on('click', () => onLegSelect(leg.leg_order))
+        .addTo(group)
+    }
+
+    let selectedLeg: TourLeg | null = null
+    for (const leg of legs) {
+      if (selectedLegOrder === leg.leg_order) {
+        selectedLeg = leg
+        continue
+      }
+      drawLeg(leg, false)
+    }
+    if (selectedLeg) drawLeg(selectedLeg, true)
     group.addTo(map)
     return () => {
       map.removeLayer(group)
     }
-  }, [legs, map])
+  }, [legs, stops, selectedLegOrder, onLegSelect, map])
   return null
 }
 
@@ -1007,8 +1148,13 @@ export function AdminMap({
   activeTour,
   tourStops,
   tourLegs,
+  selectedLegOrder = null,
+  onLegSelect,
+  focusedStopId = null,
+  focusedStopNonce = 0,
   onStopMoved,
   addStopMode = 'none',
+  onCancelAddStopMode,
   onMapClickAddFree,
   onPickPoiForStop,
   directionsTarget,
@@ -1187,6 +1333,18 @@ export function AdminMap({
     }
   }, [pending, onPoiMoved])
 
+  // Esc cancels add-stop mode (free/POI). Listener is global so it works
+  // whether the map or the side panel has focus. Declared before the early
+  // return below so hook order stays stable across renders.
+  useEffect(() => {
+    if (addStopMode === 'none' || !onCancelAddStopMode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancelAddStopMode()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [addStopMode, onCancelAddStopMode])
+
   if (!pois && !tourStops) {
     return (
       <div className="absolute inset-0 flex items-center justify-center text-slate-500">
@@ -1199,10 +1357,23 @@ export function AdminMap({
     <div className={`absolute inset-0 ${addStopMode !== 'none' ? 'cursor-crosshair' : ''}`}>
       {addStopMode !== 'none' && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[600]
-                        bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow">
-          {addStopMode === 'free'
-            ? 'Click the map to drop a free waypoint'
-            : 'Click any POI marker to add it as a stop'}
+                        bg-amber-500 text-white text-xs pl-3 pr-1 py-1 rounded-full shadow
+                        flex items-center gap-2">
+          <span>
+            {addStopMode === 'free'
+              ? 'Click the map to drop a free waypoint'
+              : 'Click any POI marker to add it as a stop'}
+          </span>
+          <span className="text-amber-100 text-[10px]">(Esc to cancel)</span>
+          <button
+            type="button"
+            onClick={onCancelAddStopMode}
+            title="Cancel add-stop mode"
+            className="rounded-full w-5 h-5 leading-none flex items-center justify-center
+                       bg-amber-700 hover:bg-amber-800 text-white text-sm"
+          >
+            ×
+          </button>
         </div>
       )}
       <MapContainer
@@ -1235,12 +1406,22 @@ export function AdminMap({
         />
         <FlyToSelected selectedPoi={selectedPoi} />
         {tourLegs && tourLegs.length > 0 && (
-          <TourLegsLayer legs={tourLegs} />
+          <TourLegsLayer
+            legs={tourLegs}
+            stops={tourStops ?? null}
+            selectedLegOrder={selectedLegOrder}
+            onLegSelect={onLegSelect ?? (() => {})}
+          />
         )}
         {tourStops && tourStops.length > 0 && (
           <TourStopLayer stops={tourStops} onDragEnd={handleStopDragEnd} />
         )}
         <FitTourBounds stops={tourStops ?? null} tourId={activeTour?.id ?? null} />
+        <FlyToStop
+          stopId={focusedStopId}
+          nonce={focusedStopNonce}
+          stops={tourStops ?? null}
+        />
         {directionsTarget && Number.isFinite(directionsTarget.lat) && Number.isFinite(directionsTarget.lng) && (
           <DirectionsLayer
             target={directionsTarget}

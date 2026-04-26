@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 174-183. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 175-184. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 184: 2026-04-26 — Admin walking-route UX polish: marker-anchored polylines + click-to-highlight + click-to-recenter
+
+Continuation of S183's authoring pipeline — pure web admin UX, zero backend or bake changes. Diagnosed the operator's "leg 1 → 2 missing" report as a marker-vs-polyline gap (the on-device router snaps each waypoint to the nearest pedestrian-graph node, leaving 1.1–25.1 m visible gaps at the dots), and shipped: (1) `TourLegsLayer` now anchors each leg's polyline to its from/to marker coords AND clips the routed geometry to the polyline-points closest to each marker, so road-snap gaps disappear AND overshoot/corner-and-back doglegs (e.g. leg 4 ending 16 m past waypoint 5) get trimmed; (2) click a leg row in the side panel → that leg highlights red on the map (custom Leaflet pane at z-index 450 so it sits above `overlayPane`'s dashed inter-stop connector but below `markerPane`'s numbered waypoint dots); click anywhere on a leg polyline also selects the matching row; (3) click a waypoint row → map flies to the stop (zoom ≥18, repeat-clicks re-fire via a nonce); (4) cancel for "+ Free waypoint" / "+ POI as stop" modes — × button on the amber banner, Esc key handler, "(Esc to cancel)" hint. One Rules-of-Hooks bug (Esc `useEffect` declared after the early-return guard) caused a white-screen on refresh; fixed by moving the effect above the guard. Surfaced two routing-graph oddities — legs 10 and 12 of `tour_WD1` were 2082 m / 1850 m for waypoints 80–108 m apart because stops 10–13 sat on/inside Salem Common where the pedestrian graph has no edges; per `feedback_tour_routing_is_content_not_engineering.md`, operator dragged those waypoints onto streets and the legs went sane. Files: `web/src/admin/AdminMap.tsx`, `web/src/admin/AdminLayout.tsx`, `web/src/admin/TourTree.tsx`. TypeScript clean throughout. App-side bake / `TourViewModel` switch / Lenovo smoke-test items still queued.
+
+Full session detail: `docs/session-logs/session-184-2026-04-26.md`. Commit: `<pending>`.
+
+---
 
 ## Session 183: 2026-04-26 — Tour walking-route content tool: per-leg compute + admin overlay
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-175-2026-04-25.md`. Commit: `186
 
 ---
 
-## Session 174: 2026-04-25 — Web admin tour editor (full CRUD + drag-to-reposition)
-
-Shipped a brand-new Tours tab in the web admin tool so tours can be edited end-to-end ahead of post-TigerLine-cleanup rerouting. Schema migration added `stop_id` PK, nullable `lat`/`lng` (per-tour coord override), and nullable `name`/`poi_id` to `salem_tour_stops`; effective coord at read time = `COALESCE(stop.lat, poi.lat)`. New `cache-proxy/lib/admin-tours.js` adds 7 admin endpoints — list/get tours, create/patch/delete tour, add/patch/delete/reorder stops — with auto-resync of `salem_tours.stop_count` on every stop mutation. Frontend: new `TourTree.tsx` (create form, per-row delete, metadata edit form, waypoint list with ↑/↓/🗑, "+ Free waypoint" map-click-to-add mode, "+ POI as stop" pick-marker mode), generalized `MoveConfirm` modal, new `TourStopLayer` (numbered draggable markers + dashed connecting polyline + amber-vs-indigo for override-vs-fallback), `FitTourBounds`, `MapClickAddListener`. Operator parked at session end pending TigerLine database cleanup before doing the actual rerouting.
-
-Full session detail: `docs/session-logs/session-174-2026-04-25.md`. Commit: `42f4698`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 173 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 174 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S174 rolled to archive 2026-04-26 by the session-end protocol (S184) -->
 <!-- S173 rolled to archive 2026-04-26 by the session-end protocol (S183) -->
 <!-- S172 rolled to archive 2026-04-26 by the session-end protocol (S182) -->
 <!-- S171 rolled to archive 2026-04-26 by the session-end protocol (S181) -->
