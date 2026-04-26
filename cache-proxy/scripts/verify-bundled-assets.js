@@ -23,16 +23,27 @@ const Database = require('better-sqlite3');
 
 const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 
-const ROOM_IDENTITY_HASH_V9 = '4ec9ae3528d8f55529cd6875c7b0adef';
+// S185 — Room schema bumped 9 → 10 (new TourLeg entity for the per-leg
+// walking polylines authored by the admin tool in S183/S184). The v10 hash
+// comes from app-salem/schemas/.../10.json after a kspDebugKotlin run with
+// exportSchema = true.
+const ROOM_IDENTITY_HASH_V10 = 'dad6c01b8e5f8fed0ae9ff6f8ef7432d';
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
+//
+// S185: tours/tour_stops thresholds dropped to reflect the new V1 model —
+// only tour_WD1 ships (operator-authored via web admin in S183/S184), as
+// a polyline-only walking path. Narration is POI-driven, independent of
+// any tour. The 5 historical Kotlin-curated tours were removed; they'll be
+// re-authored manually in PG when needed.
 const REQUIRED_ROOM_TABLES = [
   { table: 'salem_pois',                    minRows: 1800 },
   { table: 'salem_businesses',              minRows: 800  },
   { table: 'narration_points',              minRows: 800  },
-  { table: 'tours',                         minRows: 5    },
-  { table: 'tour_stops',                    minRows: 80   },
+  { table: 'tours',                         minRows: 1    },
+  { table: 'tour_stops',                    minRows: 0    },
+  { table: 'tour_legs',                     minRows: 14   },
   { table: 'tour_pois',                     minRows: 40   },
   { table: 'events_calendar',               minRows: 20   },
   { table: 'historical_facts',              minRows: 500  },
@@ -45,14 +56,10 @@ const REQUIRED_ROOM_TABLES = [
   { table: 'room_master_table',             minRows: 1    },
 ];
 
-// Required tour-route files — one per row in the `tours` table.
-const REQUIRED_TOUR_ROUTES = [
-  'tour_essentials.json',
-  'tour_explorer.json',
-  'tour_grand.json',
-  'tour_salem_heritage_trail.json',
-  'tour_witch_trials.json',
-];
+// S185: tour-route JSONs no longer required (Kotlin tours dropped). The
+// runtime tour player reads polyline geometry from the `tour_legs` Room
+// table now, not from JSON assets.
+const REQUIRED_TOUR_ROUTES = [];
 
 // Required top-level asset directories that must exist and be non-empty.
 const REQUIRED_NONEMPTY_DIRS = [
@@ -98,10 +105,10 @@ if (!fs.existsSync(CONTENT_DB)) {
     const master = db.prepare('SELECT identity_hash FROM room_master_table WHERE id=42').get();
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
-    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V9) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V9} (v9)`);
+    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V10) {
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V10} (v10)`);
     } else {
-      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v9)`);
+      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v10)`);
     }
   } catch (e) {
     fail(`salem_content.db: open/query failed: ${e.message}`);

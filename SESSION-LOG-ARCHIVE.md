@@ -1,7 +1,15 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 173, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 175, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 174, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 175, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 175: 2026-04-25 — On-device Salem walking router (TigerLine bake → APK + Directions UI)
+
+Shipped a fully on-device walking router for the Salem app. New bake pipeline at `tools/routing-bake/` clips TigerLine's `salem.edges` + `salem.edges_vertices_pgr` to a 3-mile-buffer Salem bbox (16,226 walkable edges, 12,742 nodes, 4.1 MB SQLite bundle in `app-salem/src/main/assets/routing/`). New `:core` routing module: `RoutingBundle` (CSR adjacency + grid spatial index), `RoutingBundleLoader` (Android SQLite reader), `Router` (pure-Kotlin Dijkstra + planar SRID-4269 KNN matching TigerLine's `<->` semantic), `TurnByTurn` (per-edge bearing-change synthesis with imperial distances). Salem-app wiring: `SalemRouterProvider` lazy-loads the bundle on first call (~80-150ms warm-up); `WalkingDirections` swaps its V1_OFFLINE_ONLY straight-line fallback for real bundled-graph routing while keeping the existing `WalkingRoute` contract so `SalemMainActivityDirections` overlays + the turn-by-turn dialog inherit the upgrade with no UI change. `PoiDetailSheet`'s Directions action now calls `walkTo(GeoPoint)` instead of launching the external `geo:` intent. On-device verification on Lenovo TB305FU via new `/route-test` debug endpoint: 3 reference routes match TigerLine's live `tiger.route_walking()` to the millimetre (0.000m delta), 32ms cold first call, 4-6ms warm calls. Two memories locked: WickedMapView is the sole basemap (Esri+Mapnik dropped), MBTA Salem station is the simulated walk origin when GPS-Salem isn't available. Carry-forward to S176: live re-routing on path-drift, walk-sim FAB integration, web-side router in cache-proxy with `?source=live` override, web Leaflet polyline UI, and tour-leg pre-bake.
+
+Full session detail: `docs/session-logs/session-175-2026-04-25.md`. Commit: `186a89a`.
+
+---
 
 ## Session 174: 2026-04-25 — Web admin tour editor (full CRUD + drag-to-reposition)
 

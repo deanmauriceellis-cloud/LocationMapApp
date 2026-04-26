@@ -27,6 +27,7 @@ class SalemContentRepository @Inject constructor(
     private val primarySourceDao: PrimarySourceDao,
     private val tourDao: TourDao,
     private val tourStopDao: TourStopDao,
+    private val tourLegDao: TourLegDao,
     private val eventsCalendarDao: EventsCalendarDao,
     private val salemPoiDao: SalemPoiDao
 ) {
@@ -41,6 +42,9 @@ class SalemContentRepository @Inject constructor(
 
     /** Get the full TourPoi objects for each stop in a tour, ordered. */
     suspend fun getTourPois(tourId: String): List<TourPoi> = tourStopDao.findTourPoisByTour(tourId)
+
+    /** S185 — Pre-baked walking legs for a tour, ordered by from_stop_order. */
+    suspend fun getTourLegs(tourId: String): List<TourLeg> = tourLegDao.findByTour(tourId)
 
     // ── Tour POIs (project from salem_pois — Phase 9U) ───────────────────
 

@@ -116,6 +116,49 @@ html, body, #root {
   border: none !important;
 }
 
+/* S185 — labeled POI marker shown at zoom ≥ 17. Mirrors Android's
+   MarkerIconHelper.labeledDot: humanized category in category color above
+   the dot, name in dark gray below. Both labels have a translucent white
+   pill background so they stay readable over satellite/road tiles. */
+.admin-poi-marker-labeled {
+  pointer-events: none;
+}
+.admin-poi-marker-labeled .admin-poi-labeled {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.admin-poi-marker-labeled .admin-poi-labeled-dot {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+.admin-poi-label {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-poi-label-cat {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.admin-poi-label-name {
+  color: #1f2937;
+}
+
 /* Transit marker labels */
 .transit-label {
   position: absolute;

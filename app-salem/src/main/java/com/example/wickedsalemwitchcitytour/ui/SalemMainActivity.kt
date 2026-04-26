@@ -1587,42 +1587,54 @@ class SalemMainActivity : AppCompatActivity() {
                     else -> "Idle"
                 }
                 DebugLogger.i("SalemMainActivity",
-                    "Walk sim: no tour selected (state=$stateLabel) → auto-starting tour_salem_heritage_trail")
-                tourViewModel.startTour("tour_salem_heritage_trail")
+                    "Walk sim: no tour selected (state=$stateLabel) → auto-starting tour_WD1")
+                tourViewModel.startTour("tour_WD1")
                 autoStartedHeritageTrail = true
             }
         }
         val routePoints: List<org.osmdroid.util.GeoPoint>
         val routeLabel: String
         if (activeTour != null) {
-            val tourRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadAllRoutePoints(this@SalemMainActivity, activeTour.tour.id)
-            if (tourRoute.isNotEmpty()) {
-                routePoints = tourRoute
+            // S185: prefer the baked `tour_legs` polyline (operator-curated via
+            // the web admin in S183/S184). Mirrors the in-app overlay 1:1 so
+            // the walk-sim follows the exact line the user sees.
+            val bakedRoute = tourViewModel.computeTourPolyline(activeTour)
+            val bakedPolyline = bakedRoute?.polyline.orEmpty()
+            if (bakedPolyline.size >= 2) {
+                routePoints = bakedPolyline
                 routeLabel = activeTour.tour.name
                 DebugLogger.i("SalemMainActivity",
-                    "Walk sim using tour route: '${activeTour.tour.name}' (${tourRoute.size} points)")
+                    "Walk sim using baked tour_legs polyline: '${activeTour.tour.name}' (${bakedPolyline.size} points)")
             } else {
-                // Tour has no route geometry — build from stop coordinates
-                val stopPoints = activeTour.pois.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
-                if (stopPoints.size >= 2) {
-                    routePoints = stopPoints
+                val tourRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                    .loadAllRoutePoints(this@SalemMainActivity, activeTour.tour.id)
+                if (tourRoute.isNotEmpty()) {
+                    routePoints = tourRoute
                     routeLabel = activeTour.tour.name
                     DebugLogger.i("SalemMainActivity",
-                        "Walk sim using tour stop coordinates: '${activeTour.tour.name}' (${stopPoints.size} stops)")
+                        "Walk sim using tour JSON route: '${activeTour.tour.name}' (${tourRoute.size} points)")
                 } else {
-                    routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                        .loadDowntownRoute(this@SalemMainActivity)
-                    routeLabel = "Downtown Salem"
-                    DebugLogger.w("SalemMainActivity",
-                        "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
+                    // Tour has no baked legs and no JSON — build from stop coordinates
+                    val stopPoints = activeTour.pois.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
+                    if (stopPoints.size >= 2) {
+                        routePoints = stopPoints
+                        routeLabel = activeTour.tour.name
+                        DebugLogger.i("SalemMainActivity",
+                            "Walk sim using tour stop coordinates: '${activeTour.tour.name}' (${stopPoints.size} stops)")
+                    } else {
+                        routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
+                            .loadDowntownRoute(this@SalemMainActivity)
+                        routeLabel = "Downtown Salem"
+                        DebugLogger.w("SalemMainActivity",
+                            "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
+                    }
                 }
             }
         } else if (autoStartedHeritageTrail) {
             // Heritage Trail was just auto-started above; its state hasn't
             // flipped yet but the bundled route asset is available right now.
             val trailRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadAllRoutePoints(this@SalemMainActivity, "tour_salem_heritage_trail")
+                .loadAllRoutePoints(this@SalemMainActivity, "tour_WD1")
             if (trailRoute.isNotEmpty()) {
                 routePoints = trailRoute
                 routeLabel = "Salem Heritage Trail"
@@ -2088,7 +2100,15 @@ class SalemMainActivity : AppCompatActivity() {
             is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> state.activeTour
             else -> null
         }
-        if (activeTour != null && !showAllPoisActive) {
+        // S185: a tour with zero user-facing stops is the polyline-only V1
+        // model — the tour is just a line for the user to follow, and POI
+        // geofences govern their own narration independently of any tour.
+        // Enabling Historical Mode here would build an empty whitelist and
+        // silence every POI on the route except the few that pass the
+        // "categorically historical + non-blank historical_note" fallback.
+        // Skip HM for stop-less tours so all POIs fire normally.
+        val hasUserStops = activeTour?.stops?.isNotEmpty() == true
+        if (activeTour != null && hasUserStops && !showAllPoisActive) {
             val stopIds = activeTour.stops.map { it.poiId }.toSet()
             narrationGeofenceManager.setHistoricalMode(true, stopIds)
             DebugLogger.i("SalemMainActivity",

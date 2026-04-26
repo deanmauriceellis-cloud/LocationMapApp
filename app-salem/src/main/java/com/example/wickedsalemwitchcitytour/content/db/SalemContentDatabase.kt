@@ -22,14 +22,15 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         PrimarySource::class,
         Tour::class,
         TourStop::class,
+        TourLeg::class,
         EventsCalendar::class,
         SalemPoi::class,
         WitchTrialsArticle::class,
         WitchTrialsNpcBio::class,
         WitchTrialsNewspaper::class
     ],
-    version = 9,
-    exportSchema = false
+    version = 10,
+    exportSchema = true
 )
 abstract class SalemContentDatabase : RoomDatabase() {
     abstract fun tourPoiDao(): TourPoiDao
@@ -39,6 +40,7 @@ abstract class SalemContentDatabase : RoomDatabase() {
     abstract fun primarySourceDao(): PrimarySourceDao
     abstract fun tourDao(): TourDao
     abstract fun tourStopDao(): TourStopDao
+    abstract fun tourLegDao(): TourLegDao
     abstract fun eventsCalendarDao(): EventsCalendarDao
     abstract fun salemPoiDao(): SalemPoiDao
     abstract fun witchTrialsArticleDao(): WitchTrialsArticleDao

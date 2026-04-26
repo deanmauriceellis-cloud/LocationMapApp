@@ -100,12 +100,13 @@ class TourEngine @Inject constructor(
                 return
             }
 
+            // S185: a tour can be polyline-only — its stops table holds
+            // internal authoring waypoints (poi_id NULL) that we deliberately
+            // exclude from the asset DB. Such tours render their `tour_legs`
+            // overlay; narration is driven by POI geofences independently.
+            // Don't error on empty stops — let the player run as a
+            // line-on-the-ground.
             val stops = repository.getTourStops(tourId)
-            if (stops.isEmpty()) {
-                _tourState.value = TourState.Error("Tour has no stops: ${tour.name}")
-                return
-            }
-
             val pois = repository.getTourPois(tourId)
 
             val progress = TourProgress(

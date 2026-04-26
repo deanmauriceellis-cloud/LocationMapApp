@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 175-184. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 176-185. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 185: 2026-04-26 — Land S183/S184 walking-route work in the AAB; flush latent asset-DB schema landmines
+
+The S183/S184 operator-curated `tour_WD1` is now actually in the AAB on the Lenovo. New Room `TourLeg` entity (v9 → v10), new `cache-proxy/scripts/publish-tour-legs.js` (PG `salem_tour_legs` → asset's `tour_legs`), `TourViewModel.computeTourPolyline()` rewritten to read baked legs and assemble them with the same anchor + clip rendering policy as the admin's `TourLegsLayer.drawLeg`. Also rewired walk-sim's route loader (was falling back to the bundled "Downtown Salem" route because tour_WD1 has no JSON in `assets/tours/` and no POI-bound stops). Operator clarified the V1 model mid-session: tours are polyline-only paths users follow; POIs govern their own narration via geofence proximity, fully independent of any tour. `TourEngine.startTour` no longer errors on stop-less tours, and Historical Mode is auto-skipped when the active tour has zero user-facing stops (was building an empty whitelist that silenced every POI on the route, which is what hid Ames Memorial Hall during the operator's first walk-sim test). Two latent asset-DB landmines flushed during the install loop: (1) tables had `DEFAULT` clauses from `salem-content/create_db.sql` while Room codegen has none → `TableInfo.equals` mismatch → `fallbackToDestructiveMigration` wiped the asset on every fresh install; (2) `PRAGMA user_version` lagged the `@Database(version=N)` value → upgrade migration ran → fallback destructive. New `cache-proxy/scripts/align-asset-schema-to-room.js` is the canonical bridge — rewrites every Room-managed table using the exact `createSql` from `app-salem/schemas/<DB>/<v>.json` and stamps both `identity_hash` and `user_version`. The 5 historical Kotlin-curated tours (Essentials/Explorer/Grand/Witch Trials/Heritage Trail) were dropped from the asset; operator will re-author them in PG via admin when wanted. Admin polish at session end: POI markers at zoom ≥17 now show humanized category above + name below (mirrors Android `MarkerIconHelper.labeledDot`), cluster threshold lowered to 17 to match. Carry-forward (S186): tour-start onboarding to nearest point on polyline; investigate Lenovo's GPS-OBS heartbeat (system delivers fixes but app's tour observer reports them stale); hard-delete dedup losers; Tier 2 admin → build pipeline auto-bake (now critical with 3 publish scripts).
+
+Full session detail: `docs/session-logs/session-185-2026-04-26.md`. Commit: `<backfill at S186 open>`.
+
+---
 
 ## Session 184: 2026-04-26 — Admin walking-route UX polish: marker-anchored polylines + click-to-highlight + click-to-recenter
 
@@ -76,15 +84,8 @@ Full session detail: `docs/session-logs/session-176-2026-04-25.md`. Commit: `d2a
 
 ---
 
-## Session 175: 2026-04-25 — On-device Salem walking router (TigerLine bake → APK + Directions UI)
-
-Shipped a fully on-device walking router for the Salem app. New bake pipeline at `tools/routing-bake/` clips TigerLine's `salem.edges` + `salem.edges_vertices_pgr` to a 3-mile-buffer Salem bbox (16,226 walkable edges, 12,742 nodes, 4.1 MB SQLite bundle in `app-salem/src/main/assets/routing/`). New `:core` routing module: `RoutingBundle` (CSR adjacency + grid spatial index), `RoutingBundleLoader` (Android SQLite reader), `Router` (pure-Kotlin Dijkstra + planar SRID-4269 KNN matching TigerLine's `<->` semantic), `TurnByTurn` (per-edge bearing-change synthesis with imperial distances). Salem-app wiring: `SalemRouterProvider` lazy-loads the bundle on first call (~80-150ms warm-up); `WalkingDirections` swaps its V1_OFFLINE_ONLY straight-line fallback for real bundled-graph routing while keeping the existing `WalkingRoute` contract so `SalemMainActivityDirections` overlays + the turn-by-turn dialog inherit the upgrade with no UI change. `PoiDetailSheet`'s Directions action now calls `walkTo(GeoPoint)` instead of launching the external `geo:` intent. On-device verification on Lenovo TB305FU via new `/route-test` debug endpoint: 3 reference routes match TigerLine's live `tiger.route_walking()` to the millimetre (0.000m delta), 32ms cold first call, 4-6ms warm calls. Two memories locked: WickedMapView is the sole basemap (Esri+Mapnik dropped), MBTA Salem station is the simulated walk origin when GPS-Salem isn't available. Carry-forward to S176: live re-routing on path-drift, walk-sim FAB integration, web-side router in cache-proxy with `?source=live` override, web Leaflet polyline UI, and tour-leg pre-bake.
-
-Full session detail: `docs/session-logs/session-175-2026-04-25.md`. Commit: `186a89a`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 174 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- END OF ROLLING WINDOW — Sessions 175 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S175 rolled to archive 2026-04-26 by the session-end protocol (S185) -->
 <!-- S174 rolled to archive 2026-04-26 by the session-end protocol (S184) -->
 <!-- S173 rolled to archive 2026-04-26 by the session-end protocol (S183) -->
 <!-- S172 rolled to archive 2026-04-26 by the session-end protocol (S182) -->

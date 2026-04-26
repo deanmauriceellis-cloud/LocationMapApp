@@ -112,6 +112,88 @@ function poiIcon(color: string, selected: boolean, hidden: boolean = false): L.D
   return icon
 }
 
+const ZOOM_LABEL_THRESHOLD = 17
+
+function humanizeCategory(category: string | undefined): string {
+  if (!category) return ''
+  return category
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Mirrors `MarkerIconHelper.labeledDot` on Android: humanized category label
+ * above the dot, name label below. Used at zoom ≥ ZOOM_LABEL_THRESHOLD when
+ * the operator is close enough to the map for labels to be readable without
+ * crowding the view.
+ */
+function poiIconLabeled(
+  color: string,
+  selected: boolean,
+  hidden: boolean,
+  category: string | undefined,
+  name: string | undefined
+): L.DivIcon {
+  const cat = humanizeCategory(category)
+  const nm = name && name.trim() ? name : ''
+  const key = `${color}|${selected ? 'sel' : 'norm'}|${hidden ? 'hid' : 'vis'}|L|${cat}|${nm}`
+  const cached = iconCache.get(key)
+  if (cached) return cached
+
+  const dotSize = selected ? 18 : 12
+  const stroke = selected ? '#facc15' : '#ffffff'
+  const strokeW = selected ? 3 : 1.5
+  const opacity = hidden ? 0.35 : 1
+
+  const dotSvg = `
+    <svg width="${dotSize}" height="${dotSize}" viewBox="0 0 ${dotSize} ${dotSize}" xmlns="http://www.w3.org/2000/svg" style="opacity:${opacity}">
+      <circle cx="${dotSize / 2}" cy="${dotSize / 2}" r="${dotSize / 2 - strokeW / 2}"
+              fill="${color}" stroke="${stroke}" stroke-width="${strokeW}"/>
+    </svg>`
+
+  const catHtml = cat
+    ? `<div class="admin-poi-label admin-poi-label-cat" style="color:${color}">${escapeHtml(cat)}</div>`
+    : ''
+  const nameHtml = nm
+    ? `<div class="admin-poi-label admin-poi-label-name">${escapeHtml(nm)}</div>`
+    : ''
+
+  const html = `
+    <div class="admin-poi-labeled">
+      ${catHtml}
+      <div class="admin-poi-labeled-dot">${dotSvg}</div>
+      ${nameHtml}
+    </div>`
+
+  // iconAnchor centers on the dot, not the bounding box. Width is auto via
+  // CSS (max-content); height is dot + ~15px label above + ~15px below per
+  // label that's present.
+  const labelH = 15
+  const totalH = (cat ? labelH + 2 : 0) + dotSize + (nm ? labelH + 2 : 0)
+  const yAnchor = (cat ? labelH + 2 : 0) + dotSize / 2
+
+  const icon = L.divIcon({
+    html,
+    className: 'admin-poi-marker admin-poi-marker-labeled',
+    iconSize: [120, totalH],
+    iconAnchor: [60, yAnchor],
+  })
+  iconCache.set(key, icon)
+  return icon
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface PendingMove {
@@ -183,7 +265,32 @@ function MarkerLayer({
 }: MarkerLayerProps) {
   const map = useMap()
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
-  const markersByKeyRef = useRef<Map<string, { marker: L.Marker; color: string; hidden: boolean }>>(new Map())
+  const markersByKeyRef = useRef<
+    Map<
+      string,
+      {
+        marker: L.Marker
+        color: string
+        hidden: boolean
+        category: string | undefined
+        name: string | undefined
+      }
+    >
+  >(new Map())
+  const labelsActiveRef = useRef<boolean>(map.getZoom() >= ZOOM_LABEL_THRESHOLD)
+
+  const iconFor = (
+    color: string,
+    selected: boolean,
+    hidden: boolean,
+    category: string | undefined,
+    name: string | undefined,
+    labeled: boolean
+  ): L.DivIcon => {
+    return labeled
+      ? poiIconLabeled(color, selected, hidden, category, name)
+      : poiIcon(color, selected, hidden)
+  }
 
   useEffect(() => {
     if (clusterGroupRef.current) {
@@ -195,7 +302,10 @@ function MarkerLayer({
     const cluster = L.markerClusterGroup({
       showCoverageOnHover: false,
       spiderfyOnMaxZoom: true,
-      disableClusteringAtZoom: 18,
+      // S185: matches ZOOM_LABEL_THRESHOLD so labels appear the moment
+      // markers de-cluster — no zoom-17 limbo where some markers are
+      // labeled and others are still hidden inside a cluster bubble.
+      disableClusteringAtZoom: ZOOM_LABEL_THRESHOLD,
       maxClusterRadius: 50,
     }) as L.MarkerClusterGroup
 
@@ -212,7 +322,14 @@ function MarkerLayer({
       const isHidden = poi.default_visible === false
 
       const marker = L.marker([poi.lat, poi.lng], {
-        icon: poiIcon(color, isSelected, isHidden),
+        icon: iconFor(
+          color,
+          isSelected,
+          isHidden,
+          poi.category as string | undefined,
+          poi.name as string | undefined,
+          labelsActiveRef.current
+        ),
         draggable: true,
         autoPan: true,
         title: `${poi.category || '—'}: ${poi.name}`,
@@ -239,7 +356,13 @@ function MarkerLayer({
       })
 
       allMarkers.push(marker)
-      markersByKeyRef.current.set(key, { marker, color, hidden: isHidden })
+      markersByKeyRef.current.set(key, {
+        marker,
+        color,
+        hidden: isHidden,
+        category: poi.category as string | undefined,
+        name: poi.name as string | undefined,
+      })
     }
 
     cluster.addLayers(allMarkers)
@@ -258,17 +381,51 @@ function MarkerLayer({
 
   const previousSelectedKeyRef = useRef<string | null>(null)
   useEffect(() => {
+    const labeled = labelsActiveRef.current
     const prev = previousSelectedKeyRef.current
     if (prev && prev !== selectedKey) {
       const entry = markersByKeyRef.current.get(prev)
-      if (entry) entry.marker.setIcon(poiIcon(entry.color, false, entry.hidden))
+      if (entry) {
+        entry.marker.setIcon(
+          iconFor(entry.color, false, entry.hidden, entry.category, entry.name, labeled)
+        )
+      }
     }
     if (selectedKey) {
       const entry = markersByKeyRef.current.get(selectedKey)
-      if (entry) entry.marker.setIcon(poiIcon(entry.color, true, entry.hidden))
+      if (entry) {
+        entry.marker.setIcon(
+          iconFor(entry.color, true, entry.hidden, entry.category, entry.name, labeled)
+        )
+      }
     }
     previousSelectedKeyRef.current = selectedKey
   }, [selectedKey])
+
+  // S185: swap to labeled icons (humanized category above the dot, name below
+  // — same layout as Android's MarkerIconHelper.labeledDot) once we cross
+  // ZOOM_LABEL_THRESHOLD. Below the threshold, plain dot to avoid label
+  // crowding when many POIs are visible. Listening on zoomend so we only
+  // touch markers when the threshold is actually crossed.
+  useEffect(() => {
+    const apply = () => {
+      const shouldLabel = map.getZoom() >= ZOOM_LABEL_THRESHOLD
+      if (shouldLabel === labelsActiveRef.current) return
+      labelsActiveRef.current = shouldLabel
+      const selKey = previousSelectedKeyRef.current
+      for (const [key, entry] of markersByKeyRef.current.entries()) {
+        const isSel = key === selKey
+        entry.marker.setIcon(
+          iconFor(entry.color, isSel, entry.hidden, entry.category, entry.name, shouldLabel)
+        )
+      }
+    }
+    map.on('zoomend', apply)
+    apply()
+    return () => {
+      map.off('zoomend', apply)
+    }
+  }, [map])
 
   return null
 }

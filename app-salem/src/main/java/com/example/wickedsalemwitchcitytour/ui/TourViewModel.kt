@@ -237,18 +237,137 @@ class TourViewModel @Inject constructor(
     }
 
     /**
-     * S179: compute the full multi-leg walking polyline for an active tour.
-     * Routes consecutive POI pairs through the bundled Salem walking graph
-     * via [WalkingDirections.getMultiStopRoute] — identical engine to the
-     * point-to-point "Get directions" flow. Returns null if the tour has
-     * fewer than two stops or the router can't snap the endpoints.
+     * S185: compute the full multi-leg walking polyline for an active tour.
+     *
+     * Reads pre-baked legs from `tour_legs` first. The bake is the operator's
+     * web-admin output (S183/S184) — hand-curated waypoints, anchor + clip
+     * polylines authored against PG. Concatenating those legs renders the
+     * exact overlay the operator confirmed in the admin map.
+     *
+     * Falls back to runtime [WalkingDirections.getMultiStopRoute] only when
+     * no legs are baked for the active tour — preserves a working overlay
+     * for any tour that hasn't been authored through the admin tool yet.
+     *
+     * Mirrors the admin's `TourLegsLayer.drawLeg` policy: each leg's routed
+     * geometry is clipped to the segment closest to the from/to stop markers
+     * (eliminates road-snap overshoots like the leg 4→5 dogleg) and then
+     * anchored to the marker coords (eliminates the road-snap gap at every
+     * waypoint). The in-app overlay matches the admin tool 1:1.
      */
     suspend fun computeTourPolyline(activeTour: ActiveTour): WalkingRoute? {
+        val tourId = activeTour.tour.id
+        val legs = try {
+            repository.getTourLegs(tourId)
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Failed to read baked legs for $tourId: ${e.message}")
+            emptyList()
+        }
+        if (legs.isNotEmpty()) {
+            return assembleBakedTourRoute(legs)
+        }
+
+        DebugLogger.i(TAG, "No baked legs for $tourId — falling back to runtime route")
         val points = activeTour.stops.mapNotNull { stop ->
             activeTour.pois.firstOrNull { it.id == stop.poiId }?.let { GeoPoint(it.lat, it.lng) }
         }
         if (points.size < 2) return null
         return walkingDirections.getMultiStopRoute(points)
+    }
+
+    /**
+     * Mirrors `web/src/admin/AdminMap.tsx#TourLegsLayer.drawLeg`:
+     *   1. decode geometry "lat,lng;lat,lng;..." into a point list
+     *   2. clip to the polyline indices closest to the from/to stop markers
+     *      (squared-degree distance is fine for sub-km legs)
+     *   3. anchor with the marker coords prepended/appended
+     * Concatenates all legs into one polyline, skipping duplicated endpoints
+     * between consecutive legs.
+     */
+    private fun assembleBakedTourRoute(
+        legs: List<com.example.wickedsalemwitchcitytour.content.model.TourLeg>,
+    ): WalkingRoute? {
+        val sortedLegs = legs.sortedBy { it.fromStopOrder }
+        val combined = ArrayList<GeoPoint>(sortedLegs.sumOf { it.edgeCount + 2 })
+        var totalDistanceM = 0.0
+        var totalDurationS = 0.0
+
+        for (leg in sortedLegs) {
+            val routed = decodeGeometry(leg.geometry)
+            if (routed.size < 2) continue
+            val fromAnchor = if (leg.fromLat != null && leg.fromLng != null)
+                GeoPoint(leg.fromLat, leg.fromLng) else null
+            val toAnchor = if (leg.toLat != null && leg.toLng != null)
+                GeoPoint(leg.toLat, leg.toLng) else null
+
+            var startIdx = 0
+            var endIdx = routed.size - 1
+            if (fromAnchor != null) startIdx = closestIdx(routed, fromAnchor)
+            if (toAnchor != null) endIdx = closestIdx(routed, toAnchor)
+            if (startIdx > endIdx) {
+                startIdx = 0
+                endIdx = routed.size - 1
+            }
+
+            val legPolyline = ArrayList<GeoPoint>(endIdx - startIdx + 3)
+            if (fromAnchor != null) legPolyline.add(fromAnchor)
+            for (i in startIdx..endIdx) legPolyline.add(routed[i])
+            if (toAnchor != null) legPolyline.add(toAnchor)
+
+            // Stitch into the combined polyline. Drop the first point of every
+            // leg except the first to avoid the duplicated waypoint vertex
+            // between consecutive legs (each leg's to-anchor == next leg's
+            // from-anchor by construction).
+            if (combined.isEmpty()) {
+                combined.addAll(legPolyline)
+            } else {
+                combined.addAll(legPolyline.drop(1))
+            }
+            totalDistanceM += leg.distanceM
+            totalDurationS += leg.durationS
+        }
+
+        if (combined.size < 2) return null
+        DebugLogger.i(
+            TAG,
+            "Baked tour route: ${sortedLegs.size} legs, %.0fm, %.0fs, ${combined.size} pts".format(
+                totalDistanceM, totalDurationS
+            )
+        )
+        return WalkingRoute(
+            polyline = combined,
+            distanceKm = totalDistanceM / 1000.0,
+            durationMinutes = (totalDurationS / 60.0).toInt(),
+            instructions = emptyList(),
+            road = null,
+        )
+    }
+
+    /** Decode the bake's "lat,lng;lat,lng;..." string into GeoPoints. */
+    private fun decodeGeometry(geometry: String): List<GeoPoint> {
+        if (geometry.isEmpty()) return emptyList()
+        val out = ArrayList<GeoPoint>()
+        for (pair in geometry.split(';')) {
+            val comma = pair.indexOf(',')
+            if (comma <= 0) continue
+            val lat = pair.substring(0, comma).toDoubleOrNull() ?: continue
+            val lng = pair.substring(comma + 1).toDoubleOrNull() ?: continue
+            out.add(GeoPoint(lat, lng))
+        }
+        return out
+    }
+
+    /** Squared-degree distance — good enough for sub-km clip lookups. */
+    private fun closestIdx(poly: List<GeoPoint>, target: GeoPoint): Int {
+        var best = 0
+        var bestD = Double.MAX_VALUE
+        for (i in poly.indices) {
+            val p = poly[i]
+            val dLat = p.latitude - target.latitude
+            val dLng = p.longitude - target.longitude
+            val d = dLat * dLat + dLng * dLng
+            if (d < bestD) { bestD = d; best = i }
+        }
+        return best
     }
 
     /** Clear the walking route display and any active directions session. */

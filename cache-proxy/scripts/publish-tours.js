@@ -72,11 +72,16 @@ async function main() {
       ORDER BY sort_order, name
     `);
     tours = toursRes.rows;
+    // S185: skip rows whose poi_id is NULL (free waypoints — internal
+    // authoring data for the admin walking-route tool, not user-facing
+    // stops). Tours are polyline-only at runtime; narration is driven by
+    // POI geofences independently of tour_stops.
     const stopsRes = await client.query(`
       SELECT tour_id, poi_id, stop_order, transition_narration,
              walking_minutes_from_prev, distance_m_from_prev,
              data_source, confidence
       FROM salem_tour_stops
+      WHERE poi_id IS NOT NULL
       ORDER BY tour_id, stop_order
     `);
     stops = stopsRes.rows;

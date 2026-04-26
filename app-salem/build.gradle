@@ -86,6 +86,13 @@ android {
     }
 }
 
+// S185: Room schema export — emits app-salem/schemas/<DB>/<version>.json
+// with the generated identity_hash. Needed when bumping the asset DB so
+// publish / verify scripts can reference the right hash.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas".toString())
+}
+
 // S180 — verify-bundled-assets.js gate.
 // Catches the recurring failure mode where a content rebake silently wipes
 // or undersizes a Room table that a different script populates separately.
