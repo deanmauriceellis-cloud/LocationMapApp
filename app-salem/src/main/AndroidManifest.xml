@@ -9,15 +9,16 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Location -->
+    <!-- Location (only outside contact V1 makes — GPS satellite) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Network -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- S180: V1 zero-network rule — INTERNET, ACCESS_NETWORK_STATE
+         permissions REMOVED. The OS denies any net access at the syscall
+         layer regardless of code. Re-add for V2 alongside FeatureFlags
+         flip. See feedback_v1_no_external_contact.md. -->
 
-    <!-- OSMDroid tile cache write -->
+    <!-- OSMDroid tile cache write (legacy bundled tile extraction) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
@@ -38,8 +39,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.WickedSalem"
-        android:usesCleartextTraffic="true">
+        android:theme="@style/Theme.WickedSalem">
 
         <activity
             android:name=".ui.SplashActivity"
@@ -73,24 +73,23 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- S180: VoiceTestActivity narrowed from exported=true to exported=false.
+             Internal-only debug activity; nothing outside this APK should be
+             able to launch it. Should be moved to app-salem/src/debug/ for V2. -->
         <activity
             android:name=".debug.VoiceTestActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
-        <!-- S171: custom 2D map prototype (no osmdroid). Standalone launcher
-             so we can field-test WickedMapView pan/pinch/animation bones
-             without touching SalemMainActivity. Remove or gate before V1 ship. -->
+        <!-- S171/S180: custom 2D map prototype kept reachable via the
+             in-app FAB only. LAUNCHER intent-filter REMOVED for V1 so the
+             prototype does not appear as a separate app icon. Activity
+             stays so the FAB launch path keeps working. -->
         <activity
             android:name=".wickedmap.WickedMapPrototypeActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="WickedMap Proto"
-            android:theme="@style/Theme.AppCompat.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
 
     </application>
 
