@@ -16,7 +16,7 @@
 - **S183 shipped: per-leg tour walking-route admin tool (backend + UI).** New PG table `salem_tour_legs` (per-leg JSONB polyline + distance/duration + router_version + nullable manual_edits). 3 cache-proxy admin endpoints (`GET /admin/salem/tours/:id/legs`, `POST /compute-route`, `POST /legs/:n/recompute`). Web admin: "Walking route" panel + green polyline overlay matching the in-app `DirectionsLayer` style. CLI-verified on `tour_WD1` (14 legs / 6.82 km / 81 min, no skipped legs). Operator hasn't yet eyeballed the admin map render — that's S184 step 1.
 - **App-side consumption is NOT yet shipped.** `TourViewModel` still calls runtime `routeMulti`. Salem-content bake does not yet include `salem_tour_legs`. Those two pieces are what land S183 work into the AAB.
 - **Upload signing key — one off-machine copy on USB**, second-medium copy still owed before first Play Console upload.
-- Last LMA commit: `<S183-close-sha>` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
+- Last LMA commit: `d943595` on `master`, in sync with `origin/master`. OMEN repo unchanged this session.
 
 ### S184 next steps — in priority order
 
