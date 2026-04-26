@@ -13,15 +13,49 @@ android {
         applicationId "com.destructiveaigurus.katrinasmysticvisitorsguide"
         minSdk 26
         targetSdk 35
-        versionCode 1
+        // Versioning scheme (S180): versionCode = MAJOR * 10000 + MINOR * 100 + PATCH.
+        // First paid Play Store release is v1.0.0 → versionCode 10000.
+        // Every Play Store upload MUST increase versionCode (Google enforces).
+        versionCode 10000
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // S180 — release signing configuration.
+    // Keystore + credentials live OUTSIDE the repo:
+    //   keystore: ~/keys/wickedsalem-upload.jks (Play upload key, not signing key)
+    //   credentials: ~/.gradle/gradle.properties (user-level, NOT checked in)
+    // Required gradle properties:
+    //   WICKED_SALEM_KEYSTORE_PATH=/home/<user>/keys/wickedsalem-upload.jks
+    //   WICKED_SALEM_KEYSTORE_PASSWORD=<random>
+    //   WICKED_SALEM_KEY_ALIAS=upload
+    //   WICKED_SALEM_KEY_PASSWORD=<random>
+    // If any property is missing, release builds fall back to debug-signing
+    // (the AAB will not be uploadable to Play Store but the build won't fail).
+    signingConfigs {
+        release {
+            def ksPath = findProperty('WICKED_SALEM_KEYSTORE_PATH') ?: ''
+            if (ksPath && file(ksPath).exists()) {
+                storeFile file(ksPath)
+                storePassword findProperty('WICKED_SALEM_KEYSTORE_PASSWORD') ?: ''
+                keyAlias findProperty('WICKED_SALEM_KEY_ALIAS') ?: 'upload'
+                keyPassword findProperty('WICKED_SALEM_KEY_PASSWORD') ?: ''
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
+            // S180: minify on for V1 release. Const-eliminated FeatureFlags.V1_OFFLINE_ONLY
+            // branches get stripped by R8; obfuscation reduces APK size.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Use release signing only when the keystore properties resolve.
+            def ksPath = findProperty('WICKED_SALEM_KEYSTORE_PATH') ?: ''
+            if (ksPath && file(ksPath).exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
@@ -49,6 +83,27 @@ android {
         // OfflineTileManager can compare on-disk size to asset size cheaply
         // via AssetFileDescriptor.getLength().
         noCompress += ['sqlite']
+    }
+}
+
+// S180 — verify-bundled-assets.js gate.
+// Catches the recurring failure mode where a content rebake silently wipes
+// or undersizes a Room table that a different script populates separately.
+// Tied to preBuild so every build (debug + release) runs the check.
+// Cost: ~1s per invocation. Failure exits non-zero → Gradle build aborts.
+tasks.register('verifyBundledAssets', Exec) {
+    group = 'verification'
+    description = 'Validate APK-bundled assets against minimum row / file checks'
+    workingDir = rootProject.projectDir
+    commandLine 'node', 'cache-proxy/scripts/verify-bundled-assets.js'
+    // Treat absence of node or the script as a soft warning (don't block build
+    // on workstations that don't have node installed); only treat actual
+    // verification failure as a hard error.
+    ignoreExitValue = false
+}
+afterEvaluate {
+    tasks.named('preBuild').configure {
+        dependsOn 'verifyBundledAssets'
     }
 }
 
