@@ -52,33 +52,16 @@ interface TileProvider {
   maxNativeZoom: number
 }
 
+// Witchy bundle is the ONLY basemap (S188 operator rule). Mapnik/Esri/OSM
+// removed from the picker. Server-side overzoom (cache-proxy/lib/admin-tiles.js)
+// fills missing zoom levels by resizing whatever Witchy tile we DO have for
+// the requested area.
 const TILE_PROVIDERS: TileProvider[] = [
   {
     id: 'Salem-Custom',
     label: 'Witchy (Salem-Custom)',
     url: '/api/admin/tiles/Salem-Custom/{z}/{x}/{y}',
     attribution: 'Bundled Witchy tiles — OSM + MassGIS | planetiler + tippecanoe + MapLibre-GL-Native',
-    maxNativeZoom: 19,
-  },
-  {
-    id: 'Mapnik',
-    label: 'OSM Mapnik (bundled)',
-    url: '/api/admin/tiles/Mapnik/{z}/{x}/{y}',
-    attribution: 'Bundled OSM Mapnik tiles &copy; OpenStreetMap contributors',
-    maxNativeZoom: 19,
-  },
-  {
-    id: 'Esri-WorldImagery',
-    label: 'Esri Satellite (bundled)',
-    url: '/api/admin/tiles/Esri-WorldImagery/{z}/{x}/{y}',
-    attribution: 'Bundled Esri World Imagery — Tiles &copy; Esri',
-    maxNativeZoom: 19,
-  },
-  {
-    id: 'OSM',
-    label: 'OSM online (zoom out)',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxNativeZoom: 19,
   },
 ]
@@ -248,6 +231,41 @@ interface AdminMapProps {
    *  this POI using /api/salem/route. */
   directionsTarget?: PoiRow | null
   onClearDirections?: () => void
+  /** S188 — geocode-candidate preview. When set, the map renders a temp
+   *  marker at the candidate lat/lng plus a line from the source POI, and
+   *  shows a floating panel with accept / ignore / cancel buttons. */
+  geocodePreview?: {
+    sourcePoi: PoiRow
+    candidate: {
+      lat: number
+      lng: number
+      rating: number
+      normalized_address: string
+      distance_m: number
+    }
+    /** Every Tiger candidate across the cluster — focal + dupes. The "Show
+     *  all candidates" toggle in the panel renders all of these on the map
+     *  with dashed lines back to their source POI. */
+    allCandidates?: Array<{
+      source_poi_id: string
+      source_poi_name: string
+      source_lat: number
+      source_lng: number
+      source_address: string | null
+      lat: number
+      lng: number
+      rating: number
+      normalized_address: string
+      distance_m: number
+    }>
+  } | null
+  onGeocodePreviewAccept?: () => void | Promise<void>
+  onGeocodePreviewIgnore?: () => void | Promise<void>
+  onGeocodePreviewCancel?: () => void
+  /** Validate stored coords as correct without moving the POI. */
+  onGeocodePreviewValidateStored?: () => void | Promise<void>
+  /** Open the source POI's editor focused on the address field. */
+  onGeocodePreviewEditAddress?: () => void
 }
 
 export interface PendingStopMove {
@@ -1211,6 +1229,560 @@ function DirectionsLayer({ target, source, onResult }: DirectionsLayerProps) {
   return null
 }
 
+// ─── Geocode candidate preview (S188) ───────────────────────────────────────
+
+interface GeocodePreviewLayerProps {
+  sourcePoi: PoiRow
+  candidate: { lat: number; lng: number; rating: number; normalized_address: string; distance_m: number }
+  /** When provided AND showAll is true, render every candidate from every
+   *  source POI in the cluster, color-coded by rating. */
+  allCandidates?: Array<{
+    source_poi_id: string
+    source_poi_name: string
+    source_lat: number
+    source_lng: number
+    source_address: string | null
+    lat: number
+    lng: number
+    rating: number
+    normalized_address: string
+    distance_m: number
+  }>
+  showAll: boolean
+  /** Re-fit map bounds nonce — bumping triggers a fresh fitBounds. */
+  fitNonce: number
+}
+
+function ratingColor(rating: number): string {
+  if (rating <= 5) return '#059669'   // emerald-600
+  if (rating <= 30) return '#65a30d'  // lime-600
+  if (rating <= 70) return '#d97706'  // amber-600
+  return '#a21caf'                    // fuchsia-700 (city-centroid / weak)
+}
+
+function GeocodePreviewLayer({
+  sourcePoi, candidate, allCandidates, showAll, fitNonce,
+}: GeocodePreviewLayerProps) {
+  const map = useMap()
+  const layerRef = useRef<L.LayerGroup | null>(null)
+  const lastFitNonceRef = useRef<number>(-1)
+
+  useEffect(() => {
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current)
+      layerRef.current = null
+    }
+    const group = L.layerGroup()
+    const fitPoints: Array<[number, number]> = []
+
+    const sources = new Map<string, { lat: number; lng: number; name: string }>()
+    sources.set(sourcePoi.id, {
+      lat: sourcePoi.lat as number,
+      lng: sourcePoi.lng as number,
+      name: sourcePoi.name,
+    })
+
+    if (showAll && allCandidates && allCandidates.length > 0) {
+      // Multi-mode: every Tiger candidate across the cluster, colored by rating.
+      for (const a of allCandidates) {
+        if (!sources.has(a.source_poi_id)) {
+          sources.set(a.source_poi_id, {
+            lat: a.source_lat, lng: a.source_lng, name: a.source_poi_name,
+          })
+        }
+        const c = ratingColor(a.rating)
+        L.polyline(
+          [[a.source_lat, a.source_lng], [a.lat, a.lng]],
+          { color: c, weight: 2, dashArray: '4 5', opacity: 0.7 },
+        ).addTo(group)
+        const icon = L.divIcon({
+          className: 'geocode-candidate-marker',
+          html: `<div style="background:${c};color:#fff;border:2px solid #fff;
+                             border-radius:50%;width:22px;height:22px;line-height:18px;
+                             text-align:center;font-weight:700;font-size:11px;
+                             box-shadow:0 1px 4px rgba(0,0,0,0.4);">r${a.rating}</div>`,
+          iconSize: [22, 22], iconAnchor: [11, 11],
+        })
+        L.marker([a.lat, a.lng], { icon, zIndexOffset: 800 })
+          .bindTooltip(
+            `<strong>${a.source_poi_name}</strong> · r${a.rating}<br>` +
+            `${a.normalized_address}<br>` +
+            `${a.distance_m.toLocaleString()} m from stored`,
+            { direction: 'top', offset: [0, -12] },
+          )
+          .addTo(group)
+        fitPoints.push([a.lat, a.lng])
+      }
+    } else {
+      // Single-candidate mode (default).
+      const candidateIcon = L.divIcon({
+        className: 'geocode-candidate-marker',
+        html: `<div style="background:#a21caf;color:#fff;border:3px solid #fdf4ff;
+                           border-radius:50%;width:30px;height:30px;line-height:24px;
+                           text-align:center;font-weight:700;font-size:16px;
+                           box-shadow:0 2px 6px rgba(0,0,0,0.4);">?</div>`,
+        iconSize: [30, 30], iconAnchor: [15, 15],
+      })
+      L.marker([candidate.lat, candidate.lng], { icon: candidateIcon, zIndexOffset: 1000 })
+        .bindTooltip(
+          `Tiger candidate: ${candidate.normalized_address}<br>` +
+          `r${candidate.rating} · ${candidate.distance_m} m from stored`,
+          { direction: 'top', offset: [0, -15] },
+        )
+        .addTo(group)
+      L.polyline(
+        [[sourcePoi.lat as number, sourcePoi.lng as number], [candidate.lat, candidate.lng]],
+        { color: '#a21caf', weight: 3, dashArray: '6 6', opacity: 0.85 },
+      ).addTo(group)
+      fitPoints.push([candidate.lat, candidate.lng])
+    }
+
+    // Source POI dots — one per unique source.
+    for (const [, s] of sources) {
+      L.circleMarker([s.lat, s.lng], {
+        radius: 8, color: '#6d28d9', weight: 3, fillColor: '#ddd6fe', fillOpacity: 0.9,
+      }).bindTooltip(`${s.name} (stored)`, { direction: 'top', offset: [0, -10] })
+        .addTo(group)
+      fitPoints.push([s.lat, s.lng])
+    }
+
+    group.addTo(map)
+    layerRef.current = group
+
+    // Fit when nonce bumps (cancel previous fit, do a new one).
+    if (fitNonce !== lastFitNonceRef.current && fitPoints.length > 0) {
+      lastFitNonceRef.current = fitNonce
+      const bounds = L.latLngBounds(fitPoints)
+      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 19 })
+    }
+
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current)
+        layerRef.current = null
+      }
+    }
+  }, [map, sourcePoi.id, sourcePoi.lat, sourcePoi.lng, sourcePoi.name, candidate.lat, candidate.lng, candidate.rating, candidate.normalized_address, candidate.distance_m, showAll, allCandidates, fitNonce])
+
+  return null
+}
+
+interface GeocodePreviewPanelProps {
+  sourcePoi: PoiRow
+  candidate: { lat: number; lng: number; rating: number; normalized_address: string; distance_m: number }
+  hasAllCandidates: boolean
+  showAll: boolean
+  onToggleShowAll: () => void
+  focusMap: boolean
+  onToggleFocusMap: () => void
+  onRefit: () => void
+  onAccept?: () => void | Promise<void>
+  onIgnore?: () => void | Promise<void>
+  onCancel?: () => void
+  onValidateStored?: () => void | Promise<void>
+  onEditAddress?: () => void
+}
+
+// ─── Conflict analyzer ───────────────────────────────────────────────────────
+// Looks at the stored address + stored coords + Tiger candidate and produces
+// a plain-English diagnosis: which side of the conflict is suspect, what the
+// specific failure mode is, and what the operator most likely wants to do.
+//
+// The four useful failure modes in practice:
+//   1. Stored address is empty or vague (no street number) — geocoder cannot
+//      do any better than city-level. Fix the address.
+//   2. Tiger's rating >= 90 — same outcome (city-centroid fallback) but caused
+//      by the geocoder rather than the input. Hide this candidate.
+//   3. Strong street-level match within ~50 m — the geocoder confirms the
+//      stored coords. Validate without moving.
+//   4. Strong street-level match >100 m away — real conflict, needs a human.
+
+interface ConflictAnalysis {
+  severity: 'good' | 'warn' | 'bad'
+  headline: string
+  conflicts: { label: string; detail: string }[]
+  recommendation: { label: string; rationale: string; action: 'move' | 'validate' | 'hide' | 'edit' | 'investigate' }
+  storedAddress: string | null
+  candidateAddress: string
+  ratingHint: string
+}
+
+function analyzeGeocodeConflict(
+  storedLat: number, storedLng: number, storedAddress: string | null,
+  candLat: number, candLng: number, candRating: number,
+  candNormalizedAddress: string, distanceM: number,
+): ConflictAnalysis {
+  const ratingHint =
+    candRating <= 5  ? `Exact street-level match (r${candRating})` :
+    candRating <= 30 ? `Strong street match (r${candRating})` :
+    candRating <= 70 ? `Approximate match (r${candRating})` :
+    candRating <= 89 ? `Weak match (r${candRating})` :
+    `City-centroid fallback (r${candRating}) — Tiger could NOT match street-level`
+
+  const trimmed = (storedAddress ?? '').trim()
+  const hasDigit = /\d/.test(trimmed)
+  const looksCityOnly = trimmed.length > 0 && trimmed.length < 18 && !hasDigit
+  const conflicts: { label: string; detail: string }[] = []
+
+  // Address-side issues
+  if (trimmed.length === 0) {
+    conflicts.push({
+      label: 'Stored address is empty',
+      detail: 'POI has no address in the database, so Tiger had nothing to match against and returned the city center.',
+    })
+  } else if (!hasDigit) {
+    conflicts.push({
+      label: 'Stored address has no street number',
+      detail: `Stored address "${trimmed}" lacks a house number. Tiger needs a street number to land on a building; without one it falls back to the city centroid.`,
+    })
+  } else if (looksCityOnly) {
+    conflicts.push({
+      label: 'Stored address is too vague',
+      detail: `"${trimmed}" looks like a city/state, not a street address.`,
+    })
+  }
+
+  // Geocoder-side issues
+  if (candRating >= 90) {
+    conflicts.push({
+      label: 'Tiger fell back to city centroid',
+      detail: `Rating ${candRating} means Tiger could not match the address at street level and returned Salem's geographic center. The candidate location is meaningless for placing this POI.`,
+    })
+  }
+
+  // Address vs normalized address
+  if (trimmed.length > 0 && candNormalizedAddress) {
+    const norm = candNormalizedAddress.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const stored = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (candRating <= 70 && norm !== stored && !norm.includes(stored) && !stored.includes(norm)) {
+      conflicts.push({
+        label: 'Tiger normalized your address differently',
+        detail: `Stored: "${trimmed}" → Tiger parsed: "${candNormalizedAddress}". Confirm Tiger picked the right street.`,
+      })
+    }
+  }
+
+  // Distance vs match strength
+  if (candRating <= 30 && distanceM > 200) {
+    conflicts.push({
+      label: 'Stored coords disagree with the address',
+      detail: `Tiger is confident in the address (r${candRating}), and it points ${distanceM.toLocaleString()} m away from the stored coords. Either the stored coords are wrong, the address is stale, or there are two locations with similar names.`,
+    })
+  } else if (candRating <= 30 && distanceM <= 50) {
+    conflicts.push({
+      label: 'Stored coords agree with the address',
+      detail: `Tiger's geocode lands ${distanceM} m from the stored coords — essentially the same place. Stored coords appear correct.`,
+    })
+  }
+
+  // Recommendation
+  let recommendation: ConflictAnalysis['recommendation']
+  let severity: ConflictAnalysis['severity'] = 'warn'
+
+  if (trimmed.length === 0 || !hasDigit) {
+    severity = 'bad'
+    recommendation = {
+      label: 'Edit the POI address',
+      rationale: 'The stored address is too vague to geocode. Fix the address first, then re-run Geocodes. Hide this candidate so it stops appearing.',
+      action: 'edit',
+    }
+  } else if (candRating >= 90) {
+    severity = 'bad'
+    recommendation = {
+      label: 'Hide this candidate',
+      rationale: 'City-centroid fallback. Moving the POI here puts it on top of every other unresolved POI. The address itself looks fine — Tiger may need MA street data tuning, or this is a building Tiger doesn\'t know about.',
+      action: 'hide',
+    }
+  } else if (candRating <= 30 && distanceM <= 50) {
+    severity = 'good'
+    recommendation = {
+      label: 'Validate stored location',
+      rationale: 'Tiger confirms the stored coords. Mark them verified without moving the POI.',
+      action: 'validate',
+    }
+  } else if (candRating <= 30 && distanceM <= 200) {
+    severity = 'warn'
+    recommendation = {
+      label: 'Move POI to Tiger\'s match',
+      rationale: 'Strong address match within 200 m of stored coords. Likely the correct fix for a small placement drift.',
+      action: 'move',
+    }
+  } else if (candRating <= 30) {
+    severity = 'bad'
+    recommendation = {
+      label: 'Investigate before moving',
+      rationale: `Tiger is confident in the address but it\'s ${distanceM.toLocaleString()} m from the stored coords. One of them is wrong. Don\'t auto-accept — open the editor and check.`,
+      action: 'investigate',
+    }
+  } else {
+    severity = 'warn'
+    recommendation = {
+      label: 'Eyeball the map before deciding',
+      rationale: `Match strength is ${ratingHint.toLowerCase()}. Look at the dashed line on the map to see if the candidate is on the right block.`,
+      action: 'investigate',
+    }
+  }
+
+  const headline =
+    severity === 'good' ? 'Stored coords look correct' :
+    severity === 'warn' ? 'Some uncertainty — review needed' :
+    'Conflict detected — do NOT auto-accept'
+
+  return {
+    severity, headline, conflicts, recommendation,
+    storedAddress: trimmed.length > 0 ? trimmed : null,
+    candidateAddress: candNormalizedAddress,
+    ratingHint,
+  }
+}
+
+function GeocodePreviewPanel({
+  sourcePoi, candidate,
+  hasAllCandidates, showAll, onToggleShowAll,
+  focusMap, onToggleFocusMap, onRefit,
+  onAccept, onIgnore, onCancel,
+  onValidateStored, onEditAddress,
+}: GeocodePreviewPanelProps) {
+  // ESC closes the panel — operator was getting stuck in it.
+  useEffect(() => {
+    if (!onCancel) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onCancel])
+  const storedAddrRaw = (sourcePoi as { address?: unknown }).address
+  const storedAddr = typeof storedAddrRaw === 'string' ? storedAddrRaw : null
+
+  const analysis = analyzeGeocodeConflict(
+    sourcePoi.lat as number, sourcePoi.lng as number, storedAddr,
+    candidate.lat, candidate.lng, candidate.rating,
+    candidate.normalized_address, candidate.distance_m,
+  )
+
+  const sevBg =
+    analysis.severity === 'good' ? 'bg-emerald-50 border-emerald-300 text-emerald-900' :
+    analysis.severity === 'warn' ? 'bg-amber-50 border-amber-300 text-amber-900' :
+    'bg-rose-50 border-rose-300 text-rose-900'
+
+  // Action enablement
+  const canMove = candidate.rating < 90 // never propose city-centroid as a move target
+  const recAction = analysis.recommendation.action
+
+  return (
+    <div className="absolute bottom-4 right-4 z-[600]
+                    bg-white rounded-lg shadow-xl border border-fuchsia-300
+                    px-4 py-3 w-[520px] max-w-[95vw] max-h-[80vh] overflow-y-auto text-sm">
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="text-xs uppercase tracking-wide text-fuchsia-700 font-semibold">
+          Geocode conflict review · {sourcePoi.name}
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-slate-400 hover:text-slate-700 text-xl leading-none flex-none -mt-0.5"
+          title="Close (Esc)"
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Map view controls */}
+      <div className="mb-2 px-2 py-1.5 bg-violet-50 border border-violet-200 rounded flex items-center gap-2 flex-wrap text-[11px]">
+        <span className="text-violet-700 font-semibold uppercase tracking-wide">Map view:</span>
+        <button
+          type="button"
+          onClick={onToggleFocusMap}
+          className={`px-2 py-0.5 rounded text-[11px] ${
+            focusMap
+              ? 'bg-violet-600 text-white hover:bg-violet-700'
+              : 'bg-white text-violet-700 border border-violet-300 hover:bg-violet-100'
+          }`}
+          title="Hide every other POI on the map; only the source POI(s) and the geocode candidate(s) stay visible"
+        >
+          {focusMap ? '✓ Focused' : 'Focus on these coords'}
+        </button>
+        {hasAllCandidates && (
+          <button
+            type="button"
+            onClick={onToggleShowAll}
+            className={`px-2 py-0.5 rounded text-[11px] ${
+              showAll
+                ? 'bg-fuchsia-600 text-white hover:bg-fuchsia-700'
+                : 'bg-white text-fuchsia-700 border border-fuchsia-300 hover:bg-fuchsia-100'
+            }`}
+            title="Show every Tiger candidate from the cluster on the map at once"
+          >
+            {showAll ? '✓ Showing all candidates' : 'Show all candidates'}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onRefit}
+          className="px-2 py-0.5 rounded text-[11px] bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+          title="Re-fit the map to the current geocode markers"
+        >
+          ⤢ Re-fit
+        </button>
+      </div>
+
+      {/* Diagnosis banner */}
+      <div className={`mt-1 px-2 py-1.5 text-xs rounded border ${sevBg}`}>
+        <div className="font-semibold">
+          {analysis.severity === 'good' ? '✓ ' : analysis.severity === 'warn' ? '⚠ ' : '✗ '}
+          {analysis.headline}
+        </div>
+        <div className="mt-0.5 text-[11px] opacity-90">
+          <strong>Recommendation:</strong> {analysis.recommendation.label}.{' '}
+          {analysis.recommendation.rationale}
+        </div>
+      </div>
+
+      {/* Side-by-side details */}
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+        <div className="border border-violet-300 rounded p-2 bg-violet-50/40">
+          <div className="text-[10px] uppercase tracking-wide text-violet-700 font-semibold mb-1">
+            Stored (current)
+          </div>
+          <div className="text-slate-500">Address</div>
+          <div className="text-slate-800 break-words mb-1">
+            {analysis.storedAddress || <em className="text-rose-700">none</em>}
+          </div>
+          <div className="text-slate-500">Coords</div>
+          <div className="text-slate-800 tabular-nums">
+            {(sourcePoi.lat as number).toFixed(5)}, {(sourcePoi.lng as number).toFixed(5)}
+          </div>
+        </div>
+        <div className="border border-fuchsia-300 rounded p-2 bg-fuchsia-50/40">
+          <div className="text-[10px] uppercase tracking-wide text-fuchsia-700 font-semibold mb-1 flex items-center gap-1">
+            <span>Tiger geocoder</span>
+            <span className={`text-[9px] uppercase tracking-wide px-1 py-0.5 rounded ${
+              candidate.rating <= 5 ? 'bg-emerald-100 text-emerald-700' :
+              candidate.rating <= 30 ? 'bg-lime-100 text-lime-700' :
+              candidate.rating <= 70 ? 'bg-amber-100 text-amber-700' :
+              'bg-rose-100 text-rose-700'
+            }`}>r{candidate.rating}</span>
+          </div>
+          <div className="text-slate-500">Normalized address</div>
+          <div className="text-slate-800 break-words mb-1">{candidate.normalized_address}</div>
+          <div className="text-slate-500">Coords</div>
+          <div className="text-slate-800 tabular-nums">
+            {candidate.lat.toFixed(5)}, {candidate.lng.toFixed(5)}
+          </div>
+          <div className="text-slate-500 mt-1">Distance from stored</div>
+          <div className="text-slate-800 tabular-nums">{candidate.distance_m.toLocaleString()} m</div>
+          <div className="text-slate-500 mt-1">Match strength</div>
+          <div className="text-slate-800">{analysis.ratingHint}</div>
+        </div>
+      </div>
+
+      {/* Conflict bullets */}
+      {analysis.conflicts.length > 0 && (
+        <div className="mt-2 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded">
+          <div className="text-[10px] uppercase tracking-wide text-slate-600 font-semibold mb-1">
+            What's conflicting ({analysis.conflicts.length})
+          </div>
+          <ul className="text-[11px] text-slate-700 space-y-1">
+            {analysis.conflicts.map((c, i) => (
+              <li key={i}>
+                <strong>{c.label}.</strong> {c.detail}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Options */}
+      <div className="mt-3 flex flex-col gap-1.5">
+        <button
+          type="button"
+          disabled={!canMove}
+          onClick={() => void onAccept?.()}
+          className={`w-full px-3 py-2 text-xs rounded text-left disabled:opacity-40 disabled:cursor-not-allowed text-white ${
+            recAction === 'move' ? 'bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700'
+          }`}
+          title={canMove ? 'Move the POI to this candidate' : 'Disabled: city-centroid candidate is not a real location'}
+        >
+          ✓ <strong>Move POI here</strong>
+          {recAction === 'move' && <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/25 px-1 rounded">recommended</span>}
+          <div className="text-[10px] opacity-90 mt-0.5">
+            Update <em>{sourcePoi.name}</em> to{' '}
+            <span className="tabular-nums">{candidate.lat.toFixed(5)}, {candidate.lng.toFixed(5)}</span>
+            {' '}({candidate.distance_m.toLocaleString()} m shift). Sets location_status='verified' implicitly via /move.
+            {!canMove && ' — disabled because the candidate is a city-centroid fallback'}
+          </div>
+        </button>
+
+        {onValidateStored && (
+          <button
+            type="button"
+            onClick={() => void onValidateStored()}
+            className={`w-full px-3 py-2 text-xs rounded text-left text-white ${
+              recAction === 'validate' ? 'bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400' : 'bg-emerald-700 hover:bg-emerald-800'
+            }`}
+            title="Mark the stored coordinates as verified without moving the POI"
+          >
+            ✓ <strong>Validate stored coords</strong>
+            {recAction === 'validate' && <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/25 px-1 rounded">recommended</span>}
+            <div className="text-[10px] opacity-90 mt-0.5">
+              Keep <em>{sourcePoi.name}</em> at{' '}
+              <span className="tabular-nums">{(sourcePoi.lat as number).toFixed(5)}, {(sourcePoi.lng as number).toFixed(5)}</span>
+              {' '}and stamp location_status='verified' / location_verified_at=now.
+            </div>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void onIgnore?.()}
+          className={`w-full px-3 py-2 text-xs rounded text-white text-left ${
+            recAction === 'hide' ? 'bg-rose-600 hover:bg-rose-700 ring-2 ring-rose-300' : 'bg-rose-600 hover:bg-rose-700'
+          }`}
+          title="Add this candidate to the geocode blacklist for this POI"
+        >
+          ✗ <strong>Hide this candidate</strong>
+          {recAction === 'hide' && <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/25 px-1 rounded">recommended</span>}
+          <div className="text-[10px] opacity-90 mt-0.5">
+            Mark <span className="tabular-nums">{candidate.lat.toFixed(5)}, {candidate.lng.toFixed(5)}</span>
+            {' '}as wrong for <em>{sourcePoi.name}</em>. Adds a row to <code>salem_geocode_blacklist</code>;
+            this exact lat/lng stops appearing in future Geocodes lookups for this POI.
+          </div>
+        </button>
+
+        {onEditAddress && (
+          <button
+            type="button"
+            onClick={() => onEditAddress()}
+            className={`w-full px-3 py-2 text-xs rounded text-left text-white ${
+              recAction === 'edit' ? 'bg-slate-700 hover:bg-slate-800 ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-800'
+            }`}
+            title="Open the POI editor focused on the address field"
+          >
+            ✎ <strong>Edit POI address</strong>
+            {recAction === 'edit' && <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/25 px-1 rounded">recommended</span>}
+            <div className="text-[10px] opacity-90 mt-0.5">
+              Open <em>{sourcePoi.name}</em> in the POI editor. Use this when the stored address
+              is wrong/incomplete and the geocoder needs better input before it can help.
+            </div>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={onCancel}
+          className="w-full px-3 py-2 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-left"
+        >
+          ↩ <strong>Cancel</strong>
+          <div className="text-[10px] opacity-80 mt-0.5">
+            Close this preview without changing anything. The POI, the candidate, and the
+            blacklist all stay as they are.
+          </div>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 interface DirectionsPanelProps {
   target: PoiRow
   source: 'bundle' | 'live'
@@ -1333,7 +1905,35 @@ export function AdminMap({
   onPickPoiForStop,
   directionsTarget,
   onClearDirections,
+  geocodePreview,
+  onGeocodePreviewAccept,
+  onGeocodePreviewIgnore,
+  onGeocodePreviewCancel,
+  onGeocodePreviewValidateStored,
+  onGeocodePreviewEditAddress,
 }: AdminMapProps) {
+  // S188 — geocode-preview view mode. `focusMap` hides every POI marker
+  // outside the cluster; `showAll` renders every Tiger candidate at once.
+  // `fitNonce` is bumped to trigger a fresh fitBounds (toggle Re-fit).
+  const [showAllCandidates, setShowAllCandidates] = useState(false)
+  const [focusMap, setFocusMap] = useState(true)
+  const [fitNonce, setFitNonce] = useState(0)
+  // Reset to defaults when a new preview opens (different sourcePoi).
+  const previewKey = geocodePreview
+    ? `${geocodePreview.sourcePoi.id}|${geocodePreview.candidate.lat.toFixed(5)},${geocodePreview.candidate.lng.toFixed(5)}`
+    : null
+  const lastPreviewKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (previewKey !== lastPreviewKeyRef.current) {
+      lastPreviewKeyRef.current = previewKey
+      if (previewKey) {
+        setShowAllCandidates(false)
+        setFocusMap(true)
+        setFitNonce(n => n + 1)
+      }
+    }
+  }, [previewKey])
+
   const filteredPois = useMemo(() => {
     if (!pois) return pois
     let out = pois
@@ -1343,8 +1943,18 @@ export function AdminMap({
     if (lintIdFilter && lintIdFilter.size > 0) {
       out = out.filter((p) => lintIdFilter.has(p.id))
     }
+    // When the geocode preview is open AND focusMap is on, hide every POI
+    // marker EXCEPT the source POI (single mode) or the source POI + every
+    // dupe contributing a candidate (show-all mode).
+    if (geocodePreview && focusMap) {
+      const keep = new Set<string>([geocodePreview.sourcePoi.id])
+      if (showAllCandidates && geocodePreview.allCandidates) {
+        for (const a of geocodePreview.allCandidates) keep.add(a.source_poi_id)
+      }
+      out = out.filter(p => keep.has(p.id))
+    }
     return out
-  }, [pois, categoryFilter, lintIdFilter])
+  }, [pois, categoryFilter, lintIdFilter, geocodePreview, focusMap, showAllCandidates])
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -1609,11 +2219,22 @@ export function AdminMap({
             onResult={handleDirectionsResult}
           />
         )}
+        {geocodePreview && (
+          <GeocodePreviewLayer
+            sourcePoi={geocodePreview.sourcePoi}
+            candidate={geocodePreview.candidate}
+            allCandidates={geocodePreview.allCandidates}
+            showAll={showAllCandidates}
+            fitNonce={fitNonce}
+          />
+        )}
       </MapContainer>
-      <TileProviderPicker
-        providerId={tileProviderId}
-        onChange={setTileProviderId}
-      />
+      {TILE_PROVIDERS.length > 1 && (
+        <TileProviderPicker
+          providerId={tileProviderId}
+          onChange={setTileProviderId}
+        />
+      )}
       <Legend categoryCounts={categoryCounts} />
       {categoryFilter && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[500]
@@ -1666,6 +2287,26 @@ export function AdminMap({
           result={directionsResult}
           error={directionsError}
           onClose={() => { onClearDirections?.() }}
+        />
+      )}
+      {geocodePreview && (
+        <GeocodePreviewPanel
+          sourcePoi={geocodePreview.sourcePoi}
+          candidate={geocodePreview.candidate}
+          hasAllCandidates={(geocodePreview.allCandidates?.length ?? 0) > 0}
+          showAll={showAllCandidates}
+          onToggleShowAll={() => {
+            setShowAllCandidates(v => !v)
+            setFitNonce(n => n + 1)
+          }}
+          focusMap={focusMap}
+          onToggleFocusMap={() => setFocusMap(v => !v)}
+          onRefit={() => setFitNonce(n => n + 1)}
+          onAccept={onGeocodePreviewAccept}
+          onIgnore={onGeocodePreviewIgnore}
+          onCancel={onGeocodePreviewCancel}
+          onValidateStored={onGeocodePreviewValidateStored}
+          onEditAddress={onGeocodePreviewEditAddress}
         />
       )}
       {pendingStop && (

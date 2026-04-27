@@ -6,9 +6,17 @@
 
 ---
 
-## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S187 close, 2026-04-26)
+## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S188 close, 2026-04-26)
 
 > **Operator override of lean-startup rule.** Read this block at session start *before* the lean greeting. Pinned here because CLAUDE.md auto-loads and these items are time-sensitive or load-bearing for V1 ship. Once an item is done, remove it from this block and move it to STATE.md.
+
+### State as of S188 close
+
+- **Geocodes modal now drives the dupe-cleanup + coord-validation flow.** Every duplicate's address is geocoded too (one shared Tiger client, cluster-wide BEST badge), each candidate row has a fuchsia **Show on Map** button that opens an in-map preview (purple POI dot + fuchsia "?" candidate marker + dashed line). Preview panel runs `analyzeGeocodeConflict()` — diagnoses the conflict (good/warn/bad), enumerates plain-English issue bullets, and recommends one of five action buttons (Move POI / Validate stored / Hide candidate / Edit address / Cancel). The **Hide this candidate** action persists in a new `salem_geocode_blacklist` table — flagged candidates stop appearing in future lookups for that POI. The preview panel can be dismissed with `×` or `Esc`, has Focus / Show-all-candidates / Re-fit toggles, and is bottom-right of the map (was bottom-center / map-blocking).
+- **Witchy is the only basemap; auto-overzoom is server-side.** Mapnik / Esri / OSM-online removed from the picker. `cache-proxy/lib/admin-tiles.js` now serves auto-resized Witchy tiles when (z,x,y) isn't baked: walks UP up to 8 ancestor levels (`sharp` crop+resize) or DOWN up to 2 child levels (stitch 2^dz × 2^dz). 500-entry LRU. `X-Tile-Source: exact | overzoom-up-N | overzoom-down-N` header on every response for devtools debugging. New runtime dep: `sharp@0.34+`. Operator rule baked: only Witchy bundle, no online fallback.
+- **Soft-deleted POIs are footnotes only.** Operator-confirmed S188 rule: dupe cluster query in geocode-candidates filters `deleted_at IS NULL`. They don't surface as decision targets and Tiger doesn't burn budget on them. Lint tab still shows the soft-deleted dedup losers in their own check (Cleanup → "Soft-deleted dedup losers, pre-AAB cleanup") because that's the whole point of that check.
+- **Modal can never hang.** Per-call Tiger `statement_timeout` dropped 15 s → 5 s. New 20 s wall-clock budget across the entire `/geocode-candidates` call; once exhausted, remaining dupes return with `geocode_warning: 'skipped — modal time budget exhausted'`. Worst-case 26 × 15 s = 6.5 min has become 20 s hard cap.
+- **Cache-proxy currently running on PID 68413** with all S188 changes live (re-launched mid-session). Vite dev server still on 4302. `npm install --save sharp` was added to `cache-proxy/package.json` — anyone re-cloning needs `npm install` in `cache-proxy/`.
 
 ### State as of S187 close
 
@@ -30,7 +38,7 @@
 - **Operator-confirmed working post-S186 walk:** First Church Meetinghouse 1692 Site visible during tour with Hist Landmark checkbox OFF (force-visible via is_tour_poi); same POI does not re-fire after walk-sim stop+start. Operator close: "good enough."
 - **Upload signing key** — one off-machine copy on USB; second-medium copy still owed before first Play Console upload.
 
-### S188 next steps — S187 shipped the Lint tab; the next session uses it
+### S189 next steps — S187 shipped the Lint tab; S188 polished the Geocodes flow; S189 uses both
 
 **Use the new Lint tab to drive content cleanup. Operator drill-down: the lint tab now surfaces these gaps in plain English with one-click jump-to-editor:**
 

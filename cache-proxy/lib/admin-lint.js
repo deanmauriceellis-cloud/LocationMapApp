@@ -71,6 +71,78 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
+// ─── Tiger geocoder helpers ─────────────────────────────────────────────────
+// Run tiger.geocode() on one address against an already-borrowed client
+// (caller manages SET statement_timeout). Tries the same variant ladder as
+// the original geocode-candidates path: as-is, abbreviated street types, and
+// w/o ZIP. Returns { candidates, warnings }.
+async function geocodeOneAddress(client, rawAddress, sourceLat, sourceLng, limit) {
+  const baseAddress = normalizeAddressForTiger(rawAddress);
+  const expanded = baseAddress
+    .replace(/\bStreet\b/gi, 'St')
+    .replace(/\bAvenue\b/gi, 'Ave')
+    .replace(/\bRoad\b/gi, 'Rd')
+    .replace(/\bDrive\b/gi, 'Dr')
+    .replace(/\bSquare\b/gi, 'Sq')
+    .replace(/\bCourt\b/gi, 'Ct')
+    .replace(/\bLane\b/gi, 'Ln')
+    .replace(/\bBoulevard\b/gi, 'Blvd');
+  const noZip = expanded.replace(/\b\d{5}(?:-\d{4})?\b/g, '').replace(/\s+,/g, ',').trim();
+  const variants = Array.from(new Set([baseAddress, expanded, noZip].filter(Boolean)));
+
+  let rows = [];
+  const warnings = [];
+  for (const v of variants) {
+    try {
+      const r = await client.query(
+        `SELECT rating,
+                ST_Y(geomout) AS glat,
+                ST_X(geomout) AS glng,
+                pprint_addy(addy) AS normalized_address
+         FROM tiger.geocode($1, $2)
+         ORDER BY rating ASC`,
+        [v, limit],
+      );
+      if (r.rows.length > 0) {
+        rows = r.rows;
+        if (r.rows.some(x => x.rating < 90)) break;
+      }
+    } catch (e) {
+      warnings.push(`Variant "${v}" timed out (>15s) — no street-level match in Tiger.`);
+    }
+  }
+  const candidates = rows.map(r => ({
+    rating: r.rating,
+    lat: r.glat,
+    lng: r.glng,
+    normalized_address: r.normalized_address,
+    distance_m: Math.round(haversineKm(sourceLat, sourceLng, r.glat, r.glng) * 1000),
+  }));
+  return { candidates, warnings };
+}
+
+// Across the whole cluster (focal + dupes), pick the geocode candidate that
+// most strongly anchors the cluster: lowest Tiger rating wins (0 = exact
+// house-number match, 100 = city centroid). Ties broken by smallest
+// distance_m from that candidate's source POI — the geocode landed nearest
+// to where the POI is actually stored, so address+coord agree most.
+// Returns { source_poi_id, source_poi_name, rating, lat, lng, normalized_address, distance_m }
+// or null if nothing matched anywhere.
+function pickBestMatch(focalPoi, focalCandidates, duplicates) {
+  const all = [];
+  for (const c of focalCandidates) {
+    all.push({ ...c, source_poi_id: focalPoi.id, source_poi_name: focalPoi.name });
+  }
+  for (const d of duplicates) {
+    for (const c of (d.candidates || [])) {
+      all.push({ ...c, source_poi_id: d.id, source_poi_name: d.name });
+    }
+  }
+  if (all.length === 0) return null;
+  all.sort((a, b) => a.rating - b.rating || a.distance_m - b.distance_m);
+  return all[0];
+}
+
 // ─── Suppression filter ─────────────────────────────────────────────────────
 // Each POI check appends a NOT IN clause that excludes operator-flagged false
 // positives. Helper returns the SQL fragment and pushes the check_id onto
@@ -679,6 +751,21 @@ module.exports = function(app, deps) {
     );
     CREATE INDEX IF NOT EXISTS idx_salem_lint_suppressions_check_id
       ON salem_lint_suppressions (check_id);
+
+    -- Operator-flagged "this geocode candidate is wrong" entries. Filtered
+    -- out of the geocode-candidates response so the bad candidate stops
+    -- showing up. Lat/lng rounded to 5 decimals (~1 m) so floating-point
+    -- jitter from PostGIS doesn't defeat the PK.
+    CREATE TABLE IF NOT EXISTS salem_geocode_blacklist (
+      poi_id      TEXT        NOT NULL REFERENCES salem_pois(id) ON DELETE CASCADE,
+      lat         NUMERIC(8,5) NOT NULL,
+      lng         NUMERIC(8,5) NOT NULL,
+      reason      TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (poi_id, lat, lng)
+    );
+    CREATE INDEX IF NOT EXISTS idx_salem_geocode_blacklist_poi_id
+      ON salem_geocode_blacklist (poi_id);
   `).catch(err => console.error('[admin-lint] schema bootstrap failed:', err.message));
 
   // GET /admin/salem/lint — run all instant checks
@@ -756,11 +843,72 @@ module.exports = function(app, deps) {
       );
       if (poiRows.length === 0) return res.status(404).json({ error: 'POI not found' });
       const poi = poiRows[0];
+
+      // Sibling duplicates within 15m (same threshold as the dupes lint check),
+      // excluding this POI AND soft-deleted ones. Operator rule (S188):
+      // soft-deleted are footnotes — don't surface them as decision targets,
+      // and don't spend Tiger budget geocoding their addresses.
+      const DUPE_RADIUS_M = 15;
+      const latBox = DUPE_RADIUS_M / 111000.0;
+      const lngBox = DUPE_RADIUS_M / 60000.0;
+      const { rows: dupeRows } = await pgPool.query(`
+        SELECT id, name, lat, lng, address, location_status, deleted_at,
+               6371000.0 * 2.0 * ASIN(SQRT(
+                 POWER(SIN(RADIANS(lat - $2) / 2.0), 2) +
+                 COS(RADIANS($2)) * COS(RADIANS(lat)) *
+                 POWER(SIN(RADIANS(lng - $3) / 2.0), 2)
+               )) AS distance_m
+        FROM salem_pois
+        WHERE id <> $1
+          AND deleted_at IS NULL
+          AND ABS(lat - $2) <= $4
+          AND ABS(lng - $3) <= $5
+          AND 6371000.0 * 2.0 * ASIN(SQRT(
+                POWER(SIN(RADIANS(lat - $2) / 2.0), 2) +
+                COS(RADIANS($2)) * COS(RADIANS(lat)) *
+                POWER(SIN(RADIANS(lng - $3) / 2.0), 2)
+              )) <= $6
+        ORDER BY distance_m ASC
+        LIMIT 25
+      `, [id, poi.lat, poi.lng, latBox, lngBox, DUPE_RADIUS_M]);
+      const duplicates = dupeRows.map(r => ({
+        id: r.id,
+        name: r.name,
+        lat: parseFloat(r.lat),
+        lng: parseFloat(r.lng),
+        address: r.address || null,
+        location_status: r.location_status || null,
+        deleted_at: r.deleted_at || null,
+        distance_m: Math.round(parseFloat(r.distance_m)),
+      }));
+      // Load operator-flagged "this candidate is wrong" entries for the focal
+      // and every dupe so we can filter Tiger results before returning. Lat/lng
+      // stored at 5-decimal precision; we match the same way.
+      const blacklistIds = [poi.id, ...duplicates.map(d => d.id)];
+      const { rows: blacklistRows } = await pgPool.query(
+        `SELECT poi_id, lat::text AS lat, lng::text AS lng
+           FROM salem_geocode_blacklist
+          WHERE poi_id = ANY($1::text[])`,
+        [blacklistIds],
+      );
+      const blacklistByPoi = new Map(); // poi_id → Set<"lat,lng">
+      for (const b of blacklistRows) {
+        const key = `${parseFloat(b.lat).toFixed(5)},${parseFloat(b.lng).toFixed(5)}`;
+        if (!blacklistByPoi.has(b.poi_id)) blacklistByPoi.set(b.poi_id, new Set());
+        blacklistByPoi.get(b.poi_id).add(key);
+      }
+      const filterBlacklisted = (sourcePoiId, cands) => {
+        const set = blacklistByPoi.get(sourcePoiId);
+        if (!set || set.size === 0) return cands;
+        return cands.filter(c => !set.has(`${c.lat.toFixed(5)},${c.lng.toFixed(5)}`));
+      };
+
       if (!poi.address || poi.address.length < 5) {
         return res.json({
           poi: { id: poi.id, name: poi.name, lat: poi.lat, lng: poi.lng, address: poi.address || null,
                  location_status: poi.location_status, location_verified_at: poi.location_verified_at },
           candidates: [],
+          duplicates,
           warning: 'POI has no usable address — Tiger geocoder cannot run.',
         });
       }
@@ -768,70 +916,67 @@ module.exports = function(app, deps) {
       const tiger = tigerPool();
       let candidates = [];
       const tigerWarnings = [];
+      const dupeWarnings = []; // collected across all dupe geocodes
+      // Wall-clock budget for the whole geocode-candidates call. Once we burn
+      // through this, remaining dupes are skipped with a stub warning so the
+      // modal never hangs waiting on Tiger.
+      const WALL_BUDGET_MS = 20_000;
+      const startedAt = Date.now();
+      const timeLeft = () => WALL_BUDGET_MS - (Date.now() - startedAt);
       try {
-        const baseAddress = normalizeAddressForTiger(poi.address);
-        // Try variants in order until we get street-level (rating < 90) hits.
-        // 1) as-is, 2) Street→St / Avenue→Ave / etc., 3) variant w/o ZIP.
-        const expanded = baseAddress
-          .replace(/\bStreet\b/gi, 'St')
-          .replace(/\bAvenue\b/gi, 'Ave')
-          .replace(/\bRoad\b/gi, 'Rd')
-          .replace(/\bDrive\b/gi, 'Dr')
-          .replace(/\bSquare\b/gi, 'Sq')
-          .replace(/\bCourt\b/gi, 'Ct')
-          .replace(/\bLane\b/gi, 'Ln')
-          .replace(/\bBoulevard\b/gi, 'Blvd');
-        const noZip = expanded.replace(/\b\d{5}(?:-\d{4})?\b/g, '').replace(/\s+,/g, ',').trim();
-        const variants = Array.from(new Set([baseAddress, expanded, noZip].filter(Boolean)));
-
-        // Cap each geocode call at 15s — Tiger can scan all-MA street
-        // segments when the exact house number isn't in ma_addr, which
-        // turns into a multi-minute query. Time out and surface a hint
-        // rather than block the operator.
-        // Cap each geocode call. SET LOCAL needs a transaction; SET (session)
-        // applies for the connection lifetime, so we reset before releasing.
-        let rows = [];
+        // One pooled client for the focal POI + every duplicate. Tiger connect
+        // overhead dominates each call so reusing the client is cheaper than
+        // re-borrowing per address; statement_timeout is set once.
         const client = await tiger.connect();
         try {
-          await client.query("SET statement_timeout = '15s'");
-          for (const v of variants) {
-            try {
-              const r = await client.query(
-                `SELECT rating,
-                        ST_Y(geomout) AS glat,
-                        ST_X(geomout) AS glng,
-                        pprint_addy(addy) AS normalized_address
-                 FROM tiger.geocode($1, $2)
-                 ORDER BY rating ASC`,
-                [v, limit],
-              );
-              if (r.rows.length > 0) {
-                rows = r.rows;
-                if (r.rows.some(x => x.rating < 90)) break;
-              }
-            } catch (e) {
-              tigerWarnings.push(`Variant "${v}" timed out (>15s) — no street-level match in Tiger for this string.`);
+          // Per-call cap dropped to 5s. With up to 25 dupes the focal+dupes
+          // would otherwise run 26 × 15s = 6.5 minutes worst case.
+          await client.query("SET statement_timeout = '5s'");
+
+          const focalRes = await geocodeOneAddress(client, poi.address, poi.lat, poi.lng, limit);
+          candidates = filterBlacklisted(poi.id, focalRes.candidates);
+          tigerWarnings.push(...focalRes.warnings);
+
+          // Geocode each dupe's address. Cap candidate count per dupe at 3 to
+          // keep the modal scannable and the response under a few KB even
+          // for a 5-way cluster.
+          for (const d of duplicates) {
+            if (!d.address || d.address.length < 5) {
+              d.candidates = [];
+              d.geocode_warning = 'no usable address';
+              continue;
+            }
+            if (timeLeft() <= 1000) {
+              d.candidates = [];
+              d.geocode_warning = 'skipped — modal time budget exhausted';
+              continue;
+            }
+            const r = await geocodeOneAddress(client, d.address, d.lat, d.lng, 3);
+            d.candidates = filterBlacklisted(d.id, r.candidates);
+            if (r.warnings.length > 0) {
+              d.geocode_warning = `Tiger timed out on ${r.warnings.length} variant(s) — no street-level match.`;
+              dupeWarnings.push(...r.warnings);
             }
           }
         } finally {
           try { await client.query("SET statement_timeout = 0"); } catch {}
           client.release();
         }
-        candidates = rows.map(r => ({
-          rating: r.rating,
-          lat: r.glat,
-          lng: r.glng,
-          normalized_address: r.normalized_address,
-          distance_m: Math.round(haversineKm(poi.lat, poi.lng, r.glat, r.glng) * 1000),
-        }));
       } catch (e) {
         console.error('[admin-lint] geocode-candidates tiger query failed:', e.message);
         return res.status(502).json({
           error: `Tiger geocoder failed: ${e.message}`,
           poi: { id: poi.id, name: poi.name, lat: poi.lat, lng: poi.lng, address: poi.address },
           candidates: [],
+          duplicates,
         });
       }
+
+      // Best match across the cluster — lowest Tiger rating wins; ties
+      // broken by smallest distance_m from that candidate's source POI
+      // (i.e. the geocode landed nearest to where the POI is stored,
+      // implying the address+stored coord agree most strongly).
+      const bestMatch = pickBestMatch(poi, candidates, duplicates);
 
       res.json({
         poi: {
@@ -844,8 +989,10 @@ module.exports = function(app, deps) {
           location_verified_at: poi.location_verified_at,
         },
         candidates,
-        warning: tigerWarnings.length > 0
-          ? `Tiger geocoder timed out on ${tigerWarnings.length} variant(s). Salem street data is loaded but house-number-level lookups can be slow when the exact number is missing from the addr table. You can validate the current location manually below.`
+        duplicates,
+        best_match: bestMatch,
+        warning: (tigerWarnings.length + dupeWarnings.length) > 0
+          ? `Tiger geocoder timed out on ${tigerWarnings.length + dupeWarnings.length} variant(s). Salem street data is loaded but house-number-level lookups can be slow when the exact number is missing from the addr table. You can validate the current location manually below.`
           : undefined,
       });
     } catch (err) {
@@ -879,6 +1026,57 @@ module.exports = function(app, deps) {
       res.json(rows[0]);
     } catch (err) {
       console.error('[admin-lint] mark-verified error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── Geocode-candidate blacklist ───────────────────────────────────────────
+  // POST /admin/salem/lint/poi/:id/blacklist-candidate  body: { lat, lng, reason? }
+  // Marks one Tiger geocode candidate as wrong for this POI so it stops
+  // appearing in the modal. Idempotent ON CONFLICT.
+  app.post('/admin/salem/lint/poi/:id/blacklist-candidate', requirePg, async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { lat, lng, reason } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'id is required' });
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        return res.status(400).json({ error: 'lat and lng (numbers) are required' });
+      }
+      const { rows } = await pgPool.query(
+        `INSERT INTO salem_geocode_blacklist (poi_id, lat, lng, reason, created_at)
+         VALUES ($1, ROUND($2::numeric, 5), ROUND($3::numeric, 5), $4, NOW())
+         ON CONFLICT (poi_id, lat, lng)
+           DO UPDATE SET reason = EXCLUDED.reason, created_at = NOW()
+         RETURNING poi_id, lat, lng, reason, created_at`,
+        [id, lat, lng, reason || null],
+      );
+      res.json(rows[0]);
+    } catch (err) {
+      console.error('[admin-lint] blacklist-candidate error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /admin/salem/lint/poi/:id/blacklist-candidate  body: { lat, lng }
+  // Restores a previously blacklisted candidate.
+  app.delete('/admin/salem/lint/poi/:id/blacklist-candidate', requirePg, async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { lat, lng } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'id is required' });
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        return res.status(400).json({ error: 'lat and lng (numbers) are required' });
+      }
+      const { rowCount } = await pgPool.query(
+        `DELETE FROM salem_geocode_blacklist
+          WHERE poi_id = $1
+            AND lat = ROUND($2::numeric, 5)
+            AND lng = ROUND($3::numeric, 5)`,
+        [id, lat, lng],
+      );
+      res.json({ deleted: rowCount });
+    } catch (err) {
+      console.error('[admin-lint] unblacklist-candidate error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });

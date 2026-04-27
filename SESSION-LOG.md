@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 178-187. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 179-188. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 188: 2026-04-26 — Geocode-candidates modal polish (cluster geocoding, smart conflict analyzer, map preview w/ accept/ignore) + Witchy-only basemap with server-side auto-overzoom
+
+Single-evening polish pass on the S187 Geocodes modal driven by nine sequential operator refinements. Backend extends `/admin/salem/lint/poi/:id/geocode-candidates` to also geocode every duplicate's address (one shared Tiger client, cluster-wide best-match selection by lowest rating + nearest-to-source tiebreak), adds a `salem_geocode_blacklist(poi_id, lat, lng, reason)` table with idempotent CREATE plus `POST/DELETE /admin/salem/lint/poi/:id/blacklist-candidate` endpoints filtered by the geocode-candidates endpoint, and tightens to a 5 s per-call / 20 s wall-clock budget with `deleted_at IS NULL` filtering on dupes (operator: "soft deleted are not concerns, just footnotes") so the modal can never hang. Frontend modal grows side-by-side stored/Tiger detail panels, BEST badges, per-dupe candidate lists with Use & soft-delete actions, and a `Show on Map` per-candidate button that opens a new AdminMap floating panel with a smart `analyzeGeocodeConflict()` diagnoser (severity good/warn/bad, plain-English conflict bullets, recommendation pill on the matching action button), five action buttons each spelling out their effect (Move POI / Validate stored / Hide candidate / Edit address / Cancel), Focus toggle to hide unrelated POIs, Show all candidates rendering every cluster Tiger hit color-coded by rating with dashed lines back to source, `×` close + Esc keybind. Mapnik/Esri/OSM removed from the basemap picker (operator: Witchy only); `cache-proxy/lib/admin-tiles.js` gains `sharp`-backed auto-overzoom that walks UP to 8 ancestor levels (crop+resize) or DOWN to 2 child levels (stitch 2^dz × 2^dz children) when the requested (z,x,y) isn't baked in `salem_tiles.sqlite`, with a 500-entry LRU and `X-Tile-Source` headers for devtools introspection.
+
+Full session detail: `docs/session-logs/session-188-2026-04-26.md`. Commit: `_pending_`.
+
+---
 
 ## Session 187: 2026-04-26 — Admin Lint tab: 15-check data-quality scan + tiger.geocode address validator + false-positive suppression
 
@@ -76,14 +84,5 @@ Full session detail: `docs/session-logs/session-179-2026-04-26.md`. Commit: `e86
 
 ---
 
-## Session 178: 2026-04-25/26 — P6 tour-leg pre-bake + :routing-jvm extraction + surgical OSM pedestrian ingest
-
-S175's last carry-forward shipped: tour-leg polylines pre-baked from the same TigerLine bundle the runtime Router uses (P6). New `:routing-jvm` module extracted from `:core` so both Android and the JVM `:salem-content` pipeline consume one routing engine; `salem-content` grew a `TourLegBaker` that writes the new `tour_legs` table AND regenerates the runtime `assets/tours/*.json` files (replacing S125's OSRM-baked content). Live "Get directions" routes got first/last-approach segments capped at 60m (over-water fix); for pier/peninsular destinations TIGER doesn't reach, surgical OSM ingest of 11 hand-picked osm_ids (Derby Wharf, Seven Gables waterfront, Charter Cemetery interior paths, Salem Willows) with verified per-feature TIGER hookup — Derby Wharf Light snap dropped 349.3m → 5.3m, Charter Cemetery 83.8m → 5.5m. Two new memories: `feedback_v1_no_external_contact.md` (Android app makes ZERO outside contact except GPS — V1 mandate), `feedback_internal_db_single_source.md` (internal DB is canonical; web admin may validate against PG, runtime app makes no validation calls); `feedback_no_osm_use_local_geo.md` got an addendum that allows surgical-allowlist OSM ingest when nothing internal covers a feature, and forbids broad bbox imports (the first attempt produced 608 disconnected components and broke 57 tour legs before rollback).
-
-Full session detail: `docs/session-logs/session-178-2026-04-25.md`. Commit: `a7d7b76`.
-
----
-
-
-<!-- END OF ROLLING WINDOW — Sessions 176 and earlier are in SESSION-LOG-ARCHIVE.md -->
-<!-- S177 rolled to archive 2026-04-26 by the session-end protocol (S187) -->
+<!-- END OF ROLLING WINDOW — Sessions 178 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S178 rolled to archive 2026-04-26 by the session-end protocol (S188) -->

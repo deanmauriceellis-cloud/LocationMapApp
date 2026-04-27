@@ -28,10 +28,42 @@ const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-tiles.js';
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const sharp = require('sharp');
+
+// ─── Overzoom (S188) ─────────────────────────────────────────────────────────
+// When a requested (z, x, y) tile isn't in the bundle, walk UP the pyramid
+// (z-1, z-2, …) to find an ancestor that exists, then crop+resize the right
+// sub-region to fill in. Then walk DOWN (z+1) and stitch 4 children if
+// no ancestor is available — used when zoomed out beyond what was baked.
+//
+// Operator rule (S188): only Witchy/bundled tiles, no online fallback. If we
+// have a tile at any zoom that covers the requested area, use it.
+
+const OVERZOOM_MAX_UP = 8;     // walk up to 8 levels (1024× scale)
+const OVERZOOM_MAX_DOWN = 2;   // walk down up to 2 levels (16 children stitched)
+const OVERZOOM_CACHE_MAX = 500; // LRU max entries (resized tiles)
+const OVERZOOM_CACHE = new Map(); // key="provider:z:x:y" → { buf, contentType }
+
+function lruGet(key) {
+  if (!OVERZOOM_CACHE.has(key)) return null;
+  const v = OVERZOOM_CACHE.get(key);
+  OVERZOOM_CACHE.delete(key);
+  OVERZOOM_CACHE.set(key, v);
+  return v;
+}
+function lruSet(key, value) {
+  if (OVERZOOM_CACHE.has(key)) OVERZOOM_CACHE.delete(key);
+  OVERZOOM_CACHE.set(key, value);
+  if (OVERZOOM_CACHE.size > OVERZOOM_CACHE_MAX) {
+    const oldest = OVERZOOM_CACHE.keys().next().value;
+    OVERZOOM_CACHE.delete(oldest);
+  }
+}
 
 const TILE_DB_PATH = path.resolve(__dirname, '../../tools/tile-bake/dist/salem_tiles.sqlite');
 
-const ALLOWED_PROVIDERS = new Set(['Salem-Custom', 'Mapnik', 'Esri-WorldImagery']);
+// S188 — operator rule: Witchy is the only basemap. Mapnik/Esri removed.
+const ALLOWED_PROVIDERS = new Set(['Salem-Custom']);
 
 function osmdroidKey(z, x, y) {
   const zb = BigInt(z);
@@ -80,8 +112,103 @@ function openDb() {
   return _db;
 }
 
+function lookupExactTile(provider, z, x, y) {
+  if (z < 0 || z > 25 || x < 0 || y < 0) return null;
+  const max = 1 << z;
+  if (x >= max || y >= max) return null;
+  const key = osmdroidKey(z, x, y);
+  let row;
+  try { row = _stmt.get(key, provider); } catch { return null; }
+  if (!row || !row.tile) return null;
+  const buf = Buffer.isBuffer(row.tile) ? row.tile : Buffer.from(row.tile);
+  return buf;
+}
+
+// Walk UP the pyramid (lower zoom = wider area per tile). When a higher-zoom
+// tile is missing, an ancestor at z-dz covers the same area; we crop the
+// matching sub-region and resize to 256×256.
+async function overzoomFromAncestor(provider, z, x, y) {
+  for (let dz = 1; dz <= OVERZOOM_MAX_UP && z - dz >= 0; dz++) {
+    const az = z - dz;
+    const ax = Math.floor(x / (1 << dz));
+    const ay = Math.floor(y / (1 << dz));
+    const ancestor = lookupExactTile(provider, az, ax, ay);
+    if (!ancestor) continue;
+
+    // Sub-region within the ancestor that corresponds to (x, y, z):
+    //   tilesPerSide = 1 << dz   (each ancestor tile covers a tilesPerSide × tilesPerSide grid at zoom z)
+    //   subSize      = 256 >> dz (pixel size of that sub-region in the ancestor)
+    //   subX, subY   = local position of (x, y) within the ancestor's grid
+    const tilesPerSide = 1 << dz;
+    const subSize = 256 / tilesPerSide;
+    const subX = (x % tilesPerSide) * subSize;
+    const subY = (y % tilesPerSide) * subSize;
+
+    try {
+      // Sharp's extract requires integer coords; subSize is integer for dz<=8 (256/256=1).
+      const sub = Math.max(1, Math.floor(subSize));
+      const buf = await sharp(ancestor)
+        .extract({ left: Math.floor(subX), top: Math.floor(subY), width: sub, height: sub })
+        .resize(256, 256, { kernel: dz <= 2 ? 'lanczos3' : 'nearest' })
+        .png({ compressionLevel: 6 })
+        .toBuffer();
+      return { buf, contentType: 'image/png', source: `overzoom-up-${dz}` };
+    } catch (err) {
+      console.warn(`[admin-tiles] overzoom-up dz=${dz} for ${provider}/${z}/${x}/${y} failed:`, err.message);
+      // try next ancestor
+    }
+  }
+  return null;
+}
+
+// Walk DOWN: stitch 2^dz × 2^dz children from a higher zoom into one tile.
+// Only useful when we have detailed zoom but the operator zoomed out beyond
+// what was baked at the requested (lower) zoom level.
+async function overzoomFromChildren(provider, z, x, y) {
+  for (let dz = 1; dz <= OVERZOOM_MAX_DOWN && z + dz <= 25; dz++) {
+    const cz = z + dz;
+    const grid = 1 << dz;
+    const baseX = x * grid;
+    const baseY = y * grid;
+    // Probe one corner first; if no children exist there either, skip dz.
+    if (!lookupExactTile(provider, cz, baseX, baseY)) continue;
+
+    const childSize = Math.floor(256 / grid);
+    const composites = [];
+    let anyMissing = false;
+    for (let cy = 0; cy < grid; cy++) {
+      for (let cx = 0; cx < grid; cx++) {
+        const child = lookupExactTile(provider, cz, baseX + cx, baseY + cy);
+        if (!child) { anyMissing = true; continue; }
+        try {
+          const resized = await sharp(child)
+            .resize(childSize, childSize, { kernel: 'lanczos3' })
+            .png()
+            .toBuffer();
+          composites.push({ input: resized, top: cy * childSize, left: cx * childSize });
+        } catch (err) {
+          console.warn(`[admin-tiles] child resize failed:`, err.message);
+        }
+      }
+    }
+    if (composites.length === 0) continue;
+    try {
+      const buf = await sharp({
+        create: { width: 256, height: 256, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+      })
+        .composite(composites)
+        .png({ compressionLevel: 6 })
+        .toBuffer();
+      return { buf, contentType: 'image/png', source: `overzoom-down-${dz}${anyMissing ? '-partial' : ''}` };
+    } catch (err) {
+      console.warn(`[admin-tiles] overzoom-down dz=${dz} stitch failed:`, err.message);
+    }
+  }
+  return null;
+}
+
 module.exports = function(app /*, deps */) {
-  app.get('/admin/tiles/:provider/:z/:x/:y', (req, res) => {
+  app.get('/admin/tiles/:provider/:z/:x/:y', async (req, res) => {
     const { provider } = req.params;
     if (!ALLOWED_PROVIDERS.has(provider)) {
       return res.status(400).json({ error: `unknown provider '${provider}'; allowed: ${[...ALLOWED_PROVIDERS].join(', ')}` });
@@ -90,7 +217,6 @@ module.exports = function(app /*, deps */) {
     const z = Number.parseInt(req.params.z, 10);
     const x = Number.parseInt(req.params.x, 10);
     const yRaw = req.params.y;
-    // Strip any file extension (Leaflet sometimes appends `.png`).
     const y = Number.parseInt(String(yRaw).replace(/\.[a-z0-9]+$/i, ''), 10);
 
     if (!Number.isFinite(z) || z < 0 || z > 25 || !Number.isFinite(x) || x < 0 || !Number.isFinite(y) || y < 0) {
@@ -102,24 +228,40 @@ module.exports = function(app /*, deps */) {
       return res.status(503).json({ error: 'tile archive unavailable' });
     }
 
-    const key = osmdroidKey(z, x, y);
-    let row;
-    try {
-      row = _stmt.get(key, provider);
-    } catch (err) {
-      console.error('[admin-tiles] query failed:', err.message);
-      return res.status(500).json({ error: 'tile query failed' });
+    // 1) Exact-zoom hit.
+    const exact = lookupExactTile(provider, z, x, y);
+    if (exact) {
+      res.setHeader('Content-Type', sniffContentType(exact));
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.setHeader('Content-Length', String(exact.length));
+      res.setHeader('X-Tile-Source', 'exact');
+      return res.send(exact);
     }
 
-    if (!row || !row.tile) {
-      return res.status(404).end();
+    // 2) Cached overzoom result.
+    const cacheKey = `${provider}:${z}:${x}:${y}`;
+    const cached = lruGet(cacheKey);
+    if (cached) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.setHeader('Content-Length', String(cached.buf.length));
+      res.setHeader('X-Tile-Source', `${cached.source}-cached`);
+      return res.send(cached.buf);
     }
 
-    const buf = Buffer.isBuffer(row.tile) ? row.tile : Buffer.from(row.tile);
-    res.setHeader('Content-Type', sniffContentType(buf));
+    // 3) Overzoom — walk UP first (most common: zoomed in past what was baked).
+    let result = await overzoomFromAncestor(provider, z, x, y);
+    // 4) Then walk DOWN (zoomed out past what was baked).
+    if (!result) result = await overzoomFromChildren(provider, z, x, y);
+
+    if (!result) return res.status(404).end();
+
+    lruSet(cacheKey, { buf: result.buf, contentType: result.contentType, source: result.source });
+    res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-    res.setHeader('Content-Length', String(buf.length));
-    res.send(buf);
+    res.setHeader('Content-Length', String(result.buf.length));
+    res.setHeader('X-Tile-Source', result.source);
+    res.send(result.buf);
   });
 };
 

@@ -74,6 +74,122 @@ export function AdminLayout() {
       .then(body => setPois(body.pois ?? null))
       .catch(() => {})
   }, [])
+
+  // S188 — geocode-candidate map preview state. When set, AdminMap renders
+  // the source POI + a temp marker at the candidate lat/lng + a line, plus
+  // a floating panel for accept / ignore / cancel.
+  const [geocodePreview, setGeocodePreview] = useState<{
+    sourcePoi: PoiRow
+    candidate: {
+      lat: number
+      lng: number
+      rating: number
+      normalized_address: string
+      distance_m: number
+    }
+    allCandidates?: Array<{
+      source_poi_id: string
+      source_poi_name: string
+      source_lat: number
+      source_lng: number
+      source_address: string | null
+      lat: number
+      lng: number
+      rating: number
+      normalized_address: string
+      distance_m: number
+    }>
+  } | null>(null)
+  const handleGeocodePreviewAccept = useCallback(async () => {
+    if (!geocodePreview) return
+    const { sourcePoi, candidate } = geocodePreview
+    const ok = window.confirm(
+      `Move "${sourcePoi.name}"\n` +
+      `  from (${sourcePoi.lat.toFixed(5)}, ${sourcePoi.lng.toFixed(5)})\n` +
+      `  to   (${candidate.lat.toFixed(5)}, ${candidate.lng.toFixed(5)}) — ${candidate.distance_m} m\n\n` +
+      `Tiger normalized: ${candidate.normalized_address}`,
+    )
+    if (!ok) return
+    try {
+      const res = await fetch(`/api/admin/salem/pois/${encodeURIComponent(sourcePoi.id)}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ lat: candidate.lat, lng: candidate.lng }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `${res.status} ${res.statusText}`)
+      }
+      handleGeocodeChanged()
+      setGeocodePreview(null)
+    } catch (e) {
+      window.alert(`Move failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [geocodePreview, handleGeocodeChanged])
+  const handleGeocodePreviewIgnore = useCallback(async () => {
+    if (!geocodePreview) return
+    const { sourcePoi, candidate } = geocodePreview
+    const reason = window.prompt(
+      `Ignore this geocode candidate for "${sourcePoi.name}"?\n` +
+      `(${candidate.lat.toFixed(5)}, ${candidate.lng.toFixed(5)}) — ${candidate.normalized_address}\n\n` +
+      `Optional reason (Cancel to abort):`,
+      '',
+    )
+    if (reason === null) return
+    try {
+      const res = await fetch(
+        `/api/admin/salem/lint/poi/${encodeURIComponent(sourcePoi.id)}/blacklist-candidate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ lat: candidate.lat, lng: candidate.lng, reason: reason || null }),
+        },
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `${res.status} ${res.statusText}`)
+      }
+      setGeocodePreview(null)
+    } catch (e) {
+      window.alert(`Ignore failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [geocodePreview])
+  const handleGeocodePreviewCancel = useCallback(() => {
+    setGeocodePreview(null)
+  }, [])
+  const handleGeocodePreviewValidateStored = useCallback(async () => {
+    if (!geocodePreview) return
+    const { sourcePoi } = geocodePreview
+    const ok = window.confirm(
+      `Mark "${sourcePoi.name}" as VERIFIED at its current coordinates ` +
+      `(${(sourcePoi.lat as number).toFixed(5)}, ${(sourcePoi.lng as number).toFixed(5)})?\n\n` +
+      `Sets location_status='verified' and stamps location_verified_at to now. Does NOT move the POI.`,
+    )
+    if (!ok) return
+    try {
+      const res = await fetch(
+        `/api/admin/salem/lint/poi/${encodeURIComponent(sourcePoi.id)}/mark-verified`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `${res.status} ${res.statusText}`)
+      }
+      handleGeocodeChanged()
+      setGeocodePreview(null)
+    } catch (e) {
+      window.alert(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [geocodePreview, handleGeocodeChanged])
+  const handleGeocodePreviewEditAddress = useCallback(() => {
+    if (!geocodePreview) return
+    const { sourcePoi } = geocodePreview
+    setGeocodePreview(null)
+    setSelectedPoi({ poi: sourcePoi })
+    setEditOpen(true)
+  }, [geocodePreview])
   // S177 P5 — Directions overlay target. When set, AdminMap fetches a route
   // from the current map center to this POI and renders a polyline.
   const [directionsTarget, setDirectionsTarget] = useState<PoiRow | null>(null)
@@ -571,6 +687,12 @@ export function AdminLayout() {
                 onClearLintIdFilter={clearLintIdFilter}
                 directionsTarget={directionsTarget}
                 onClearDirections={handleClearDirections}
+                geocodePreview={geocodePreview}
+                onGeocodePreviewAccept={handleGeocodePreviewAccept}
+                onGeocodePreviewIgnore={handleGeocodePreviewIgnore}
+                onGeocodePreviewCancel={handleGeocodePreviewCancel}
+                onGeocodePreviewValidateStored={handleGeocodePreviewValidateStored}
+                onGeocodePreviewEditAddress={handleGeocodePreviewEditAddress}
               />
             </main>
           </div>
@@ -583,6 +705,47 @@ export function AdminLayout() {
         poiId={geocodeModalPoiId}
         onClose={handleGeocodeModalClose}
         onChanged={handleGeocodeChanged}
+        onOpenSibling={(id) => {
+          setGeocodeModalPoiId(null)
+          void handleLintOpenPoi(id)
+        }}
+        onShowSiblingOnMap={async (id) => {
+          setGeocodeModalPoiId(null)
+          const poi = await resolvePoi(id)
+          if (!poi) {
+            window.alert(`Could not load POI ${id} — it may have been hard-deleted.`)
+            return
+          }
+          setPoiFlyToMinZoom(20)
+          setSelectedPoi({ poi })
+          setView('pois')
+        }}
+        onPreviewCandidate={async (sourcePoiId, candidate, allCandidates) => {
+          setGeocodeModalPoiId(null)
+          const sourcePoi = await resolvePoi(sourcePoiId)
+          if (!sourcePoi) {
+            window.alert(`Could not load POI ${sourcePoiId}.`)
+            return
+          }
+          setSelectedPoi({ poi: sourcePoi })
+          setPoiFlyToMinZoom(19)
+          setView('pois')
+          setGeocodePreview({ sourcePoi, candidate, allCandidates })
+        }}
+        onShowClusterOnMap={async (focalId, dupeIds, label) => {
+          setGeocodeModalPoiId(null)
+          const all = [focalId, ...dupeIds]
+          const focal = await resolvePoi(focalId)
+          if (!focal) {
+            window.alert(`Could not load focal POI ${focalId}.`)
+            return
+          }
+          setLintIdFilter(new Set(all))
+          setLintIdFilterLabel(`${label} · ${all.length}`)
+          setPoiFlyToMinZoom(20)
+          setSelectedPoi({ poi: focal })
+          setView('pois')
+        }}
       />
 
       {/* Edit dialog (POI view only) */}
