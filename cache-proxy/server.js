@@ -207,6 +207,9 @@ require('./lib/admin-tours')(app, deps);
 // Admin Witch Trials content endpoints (Phase 9X.7) — gated by /admin Basic Auth
 require('./lib/admin-witch-trials')(app, deps);
 
+// Admin Lint endpoints (S187) — gated by /admin Basic Auth
+require('./lib/admin-lint')(app, deps);
+
 // Admin tile server (S160) — serves Witchy/Mapnik/Esri offline tiles out of
 // tools/tile-bake/dist/salem_tiles.sqlite so the admin map matches what the
 // phone app sees. Gated by /admin Basic Auth.

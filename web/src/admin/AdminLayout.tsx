@@ -17,8 +17,10 @@ import { WitchTrialsPanel } from './WitchTrialsPanel'
 import { TourTree, type AddStopMode } from './TourTree'
 import type { TourLeg, TourStop, TourSummary } from './tourTypes'
 import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
+import { LintTab } from './LintTab'
+import { GeocodeCandidatesModal } from './GeocodeCandidatesModal'
 
-type AdminView = 'pois' | 'tours' | 'witch-trials'
+type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -42,6 +44,36 @@ export function AdminLayout() {
   const [pois, setPois] = useState<PoiRow[] | null>(null)
   const [selectedPoi, setSelectedPoi] = useState<PoiSelection | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  // S187 — when the operator navigates from the Lint tab, zoom in 3 closer
+  // than the default POI fly-to floor (17 → 20). Cleared on next non-lint
+  // selection so map clicks etc. resume normal behavior.
+  const [poiFlyToMinZoom, setPoiFlyToMinZoom] = useState<number | undefined>(undefined)
+  // S187 — restrict the POI map to only the entities flagged by the current
+  // lint check. Independent of categoryFilter (intersected if both set).
+  const [lintIdFilter, setLintIdFilter] = useState<Set<string> | null>(null)
+  const [lintIdFilterLabel, setLintIdFilterLabel] = useState<string | null>(null)
+  const clearLintIdFilter = useCallback(() => {
+    setLintIdFilter(null)
+    setLintIdFilterLabel(null)
+  }, [])
+  // S187 — Geocodes modal state.
+  const [geocodeModalPoiId, setGeocodeModalPoiId] = useState<string | null>(null)
+  const handleLintOpenGeocodes = useCallback((poiId: string) => {
+    setGeocodeModalPoiId(poiId)
+  }, [])
+  const handleGeocodeModalClose = useCallback(() => {
+    setGeocodeModalPoiId(null)
+  }, [])
+  const handleGeocodeChanged = useCallback(() => {
+    // Refresh the cached pois list so any open POI editor sees fresh coords.
+    // Cheap brute-force: re-fetch the whole list.
+    void fetch('/api/admin/salem/pois?include_deleted=true&limit=5000', {
+      credentials: 'same-origin',
+    })
+      .then(r => r.json())
+      .then(body => setPois(body.pois ?? null))
+      .catch(() => {})
+  }, [])
   // S177 P5 — Directions overlay target. When set, AdminMap fetches a route
   // from the current map center to this POI and renders a polyline.
   const [directionsTarget, setDirectionsTarget] = useState<PoiRow | null>(null)
@@ -220,10 +252,14 @@ export function AdminLayout() {
   }, [])
 
   const handleTreeSelect = useCallback((selection: PoiSelection) => {
+    setPoiFlyToMinZoom(undefined)
     setSelectedPoi(selection)
   }, [])
 
   const handleMapSelect = useCallback((selection: PoiSelection) => {
+    // Map clicks should not auto-clear an active lint filter — operator may
+    // be inspecting markers within the filtered set. Only zoom-floor resets.
+    setPoiFlyToMinZoom(undefined)
     setSelectedPoi(selection)
     setEditOpen(true)
   }, [])
@@ -261,6 +297,68 @@ export function AdminLayout() {
 
   const handleEditClose = useCallback(() => {
     setEditOpen(false)
+  }, [])
+
+  // ── Lint tab handlers (S187) ──────────────────────────────────────────────
+  // Lint items only carry an entity_id. We resolve to the full PoiRow either
+  // from the cached `pois` list (if the operator has already loaded the POI
+  // view) or by fetching /admin/salem/pois/:id on demand.
+  const resolvePoi = useCallback(async (poiId: string): Promise<PoiRow | null> => {
+    if (pois) {
+      const hit = pois.find(p => p.id === poiId)
+      if (hit) return hit
+    }
+    try {
+      const res = await fetch(`/api/admin/salem/pois/${encodeURIComponent(poiId)}`, {
+        credentials: 'same-origin',
+      })
+      if (!res.ok) return null
+      const body = await res.json()
+      const row = body.poi ?? body
+      return {
+        ...row,
+        lat: typeof row.lat === 'string' ? parseFloat(row.lat) : row.lat,
+        lng: typeof row.lng === 'string' ? parseFloat(row.lng) : row.lng,
+      } as PoiRow
+    } catch (e) {
+      console.error('[AdminLayout] resolvePoi failed:', e)
+      return null
+    }
+  }, [pois])
+
+  const handleLintOpenPoi = useCallback(async (poiId: string) => {
+    const poi = await resolvePoi(poiId)
+    if (!poi) {
+      window.alert(`Could not load POI ${poiId} — it may have been hard-deleted.`)
+      return
+    }
+    setPoiFlyToMinZoom(20)
+    setSelectedPoi({ poi })
+    setEditOpen(true)
+  }, [resolvePoi])
+
+  const handleLintShowPoiOnMap = useCallback(async (
+    poiId: string,
+    checkPoiIds: string[],
+    checkLabel: string,
+  ) => {
+    const poi = await resolvePoi(poiId)
+    if (!poi) {
+      window.alert(`Could not load POI ${poiId} — it may have been hard-deleted.`)
+      return
+    }
+    setLintIdFilter(new Set(checkPoiIds))
+    setLintIdFilterLabel(`${checkLabel} · ${checkPoiIds.length}`)
+    setPoiFlyToMinZoom(20)
+    setSelectedPoi({ poi })
+    setView('pois')
+  }, [resolvePoi])
+
+  const handleLintOpenTour = useCallback((tourId: string) => {
+    setView('tours')
+    // Tour selection wiring is owned by TourTree; operator picks the tour
+    // from the side tree. We surface the id so they know which one.
+    console.log(`[lint] Open tour requested: ${tourId} — pick from the tour tree.`)
   }, [])
 
   const knownCategories = useMemo(() => {
@@ -336,6 +434,16 @@ export function AdminLayout() {
           >
             Witch Trials
           </button>
+          <button
+            type="button"
+            onClick={() => setView('lint')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'lint' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+            title="Data-quality lint scan"
+          >
+            Lint
+          </button>
         </div>
 
         {view === 'pois' && (
@@ -375,6 +483,15 @@ export function AdminLayout() {
         <div className="flex-1 min-h-0">
           <WitchTrialsPanel />
         </div>
+      ) : view === 'lint' ? (
+        <div className="flex-1 min-h-0">
+          <LintTab
+            onOpenPoi={handleLintOpenPoi}
+            onShowPoiOnMap={handleLintShowPoiOnMap}
+            onOpenTour={handleLintOpenTour}
+            onOpenGeocodes={handleLintOpenGeocodes}
+          />
+        </div>
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">
           <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
@@ -400,6 +517,7 @@ export function AdminLayout() {
             <AdminMap
               pois={pois}
               selectedPoi={selectedPoi}
+              selectedPoiMinZoom={poiFlyToMinZoom}
               onPoiSelect={handleMapSelect}
               onPoiMoved={handlePoiMoved}
               categoryFilter={mapCategoryFilter}
@@ -443,10 +561,14 @@ export function AdminLayout() {
               <AdminMap
                 pois={pois}
                 selectedPoi={selectedPoi}
+                selectedPoiMinZoom={poiFlyToMinZoom}
                 onPoiSelect={handleMapSelect}
                 onPoiMoved={handlePoiMoved}
                 categoryFilter={mapCategoryFilter}
                 onClearCategoryFilter={() => setMapCategoryFilter(null)}
+                lintIdFilter={lintIdFilter}
+                lintIdFilterLabel={lintIdFilterLabel}
+                onClearLintIdFilter={clearLintIdFilter}
                 directionsTarget={directionsTarget}
                 onClearDirections={handleClearDirections}
               />
@@ -454,6 +576,14 @@ export function AdminLayout() {
           </div>
         </>
       )}
+
+      {/* Geocodes modal (Lint tab) */}
+      <GeocodeCandidatesModal
+        open={geocodeModalPoiId != null}
+        poiId={geocodeModalPoiId}
+        onClose={handleGeocodeModalClose}
+        onChanged={handleGeocodeChanged}
+      />
 
       {/* Edit dialog (POI view only) */}
       <PoiEditDialog

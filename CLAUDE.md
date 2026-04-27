@@ -6,9 +6,18 @@
 
 ---
 
-## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S185 close, 2026-04-26)
+## ⚠️  IMMEDIATE PRIORITY — Pinned for next session start (set S187 close, 2026-04-26)
 
 > **Operator override of lean-startup rule.** Read this block at session start *before* the lean greeting. Pinned here because CLAUDE.md auto-loads and these items are time-sensitive or load-bearing for V1 ship. Once an item is done, remove it from this block and move it to STATE.md.
+
+### State as of S187 close
+
+- **Admin Lint tab is live.** Web admin has a 4th view "Lint" (header toggle next to POIs/Tours/Witch Trials). 15 instant data-quality checks + 1 on-demand (address-geocode deep scan). Drill-down tree on the left, plain-English message + fix hint per item, four per-item actions (Open Editor / Show on Map / Geocodes / Suppress). Backend at `cache-proxy/lib/admin-lint.js`. Frontend at `web/src/admin/LintTab.tsx` + `web/src/admin/GeocodeCandidatesModal.tsx`.
+- **Tiger MA address data is fully loaded.** `tiger_data.ma_*` populated (576K addr, 703K featnames, 761K edges, 13 tables). `tiger.geocode()` works at street level for Salem when the house number is in the addr table. ~322 MB on disk under `~/tiger-staging/`. Address normalizer in admin-lint strips ", USA" suffix (Tiger returns 0 candidates if it sees this) and normalizes "Street → St" / "Avenue → Ave" / etc. 15-second statement_timeout per geocode call so misses don't hang the modal.
+- **`salem_lint_suppressions` table exists.** PK (poi_id, check_id) — operator can flag false positives (e.g. Salem Lighthouse) so a check stops surfacing them. Idempotent CREATE on cache-proxy startup; no manual migration step needed for new deploys.
+- **Lint nav UX rules baked in:** clicking "Show on Map" from a lint check (a) bumps the POI fly-to floor from zoom 17 to 20 (operator: "I need the zoom 3 greater when I go to the POI in lint"), and (b) filters the map to ONLY the POIs flagged by the current check, with an amber banner showing count + Clear (operator: "Show on Map should only show me the POIs of interest in LINT").
+- **Cleanup carry-forward updated.** S185's "110 dedup losers to hard-delete pre-AAB" was an estimate; lint tab confirmed actual count is **365**. Also surfaced 500+ historical buildings missing `year_established` (capped — there are likely more), 119 tour POIs missing image, 75 outlier coords, 150 in geocoder-fallback clusters.
+- **All S185/S186 carry-forwards still apply** — none of S187's work touched the Android app, the publish chain, the AAB on the Lenovo, or the Tour Mode narration gate.
 
 ### State as of S186 close
 
@@ -21,31 +30,35 @@
 - **Operator-confirmed working post-S186 walk:** First Church Meetinghouse 1692 Site visible during tour with Hist Landmark checkbox OFF (force-visible via is_tour_poi); same POI does not re-fire after walk-sim stop+start. Operator close: "good enough."
 - **Upload signing key** — one off-machine copy on USB; second-medium copy still owed before first Play Console upload.
 
-### S187 next steps — operator direction at S186 close: "we continue next session with refinement"
+### S188 next steps — S187 shipped the Lint tab; the next session uses it
 
-**Claude-side technical work:**
+**Use the new Lint tab to drive content cleanup. Operator drill-down: the lint tab now surfaces these gaps in plain English with one-click jump-to-editor:**
 
-1. **Backfill `year_established` on ENTERTAINMENT + LODGING.** With strict pre-1860 filter, the Hist Landmark override only narratable set is currently 79 POIs (74 HIST_BLDG + 0 ENTERTAINMENT + 5 LODGING — most ENTERTAINMENT/LODGING rows have NULL year). Operator should backfill via admin one-by-one or via a research pass for the historic core (Hawthorne Hotel, etc.).
+1. **Backfill `year_established` on the 500+ Historical Buildings flagged by `hist_bldg_missing_year`.** Lint tab → Historical Buildings → drill in. Each item has Open Editor → Operational tab → Year Established. Pull from SalemIntelligence at :8089 or MHC inventory. Reduces the cap-hit so other gaps surface.
 
-2. **Author narration text for the 8 newly tour-flagged HIST_BLDG museums.** They have `is_tour_poi=true` after the S186 bulk-flag but `has_announce_narration=false` — tour-eligible but silent. Pull from SalemIntelligence or curate manually.
+2. **Author narration text for the Historical Buildings flagged by `hist_bldg_missing_narration` (3 active) AND the 8 museums tour-flagged in S186 (`narration_tour_missing` includes them).** Open Editor → Narration tab → Short Narration. Pull from SalemIntelligence.
 
-3. **De-hardcode the Room identity_hash in `cache-proxy/scripts/publish-tour-legs.js`.** Currently stamps `dad6c01b8e5f8fed0ae9ff6f8ef7432d` (v10). The align script overwrites it but if anyone ran the publish chain without the align trailing, the asset would carry a stale hash. Read latest from `app-salem/schemas/<DB>/<v>.json` instead.
+3. **Pre-AAB hard-delete the 365 dedup losers** (carry-forward from S185, **count corrected by S187 lint** — was estimated at 110, actual is 365). Lint tab → Cleanup → "Soft-deleted dedup losers (pre-AAB cleanup)" → confirm one-by-one OR run the bulk SQL from CLAUDE.md (verify zero FK refs first). This must happen before first Play Store upload.
 
-4. **Onboarding-to-nearest-point on tour start** (S185 carry-forward, still owed). When user picks a tour and isn't on the polyline, route them to the nearest point on it before walk mode begins. Path: `TourViewModel.startTour()` → fetch `tour_legs` → flatten polyline → find nearest segment → `walkingDirections.getRoute(userLoc, nearestPoint)` → publish as active directions session.
+4. **Run the address-geocode deep scan once.** Lint tab → Geography → "Address ↔ geocode mismatch (deep scan)" → Run Verification. Background pass, ~1700 POIs × ~250ms-15s each. Returns the worst N mismatches sorted by distance. Use the Geocodes button per POI to override or validate.
 
-5. **GPS-OBS heartbeat investigation** (S185 carry-forward). Lenovo TB305FU quirk: system GPS delivers fixes but app's tour observer reports them stale. Same family as broken-motion-sensor issue. Investigate why fresh fixes aren't reaching `lastFixAtMs`.
+5. **Suppress lighthouse-style false positives as you encounter them.** Per-item Suppress button. Once suppressed they stop appearing; toggleable via the Suppressed (N) header button.
 
-6. **Tier 2 — admin → build pipeline auto-bake** (S180/S185 carry-forward, escalated). Wrap `publish-salem-pois.js` + `publish-tours.js` + `publish-tour-legs.js` + `align-asset-schema-to-room.js` as a `preBuild`-dependent Gradle task with stale-bake warning. Critical since the publish chain has 4 scripts now (S186 added is_civic_poi to publish-salem-pois.js too) and getting any out of order leaves a destructive-migration footgun.
+6. **De-hardcode the Room identity_hash in `cache-proxy/scripts/publish-tour-legs.js`** (S186 carry-forward). Currently stamps `dad6c01b8e5f8fed0ae9ff6f8ef7432d` (v10). Read latest from `app-salem/schemas/<DB>/<v>.json` instead.
 
-7. **Pre-AAB hard-delete dedup losers** (S185 carry-forward). S123 soft-deleted 110 duplicate POIs marked in `data_source`. Before first Play Store upload: `DELETE FROM salem_pois WHERE data_source LIKE '%dedup-2026-04-13-loser%' OR data_source LIKE '%address-dedup-2026-04-13-loser%';` (verify zero FK refs first).
+7. **Onboarding-to-nearest-point on tour start** (S185 carry-forward, still owed). When user picks a tour and isn't on the polyline, route them to the nearest point on it before walk mode begins. Path: `TourViewModel.startTour()` → fetch `tour_legs` → flatten polyline → find nearest segment → `walkingDirections.getRoute(userLoc, nearestPoint)` → publish as active directions session.
 
-8. **Re-author the 5 deleted Kotlin tours in PG** (S185 carry-forward). Polyline-only tours via web admin. Each: insert `salem_tours` row, drop free waypoints, click Compute Route, eyeball-verify, re-run publish chain.
+8. **GPS-OBS heartbeat investigation** (S185 carry-forward). Lenovo TB305FU quirk: system GPS delivers fixes but app's tour observer reports them stale. Same family as broken-motion-sensor issue. Investigate why fresh fixes aren't reaching `lastFixAtMs`.
 
-9. **Continue eyes-on smoke test on Lenovo** (S180/S181/S182 carry-forward): POI detail Visit Website ACTION_VIEW handoff; Find dialog Reviews/Comments hidden; Find Directions on-device router; toolbar gating; webcam dialog "View Live" hidden.
+9. **Tier 2 — admin → build pipeline auto-bake** (S180/S185 carry-forward, escalated). Wrap `publish-salem-pois.js` + `publish-tours.js` + `publish-tour-legs.js` + `align-asset-schema-to-room.js` as a `preBuild`-dependent Gradle task with stale-bake warning. Critical since the publish chain has 4 scripts now and getting any out of order leaves a destructive-migration footgun.
 
-10. **Tier 3 — outlier POI coordinate fixes.** `salem_common_2` 600m off; `salem_willows` mid-parking-lot. Fix via `UPDATE salem_pois`, re-run publish chain, rebuild.
+10. **Re-author the 5 deleted Kotlin tours in PG** (S185 carry-forward). Polyline-only tours via web admin. Each: insert `salem_tours` row, drop free waypoints, click Compute Route, eyeball-verify, re-run publish chain.
 
-11. **Deferred from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; admin vertex hand-editing for `salem_tour_legs`.
+11. **Continue eyes-on smoke test on Lenovo** (S180/S181/S182 carry-forward): POI detail Visit Website ACTION_VIEW handoff; Find dialog Reviews/Comments hidden; Find Directions on-device router; toolbar gating; webcam dialog "View Live" hidden.
+
+12. **Outlier POI coordinate fixes** (now surfaced by lint `geo_outlier`, 75 flagged). `salem_common_2` 600m off; `salem_willows` mid-parking-lot; rest discoverable via the lint tab. Use the Geocodes modal to validate-or-override.
+
+13. **Deferred from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; admin vertex hand-editing for `salem_tour_legs`.
 
 **Operator-side (Claude cannot do these for you):**
 

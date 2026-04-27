@@ -206,11 +206,21 @@ export interface PendingMove {
 interface AdminMapProps {
   pois: PoiRow[] | null
   selectedPoi: PoiSelection | null
+  /** Override the FlyToSelected zoom floor (default 17). Lint nav passes 20. */
+  selectedPoiMinZoom?: number
   onPoiSelect: (selection: PoiSelection) => void
   onPoiMoved: (id: string, lat: number, lng: number) => void
   /** When set, only POIs with matching category render on the map. */
   categoryFilter?: string | null
   onClearCategoryFilter?: () => void
+  /** When set (S187 lint nav), only POIs whose id is in the set render. Used
+   *  by the Lint tab "Show on Map" action so the operator sees only the POIs
+   *  flagged by the current check. Independent of categoryFilter (intersected
+   *  if both are set). */
+  lintIdFilter?: Set<string> | null
+  /** Optional label shown in the floating filter banner. */
+  lintIdFilterLabel?: string | null
+  onClearLintIdFilter?: () => void
   /** Tour-mode props (S174). When activeTour is set, the tour-stop layer
    *  renders numbered draggable waypoints over the basemap. */
   activeTour?: TourSummary | null
@@ -619,9 +629,12 @@ function ParcelHitTest({ pois, onPoiSelect }: HitTestProps) {
 
 interface FlyToProps {
   selectedPoi: PoiSelection | null
+  /** Minimum zoom floor when flying to the selection. Default 17. Lint nav
+   *  overrides to 20 (3 closer) so the operator lands tight on the marker. */
+  minZoom?: number
 }
 
-function FlyToSelected({ selectedPoi }: FlyToProps) {
+function FlyToSelected({ selectedPoi, minZoom = 17 }: FlyToProps) {
   const map = useMap()
   const lastIdRef = useRef<string | null>(null)
   useEffect(() => {
@@ -632,9 +645,9 @@ function FlyToSelected({ selectedPoi }: FlyToProps) {
     const { lat, lng } = selectedPoi.poi
     if (typeof lat !== 'number' || typeof lng !== 'number') return
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
-    const targetZoom = Math.max(map.getZoom(), 17)
+    const targetZoom = Math.max(map.getZoom(), minZoom)
     map.flyTo([lat, lng], targetZoom, { duration: 0.6 })
-  }, [selectedPoi, map])
+  }, [selectedPoi, map, minZoom])
   return null
 }
 
@@ -1298,10 +1311,14 @@ function DirectionsPanel({
 export function AdminMap({
   pois,
   selectedPoi,
+  selectedPoiMinZoom,
   onPoiSelect,
   onPoiMoved,
   categoryFilter,
   onClearCategoryFilter,
+  lintIdFilter,
+  lintIdFilterLabel,
+  onClearLintIdFilter,
   activeTour,
   tourStops,
   tourLegs,
@@ -1319,9 +1336,15 @@ export function AdminMap({
 }: AdminMapProps) {
   const filteredPois = useMemo(() => {
     if (!pois) return pois
-    if (!categoryFilter) return pois
-    return pois.filter((p) => (p.category as string | undefined) === categoryFilter)
-  }, [pois, categoryFilter])
+    let out = pois
+    if (categoryFilter) {
+      out = out.filter((p) => (p.category as string | undefined) === categoryFilter)
+    }
+    if (lintIdFilter && lintIdFilter.size > 0) {
+      out = out.filter((p) => lintIdFilter.has(p.id))
+    }
+    return out
+  }, [pois, categoryFilter, lintIdFilter])
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -1561,7 +1584,7 @@ export function AdminMap({
           active={addStopMode === 'free'}
           onClick={handleMapClickAddFree}
         />
-        <FlyToSelected selectedPoi={selectedPoi} />
+        <FlyToSelected selectedPoi={selectedPoi} minZoom={selectedPoiMinZoom} />
         {tourLegs && tourLegs.length > 0 && (
           <TourLegsLayer
             legs={tourLegs}
@@ -1600,6 +1623,22 @@ export function AdminMap({
           <button
             type="button"
             onClick={onClearCategoryFilter}
+            className="ml-1 text-white/80 hover:text-white underline text-xs"
+          >
+            clear
+          </button>
+        </div>
+      )}
+      {lintIdFilter && lintIdFilter.size > 0 && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-[500]
+                        bg-amber-600 text-white text-sm px-3 py-1 rounded-full shadow
+                        flex items-center gap-2">
+          <span>
+            Lint filter: <strong>{lintIdFilterLabel || `${lintIdFilter.size} POIs`}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={onClearLintIdFilter}
             className="ml-1 text-white/80 hover:text-white underline text-xs"
           >
             clear

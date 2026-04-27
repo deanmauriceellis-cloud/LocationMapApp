@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 177-186. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 178-187. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 187: 2026-04-26 — Admin Lint tab: 15-check data-quality scan + tiger.geocode address validator + false-positive suppression
+
+Operator asked to refine the admin tool before returning to the Android app — built a feature-complete data-quality "Lint" tab in the web admin. Backend (`cache-proxy/lib/admin-lint.js`, NEW) registers 15 instant checks (Narration ×2, Tour gates ×1, Historical Buildings ×2, Content ×2, Geography ×2, Duplicates, Cleanup, Provenance, Tour data ×3) plus 1 on-demand check (address↔geocode mismatch deep scan via `tiger.geocode()`). Frontend (`LintTab.tsx`, `GeocodeCandidatesModal.tsx`, NEW; AdminLayout/AdminMap modified) renders a left-side category tree with drill-down counts, right pane with plain-English message + fix hint per item, and four per-item actions: Open Editor, Show on Map (lint nav also filters the map to ONLY the current check's POIs and bumps the fly-to floor from zoom 17 to 20), Geocodes (modal with N tiger.geocode candidates, [Use This Location] override per candidate, [Validate Current Location] that POSTs to a new `/mark-verified` endpoint), and Suppress (operator: "There will be false events — things like the lighthouse" — new `salem_lint_suppressions` table with PK (poi_id, check_id), every POI check inlines a NOT IN exclusion clause, header toggle to view/unsuppress). Tiger MA address data was missing — `tiger.geocode()` was returning city centroids only. Configured `tiger.loader_platform` for peer-auth + custom staging, generated state-25 loader script, ran in background (~322 MB / 13 tables / 576K addr / 703K featnames / 761K edges); ma_edges import initially failed because salem-router added 5 pgrouting columns to the `tiger.edges` parent — fixed with a custom edges-only loader that ALTERs the staging table to add NULL placeholders before `loader_load_staged_data` runs. Address normalizer strips ", USA" suffix (Tiger returns 0 candidates if it sees this), normalizes "Street → St" / "Avenue → Ave" / etc., 15-second per-call statement_timeout so misses don't hang. Initial counts (operator-actionable): 500 hist_bldg missing year (capped), 365 soft-deleted dedup losers (S185 estimate was 110 — actual 3.3× higher), 119 tour POIs missing image, 75 outlier coords, 150 in geocoder-fallback clusters, 54 thin-provenance tour POIs, 30 civic POIs silent. Tour-data checks all 0 (clean). Address-geocode deep scan idle until operator clicks Run.
+
+Full session detail: `docs/session-logs/session-187-2026-04-26.md`. Commit: `<filled-in-on-close>`.
+
+---
 
 ## Session 186: 2026-04-26 — Tour Mode narration gate + mode-dependent Layers checkboxes (POIs Civic / POIs Hist. Landmark)
 
@@ -76,46 +84,6 @@ Full session detail: `docs/session-logs/session-178-2026-04-25.md`. Commit: `a7d
 
 ---
 
-## Session 177: 2026-04-25 — Web walking router + Leaflet Directions UI
 
-Two final S175 carry-forwards shipped. **P4:** new `cache-proxy/lib/salem-router.js` is a JS port of `RoutingBundle.kt` + `Router.kt` reading the same `salem-routing-graph.sqlite` the APK ships — CSR adjacency, expanding-ring grid KNN with planar SRID-4269 distance, binary-heap Dijkstra, undirected pedestrian graph. Endpoints: `GET /salem/route?from_lat&from_lng&to_lat&to_lng[&source=live|bundle]`, `POST /salem/route-multi`, `GET /salem/route/meta`. `?source=live` falls through to `tiger.route_walking()` over a lazy-init unix-socket pg.Pool (peer auth) and stitches the returned MultiLineString into travel order by walking endpoints. Smoke-tested against the four `RouterParityTest.kt` reference fixtures — all four match bit-exact (Common→7G 1240.7187 m, Commuter Rail→Museum Place 509.8629 m, Witch House→Burying Point 413.7483 m, Peabody→Derby Wharf 1078 m sanity). Bundle vs live cross-check produces ±0 mm; the `DIVERGENCE` warning would fire above 5%. **P5:** new optional `onShowDirections` prop on `PoiEditDialog` adds a Directions button; AdminLayout owns the `directionsTarget` state; AdminMap renders `<DirectionsLayer>` (Polyline #22C55E w/ #0f5132 outer casing, origin CircleMarker, fits bounds once per target+source) and a `<DirectionsPanel>` (distance/duration/pace + bundle/live source toggle + close ×). TS clean, Vite production build clean, end-to-end data path verified through the Vite `/api` → cache-proxy `/salem` proxy. Visual click-flow verification deferred to operator. The S175 five-task queue (P3b/P3c/P2c/P4/P5) is now fully drained.
-
-Full session detail: `docs/session-logs/session-177-2026-04-25.md`. Commit: `0c43131`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 175 and earlier are in SESSION-LOG-ARCHIVE.md -->
-<!-- S175 rolled to archive 2026-04-26 by the session-end protocol (S185) -->
-<!-- S174 rolled to archive 2026-04-26 by the session-end protocol (S184) -->
-<!-- S173 rolled to archive 2026-04-26 by the session-end protocol (S183) -->
-<!-- S172 rolled to archive 2026-04-26 by the session-end protocol (S182) -->
-<!-- S171 rolled to archive 2026-04-26 by the session-end protocol (S181) -->
-<!-- S170 rolled to archive 2026-04-26 by the session-end protocol (S180) -->
-<!-- S169 rolled to archive 2026-04-26 by the session-end protocol (S179) -->
-<!-- S168 rolled to archive 2026-04-26 by the session-end protocol (S178) -->
-<!-- S167 rolled to archive 2026-04-25 by the session-end protocol (S177) -->
-<!-- S166 rolled to archive 2026-04-25 by the session-end protocol (S176) -->
-<!-- S165 rolled to archive 2026-04-25 by the session-end protocol (S175) -->
-<!-- S164 rolled to archive 2026-04-25 by the session-end protocol (S174) -->
-<!-- S163 rolled to archive 2026-04-25 by the session-end protocol (S173) -->
-<!-- S162 rolled to archive 2026-04-25 by the session-end protocol (S172) -->
-<!-- S161 rolled to archive 2026-04-25 by the session-end protocol (S171) -->
-<!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
-<!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
-<!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
-<!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->
-<!-- S160 rolled to archive 2026-04-24 by the session-end protocol (S170) -->
-<!-- S159 rolled to archive 2026-04-24 by the session-end protocol (S169) -->
-<!-- S158 rolled to archive 2026-04-24 by the session-end protocol (S168) -->
-<!-- S157 rolled to archive 2026-04-24 by the session-end protocol (S167) -->
-<!-- S156 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
-<!-- S155 rolled to archive 2026-04-24 by the session-end protocol (S166) -->
-<!-- S154 rolled to archive 2026-04-24 by the session-end protocol (S164) -->
-<!-- S153 rolled to archive 2026-04-24 by the session-end protocol (S163) -->
-<!-- S152 rolled to archive 2026-04-23 by the session-end protocol (S162) -->
-<!-- S151 rolled to archive 2026-04-23 by the session-end protocol (S161) -->
-<!-- S150 rolled to archive 2026-04-23 by the session-end protocol (S160) -->
-<!-- S149 rolled to archive 2026-04-23 by the session-end protocol (S159) -->
-<!-- S148 rolled to archive 2026-04-23 by the session-end protocol (S158) -->
-
-
+<!-- END OF ROLLING WINDOW — Sessions 176 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S177 rolled to archive 2026-04-26 by the session-end protocol (S187) -->
