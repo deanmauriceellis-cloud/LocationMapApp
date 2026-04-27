@@ -1,7 +1,15 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 178, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 179, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 178, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 179, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 179: 2026-04-26 — Tour routing unified to live engine + bake-time edge splitting
+
+Two shipped pieces. **P1:** runtime tour polyline now computed via the same `Router.route()` against the bundled Salem walking graph that powers point-to-point "Get directions" — pre-baked `tour_legs` / `routeToNext` from S178 P6 are no longer consulted, gold tour line replaced with green + dark-green-border + intersection markers identical to point-to-point, `WalkingDirections.getBundledTourRoute()` removed. **P2:** operator field-tested directions to Phillips House (34 Chestnut St) drew a polyline that didn't enter Chestnut St; root-caused to TIGER's intersection-only vertex layout (95m gap to nearest walkable vertex, 108m tail approach blocked by 60m safety cap). Added bake-time edge splitting in `bake-salem-routing.py` — long edges >60m split into ~40m sub-segments with synthetic mid-edge walkable nodes; graph went from 16,237 edges / 12,756 nodes to 47,704 / 44,223 (asset 5 → 11.2 MB, bake 0.8s). Phillips House snap 95m → 30m, operator confirmed "working very well" on Lenovo. Carry-forward: option 2 (runtime mid-edge projection) for the residual ~30m, plus walk-sim + DebugEndpoints `TourRouteLoader` cleanup, then full retirement of `TourLegBaker` / `tour_legs` / `routeToNext`.
+
+Full session detail: `docs/session-logs/session-179-2026-04-26.md`. Commit: `e86de97`.
+
+---
 
 ## Session 178: 2026-04-25/26 — P6 tour-leg pre-bake + :routing-jvm extraction + surgical OSM pedestrian ingest
 

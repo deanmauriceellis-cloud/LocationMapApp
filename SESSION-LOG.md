@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 179-188. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 180-189. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 189: 2026-04-26 — Total launch review + .odt intake document
+
+Diagnostic / planning session, no app or admin code changed. Operator asked for a "total review" of where the project stands going to market; spawned two parallel Explore agents to summarize legal/IP/commercial docs (`GOVERNANCE.md` / `IP.md` / `COMMERCIALIZATION.md` / both privacy policies) and design/test/sessions/OMEN context (`DESIGN-REVIEW.md` / `MASTER_SESSION_REFERENCE.md` / `CURRENT_TESTING.md` / S185–S187 live logs / OMEN notes + ACTIVE.md), then synthesized a 10-section inline review (Executive Snapshot / Strengths / Critical Concerns / Soft Concerns / Open Questions / Feature Ideas / V2 Backlog / Honest GTM Assessment / Action Order / Top Risks). Critical-blocker findings: Form TX copyright filing 23 days out and unconfirmed; 2026-04-20 lawyer meeting outcome not in any session log; privacy policy `[TBD]` placeholders unresolved; Play Console developer account not started (multi-week lead); 365 dedup losers still soft-deleted in PG (S185 estimated 110, S187 lint surfaced actual 365); V1 feature-gating eyes-on smoke test from S180 still owed (5 items); single-medium upload-keystore backup. Soft findings include doc drift in CLAUDE.md / STATE.md still citing the pre-S167 544 MB poi-icons figure (current is 3.4 MB), zero Kotlin unit tests with the narration gate as the highest-risk untested logic, two consecutive zero-Android sessions (S187/S188) while operator-side launch prep has not visibly begun, untested Android TTS audio quality for a $19.99 paid product, missing marketing/ASO plan, no iOS plan. Operator then requested the review as a `.odt` they could annotate as the intake into S190+ planning. Built `cache-proxy/scripts/build-launch-review-odt.py` (odfpy-based, full style suite — heading hierarchy, severity banners, inline spans, violet-bordered ResponseBox blocks) and generated `docs/V1-LAUNCH-REVIEW-2026-04-27.odt` (13 KB OpenDocument Text, ~40 KB content.xml, 11 sections with explicit "Operator Response" blocks after every concern, question, feature idea, action-week, and risk). One bug fixed mid-build (helper signature mismatch when passing `text_props=...` as kwarg into `**text_props`). The annotated copy of the `.odt` will drive S190+ work; pre-existing S189 TOP PRIORITY items in `STATE.md` remain valid and are now framed inside the broader launch-review action order.
+
+Full session detail: `docs/session-logs/session-189-2026-04-26.md`. Commit: pending session-end push.
+
+---
 
 ## Session 188: 2026-04-26 — Geocode-candidates modal polish (cluster geocoding, smart conflict analyzer, map preview w/ accept/ignore) + Witchy-only basemap with server-side auto-overzoom
 
@@ -76,13 +84,5 @@ Full session detail: `docs/session-logs/session-180-2026-04-26.md`. Commit: `04c
 
 ---
 
-## Session 179: 2026-04-26 — Tour routing unified to live engine + bake-time edge splitting
-
-Two shipped pieces. **P1:** runtime tour polyline now computed via the same `Router.route()` against the bundled Salem walking graph that powers point-to-point "Get directions" — pre-baked `tour_legs` / `routeToNext` from S178 P6 are no longer consulted, gold tour line replaced with green + dark-green-border + intersection markers identical to point-to-point, `WalkingDirections.getBundledTourRoute()` removed. **P2:** operator field-tested directions to Phillips House (34 Chestnut St) drew a polyline that didn't enter Chestnut St; root-caused to TIGER's intersection-only vertex layout (95m gap to nearest walkable vertex, 108m tail approach blocked by 60m safety cap). Added bake-time edge splitting in `bake-salem-routing.py` — long edges >60m split into ~40m sub-segments with synthetic mid-edge walkable nodes; graph went from 16,237 edges / 12,756 nodes to 47,704 / 44,223 (asset 5 → 11.2 MB, bake 0.8s). Phillips House snap 95m → 30m, operator confirmed "working very well" on Lenovo. Carry-forward: option 2 (runtime mid-edge projection) for the residual ~30m, plus walk-sim + DebugEndpoints `TourRouteLoader` cleanup, then full retirement of `TourLegBaker` / `tour_legs` / `routeToNext`.
-
-Full session detail: `docs/session-logs/session-179-2026-04-26.md`. Commit: `e86de97`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 178 and earlier are in SESSION-LOG-ARCHIVE.md -->
-<!-- S178 rolled to archive 2026-04-26 by the session-end protocol (S188) -->
+<!-- END OF ROLLING WINDOW — Sessions 179 and earlier are in SESSION-LOG-ARCHIVE.md -->
+<!-- S179 rolled to archive 2026-04-27 by the session-end protocol (S189) -->
