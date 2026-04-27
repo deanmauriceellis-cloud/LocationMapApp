@@ -297,6 +297,45 @@ async function checkHistBldgMissingNarration(pgPool) {
   ));
 }
 
+async function checkHistCuratedNotTour(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('hist_curated_not_tour', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, data_source
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND category = 'HISTORICAL_BUILDINGS'
+      AND (data_source NOT LIKE '%massgis%' OR data_source IS NULL)
+      AND is_tour_poi = false
+      ${suppress}
+    ORDER BY name
+    LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Curated Historical Building is not flagged is_tour_poi. Won't narrate during tour mode and won't appear under Tour POIs in the tree.`,
+    `Open the editor → Operational tab → check "Tour POI". The MHC bulk-imported buildings stay off; only the hand-curated ones (data_source not "massgis") should be on.`,
+  ));
+}
+
+async function checkCivicFlagMismatch(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('civic_flag_mismatch', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, category
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND is_civic_poi = true
+      AND category <> 'CIVIC'
+      ${suppress}
+    ORDER BY category, name
+    LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `is_civic_poi=true but category is "${r.category}", not CIVIC. Will appear under both the POIs Civic Layers checkbox and its real category bucket — usually unintended (S186 leftover after a category change).`,
+    `Open the editor → Operational tab → uncheck "Civic POI". Or, if it really IS civic, change the category to CIVIC.`,
+  ));
+}
+
 async function checkContentNoDescription(pgPool) {
   const params = [ITEM_CAP];
   const suppress = suppressionClause('content_no_description', params);
@@ -626,6 +665,8 @@ const CHECKS = [
   { id: 'tour_gate_missing_year',    label: 'Tour-eligible POIs missing year_established',category: 'Tour gates', severity: 'warn',  run: checkTourGateMissingYear },
   { id: 'hist_bldg_missing_year',    label: 'Historical Buildings missing year_established',category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingYear },
   { id: 'hist_bldg_missing_narration', label: 'Historical Buildings with no narration text', category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingNarration },
+  { id: 'hist_curated_not_tour',     label: 'Curated Historical Buildings missing tour flag', category: 'Historical Buildings', severity: 'warn',  run: checkHistCuratedNotTour },
+  { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'warn',  run: checkCivicFlagMismatch },
   { id: 'content_no_description',    label: 'POIs with no description text',              category: 'Content',    severity: 'info',  run: checkContentNoDescription },
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },
   { id: 'geo_outlier',               label: 'Outlier coordinates',                        category: 'Geography',  severity: 'error', run: checkGeoOutlier },

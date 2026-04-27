@@ -446,13 +446,15 @@ export function PoiEditDialog({
   onShowDirections,
 }: PoiEditDialogProps) {
   // ─── Form state ────────────────────────────────────────────────────────────
-  // We rebuild defaults from scratch each time the dialog opens for a different
-  // POI. The `key` on Dialog forces a fresh form mount per POI; that combined
-  // with `defaultValues` is the simplest way to keep state isolated per POI.
+  // Only re-init when the POI *identity* changes (open-on-different-row).
+  // Reacting to every `poi` prop change wipes unsaved edits whenever the
+  // parent updates lat/lng after a marker drag — see S191 race fix.
+  const poiId = poi?.id ?? null
   const defaultValues = useMemo(() => {
     if (!poi) return {}
     return buildDefaults(poi)
-  }, [poi])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poiId])
 
   const {
     register,
@@ -463,7 +465,6 @@ export function PoiEditDialog({
     watch,
   } = useForm<FieldValues>({
     defaultValues,
-    // Re-init when defaults change (POI swap)
     values: defaultValues,
   })
 

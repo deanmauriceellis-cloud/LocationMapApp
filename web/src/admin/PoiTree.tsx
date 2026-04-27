@@ -145,6 +145,10 @@ interface TreeFilter {
 const SYNTHETIC_CATEGORY_LABELS: Record<string, string> = {
   'HISTORICAL_BUILDINGS:non_mhc': 'Historic Buildings',
   'HISTORICAL_BUILDINGS:mhc': 'POI Hist. Landmark',
+  // S191 — cross-cutting data_source views. Not real categories; show every
+  // POI whose data_source mentions the source, regardless of stored category.
+  'SOURCE:destination_salem': 'Destination Salem (source)',
+  'SOURCE:haunted_happenings': 'Haunted Happenings (source)',
 }
 
 /**
@@ -180,9 +184,22 @@ export function categoryLabel(cat: string): string {
 export const HIST_BUILDINGS_FILTER = 'HISTORICAL_BUILDINGS:non_mhc'
 export const HIST_LANDMARK_FILTER = 'HISTORICAL_BUILDINGS:mhc'
 
+// S191 — synthetic source-based filters. Cross-cutting (any category).
+export const SOURCE_DESTSALEM_FILTER = 'SOURCE:destination_salem'
+export const SOURCE_HAUNTED_FILTER = 'SOURCE:haunted_happenings'
+
+const SOURCE_FILTERS: Record<string, string> = {
+  [SOURCE_DESTSALEM_FILTER]: 'destination_salem',
+  [SOURCE_HAUNTED_FILTER]: 'haunted_happenings',
+}
+
 export function isMassgisHistorical(poi: { category?: string; data_source?: string }): boolean {
   if (poi.category !== 'HISTORICAL_BUILDINGS') return false
   return ((poi.data_source ?? '') as string).toLowerCase().includes('massgis')
+}
+
+function dataSourceContains(poi: { data_source?: string }, needle: string): boolean {
+  return ((poi.data_source ?? '') as string).toLowerCase().includes(needle)
 }
 
 /** Predicate used by AdminMap to interpret synthetic category filter keys. */
@@ -194,6 +211,8 @@ export function categoryFilterMatches(
   if (filter === HIST_BUILDINGS_FILTER) {
     return poi.category === 'HISTORICAL_BUILDINGS' && !isMassgisHistorical(poi)
   }
+  const sourceNeedle = SOURCE_FILTERS[filter]
+  if (sourceNeedle) return dataSourceContains(poi, sourceNeedle)
   return (poi.category ?? '') === filter
 }
 
@@ -251,7 +270,34 @@ function buildTree(
     arr.sort((a, b) => a.display_order - b.display_order)
   }
 
-  return catEntries.map(([cat, rowsInCat]) => {
+  // S191 — synthetic source-based virtual categories prepended at the top of
+  // the tree. These cross-cut real categories: a POI from data_source
+  // "destination_salem+openstreetmap" appears here AND under its real category.
+  // Flat children list (no subcategory layer) since these are saved-search views.
+  const sourceNodes: TreeNode[] = []
+  for (const [key, needle] of Object.entries(SOURCE_FILTERS)) {
+    const sourceRows = filtered
+      .filter((r) => dataSourceContains(r, needle))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    const node: TreeNode = {
+      id: `cat:${key}`,
+      label: SYNTHETIC_CATEGORY_LABELS[key],
+      type: 'category',
+      category: key,
+      count: sourceRows.length,
+      children: sourceRows.map((row): TreeNode => ({
+        id: `cat:${key}|poi:${row.id}`,
+        label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+        type: 'poi',
+        category: key,
+        poi: row,
+        isDeleted: !!row.deleted_at,
+      })),
+    }
+    sourceNodes.push(node)
+  }
+
+  const realNodes: TreeNode[] = catEntries.map(([cat, rowsInCat]): TreeNode => {
     // S190 — bucket POIs by their stored subcategory; collect rows whose
     // subcategory is null/empty into a separate "(no subcategory)" bucket
     // so the operator can see which POIs still need a subcategory assigned.
@@ -355,6 +401,8 @@ function buildTree(
       children,
     }
   })
+
+  return [...sourceNodes, ...realNodes]
 }
 
 // ─── ResizeObserver hook ─────────────────────────────────────────────────────
