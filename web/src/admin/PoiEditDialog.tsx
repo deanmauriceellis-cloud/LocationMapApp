@@ -38,7 +38,7 @@
 //   - 9P.10a — Linked Historical Content tab is a stub; real impl after 9Q
 //   - 9P.10b — "Generate with Salem Oracle" button slot in Narration tab
 
-import { Fragment, useCallback, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Dialog,
   DialogPanel,
@@ -65,6 +65,14 @@ import {
   NUMERIC_FIELDS,
   DATE_FIELDS,
 } from './poiAdminFields'
+// S190 — taxonomy is sourced from the live admin endpoints, not the
+// hardcoded POI_CATEGORIES file. The TS file is still authoritative for
+// pref-key naming and Android default visibility, but the admin tool now
+// drives both <select> dropdowns from salem_poi_categories /
+// salem_poi_subcategories so operator-added entries appear immediately.
+// Type definitions live in PoiTree.tsx and are re-exported here.
+export type { CategoryRow, SubcategoryRow } from './PoiTree'
+import type { CategoryRow, SubcategoryRow } from './PoiTree'
 import {
   ask as oracleAsk,
   isAskOk,
@@ -120,10 +128,23 @@ export interface PoiEditDialogProps {
   /** @deprecated kind removed in Phase 9U — unified table */
   /**
    * Observed category / business_type values from the loaded dataset.
-   * Used to populate the <datalist> autocomplete on the category field.
-   * Operator can type new values; this is just hints.
+   * Used to populate the <datalist> autocomplete on the business_type field
+   * (free-text). Category is now a strict <select> driven by `categories`.
    */
   knownCategories: string[]
+  /**
+   * S190 — canonical taxonomy from salem_poi_categories /
+   * salem_poi_subcategories. Drives both the strict <select> dropdowns and
+   * the inline "+ Add new" forms.
+   */
+  categories: CategoryRow[]
+  subcategories: SubcategoryRow[]
+  /**
+   * S190 — called after a successful POST creating a new category or
+   * subcategory. Parent should re-fetch (or optimistically append) so the
+   * dropdown re-renders with the new value selectable.
+   */
+  onTaxonomyChanged: () => void | Promise<void>
   /**
    * 9P.10b: whether the Salem Oracle is currently reachable, mirrored from
    * AdminLayout's polled status. When false, the "Generate with Salem Oracle"
@@ -414,6 +435,9 @@ export function PoiEditDialog({
   open,
   poi,
   knownCategories,
+  categories,
+  subcategories,
+  onTaxonomyChanged,
   oracleAvailable,
   onOracleRefresh,
   onSaved,
@@ -436,11 +460,143 @@ export function PoiEditDialog({
     formState: { dirtyFields, isDirty, isSubmitting },
     reset,
     setValue,
+    watch,
   } = useForm<FieldValues>({
     defaultValues,
     // Re-init when defaults change (POI swap)
     values: defaultValues,
   })
+
+  // S190 — drive Category as a strict <select> from salem_poi_categories,
+  // and Subcategory as a <select> filtered to subcategories whose
+  // category_id matches. Watch category so the subcategory list reacts.
+  const currentCategory = (watch('category') as string | undefined) ?? ''
+  const currentSubcategory = (watch('subcategory') as string | undefined) ?? ''
+
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.display_order - b.display_order),
+    [categories],
+  )
+
+  const subcategoryOptions = useMemo(() => {
+    const cat = currentCategory.trim()
+    if (!cat) return [] as SubcategoryRow[]
+    return subcategories
+      .filter((s) => s.category_id === cat)
+      .sort((a, b) => a.display_order - b.display_order)
+  }, [currentCategory, subcategories])
+
+  // If the operator changes the category and the current subcategory no
+  // longer matches, clear it. Avoids saving a mismatched pair like
+  // (HISTORICAL_BUILDINGS, ENTERTAINMENT__tour_operators).
+  useEffect(() => {
+    if (!currentSubcategory) return
+    const cat = currentCategory.trim()
+    if (!cat) {
+      setValue('subcategory', '', { shouldDirty: true })
+      return
+    }
+    const stillValid = subcategories.some(
+      (s) => s.id === currentSubcategory && s.category_id === cat,
+    )
+    if (!stillValid) {
+      setValue('subcategory', '', { shouldDirty: true })
+    }
+  }, [currentCategory, currentSubcategory, subcategories, setValue])
+
+  // S190 — inline "+ Add new" forms for category + subcategory. Each is a
+  // small expand/collapse panel below its dropdown. On save we POST to the
+  // admin endpoint, then ask the parent to refetch the taxonomy so the
+  // new value is in the next render's options, and select it via setValue.
+  const [addCatOpen, setAddCatOpen] = useState(false)
+  const [newCatLabel, setNewCatLabel] = useState('')
+  const [newCatColor, setNewCatColor] = useState('#607D8B')
+  const [addCatBusy, setAddCatBusy] = useState(false)
+  const [addCatError, setAddCatError] = useState<string | null>(null)
+
+  const [addSubOpen, setAddSubOpen] = useState(false)
+  const [newSubLabel, setNewSubLabel] = useState('')
+  const [addSubBusy, setAddSubBusy] = useState(false)
+  const [addSubError, setAddSubError] = useState<string | null>(null)
+
+  const closeAddCat = useCallback(() => {
+    setAddCatOpen(false)
+    setNewCatLabel('')
+    setNewCatColor('#607D8B')
+    setAddCatError(null)
+  }, [])
+  const closeAddSub = useCallback(() => {
+    setAddSubOpen(false)
+    setNewSubLabel('')
+    setAddSubError(null)
+  }, [])
+
+  const submitAddCategory = useCallback(async () => {
+    const label = newCatLabel.trim()
+    if (!label) {
+      setAddCatError('Label is required')
+      return
+    }
+    setAddCatBusy(true)
+    setAddCatError(null)
+    try {
+      const res = await fetch('/api/admin/salem/categories', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, color: newCatColor }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAddCatError(body.error || `HTTP ${res.status}`)
+        return
+      }
+      const created = body.category as CategoryRow
+      await onTaxonomyChanged()
+      setValue('category', created.id, { shouldDirty: true })
+      closeAddCat()
+    } catch (e) {
+      setAddCatError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAddCatBusy(false)
+    }
+  }, [newCatLabel, newCatColor, onTaxonomyChanged, setValue, closeAddCat])
+
+  const submitAddSubcategory = useCallback(async () => {
+    const label = newSubLabel.trim()
+    const cat = currentCategory.trim()
+    if (!cat) {
+      setAddSubError('Pick a category first')
+      return
+    }
+    if (!label) {
+      setAddSubError('Label is required')
+      return
+    }
+    setAddSubBusy(true)
+    setAddSubError(null)
+    try {
+      const res = await fetch('/api/admin/salem/subcategories', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category_id: cat, label }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAddSubError(body.error || `HTTP ${res.status}`)
+        return
+      }
+      const created = body.subcategory as SubcategoryRow
+      await onTaxonomyChanged()
+      setValue('subcategory', created.id, { shouldDirty: true })
+      closeAddSub()
+    } catch (e) {
+      setAddSubError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAddSubBusy(false)
+    }
+  }, [newSubLabel, currentCategory, onTaxonomyChanged, setValue, closeAddSub])
 
   const [saveError, setSaveError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -805,25 +961,91 @@ export function PoiEditDialog({
                         </FieldRow>
                       )}
 
-                      {/* Category — tour & narration use `category`, business uses `business_type` */}
+                      {/* Category — tour & narration use `category`, business uses `business_type`.
+                          S190: strict <select> driven by salem_poi_categories. Legacy/non-canonical
+                          values are preserved as a tagged option so the operator can see and
+                          correct them without losing data. The "+ Add new category" link below
+                          opens an inline form that POSTs to /admin/salem/categories. */}
                       {has('category') && (
                         <FieldRow
                           label="Category"
                           htmlFor="category"
-                          hint="Free text. Suggestions are existing values from this kind."
+                          hint="Pick one or leave unset. Use + Add to create a new category."
                         >
-                          <input
+                          <select
                             id="category"
-                            type="text"
-                            list="poi-edit-category-list"
                             {...reg('category')}
-                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
-                          />
-                          <datalist id="poi-edit-category-list">
-                            {knownCategories.map((c) => (
-                              <option key={c} value={c} />
+                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded bg-white"
+                          >
+                            <option value="">— none —</option>
+                            {sortedCategories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.label} ({c.id})
+                              </option>
                             ))}
-                          </datalist>
+                            {currentCategory &&
+                              !sortedCategories.some((c) => c.id === currentCategory) && (
+                                <option value={currentCategory}>
+                                  {currentCategory} (legacy — not in canonical list)
+                                </option>
+                              )}
+                          </select>
+                          {!addCatOpen ? (
+                            <button
+                              type="button"
+                              onClick={() => setAddCatOpen(true)}
+                              className="mt-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                            >
+                              + Add new category…
+                            </button>
+                          ) : (
+                            <div className="mt-2 p-2 border border-indigo-300 bg-indigo-50 rounded text-xs space-y-1">
+                              <div className="font-semibold text-indigo-800">New category</div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Label, e.g. Bookstores"
+                                  value={newCatLabel}
+                                  onChange={(e) => setNewCatLabel(e.target.value)}
+                                  disabled={addCatBusy}
+                                  className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded"
+                                  autoFocus
+                                />
+                                <input
+                                  type="color"
+                                  value={newCatColor}
+                                  onChange={(e) => setNewCatColor(e.target.value)}
+                                  disabled={addCatBusy}
+                                  className="h-7 w-10 border border-slate-300 rounded cursor-pointer"
+                                  title="Color"
+                                />
+                              </div>
+                              <div className="text-slate-600">
+                                ID will be auto-derived from label (uppercased, snake_case).
+                              </div>
+                              {addCatError && (
+                                <div className="text-rose-600">{addCatError}</div>
+                              )}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={submitAddCategory}
+                                  disabled={addCatBusy || !newCatLabel.trim()}
+                                  className="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  {addCatBusy ? 'Saving…' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={closeAddCat}
+                                  disabled={addCatBusy}
+                                  className="px-2 py-0.5 text-xs bg-white border border-slate-300 rounded hover:bg-slate-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </FieldRow>
                       )}
                       {has('business_type') && (
@@ -847,13 +1069,83 @@ export function PoiEditDialog({
                         </FieldRow>
                       )}
                       {has('subcategory') && (
-                        <FieldRow label="Subcategory" htmlFor="subcategory">
-                          <input
+                        <FieldRow
+                          label="Subcategory"
+                          htmlFor="subcategory"
+                          hint={
+                            currentCategory
+                              ? `Filtered to ${currentCategory}. Use + Add to create a new subcategory.`
+                              : 'Pick a category first.'
+                          }
+                        >
+                          <select
                             id="subcategory"
-                            type="text"
                             {...reg('subcategory')}
-                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
-                          />
+                            disabled={!currentCategory}
+                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            <option value="">— none —</option>
+                            {subcategoryOptions.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.label}
+                              </option>
+                            ))}
+                            {currentSubcategory &&
+                              !subcategoryOptions.some((s) => s.id === currentSubcategory) && (
+                                <option value={currentSubcategory}>
+                                  {currentSubcategory} (legacy — outside current category)
+                                </option>
+                              )}
+                          </select>
+                          {currentCategory && !addSubOpen && (
+                            <button
+                              type="button"
+                              onClick={() => setAddSubOpen(true)}
+                              className="mt-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                            >
+                              + Add new subcategory under {currentCategory}…
+                            </button>
+                          )}
+                          {addSubOpen && (
+                            <div className="mt-2 p-2 border border-indigo-300 bg-indigo-50 rounded text-xs space-y-1">
+                              <div className="font-semibold text-indigo-800">
+                                New subcategory under {currentCategory}
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Label, e.g. Bed & Breakfast"
+                                value={newSubLabel}
+                                onChange={(e) => setNewSubLabel(e.target.value)}
+                                disabled={addSubBusy}
+                                className="w-full px-2 py-1 text-xs border border-slate-300 rounded"
+                                autoFocus
+                              />
+                              <div className="text-slate-600">
+                                ID will be {currentCategory}__&lt;slug&gt; (auto-derived from label).
+                              </div>
+                              {addSubError && (
+                                <div className="text-rose-600">{addSubError}</div>
+                              )}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={submitAddSubcategory}
+                                  disabled={addSubBusy || !newSubLabel.trim()}
+                                  className="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  {addSubBusy ? 'Saving…' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={closeAddSub}
+                                  disabled={addSubBusy}
+                                  className="px-2 py-0.5 text-xs bg-white border border-slate-300 rounded hover:bg-slate-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </FieldRow>
                       )}
                       {has('cuisine_type') && (

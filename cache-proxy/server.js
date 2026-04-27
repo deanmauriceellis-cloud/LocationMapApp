@@ -194,6 +194,7 @@ require('./lib/salem')(app, deps);
 const salemRouterModule = require('./lib/salem-router')(app, deps);
 deps.salemRoute = salemRouterModule._route;
 deps.salemBundle = salemRouterModule._bundle;
+deps.salemRouteDiag = salemRouterModule._routeDiag;
 
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);
@@ -209,6 +210,9 @@ require('./lib/admin-witch-trials')(app, deps);
 
 // Admin Lint endpoints (S187) — gated by /admin Basic Auth
 require('./lib/admin-lint')(app, deps);
+
+// Admin POI taxonomy endpoints (S190) — categories + subcategories CRUD
+require('./lib/admin-categories')(app, deps);
 
 // Admin tile server (S160) — serves Witchy/Mapnik/Esri offline tiles out of
 // tools/tile-bake/dist/salem_tiles.sqlite so the admin map matches what the

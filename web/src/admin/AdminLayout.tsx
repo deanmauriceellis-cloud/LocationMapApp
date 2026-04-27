@@ -12,15 +12,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PoiTree, type PoiRow, type PoiSelection, type CategorySelection } from './PoiTree'
 import { AdminMap } from './AdminMap'
-import { PoiEditDialog } from './PoiEditDialog'
+import { PoiEditDialog, type CategoryRow, type SubcategoryRow } from './PoiEditDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
 import { TourTree, type AddStopMode } from './TourTree'
 import type { TourLeg, TourStop, TourSummary } from './tourTypes'
 import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
 import { LintTab } from './LintTab'
+import { GeocodesTab } from './GeocodesTab'
 import { GeocodeCandidatesModal } from './GeocodeCandidatesModal'
 
-type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint'
+type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -486,6 +487,36 @@ export function AdminLayout() {
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [pois])
 
+  // S190 — canonical taxonomy from salem_poi_categories /
+  // salem_poi_subcategories. Drives the PoiEditDialog Category and
+  // Subcategory <select> dropdowns and the inline "+ Add new" forms.
+  // Refetched after a successful POST so the new entry is selectable.
+  const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([])
+
+  const refetchTaxonomy = useCallback(async () => {
+    try {
+      const [catRes, subRes] = await Promise.all([
+        fetch('/api/admin/salem/categories', { credentials: 'same-origin' }),
+        fetch('/api/admin/salem/subcategories', { credentials: 'same-origin' }),
+      ])
+      if (catRes.ok) {
+        const body = await catRes.json()
+        setCategories((body.categories || []) as CategoryRow[])
+      }
+      if (subRes.ok) {
+        const body = await subRes.json()
+        setSubcategories((body.subcategories || []) as SubcategoryRow[])
+      }
+    } catch (e) {
+      console.warn('[admin] taxonomy fetch failed:', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refetchTaxonomy()
+  }, [refetchTaxonomy])
+
   const handlePoiMoved = useCallback(
     (id: string, lat: number, lng: number) => {
       setPois((prev) => {
@@ -560,6 +591,16 @@ export function AdminLayout() {
           >
             Lint
           </button>
+          <button
+            type="button"
+            onClick={() => setView('geocodes')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'geocodes' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+            title="Address ↔ stored coords deep verification"
+          >
+            Geocodes
+          </button>
         </div>
 
         {view === 'pois' && (
@@ -608,6 +649,14 @@ export function AdminLayout() {
             onOpenGeocodes={handleLintOpenGeocodes}
           />
         </div>
+      ) : view === 'geocodes' ? (
+        <div className="flex-1 min-h-0">
+          <GeocodesTab
+            onOpenPoi={handleLintOpenPoi}
+            onShowPoiOnMap={handleLintShowPoiOnMap}
+            onOpenGeocodes={handleLintOpenGeocodes}
+          />
+        </div>
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">
           <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
@@ -638,6 +687,7 @@ export function AdminLayout() {
               onPoiMoved={handlePoiMoved}
               categoryFilter={mapCategoryFilter}
               onClearCategoryFilter={() => setMapCategoryFilter(null)}
+              categories={categories}
               activeTour={activeTour}
               tourStops={tourStops}
               tourLegs={tourLegs}
@@ -669,6 +719,8 @@ export function AdminLayout() {
                   onCategorySelect={handleCategorySelect}
                   onDataLoaded={handleDataLoaded}
                   externalPois={pois}
+                  categories={categories}
+                  subcategories={subcategories}
                 />
               </div>
             </aside>
@@ -682,6 +734,7 @@ export function AdminLayout() {
                 onPoiMoved={handlePoiMoved}
                 categoryFilter={mapCategoryFilter}
                 onClearCategoryFilter={() => setMapCategoryFilter(null)}
+                categories={categories}
                 lintIdFilter={lintIdFilter}
                 lintIdFilterLabel={lintIdFilterLabel}
                 onClearLintIdFilter={clearLintIdFilter}
@@ -753,6 +806,9 @@ export function AdminLayout() {
         open={editOpen}
         poi={selectedPoi?.poi ?? null}
         knownCategories={knownCategories}
+        categories={categories}
+        subcategories={subcategories}
+        onTaxonomyChanged={refetchTaxonomy}
         oracleAvailable={oraclePill.kind === 'ready'}
         onOracleRefresh={refreshOracleStatus}
         onSaved={handlePoiSaved}

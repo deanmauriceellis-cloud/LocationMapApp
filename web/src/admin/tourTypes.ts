@@ -56,6 +56,20 @@ export interface TourDetailResponse {
 // One row per consecutive (stop_order n → n+1) pair on a tour. Authored
 // once via the admin "Compute Route" tool against the on-device router and
 // baked into salem_content.db so the APK never has to route at runtime.
+// S190 — per-leg routing diagnostics. Returned by both compute-route
+// (every leg) and recompute-leg (single leg) so the operator can spot
+// suspicious detours (ratio > 1.6, big-detour-on-small-hop) without
+// reading the cache-proxy log.
+export interface LegDiagnostics {
+  straight_m: number | null
+  routed_m: number | null
+  duration_s: number | null
+  detour_ratio: number | null
+  point_count: number
+  elapsed_ms: number
+  suspicious: boolean
+}
+
 export interface TourLeg {
   tour_id: string
   leg_order: number
@@ -69,6 +83,13 @@ export interface TourLeg {
   /** Null until vertices are hand-edited. */
   manual_edits: unknown | null
   computed_at: string
+  // S190 — present on rows returned by compute-route / recompute-leg
+  // (not by the read-only /legs endpoint, since diagnostics aren't
+  // persisted to salem_tour_legs).
+  diagnostics?: LegDiagnostics
+  from_label?: string
+  to_label?: string
+  preserved?: boolean
 }
 
 export interface TourLegsResponse {
@@ -80,10 +101,18 @@ export interface TourLegsResponse {
 export interface ComputeRouteResponse {
   tour_id: string
   leg_count: number
-  skipped: Array<{ leg_order: number; reason: string }>
+  skipped: Array<{
+    leg_order: number
+    reason: string
+    from?: string
+    to?: string
+    straight_m?: number
+  }>
   total_distance_m: number
   total_duration_s: number
   router_version: string | null
   force: boolean
+  /** S190 — count of legs flagged as suspicious by the router-diagnostic heuristic. */
+  suspicious_count?: number
   legs: TourLeg[]
 }

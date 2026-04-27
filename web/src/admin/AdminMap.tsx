@@ -9,7 +9,14 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.markercluster'
-import type { PoiRow, PoiSelection } from './PoiTree'
+import type { PoiRow, PoiSelection, CategoryRow } from './PoiTree'
+import {
+  categoryFilterMatches,
+  makeCategoryLabelLookup,
+  isMassgisHistorical,
+  HIST_BUILDINGS_FILTER,
+  HIST_LANDMARK_FILTER,
+} from './PoiTree'
 import type { TourLeg, TourStop, TourSummary } from './tourTypes'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -37,7 +44,11 @@ const CATEGORY_COLORS: Record<string, string> = {
 const DEFAULT_COLOR = '#94a3b8' // slate-400
 
 function categoryColor(category: string | undefined): string {
-  return (category && CATEGORY_COLORS[category]) || DEFAULT_COLOR
+  if (!category) return DEFAULT_COLOR
+  // S190 — synthetic split keys like HISTORICAL_BUILDINGS:mhc share the
+  // base category's color.
+  const base = category.split(':')[0]
+  return CATEGORY_COLORS[base] || CATEGORY_COLORS[category] || DEFAULT_COLOR
 }
 
 // Tile provider choices (S160). Salem-Custom / Mapnik / Esri-WorldImagery come
@@ -196,6 +207,12 @@ interface AdminMapProps {
   /** When set, only POIs with matching category render on the map. */
   categoryFilter?: string | null
   onClearCategoryFilter?: () => void
+  /**
+   * S190 — canonical categories from salem_poi_categories. Drives the
+   * legend + filter banner labels so they match the tree and dropdown
+   * (DB is single source of truth).
+   */
+  categories?: CategoryRow[]
   /** When set (S187 lint nav), only POIs whose id is in the set render. Used
    *  by the Lint tab "Show on Map" action so the operator sees only the POIs
    *  flagged by the current check. Independent of categoryFilter (intersected
@@ -814,7 +831,13 @@ function TileProviderPicker({
   )
 }
 
-function Legend({ categoryCounts }: { categoryCounts: [string, number][] }) {
+function Legend({
+  categoryCounts,
+  labelLookup,
+}: {
+  categoryCounts: [string, number][]
+  labelLookup: (cat: string) => string
+}) {
   return (
     <div className="absolute top-2 right-2 z-[100] bg-white/95 border border-slate-300 rounded shadow px-3 py-2 text-xs max-h-80 overflow-y-auto">
       <div className="font-semibold text-slate-700 mb-1">Legend</div>
@@ -824,7 +847,7 @@ function Legend({ categoryCounts }: { categoryCounts: [string, number][] }) {
             className="inline-block w-3 h-3 rounded-full border border-white flex-shrink-0"
             style={{ background: categoryColor(cat) }}
           />
-          <span className="text-slate-700 truncate">{cat.replace(/_/g, ' ')}</span>
+          <span className="text-slate-700 truncate">{labelLookup(cat)}</span>
           <span className="ml-auto tabular-nums text-slate-500">{count}</span>
         </div>
       ))}
@@ -1888,6 +1911,7 @@ export function AdminMap({
   onPoiMoved,
   categoryFilter,
   onClearCategoryFilter,
+  categories,
   lintIdFilter,
   lintIdFilterLabel,
   onClearLintIdFilter,
@@ -1938,7 +1962,11 @@ export function AdminMap({
     if (!pois) return pois
     let out = pois
     if (categoryFilter) {
-      out = out.filter((p) => (p.category as string | undefined) === categoryFilter)
+      // S190 — categoryFilter may be a real DB category or a synthetic
+      // "<CATEGORY>:<tag>" key (currently HISTORICAL_BUILDINGS:mhc /
+      // HISTORICAL_BUILDINGS:non_mhc). Delegate to the shared predicate so
+      // both buckets render the right subset on the map.
+      out = out.filter((p) => categoryFilterMatches(p, categoryFilter))
     }
     if (lintIdFilter && lintIdFilter.size > 0) {
       out = out.filter((p) => lintIdFilter.has(p.id))
@@ -2047,12 +2075,25 @@ export function AdminMap({
 
   const selectedKey = selectedPoi?.poi.id ?? null
 
+  // S190 — label lookup driven by salem_poi_categories so the legend
+  // and filter banner stay in sync with the tree + the editor dropdown.
+  const labelLookup = useMemo(
+    () => makeCategoryLabelLookup(categories ?? []),
+    [categories],
+  )
+
   const categoryCounts = useMemo(() => {
     if (!pois) return []
     const counts = new Map<string, number>()
     for (const p of pois) {
       if (p.deleted_at) continue
-      const cat = (p.category as string) || '(uncategorized)'
+      // S190 — mirror the PoiTree split for HISTORICAL_BUILDINGS so the
+      // legend shows "Historic Buildings" and "POI Hist. Landmark"
+      // separately. Underlying DB rows are unchanged.
+      let cat = (p.category as string) || '(uncategorized)'
+      if (cat === 'HISTORICAL_BUILDINGS') {
+        cat = isMassgisHistorical(p) ? HIST_LANDMARK_FILTER : HIST_BUILDINGS_FILTER
+      }
       counts.set(cat, (counts.get(cat) || 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1])
@@ -2235,12 +2276,12 @@ export function AdminMap({
           onChange={setTileProviderId}
         />
       )}
-      <Legend categoryCounts={categoryCounts} />
+      <Legend categoryCounts={categoryCounts} labelLookup={labelLookup} />
       {categoryFilter && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[500]
                         bg-indigo-600 text-white text-sm px-3 py-1 rounded-full shadow
                         flex items-center gap-2">
-          <span>Filtering: <strong>{categoryFilter}</strong></span>
+          <span>Filtering: <strong>{labelLookup(categoryFilter)}</strong></span>
           <button
             type="button"
             onClick={onClearCategoryFilter}

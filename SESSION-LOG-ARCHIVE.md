@@ -1,7 +1,15 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 179, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 180, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 179, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 180, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 180: 2026-04-26 — V1 Play Store gating chores + first signed AAB on Lenovo
+
+Tier 1 of the S180 ship-readiness review shipped end-to-end. **P1** stripped the manifest network surface (INTERNET / ACCESS_NETWORK_STATE / cleartextTraffic gone, WickedMap LAUNCHER intent removed, VoiceTest narrowed to exported=false). **P2** hard-gated 10 V1-disabled UI sites that bypassed the OkHttp `OfflineModeInterceptor` via WebView, osmdroid online tile sources, and external Intents — all behind `if (!FeatureFlags.V1_OFFLINE_ONLY)` so R8 + const dead-code-eliminates them from the V1 release binary; Find dialog Directions button permanently switched to on-device `walkTo()` instead of Google Maps URL. **P3** revised V1 website behaviour per operator: Visit Website button stays visible, click hands off to external browser via ACTION_VIEW (no in-app WebView); defensive gates on every social dialog body. **P4** locked `UserDataDatabase` migrations — removed `fallbackToDestructiveMigration` so paying users no longer lose POI encounter history on every update; schema v2 is the v1.0.0 floor, future bumps need real Migration objects. **P5** versionCode 1 → 10000, minifyEnabled+shrinkResources, new conservative `proguard-rules.pro` (with -dontwarn for sqlite-jdbc/slf4j leaking from `:routing-jvm`), `signingConfigs.release` block reading from `~/.gradle/gradle.properties`, and `verifyBundledAssets` Gradle Exec task wired to preBuild (catches the silent rebake-wipe class of bug). Generated upload keystore at `~/keys/wickedsalem-upload.jks` (PKCS12, RSA-2048, 10000-day validity, 32-char random pw); registered in OMEN credential audit (committed + pushed to OMEN remote). First signed AAB built (78 MB) + signed release APK (87 MB) installed on Lenovo TB305FU; SalemMainActivity at 60fps with no AndroidRuntime errors. Two new memories saved: `feedback_admin_changes_propagate_to_builds.md` + `feedback_v1_feature_scope_explicit.md`. Operator-side carry-forward: keystore off-machine backup before first Play Console upload, Form TX copyright (24 days to 2026-05-20), Play Developer Account verification, public Privacy Policy hosting.
+
+Full session detail: `docs/session-logs/session-180-2026-04-26.md`. Commit: `04c99e3`.
+
+---
 
 ## Session 179: 2026-04-26 — Tour routing unified to live engine + bake-time edge splitting
 

@@ -359,6 +359,48 @@ function routeBundle(b, fromLat, fromLng, toLat, toLng) {
   return routeBetween(b, sIdx, tIdx);
 }
 
+// S190 — diagnostic-only helper for the admin tools layer. Returns the
+// nearest-node info that routeBundle uses internally, plus haversine
+// meter distances, so the admin tour-route logger can explain WHY a leg
+// failed (same-node snap, snap too far from graph, isolated component).
+//
+// Does NOT route or alter routing behavior — pure introspection.
+function _haversineMSimple(lat1, lng1, lat2, lng2) {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function routeBundleDiag(b, fromLat, fromLng, toLat, toLng) {
+  const sIdx = nearestWalkableNode(b, fromLat, fromLng);
+  const tIdx = nearestWalkableNode(b, toLat, toLng);
+  const fromSnapM =
+    sIdx >= 0
+      ? _haversineMSimple(fromLat, fromLng, b.nodeLat[sIdx], b.nodeLng[sIdx])
+      : null;
+  const toSnapM =
+    tIdx >= 0
+      ? _haversineMSimple(toLat, toLng, b.nodeLat[tIdx], b.nodeLng[tIdx])
+      : null;
+  return {
+    from_node_idx: sIdx,
+    to_node_idx: tIdx,
+    from_snap_m: fromSnapM == null ? null : Math.round(fromSnapM),
+    to_snap_m: toSnapM == null ? null : Math.round(toSnapM),
+    same_node: sIdx >= 0 && sIdx === tIdx,
+    from_snapped_lat: sIdx >= 0 ? b.nodeLat[sIdx] : null,
+    from_snapped_lng: sIdx >= 0 ? b.nodeLng[sIdx] : null,
+    to_snapped_lat: tIdx >= 0 ? b.nodeLat[tIdx] : null,
+    to_snapped_lng: tIdx >= 0 ? b.nodeLng[tIdx] : null,
+  };
+}
+
 function routeMultiBundle(b, stops) {
   if (!Array.isArray(stops) || stops.length < 2) return null;
   const parts = [];
@@ -669,5 +711,6 @@ module.exports = function (app, deps) {
     // Exposed for tests / introspection.
     _bundle: () => bundle,
     _route: (a, b, c, d) => (bundle ? routeBundle(bundle, a, b, c, d) : null),
+    _routeDiag: (a, b, c, d) => (bundle ? routeBundleDiag(bundle, a, b, c, d) : null),
   };
 };

@@ -61,6 +61,33 @@ SPLIT_TARGET_M = 40.0    # nominal sub-segment length after splitting
 SPLIT_NODE_ID_BASE = 20_000_000_000   # synthetic node IDs use this offset
 SPLIT_EDGE_ID_BASE = 5_000_000_000    # synthetic edge IDs use this offset
 
+# S190: vertex-coincidence merge tolerance. Independent OSM pedestrian
+# ingest passes (cache-proxy/scripts/ingest-osm-pedestrian-into-salem-edges.sql)
+# allocate fresh vertex IDs for each feature's endpoints, so two paths
+# that physically meet at the same junction end up with two different
+# vertex IDs and are routing-disconnected. The Charter Street Cemetery
+# was the first observed case (S190): seven cemetery paths, multiple
+# shared junctions, all routing-disjoint. This merge step fuses any two
+# nodes within MERGE_TOL_M into one, picking the lowest ID as survivor
+# (TIGER ids < OSM-offset ids < split-introduced ids), then rewrites all
+# edges, drops self-loops, and dedups parallel edges (keeping the
+# shortest). Runs BEFORE edge-split so the densifier sees a clean graph.
+MERGE_TOL_M = 3.0
+
+# S190: bridging tolerance for isolated components. After the coincident-
+# node merge, any tiny island components (size < BRIDGE_MAX_COMPONENT) get
+# a single bridge edge added between their closest node and the closest
+# node in the main component, IF that distance is < BRIDGE_TOL_M. The
+# Charter Street Cemetery is the canonical case: TIGER doesn't model
+# cemetery interior paths, so OSM features inside the cemetery form little
+# unreachable islands. Bridging them with a synthetic walkable edge mimics
+# what a real pedestrian does (cuts across grass / open space to reach the
+# perimeter sidewalk). A node already within MERGE_TOL_M of another would
+# have been merged outright; bridging fills the 3-60m gap.
+BRIDGE_TOL_M = 60.0
+BRIDGE_MAX_COMPONENT = 30   # don't bridge "small main grids" — only true islands
+BRIDGE_EDGE_ID_BASE = 6_000_000_000
+
 
 def log(msg):
     print(f"[bake] {msg}", flush=True)
@@ -94,6 +121,220 @@ def parse_polyline(s):
 
 def encode_polyline(pts):
     return ";".join(f"{p[0]:.6f},{p[1]:.6f}" for p in pts)
+
+
+def merge_coincident_nodes(edges, nodes, tol_m=MERGE_TOL_M):
+    """S190 — fuse near-coincident vertices into one to repair the
+    disconnected components caused by independent OSM ingest passes.
+
+    Survivor preference: lowest id (TIGER < OSM-offset < split-introduced).
+    After remapping, drops self-loops and parallel duplicates (keeping the
+    shortest of each pair), then drops nodes that are no longer referenced.
+    """
+    log(f"merging coincident nodes (tol={tol_m}m)…")
+    if not nodes:
+        return edges, nodes
+
+    # Coarse-grid bucketing at ~11m so each node only has to compare
+    # against its own bucket and the 8 neighbors. Two nodes within
+    # tol_m must share at least one cell in this 3×3 search window.
+    GRID = 0.0001
+    by_bucket = {}
+    for n in nodes:
+        nid, lat, lng, _ = n
+        bk = (int(lat / GRID), int(lng / GRID))
+        by_bucket.setdefault(bk, []).append(n)
+
+    # Iterate lowest-id first so survivors are always TIGER nodes when
+    # available, then OSM-offset, then split-introduced.
+    sorted_nodes = sorted(nodes, key=lambda n: n[0])
+    remap = {}
+    for n in sorted_nodes:
+        nid = n[0]
+        if nid in remap:
+            continue  # already a loser, can't be a survivor
+        lat, lng = n[1], n[2]
+        bk = (int(lat / GRID), int(lng / GRID))
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                bn = (bk[0] + dr, bk[1] + dc)
+                cell = by_bucket.get(bn)
+                if not cell:
+                    continue
+                for m in cell:
+                    mid = m[0]
+                    if mid <= nid or mid in remap:
+                        continue
+                    if haversine_m((lat, lng), (m[1], m[2])) <= tol_m:
+                        remap[mid] = nid
+
+    if not remap:
+        log("  no coincident nodes")
+        return edges, nodes
+
+    log(f"  fusing {len(remap)} duplicate vertices into survivors")
+
+    # Walk edges with the remap. Drop self-loops; for parallel edges
+    # (same canonical (low,high) endpoint pair) keep the shortest.
+    seen = {}  # (a,b) -> index into new_edges
+    new_edges = []
+    self_loops = 0
+    parallel_dropped = 0
+    for e in edges:
+        gid, src, tgt, length_m, walk_cost, mtfcc, fullname, polyline = e
+        s2 = remap.get(src, src)
+        t2 = remap.get(tgt, tgt)
+        if s2 == t2:
+            self_loops += 1
+            continue
+        pair = (min(s2, t2), max(s2, t2))
+        if pair in seen:
+            existing_idx = seen[pair]
+            existing = new_edges[existing_idx]
+            if length_m < existing[3]:
+                new_edges[existing_idx] = (gid, s2, t2, length_m, walk_cost, mtfcc, fullname, polyline)
+            parallel_dropped += 1
+            continue
+        seen[pair] = len(new_edges)
+        new_edges.append((gid, s2, t2, length_m, walk_cost, mtfcc, fullname, polyline))
+
+    # Drop nodes no longer referenced (the losers).
+    referenced = set()
+    for e in new_edges:
+        referenced.add(e[1])
+        referenced.add(e[2])
+    new_nodes = [n for n in nodes if n[0] in referenced]
+
+    log(f"  edges: {len(edges)} → {len(new_edges)} (dropped {self_loops} self-loops, {parallel_dropped} parallel duplicates)")
+    log(f"  nodes: {len(nodes)} → {len(new_nodes)}")
+    return new_edges, new_nodes
+
+
+def bridge_isolated_components(edges, nodes, tol_m=BRIDGE_TOL_M, max_island=BRIDGE_MAX_COMPONENT):
+    """S190 — for each tiny isolated component (size < max_island), add a
+    single synthetic walkable edge to the closest node in any larger
+    component, provided the distance is ≤ tol_m. Repairs unreachable
+    cemetery interiors and similar OSM-imported islands without changing
+    routing behavior in the main graph.
+
+    Synthetic edges are tagged with mtfcc='SYNTH_BRIDGE' so the source is
+    auditable in the bundle and on tour-leg polylines. fullname carries
+    the actual gap distance for traceability.
+    """
+    log(f"bridging isolated components (tol={tol_m}m, max_island={max_island})…")
+    if not nodes:
+        return edges, nodes
+
+    # Union-find over the merged graph.
+    parent = {n[0]: n[0] for n in nodes}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for e in edges:
+        union(e[1], e[2])
+
+    # Group nodes by component root.
+    comp = {}  # root -> list of node tuples
+    for n in nodes:
+        comp.setdefault(find(n[0]), []).append(n)
+    log(f"  total components: {len(comp)}")
+
+    # Pick the main component (largest) — never modify it.
+    main_root = max(comp, key=lambda k: len(comp[k]))
+    main_nodes = comp[main_root]
+    log(f"  main component: {len(main_nodes)} nodes (root={main_root})")
+
+    # Build a coarse spatial index over main-component nodes for fast
+    # nearest-node-in-main lookup. ~50m cells (5e-4 ≈ 55m at 42°N).
+    GRID = 0.0005
+    main_bucket = {}
+    for n in main_nodes:
+        bk = (int(n[1] / GRID), int(n[2] / GRID))
+        main_bucket.setdefault(bk, []).append(n)
+
+    # For each non-main, small island, find the closest main-component node.
+    bridges = []
+    skipped_too_big = 0
+    skipped_too_far = 0
+    for root, members in comp.items():
+        if root == main_root:
+            continue
+        if len(members) > max_island:
+            skipped_too_big += 1
+            continue
+        # Brute-force closest pair: every island node × neighboring main cells.
+        best = None  # (dist, island_node, main_node)
+        for isl in members:
+            ilat, ilng = isl[1], isl[2]
+            ibk = (int(ilat / GRID), int(ilng / GRID))
+            # Search radius in cells: ceil(tol_m / 55m) rounded up
+            R = max(2, int(tol_m / 50) + 1)
+            for dr in range(-R, R + 1):
+                for dc in range(-R, R + 1):
+                    cell = main_bucket.get((ibk[0] + dr, ibk[1] + dc))
+                    if not cell:
+                        continue
+                    for mn in cell:
+                        d = haversine_m((ilat, ilng), (mn[1], mn[2]))
+                        if d <= tol_m and (best is None or d < best[0]):
+                            best = (d, isl, mn)
+        if best is None:
+            skipped_too_far += 1
+            continue
+        bridges.append(best)
+
+    if not bridges:
+        log("  no bridges added")
+        return edges, nodes
+
+    new_edges = list(edges)
+    for i, (d, isl, mn) in enumerate(bridges):
+        new_edges.append((
+            BRIDGE_EDGE_ID_BASE + i,
+            isl[0], mn[0],
+            d, d,
+            'SYNTH_BRIDGE',
+            f'bridge {round(d, 1)}m',
+            encode_polyline([(isl[1], isl[2]), (mn[1], mn[2])]),
+        ))
+
+    log(f"  added {len(bridges)} synthetic bridges")
+    if skipped_too_big > 0:
+        log(f"  skipped {skipped_too_big} components (size > {max_island})")
+    if skipped_too_far > 0:
+        log(f"  skipped {skipped_too_far} components (no main node within {tol_m}m)")
+    return new_edges, nodes
+
+
+def count_components(edges, nodes):
+    """Diagnostic — count connected components in the graph using union-find.
+    Logged before & after merge so the operator can see the impact."""
+    parent = {n[0]: n[0] for n in nodes}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for e in edges:
+        union(e[1], e[2])
+    roots = set(find(n[0]) for n in nodes)
+    return len(roots)
 
 
 def split_long_edges(edges, nodes):
@@ -419,6 +660,18 @@ def main():
 
     pg.close()
 
+    pre_components = count_components(edges, nodes)
+    log(f"connected components before merge: {pre_components}")
+
+    edges, nodes = merge_coincident_nodes(edges, nodes)
+
+    post_merge_components = count_components(edges, nodes)
+    log(f"connected components after merge: {post_merge_components}")
+
+    edges, nodes = bridge_isolated_components(edges, nodes)
+    post_bridge_components = count_components(edges, nodes)
+    log(f"connected components after bridging: {post_bridge_components}")
+
     log(f"densifying long edges (split >{SPLIT_MIN_M:.0f}m, target {SPLIT_TARGET_M:.0f}m)…")
     edges, nodes = split_long_edges(edges, nodes)
     log(f"  post-split: {len(edges)} edges, {len(nodes)} nodes")
@@ -426,7 +679,9 @@ def main():
     source_summary = (
         f"salem.edges intersect bbox @ {datetime.now(timezone.utc).date().isoformat()} "
         f"(TigerLine source — see SalemTourMapRouting.md); "
-        f"S179 edge-split min={SPLIT_MIN_M:.0f}m target={SPLIT_TARGET_M:.0f}m"
+        f"S179 edge-split min={SPLIT_MIN_M:.0f}m target={SPLIT_TARGET_M:.0f}m; "
+        f"S190 vertex-merge tol={MERGE_TOL_M:.1f}m + island-bridge tol={BRIDGE_TOL_M:.0f}m max_island={BRIDGE_MAX_COMPONENT}; "
+        f"components={pre_components}→{post_merge_components}→{post_bridge_components}"
     )
 
     log("writing sqlite…")

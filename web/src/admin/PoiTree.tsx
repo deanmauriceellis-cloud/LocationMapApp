@@ -32,6 +32,11 @@ export interface PoiRow {
   lng: number
   category?: string
   subcategory?: string
+  // S190 — used by the admin tree to split HISTORICAL_BUILDINGS into
+  // "Historic Buildings" (curated) vs "POI Hist. Landmark" (MassGIS MHC).
+  // The DB column stays `category=HISTORICAL_BUILDINGS` for both.
+  data_source?: string
+  mhc_id?: string | null
   is_tour_poi?: boolean
   is_narrated?: boolean
   default_visible?: boolean
@@ -53,6 +58,25 @@ export interface PoiRow {
   location_verified_at?: string | null
   location_truth_of_record?: boolean
   [key: string]: unknown
+}
+
+// S190 — canonical taxonomy from salem_poi_categories /
+// salem_poi_subcategories. Defined here so PoiTree, PoiEditDialog, and
+// AdminLayout can share one type. The admin tool fetches both lists
+// once at mount and re-fetches after a successful add.
+export interface CategoryRow {
+  id: string
+  label: string
+  color: string
+  display_order: number
+}
+
+export interface SubcategoryRow {
+  id: string
+  category_id: string
+  label: string
+  slug: string
+  display_order: number
 }
 
 export type LocationStatus =
@@ -113,31 +137,72 @@ interface TreeFilter {
   location: LocationFilter
 }
 
-/** Category display names for nicer labels */
-const CATEGORY_LABELS: Record<string, string> = {
-  FOOD_DRINK: 'Food & Drink',
-  HISTORICAL_BUILDINGS: 'Historic Sites',
-  WITCH_SHOP: 'Witch & Occult',
-  PSYCHIC: 'Psychic & Tarot',
-  TOUR_COMPANIES: 'Tour Companies',
-  ENTERTAINMENT: 'Entertainment',
-  PARKS_REC: 'Parks & Recreation',
-  LODGING: 'Lodging',
-  CIVIC: 'Civic',
-  EDUCATION: 'Education',
-  SHOPPING: 'Shopping',
-  WORSHIP: 'Places of Worship',
-  HEALTHCARE: 'Healthcare',
-  OFFICES: 'Professional Services',
-  FINANCE: 'Finance',
-  AUTO_SERVICES: 'Auto Services',
+// S190 — overrides for synthetic admin-tree-only category keys. The
+// underlying DB category stays HISTORICAL_BUILDINGS for both buckets;
+// these keys exist only so the tree node + map filter can distinguish
+// curated entries from MassGIS MHC imports. Real categories pull their
+// labels from the DB (salem_poi_categories) via makeCategoryLabelLookup.
+const SYNTHETIC_CATEGORY_LABELS: Record<string, string> = {
+  'HISTORICAL_BUILDINGS:non_mhc': 'Historic Buildings',
+  'HISTORICAL_BUILDINGS:mhc': 'POI Hist. Landmark',
 }
 
-function categoryLabel(cat: string): string {
-  return CATEGORY_LABELS[cat] || cat
+/**
+ * Build a label-lookup function from the canonical category list. The
+ * DB row's `label` is the source of truth — tree, editor dropdown, and
+ * map legend all share this lookup so they can never drift apart.
+ */
+export function makeCategoryLabelLookup(
+  categories: CategoryRow[],
+): (cat: string) => string {
+  const byId = new Map<string, string>()
+  for (const c of categories) byId.set(c.id, c.label)
+  return (cat: string): string => {
+    if (Object.prototype.hasOwnProperty.call(SYNTHETIC_CATEGORY_LABELS, cat)) {
+      return SYNTHETIC_CATEGORY_LABELS[cat]
+    }
+    return byId.get(cat) ?? cat
+  }
 }
 
-function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
+/** Fallback used when the categories list hasn't loaded yet. Returns the raw id. */
+export function categoryLabel(cat: string): string {
+  return SYNTHETIC_CATEGORY_LABELS[cat] ?? cat
+}
+
+// ─── S190 synthetic Historic-Buildings split ─────────────────────────────────
+// The admin tree splits HISTORICAL_BUILDINGS rows into two display groups:
+//   - "Historic Buildings"    (data_source NOT LIKE '%massgis%')
+//   - "POI Hist. Landmark"    (data_source LIKE '%massgis%')
+// Both still save with category=HISTORICAL_BUILDINGS in the DB, and the
+// Android module / narration / layer logic is untouched. Only the tree node
+// keying and the AdminMap categoryFilter understand the synthetic suffixes.
+export const HIST_BUILDINGS_FILTER = 'HISTORICAL_BUILDINGS:non_mhc'
+export const HIST_LANDMARK_FILTER = 'HISTORICAL_BUILDINGS:mhc'
+
+export function isMassgisHistorical(poi: { category?: string; data_source?: string }): boolean {
+  if (poi.category !== 'HISTORICAL_BUILDINGS') return false
+  return ((poi.data_source ?? '') as string).toLowerCase().includes('massgis')
+}
+
+/** Predicate used by AdminMap to interpret synthetic category filter keys. */
+export function categoryFilterMatches(
+  poi: { category?: string; data_source?: string },
+  filter: string,
+): boolean {
+  if (filter === HIST_LANDMARK_FILTER) return isMassgisHistorical(poi)
+  if (filter === HIST_BUILDINGS_FILTER) {
+    return poi.category === 'HISTORICAL_BUILDINGS' && !isMassgisHistorical(poi)
+  }
+  return (poi.category ?? '') === filter
+}
+
+function buildTree(
+  allPois: PoiRow[],
+  filter: TreeFilter,
+  allSubcategories: SubcategoryRow[],
+  labelLookup: (cat: string) => string,
+): TreeNode[] {
   let filtered = allPois
   if (!filter.showDeleted) filtered = filtered.filter((r) => !r.deleted_at)
   if (filter.tourOnly) filtered = filtered.filter((r) => r.is_tour_poi)
@@ -147,10 +212,18 @@ function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
     filtered = filtered.filter((r) => (r.location_status ?? 'unverified') === filter.location)
   }
 
-  // Group by category → subcategory
+  // Group by category → subcategory.
+  //
+  // S190 — split HISTORICAL_BUILDINGS into two synthetic display buckets so
+  // the tree distinguishes curated Historic Buildings from MassGIS MHC Hist.
+  // Landmarks. Both keep DB category=HISTORICAL_BUILDINGS; only the tree key
+  // (and the AdminMap filter that mirrors it) carries the suffix.
   const byCat = new Map<string, PoiRow[]>()
   for (const row of filtered) {
-    const cat = (row.category as string) || '(uncategorized)'
+    let cat = (row.category as string) || '(uncategorized)'
+    if (cat === 'HISTORICAL_BUILDINGS') {
+      cat = isMassgisHistorical(row) ? HIST_LANDMARK_FILTER : HIST_BUILDINGS_FILTER
+    }
     let bucket = byCat.get(cat)
     if (!bucket) {
       bucket = []
@@ -165,8 +238,23 @@ function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
     return a[0].localeCompare(b[0])
   })
 
+  // Index canonical subcategories by category_id for fast lookup. Synthetic
+  // category keys (HISTORICAL_BUILDINGS:mhc / :non_mhc) reuse the base
+  // HISTORICAL_BUILDINGS subcategory list.
+  const subsByCat = new Map<string, SubcategoryRow[]>()
+  for (const s of allSubcategories) {
+    const arr = subsByCat.get(s.category_id) ?? []
+    if (arr.length === 0) subsByCat.set(s.category_id, arr)
+    arr.push(s)
+  }
+  for (const arr of subsByCat.values()) {
+    arr.sort((a, b) => a.display_order - b.display_order)
+  }
+
   return catEntries.map(([cat, rowsInCat]) => {
-    // Check if this category has subcategories
+    // S190 — bucket POIs by their stored subcategory; collect rows whose
+    // subcategory is null/empty into a separate "(no subcategory)" bucket
+    // so the operator can see which POIs still need a subcategory assigned.
     const bySubcat = new Map<string, PoiRow[]>()
     const noSubcat: PoiRow[] = []
     for (const row of rowsInCat) {
@@ -183,64 +271,84 @@ function buildTree(allPois: PoiRow[], filter: TreeFilter): TreeNode[] {
       }
     }
 
-    let children: TreeNode[]
+    const baseCat = cat.split(':')[0]
+    const canonSubs = subsByCat.get(baseCat) ?? []
 
-    if (bySubcat.size === 0) {
-      // No subcategories — flat list of POIs
-      const sortedRows = [...rowsInCat].sort((a, b) => a.name.localeCompare(b.name))
-      children = sortedRows.map((row) => ({
-        id: `cat:${cat}|poi:${row.id}`,
-        label: row.deleted_at ? `${row.name} (deleted)` : row.name,
-        type: 'poi',
+    const children: TreeNode[] = []
+
+    // "(no subcategory)" bucket first — only when there are POIs without
+    // an assignment, otherwise we'd add an empty noise node to every category.
+    if (noSubcat.length > 0) {
+      const sorted = [...noSubcat].sort((a, b) => a.name.localeCompare(b.name))
+      children.push({
+        id: `cat:${cat}|sub:__none__`,
+        label: '(no subcategory)',
+        type: 'category',
         category: cat,
-        poi: row,
-        isDeleted: !!row.deleted_at,
-      }))
-    } else {
-      // Has subcategories — 3-level tree
-      children = []
-
-      // POIs without subcategory come first
-      if (noSubcat.length > 0) {
-        const sorted = [...noSubcat].sort((a, b) => a.name.localeCompare(b.name))
-        for (const row of sorted) {
-          children.push({
-            id: `cat:${cat}|poi:${row.id}`,
-            label: row.deleted_at ? `${row.name} (deleted)` : row.name,
-            type: 'poi',
-            category: cat,
-            poi: row,
-            isDeleted: !!row.deleted_at,
-          })
-        }
-      }
-
-      // Subcategory nodes
-      const subEntries = [...bySubcat.entries()].sort((a, b) => b[1].length - a[1].length)
-      for (const [sub, subRows] of subEntries) {
-        const sortedSub = [...subRows].sort((a, b) => a.name.localeCompare(b.name))
-        const subLabel = sub.replace(/^[A-Z_]+__/, '').replace(/_/g, ' ')
-        children.push({
-          id: `cat:${cat}|sub:${sub}`,
-          label: subLabel,
-          type: 'category',
+        count: sorted.length,
+        children: sorted.map((row) => ({
+          id: `cat:${cat}|sub:__none__|poi:${row.id}`,
+          label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+          type: 'poi',
           category: cat,
-          count: sortedSub.length,
-          children: sortedSub.map((row) => ({
-            id: `cat:${cat}|sub:${sub}|poi:${row.id}`,
-            label: row.deleted_at ? `${row.name} (deleted)` : row.name,
-            type: 'poi',
-            category: cat,
-            poi: row,
-            isDeleted: !!row.deleted_at,
-          })),
-        })
-      }
+          poi: row,
+          isDeleted: !!row.deleted_at,
+        })),
+      })
+    }
+
+    // Canonical subcategories in display_order, including empty ones — the
+    // operator needs to see what subcategories exist so they can assign POIs
+    // and create new ones when something doesn't fit.
+    for (const sub of canonSubs) {
+      const subRows = bySubcat.get(sub.id) ?? []
+      bySubcat.delete(sub.id)
+      const sortedSub = [...subRows].sort((a, b) => a.name.localeCompare(b.name))
+      children.push({
+        id: `cat:${cat}|sub:${sub.id}`,
+        label: sub.label,
+        type: 'category',
+        category: cat,
+        count: sortedSub.length,
+        children: sortedSub.map((row) => ({
+          id: `cat:${cat}|sub:${sub.id}|poi:${row.id}`,
+          label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+          type: 'poi',
+          category: cat,
+          poi: row,
+          isDeleted: !!row.deleted_at,
+        })),
+      })
+    }
+
+    // Anything left in bySubcat is a legacy/non-canonical subcategory value
+    // assigned to actual POIs (e.g. HISTORICAL_BUILDINGS rows holding the
+    // ENTERTAINMENT__tour_operators value). Surface it tagged as legacy
+    // rather than dropping it silently — operator can drill in and fix.
+    const leftover = [...bySubcat.entries()].sort((a, b) => b[1].length - a[1].length)
+    for (const [sub, subRows] of leftover) {
+      const sortedSub = [...subRows].sort((a, b) => a.name.localeCompare(b.name))
+      const subLabel = sub.replace(/^[A-Z_]+__/, '').replace(/_/g, ' ') + ' (legacy)'
+      children.push({
+        id: `cat:${cat}|sub:${sub}`,
+        label: subLabel,
+        type: 'category',
+        category: cat,
+        count: sortedSub.length,
+        children: sortedSub.map((row) => ({
+          id: `cat:${cat}|sub:${sub}|poi:${row.id}`,
+          label: row.deleted_at ? `${row.name} (deleted)` : row.name,
+          type: 'poi',
+          category: cat,
+          poi: row,
+          isDeleted: !!row.deleted_at,
+        })),
+      })
     }
 
     return {
       id: `cat:${cat}`,
-      label: categoryLabel(cat),
+      label: labelLookup(cat),
       type: 'category',
       category: cat,
       count: rowsInCat.length,
@@ -345,9 +453,30 @@ export interface PoiTreeProps {
   onCategorySelect?: (selection: CategorySelection) => void
   onDataLoaded?: (pois: PoiRow[]) => void
   externalPois?: PoiRow[] | null
+  /**
+   * S190 — canonical categories from salem_poi_categories. Drives the
+   * label lookup for tree category nodes so the tree, the editor
+   * dropdown, and the map legend all show identical labels (the DB row's
+   * `label` is the single source of truth).
+   */
+  categories?: CategoryRow[]
+  /**
+   * S190 — canonical subcategories from salem_poi_subcategories. Drives
+   * the tree's subcategory nodes so EVERY defined subcategory shows under
+   * its parent category (even with zero POIs assigned), plus a synthetic
+   * "(no subcategory)" bucket for unassigned POIs.
+   */
+  subcategories?: SubcategoryRow[]
 }
 
-export function PoiTree({ onSelect, onCategorySelect, onDataLoaded, externalPois }: PoiTreeProps) {
+export function PoiTree({
+  onSelect,
+  onCategorySelect,
+  onDataLoaded,
+  externalPois,
+  categories,
+  subcategories,
+}: PoiTreeProps) {
   const lastCategoryRef = useRef<string | null>(null)
   const [pois, setPois] = useState<PoiRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -379,12 +508,20 @@ export function PoiTree({ onSelect, onCategorySelect, onDataLoaded, externalPois
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const labelLookup = useMemo(
+    () => makeCategoryLabelLookup(categories ?? []),
+    [categories],
+  )
+
   const treeData = useMemo(() => {
     if (!effectivePois) return []
-    return buildTree(effectivePois, {
-      showDeleted, tourOnly, narratedOnly, visibleOnly, location: locationFilter,
-    })
-  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter])
+    return buildTree(
+      effectivePois,
+      { showDeleted, tourOnly, narratedOnly, visibleOnly, location: locationFilter },
+      subcategories ?? [],
+      labelLookup,
+    )
+  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter, subcategories, labelLookup])
 
   // Category toggle handler — called directly from PoiNode via context.
   const handleCategoryClick = useCallback((cat: string | null) => {

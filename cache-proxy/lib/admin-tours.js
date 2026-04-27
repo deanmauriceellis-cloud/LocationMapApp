@@ -24,6 +24,55 @@ function isFiniteNumber(v) {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
+// S190 — great-circle distance between two lat/lng pairs, in meters.
+// Used to compare a routed polyline's distance against the as-the-crow-flies
+// distance so the compute-route logs can flag suspicious detours.
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// S190 — build a small diagnostic record for a routed leg. Used both for
+// console logging and to attach to the JSON response so the admin UI can
+// surface flagged legs without having to recompute anything client-side.
+//
+// "Suspicious" heuristic (purely diagnostic — does NOT alter routing):
+//   - ratio > 1.6 (routed distance is more than 60% longer than straight line)
+//   - OR straight < 200 m but routed > 800 m (small hop, big detour)
+//   - OR straight < 100 m but routed > 400 m (very small hop, clear loop)
+// Any of those is worth the operator's eyes.
+function diagnoseLeg(a, b, r, elapsedMs) {
+  const straightM =
+    a && b && a.lat != null && b.lat != null
+      ? haversineMeters(a.lat, a.lng, b.lat, b.lng)
+      : null;
+  const routedM = r && Number.isFinite(r.distanceM) ? r.distanceM : null;
+  const ratio = routedM != null && straightM != null && straightM > 0
+    ? routedM / straightM
+    : null;
+  const ptCount = r && r.geometry ? r.geometry.length : 0;
+  const suspicious =
+    ratio != null &&
+    (ratio > 1.6 ||
+      (straightM < 200 && routedM > 800) ||
+      (straightM < 100 && routedM > 400));
+  return {
+    straight_m: straightM == null ? null : Math.round(straightM),
+    routed_m: routedM == null ? null : Math.round(routedM),
+    duration_s: r && Number.isFinite(r.durationS) ? r.durationS : null,
+    detour_ratio: ratio == null ? null : Math.round(ratio * 100) / 100,
+    point_count: ptCount,
+    elapsed_ms: elapsedMs,
+    suspicious,
+  };
+}
+
 function validateLatLng(lat, lng) {
   if (lat !== undefined && lat !== null) {
     if (!isFiniteNumber(lat) || lat < -90 || lat > 90) {
@@ -594,18 +643,38 @@ module.exports = function(app, deps) {
       const version = routerVersion();
       const legs = [];
       const skipped = [];
+      const t0Tour = Date.now();
+      // S190 — verbose per-leg diagnostics. Logged to the cache-proxy
+      // console AND echoed in the JSON response so the operator can see
+      // why a leg looks weird in the admin map.
+      console.log(
+        `[AdminTours] compute-route start tour=${tourId} stops=${stops.length} force=${force} router=${version}`,
+      );
       for (let i = 0; i < stops.length - 1; i++) {
         const a = stops[i];
         const b = stops[i + 1];
         const legOrder = i + 1;
+        const fromLabel = `${a.name ?? a.stop_id} (${a.stop_id})`;
+        const toLabel = `${b.name ?? b.stop_id} (${b.stop_id})`;
         if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) {
-          skipped.push({ leg_order: legOrder, reason: 'missing coords' });
+          console.log(
+            `[AdminTours]   leg ${legOrder} SKIP missing-coords  ${fromLabel} → ${toLabel}`,
+          );
+          skipped.push({
+            leg_order: legOrder,
+            from: fromLabel,
+            to: toLabel,
+            reason: 'missing coords',
+          });
           continue;
         }
 
         const prev = prevByOrder.get(legOrder);
         if (!force && prev && prev.manual_edits != null) {
           // Preserve hand-edited leg. Echo it back unchanged.
+          console.log(
+            `[AdminTours]   leg ${legOrder} PRESERVED manual_edits  ${fromLabel} → ${toLabel}  routed=${prev.distance_m}m`,
+          );
           legs.push({
             leg_order: legOrder,
             from_stop_id: a.stop_id,
@@ -616,21 +685,81 @@ module.exports = function(app, deps) {
             router_version: prev.router_version,
             manual_edits: prev.manual_edits,
             preserved: true,
+            diagnostics: diagnoseLeg(
+              a,
+              b,
+              { distanceM: prev.distance_m, durationS: prev.duration_s, geometry: prev.polyline_json },
+              0,
+            ),
           });
           continue;
         }
 
         let r;
+        const tLeg = Date.now();
         try {
           r = deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
         } catch (err) {
-          skipped.push({ leg_order: legOrder, reason: `router error: ${err.message}` });
+          console.log(
+            `[AdminTours]   leg ${legOrder} ERROR  ${fromLabel} → ${toLabel}  ${err.message}`,
+          );
+          skipped.push({
+            leg_order: legOrder,
+            from: fromLabel,
+            to: toLabel,
+            reason: `router error: ${err.message}`,
+          });
           continue;
         }
         if (!r || !r.geometry || r.geometry.length < 2) {
-          skipped.push({ leg_order: legOrder, reason: 'no route found' });
+          const straightM = Math.round(haversineMeters(a.lat, a.lng, b.lat, b.lng));
+          // S190 — pull snap-info diagnostics out of the router so we can
+          // explain WHY no route was found. Three common failure modes:
+          //   (1) same_node = true   → both endpoints snap to same graph node
+          //   (2) huge from/to_snap_m → endpoint sits far from any walkable edge
+          //   (3) snap distances OK but routeBetween couldn't reach → likely
+          //       isolated graph component (rare; usually a graph data issue)
+          let diagInfo = null;
+          let detail = '';
+          let cause = 'unreachable in graph';
+          if (typeof deps.salemRouteDiag === 'function') {
+            try {
+              diagInfo = deps.salemRouteDiag(a.lat, a.lng, b.lat, b.lng);
+              if (diagInfo) {
+                if (diagInfo.same_node) {
+                  cause = `endpoints snap to same node #${diagInfo.from_node_idx}`;
+                  detail = ` snap=${diagInfo.from_snap_m}m/${diagInfo.to_snap_m}m`;
+                } else if (diagInfo.from_node_idx < 0 || diagInfo.to_node_idx < 0) {
+                  cause = 'endpoint outside graph coverage';
+                } else {
+                  cause = 'no path between snapped nodes (graph component)';
+                  detail = ` from_node=#${diagInfo.from_node_idx} (snap ${diagInfo.from_snap_m}m), to_node=#${diagInfo.to_node_idx} (snap ${diagInfo.to_snap_m}m)`;
+                }
+              }
+            } catch { /* diag is best-effort */ }
+          }
+          console.log(
+            `[AdminTours]   leg ${legOrder} NO-ROUTE  ${fromLabel} → ${toLabel}  ` +
+              `straight=${straightM}m  cause=${cause}${detail}`,
+          );
+          skipped.push({
+            leg_order: legOrder,
+            from: fromLabel,
+            to: toLabel,
+            reason: `no route found (${cause})`,
+            straight_m: straightM,
+            snap_diag: diagInfo,
+          });
           continue;
         }
+
+        const diag = diagnoseLeg(a, b, r, Date.now() - tLeg);
+        const flag = diag.suspicious ? '⚠ SUSPICIOUS' : '';
+        console.log(
+          `[AdminTours]   leg ${legOrder}  ${fromLabel} → ${toLabel}  ` +
+            `straight=${diag.straight_m}m routed=${diag.routed_m}m ratio=${diag.detour_ratio} ` +
+            `pts=${diag.point_count} dur=${diag.duration_s}s t=${diag.elapsed_ms}ms ${flag}`,
+        );
 
         legs.push({
           leg_order: legOrder,
@@ -642,6 +771,9 @@ module.exports = function(app, deps) {
           router_version: version,
           manual_edits: null,
           preserved: false,
+          diagnostics: diag,
+          from_label: fromLabel,
+          to_label: toLabel,
         });
       }
 
@@ -677,6 +809,14 @@ module.exports = function(app, deps) {
       );
       await client.query('COMMIT');
 
+      // S190 — final summary log.
+      const suspiciousCount = legs.filter((l) => l.diagnostics && l.diagnostics.suspicious).length;
+      console.log(
+        `[AdminTours] compute-route done tour=${tourId} legs=${legs.length} skipped=${skipped.length} ` +
+          `suspicious=${suspiciousCount} totalDist=${totalM}m totalDur=${totalS}s ` +
+          `wall=${Date.now() - t0Tour}ms`,
+      );
+
       res.json({
         tour_id: tourId,
         leg_count: legs.length,
@@ -685,6 +825,7 @@ module.exports = function(app, deps) {
         total_duration_s: totalS,
         router_version: version,
         force,
+        suspicious_count: suspiciousCount,
         legs,
       });
     } catch (err) {
@@ -734,10 +875,44 @@ module.exports = function(app, deps) {
         });
       }
 
+      // S190 — verbose logging for single-leg recompute.
+      const fromLabel = `${a.name ?? a.stop_id} (${a.stop_id})`;
+      const toLabel = `${b.name ?? b.stop_id} (${b.stop_id})`;
+      const tLeg = Date.now();
       const r = deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
       if (!r || !r.geometry || r.geometry.length < 2) {
-        return res.status(404).json({ error: 'no route found for this leg' });
+        const straightM = Math.round(haversineMeters(a.lat, a.lng, b.lat, b.lng));
+        let diagInfo = null;
+        let cause = 'unreachable in graph';
+        if (typeof deps.salemRouteDiag === 'function') {
+          try {
+            diagInfo = deps.salemRouteDiag(a.lat, a.lng, b.lat, b.lng);
+            if (diagInfo) {
+              if (diagInfo.same_node) cause = `endpoints snap to same node #${diagInfo.from_node_idx}`;
+              else if (diagInfo.from_node_idx < 0 || diagInfo.to_node_idx < 0) cause = 'endpoint outside graph coverage';
+              else cause = 'no path between snapped nodes (graph component)';
+            }
+          } catch { /* best-effort */ }
+        }
+        console.log(
+          `[AdminTours] recompute leg=${legOrder} NO-ROUTE  ${fromLabel} → ${toLabel}  ` +
+            `straight=${straightM}m  cause=${cause}`,
+        );
+        return res.status(404).json({
+          error: 'no route found for this leg',
+          from: fromLabel,
+          to: toLabel,
+          straight_m: straightM,
+          snap_diag: diagInfo,
+        });
       }
+      const diag = diagnoseLeg(a, b, r, Date.now() - tLeg);
+      const flag = diag.suspicious ? '⚠ SUSPICIOUS' : '';
+      console.log(
+        `[AdminTours] recompute leg=${legOrder}  ${fromLabel} → ${toLabel}  ` +
+          `straight=${diag.straight_m}m routed=${diag.routed_m}m ratio=${diag.detour_ratio} ` +
+          `pts=${diag.point_count} dur=${diag.duration_s}s t=${diag.elapsed_ms}ms ${flag}`,
+      );
 
       const version = routerVersion();
       await client.query(
@@ -771,7 +946,15 @@ module.exports = function(app, deps) {
           WHERE tour_id = $1 AND leg_order = $2`,
         [tourId, legOrder]
       );
-      res.json(out.rows[0]);
+      // S190 — attach the diagnostics block + endpoint labels so the admin
+      // tool can show the operator the detour ratio for the leg they just
+      // recomputed without having to read it out of the proxy log.
+      res.json({
+        ...out.rows[0],
+        from_label: fromLabel,
+        to_label: toLabel,
+        diagnostics: diag,
+      });
     } catch (err) {
       console.error('[AdminTours] recompute leg error:', err.message);
       res.status(500).json({ error: err.message });

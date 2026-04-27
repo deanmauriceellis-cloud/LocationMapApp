@@ -75,6 +75,9 @@ export function TourTree({
   const [busy, setBusy] = useState(false)
   const [computing, setComputing] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  // S190 — keep the most recent compute-route response so the panel can
+  // show a "suspicious legs" call-out under the Compute button.
+  const [lastCompute, setLastCompute] = useState<ComputeRouteResponse | null>(null)
 
   // Push legs up to AdminLayout whenever they change so AdminMap can render.
   useEffect(() => {
@@ -138,6 +141,35 @@ export function TourTree({
           },
         )
         setLegs(body.legs)
+        setLastCompute(body)
+        // S190 — verbose console output so the operator can compare per-leg
+        // detour ratios without tailing the cache-proxy log. console.table
+        // gives a clean tabular view in DevTools.
+        console.groupCollapsed(
+          `[TourTree] compute-route done · tour=${body.tour_id} · ` +
+            `legs=${body.leg_count} · skipped=${body.skipped.length} · ` +
+            `suspicious=${body.suspicious_count ?? 0} · ` +
+            `total=${body.total_distance_m}m / ${body.total_duration_s}s`,
+        )
+        const tableRows = body.legs.map((leg) => ({
+          leg: leg.leg_order,
+          from: leg.from_label ?? `stop ${leg.from_stop_id}`,
+          to: leg.to_label ?? `stop ${leg.to_stop_id}`,
+          straight_m: leg.diagnostics?.straight_m ?? null,
+          routed_m: leg.diagnostics?.routed_m ?? leg.distance_m,
+          ratio: leg.diagnostics?.detour_ratio ?? null,
+          pts: leg.diagnostics?.point_count ?? leg.polyline_json.length,
+          dur_s: leg.duration_s,
+          ms: leg.diagnostics?.elapsed_ms ?? null,
+          flag: leg.diagnostics?.suspicious ? '⚠' : leg.preserved ? 'preserved' : '',
+        }))
+        // eslint-disable-next-line no-console
+        console.table(tableRows)
+        if (body.skipped.length) {
+          // eslint-disable-next-line no-console
+          console.warn('[TourTree] skipped legs:', body.skipped)
+        }
+        console.groupEnd()
         // Roll-up may have updated tour.distance_km / estimated_minutes.
         await loadTours()
         await loadTour(tour.id)
@@ -156,13 +188,23 @@ export function TourTree({
       setBusy(true)
       setError(null)
       try {
-        await fetchJson(
+        const body = await fetchJson<TourLeg>(
           `${ENDPOINT}/${encodeURIComponent(tour.id)}/legs/${legOrder}/recompute`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ force }),
           },
+        )
+        // S190 — log per-leg diagnostics for ad-hoc recomputes too.
+        const d = body.diagnostics
+        const flag = d?.suspicious ? ' ⚠ SUSPICIOUS' : ''
+        // eslint-disable-next-line no-console
+        console.log(
+          `[TourTree] recompute leg=${legOrder}  ${body.from_label ?? ''} → ${body.to_label ?? ''}  ` +
+            `straight=${d?.straight_m ?? '?'}m routed=${d?.routed_m ?? body.distance_m}m ` +
+            `ratio=${d?.detour_ratio ?? '?'} pts=${d?.point_count ?? body.polyline_json.length} ` +
+            `dur=${body.duration_s}s${flag}`,
         )
         await loadLegs(tour.id)
       } catch (e) {
@@ -441,6 +483,7 @@ export function TourTree({
             onRecomputeLeg={handleRecomputeLeg}
             selectedLegOrder={selectedLegOrder}
             onLegSelect={onLegSelect}
+            lastCompute={lastCompute}
           />
 
           <ol className="text-xs">
@@ -530,6 +573,12 @@ interface RouteSectionProps {
   onRecomputeLeg: (legOrder: number, force?: boolean) => void | Promise<void>
   selectedLegOrder: number | null
   onLegSelect?: (legOrder: number) => void
+  /**
+   * S190 — most recent compute-route response. Used to show suspicious-leg
+   * call-outs ("⚠ leg 3: 45 m straight, 412 m routed, ratio 9.2") so the
+   * operator can fix bad legs without grepping the proxy log.
+   */
+  lastCompute: ComputeRouteResponse | null
 }
 
 function RouteSection({
@@ -542,6 +591,7 @@ function RouteSection({
   onRecomputeLeg,
   selectedLegOrder,
   onLegSelect,
+  lastCompute,
 }: RouteSectionProps) {
   const totalDistance = useMemo(
     () => (legs ?? []).reduce((s, l) => s + l.distance_m, 0),
@@ -601,6 +651,67 @@ function RouteSection({
             </span>
           )}
         </div>
+
+        {/* S190 — suspicious-leg banner. Surfaces legs whose routed
+            distance is implausibly long compared to the straight-line
+            distance, so the operator can spot bad legs at a glance. */}
+        {lastCompute && (lastCompute.suspicious_count ?? 0) > 0 && (
+          <div className="border border-amber-300 bg-amber-50 rounded p-2 space-y-1">
+            <div className="font-semibold text-amber-800">
+              ⚠ {lastCompute.suspicious_count} suspicious leg
+              {(lastCompute.suspicious_count ?? 0) === 1 ? '' : 's'}
+            </div>
+            <ul className="space-y-0.5">
+              {lastCompute.legs
+                .filter((l) => l.diagnostics?.suspicious)
+                .map((l) => (
+                  <li key={l.leg_order} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onLegSelect?.(l.leg_order)}
+                      className="text-amber-900 hover:underline font-mono"
+                      title="Highlight this leg on the map"
+                    >
+                      leg {l.leg_order}
+                    </button>
+                    <span className="text-amber-900 truncate flex-1">
+                      {l.from_label?.replace(/\s*\([^)]+\)\s*$/, '') ?? '?'} →{' '}
+                      {l.to_label?.replace(/\s*\([^)]+\)\s*$/, '') ?? '?'}
+                    </span>
+                    <span className="font-mono text-amber-700 tabular-nums">
+                      {l.diagnostics?.straight_m ?? '?'}m straight ·{' '}
+                      {l.diagnostics?.routed_m ?? l.distance_m}m routed ·
+                      {' '}
+                      <strong>{l.diagnostics?.detour_ratio ?? '?'}×</strong>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+            <div className="text-amber-700 italic text-[11px]">
+              Suspicious = routed distance &gt; 1.6× straight-line, OR routed &gt; 800 m for stops &lt;200 m apart.
+              Click a leg to select it on the map; use the Recompute button on the leg row to re-route.
+            </div>
+          </div>
+        )}
+
+        {/* Skipped legs (no route, missing coords) */}
+        {lastCompute && lastCompute.skipped.length > 0 && (
+          <div className="border border-rose-300 bg-rose-50 rounded p-2 space-y-1">
+            <div className="font-semibold text-rose-800">
+              {lastCompute.skipped.length} leg
+              {lastCompute.skipped.length === 1 ? '' : 's'} skipped
+            </div>
+            <ul className="text-rose-900 space-y-0.5 font-mono text-[11px]">
+              {lastCompute.skipped.map((s) => (
+                <li key={s.leg_order}>
+                  leg {s.leg_order}: {s.reason}
+                  {s.from && s.to ? ` — ${s.from.replace(/\s*\([^)]+\)\s*$/, '')} → ${s.to.replace(/\s*\([^)]+\)\s*$/, '')}` : ''}
+                  {typeof s.straight_m === 'number' ? ` (${s.straight_m} m straight)` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {haveLegs && (
           <ol className="border border-slate-200 rounded divide-y divide-slate-100 bg-white">
