@@ -135,6 +135,14 @@ interface MenuEventListener {
     /** Toggle visibility of MassGIS historical landmark POIs (data_source = massgis_mhc). Default no-op. */
     fun onHistLandmarkToggled(enabled: Boolean) {}
 
+    /** S186: toggle Tour Mode narration override for is_civic_poi=true POIs. Default no-op. */
+    fun onCivicToggled(enabled: Boolean) {}
+
+    /** S186: lets the menu pick the correct Layers pref (explore vs tour) when
+     *  rendering and toggling. Override returns true while a tour is Active or
+     *  Paused. Default false. */
+    fun isTourActive(): Boolean = false
+
     // =========================================================================
     // POINTS OF INTEREST
     // =========================================================================

@@ -78,6 +78,48 @@ class NarrationGeofenceManager @Inject constructor(
     fun isHistoricalMode(): Boolean = historicalMode
 
     /**
+     * S186 — Tour Mode narration gate.
+     *
+     * When ON, narration is restricted to:
+     *   - POIs flagged `is_tour_poi=true`, OR
+     *   - POIs flagged `is_civic_poi=true` AND [tourAllowCivic] (Layers checkbox), OR
+     *   - POIs in {HIST_BLDG, ENTERTAINMENT, LODGING} with year_established ≤ 1860
+     *     AND [tourAllowHistLandmarks] (Layers checkbox).
+     *
+     * Everything else is silent during a tour. The S185 "auto-skip Historical
+     * Mode for stop-less tours" workaround was the wrong fix for the same
+     * problem — this gate is the right one.
+     */
+    private var tourMode: Boolean = false
+    private var tourAllowHistLandmarks: Boolean = false
+    private var tourAllowCivic: Boolean = false
+
+    fun setTourMode(active: Boolean, allowHistLandmarks: Boolean = false, allowCivic: Boolean = false) {
+        tourMode = active
+        tourAllowHistLandmarks = active && allowHistLandmarks
+        tourAllowCivic = active && allowCivic
+        com.example.locationmapapp.util.DebugLogger.i(
+            "NARR-GEO",
+            "tourMode=$active (allowHist=$tourAllowHistLandmarks, allowCivic=$tourAllowCivic)"
+        )
+    }
+
+    fun isTourMode(): Boolean = tourMode
+
+    private fun isTourEligible(point: SalemPoi): Boolean {
+        if (point.isTourPoi) return true
+        if (tourAllowCivic && point.isCivicPoi) return true
+        if (tourAllowHistLandmarks) {
+            val cat = point.category.uppercase()
+            if (cat in TOUR_HIST_LANDMARK_CATEGORIES) {
+                val year = point.yearEstablished
+                if (year != null && year <= 1860) return true
+            }
+        }
+        return false
+    }
+
+    /**
      * Is this POI categorically historical? Single source of truth for the
      * Historical Mode visibility + narration gates — checks ONLY per-POI
      * category + metadata, never looks at `historical_note` content.
@@ -119,6 +161,7 @@ class NarrationGeofenceManager @Inject constructor(
      *   - Otherwise, must be categorically historical AND have a note to read
      */
     private fun isHistoricalQualified(point: SalemPoi): Boolean {
+        if (tourMode) return isTourEligible(point)
         if (!historicalMode) return true
         if (point.id in historicalAllowedIds) return true
         if (point.historicalNote.isNullOrBlank()) return false
@@ -269,6 +312,19 @@ class NarrationGeofenceManager @Inject constructor(
         private val AMUSEMENT_LIKE_CATEGORIES = setOf(
             "ENTERTAINMENT", "MUSEUM",
             "PARKS_REC", "WORSHIP"
+        )
+
+        /**
+         * S186 — categories the Layers "POIs Hist. Landmark" checkbox unsilences
+         * during Tour Mode. WORSHIP/PARKS_REC/EDUCATION/CIVIC + HIST_BLDG museums
+         * are NOT in this set — those are governed by per-POI flags
+         * (is_tour_poi / is_civic_poi) bulk-set at S186 PG migration. This set
+         * is the residual "labeled historic but unverified" categories that
+         * Salem mislabels heavily — strict pre-1860 year_established gate
+         * (applied separately) is what de-mislabels them.
+         */
+        private val TOUR_HIST_LANDMARK_CATEGORIES = setOf(
+            "HISTORICAL_BUILDINGS", "ENTERTAINMENT", "LODGING"
         )
     }
 

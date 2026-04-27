@@ -796,6 +796,10 @@ internal fun SalemMainActivity.showActiveTourDialog() {
 internal fun SalemMainActivity.observeTourState() {
     lifecycleScope.launch {
         tourViewModel.tourState.collectLatest { state ->
+            // S186: tour state transitions flip the Layers pref source
+            // (explore vs tour) and the narration gate. Refresh both before
+            // applying transition-specific UI so the map and gate stay in sync.
+            refreshHistoricalModeForActiveTour()
             when (state) {
                 is TourState.Idle -> {
                     clearTourOverlays()

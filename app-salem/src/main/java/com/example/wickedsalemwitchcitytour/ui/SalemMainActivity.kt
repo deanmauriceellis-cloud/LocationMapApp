@@ -1656,14 +1656,17 @@ class SalemMainActivity : AppCompatActivity() {
             toast("No route data available")
             return@withLock
         }
-        // Reset narration session so all POIs can trigger fresh (clears narratedToday + cooldowns)
-        narrationGeofenceManager.resetSession()
+        // S186: do NOT reset the narration session here. The 1-hour repeat
+        // window must hold across walk-sim start/stop within the same process —
+        // it is only cleared on cold start (onCreate with savedInstanceState=null,
+        // ~line 674). Operator rule: a POI narrated in this session should not
+        // repeat for 1 hour regardless of how many times walk-sim is restarted.
         // Enable walk sim mode: expanded geofence radius + tighter reach-out
         narrationGeofenceManager.walkSimMode = true
         walkSimRunning = true
         binding.btnWalkSim.text = "Stop"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
-        DebugLogger.i("SalemMainActivity", "Walk sim started: '$routeLabel' — ${routePoints.size} route points (narration session reset)")
+        DebugLogger.i("SalemMainActivity", "Walk sim started: '$routeLabel' — ${routePoints.size} route points (narration history preserved)")
 
         walkSimJob = lifecycleScope.launch {
             // S125: hold a PARTIAL wake lock for the whole walk so the CPU
@@ -2079,19 +2082,20 @@ class SalemMainActivity : AppCompatActivity() {
     }
 
     /**
-     * S125: Apply the narration-filter mode that matches the current tour
-     * state and the "Show All POIs" FAB.
+     * S186 — Apply Tour Mode (replacing the S125 Historical Mode application).
      *
-     *   showAllPoisActive == true                                  → off
-     *   showAllPoisActive == false AND an Active/Paused tour exists → on
-     *   showAllPoisActive == false AND no tour                      → off
+     *   showAllPoisActive == true                                  → Tour Mode OFF
+     *   showAllPoisActive == false AND Active/Paused tour exists    → Tour Mode ON
+     *   showAllPoisActive == false AND no tour                      → Tour Mode OFF
      *       (Explore Salem ambient — hear everything nearby.)
      *
-     * When Historical Mode is on, the tour's stops are whitelisted so they
-     * always narrate regardless of category. Every other POI must be
-     * categorically historical (see
-     * NarrationGeofenceManager.isCategoricallyHistorical) and have a
-     * non-blank historical_note.
+     * In Tour Mode, narration is gated to:
+     *   - is_tour_poi=true (always)
+     *   - is_civic_poi=true AND PREF_POI_CIVIC ON
+     *   - HIST_BLDG/ENTERTAINMENT/LODGING with year_established ≤ 1860 AND
+     *     PREF_POI_HIST_LANDMARK ON
+     * Replaces the S125 HERITAGE_TRAIL-only Historical Mode and the S185
+     * empty-stops auto-skip.
      */
     internal fun refreshHistoricalModeForActiveTour() {
         val state = tourViewModel.tourState.value
@@ -2100,26 +2104,30 @@ class SalemMainActivity : AppCompatActivity() {
             is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> state.activeTour
             else -> null
         }
-        // S185: a tour with zero user-facing stops is the polyline-only V1
-        // model — the tour is just a line for the user to follow, and POI
-        // geofences govern their own narration independently of any tour.
-        // Enabling Historical Mode here would build an empty whitelist and
-        // silence every POI on the route except the few that pass the
-        // "categorically historical + non-blank historical_note" fallback.
-        // Skip HM for stop-less tours so all POIs fire normally.
-        val hasUserStops = activeTour?.stops?.isNotEmpty() == true
-        if (activeTour != null && hasUserStops && !showAllPoisActive) {
-            val stopIds = activeTour.stops.map { it.poiId }.toSet()
-            narrationGeofenceManager.setHistoricalMode(true, stopIds)
+        if (activeTour != null && !showAllPoisActive) {
+            val menuPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+            val allowHist = menuPrefs.getBoolean(
+                MenuPrefs.histLandmarkPrefKey(true),
+                MenuPrefs.histLandmarkPrefDefault(true)
+            )
+            val allowCivic = menuPrefs.getBoolean(
+                MenuPrefs.civicPrefKey(true),
+                MenuPrefs.civicPrefDefault(true)
+            )
+            narrationGeofenceManager.setTourMode(true, allowHist, allowCivic)
             DebugLogger.i("SalemMainActivity",
-                "Historical Mode ON — tour '${activeTour.tour.name}' (${stopIds.size} stops whitelisted)")
+                "Tour Mode ON — tour '${activeTour.tour.name}' (allowHist=$allowHist, allowCivic=$allowCivic)")
         } else {
-            if (narrationGeofenceManager.isHistoricalMode()) {
-                narrationGeofenceManager.setHistoricalMode(false)
+            if (narrationGeofenceManager.isTourMode()) {
+                narrationGeofenceManager.setTourMode(false)
                 val reason = if (showAllPoisActive) "Show All POIs FAB ON" else "no tour active"
-                DebugLogger.i("SalemMainActivity", "Historical Mode OFF — $reason")
+                DebugLogger.i("SalemMainActivity", "Tour Mode OFF — $reason")
             }
         }
+        // S186: reload markers because the Layers gate is mode-dependent
+        // (separate explore vs tour prefs). On tour-state transitions and
+        // Layers checkbox toggles, the visible POI set changes.
+        loadNarrationPointMarkers()
     }
 
     /** Narration point markers — stored for zoom-based icon refresh */
@@ -2168,15 +2176,50 @@ class SalemMainActivity : AppCompatActivity() {
                 } else {
                     tierFiltered
                 }
-                // S167: MassGIS landmark toggle — hide massgis_mhc POIs when unchecked
-                val histLandmarkOn = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
-                    .getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, false)
-                val points = if (histLandmarkOn) histModeFiltered
-                             else histModeFiltered.filter { it.dataSource != "massgis_mhc" }
+                // S186: unified Layers map-visibility gates with mode-dependent
+                // prefs. Each checkbox is a bidirectional gate — ON = visible on
+                // the map AND audible (ambient in Explore, restricted to the gated
+                // class in Tour). OFF = hidden + silent. Defaults differ per mode:
+                //   Explore: both ON   (default install)
+                //   Tour:    both OFF  (more restrictive — only is_tour_poi narrates)
+                // Show All POIs FAB overrides both regardless of mode.
+                val menuPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+                val tourActive = menuEventListenerImpl.isTourActive()
+                val histLandmarkOn = menuPrefs.getBoolean(
+                    MenuPrefs.histLandmarkPrefKey(tourActive),
+                    MenuPrefs.histLandmarkPrefDefault(tourActive)
+                )
+                val civicOn = menuPrefs.getBoolean(
+                    MenuPrefs.civicPrefKey(tourActive),
+                    MenuPrefs.civicPrefDefault(tourActive)
+                )
+                val histLandmarkCats = setOf("HISTORICAL_BUILDINGS", "ENTERTAINMENT", "LODGING")
+                val points = if (showAllPoisActive) {
+                    histModeFiltered
+                } else {
+                    histModeFiltered.filter { p ->
+                        // S186: is_tour_poi=true is the force-visible override.
+                        // These POIs always show on the map and always narrate
+                        // (per NarrationGeofenceManager.isTourEligible) regardless
+                        // of any Layers checkbox state. Unchecking a Layers
+                        // checkbox only removes the *additional* class it added —
+                        // not the tour-flagged baseline.
+                        if (p.isTourPoi) return@filter true
+                        val isHistLandmark = p.dataSource == "massgis_mhc" ||
+                            (p.category.uppercase() in histLandmarkCats &&
+                                p.yearEstablished != null && p.yearEstablished <= 1860)
+                        val isCivic = p.isCivicPoi
+                        when {
+                            isHistLandmark -> histLandmarkOn
+                            isCivic        -> civicOn
+                            else           -> true
+                        }
+                    }
+                }
                 DebugLogger.i("SalemMainActivity",
                     "Loading ${points.size} narration markers (showAll=$showAllPoisActive, " +
                     "total=${allPoints.size}, histMode=${narrationGeofenceManager.isHistoricalMode()}, " +
-                    "histLandmark=$histLandmarkOn)")
+                    "histLandmark=$histLandmarkOn, civic=$civicOn)")
 
                 // S118: Pre-generate icons on background thread to avoid ANR
                 val zoom = binding.mapView.zoomLevelDouble
@@ -3786,7 +3829,21 @@ class SalemMainActivity : AppCompatActivity() {
 
         override fun onHistLandmarkToggled(enabled: Boolean) {
             DebugLogger.i("SalemMainActivity", "onHistLandmarkToggled: $enabled")
-            loadNarrationPointMarkers()
+            // S186: refreshHistoricalModeForActiveTour now also reloads markers,
+            // so the unified Layers gate (visibility + narration) flips together.
+            refreshHistoricalModeForActiveTour()
+        }
+
+        override fun onCivicToggled(enabled: Boolean) {
+            DebugLogger.i("SalemMainActivity", "onCivicToggled: $enabled")
+            refreshHistoricalModeForActiveTour()
+        }
+
+        override fun isTourActive(): Boolean {
+            // S186: lets the Layers popup pick the explore vs tour pref.
+            val state = tourViewModel.tourState.value
+            return state is com.example.wickedsalemwitchcitytour.tour.TourState.Active ||
+                   state is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
         }
 
         // ── Weather ───────────────────────────────────────────────────────────

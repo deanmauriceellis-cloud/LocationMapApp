@@ -96,11 +96,48 @@ object MenuPrefs {
      *  the startup pref read so they can't drift. */
     const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = false
 
-    // ── POI source filters ──────────────────────────────────────────────────
-    /** When true, MassGIS historical landmark POIs (data_source = massgis_mhc) are shown on the map. */
+    // ── POI source filters (S186 — Layers checkboxes, mode-dependent) ──────────
+    // Each Layers checkbox (POIs Hist. Landmark, POIs Civic) has TWO prefs:
+    // one for Explore Salem (no tour) and one for Tour Mode. Defaults differ:
+    //   Explore: both ON  (default install state — wander Salem hearing
+    //                      everything visible, including civic + hist landmark)
+    //   Tour:    both OFF (more restrictive — only is_tour_poi=true narrates
+    //                      until user opts back in mid-tour via Layers)
+    // Each checkbox reads/writes the pref matching the current tour state, so
+    // the user's Explore choice is independent of their Tour choice.
+    // Both prefs gate BOTH map visibility AND narration eligibility unified.
+
+    /** Explore-mode "POIs Hist. Landmark" toggle. Default ON.
+     *  Gates HIST_BLDG/ENT/LODGING with year_established ≤ 1860 + data_source=massgis_mhc. */
     const val PREF_POI_HIST_LANDMARK = "poi_hist_landmark_on"
+    const val PREF_POI_HIST_LANDMARK_DEFAULT = true
+
+    /** Tour-mode "POIs Hist. Landmark" toggle. Default OFF.
+     *  When ON during a tour, unsilences + shows the same Historical Landmark set. */
+    const val PREF_POI_HIST_LANDMARK_TOUR = "poi_hist_landmark_tour_on"
+    const val PREF_POI_HIST_LANDMARK_TOUR_DEFAULT = false
+
+    /** Explore-mode "POIs Civic" toggle. Default ON.
+     *  Gates POIs flagged is_civic_poi=true (police/fire/town hall/etc.). */
+    const val PREF_POI_CIVIC = "poi_civic_on"
+    const val PREF_POI_CIVIC_DEFAULT = true
+
+    /** Tour-mode "POIs Civic" toggle. Default OFF.
+     *  When ON during a tour, unsilences + shows is_civic_poi=true POIs. */
+    const val PREF_POI_CIVIC_TOUR = "poi_civic_tour_on"
+    const val PREF_POI_CIVIC_TOUR_DEFAULT = false
 
     // ── Witch Trials feature (Phase 9X, S127) ─────────────────────────────
     /** When true, detail screens (history tile, newspaper, NPC bio) auto-speak the body 1s after open. */
     const val PREF_NARRATOR_MODE_ENABLED = "narrator_mode_enabled"
+
+    // ── S186 helpers: pick the correct Layers pref for the active mode ────────
+    fun histLandmarkPrefKey(tourActive: Boolean): String =
+        if (tourActive) PREF_POI_HIST_LANDMARK_TOUR else PREF_POI_HIST_LANDMARK
+    fun histLandmarkPrefDefault(tourActive: Boolean): Boolean =
+        if (tourActive) PREF_POI_HIST_LANDMARK_TOUR_DEFAULT else PREF_POI_HIST_LANDMARK_DEFAULT
+    fun civicPrefKey(tourActive: Boolean): String =
+        if (tourActive) PREF_POI_CIVIC_TOUR else PREF_POI_CIVIC
+    fun civicPrefDefault(tourActive: Boolean): Boolean =
+        if (tourActive) PREF_POI_CIVIC_TOUR_DEFAULT else PREF_POI_CIVIC_DEFAULT
 }

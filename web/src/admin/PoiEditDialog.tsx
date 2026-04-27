@@ -1017,7 +1017,8 @@ export function PoiEditDialog({
                         </div>
                         <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                           {[
-                            { field: 'is_tour_poi',           label: 'Tour POI',              hint: 'Included in walking tour routes' },
+                            { field: 'is_tour_poi',           label: 'Tour POI',              hint: 'Always narrates during tour mode' },
+                            { field: 'is_civic_poi',          label: 'Civic POI',             hint: 'Narrates during tour only when "POIs Civic" Layers checkbox is on' },
                             { field: 'is_narrated',           label: 'Narrated',              hint: 'Has geofence narration audio' },
                             { field: 'has_announce_narration',label: 'Announce narration',    hint: 'Plays brief intro when entering geofence' },
                             { field: 'default_visible',       label: 'Visible by default',    hint: 'Shown on map without filters' },

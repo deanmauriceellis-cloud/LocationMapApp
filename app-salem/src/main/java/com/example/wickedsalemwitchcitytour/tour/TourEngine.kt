@@ -11,6 +11,7 @@ package com.example.wickedsalemwitchcitytour.tour
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.SalemContentRepository
@@ -120,15 +121,24 @@ class TourEngine @Inject constructor(
             persistProgress(activeTour)
             geofenceManager.loadStops(stops, pois)
 
-            // Phase 9R.0: auto-enable Historical Mode for heritage-trail themed
-            // tours. The NarrationGeofenceManager then silences modern POIs and
-            // plays `historical_note` (tour-guide voice) instead of the default
-            // short_narration. Disables cleanly in endTour().
-            if (tour.theme.equals("HERITAGE_TRAIL", ignoreCase = true)) {
-                val allowedIds = stops.map { it.poiId }.toSet()
-                narrationGeofenceManager.setHistoricalMode(true, allowedIds)
-                DebugLogger.i(TAG, "Historical Mode ENABLED for '${tour.name}' — ${allowedIds.size} tour stops whitelisted")
-            }
+            // S186 — Tour Mode narration gate. Restricts narration to POIs flagged
+            // is_tour_poi=true, plus optional unsilencing via Layers checkboxes:
+            //   - PREF_POI_HIST_LANDMARK → HIST_BLDG/ENT/LODGE with year ≤ 1860
+            //   - PREF_POI_CIVIC         → POIs flagged is_civic_poi=true
+            // Replaces the S185 empty-stops auto-skip and the HERITAGE_TRAIL-only
+            // Historical Mode. Reads current Layers state at start; SalemMainActivity
+            // re-pushes setTourMode() if either checkbox is toggled mid-tour.
+            val menuPrefs = context.getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            val allowHist = menuPrefs.getBoolean(
+                MenuPrefs.histLandmarkPrefKey(true),
+                MenuPrefs.histLandmarkPrefDefault(true)
+            )
+            val allowCivic = menuPrefs.getBoolean(
+                MenuPrefs.civicPrefKey(true),
+                MenuPrefs.civicPrefDefault(true)
+            )
+            narrationGeofenceManager.setTourMode(true, allowHist, allowCivic)
+            DebugLogger.i(TAG, "Tour Mode ENABLED for '${tour.name}' — allowHist=$allowHist, allowCivic=$allowCivic")
 
             DebugLogger.i(TAG, "Tour started: ${tour.name} — ${stops.size} stops")
         } catch (e: Exception) {
@@ -306,12 +316,12 @@ class TourEngine @Inject constructor(
         geofenceManager.clear()
         narrationManager.stop()
 
-        // Phase 9R.0: always clear Historical Mode when the tour ends, even if
-        // the tour wasn't a HERITAGE_TRAIL one. Cheap idempotent reset.
+        // S186: clear Tour Mode (and any leftover Historical Mode from older code paths).
+        narrationGeofenceManager.setTourMode(false)
         if (narrationGeofenceManager.isHistoricalMode()) {
             narrationGeofenceManager.setHistoricalMode(false)
-            DebugLogger.i(TAG, "Historical Mode DISABLED (tour ended)")
         }
+        DebugLogger.i(TAG, "Tour Mode DISABLED (tour ended)")
 
         DebugLogger.i(TAG, "Tour ended: ${summary.tourName} — " +
                 "${summary.completedStops}/${summary.totalStops} stops, ${summary.totalTimeMinutes} min")

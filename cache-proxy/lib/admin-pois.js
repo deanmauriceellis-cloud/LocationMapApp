@@ -71,7 +71,7 @@ const UPDATABLE_FIELDS = [
   // Provenance
   'data_source', 'confidence', 'verified_date', 'stale_after',
   // Operational flags
-  'is_tour_poi', 'is_narrated', 'default_visible', 'has_announce_narration',
+  'is_tour_poi', 'is_civic_poi', 'is_narrated', 'default_visible', 'has_announce_narration',
   // Classification flags (S165)
   'is_historical_property', 'is_witch_trial_site', 'is_free_admission',
   'is_indoor', 'is_family_friendly',

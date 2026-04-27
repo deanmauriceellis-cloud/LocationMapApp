@@ -42,7 +42,7 @@ export const UPDATABLE_FIELDS = [
   // Provenance
   'data_source', 'confidence', 'verified_date', 'stale_after',
   // Flags
-  'is_tour_poi', 'is_narrated', 'default_visible',
+  'is_tour_poi', 'is_civic_poi', 'is_narrated', 'default_visible',
   // Phase 9Y — MassGIS / MHC Inventory / L3 parcel enrichment
   'building_footprint_geojson',
   'mhc_id', 'mhc_year_built', 'mhc_style', 'mhc_nr_status', 'mhc_narrative',
@@ -67,7 +67,7 @@ export const JSONB_FIELDS: ReadonlySet<string> = new Set([
 // Boolean columns (rendered as checkboxes).
 export const BOOLEAN_FIELDS: ReadonlySet<string> = new Set([
   'requires_transportation', 'wheelchair_accessible', 'seasonal',
-  'is_tour_poi', 'is_narrated', 'default_visible',
+  'is_tour_poi', 'is_civic_poi', 'is_narrated', 'default_visible',
   'location_truth_of_record',
 ])
 

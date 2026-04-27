@@ -1,7 +1,15 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 175, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 176, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 175, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 176, plus the original v1.5.0–v1.5.50 archive at the bottom.
 > SESSION-LOG.md keeps only the most recent 10 sessions. On every session end, the oldest session in SESSION-LOG.md is moved here (newest archived first).
+
+## Session 176: 2026-04-25 — Live re-routing + MBTA-origin walk-sim + Router JVM parity tests
+
+Three S175 carry-forwards shipped on the on-device walking router. **P3b (live re-routing):** new `DirectionsSession` class watches the location stream during an active route, fires a recompute after >25 m drift sustained for 2 consecutive fixes, and clears the route on arrival within 15 m of destination. Wired into `TourViewModel` so every GPS update flows through the session; mute flag prevents re-entry while a reroute is in flight. Verified on Lenovo TB305FU via new deterministic `/directions-session-test` endpoint (7 scripted fixes, all pass: drift detection requires two consecutive off-path fixes, single-fix tolerated, arrival fires inside 15 m). **P3c (MBTA-origin walk-sim):** when `lastGpsPoint` is >3 km from MBTA Salem station, `walkTo(POI)` now forks to `startSimulatedWalkFromMbta` — computes the bundled-router route from the station to the POI, publishes it as the active walking route (so the P3b session arms automatically), and drives a `walkSimAlongPolyline` simulator at 1.4 m/s. Lenovo verification (Boston as fake origin → 7 Gables): bundled route 1510 m / 11 turns, simulator interpolated to 1013 steps, step counter advancing cleanly at 1 Hz. In-Salem branch verified untouched. **P2c (Router JVM parity tests):** new `core/src/test/` source set with `JdbcRoutingBundleLoader` (sqlite-jdbc, JVM-only mirror of `RoutingBundleLoader`) and `RouterParityTest` (10 tests, all pass: four S175 reference routes pinned bit-exact to ±1 mm, plus degenerate same-point, KNN snap, multi-stop concat, pace→duration). Carry-forward to S177: P4 (web router in cache-proxy consuming the same SQLite bundle) and P5 (web Leaflet directions UI).
+
+Full session detail: `docs/session-logs/session-176-2026-04-25.md`. Commit: `d2ad291`.
+
+---
 
 ## Session 175: 2026-04-25 — On-device Salem walking router (TigerLine bake → APK + Directions UI)
 

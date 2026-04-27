@@ -227,10 +227,24 @@ class AppBarMenuManager(
         }
 
         // ── POI filter toggles ────────────────────────────────────────
-        val histLandmarkOn = prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, false)
+        // S186: Layers checkboxes have separate explore/tour state. Each
+        // checkbox reads + writes the pref matching the current tour state, so
+        // the user's Explore choice is independent of their Tour choice.
+        // Defaults: explore=ON, tour=OFF.
+        val tourActive = menuEventListener.isTourActive()
+        val histKey = MenuPrefs.histLandmarkPrefKey(tourActive)
+        val histDefault = MenuPrefs.histLandmarkPrefDefault(tourActive)
+        val histLandmarkOn = prefs.getBoolean(histKey, histDefault)
         val histItem = popup.menu.add(GROUP_POI_FILTER, ITEM_HIST_LANDMARK, nextOrder++, "POIs Hist. Landmark")
         histItem.isCheckable = true
         histItem.isChecked = histLandmarkOn
+
+        val civicKey = MenuPrefs.civicPrefKey(tourActive)
+        val civicDefault = MenuPrefs.civicPrefDefault(tourActive)
+        val civicOn = prefs.getBoolean(civicKey, civicDefault)
+        val civicItem = popup.menu.add(GROUP_POI_FILTER, ITEM_CIVIC, nextOrder++, "POIs Civic")
+        civicItem.isCheckable = true
+        civicItem.isChecked = civicOn
 
         popup.setOnMenuItemClickListener { item ->
             when (item.groupId) {
@@ -241,13 +255,24 @@ class AppBarMenuManager(
                     menuEventListener.onTileSourceChanged(selectedId)
                     true
                 }
-                GROUP_POI_FILTER -> {
-                    val newState = !prefs.getBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, false)
-                    prefs.edit().putBoolean(MenuPrefs.PREF_POI_HIST_LANDMARK, newState).apply()
-                    item.isChecked = newState
-                    DebugLogger.i(TAG, "POIs Hist. Landmark → $newState")
-                    menuEventListener.onHistLandmarkToggled(newState)
-                    true
+                GROUP_POI_FILTER -> when (item.itemId) {
+                    ITEM_HIST_LANDMARK -> {
+                        val newState = !prefs.getBoolean(histKey, histDefault)
+                        prefs.edit().putBoolean(histKey, newState).apply()
+                        item.isChecked = newState
+                        DebugLogger.i(TAG, "POIs Hist. Landmark [$histKey] → $newState")
+                        menuEventListener.onHistLandmarkToggled(newState)
+                        true
+                    }
+                    ITEM_CIVIC -> {
+                        val newState = !prefs.getBoolean(civicKey, civicDefault)
+                        prefs.edit().putBoolean(civicKey, newState).apply()
+                        item.isChecked = newState
+                        DebugLogger.i(TAG, "POIs Civic [$civicKey] → $newState")
+                        menuEventListener.onCivicToggled(newState)
+                        true
+                    }
+                    else -> false
                 }
                 else -> false
             }
@@ -259,6 +284,7 @@ class AppBarMenuManager(
         const val GROUP_BASEMAP = 1
         const val GROUP_POI_FILTER = 2
         const val ITEM_HIST_LANDMARK = 100
+        const val ITEM_CIVIC = 101
     }
 
     // ─────────────────────────────────────────────────────────────────────────
