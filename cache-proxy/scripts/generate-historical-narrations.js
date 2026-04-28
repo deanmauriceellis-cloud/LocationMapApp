@@ -498,17 +498,26 @@ function buildPrompt(name, year, lengthBucket, groundTruthBlock, witchTrial) {
     ? 'CONTENT FOCUS: This entity has a documented connection to the 1692 Salem witch trials. Cover the trial connection in detail where grounded — accusations, examinations held here, named magistrates, named accused, named accusers, outcomes — staying within the pre-1860 cutoff.'
     : 'CONTENT FOCUS: Cover the original construction, original owner/builder/architect, notable pre-1860 occupants, notable pre-1860 events at this site, and documented pre-1860 architectural features.';
   // Anti-hallucination: entities built well after 1692 cannot have hosted /
-  // predated the witch trials. Forbid that claim explicitly.
-  if (year > 1700) {
+  // predated the witch trials. Forbid that claim explicitly. Skipped when
+  // year is null — the validator's banned-witch-trial-language patterns
+  // and the GROUND_TRUTH itself are the gates.
+  if (year && year > 1700) {
     focus += ` HARD FACT: This entity dates to ${year}, which is ${year - 1692} years AFTER the 1692 Salem witch trials. Do NOT claim it predates, witnessed, or was associated with the witch trials. The trials had concluded long before this entity existed.`;
   }
+  // S193 — null year case (LMA year_established and SI mode_c.built_year both
+  // unset). Tell gemma the entity is pre-1860 but we don't have an exact year;
+  // forbid inventing one. The validator still strips any sentence that mentions
+  // a post-1859 year, so a fabricated "1875" would get caught.
+  const yearHeader = year
+    ? `Built circa ${year}.`
+    : 'Construction year is not in our records, but the entity is pre-1860. Do NOT invent a specific year — write only what is grounded in the GROUND_TRUTH below. If grounding does not support a year, say "by the early colonial period" / "during the seventeenth century" / "in the late eighteenth century" only when the grounded relations support it.';
   return [
-    `You will write a strict pre-1860 historical narration for ${name} in Salem, Massachusetts. Built circa ${year}.`,
+    `You will write a strict pre-1860 historical narration for ${name} in Salem, Massachusetts. ${yearHeader}`,
     '',
     'GROUND_TRUTH (these are operator-verified facts; the narration must use them and must not contradict them):',
     groundTruthBlock,
     '',
-    buildTemporalFraming(year),
+    buildTemporalFraming(year || 1800),
     '',
     focus,
     '',
@@ -767,14 +776,26 @@ async function generateForPoi(poi) {
   const effYear = bcsYear || poi.year_established;
   result.effective_year = effYear;
 
-  if (!effYear || effYear >= PRE1860_CUTOFF) {
+  // S193: only HARD-SKIP when year is known and ≥ 1860. When the year is
+  // null we trust the prompt + sentence-level validator to gate post-1860
+  // content out (year regex strips any 1860+ sentence; banned phrases catch
+  // modern-continuity language; "all-sentences-violated" or words<60 reject
+  // the whole POI). Cost: gemma cycles burned on POIs that turn out to be
+  // post-1860 and reject. Benefit: unlocks ~hundreds of HISTORICAL_BUILDINGS
+  // with null year_established that are genuinely pre-1860 (the LMA year
+  // field is just unauthored). Sampled 5 SI dumps for null-year POIs —
+  // mode_c.built_year is empty corpus-wide, so a "backfill year from SI"
+  // doesn't help; this is the cheapest way to expand coverage.
+  if (effYear && effYear >= PRE1860_CUTOFF) {
     result.status = 'skip-not-pre1860';
-    result.note = `effective_year=${effYear ?? 'null'}`;
+    result.note = `effective_year=${effYear}`;
     return result;
   }
 
-  const witchTrial = detectWitchTrialSignal(dump, effYear);
-  const lengthBucket = effYear < 1800 ? 'RICH' : 'STANDARD';
+  const witchTrial = detectWitchTrialSignal(dump, effYear || 1700);
+  // Null year → STANDARD bucket (60-150 words). RICH (250-500) only when
+  // we know the entity is pre-1800.
+  const lengthBucket = (effYear && effYear < 1800) ? 'RICH' : 'STANDARD';
   result.length_bucket = lengthBucket;
 
   // Build enriched GROUND_TRUTH from every available source.
