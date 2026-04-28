@@ -764,6 +764,14 @@ async function generateForPoi(poi) {
   // pre-eligibility: skip commemorative artifacts (statues/monuments/plaques)
   // regardless of LMA year. They are post-1860 even when commemorating earlier
   // subjects.
+  //
+  // S194 carry-forward: operator rule (feedback_commemoratives_are_historical_tributes)
+  // says commemoratives that tribute PRE-1860 subjects DO get historical_narration —
+  // the narration's subject is the figure/event commemorated, not the
+  // post-1860 object. Implementation deferred to next session: needs a
+  // dedicated buildCommemorativeTributePrompt() and a relaxed year guard.
+  // For now the existing skip behavior stays so the generator doesn't
+  // regress (calling buildPrompt with a statue would describe the bronze).
   const lmaName = poi.name || '';
   const siName = dump.entity_name || '';
   if (COMMEMORATIVE_NAME_PATTERN.test(lmaName) || COMMEMORATIVE_NAME_PATTERN.test(siName)) {
