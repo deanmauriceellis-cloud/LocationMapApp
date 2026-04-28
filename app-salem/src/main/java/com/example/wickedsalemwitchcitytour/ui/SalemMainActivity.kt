@@ -38,9 +38,11 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import com.example.wickedsalemwitchcitytour.R
 import com.example.locationmapapp.data.model.GeocodeSuggestion
 import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategories
@@ -1550,7 +1552,7 @@ class SalemMainActivity : AppCompatActivity() {
         // Historical Mode is only re-asserted when the active tour is a
         // HERITAGE_TRAIL theme. Other tours run in regular ambient mode.
         val initialTourState = tourViewModel.tourState.value
-        val activeTour = when (initialTourState) {
+        var activeTour = when (initialTourState) {
             is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> initialTourState.activeTour
             is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> initialTourState.activeTour
             else -> null
@@ -1562,21 +1564,21 @@ class SalemMainActivity : AppCompatActivity() {
         when {
             tourIsActive -> {
                 DebugLogger.i("SalemMainActivity",
-                    "Walk sim: tour '${activeTour!!.tour.name}' (theme=${activeTour.tour.theme}) already Active — using as-is")
-                // S125 (2026-04-14): enable Historical Mode for ANY active
-                // tour, not just HERITAGE_TRAIL. Operator direction: "All
-                // the tours need to only have historical information POIs
-                // like The Heritage trail." The tour's stops are
-                // whitelisted so they always narrate; every other POI is
-                // filtered to categorically-historical + has
-                // historical_note. The "POI" FAB (showAllPoisActive) is
-                // the escape hatch that turns the filter off.
+                    "Walk sim: tour '${activeTour!!.tour.name}' (theme=${activeTour!!.tour.theme}) already Active — using as-is")
                 refreshHistoricalModeForActiveTour()
             }
             tourIsPaused -> {
                 DebugLogger.i("SalemMainActivity",
                     "Walk sim: tour '${activeTour!!.tour.name}' was Paused → resuming via startTour (idempotent)")
-                tourViewModel.startTour(activeTour.tour.id)
+                tourViewModel.startTour(activeTour!!.tour.id)
+                // S193: wait for resume to flip back to Active so refresh +
+                // route selection see populated activeTour.
+                val resumed = withTimeoutOrNull(3_000L) {
+                    tourViewModel.tourState.first { it is com.example.wickedsalemwitchcitytour.tour.TourState.Active }
+                } as? com.example.wickedsalemwitchcitytour.tour.TourState.Active
+                if (resumed != null) {
+                    activeTour = resumed.activeTour
+                }
                 refreshHistoricalModeForActiveTour()
             }
             else -> {
@@ -1589,7 +1591,28 @@ class SalemMainActivity : AppCompatActivity() {
                 DebugLogger.i("SalemMainActivity",
                     "Walk sim: no tour selected (state=$stateLabel) → auto-starting tour_WD1")
                 tourViewModel.startTour("tour_WD1")
-                autoStartedHeritageTrail = true
+                // S193: WAIT for the auto-started tour to reach Active before
+                // computing the route. Without this wait, `activeTour` stays
+                // null and the route selector below falls into the
+                // loadDowntownRoute() fallback — a 21 km perimeter loop the
+                // walker proceeds to march. Operator: "FAB walk seems to
+                // lost its mind." The 3 s budget covers the typical PG
+                // round-trip + Room load; on timeout we still proceed so a
+                // missing-tour situation degrades to the Heritage-Trail JSON
+                // path below rather than hanging the FAB.
+                val started = withTimeoutOrNull(3_000L) {
+                    tourViewModel.tourState.first { it is com.example.wickedsalemwitchcitytour.tour.TourState.Active }
+                } as? com.example.wickedsalemwitchcitytour.tour.TourState.Active
+                if (started != null) {
+                    activeTour = started.activeTour
+                    DebugLogger.i("SalemMainActivity",
+                        "Walk sim: tour_WD1 reached Active (${started.activeTour.tour.name}) — using its baked polyline")
+                    refreshHistoricalModeForActiveTour()
+                } else {
+                    DebugLogger.w("SalemMainActivity",
+                        "Walk sim: tour_WD1 did not reach Active in 3s — falling back to Heritage Trail JSON")
+                    autoStartedHeritageTrail = true
+                }
             }
         }
         val routePoints: List<org.osmdroid.util.GeoPoint>
