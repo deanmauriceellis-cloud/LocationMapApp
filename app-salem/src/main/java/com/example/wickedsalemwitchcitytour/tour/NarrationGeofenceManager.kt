@@ -390,15 +390,16 @@ class NarrationGeofenceManager @Inject constructor(
             if (!h.isNullOrBlank()) return h
             // S193 — operator rule: HISTORICAL_BUILDINGS on a historical tour
             // have special needs. When the historic narration isn't authored
-            // yet, fall back to long → short → name rather than going silent
-            // — these POIs are the whole point of the tour. Other categories
-            // stay silent (return null) so modern blurbs don't break the
-            // historical tone for commercial / civic / shopping POIs that
-            // happened to land in the audible set via Layers checkboxes.
+            // yet, fall back to short_narration only — short is a tight
+            // intro line; long_narration is rich modern content that would
+            // dominate a historical tour with present-day commentary, and
+            // the bare-name "You are near X" line was too thin to be useful.
+            // Other categories stay silent (return null) so modern blurbs
+            // don't break the historical tone for commercial / civic /
+            // shopping POIs that landed in the audible set via Layers
+            // checkboxes.
             if (point.category.equals("HISTORICAL_BUILDINGS", ignoreCase = true)) {
-                return point.longNarration?.takeIf { it.isNotBlank() }
-                    ?: point.shortNarration?.takeIf { it.isNotBlank() }
-                    ?: "You are near ${point.name}."
+                return point.shortNarration?.takeIf { it.isNotBlank() }
             }
             return null
         }
