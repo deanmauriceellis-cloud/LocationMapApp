@@ -2146,7 +2146,12 @@ class SalemMainActivity : AppCompatActivity() {
      *
      * S112/S135: Honors the POI button (`showAllPoisActive`):
      *   - ON  → all narration points are loaded (full set)
-     *   - OFF → only HISTORICAL_BUILDINGS category (+ PAID merchants)
+     *   - OFF → curated baseline (HISTORICAL_BUILDINGS, PAID merchants,
+     *           is_historical_property, is_civic_poi). The Layers checkboxes
+     *           below then gate hist-landmark and civic visibility within this
+     *           baseline. Without admitting hist-property / civic at the tier
+     *           stage, the Layers checkbox can't make them appear — they were
+     *           filtered out before the gate ran. S195 fix.
      *
      * Always removes any previously-loaded narration markers from the map
      * before loading the new set, so toggling the button is fully reversible.
@@ -2166,7 +2171,10 @@ class SalemMainActivity : AppCompatActivity() {
                     allPoints
                 } else {
                     allPoints.filter { p ->
-                        p.adPriority > 0 || p.category == "HISTORICAL_BUILDINGS"
+                        p.adPriority > 0 ||
+                        p.category == "HISTORICAL_BUILDINGS" ||
+                        p.isHistoricalProperty ||
+                        p.isCivicPoi
                     }
                 }
                 // Phase 9R.0: when Historical Mode is on, strip out modern POIs
