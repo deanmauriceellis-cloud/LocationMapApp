@@ -572,9 +572,24 @@ async function checkDuplicates(pgPool) {
   const items = [];
   for (const members of clusters.values()) {
     if (members.length < 2) continue;
-    const sharedNames = members.map(m => m.name).slice(0, 3).join(', ') +
-      (members.length > 3 ? `, +${members.length - 3} more` : '');
-    for (const m of members) {
+    // S195 — drop members sitting at geocoder-fallback points (3+ POIs sharing
+    // exact lat/lng). Those POIs are flagged separately by geo_centroid_snap
+    // with a clearer "geocoder fallback" message. Without this filter the
+    // duplicates check listed unrelated co-located businesses (massage therapy,
+    // pub, gift shop, etc.) under a "Duplicate POIs" header — confusing UX
+    // because they're not duplicates of each other, they just collapsed onto
+    // the same fallback centroid.
+    const filtered = members.filter((m) => {
+      const sameCoords = members.filter(
+        (o) => o.lat === m.lat && o.lng === m.lng,
+      ).length;
+      return sameCoords < 3;
+    });
+    if (filtered.length < 2) continue;
+    const sharedNames =
+      filtered.map((m) => m.name).slice(0, 3).join(', ') +
+      (filtered.length > 3 ? `, +${filtered.length - 3} more` : '');
+    for (const m of filtered) {
       if (items.length >= ITEM_CAP) break;
       items.push({
         entity_type: 'poi',
@@ -582,8 +597,8 @@ async function checkDuplicates(pgPool) {
         entity_label: m.name,
         lat: m.lat,
         lng: m.lng,
-        message: `Duplicate cluster of ${members.length} POIs within 15m: ${sharedNames}.`,
-        fix_hint: `Open each in the editor, decide which is the canonical record, and Delete (soft) the losers.`,
+        message: `${filtered.length} POIs share locations within 15m of each other: ${sharedNames}. (Possible duplicates or genuinely-distinct neighbors.)`,
+        fix_hint: `Open each in the editor. If they're duplicates, pick the canonical record and Delete (soft) the losers. If they're genuinely-distinct neighbors at the same address, Suppress this flag.`,
       });
     }
     if (items.length >= ITEM_CAP) break;
@@ -736,7 +751,7 @@ const CHECKS = [
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },
   { id: 'geo_outlier',               label: 'Outlier coordinates',                        category: 'Geography',  severity: 'error', run: checkGeoOutlier },
   { id: 'geo_centroid_snap',         label: 'Geocoder fallback (3+ POIs at same point)',  category: 'Geography',  severity: 'warn',  run: checkGeoCentroidSnap },
-  { id: 'duplicates',                label: 'Duplicate POIs (within 15m)',                category: 'Duplicates', severity: 'warn',  run: checkDuplicates },
+  { id: 'duplicates',                label: 'Co-located POIs (within 15m)',               category: 'Duplicates', severity: 'warn',  run: checkDuplicates },
   { id: 'cleanup_dedup_losers',      label: 'Soft-deleted dedup losers (pre-AAB cleanup)',category: 'Cleanup',    severity: 'info',  run: checkCleanupDedupLosers },
   { id: 'provenance_gaps',           label: 'Tour POIs with thin provenance',             category: 'Provenance', severity: 'info',  run: checkProvenanceGaps },
   { id: 'tour_orphan_stops',         label: 'Tour stops referencing deleted POIs',        category: 'Tour data',  severity: 'warn',  run: checkTourOrphanStops },
