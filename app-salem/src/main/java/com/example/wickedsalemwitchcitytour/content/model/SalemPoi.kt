@@ -104,6 +104,7 @@ data class SalemPoi(
     // ── Flags ──
     @ColumnInfo(name = "is_tour_poi") val isTourPoi: Boolean = false,
     @ColumnInfo(name = "is_civic_poi") val isCivicPoi: Boolean = false,
+    @ColumnInfo(name = "is_historical_property") val isHistoricalProperty: Boolean = false,
     @ColumnInfo(name = "is_narrated") val isNarrated: Boolean = false,
     @ColumnInfo(name = "default_visible") val defaultVisible: Boolean = true,
     /**

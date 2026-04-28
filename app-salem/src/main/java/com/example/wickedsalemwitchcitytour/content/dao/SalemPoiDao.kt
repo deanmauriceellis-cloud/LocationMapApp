@@ -40,23 +40,25 @@ interface SalemPoiDao {
 
     // ── Narration queries (replaces NarrationPointDao) ─────────────��────────
 
-    // Visibility gate: narrated rows only fire if the user can see them on the
-    // map (default_visible=1) OR the POI is on the active tour-flag override
-    // path (is_tour_poi=1). Hidden non-tour POIs stay silent regardless of
-    // is_narrated. See S192 hidden-POI fix.
-    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1) ORDER BY priority ASC, name ASC")
+    // Visibility gate: narrated rows enter the candidate pool when EITHER the
+    // user can see them on the explore map (default_visible=1), OR they're a
+    // tour-flag override (is_tour_poi=1), OR they qualify for a Layers-checkbox
+    // override class (is_historical_property=1 / is_civic_poi=1). The Layers
+    // toggles in NarrationGeofenceManager then decide per-event whether the
+    // POI actually narrates — pool-widening here, eligibility there. S195.
+    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1) ORDER BY priority ASC, name ASC")
     suspend fun findNarrated(): List<SalemPoi>
 
-    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1) AND wave = :wave ORDER BY priority ASC, name ASC")
+    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1) AND wave = :wave ORDER BY priority ASC, name ASC")
     suspend fun findNarratedByWave(wave: Int): List<SalemPoi>
 
-    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1) AND priority <= :maxPriority ORDER BY priority ASC")
+    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1) AND priority <= :maxPriority ORDER BY priority ASC")
     suspend fun findNarratedByMaxPriority(maxPriority: Int): List<SalemPoi>
 
     @Query("""
         SELECT * FROM salem_pois
         WHERE is_narrated = 1
-        AND (default_visible = 1 OR is_tour_poi = 1)
+        AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1)
         AND lat BETWEEN :latMin AND :latMax
         AND lng BETWEEN :lngMin AND :lngMax
         ORDER BY priority ASC
@@ -92,7 +94,7 @@ interface SalemPoiDao {
           ((:lat - lat) * (:lat - lat) + (:lng - lng) * (:lng - lng)) AS dist_sq
         FROM salem_pois
         WHERE is_narrated = 1
-          AND (default_visible = 1 OR is_tour_poi = 1)
+          AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1)
           AND lat BETWEEN :lat - :radiusDeg AND :lat + :radiusDeg
           AND lng BETWEEN :lng - :radiusDeg AND :lng + :radiusDeg
         ORDER BY dist_sq ASC

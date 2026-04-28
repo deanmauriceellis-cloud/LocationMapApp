@@ -28,7 +28,8 @@ const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 //   v11 (S186) — added is_civic_poi to SalemPoi
 //   v12 (S192) — added historical_narration to SalemPoi
 //   v13 (S193) — added is_historical_tour to Tour
-const ROOM_IDENTITY_HASH_V11 = 'd0d3d240e2d04c159767b90860fe7a8c';
+//   v14 (S195) — added is_historical_property to SalemPoi
+const ROOM_IDENTITY_HASH_V11 = '5a42a013703bb605f5ad4f065309ee8a';
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -107,9 +108,9 @@ if (!fs.existsSync(CONTENT_DB)) {
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
     } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V11) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V11} (v13)`);
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V11} (v14)`);
     } else {
-      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v11)`);
+      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v14)`);
     }
   } catch (e) {
     fail(`salem_content.db: open/query failed: ${e.message}`);

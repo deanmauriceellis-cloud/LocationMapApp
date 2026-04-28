@@ -134,6 +134,30 @@ class NarrationGeofenceManager @Inject constructor(
 
     fun isHistoricalNarrationMode(): Boolean = historicalNarrationMode
 
+    /**
+     * S195 — Explore-mode Layers gate.
+     *
+     * The "POIs Hist. Landmark" / "POIs Civic" checkboxes act as global
+     * overrides per operator: the toggle gates whether that class speaks,
+     * regardless of tour-mode/non-tour-mode. In tour mode the existing
+     * S186 [tourMode] flow handles the tour-side prefs; in pure explore
+     * (no tour, no historicalMode), these fields drive eligibility for
+     * the matching POI classes. SalemMainActivity pushes the current
+     * pref values via [setExploreLayerPrefs] at startup, on tour state
+     * transitions, and on Layers checkbox toggles.
+     */
+    private var exploreAllowHistLandmarks: Boolean = true
+    private var exploreAllowCivic: Boolean = true
+
+    fun setExploreLayerPrefs(allowHistLandmarks: Boolean, allowCivic: Boolean) {
+        exploreAllowHistLandmarks = allowHistLandmarks
+        exploreAllowCivic = allowCivic
+        com.example.locationmapapp.util.DebugLogger.i(
+            "NARR-GEO",
+            "exploreLayers (allowHist=$allowHistLandmarks, allowCivic=$allowCivic)"
+        )
+    }
+
     private fun isTourEligible(point: SalemPoi): Boolean {
         if (point.isTourPoi) return true
         if (tourAllowCivic && point.isCivicPoi) return true
@@ -182,18 +206,56 @@ class NarrationGeofenceManager @Inject constructor(
     }
 
     /**
-     * Does this POI qualify for NARRATION under historical mode?
+     * S195 — name-based commemorative detector. Matches the S192 generator
+     * pattern so the narration runtime and the narration generator agree on
+     * which POIs are commemoratives. Used as part of the civic-historical
+     * eligibility rule below: a civic POI counts as eligible for historical
+     * narration when it's pre-1860 OR a commemorative tribute.
+     */
+    private fun isCommemorative(point: SalemPoi): Boolean {
+        return COMMEMORATIVE_NAME_PATTERN.containsMatchIn(point.name)
+    }
+
+    /**
+     * S195 — civic POI eligible for historical-narration text? Operator rule:
+     * civic POIs that are pre-1860 OR commemorative tributes use the same
+     * historical-narration > short fallback as full historical landmarks.
+     * Other civic POIs (modern police/fire/town hall) just speak short.
+     */
+    private fun isCivicHistEligible(point: SalemPoi): Boolean {
+        if (!point.isCivicPoi) return false
+        val year = point.yearEstablished
+        if (year != null && year <= 1860) return true
+        return isCommemorative(point)
+    }
+
+    /**
+     * Does this POI qualify for NARRATION right now?
      *
-     * Strict rule:
-     *   - Tour stops always narrate (whitelisted by TourEngine)
-     *   - Otherwise, must be categorically historical AND have a note to read
+     * S195 unified gate:
+     *   1. Tour stops (`is_tour_poi=true`) always narrate.
+     *   2. Tour mode → S186 [isTourEligible] handles the tour-side prefs
+     *      (POIs Hist. Landmark / Civic tour checkboxes).
+     *   3. Legacy Historical Mode (Phase 9R.0) → strict categorical rule.
+     *   4. Pure explore mode → Layers gate. Hist-property POIs admit only
+     *      when the explore Hist. Landmark toggle is on; civic POIs admit
+     *      only when the explore Civic toggle is on. Everything else still
+     *      narrates by default (explore is permissive baseline).
      */
     private fun isHistoricalQualified(point: SalemPoi): Boolean {
+        if (point.isTourPoi) return true
         if (tourMode) return isTourEligible(point)
-        if (!historicalMode) return true
-        if (point.id in historicalAllowedIds) return true
-        if (point.historicalNote.isNullOrBlank()) return false
-        return isCategoricallyHistorical(point)
+        if (historicalMode) {
+            if (point.id in historicalAllowedIds) return true
+            if (point.historicalNote.isNullOrBlank()) return false
+            return isCategoricallyHistorical(point)
+        }
+        // Pure explore mode — Layers checkboxes gate the hist-landmark and
+        // civic classes. POIs in neither class fall through to the permissive
+        // "everything narrates in Explore Salem" default.
+        if (point.isHistoricalProperty) return exploreAllowHistLandmarks
+        if (point.isCivicPoi) return exploreAllowCivic
+        return true
     }
 
     /**
@@ -354,6 +416,15 @@ class NarrationGeofenceManager @Inject constructor(
         private val TOUR_HIST_LANDMARK_CATEGORIES = setOf(
             "HISTORICAL_BUILDINGS", "ENTERTAINMENT", "LODGING"
         )
+
+        /**
+         * S195 — commemorative-tribute name pattern. Mirrors the regex in
+         * `cache-proxy/scripts/generate-historical-narrations.js` so the
+         * runtime and the generator agree on what counts as a commemorative.
+         * Matches statues/monuments/plaques/memorials/etc. by name token.
+         */
+        private val COMMEMORATIVE_NAME_PATTERN =
+            Regex("\\b(statue|monument|plaque|marker|memorial|cenotaph|obelisk|tablet|bust)\\b", RegexOption.IGNORE_CASE)
     }
 
     /** Load narration points to monitor.
@@ -406,6 +477,17 @@ class NarrationGeofenceManager @Inject constructor(
         if (historicalMode) {
             val hn = point.historicalNote
             if (!hn.isNullOrBlank()) return hn
+        }
+        // S195 — when the POI is a Layers-gate hist landmark (any
+        // is_historical_property POI) OR a civic-hist-eligible POI (civic
+        // pre-1860 or commemorative), prefer historical_narration > short.
+        // Long_narration stays excluded for these classes — modern marketing
+        // copy that doesn't fit a historical voice. See feedback memory
+        // `feedback_narration_fields_purpose_separated`.
+        if (point.isHistoricalProperty || isCivicHistEligible(point)) {
+            val hist = point.historicalNarration?.takeIf { it.isNotBlank() }
+            if (hist != null) return hist
+            return point.shortNarration?.takeIf { it.isNotBlank() }
         }
         return when (AudioControl.detailLevel()) {
             AudioControl.DetailLevel.BRIEF    -> null

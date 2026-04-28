@@ -2093,8 +2093,21 @@ class SalemMainActivity : AppCompatActivity() {
             is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> state.activeTour
             else -> null
         }
+        val menuPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+        // S195 — push explore prefs unconditionally. They drive
+        // NarrationGeofenceManager.isHistoricalQualified when the manager is
+        // in pure-explore mode (no tour, no historicalMode). Harmless when
+        // tour mode is on; the tour gate takes precedence inside the manager.
+        val exploreAllowHist = menuPrefs.getBoolean(
+            MenuPrefs.histLandmarkPrefKey(false),
+            MenuPrefs.histLandmarkPrefDefault(false)
+        )
+        val exploreAllowCivic = menuPrefs.getBoolean(
+            MenuPrefs.civicPrefKey(false),
+            MenuPrefs.civicPrefDefault(false)
+        )
+        narrationGeofenceManager.setExploreLayerPrefs(exploreAllowHist, exploreAllowCivic)
         if (activeTour != null && !showAllPoisActive) {
-            val menuPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
             val allowHist = menuPrefs.getBoolean(
                 MenuPrefs.histLandmarkPrefKey(true),
                 MenuPrefs.histLandmarkPrefDefault(true)
@@ -2194,7 +2207,12 @@ class SalemMainActivity : AppCompatActivity() {
                         // checkbox only removes the *additional* class it added —
                         // not the tour-flagged baseline.
                         if (p.isTourPoi) return@filter true
-                        val isHistLandmark = p.dataSource == "massgis_mhc" ||
+                        // S195 — prefer is_historical_property as the canonical
+                        // hist-landmark signal (358 POIs flagged in S195 backfill).
+                        // Fall back to the legacy massgis_mhc / category+year heuristic
+                        // for any POI not yet flagged.
+                        val isHistLandmark = p.isHistoricalProperty ||
+                            p.dataSource == "massgis_mhc" ||
                             (p.category.uppercase() in histLandmarkCats &&
                                 p.yearEstablished != null && p.yearEstablished <= 1860)
                         val isCivic = p.isCivicPoi
