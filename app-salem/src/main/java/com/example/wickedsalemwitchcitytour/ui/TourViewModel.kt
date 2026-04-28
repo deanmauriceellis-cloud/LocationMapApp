@@ -69,6 +69,24 @@ class TourViewModel @Inject constructor(
     /** Narration state — observe for playback controls. */
     val narrationState: StateFlow<NarrationState> = narrationManager.state
 
+    /**
+     * S193 — true when the active tour is flagged `is_historical_tour`. Read
+     * by [PoiDetailSheet] so the auto-read-through can prefer
+     * `historical_narration` over short/long during a historical tour. The
+     * runtime narration mode flag in [NarrationGeofenceManager] is set off
+     * the same condition (TourEngine.startTour); this helper is the public
+     * surface for the UI layer.
+     */
+    fun isHistoricalNarrationActive(): Boolean {
+        val s = tourEngine.tourState.value
+        val tour = when (s) {
+            is TourState.Active -> s.activeTour.tour
+            is TourState.Paused -> s.activeTour.tour
+            else -> null
+        }
+        return tour?.isHistoricalTour == true
+    }
+
     init {
         loadTours()
         restoreSavedTour()

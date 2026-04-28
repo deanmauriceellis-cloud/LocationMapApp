@@ -576,6 +576,21 @@ class PoiDetailSheet : DialogFragment() {
         tourViewModel.speakSheetSection(ttsTag, intro, name)
         DebugLogger.i(TAG, "tts enqueue intro id=${poi.id} len=${intro.length}")
 
+        // S193 — during a historical tour, the sheet's audio is the
+        // historical_narration (strict pre-1860). Short/about/story carry
+        // modern context and would conflict with the tour's purpose
+        // (per feedback_narration_fields_purpose_separated). When the
+        // POI has no historical_narration we fall back to the modern
+        // sections so the operator hears something rather than silence —
+        // an explicit-tap action surface, not the auto-narration path.
+        val historicalText = poi.historicalNarration?.takeIf { it.isNotBlank() }
+        val useHistorical = tourViewModel.isHistoricalNarrationActive() && historicalText != null
+        if (useHistorical) {
+            tourViewModel.speakSheetSection(ttsTag, historicalText!!, name)
+            DebugLogger.i(TAG, "tts enqueue HISTORICAL id=${poi.id} len=${historicalText.length}")
+            return
+        }
+
         // Segment 2+: narrative sections in visual order.
         // Overview first (matches what the user sees on screen).
         shortText?.let {
