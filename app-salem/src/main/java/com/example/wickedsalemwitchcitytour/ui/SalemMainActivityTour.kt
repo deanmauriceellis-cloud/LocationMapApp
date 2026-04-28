@@ -1659,6 +1659,17 @@ internal fun SalemMainActivity.applyHeadingUpRotationImmediate() {
     // always commits, even if the target is within 5° of the previous
     // (stale) value.
     lastAppliedRotationDeg = null
+    // S195 — if no GPS bearing is available yet, snap the canvas to
+    // north-up so the toggle has a deterministic effect even when the
+    // map was just rotated by a two-finger gesture. The first GPS
+    // bearing fix that arrives after this will rotate from north,
+    // not from whatever stale gesture orientation was on screen.
+    if (getLastMovementBearing() == null) {
+        smoothedHeadingDeg = null
+        binding.mapView.setMapOrientation(0f)
+        DebugLogger.i("HEADING-UP", "toggle ON, no GPS bearing yet — snapped to north-up baseline")
+        return
+    }
     applyHeadingUpRotation()
 }
 
