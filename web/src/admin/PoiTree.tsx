@@ -100,6 +100,19 @@ export interface CategorySelection {
 
 // ─── Tree node model ─────────────────────────────────────────────────────────
 
+type Severity = 'error' | 'warn' | 'info'
+
+function severityRank(s: Severity | undefined): number {
+  if (s === 'error') return 3
+  if (s === 'warn') return 2
+  if (s === 'info') return 1
+  return 0
+}
+
+function maxSeverity(a: Severity | undefined, b: Severity | undefined): Severity | undefined {
+  return severityRank(a) >= severityRank(b) ? a : b
+}
+
 interface TreeNode {
   id: string
   label: string
@@ -108,7 +121,44 @@ interface TreeNode {
   category?: string
   poi?: PoiRow
   isDeleted?: boolean
+  /** Aggregated lint severity. For POI leaves: this row's flag. For containers: max of descendants. */
+  severity?: Severity
+  /** For containers: count of descendant POIs that have a lint flag. */
+  flaggedCount?: number
   children?: TreeNode[]
+}
+
+interface LintItem {
+  entity_type?: string
+  entity_id: string
+}
+interface LintCheck {
+  id: string
+  severity: Severity
+  items: LintItem[]
+}
+interface LintResponse {
+  checks: LintCheck[]
+}
+
+async function fetchQualityFlags(): Promise<Map<string, Severity>> {
+  const flags = new Map<string, Severity>()
+  try {
+    const res = await fetch('/api/admin/salem/lint', { credentials: 'same-origin' })
+    if (!res.ok) return flags
+    const data = (await res.json()) as LintResponse
+    for (const chk of data.checks ?? []) {
+      for (const item of chk.items ?? []) {
+        if (item.entity_type && item.entity_type !== 'poi') continue
+        const existing = flags.get(item.entity_id)
+        const next = maxSeverity(existing, chk.severity)
+        if (next) flags.set(item.entity_id, next)
+      }
+    }
+  } catch {
+    // Lint endpoint failure is non-fatal — tree just renders without dots.
+  }
+  return flags
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -221,7 +271,30 @@ function buildTree(
   filter: TreeFilter,
   allSubcategories: SubcategoryRow[],
   labelLookup: (cat: string) => string,
+  qualityFlags: Map<string, Severity>,
 ): TreeNode[] {
+  // Roll a leaf-POI severity up to its enclosing container nodes by walking
+  // children once at the end of buildTree. Defined inline so it shares the
+  // qualityFlags closure.
+  function rollUp(node: TreeNode): { severity: Severity | undefined; flagged: number } {
+    if (node.type === 'poi') {
+      const sev = node.poi ? qualityFlags.get(node.poi.id) : undefined
+      node.severity = sev
+      return { severity: sev, flagged: sev ? 1 : 0 }
+    }
+    let acc: Severity | undefined
+    let flagged = 0
+    for (const child of node.children ?? []) {
+      const childAgg = rollUp(child)
+      acc = maxSeverity(acc, childAgg.severity)
+      flagged += childAgg.flagged
+    }
+    node.severity = acc
+    node.flaggedCount = flagged
+    return { severity: acc, flagged }
+  }
+  // (rollUp invoked at end of buildTree below)
+
   let filtered = allPois
   if (!filter.showDeleted) filtered = filtered.filter((r) => !r.deleted_at)
   if (filter.tourOnly) filtered = filtered.filter((r) => r.is_tour_poi)
@@ -402,7 +475,9 @@ function buildTree(
     }
   })
 
-  return [...sourceNodes, ...realNodes]
+  const allTopNodes = [...sourceNodes, ...realNodes]
+  for (const top of allTopNodes) rollUp(top)
+  return allTopNodes
 }
 
 // ─── ResizeObserver hook ─────────────────────────────────────────────────────
@@ -443,6 +518,13 @@ function poiSearchMatch(node: NodeApi<TreeNode>, term: string): boolean {
 
 // ─── Node renderer ───────────────────────────────────────────────────────────
 
+function severityDotClass(s: Severity | undefined): string {
+  if (s === 'error') return 'bg-rose-500'
+  if (s === 'warn') return 'bg-amber-400'
+  if (s === 'info') return 'bg-sky-400'
+  return ''
+}
+
 function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
   const data = node.data
   const isLeaf = data.type === 'poi'
@@ -464,6 +546,14 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
     }
   }
 
+  const dotClass = severityDotClass(data.severity)
+  const dotTitle =
+    data.severity && isContainer
+      ? `${data.flaggedCount ?? 0} POI${(data.flaggedCount ?? 0) === 1 ? '' : 's'} flagged (${data.severity})`
+      : data.severity
+        ? `Lint: ${data.severity}`
+        : ''
+
   return (
     <div
       style={style}
@@ -483,9 +573,26 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
       ) : (
         <span className="w-4 inline-flex justify-center text-slate-300">·</span>
       )}
+      {dotClass ? (
+        <span
+          className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`}
+          title={dotTitle}
+          aria-label={dotTitle}
+        />
+      ) : (
+        <span className="inline-block w-2 h-2 flex-shrink-0" aria-hidden />
+      )}
       <span className="truncate flex-1">{data.label}</span>
       {isContainer && data.count !== undefined && (
         <span className="ml-auto text-xs text-slate-500 tabular-nums pl-2">
+          {data.flaggedCount && data.flaggedCount > 0 ? (
+            <>
+              <span className={`mr-1 ${data.severity === 'error' ? 'text-rose-600' : data.severity === 'warn' ? 'text-amber-600' : 'text-sky-600'}`}>
+                {data.flaggedCount}
+              </span>
+              <span className="text-slate-400">/</span>{' '}
+            </>
+          ) : null}
           {data.count}
         </span>
       )}
@@ -534,6 +641,7 @@ export function PoiTree({
   const [narratedOnly, setNarratedOnly] = useState(false)
   const [visibleOnly, setVisibleOnly] = useState(false)
   const [locationFilter, setLocationFilter] = useState<LocationFilter>('all')
+  const [qualityFlags, setQualityFlags] = useState<Map<string, Severity>>(() => new Map())
   const [containerRef, size] = useElementSize()
 
   const effectivePois = externalPois ?? pois
@@ -556,6 +664,17 @@ export function PoiTree({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Quality-flag fetch — drives the colored indicator dots. Refreshed whenever
+  // the POI list reloads so a Suppress / save in another tab eventually clears
+  // the dot.
+  useEffect(() => {
+    let cancelled = false
+    fetchQualityFlags().then((flags) => {
+      if (!cancelled) setQualityFlags(flags)
+    })
+    return () => { cancelled = true }
+  }, [pois])
+
   const labelLookup = useMemo(
     () => makeCategoryLabelLookup(categories ?? []),
     [categories],
@@ -568,8 +687,9 @@ export function PoiTree({
       { showDeleted, tourOnly, narratedOnly, visibleOnly, location: locationFilter },
       subcategories ?? [],
       labelLookup,
+      qualityFlags,
     )
-  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter, subcategories, labelLookup])
+  }, [effectivePois, showDeleted, tourOnly, narratedOnly, visibleOnly, locationFilter, subcategories, labelLookup, qualityFlags])
 
   // Category toggle handler — called directly from PoiNode via context.
   const handleCategoryClick = useCallback((cat: string | null) => {

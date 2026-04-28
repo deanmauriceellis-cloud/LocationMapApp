@@ -23,6 +23,7 @@
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-lint.js';
 
 const { Pool } = require('pg');
+const { validateNarration } = require('./historical-narration-validator');
 
 const SALEM_CENTER_LAT = 42.5223;
 const SALEM_CENTER_LNG = -70.8950;
@@ -336,6 +337,47 @@ async function checkHistPre1860NoHistoricalNarration(pgPool) {
     `Pre-1860 Historical Building (${r.year_established}) has no historical_narration. Won't surface in Historical Tour mode.`,
     `Open the editor → Narration tab → write Historical narration (pre-1860 only). Or run the generator: \`node cache-proxy/scripts/generate-historical-narrations.js --ids=${r.id}\`.`,
   ));
+}
+
+async function checkHistoricalNarrationNeedsRefinement(pgPool) {
+  const params = [];
+  const suppress = suppressionClause('historical_narration_needs_refinement', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, historical_narration
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND historical_narration IS NOT NULL
+      AND length(trim(historical_narration)) > 0
+      ${suppress}
+    ORDER BY name
+  `, params);
+
+  const items = [];
+  for (const r of rows) {
+    const result = validateNarration(r.historical_narration, r.name);
+    if (result.critical.length === 0) continue;
+
+    // Group reason codes by type for a compact, readable message.
+    const grouped = {};
+    for (const reason of result.critical) {
+      const tag = reason.split(':')[0];
+      grouped[tag] = (grouped[tag] || 0) + 1;
+    }
+    const summary = Object.entries(grouped)
+      .map(([t, n]) => (n > 1 ? `${t}(${n})` : t))
+      .join(', ');
+
+    const sample = result.critical.slice(0, 3).join(' · ');
+
+    items.push(poiItem(r,
+      `Historical narration has quality issues: ${summary}. ${sample}`,
+      `Open the editor → Narration tab → review and rewrite, or clear the field. Targeted regen: \`node cache-proxy/scripts/generate-historical-narrations.js --ids=${r.id} --force\`. Or click Suppress if this is a false positive.`,
+      { reasons: result.critical, words: result.wordCount },
+    ));
+
+    if (items.length >= ITEM_CAP) break;
+  }
+  return items;
 }
 
 async function checkCivicFlagMismatch(pgPool) {
@@ -688,6 +730,7 @@ const CHECKS = [
   { id: 'hist_bldg_missing_narration', label: 'Historical Buildings with no narration text', category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingNarration },
   { id: 'hist_curated_not_tour',     label: 'Curated Historical Buildings missing tour flag', category: 'Historical Buildings', severity: 'warn',  run: checkHistCuratedNotTour },
   { id: 'hist_pre1860_no_historical_narration', label: 'Pre-1860 Historical Buildings missing historical narration', category: 'Historical Buildings', severity: 'warn', run: checkHistPre1860NoHistoricalNarration },
+  { id: 'historical_narration_needs_refinement', label: 'Historical narration needs refinement (quality issues)', category: 'Historical Buildings', severity: 'warn', run: checkHistoricalNarrationNeedsRefinement },
   { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'warn',  run: checkCivicFlagMismatch },
   { id: 'content_no_description',    label: 'POIs with no description text',              category: 'Content',    severity: 'info',  run: checkContentNoDescription },
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },

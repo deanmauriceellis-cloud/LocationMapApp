@@ -79,6 +79,7 @@ import {
   type OracleAskOk,
   type OraclePrimarySource,
 } from './oracleClient'
+import { OracleVariantPicker } from './OracleVariantPicker'
 
 // ─── Oracle audit log (9P.10b) ────────────────────────────────────────────
 //
@@ -624,6 +625,16 @@ export function PoiEditDialog({
   // log records the *posed* question even if the operator clears the textarea
   // before clicking Insert.
   const [oracleResultQuestion, setOracleResultQuestion] = useState<string>('')
+
+  // S194 — variant picker (5×short / 5×long / 5×historic). Independent of
+  // the single-shot Oracle dialog above so operators can keep using both.
+  const [variantPickerOpen, setVariantPickerOpen] = useState(false)
+  const handleVariantSelect = useCallback(
+    (field: 'short_narration' | 'long_narration' | 'historical_narration', text: string) => {
+      setValue(field, text, { shouldDirty: true })
+    },
+    [setValue],
+  )
 
   const openOracleDialog = useCallback(() => {
     // Fresh open: clear last result so the operator isn't looking at stale
@@ -1524,6 +1535,18 @@ export function PoiEditDialog({
                         label="Generate narration with Salem Oracle"
                       />
 
+                      {/* S194 — multi-variant picker. Generates 5 short / 5 long / 5 historic
+                          candidates in parallel and lets the operator pick one per type. */}
+                      <button
+                        type="button"
+                        onClick={() => setVariantPickerOpen(true)}
+                        disabled={!oracleAvailable}
+                        className="w-full px-3 py-2 text-sm font-medium rounded border border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={oracleAvailable ? 'Open variant picker' : 'SalemIntelligence is unavailable'}
+                      >
+                        ✨ Generate variants — 5 short / 5 long / 5 historic
+                      </button>
+
                       {has('short_narration') && (
                         <FieldRow label="Short narration" htmlFor="short_narration">
                           <textarea
@@ -1544,7 +1567,7 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
-                      {has('historical_narration') && currentCategory === 'HISTORICAL_BUILDINGS' && (
+                      {has('historical_narration') && (
                         <FieldRow label="Historical narration (pre-1860 only)" htmlFor="historical_narration">
                           <textarea
                             id="historical_narration"
@@ -2319,6 +2342,31 @@ export function PoiEditDialog({
         </div>
       </Dialog>
     </Transition>
+
+    {/* S194 — multi-variant picker, mounted as a sibling so its own Dialog
+        has a higher z-index than the edit dialog backdrop. */}
+    <OracleVariantPicker
+      open={variantPickerOpen}
+      poi={
+        poi
+          ? {
+              id: poi.id,
+              name: poi.name ?? '',
+              category: poi.category ?? undefined,
+              year_established:
+                typeof poi.year_established === 'number'
+                  ? poi.year_established
+                  : poi.year_established == null
+                    ? null
+                    : Number(poi.year_established) || null,
+              address:
+                typeof poi.address === 'string' ? poi.address : null,
+            }
+          : null
+      }
+      onSelect={handleVariantSelect}
+      onClose={() => setVariantPickerOpen(false)}
+    />
     </Fragment>
   )
 }
