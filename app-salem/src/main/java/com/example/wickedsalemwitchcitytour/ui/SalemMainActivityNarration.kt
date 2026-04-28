@@ -418,12 +418,13 @@ internal fun SalemMainActivity.initNarrationSystem() {
             // opts in. Without the OR clause, the checkbox is a no-op
             // because TourEngine forces historicalMode=false on tour start.
             val histOn = narrationGeofenceManager.isHistoricalMode()
+            val histNarrOn = narrationGeofenceManager.isHistoricalNarrationMode()
             val oracleOn = com.example.wickedsalemwitchcitytour.audio.AudioControl.isOracleEnabled()
-            if (!histOn && !oracleOn) {
-                DebugLogger.d("NARR-HEARTBEAT", "SKIP — both gates off (histMode=false, oracle=false)")
+            if (!histOn && !histNarrOn && !oracleOn) {
+                DebugLogger.d("NARR-HEARTBEAT", "SKIP — all gates off (histMode=false, histNarrMode=false, oracle=false)")
                 continue
             }
-            DebugLogger.d("NARR-HEARTBEAT", "TICK — histMode=$histOn oracle=$oracleOn")
+            DebugLogger.d("NARR-HEARTBEAT", "TICK — histMode=$histOn histNarrMode=$histNarrOn oracle=$oracleOn")
             val now = System.currentTimeMillis()
             val sinceLast = if (lastNewspaperFiredMs == 0L) Long.MAX_VALUE else now - lastNewspaperFiredMs
             if (sinceLast < NEWSPAPER_HEARTBEAT_INTERVAL_MS) {
@@ -499,6 +500,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
     val tourActive = tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active ||
         tourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
     if (tourActive && (narrationGeofenceManager.isHistoricalMode() ||
+            narrationGeofenceManager.isHistoricalNarrationMode() ||
             com.example.wickedsalemwitchcitytour.audio.AudioControl.isOracleEnabled())) {
         // Tour is running in Historical Mode (or operator opted-in via Oracle
         // Newspaper checkbox) — fire newspaper filler only.
@@ -557,6 +559,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
     // silence the filler queue.
     if (dwellPoisPlayed >= DWELL_MAX_POIS_PER_SESSION) {
         if (narrationGeofenceManager.isHistoricalMode() ||
+            narrationGeofenceManager.isHistoricalNarrationMode() ||
             com.example.wickedsalemwitchcitytour.audio.AudioControl.isOracleEnabled()) {
             val h = historicalHeadlineQueue.pollNext()
             if (h != null) {
@@ -592,6 +595,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
     // attempts first (fall through below).
     val fireNewspaperThisSlot =
         (narrationGeofenceManager.isHistoricalMode() ||
+            narrationGeofenceManager.isHistoricalNarrationMode() ||
             com.example.wickedsalemwitchcitytour.audio.AudioControl.isOracleEnabled()) &&
         newspaperSilenceSlotCounter >= 2
     if (fireNewspaperThisSlot) {
@@ -655,6 +659,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
     // found nothing, so any nearby POI still wins.
     // S135: 3s delay before newspaper, yield if POI starts during delay.
     val headlineFired = if (narrationGeofenceManager.isHistoricalMode() ||
+        narrationGeofenceManager.isHistoricalNarrationMode() ||
         com.example.wickedsalemwitchcitytour.audio.AudioControl.isOracleEnabled()) {
         val h = historicalHeadlineQueue.pollNext()
         if (h != null) {
