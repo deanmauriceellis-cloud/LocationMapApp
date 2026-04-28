@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   subcategory TEXT,
   short_narration TEXT,
   long_narration TEXT,
+  historical_narration TEXT,
   geofence_radius_m INTEGER NOT NULL,
   geofence_shape TEXT NOT NULL,
   corridor_points TEXT,
@@ -167,7 +168,7 @@ async function main() {
     const { rows } = await pgClient.query(`
       SELECT
         id, name, lat, lng, address, status, category, subcategory,
-        short_narration, long_narration,
+        short_narration, long_narration, historical_narration,
         geofence_radius_m, geofence_shape, corridor_points,
         priority, wave, voice_clip_asset, custom_voice_asset,
         cuisine_type, price_range, rating, merchant_tier, ad_priority,
@@ -228,7 +229,7 @@ async function main() {
   const insertStmt = db.prepare(`
     INSERT INTO salem_pois (
       id, name, lat, lng, address, status, category, subcategory,
-      short_narration, long_narration,
+      short_narration, long_narration, historical_narration,
       geofence_radius_m, geofence_shape, corridor_points,
       priority, wave, voice_clip_asset, custom_voice_asset,
       cuisine_type, price_range, rating, merchant_tier, ad_priority,
@@ -249,7 +250,7 @@ async function main() {
       canonical_address_point_id, local_historic_district, parcel_owner_class
     ) VALUES (
       @id, @name, @lat, @lng, @address, @status, @category, @subcategory,
-      @short_narration, @long_narration,
+      @short_narration, @long_narration, @historical_narration,
       @geofence_radius_m, @geofence_shape, @corridor_points,
       @priority, @wave, @voice_clip_asset, @custom_voice_asset,
       @cuisine_type, @price_range, @rating, @merchant_tier, @ad_priority,
@@ -285,6 +286,7 @@ async function main() {
         subcategory: r.subcategory || null,
         short_narration: r.short_narration || null,
         long_narration: r.long_narration || null,
+        historical_narration: r.historical_narration || null,
         geofence_radius_m: r.geofence_radius_m || 40,
         geofence_shape: r.geofence_shape || 'circle',
         corridor_points: r.corridor_points || null,

@@ -484,8 +484,185 @@ class NarrationManager @Inject constructor(
         val params = Bundle().apply {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
         }
-        tts?.speak(segment.text, TextToSpeech.QUEUE_FLUSH, params, segment.id)
-        DebugLogger.i(TAG, "Speaking: ${segment.type} — ${segment.poiName} voice=${voiceId ?: "default"}")
+        // S192: chunk on punctuation so the TTS engine handles long narration
+        // gracefully and we get natural pauses between phrases. Last chunk
+        // carries segment.id so the OnUtteranceCompleted callback still fires
+        // exactly once at the end. Earlier chunks use derived ids.
+        val chunks = chunkOnPunctuation(segment.text)
+        if (chunks.size <= 1) {
+            tts?.speak(segment.text, TextToSpeech.QUEUE_FLUSH, params, segment.id)
+        } else {
+            chunks.forEachIndexed { i, pair ->
+                val (chunk, pauseAfterMs) = pair
+                val isFirst = i == 0
+                val isLast = i == chunks.size - 1
+                val mode = if (isFirst) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+                val uid = if (isLast) segment.id else "${segment.id}-c$i"
+                tts?.speak(chunk, mode, params, uid)
+                if (!isLast && pauseAfterMs > 0L) {
+                    tts?.playSilentUtterance(pauseAfterMs, TextToSpeech.QUEUE_ADD, "${segment.id}-p$i")
+                }
+            }
+        }
+        DebugLogger.i(TAG, "Speaking: ${segment.type} — ${segment.poiName} voice=${voiceId ?: "default"} chunks=${chunks.size}")
+    }
+
+    /**
+     * S192 smart punctuation chunker. Two-stage:
+     *   1. Split text into sentences at `.` `!` `?` followed by whitespace,
+     *      with guards for abbreviations ("Mr. Hawthorne", "U.S.", "i.e."),
+     *      single-letter initials ("J. R. R."), and numbers (3.14).
+     *   2. For each sentence longer than TARGET_CHUNK_CHARS, sub-split at
+     *      `;` `:` `,` and quote boundaries, but only when the partial chunk
+     *      is at least MIN_SUB_CHARS so tight phrases like "Salem, Massachusetts"
+     *      stay intact.
+     *   3. Merge any chunk pair where BOTH are tiny (< MIN_KEEP_CHARS) so we
+     *      don't ship dribbles to the engine.
+     *
+     * Returns (chunk, pauseAfterMs) pairs. Last chunk has pause=0L.
+     */
+    private fun chunkOnPunctuation(text: String): List<Pair<String, Long>> {
+        val sentences = splitIntoSentences(text)
+        val raw = mutableListOf<Pair<String, Long>>()
+        for ((idx, sent) in sentences.withIndex()) {
+            val isLastSent = idx == sentences.lastIndex
+            val pauseAfter = if (isLastSent) 0L else PAUSE_PERIOD
+            if (sent.length <= TARGET_CHUNK_CHARS) {
+                raw.add(sent to pauseAfter)
+            } else {
+                val subs = subdivideLongSentence(sent)
+                for ((j, sub) in subs.withIndex()) {
+                    val subLast = j == subs.lastIndex
+                    val p = if (subLast) pauseAfter else sub.second
+                    raw.add(sub.first to p)
+                }
+            }
+        }
+        return mergeTinyChunks(raw)
+    }
+
+    private fun splitIntoSentences(text: String): List<String> {
+        val out = mutableListOf<String>()
+        val sb = StringBuilder()
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            sb.append(c)
+            if (c == '.' || c == '!' || c == '?') {
+                val nextIsBoundary = i + 1 >= text.length || text[i + 1].isWhitespace()
+                if (nextIsBoundary && !isAbbreviation(sb, c) && !isNumberPeriod(text, i, c)) {
+                    val sent = sb.toString().trim()
+                    if (sent.isNotEmpty()) out.add(sent)
+                    sb.clear()
+                    while (i + 1 < text.length && text[i + 1].isWhitespace()) i++
+                }
+            }
+            i++
+        }
+        val tail = sb.toString().trim()
+        if (tail.isNotEmpty()) out.add(tail)
+        return out
+    }
+
+    /** True if the period at end of `sb` is part of a known abbreviation or initial. */
+    private fun isAbbreviation(sb: StringBuilder, term: Char): Boolean {
+        if (term != '.') return false
+        // Get the last word (alpha chars before the period)
+        val s = sb.toString()
+        if (s.length < 2) return false
+        // Walk backwards from the period to find the start of the token
+        var k = s.length - 2
+        while (k >= 0 && (s[k].isLetter())) k--
+        val tokStart = k + 1
+        val tok = s.substring(tokStart, s.length - 1).lowercase()
+        if (tok.isEmpty()) return false
+        if (tok in ABBREVIATIONS) return true
+        // Single-letter initial like "J." (preceded by whitespace, start, or another initial)
+        if (tok.length == 1 && tokStart > 0) {
+            val prev = s[tokStart - 1]
+            if (prev.isWhitespace() || prev == '.') return true
+        }
+        if (tok.length == 1 && tokStart == 0) return true
+        return false
+    }
+
+    /** True if the period is between digits (e.g. "3.14"). */
+    private fun isNumberPeriod(text: String, i: Int, term: Char): Boolean {
+        if (term != '.') return false
+        val prev = if (i > 0) text[i - 1] else ' '
+        val next = if (i + 1 < text.length) text[i + 1] else ' '
+        return prev.isDigit() && next.isDigit()
+    }
+
+    /**
+     * Sub-split a long sentence at `;` `:` `,` or closing quotes. Only splits
+     * when the running chunk has reached MIN_SUB_CHARS so we don't fragment
+     * "He said," from its quoted payload.
+     */
+    private fun subdivideLongSentence(sent: String): List<Pair<String, Long>> {
+        val out = mutableListOf<Pair<String, Long>>()
+        val sb = StringBuilder()
+        var i = 0
+        while (i < sent.length) {
+            val c = sent[i]
+            sb.append(c)
+            val pause = when (c) {
+                ',' -> PAUSE_COMMA
+                ';' -> PAUSE_SEMI
+                ':' -> PAUSE_COLON
+                '"', '”', '’' -> PAUSE_QUOTE
+                else -> 0L
+            }
+            if (pause > 0L && sb.length >= MIN_SUB_CHARS) {
+                val nextIsBoundary = i + 1 >= sent.length || sent[i + 1].isWhitespace()
+                if (nextIsBoundary) {
+                    val chunk = sb.toString().trim()
+                    if (chunk.isNotEmpty()) out.add(chunk to pause)
+                    sb.clear()
+                    while (i + 1 < sent.length && sent[i + 1].isWhitespace()) i++
+                }
+            }
+            i++
+        }
+        val tail = sb.toString().trim()
+        if (tail.isNotEmpty()) out.add(tail to 0L)
+        return out
+    }
+
+    /** Merge an adjacent pair when BOTH halves are below MIN_KEEP_CHARS. */
+    private fun mergeTinyChunks(chunks: List<Pair<String, Long>>): List<Pair<String, Long>> {
+        if (chunks.size < 2) return chunks
+        val out = mutableListOf<Pair<String, Long>>()
+        for (pair in chunks) {
+            val (text, pause) = pair
+            val prev = out.lastOrNull()
+            if (prev != null && prev.first.length < MIN_KEEP_CHARS && text.length < MIN_KEEP_CHARS) {
+                out[out.lastIndex] = "${prev.first} $text" to pause
+            } else {
+                out.add(pair)
+            }
+        }
+        return out
+    }
+
+    companion object {
+        private const val PAUSE_COMMA  = 100L
+        private const val PAUSE_SEMI   = 200L
+        private const val PAUSE_COLON  = 200L
+        private const val PAUSE_PERIOD = 300L
+        private const val PAUSE_QUOTE  = 200L
+
+        private const val TARGET_CHUNK_CHARS = 280   // sentence kept whole if ≤ this
+        private const val MIN_SUB_CHARS      = 60    // commas inside a sentence ignored until this far in
+        private const val MIN_KEEP_CHARS     = 30    // pairs both shorter than this get merged
+
+        // Lower-case words that, when followed by ".", do NOT end a sentence.
+        private val ABBREVIATIONS = setOf(
+            "mr", "mrs", "ms", "dr", "st", "jr", "sr", "co", "inc", "ltd",
+            "corp", "capt", "rev", "hon", "gov", "pres", "maj", "gen", "lt",
+            "sgt", "mt", "ft", "mass", "vol", "no", "etc", "vs",
+            "u.s", "u.k", "i.e", "e.g"
+        )
     }
 
     /** Check phone ringer mode — don't speak if silent or vibrate. */

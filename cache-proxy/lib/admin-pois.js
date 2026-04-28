@@ -44,7 +44,7 @@ const UPDATABLE_FIELDS = [
   // Taxonomy
   'category', 'subcategory',
   // Narration
-  'short_narration', 'long_narration',
+  'short_narration', 'long_narration', 'historical_narration',
   'geofence_radius_m', 'geofence_shape', 'corridor_points',
   'priority', 'wave',
   'voice_clip_asset', 'custom_voice_asset',

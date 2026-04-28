@@ -855,6 +855,7 @@ export function PoiEditDialog({
   const insertableFields = [
     { field: 'short_narration', label: 'Insert into short_narration' },
     { field: 'long_narration', label: 'Insert into long_narration' },
+    { field: 'historical_narration', label: 'Insert into historical_narration (pre-1860)' },
     { field: 'description', label: 'Insert into description' },
   ].filter((f) => has(f.field))
 
@@ -1540,6 +1541,17 @@ export function PoiEditDialog({
                             rows={6}
                             {...reg('long_narration')}
                             className="w-full px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
+                      )}
+                      {has('historical_narration') && currentCategory === 'HISTORICAL_BUILDINGS' && (
+                        <FieldRow label="Historical narration (pre-1860 only)" htmlFor="historical_narration">
+                          <textarea
+                            id="historical_narration"
+                            rows={10}
+                            {...reg('historical_narration')}
+                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-serif"
+                            placeholder="Strict pre-1860 narration. Powers Historical Tour mode. Modern context belongs in short/long narration."
                           />
                         </FieldRow>
                       )}

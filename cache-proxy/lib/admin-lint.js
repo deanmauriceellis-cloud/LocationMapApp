@@ -317,6 +317,27 @@ async function checkHistCuratedNotTour(pgPool) {
   ));
 }
 
+async function checkHistPre1860NoHistoricalNarration(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('hist_pre1860_no_historical_narration', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, year_established
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND category = 'HISTORICAL_BUILDINGS'
+      AND year_established IS NOT NULL
+      AND year_established < 1860
+      AND (historical_narration IS NULL OR historical_narration = '')
+      ${suppress}
+    ORDER BY year_established, name
+    LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Pre-1860 Historical Building (${r.year_established}) has no historical_narration. Won't surface in Historical Tour mode.`,
+    `Open the editor → Narration tab → write Historical narration (pre-1860 only). Or run the generator: \`node cache-proxy/scripts/generate-historical-narrations.js --ids=${r.id}\`.`,
+  ));
+}
+
 async function checkCivicFlagMismatch(pgPool) {
   const params = [ITEM_CAP];
   const suppress = suppressionClause('civic_flag_mismatch', params);
@@ -666,6 +687,7 @@ const CHECKS = [
   { id: 'hist_bldg_missing_year',    label: 'Historical Buildings missing year_established',category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingYear },
   { id: 'hist_bldg_missing_narration', label: 'Historical Buildings with no narration text', category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingNarration },
   { id: 'hist_curated_not_tour',     label: 'Curated Historical Buildings missing tour flag', category: 'Historical Buildings', severity: 'warn',  run: checkHistCuratedNotTour },
+  { id: 'hist_pre1860_no_historical_narration', label: 'Pre-1860 Historical Buildings missing historical narration', category: 'Historical Buildings', severity: 'warn', run: checkHistPre1860NoHistoricalNarration },
   { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'warn',  run: checkCivicFlagMismatch },
   { id: 'content_no_description',    label: 'POIs with no description text',              category: 'Content',    severity: 'info',  run: checkContentNoDescription },
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },

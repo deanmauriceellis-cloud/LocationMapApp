@@ -83,7 +83,11 @@ object AudioControl {
         }
 
     // ── Setters ─────────────────────────────────────────────────────────
-    fun setOracleEnabled(on: Boolean)     { requirePrefs().edit().putBoolean(PREF_ORACLE, on).apply(); notifyListeners() }
+    fun setOracleEnabled(on: Boolean) {
+        requirePrefs().edit().putBoolean(PREF_ORACLE, on).apply()
+        com.example.locationmapapp.util.DebugLogger.i("AudioControl", "Oracle Newspaper → $on (pref=$PREF_ORACLE)")
+        notifyListeners()
+    }
     fun setMeaningfulEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_MEANINGFUL, on).apply(); notifyListeners() }
     fun setAmbientEnabled(on: Boolean)    { requirePrefs().edit().putBoolean(PREF_AMBIENT, on).apply(); notifyListeners() }
     fun setBusinessesEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_BUSINESSES, on).apply(); notifyListeners() }

@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 182-191. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 183-192. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 192: 2026-04-27 / 28 — Historical narration system end-to-end + 4 field-test fixes
+
+Built the third narration field `historical_narration` from PG column through to Lenovo. Generator script `cache-proxy/scripts/generate-historical-narrations.js` consolidates GROUND_TRUTH from SI dump + SI historical_note + local Salem JSON (buildings/biographies/facts) for 1692-trial-era entities; 6 prompt iterations of validator hardening (year guard, sentence-rescue, meta-gap ban, paces evasion, modern-business strip, abbreviation/initial guards). Backfilled `intel_entity_id` 53 → 565 via name+coords matcher. Operator approved 33 narrations across 3 review rounds; full population background run wrote 70 narrations (5 reject, 479 skip-not-pre1860, 11 skip-commemorative). Room v11→v12 schema bump + admin UI Historical Narration textarea + lint check `hist_pre1860_no_historical_narration` shipped. Field-test fixes shipped same session: hidden-POI narration visibility gate (S191 carry-forward — 5 `findNarrated*` queries gate on `default_visible OR is_tour_poi`), Oracle Newspaper silent bug (5 gate sites in SalemMainActivityNarration also honor `AudioControl.isOracleEnabled()`), Walking Tours infinite spinner (Room schema mismatch — fixed via publish + align), smart TTS chunker in NarrationManager (sentence-level + abbreviation/initial/number guards + sub-split for long sentences + pause hierarchy 100/200/300ms). Two new feedback memories saved (no-meta-gaps, narration-fields-purpose-separated).
+
+Full session detail: `docs/session-logs/session-192-2026-04-27.md`. Commit: TBD.
+
+---
 
 ## Session 191: 2026-04-27 — Tour-flag bulk fix, two new lint checks, RHF reset race, dest_salem/haunted_happenings cleanup, hidden-POI narration bug diagnosed
 
@@ -75,15 +83,3 @@ Different path from S182's "hand-curate stop coords" framing. Operator created a
 Full session detail: `docs/session-logs/session-183-2026-04-26.md`. Commit: `d943595`.
 
 ---
-
-## Session 182: 2026-04-26 — S181 OSM-policy reversal RETRACTED; tour-rendering declared content-not-engineering
-
-Operator opened with "I don't like your solution from the last session" — pushed back on S181's OSM-merge plan after testing P2P "tap POI → directions" between two Heritage Trail stops and getting a clean route, which the multi-stop tour render of consecutive stops can't reproduce. Traced both code paths: `Router.routeMulti` is literally per-leg `route()` calls + `concat()`, byte-for-byte equivalent to N P2P calls. The actual divergence is in the input — tour legs feed POI centroids (often inside/behind a building polygon, KNN snap can land on the wrong side), P2P feeds the user's GPS (already on a sidewalk). Same algorithm, different start node, different shortest path, one crosses the building and one doesn't. S181's proposed broad OSM pedestrian merge wouldn't have fixed it. Reverted: memory `feedback_no_osm_use_local_geo.md` restored to S178 surgical-only constraint, MEMORY.md index reverted, `docs/plans/S182-osm-pedestrian-routing-merge.md` archived to `docs/archive/S182-osm-pedestrian-routing-merge_archived_2026-04-26-misdiagnosis.md` with banner, CLAUDE.md pinned next-steps block reframed. Feasibility-checked an address-anchored alternative — `salem_pois.address` has 97.5% coverage, TIGER `lfromadd/ltoadd/rfromadd/rtoadd` interpolation works (sample "237 Essex St" geocoded to 12 m offset on Essex St centerline) — but ≈half the Heritage Trail stops have addresses that fall through (intersection / square-only / no-number / TIGER coverage gap), so the resolver would need a layered fallback. Operator rejected the whole engineering path: "I need to do that tour by hand, I don't want to muck more with the mapping, wasting too much time on that." Saved a new HARD RULE memory `feedback_tour_routing_is_content_not_engineering.md` to prevent this loop in future sessions. Cache-proxy (4300) and Vite admin (4302) brought up at session end for the operator's curation work. **No code changes shipped this session.**
-
-Full session detail: `docs/session-logs/session-182-2026-04-26.md`. Commit: `9efc931`.
-
----
-
-<!-- END OF ROLLING WINDOW — Sessions 180 and earlier are in SESSION-LOG-ARCHIVE.md -->
-<!-- S180 rolled to archive 2026-04-27 by the session-end protocol (S190) -->
-<!-- (S179 rolled by S189) -->
