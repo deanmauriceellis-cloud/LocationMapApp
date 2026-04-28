@@ -20,14 +20,16 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module HistoricalH
 
 /**
  * Salem 1692 "newspaper dispatch" filler — read chronologically during
- * silence gaps in Historical Mode.
+ * silence gaps.
  *
  * S135: Switched from bundled JSON asset to Room DB so we get headlines
  * (headline + headline_summary fields added S130, populated from PG).
  * Spoken format: dateline → headline → full body.
  *
- * 202 dispatches ordered by date. Pointer persists in SharedPreferences.
- * Once all 202 are spoken, loops back to start.
+ * S193: NO LOOP-BACK. Operator: "I don't mind having all the
+ * information, but a single newspaper item should not be repeated."
+ * Corpus exhaustion now leaves the queue silent instead of wrapping to
+ * index 0. Replay is an explicit operator action via [reset].
  */
 @Singleton
 class HistoricalHeadlineQueue @Inject constructor(
@@ -37,7 +39,12 @@ class HistoricalHeadlineQueue @Inject constructor(
     companion object {
         private const val TAG = "HistNewspaper"
         private const val PREFS = "historical_headline_queue"
-        private const val KEY_NEXT_INDEX = "newspaper_next_index_v2"
+        // S193 — bumped v2 → v3 alongside the no-loop-back behavior
+        // change. An old v2 index past size-1 used to wrap; under the
+        // new rule it stays silent. Bumping the key forces a fresh
+        // index=0 start so anyone updating from a v2 build hears the
+        // corpus from the beginning instead of getting silence.
+        private const val KEY_NEXT_INDEX = "newspaper_next_index_v3"
     }
 
     private val prefs: SharedPreferences =
@@ -62,11 +69,12 @@ class HistoricalHeadlineQueue @Inject constructor(
     suspend fun pollNext(): Headline? {
         val list = loadOrGet() ?: return null
         if (list.isEmpty()) return null
-        var idx = prefs.getInt(KEY_NEXT_INDEX, 0)
+        val idx = prefs.getInt(KEY_NEXT_INDEX, 0)
+        // S193: no loop-back. Once the operator has heard the corpus,
+        // the queue stays silent until reset() is called explicitly.
         if (idx < 0 || idx >= list.size) {
-            DebugLogger.i(TAG, "pollNext: corpus exhausted at idx=$idx — looping back to 0")
-            idx = 0
-            prefs.edit().putInt(KEY_NEXT_INDEX, 0).apply()
+            DebugLogger.i(TAG, "pollNext: corpus exhausted at idx=$idx (size=${list.size}) — staying silent")
+            return null
         }
         val n = list[idx]
         val dateline = n.longDate ?: n.date
@@ -129,7 +137,7 @@ class HistoricalHeadlineQueue @Inject constructor(
             return try {
                 val list = newspaperDao.findAll()
                 papers = list
-                DebugLogger.i(TAG, "loaded ${list.size} 1692 newspapers from Room DB")
+                DebugLogger.i(TAG, "loaded ${list.size} 1692 newspapers from Room DB (chronological)")
                 list
             } catch (e: Exception) {
                 DebugLogger.e(TAG, "Failed to load newspapers from Room: ${e.message}", e)
