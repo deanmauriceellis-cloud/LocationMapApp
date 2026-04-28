@@ -66,6 +66,7 @@ async function main() {
     const toursRes = await client.query(`
       SELECT id, name, theme, description, estimated_minutes, distance_km,
              stop_count, difficulty, seasonal, icon_asset, sort_order,
+             is_historical_tour,
              data_source, confidence,
              to_char(verified_date, 'YYYY-MM-DD') AS verified_date
       FROM salem_tours
@@ -115,10 +116,12 @@ async function main() {
     INSERT INTO tours (
       id, name, theme, description, estimated_minutes, distance_km,
       stop_count, difficulty, seasonal, icon_asset, sort_order,
+      is_historical_tour,
       data_source, confidence, verified_date, created_at, updated_at, stale_after
     ) VALUES (
       @id, @name, @theme, @description, @estimated_minutes, @distance_km,
       @stop_count, @difficulty, @seasonal, @icon_asset, @sort_order,
+      @is_historical_tour,
       @data_source, @confidence, @verified_date, 0, 0, 0
     )
   `);
@@ -148,6 +151,7 @@ async function main() {
         seasonal: t.seasonal ? 1 : 0,
         icon_asset: t.icon_asset || null,
         sort_order: t.sort_order || 0,
+        is_historical_tour: t.is_historical_tour ? 1 : 0,
         data_source: t.data_source || 'manual_curated',
         confidence: t.confidence != null ? t.confidence : 1.0,
         verified_date: t.verified_date || null,

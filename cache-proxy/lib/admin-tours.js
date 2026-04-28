@@ -128,7 +128,7 @@ module.exports = function(app, deps) {
       const { rows } = await pgPool.query(`
         SELECT t.id, t.name, t.theme, t.description, t.estimated_minutes,
                t.distance_km, t.stop_count, t.difficulty, t.seasonal,
-               t.icon_asset, t.sort_order, t.updated_at,
+               t.icon_asset, t.sort_order, t.is_historical_tour, t.updated_at,
                COUNT(s.stop_id)::int AS stops_actual
           FROM salem_tours t
      LEFT JOIN salem_tour_stops s ON s.tour_id = t.id
@@ -153,7 +153,7 @@ module.exports = function(app, deps) {
       const tourQ = await pgPool.query(
         `SELECT id, name, theme, description, estimated_minutes, distance_km,
                 stop_count, difficulty, seasonal, icon_asset, sort_order,
-                updated_at
+                is_historical_tour, updated_at
            FROM salem_tours WHERE id = $1`,
         [tourId]
       );
@@ -330,6 +330,7 @@ module.exports = function(app, deps) {
   const TOUR_UPDATABLE = [
     'name', 'theme', 'description', 'estimated_minutes', 'distance_km',
     'difficulty', 'seasonal', 'icon_asset', 'sort_order',
+    'is_historical_tour',
   ];
   app.patch('/admin/salem/tours/:tour_id', requirePg, async (req, res) => {
     try {

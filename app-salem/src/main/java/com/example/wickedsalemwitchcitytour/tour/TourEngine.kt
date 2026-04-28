@@ -140,6 +140,16 @@ class TourEngine @Inject constructor(
             narrationGeofenceManager.setTourMode(true, allowHist, allowCivic)
             DebugLogger.i(TAG, "Tour Mode ENABLED for '${tour.name}' — allowHist=$allowHist, allowCivic=$allowCivic")
 
+            // S193 — Historical Narration Mode. When the tour is flagged
+            // is_historical_tour=true, NarrationGeofenceManager returns
+            // historical_narration (strict pre-1860) instead of short/long.
+            // POIs without historical_narration stay silent on a historical
+            // tour by design.
+            narrationGeofenceManager.setHistoricalNarrationMode(tour.isHistoricalTour)
+            if (tour.isHistoricalTour) {
+                DebugLogger.i(TAG, "Historical Narration Mode ENABLED for '${tour.name}'")
+            }
+
             DebugLogger.i(TAG, "Tour started: ${tour.name} — ${stops.size} stops")
         } catch (e: Exception) {
             DebugLogger.e(TAG, "startTour failed: ${e.message}", e)
@@ -321,6 +331,10 @@ class TourEngine @Inject constructor(
         if (narrationGeofenceManager.isHistoricalMode()) {
             narrationGeofenceManager.setHistoricalMode(false)
         }
+        // S193: clear Historical Narration Mode if it was enabled for this tour.
+        if (narrationGeofenceManager.isHistoricalNarrationMode()) {
+            narrationGeofenceManager.setHistoricalNarrationMode(false)
+        }
         DebugLogger.i(TAG, "Tour Mode DISABLED (tour ended)")
 
         DebugLogger.i(TAG, "Tour ended: ${summary.tourName} — " +
@@ -390,8 +404,14 @@ class TourEngine @Inject constructor(
         // speakShort/Long here prevents the overnight-test bug where tour
         // stops like "Salem Common" fired a SHORT_NARRATION using the
         // legacy short text and bypassed the Historical Mode gate.
+        // S193: same reasoning for Historical Narration Mode — direct
+        // speakShort/Long would read the modern short_narration field,
+        // bypassing the historical_narration substitution in
+        // NarrationGeofenceManager.getNarrationForPass.
         val skipDirectNarration =
-            narrationGeofenceManager.isHistoricalMode() || !narrationManager.autoNarrationEnabled
+            narrationGeofenceManager.isHistoricalMode() ||
+            narrationGeofenceManager.isHistoricalNarrationMode() ||
+            !narrationManager.autoNarrationEnabled
 
         when (event.type) {
             GeofenceEventType.APPROACH -> {

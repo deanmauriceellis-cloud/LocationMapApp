@@ -13,6 +13,8 @@ export interface TourSummary {
   seasonal: boolean | null
   icon_asset: string | null
   sort_order: number | null
+  /** S193: tours flagged historical play `salem_pois.historical_narration` instead of short/long. */
+  is_historical_tour: boolean | null
   updated_at: string
   /** COUNT(*) over salem_tour_stops, computed live; may diverge from stop_count. */
   stops_actual: number

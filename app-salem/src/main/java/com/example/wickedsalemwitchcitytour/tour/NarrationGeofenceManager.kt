@@ -106,6 +106,34 @@ class NarrationGeofenceManager @Inject constructor(
 
     fun isTourMode(): Boolean = tourMode
 
+    /**
+     * S193 — Historical Narration Mode.
+     *
+     * When a tour is flagged `is_historical_tour=true` (admin tool), TourEngine
+     * flips this on at startTour. While ON:
+     *   - [getNarrationForPass] returns `historicalNarration` instead of
+     *     short/long. POIs without a populated `historical_narration` stay
+     *     silent (no fallback) — that's the whole point: only strictly
+     *     pre-1860 content plays during a historical tour.
+     *   - TourEngine bypasses its direct speakShort/speakLong calls so all
+     *     narration funnels through this manager (and thus this getter).
+     *
+     * Distinct from the legacy [historicalMode] (Phase 9R.0): this flag is
+     * only about *which text field to read*, not about visibility gating.
+     * The S186 [tourMode] gate still controls *which POIs are eligible*.
+     */
+    private var historicalNarrationMode: Boolean = false
+
+    fun setHistoricalNarrationMode(enabled: Boolean) {
+        historicalNarrationMode = enabled
+        com.example.locationmapapp.util.DebugLogger.i(
+            "NARR-GEO",
+            "historicalNarrationMode=$enabled"
+        )
+    }
+
+    fun isHistoricalNarrationMode(): Boolean = historicalNarrationMode
+
     private fun isTourEligible(point: SalemPoi): Boolean {
         if (point.isTourPoi) return true
         if (tourAllowCivic && point.isCivicPoi) return true
@@ -350,10 +378,17 @@ class NarrationGeofenceManager @Inject constructor(
      * - `BRIEF`    → null (caller speaks only "You are at X")
      * - `STANDARD` → `short_narration`
      * - `DEEP`     → `long_narration` ?: `short_narration`
-     * - Historical Mode (Phase 9R.0) still prefers `historical_note` when present,
-     *   regardless of detail level.
+     * - Historical Narration Mode (S193) returns `historical_narration` only
+     *   — null when missing so the POI stays silent. Operator-locked rule:
+     *   short/long carry modern context and must never play during a
+     *   historical tour (see feedback_narration_fields_purpose_separated).
+     * - Legacy Historical Mode (Phase 9R.0) still prefers `historical_note`.
      */
     fun getNarrationForPass(point: SalemPoi): String? {
+        if (historicalNarrationMode) {
+            val h = point.historicalNarration
+            return if (!h.isNullOrBlank()) h else null
+        }
         if (historicalMode) {
             val hn = point.historicalNote
             if (!hn.isNullOrBlank()) return hn
@@ -374,7 +409,8 @@ class NarrationGeofenceManager @Inject constructor(
         return !point.longNarration.isNullOrBlank() ||
                !point.shortNarration.isNullOrBlank() ||
                !point.description.isNullOrBlank() ||
-               !point.historicalNote.isNullOrBlank()
+               !point.historicalNote.isNullOrBlank() ||
+               !point.historicalNarration.isNullOrBlank()
     }
 
     /** Record that this POI was narrated today (increments persistent visit count) */

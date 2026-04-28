@@ -106,6 +106,22 @@ class NarrationManager @Inject constructor(
                 }
 
                 override fun onDone(utteranceId: String?) {
+                    // S193: the chunker (line ~495 in speak()) submits one
+                    // tts.speak per chunk plus one playSilentUtterance per
+                    // inter-chunk gap. onDone fires for EVERY utteranceId —
+                    // chunk sub-ids ("$id-c$n") and pause sub-ids ("$id-p$n")
+                    // included. Only treat the segment as finished when the
+                    // LAST chunk fires, which by design carries the bare
+                    // segment.id. Intermediate ids must NOT clear
+                    // currentSegment or call playNext, otherwise the app
+                    // flips to Idle mid-narration and any new enqueue (e.g.
+                    // 1692 newspaper from the silence-fill observer)
+                    // QUEUE_FLUSHes the rest of the POI chunks. Demo bug.
+                    val seg = currentSegment
+                    if (seg == null || utteranceId != seg.id) {
+                        DebugLogger.d(TAG, "TTS chunk done: $utteranceId (mid-segment)")
+                        return
+                    }
                     DebugLogger.i(TAG, "TTS done: $utteranceId (queue remaining: ${queue.size})")
                     currentSegment = null
                     playNext()
@@ -113,9 +129,21 @@ class NarrationManager @Inject constructor(
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
-                    if (intentionallyStopping) {
+                    val flushed = intentionallyStopping
+                    if (flushed) intentionallyStopping = false
+                    val seg = currentSegment
+                    // S193: same chunk-aware gate as onDone. Errors on
+                    // intermediate chunk/pause ids do NOT end the segment;
+                    // only an intentional stop OR an error on the final
+                    // chunk advances. Without this gate a transient TTS
+                    // glitch on chunk 1 wipes currentSegment and the silence-
+                    // fill observer immediately steals the queue.
+                    if (!flushed && seg != null && utteranceId != seg.id) {
+                        DebugLogger.w(TAG, "TTS chunk error: $utteranceId (mid-segment, ignored)")
+                        return
+                    }
+                    if (flushed) {
                         DebugLogger.i(TAG, "TTS cancelled: $utteranceId (queue remaining: ${queue.size})")
-                        intentionallyStopping = false
                     } else {
                         DebugLogger.e(TAG, "TTS ERROR: $utteranceId (queue remaining: ${queue.size})")
                     }

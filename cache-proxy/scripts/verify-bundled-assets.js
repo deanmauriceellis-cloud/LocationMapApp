@@ -23,10 +23,12 @@ const Database = require('better-sqlite3');
 
 const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 
-// S186 — Room schema bumped 10 → 11 (new is_civic_poi column on SalemPoi for
-// the Tour Mode "POIs Civic" Layers checkbox override). Hash from
-// app-salem/schemas/.../11.json after kspDebugKotlin with exportSchema = true.
-const ROOM_IDENTITY_HASH_V11 = '55b35822253369a8af9f91e8bdbf8656';
+// Latest Room schema hash. Bump alongside @Database(version = N) — read from
+// app-salem/schemas/.../<N>.json after kspDebugKotlin regenerates it.
+//   v11 (S186) — added is_civic_poi to SalemPoi
+//   v12 (S192) — added historical_narration to SalemPoi
+//   v13 (S193) — added is_historical_tour to Tour
+const ROOM_IDENTITY_HASH_V11 = 'd0d3d240e2d04c159767b90860fe7a8c';
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -105,7 +107,7 @@ if (!fs.existsSync(CONTENT_DB)) {
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
     } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V11) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V11} (v11)`);
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V11} (v13)`);
     } else {
       pass(`salem_content.db: identity_hash = ${master.identity_hash} (v11)`);
     }

@@ -30,6 +30,13 @@ data class Tour(
     val seasonal: Boolean = false,
     @ColumnInfo(name = "icon_asset") val iconAsset: String? = null,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,
+    /**
+     * S193: when true the tour runs in Historical Narration mode — the
+     * narration script is `salem_pois.historical_narration` (strictly
+     * pre-1860, no modern context). POIs without populated historical_narration
+     * stay silent.
+     */
+    @ColumnInfo(name = "is_historical_tour") val isHistoricalTour: Boolean = false,
 
     // --- Provenance & Staleness ---
     /** manual_curated|salem_project|overpass_import|api_sync|user_report */

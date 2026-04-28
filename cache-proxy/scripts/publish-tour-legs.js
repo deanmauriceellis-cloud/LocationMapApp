@@ -47,11 +47,27 @@ const DRY_RUN = process.argv.includes('--dry-run');
 const SQLITE_PATH = path.resolve(__dirname, '../../salem-content/salem_content.db');
 const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
 
-// S185: Room v10 identity_hash (from app-salem/schemas/.../10.json). Stamped
-// onto room_master_table after the leg insert so the runtime DB opens cleanly
-// even if a sibling publish script left a stale v9 hash. Run this script
-// LAST in the publish chain.
-const ROOM_IDENTITY_HASH_V10 = 'dad6c01b8e5f8fed0ae9ff6f8ef7432d';
+// S193: read the current Room identity_hash + version from the latest schema
+// JSON instead of hardcoding. The hardcoded v10 value caused S192/S193 to
+// silently restamp v10 on top of v12/v13 aligned DBs, requiring a follow-up
+// align-asset-schema run to recover. This script is no longer order-sensitive
+// for the hash — the next align run will overwrite anyway, but the value
+// stamped here is now correct for the schema actually compiled into the APK.
+const SCHEMAS_DIR = path.resolve(
+  __dirname,
+  '../../app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase'
+);
+function readLatestRoomIdentity() {
+  const files = fs.readdirSync(SCHEMAS_DIR).filter((f) => /^\d+\.json$/.test(f));
+  if (!files.length) {
+    throw new Error(`No schema JSON in ${SCHEMAS_DIR}. Build with exportSchema=true first.`);
+  }
+  files.sort((a, b) => parseInt(b) - parseInt(a));
+  const file = files[0];
+  const data = JSON.parse(fs.readFileSync(path.join(SCHEMAS_DIR, file), 'utf8'));
+  return { version: parseInt(file), hash: data.database.identityHash };
+}
+const ROOM_IDENTITY = readLatestRoomIdentity();
 
 if (!process.env.DATABASE_URL) {
   try {
@@ -223,12 +239,12 @@ async function main() {
   const legCount = db.prepare('SELECT COUNT(*) as c FROM tour_legs').get().c;
   console.log(`\nSQLite verification: ${legCount} tour_legs`);
 
-  // Bump Room identity_hash to v10 in the source DB before copying, so the
-  // asset never carries a stale v9 hash. Without this, Room opens v9 on
-  // device, fallbackToDestructiveMigration drops every table, and the user
-  // gets an empty content DB.
-  db.prepare('UPDATE room_master_table SET identity_hash = ? WHERE id = 42').run(ROOM_IDENTITY_HASH_V10);
-  console.log(`Stamped Room identity_hash → ${ROOM_IDENTITY_HASH_V10} (v10)`);
+  // Stamp the current Room identity_hash + user_version (read from the latest
+  // schema JSON at startup). Keeps this script in sync with @Database(version)
+  // bumps — no more drift like the S192/S193 v10 hardcode.
+  db.prepare('UPDATE room_master_table SET identity_hash = ? WHERE id = 42').run(ROOM_IDENTITY.hash);
+  db.pragma(`user_version = ${ROOM_IDENTITY.version}`);
+  console.log(`Stamped Room identity_hash → ${ROOM_IDENTITY.hash} (v${ROOM_IDENTITY.version})`);
 
   db.close();
 

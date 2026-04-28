@@ -800,6 +800,7 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
   const [km, setKm] = useState(String(tour.distance_km))
   const [difficulty, setDifficulty] = useState(tour.difficulty ?? 'moderate')
   const [seasonal, setSeasonal] = useState(Boolean(tour.seasonal))
+  const [isHistoricalTour, setIsHistoricalTour] = useState(Boolean(tour.is_historical_tour))
   const [sortOrder, setSortOrder] = useState(String(tour.sort_order ?? 0))
   const lastIdRef = useRef<string | null>(null)
 
@@ -813,6 +814,7 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
     setKm(String(tour.distance_km))
     setDifficulty(tour.difficulty ?? 'moderate')
     setSeasonal(Boolean(tour.seasonal))
+    setIsHistoricalTour(Boolean(tour.is_historical_tour))
     setSortOrder(String(tour.sort_order ?? 0))
   }, [tour])
 
@@ -825,9 +827,10 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
       km !== String(tour.distance_km) ||
       difficulty !== (tour.difficulty ?? 'moderate') ||
       seasonal !== Boolean(tour.seasonal) ||
+      isHistoricalTour !== Boolean(tour.is_historical_tour) ||
       sortOrder !== String(tour.sort_order ?? 0)
     )
-  }, [name, theme, description, minutes, km, difficulty, seasonal, sortOrder, tour])
+  }, [name, theme, description, minutes, km, difficulty, seasonal, isHistoricalTour, sortOrder, tour])
 
   const submit = () => {
     const patch: Partial<TourSummary> = {}
@@ -840,6 +843,7 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
     if (Number.isFinite(d) && d !== tour.distance_km) patch.distance_km = d
     if (difficulty !== (tour.difficulty ?? 'moderate')) patch.difficulty = difficulty
     if (seasonal !== Boolean(tour.seasonal)) patch.seasonal = seasonal
+    if (isHistoricalTour !== Boolean(tour.is_historical_tour)) patch.is_historical_tour = isHistoricalTour
     const so = parseInt(sortOrder, 10)
     if (Number.isFinite(so) && so !== (tour.sort_order ?? 0)) patch.sort_order = so
     void onSave(patch)
@@ -919,6 +923,17 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
             onChange={(e) => setSeasonal(e.target.checked)}
           />
           Seasonal
+        </label>
+        <label className="flex items-center gap-2 text-xs text-slate-700">
+          <input
+            type="checkbox"
+            checked={isHistoricalTour}
+            onChange={(e) => setIsHistoricalTour(e.target.checked)}
+          />
+          Historical tour
+          <span className="text-slate-500 font-normal">
+            — narration uses <code>historical_narration</code> (silent if missing)
+          </span>
         </label>
         <div className="flex justify-end pt-1">
           <button

@@ -448,6 +448,11 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 "FIRE — ${if (sinceLast == Long.MAX_VALUE) "never" else "${sinceLast / 1000}s"} since last newspaper, " +
                     "3s delay then ${h.date} ${h.name}"
             )
+            // S193: claim the headline NOW so a concurrent silence-fill can't
+            // grab the same one during the 3s delay (cause of operator's
+            // "newspaper repeating" report). Headline is lost-on-abort —
+            // intentional; better than re-firing.
+            historicalHeadlineQueue.advance()
             // S135: 3-second pause before newspaper starts
             delay(3000)
             // Re-check: a POI may have started during the delay
@@ -463,7 +468,6 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 "Salem 1692 — ${h.date}",
                 "en-au-x-auc-local"
             )
-            historicalHeadlineQueue.advance()
             lastNewspaperFiredMs = System.currentTimeMillis()
         }
     }
@@ -502,6 +506,9 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
         if (h != null) {
             DebugLogger.i("NARR-HEADLINE",
                 "TOUR SILENCE FILL: 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}")
+            // S193: claim the headline before the delay so a concurrent
+            // silence-fill / heartbeat can't re-fire the same one.
+            historicalHeadlineQueue.advance()
             delay(3000)
             if (tourViewModel.isNarrating()) {
                 DebugLogger.d("NARR-HEADLINE", "ABORT (tour silence) — POI started during 3s delay")
@@ -510,7 +517,6 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
             clearNarrationHighlight()
             currentNewspaperHeadline = h
             tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
-            historicalHeadlineQueue.advance()
             lastNewspaperFiredMs = System.currentTimeMillis()
         } else {
             DebugLogger.d("NARR-STATE", "  TOUR SILENCE: headline queue empty")
@@ -558,6 +564,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                     "NARR-HEADLINE",
                     "SILENCE FILL (dwell cap): 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
                 )
+                historicalHeadlineQueue.advance()  // S193: claim before delay
                 delay(3000)
                 if (tourViewModel.isNarrating()) {
                     DebugLogger.d("NARR-HEADLINE", "ABORT (dwell cap) — POI started during 3s delay")
@@ -566,7 +573,6 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                 clearNarrationHighlight()
                 currentNewspaperHeadline = h
                 tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
-                historicalHeadlineQueue.advance()
                 lastNewspaperFiredMs = System.currentTimeMillis()
                 return
             }
@@ -596,6 +602,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                 "NARR-HEADLINE",
                 "SILENCE FILL (2:1 interleave): 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
             )
+            historicalHeadlineQueue.advance()  // S193: claim before delay
             delay(3000)
             if (tourViewModel.isNarrating()) {
                 DebugLogger.d("NARR-HEADLINE", "ABORT (2:1) — POI started during 3s delay")
@@ -604,7 +611,6 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
             clearNarrationHighlight()
             currentNewspaperHeadline = h
             tourViewModel.speakTaggedNarration("newspaper_1692", h.text, "Salem 1692 — ${h.date}", "en-au-x-auc-local")
-            historicalHeadlineQueue.advance()
             lastNewspaperFiredMs = System.currentTimeMillis()
             return
         }
@@ -656,6 +662,7 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                 "NARR-HEADLINE",
                 "SILENCE FILL: 3s delay then 1692 headline ${h.index + 1}/${h.total} — ${h.date} ${h.name}"
             )
+            historicalHeadlineQueue.advance()  // S193: claim before delay
             delay(3000)
             if (tourViewModel.isNarrating()) {
                 DebugLogger.d("NARR-HEADLINE", "ABORT (silence fill) — POI started during 3s delay")
@@ -668,7 +675,6 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
                     "Salem 1692 — ${h.date}",
                     "en-au-x-auc-local"
                 )
-                historicalHeadlineQueue.advance()
                 lastNewspaperFiredMs = System.currentTimeMillis()
                 true
             }
