@@ -1560,7 +1560,6 @@ class SalemMainActivity : AppCompatActivity() {
         val tourIsActive = initialTourState is com.example.wickedsalemwitchcitytour.tour.TourState.Active
         val tourIsPaused = initialTourState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused
 
-        var autoStartedHeritageTrail = false
         when {
             tourIsActive -> {
                 DebugLogger.i("SalemMainActivity",
@@ -1609,76 +1608,43 @@ class SalemMainActivity : AppCompatActivity() {
                         "Walk sim: tour_WD1 reached Active (${started.activeTour.tour.name}) — using its baked polyline")
                     refreshHistoricalModeForActiveTour()
                 } else {
+                    // S193: operator rule — "what we have as tours is
+                    // definitive." Don't synthesize a fallback route; surface
+                    // the tour-load failure instead.
                     DebugLogger.w("SalemMainActivity",
-                        "Walk sim: tour_WD1 did not reach Active in 3s — falling back to Heritage Trail JSON")
-                    autoStartedHeritageTrail = true
+                        "Walk sim: tour_WD1 did not reach Active in 3s — aborting")
+                    toast("Tour didn't start — try again or pick a tour")
+                    return@withLock
                 }
             }
         }
+        // S193 — operator rule: "what we have as tours is definitive."
+        // Walk sim ONLY follows the authored tour_legs polyline. No
+        // synthetic fallback (Heritage-Trail JSON, stop-coordinate stitch,
+        // Downtown perimeter loop). If the active tour has no baked
+        // polyline that's a content-side gap to fix in admin/Compute Route,
+        // not something to paper over with a wrong route.
         val routePoints: List<org.osmdroid.util.GeoPoint>
         val routeLabel: String
-        if (activeTour != null) {
-            // S185: prefer the baked `tour_legs` polyline (operator-curated via
-            // the web admin in S183/S184). Mirrors the in-app overlay 1:1 so
-            // the walk-sim follows the exact line the user sees.
-            val bakedRoute = tourViewModel.computeTourPolyline(activeTour)
-            val bakedPolyline = bakedRoute?.polyline.orEmpty()
-            if (bakedPolyline.size >= 2) {
-                routePoints = bakedPolyline
-                routeLabel = activeTour.tour.name
-                DebugLogger.i("SalemMainActivity",
-                    "Walk sim using baked tour_legs polyline: '${activeTour.tour.name}' (${bakedPolyline.size} points)")
-            } else {
-                val tourRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                    .loadAllRoutePoints(this@SalemMainActivity, activeTour.tour.id)
-                if (tourRoute.isNotEmpty()) {
-                    routePoints = tourRoute
-                    routeLabel = activeTour.tour.name
-                    DebugLogger.i("SalemMainActivity",
-                        "Walk sim using tour JSON route: '${activeTour.tour.name}' (${tourRoute.size} points)")
-                } else {
-                    // Tour has no baked legs and no JSON — build from stop coordinates
-                    val stopPoints = activeTour.pois.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
-                    if (stopPoints.size >= 2) {
-                        routePoints = stopPoints
-                        routeLabel = activeTour.tour.name
-                        DebugLogger.i("SalemMainActivity",
-                            "Walk sim using tour stop coordinates: '${activeTour.tour.name}' (${stopPoints.size} stops)")
-                    } else {
-                        routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                            .loadDowntownRoute(this@SalemMainActivity)
-                        routeLabel = "Downtown Salem"
-                        DebugLogger.w("SalemMainActivity",
-                            "Tour '${activeTour.tour.name}' has no route/stops — falling back to downtown")
-                    }
-                }
-            }
-        } else if (autoStartedHeritageTrail) {
-            // Heritage Trail was just auto-started above; its state hasn't
-            // flipped yet but the bundled route asset is available right now.
-            val trailRoute = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadAllRoutePoints(this@SalemMainActivity, "tour_WD1")
-            if (trailRoute.isNotEmpty()) {
-                routePoints = trailRoute
-                routeLabel = "Salem Heritage Trail"
-                DebugLogger.i("SalemMainActivity",
-                    "Walk sim using auto-started Heritage Trail route (${trailRoute.size} points)")
-            } else {
-                routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                    .loadDowntownRoute(this@SalemMainActivity)
-                routeLabel = "Downtown Salem"
-                DebugLogger.w("SalemMainActivity",
-                    "Heritage Trail asset missing — falling back to downtown route")
-            }
-        } else {
-            routePoints = com.example.wickedsalemwitchcitytour.tour.TourRouteLoader
-                .loadDowntownRoute(this@SalemMainActivity)
-            routeLabel = "Downtown Salem"
-        }
-        if (routePoints.isEmpty()) {
-            toast("No route data available")
+        if (activeTour == null) {
+            DebugLogger.w("SalemMainActivity",
+                "Walk sim aborted — no active tour (state=${tourViewModel.tourState.value})")
+            toast("Pick a tour first")
             return@withLock
         }
+        val bakedRoute = tourViewModel.computeTourPolyline(activeTour!!)
+        val bakedPolyline = bakedRoute?.polyline.orEmpty()
+        if (bakedPolyline.size < 2) {
+            DebugLogger.w("SalemMainActivity",
+                "Walk sim aborted — tour '${activeTour!!.tour.name}' has no baked polyline " +
+                "(tour_legs empty). Author the route in admin and re-publish.")
+            toast("Tour '${activeTour!!.tour.name}' has no route — author it in admin")
+            return@withLock
+        }
+        routePoints = bakedPolyline
+        routeLabel = activeTour!!.tour.name
+        DebugLogger.i("SalemMainActivity",
+            "Walk sim using baked tour_legs polyline: '${activeTour!!.tour.name}' (${bakedPolyline.size} points)")
         // S186: do NOT reset the narration session here. The 1-hour repeat
         // window must hold across walk-sim start/stop within the same process —
         // it is only cleared on cold start (onCreate with savedInstanceState=null,
