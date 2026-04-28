@@ -666,13 +666,21 @@ export function PoiTree({
 
   // Quality-flag fetch — drives the colored indicator dots. Refreshed whenever
   // the POI list reloads so a Suppress / save in another tab eventually clears
-  // the dot.
+  // the dot. S195 — also refreshes on the 'salem-lint-changed' window event,
+  // dispatched by PoiEditDialog after the operator suppresses a flag inline.
   useEffect(() => {
     let cancelled = false
-    fetchQualityFlags().then((flags) => {
-      if (!cancelled) setQualityFlags(flags)
-    })
-    return () => { cancelled = true }
+    const refresh = () => {
+      fetchQualityFlags().then((flags) => {
+        if (!cancelled) setQualityFlags(flags)
+      })
+    }
+    refresh()
+    window.addEventListener('salem-lint-changed', refresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener('salem-lint-changed', refresh)
+    }
   }, [pois])
 
   const labelLookup = useMemo(

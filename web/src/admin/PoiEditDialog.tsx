@@ -432,6 +432,20 @@ function LocationVerifyPanel({
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// S195 — per-POI quality-flag panel. Each entry is one active lint check
+// firing on this POI; the operator can suppress the (poi_id, check_id)
+// pair to acknowledge a false positive. Mirrors the Lint tab's Suppress
+// button but inline in the editor so flags surface where you fix them.
+type LintSeverity = 'error' | 'warn' | 'info'
+interface PoiLintFlag {
+  check_id: string
+  label: string
+  category: string
+  severity: LintSeverity
+  message?: string
+  fix_hint?: string
+}
+
 export function PoiEditDialog({
   open,
   poi,
@@ -487,6 +501,85 @@ export function PoiEditDialog({
       .filter((s) => s.category_id === cat)
       .sort((a, b) => a.display_order - b.display_order)
   }, [currentCategory, subcategories])
+
+  // S195 — per-POI lint flag fetch. Runs when the dialog opens with a POI.
+  // The /admin/salem/lint endpoint runs all active checks; we filter to
+  // items where this POI's id appears, group by check, and render the panel.
+  // Suppress writes through to salem_lint_suppressions and removes the row
+  // locally; the tree's flag dot also refreshes via the 'salem-lint-changed'
+  // event listener in PoiTree.
+  const [lintFlags, setLintFlags] = useState<PoiLintFlag[] | null>(null)
+  const [lintLoading, setLintLoading] = useState(false)
+  const [suppressingCheckId, setSuppressingCheckId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!open || !poiId) {
+      setLintFlags(null)
+      return
+    }
+    let cancelled = false
+    setLintLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/salem/lint', { credentials: 'same-origin' })
+        if (!res.ok) {
+          if (!cancelled) setLintFlags([])
+          return
+        }
+        const data = await res.json()
+        const flags: PoiLintFlag[] = []
+        for (const chk of (data.checks ?? []) as Array<{
+          id: string
+          label: string
+          category: string
+          severity: LintSeverity
+          items: Array<{ entity_type?: string; entity_id: string; message?: string; fix_hint?: string }>
+        }>) {
+          for (const item of chk.items ?? []) {
+            if (item.entity_type && item.entity_type !== 'poi') continue
+            if (item.entity_id !== poiId) continue
+            flags.push({
+              check_id: chk.id,
+              label: chk.label,
+              category: chk.category,
+              severity: chk.severity,
+              message: item.message,
+              fix_hint: item.fix_hint,
+            })
+            break // one row per check is enough for the per-POI panel
+          }
+        }
+        if (!cancelled) setLintFlags(flags)
+      } catch {
+        if (!cancelled) setLintFlags([])
+      } finally {
+        if (!cancelled) setLintLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [open, poiId])
+
+  const handleSuppressFlag = useCallback(async (checkId: string) => {
+    if (!poiId) return
+    setSuppressingCheckId(checkId)
+    try {
+      const res = await fetch(`/api/admin/salem/lint/poi/${encodeURIComponent(poiId)}/suppress`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ check_id: checkId, reason: 'Suppressed from POI editor' }),
+      })
+      if (!res.ok) {
+        // Surface the failure but keep the flag visible so the operator can retry.
+        console.error('suppress failed', res.status, await res.text().catch(() => ''))
+        return
+      }
+      setLintFlags((prev) => (prev ?? []).filter((f) => f.check_id !== checkId))
+      // Tell PoiTree to refetch its flag map so the dot disappears.
+      window.dispatchEvent(new CustomEvent('salem-lint-changed'))
+    } finally {
+      setSuppressingCheckId(null)
+    }
+  }, [poiId])
 
   // If the operator changes the category and the current subcategory no
   // longer matches, clear it. Avoids saving a mismatched pair like
@@ -930,6 +1023,67 @@ export function PoiEditDialog({
                   This POI is soft-deleted. Saving will fail with a 409 — you
                   must restore it from the backend (no UI yet) before editing.
                   You can still inspect the fields here.
+                </div>
+              )}
+
+              {/* S195 — per-POI quality flags */}
+              {lintFlags && lintFlags.length > 0 && (
+                <div className="mx-4 mt-3 border border-amber-300 bg-amber-50 rounded">
+                  <div className="px-3 py-1.5 border-b border-amber-200 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-amber-900">Quality flags</span>
+                    <span className="text-[11px] text-amber-700">
+                      {lintFlags.length} active
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-amber-200 max-h-48 overflow-y-auto">
+                    {lintFlags.map((flag) => {
+                      const sevClass =
+                        flag.severity === 'error'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : flag.severity === 'warn'
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-sky-100 text-sky-800 border-sky-300'
+                      return (
+                        <li key={flag.check_id} className="px-3 py-2 flex items-start gap-3">
+                          <span
+                            className={`shrink-0 inline-block px-1.5 py-0.5 rounded border text-[10px] font-semibold uppercase tracking-wide ${sevClass}`}
+                          >
+                            {flag.severity}
+                          </span>
+                          <div className="flex-1 min-w-0 text-xs leading-snug">
+                            <div className="font-medium text-slate-800">
+                              {flag.label}
+                              <span className="ml-2 text-[10px] font-normal text-slate-500">
+                                {flag.category}
+                              </span>
+                            </div>
+                            {flag.message && (
+                              <div className="text-slate-700 mt-0.5">{flag.message}</div>
+                            )}
+                            {flag.fix_hint && (
+                              <div className="text-slate-500 italic mt-0.5">
+                                Fix: {flag.fix_hint}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleSuppressFlag(flag.check_id)}
+                            disabled={suppressingCheckId === flag.check_id}
+                            className="shrink-0 px-2 py-1 text-[11px] rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            title="Suppress this flag for this POI (acknowledges false positive)"
+                          >
+                            {suppressingCheckId === flag.check_id ? 'Suppressing…' : 'Suppress'}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+              {lintFlags && lintFlags.length === 0 && !lintLoading && (
+                <div className="mx-4 mt-3 px-3 py-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded">
+                  No active quality flags on this POI.
                 </div>
               )}
 
