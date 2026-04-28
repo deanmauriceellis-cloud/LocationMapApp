@@ -579,15 +579,32 @@ class PoiDetailSheet : DialogFragment() {
         // S193 — during a historical tour, the sheet's audio is the
         // historical_narration (strict pre-1860). Short/about/story carry
         // modern context and would conflict with the tour's purpose
-        // (per feedback_narration_fields_purpose_separated). When the
-        // POI has no historical_narration we fall back to the modern
-        // sections so the operator hears something rather than silence —
-        // an explicit-tap action surface, not the auto-narration path.
+        // (per feedback_narration_fields_purpose_separated).
+        //
+        // Fallback rule (operator clarified S193 mid-session): when the POI
+        // is HISTORICAL_BUILDINGS and historical_narration isn't authored
+        // yet, fall back to long → short — these POIs are the whole point
+        // of the tour and silence is wrong. Non-historic-buildings on a
+        // tour stay intro-only so modern blurbs don't sneak in.
+        val historicalActive = tourViewModel.isHistoricalNarrationActive()
         val historicalText = poi.historicalNarration?.takeIf { it.isNotBlank() }
-        val useHistorical = tourViewModel.isHistoricalNarrationActive() && historicalText != null
-        if (useHistorical) {
-            tourViewModel.speakSheetSection(ttsTag, historicalText!!, name)
-            DebugLogger.i(TAG, "tts enqueue HISTORICAL id=${poi.id} len=${historicalText.length}")
+        if (historicalActive) {
+            if (historicalText != null) {
+                tourViewModel.speakSheetSection(ttsTag, historicalText, name)
+                DebugLogger.i(TAG, "tts enqueue HISTORICAL id=${poi.id} len=${historicalText.length}")
+                return
+            }
+            val isHistBldg = poi.category.equals("HISTORICAL_BUILDINGS", ignoreCase = true)
+            if (isHistBldg) {
+                val fallback = storyText ?: shortText
+                if (fallback != null) {
+                    tourViewModel.speakSheetSection(ttsTag, fallback, name)
+                    DebugLogger.i(TAG, "tts enqueue HIST_BLDG_FALLBACK id=${poi.id} len=${fallback.length}")
+                }
+                return
+            }
+            // Non-HIST_BLDG without historical_narration on a tour → intro only.
+            DebugLogger.i(TAG, "tts intro-only id=${poi.id} cat=${poi.category} (no historical, not hist-bldg)")
             return
         }
 
