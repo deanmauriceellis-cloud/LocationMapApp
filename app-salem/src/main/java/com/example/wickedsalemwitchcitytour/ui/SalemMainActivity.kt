@@ -2643,16 +2643,16 @@ class SalemMainActivity : AppCompatActivity() {
      * every GPS fix with an EMA + 5° hysteresis to avoid jitter.
      */
     /**
-     * S125 (2026-04-14): Heading-up map rotation is temporarily DISABLED.
-     * The feature fights GPS noise + sensor freeze issues in real-world
-     * field tests (see field-test analysis in docs/session-logs/session-125)
-     * and needs a more careful redesign before re-enabling. All the code —
-     * DeviceOrientationTracker, applyHeadingUpRotation, bearing fusion —
-     * is intentionally PRESERVED so the rework has a starting point; flip
-     * this constant to true (and re-show the FAB in layout if it was
-     * hidden) to bring it back.
+     * S195: Heading-up re-enabled per operator, GPS-only. The S125
+     * disablement removed the feature because the magnetometer/gyro
+     * fallback (DeviceOrientationTracker) fought GPS noise. Operator's
+     * direction this session: GPS-derived movement bearing is the SOLE
+     * source of rotation. When the user is stationary the bearing
+     * freezes — that's the intended behavior, not a bug.
+     * applyHeadingUpRotation no longer consults the sensor; the tracker
+     * is left in the codebase but is not started by the heading-up FAB.
      */
-    private val HEADING_UP_ENABLED: Boolean = false
+    private val HEADING_UP_ENABLED: Boolean = true
 
     private fun setupHeadingUpButton() {
         val btn = binding.btnHeadingUp
@@ -2671,12 +2671,10 @@ class SalemMainActivity : AppCompatActivity() {
             btn.setTextColor(if (isHeadingUpMode()) GPS_TRACK_TINT_ON else GPS_TRACK_TINT_OFF)
         }
         refreshTint()
-        // S115: If heading-up is already ON from a previous session, start
-        // the sensor tracker now so the map can rotate on sensor updates as
-        // soon as the activity is visible, not only after the next GPS fix.
-        if (isHeadingUpMode()) {
-            deviceOrientationTracker?.start()
-        }
+        // S195: GPS-only — no sensor tracker start. Movement bearing is
+        // derived from successive GPS fixes (≥1m moves) and that's the sole
+        // rotation input. When the user is stationary the bearing freezes;
+        // that's intentional per operator direction.
         btn.setOnClickListener {
             val newEnabled = !isHeadingUpMode()
             setHeadingUpMode(newEnabled)
@@ -2684,9 +2682,7 @@ class SalemMainActivity : AppCompatActivity() {
             if (!newEnabled) {
                 // Immediate snap back to north — don't make the user wait for the next fix.
                 resetHeadingUpRotation()
-                deviceOrientationTracker?.stop()  // S115: save battery when off
             } else {
-                deviceOrientationTracker?.start()  // S115: start sensor fallback
                 // Apply current smoothed bearing immediately if we have one.
                 applyHeadingUpRotationImmediate()
             }
@@ -2697,8 +2693,7 @@ class SalemMainActivity : AppCompatActivity() {
             ).show()
             DebugLogger.i(
                 "SalemMainActivity",
-                "Heading-up toggled → ${if (newEnabled) "ON" else "OFF"} " +
-                    "(sensor available=${deviceOrientationTracker?.hasSensor() == true})"
+                "Heading-up toggled → ${if (newEnabled) "ON" else "OFF"} (GPS-only)"
             )
         }
     }
