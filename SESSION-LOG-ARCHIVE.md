@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 184, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 185, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 184, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 185, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 185: 2026-04-26 — Land S183/S184 walking-route work in the AAB; flush latent asset-DB schema landmines
+
+The S183/S184 operator-curated `tour_WD1` is now actually in the AAB on the Lenovo. New Room `TourLeg` entity (v9 → v10), new `cache-proxy/scripts/publish-tour-legs.js` (PG `salem_tour_legs` → asset's `tour_legs`), `TourViewModel.computeTourPolyline()` rewritten to read baked legs and assemble them with the same anchor + clip rendering policy as the admin's `TourLegsLayer.drawLeg`. Also rewired walk-sim's route loader (was falling back to the bundled "Downtown Salem" route because tour_WD1 has no JSON in `assets/tours/` and no POI-bound stops). Operator clarified the V1 model mid-session: tours are polyline-only paths users follow; POIs govern their own narration via geofence proximity, fully independent of any tour. `TourEngine.startTour` no longer errors on stop-less tours, and Historical Mode is auto-skipped when the active tour has zero user-facing stops (was building an empty whitelist that silenced every POI on the route, which is what hid Ames Memorial Hall during the operator's first walk-sim test). Two latent asset-DB landmines flushed during the install loop: (1) tables had `DEFAULT` clauses from `salem-content/create_db.sql` while Room codegen has none → `TableInfo.equals` mismatch → `fallbackToDestructiveMigration` wiped the asset on every fresh install; (2) `PRAGMA user_version` lagged the `@Database(version=N)` value → upgrade migration ran → fallback destructive. New `cache-proxy/scripts/align-asset-schema-to-room.js` is the canonical bridge — rewrites every Room-managed table using the exact `createSql` from `app-salem/schemas/<DB>/<v>.json` and stamps both `identity_hash` and `user_version`. The 5 historical Kotlin-curated tours (Essentials/Explorer/Grand/Witch Trials/Heritage Trail) were dropped from the asset; operator will re-author them in PG via admin when wanted. Admin polish at session end: POI markers at zoom ≥17 now show humanized category above + name below (mirrors Android `MarkerIconHelper.labeledDot`), cluster threshold lowered to 17 to match. Carry-forward (S186): tour-start onboarding to nearest point on polyline; investigate Lenovo's GPS-OBS heartbeat (system delivers fixes but app's tour observer reports them stale); hard-delete dedup losers; Tier 2 admin → build pipeline auto-bake (now critical with 3 publish scripts).
+
+Full session detail: `docs/session-logs/session-185-2026-04-26.md`. Commit: `3c68102`.
+
+---
 
 ## Session 184: 2026-04-26 — Admin walking-route UX polish: marker-anchored polylines + click-to-highlight + click-to-recenter
 
