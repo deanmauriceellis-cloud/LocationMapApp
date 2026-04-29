@@ -20,8 +20,9 @@ import { ORACLE_BASE, getStatus, type OracleStatus } from './oracleClient'
 import { LintTab } from './LintTab'
 import { GeocodesTab } from './GeocodesTab'
 import { GeocodeCandidatesModal } from './GeocodeCandidatesModal'
+import { AuditTab } from './AuditTab'
 
-type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes'
+type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes' | 'audit'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -601,6 +602,16 @@ export function AdminLayout() {
           >
             Geocodes
           </button>
+          <button
+            type="button"
+            onClick={() => setView('audit')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'audit' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+            title="Change audit log — every admin/automation edit, with revert"
+          >
+            Audit
+          </button>
         </div>
 
         {view === 'pois' && (
@@ -656,6 +667,10 @@ export function AdminLayout() {
             onShowPoiOnMap={handleLintShowPoiOnMap}
             onOpenGeocodes={handleLintOpenGeocodes}
           />
+        </div>
+      ) : view === 'audit' ? (
+        <div className="flex-1 min-h-0">
+          <AuditTab />
         </div>
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">

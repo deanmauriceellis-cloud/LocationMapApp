@@ -181,6 +181,39 @@ function tourItem(row, message, fix_hint, extras = {}) {
 
 // ─── Check implementations ───────────────────────────────────────────────────
 
+// S196 — surface POIs whose last narration regen attempt failed (status != 'ok').
+// Reads `salem_narration_regen_log` populated by the post-regen ingest. Each POI
+// gets its most-recent log row only — if a later run succeeded, the prior
+// failure is no longer surfaced. Useful when the LLM rejects a POI for
+// thin grounding (e.g. WWII Memorial — no Salem-specific KB facts) and the
+// operator needs to either hand-author or add KB content before re-running.
+async function checkNarrationRegenFailed(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('narration_regen_failed', params, 'p.id');
+  const { rows } = await pgPool.query(`
+    WITH latest AS (
+      SELECT DISTINCT ON (poi_id) poi_id, status, reason, bucket, attempts, words, recorded_at
+        FROM salem_narration_regen_log
+       ORDER BY poi_id, recorded_at DESC
+    )
+    SELECT p.id, p.name, p.lat, p.lng, p.category,
+           l.status, l.reason, l.bucket, l.attempts, l.words, l.recorded_at
+      FROM latest l
+      JOIN salem_pois p ON p.id = l.poi_id
+     WHERE p.deleted_at IS NULL
+       AND l.status != 'ok'
+       AND l.status NOT LIKE 'skip-%'
+       ${suppress}
+     ORDER BY l.recorded_at DESC, p.name
+     LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Regen ${r.status} (${r.attempts ?? '?'} attempts, ${r.words ?? 0}w): ${r.reason || 'no reason recorded'}`,
+    `Either hand-author historical_narration via the Narration tab, add Salem-specific KB content for the SI grounding, or suppress this flag if the gap is intentional.`,
+    { regen_status: r.status, regen_bucket: r.bucket, regen_attempts: r.attempts, regen_recorded_at: r.recorded_at },
+  ));
+}
+
 async function checkNarrationTourMissing(pgPool) {
   const params = [ITEM_CAP];
   const suppress = suppressionClause('narration_tour_missing', params);
@@ -738,6 +771,7 @@ async function checkTourLegsEmpty(pgPool) {
 // ─── Registry ────────────────────────────────────────────────────────────────
 
 const CHECKS = [
+  { id: 'narration_regen_failed',    label: 'Narration regen failed (LLM rejected or returned EMPTY)', category: 'Narration', severity: 'warn',  run: checkNarrationRegenFailed },
   { id: 'narration_tour_missing',    label: 'Tour POIs missing narration',                category: 'Narration',  severity: 'warn',  run: checkNarrationTourMissing },
   { id: 'narration_civic_missing',   label: 'Civic POIs missing narration',               category: 'Narration',  severity: 'info',  run: checkNarrationCivicMissing },
   { id: 'tour_gate_missing_year',    label: 'Tour-eligible POIs missing year_established',category: 'Tour gates', severity: 'warn',  run: checkTourGateMissingYear },

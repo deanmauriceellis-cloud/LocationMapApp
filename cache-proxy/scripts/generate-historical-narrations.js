@@ -323,9 +323,13 @@ async function fetchHistoricalNote(entityId) {
 const WITCH_TRIAL_PATTERN = /witch.*trial|corwin|hathorne|parris|proctor|samuel sewall|cotton mather|salem village 1692|tituba|bridget bishop|rebecca nurse|giles corey/i;
 
 // Names that indicate a commemorative artifact (statue/monument/plaque/etc.)
-// rather than a building. These are post-1860 even when honoring earlier
-// subjects, and never qualify for a pre-1860 historical narration.
-const COMMEMORATIVE_NAME_PATTERN = /\b(statue|monument|plaque|marker|memorial|cenotaph|obelisk|tablet|bust)\b/i;
+// rather than a building. ALL such POIs route to the tribute prompt path
+// (S196 era-flexible), narrating the SUBJECT being commemorated. The subject
+// may be pre-1860 (Roger Conant Statue, Witch Trials Memorial) or post-1860
+// (Bewitched/Samantha Statue, WWII Memorial); the tribute prompt picks the
+// voice based on subject era and the validator runs in tribute-relaxed mode.
+// See feedback_commemoratives_are_historical_tributes.md.
+const COMMEMORATIVE_NAME_PATTERN = /\b(statue|monument|plaque|marker|memorial|cenotaph|obelisk|tablet|bust|arch)\b/i;
 
 function extractEffectiveYear(dump) {
   const mc = dump.mode_c_historic_building_details || {};
@@ -418,7 +422,7 @@ const STRICT_RULES = [
   '3. Do NOT use any of these words/phrases: today, currently, now, modern, recently, contemporary, present-day, last century, 19th century late, 20th century, 21st century, visitors, tourists, museum, operates, operated by, open to the public, guided tour, admission, gift shop, designated, registered, listed, national register, national historic landmark, historic district, restoration, preserved, commemorate, commemorating, recognized, memorial plaque, today\'s.',
   '4. Do NOT describe any work, restoration, care, repair, attention, or modification done on the building AFTER 1859. Do NOT euphemize post-1859 work as "later care", "the passage of years", "in the years following", "an antiquarian later", "subsequent attention", etc. — simply omit it. Pre-1860 modifications and additions ARE in scope and may be mentioned.',
   '4b. Do NOT mention modern business names, restaurants, shops, salons, marketing firms, printing companies, real-estate agencies, or any commercial entity established after 1859. Do NOT list neighboring businesses or distances from them. Do NOT name people who are alive in your training knowledge — only name pre-1860 historical figures with documented connections to this site. If KB context includes such modern names, IGNORE them.',
-  '5. Do NOT describe statues, monuments, plaques, memorials, or markers — those are post-1860 artifacts even when commemorating an earlier subject. If the subject of the entry is a statue/monument/plaque/marker, return EMPTY.',
+  '5. If the subject is a commemorative artifact (statue / monument / plaque / memorial / marker / cenotaph / obelisk / tablet / bust), DO NOT describe the artifact itself. Narrate the pre-1860 SUBJECT being commemorated (the figure, event, or place) as if the artifact did not exist. If the commemorated subject is post-1860 or unknown, return EMPTY.',
   '6. Write in past tense. The narration should read as if delivered by a careful 1859 historian.',
   '7. Cover where grounded: full name, year built (or approximate decade), original owner/builder/architect, notable pre-1860 events or occupants, documented pre-1860 architectural features.',
   '8. Output English prose only. No bullet points, no headings, no markdown.',
@@ -426,6 +430,9 @@ const STRICT_RULES = [
   '10. If GROUND_TRUTH or retrieved knowledge-base context contains any banned phrase or post-1860 fact, OMIT that fact entirely. Do not transcribe it. Do not rephrase it ("location within X historic district" must simply not appear). The narration must be silent on modern designations even when the KB knows them.',
   '11. SAY WHAT YOU KNOW. NEVER narrate what you do NOT know. Do NOT include sentences that announce missing or unknown information. Forbidden phrasings include: "records do not detail …", "details remain scarce", "particulars are not within my recollection", "specific accounts are not (recorded|available)", "the names of … are not known", "though detailed accounts are not at hand", "lie beyond my recollection", "though I do not carry accounts", "while specific … remain elusive/obscured/unrecorded". If a fact is not grounded, simply OMIT that aspect — do not write a sentence acknowledging the gap. Silence is preferred to filler.',
   '12. ALLOWED — architectural classifications. You MAY use architectural style names such as "First Period", "Federal", "Federal style", "Georgian", "Georgian Revival", "Greek Revival", "Italianate", "Colonial Revival", "Adam style", "Federalist style", "Second Empire", "Gothic Revival", "Queen Anne", etc. even though some of these terms were coined by historians AFTER 1860. They describe pre-1860 architecture and are scholarly classifications, not modern designations. Use them confidently when grounded.',
+  '13. NO REPETITION. Each sentence must add a NEW grounded fact. Do not restate the same fact in different words across sentences. Do not name the same architectural style twice. Do not echo a fact already given in the GROUND_TRUTH preamble unless adding new detail. Forbidden closure flourishes (final-paragraph filler that adds no fact): "remains a testament to …", "stands as a testament to …", "stands as a witness to …", "echoes of generations still linger", "lives lived within its walls", "the imprint of their daily lives", "speaks to a time of …", "the house itself speaks to …", "a tranquil escape", "a fitting backdrop", "a captivating journey", "offers a glimpse into …". Strike any sentence that uses such phrasing — there is no flourish quota. End on the last grounded fact, even if abrupt.',
+  '14. NO META-NARRATION. Do not address the reader. Do not say "you are looking at", "you can see", "imagine yourself", "picture this", "as you walk past". The narration is third-person past-tense history.',
+  '15. NAME ANCHOR. The first sentence MUST refer to the subject by its actual name (the name given at the top of this prompt). Do NOT substitute the name of a different building, person, or place — even if the knowledge base mentions one. If you cannot ground the named subject, return EMPTY.',
 ];
 
 const GROUND_TRUTH_LINE_FILTERS = [
@@ -482,18 +489,20 @@ function buildTemporalFraming(year) {
 }
 
 function buildPrompt(name, year, lengthBucket, groundTruthBlock, witchTrial) {
-  let lengthRule;
-  if (lengthBucket === 'RICH') {
-    lengthRule = [
-      'LENGTH: Write up to 500 words, scaled to the grounded facts:',
-      '- If GROUND_TRUTH and KB context together support a rich account (multiple events, named occupants, architectural detail, period anecdotes, primary-source attribution), write toward 500 words.',
-      '- If grounding only supports the basics, write 100-200 words. Brevity is correct when the facts are thin.',
-      '- If grounding cannot support even 60 words of strictly pre-1860, fact-grounded content WITHOUT padding or modern-continuity language, return only the literal string EMPTY.',
-      '- DO NOT pad to reach a word target. Better short and grounded than long and padded.',
-    ].join('\n');
-  } else {
-    lengthRule = 'LENGTH: 60 to 150 words, one or two paragraphs. If grounding cannot support 60 words without padding or modern-continuity language, return only the literal string EMPTY.';
-  }
+  // S196 — single length band, hard cap 250 words. The previous RICH bucket
+  // (up to 500w) produced padded, repetitive output that played 60–90s+ on
+  // the device. Operator target: 100–250 words = ~45–110 seconds at TTS
+  // rate 0.9x, fitting comfortably in a 2-minute walking-pace narration.
+  // The lengthBucket arg is retained for call-site compatibility; both
+  // values share the same rule below.
+  const lengthRule = [
+    'LENGTH: 100 to 250 words. HARD CAP 250. One or two short paragraphs.',
+    '- Aim for ~150 words when grounding supports it.',
+    '- If grounding only supports the basics, 100 words is fine. Brevity is correct when the facts are thin.',
+    '- If grounding cannot support 60 words of strictly pre-1860, fact-grounded content WITHOUT padding or repetition, return only the literal string EMPTY.',
+    '- DO NOT pad to reach a word target. Stop on the last grounded fact.',
+    '- DO NOT exceed 250 words under any circumstance. Output longer than 250 words will be rejected.',
+  ].join('\n');
   let focus = witchTrial
     ? 'CONTENT FOCUS: This entity has a documented connection to the 1692 Salem witch trials. Cover the trial connection in detail where grounded — accusations, examinations held here, named magistrates, named accused, named accusers, outcomes — staying within the pre-1860 cutoff.'
     : 'CONTENT FOCUS: Cover the original construction, original owner/builder/architect, notable pre-1860 occupants, notable pre-1860 events at this site, and documented pre-1860 architectural features.';
@@ -525,6 +534,72 @@ function buildPrompt(name, year, lengthBucket, groundTruthBlock, witchTrial) {
     lengthRule,
     '',
     'Begin narration:',
+  ].join('\n');
+}
+
+// S196 — commemorative tribute prompt (era-flexible). The subject of the
+// narration is the figure / event / place being commemorated, NOT the
+// artifact itself. The subject may be any era:
+//
+//   - Pre-1860 subject (Roger Conant, witch trials, Hawthorne) → narrate
+//     in 1859-historian voice, past tense, pre-1860 vocabulary.
+//   - Post-1860 subject (Bewitched filming, WWII servicemembers, Lydia
+//     Pinkham) → narrate in present-day Salem voice, may use modern
+//     vocabulary and post-1860 dates.
+//
+// The LLM picks the voice based on the inferred subject era. The validator
+// runs in tribute-relaxed mode: skips year-cutoff strip and pre-1860 word
+// bans (so "1970", "filming", "today" are allowed when narrating a modern
+// commemorated subject). Anti-padding, anti-repetition, name-anchor, and
+// 100-250w cap still apply.
+function buildCommemorativeTributePrompt(name, groundTruthBlock) {
+  const lengthRule = [
+    'LENGTH: 100 to 250 words. HARD CAP 250. One or two short paragraphs.',
+    '- Aim for ~150 words.',
+    '- DO NOT exceed 250 words. Output longer than 250 words will be rejected.',
+    '- DO NOT pad. Stop on the last grounded fact about the subject.',
+  ].join('\n');
+  // Lighter rules for tribute mode: drop pre-1860-specific bans (rules 2,
+  // 3, 4, 4b, 6, 12 are pre-1860-historian voice constraints). Keep the
+  // anti-padding / anti-repetition / no-meta-gap / name-anchor rules,
+  // which are quality concerns that apply across eras.
+  const TRIBUTE_RULES = [
+    'TRIBUTE STRICT RULES (violation means return only EMPTY):',
+    'T1. Use ONLY facts present in GROUND_TRUTH or facts retrievable from the SalemIntelligence knowledge base. Do NOT invent.',
+    'T2. Output English prose only. No bullet points, no headings, no markdown headers, no preamble.',
+    'T3. NO PADDING / NO REPETITION (mirrors STRICT_RULE 13). Each sentence must add a NEW grounded fact. Do not restate the same fact in different words. Forbidden closure flourishes: "remains a testament to …", "stands as a witness to …", "echoes still linger", "lives lived within these walls", "the imprint of their daily lives", "speaks to a time of …", "a fitting backdrop", "a captivating journey", "offers a glimpse into …". Strike any sentence that uses such phrasing — there is no flourish quota. End on the last grounded fact, even if abrupt.',
+    'T4. NO META-NARRATION (mirrors STRICT_RULE 14). Do not address the reader. Do not say "you are looking at", "you can see", "imagine yourself", "picture this", "as you walk past". Third-person narration only.',
+    'T5. NO META-GAP. SAY WHAT YOU KNOW. Do NOT include sentences that announce missing or unknown information. If a fact is not grounded, simply OMIT that aspect — do not write a sentence acknowledging the gap.',
+    'T6. NO COMMERCIAL / MEMOIRESQUE PROMOTION. Do not mention modern business names that aren\'t directly part of the subject\'s story. No LLC/Inc. legal suffixes. No restaurant / shop / brewery names unless central to the commemorated subject (e.g. a brewery whose founder is the commemorated figure is OK).',
+    'T7. NAME ANCHOR. The first sentence MUST refer to the subject by name (the commemorated figure / event / place — NOT the artifact name unless the artifact name and the subject are the same).',
+    'T8. DO NOT describe the artifact itself in detail. The bronze, the plaque, the dedication year, the artist, the inscription wording — these are at most one passing sentence; the focus is the SUBJECT being commemorated. The narration should read as a story about the historical subject, with the commemorative artifact being the framing context.',
+  ];
+  return [
+    `The Salem POI "${name}" is a commemorative artifact (statue, monument, plaque, memorial, marker, or arch). Your task is to narrate the SUBJECT being commemorated — the historical figure, event, or place that this artifact honors. The artifact itself is the framing context; the SUBJECT is the story.`,
+    '',
+    'TRIBUTE-MODE INSTRUCTIONS:',
+    '1. From the artifact name and the GROUND_TRUTH below, identify the commemorated subject. Examples:',
+    '   - "Roger Conant Statue" → Roger Conant the 1626 Salem founder',
+    '   - "Salem Witch Trials Memorial" → the 1692 trials',
+    '   - "Hawthorne Statue" → Nathaniel Hawthorne the author (1804–1864)',
+    '   - "Bewitched Sculpture / Samantha Statue" → the 1970 filming of Bewitched in Salem and the show\'s connection to the city\'s pop-culture identity',
+    '   - "World War II Memorial" → Salem servicemembers who fought in WWII',
+    '   - "Washington Arch" → George Washington (1732–1799)',
+    '   - "Viking Statue" → Leif Erikson and the Norse exploration of New England',
+    '2. PICK THE VOICE BASED ON THE SUBJECT\'S ERA:',
+    '   - If the subject is pre-1860 (founder, witch trials, colonial figure, Revolutionary-era figure, antebellum author/event), narrate in past tense as a careful 1859 historian. Use period-appropriate vocabulary: "the colony", "the Province of Massachusetts Bay", "the Commonwealth", etc. as the year permits.',
+    '   - If the subject is post-1860 (Civil War, WWII, 20th-century cultural moment, modern-era figure, TV show, modern industry), narrate as a present-day Salem narrator. Past tense. You MAY use post-1860 dates ("1970", "2005"), modern vocabulary ("filming", "television", "veterans"), and reference the subject in its actual era.',
+    '3. If the subject is genuinely unknown / cannot be inferred from name + KB grounding, return EMPTY.',
+    '4. Salem connection is the storytelling hook — what does the commemorated subject have to do with Salem? Surface that connection prominently.',
+    '5. DO NOT describe the artifact in detail. The story is about the SUBJECT.',
+    '',
+    'GROUND_TRUTH (operator-verified facts; use what fits the subject\'s story):',
+    groundTruthBlock,
+    '',
+    TRIBUTE_RULES.join('\n'),
+    lengthRule,
+    '',
+    'Begin subject narration:',
   ].join('\n');
 }
 
@@ -673,7 +748,7 @@ function splitSentences(text) {
 
 const PRONOUN_ANCHOR = /^\s*(?:He|She|His|Her|Hers|Him|Their|They|Them|It|Its|This|That|These|Those)\b/;
 
-function validate(text, lengthBucket, effectiveYear) {
+function validate(text, lengthBucket, effectiveYear, poiName) {
   const failures = [];
   const trimmed = (text || '').trim();
   if (!trimmed) return { ok: false, reason: 'empty' };
@@ -686,6 +761,76 @@ function validate(text, lengthBucket, effectiveYear) {
   }
   const asciiRatio = asciiCount / trimmed.length;
   if (asciiRatio < 0.95) return { ok: false, reason: `ascii_ratio=${asciiRatio.toFixed(2)}` };
+
+  // S196 — name anchor. The first ~240 chars must contain a recognizable
+  // token from the POI name. Catches LLM hallucinations where a different
+  // entity name slips in (e.g. "Fairbanks House" leaking into a Witch House
+  // narration). For tribute mode the anchor token is also expected — since
+  // the commemorated subject's name typically matches a token from the POI
+  // name (e.g. "Hawthorne Statue" → "hawthorne"). Stop-words are ignored.
+  if (poiName) {
+    const STOP = new Set(['the','of','and','a','an','at','in','on','to','from','for','salem','house','hall','site','park','square','street','company','salem,','massachusetts','ma','usa','statue','monument','plaque','marker','memorial','cenotaph','obelisk','tablet','bust','arch','sculpture']);
+    const tokens = poiName.toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length >= 3 && !STOP.has(t));
+    if (tokens.length) {
+      const head = trimmed.slice(0, 240).toLowerCase();
+      const hit = tokens.some((t) => head.includes(t));
+      if (!hit) {
+        return {
+          ok: false,
+          reason: `name-anchor-miss: first 240 chars contain none of [${tokens.join(',')}]`,
+          rejected_text: trimmed.slice(0, 200),
+        };
+      }
+    }
+  }
+
+  // S196 — tribute mode (any-era subject) skips the per-sentence year-cutoff
+  // and pre-1860 banned-phrase strip. The tribute prompt's TRIBUTE_RULES
+  // handle quality concerns; the validator's residual job is name-anchor +
+  // ASCII floor + word-count cap + EMPTY check + (light) sentence cleanup.
+  // For tribute mode we skip the strip phase entirely and let the prompt
+  // bear the quality load.
+  const isTribute = lengthBucket === 'TRIBUTE';
+  if (isTribute) {
+    const cleanText = trimmed;
+    let words = cleanText.split(/\s+/).length;
+    const MIN_WORDS = 60;
+    const MAX_WORDS = 250;
+    if (words < MIN_WORDS) {
+      return { ok: false, reason: `tribute-words=${words}<${MIN_WORDS}`, words, cleanText };
+    }
+    let truncatedSentences = 0;
+    let outText = cleanText;
+    if (words > MAX_WORDS) {
+      const tribKept = splitSentences(cleanText);
+      const truncated = [];
+      let runningWords = 0;
+      for (const s of tribKept) {
+        const sw = s.trim().split(/\s+/).length;
+        if (runningWords + sw > MAX_WORDS) break;
+        truncated.push(s);
+        runningWords += sw;
+      }
+      if (truncated.length === 0) {
+        return { ok: false, reason: `tribute-over-cap-unrecoverable`, words, cleanText };
+      }
+      truncatedSentences = tribKept.length - truncated.length;
+      outText = truncated.join(' ').trim();
+      words = outText.split(/\s+/).length;
+    }
+    return {
+      ok: true,
+      words,
+      cleanText: outText,
+      stripped: 0,
+      truncatedSentences: truncatedSentences || null,
+      droppedReasons: null,
+      tribute: true,
+    };
+  }
 
   // Sentence-level scan: drop violating sentences AND following pronoun-anchored
   // sentences (orphan-pronoun rescue — "He undertook..." dangles if its
@@ -709,30 +854,60 @@ function validate(text, lengthBucket, effectiveYear) {
     dropNext = false;
     kept.push(s);
   }
-  const cleanText = kept.join(' ').trim();
-  const words = cleanText ? cleanText.split(/\s+/).length : 0;
+  let cleanText = kept.join(' ').trim();
+  let words = cleanText ? cleanText.split(/\s+/).length : 0;
   // Operator decision (S192): if grounding is sparse, accept short output.
-  // Floor is 60 words across both buckets — the prompt still asks for richer
-  // output when grounded (RICH = 250-500), but the validator no longer rejects
-  // legitimate-but-thin pre-1860 content.
-  const minWords = 60;
+  // Floor is 60 words. S196 — added 250-word ceiling per operator (target
+  // 100-250w, fits ~2 min walking-pace TTS). Over-cap output is truncated
+  // at the last sentence boundary that keeps us ≤ 250 words; if truncation
+  // can't get us under, we reject so a retry can try harder.
+  const MIN_WORDS = 60;
+  const MAX_WORDS = 250;
 
   if (!cleanText) {
     return { ok: false, reason: `all-sentences-violated: ${droppedReasons.slice(0,3).join(' / ')}`, words: 0 };
   }
-  if (words < minWords) {
+  if (words < MIN_WORDS) {
     return {
       ok: false,
-      reason: `words=${words}<${minWords} (after stripping ${sentences.length - kept.length} violating sentences: ${droppedReasons.slice(0,3).join(' / ')})`,
+      reason: `words=${words}<${MIN_WORDS} (after stripping ${sentences.length - kept.length} violating sentences: ${droppedReasons.slice(0,3).join(' / ')})`,
       words,
       cleanText,
     };
+  }
+  let truncatedSentences = 0;
+  if (words > MAX_WORDS) {
+    // Walk kept[] from the start, accumulating sentences until adding the
+    // next would exceed MAX_WORDS. Output is truncated at the last full
+    // sentence boundary ≤ MAX_WORDS. If even one sentence exceeds the cap
+    // (very long single sentence), we reject so the retry path can re-prompt
+    // with a tighter bias.
+    const truncated = [];
+    let runningWords = 0;
+    for (const s of kept) {
+      const sw = s.trim().split(/\s+/).length;
+      if (runningWords + sw > MAX_WORDS) break;
+      truncated.push(s);
+      runningWords += sw;
+    }
+    if (truncated.length === 0) {
+      return {
+        ok: false,
+        reason: `over-cap-unrecoverable: first sentence already > ${MAX_WORDS} words`,
+        words,
+        cleanText,
+      };
+    }
+    truncatedSentences = kept.length - truncated.length;
+    cleanText = truncated.join(' ').trim();
+    words = cleanText.split(/\s+/).length;
   }
   return {
     ok: true,
     words,
     cleanText,
     stripped: sentences.length - kept.length,
+    truncatedSentences: truncatedSentences || null,
     droppedReasons: droppedReasons.length ? droppedReasons : null,
   };
 }
@@ -761,50 +936,39 @@ async function generateForPoi(poi) {
     return result;
   }
 
-  // pre-eligibility: skip commemorative artifacts (statues/monuments/plaques)
-  // regardless of LMA year. They are post-1860 even when commemorating earlier
-  // subjects.
-  //
-  // S194 carry-forward: operator rule (feedback_commemoratives_are_historical_tributes)
-  // says commemoratives that tribute PRE-1860 subjects DO get historical_narration —
-  // the narration's subject is the figure/event commemorated, not the
-  // post-1860 object. Implementation deferred to next session: needs a
-  // dedicated buildCommemorativeTributePrompt() and a relaxed year guard.
-  // For now the existing skip behavior stays so the generator doesn't
-  // regress (calling buildPrompt with a statue would describe the bronze).
+  // S196 — commemorative routing (era-flexible). If the POI's name matches
+  // the commemorative pattern (statue/monument/plaque/memorial/...), it
+  // gets the tribute prompt path: narrate the SUBJECT, not the artifact.
+  // The subject may be any era — pre-1860 subjects get historian voice,
+  // post-1860 subjects get present-day Salem voice. No exclusions: every
+  // Salem-connected commemorative narrates per operator policy.
   const lmaName = poi.name || '';
   const siName = dump.entity_name || '';
-  if (COMMEMORATIVE_NAME_PATTERN.test(lmaName) || COMMEMORATIVE_NAME_PATTERN.test(siName)) {
-    result.status = 'skip-commemorative';
-    result.note = `name matches commemorative pattern: ${lmaName}`;
-    return result;
+  const isCommemorative = COMMEMORATIVE_NAME_PATTERN.test(lmaName) || COMMEMORATIVE_NAME_PATTERN.test(siName);
+  if (isCommemorative) {
+    result.is_commemorative = true;
   }
 
   const bcsYear = extractEffectiveYear(dump);
   const effYear = bcsYear || poi.year_established;
   result.effective_year = effYear;
 
-  // S193: only HARD-SKIP when year is known and ≥ 1860. When the year is
-  // null we trust the prompt + sentence-level validator to gate post-1860
-  // content out (year regex strips any 1860+ sentence; banned phrases catch
-  // modern-continuity language; "all-sentences-violated" or words<60 reject
-  // the whole POI). Cost: gemma cycles burned on POIs that turn out to be
-  // post-1860 and reject. Benefit: unlocks ~hundreds of HISTORICAL_BUILDINGS
-  // with null year_established that are genuinely pre-1860 (the LMA year
-  // field is just unauthored). Sampled 5 SI dumps for null-year POIs —
-  // mode_c.built_year is empty corpus-wide, so a "backfill year from SI"
-  // doesn't help; this is the cheapest way to expand coverage.
-  if (effYear && effYear >= PRE1860_CUTOFF) {
+  // S193: only HARD-SKIP when year is known and ≥ 1860 AND not a commemorative.
+  // Commemoratives skip this guard — their year_established is the artifact's
+  // installation year (post-1860 by definition), but the SUBJECT being
+  // commemorated may well be pre-1860. The tribute prompt + STRICT_RULES gate
+  // the actual output.
+  if (!isCommemorative && effYear && effYear >= PRE1860_CUTOFF) {
     result.status = 'skip-not-pre1860';
     result.note = `effective_year=${effYear}`;
     return result;
   }
 
   const witchTrial = detectWitchTrialSignal(dump, effYear || 1700);
-  // Null year → STANDARD bucket (60-150 words). RICH (250-500) only when
-  // we know the entity is pre-1800.
+  // S196 — single 100-250w bucket; argument retained for compatibility but
+  // both labels share the same length rule now.
   const lengthBucket = (effYear && effYear < 1800) ? 'RICH' : 'STANDARD';
-  result.length_bucket = lengthBucket;
+  result.length_bucket = isCommemorative ? 'TRIBUTE' : lengthBucket;
 
   // Build enriched GROUND_TRUTH from every available source.
   const blocks = [];
@@ -844,7 +1008,9 @@ async function generateForPoi(poi) {
   }
 
   const groundTruth = blocks.filter(Boolean).join('\n\n');
-  const prompt = buildPrompt(poi.name, effYear, lengthBucket, groundTruth, witchTrial);
+  const prompt = isCommemorative
+    ? buildCommemorativeTributePrompt(poi.name, groundTruth)
+    : buildPrompt(poi.name, effYear, lengthBucket, groundTruth, witchTrial);
 
   const MAX_ATTEMPTS = 3;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -877,8 +1043,13 @@ async function generateForPoi(poi) {
     ans = ans.replace(/^\s*I\s+(?:find|believe|note|see|will|shall|am|have|do)[^.!?]*[.!?]\s*/, '');
     // Other meta-openers
     ans = ans.replace(/^\s*(?:Certainly[^.!?]*[.!?]|Here(?:'s| is)[^.!?]*[.!?:]|Below is[^.!?]*[.!?:]|Okay[^.!?]*[.!?]|Sure[^.!?]*[.!?])\s*/i, '');
+    // S196 — bare-token preambles (e.g. "userRouter:", "PRODUCTS OF THE PAST:")
+    // — strip a leading short identifier line that ends with a colon.
+    ans = ans.replace(/^\s*[A-Za-z][\w\s]{0,40}:\s*\n+/, '');
+    // ALL-CAPS section headers like "PRODUCTS OF THE PAST:" with surrounding blanks
+    ans = ans.replace(/^\s*[A-Z][A-Z\s]{2,40}:\s*\n+/, '');
     ans = ans.trim();
-    const v = validate(ans, lengthBucket, effYear);
+    const v = validate(ans, result.length_bucket, effYear, poi.name);
     if (v.ok) {
       result.status = 'ok';
       result.narration = v.cleanText || ans;
@@ -902,7 +1073,12 @@ async function generateForPoi(poi) {
 async function main() {
   console.error(`generate-historical-narrations: dry_run=${DRY_RUN} force=${FORCE} limit=${LIMIT ?? 'none'} ids=${ONLY_IDS ? ONLY_IDS.length : 'all'}`);
 
-  let where = `category = 'HISTORICAL_BUILDINGS' AND deleted_at IS NULL AND intel_entity_id IS NOT NULL`;
+  // S196 — eligibility: HIST_BLDG (the legacy set) OR commemorative-named
+  // POIs in any category. Commemoratives are routed to the tribute prompt
+  // path inside generateForPoi(), narrating the pre-1860 subject rather
+  // than the post-1860 artifact.
+  const COMMEMORATIVE_SQL = `name ~* '\\m(statue|monument|plaque|marker|memorial|cenotaph|obelisk|tablet|bust|arch)\\M'`;
+  let where = `(category = 'HISTORICAL_BUILDINGS' OR ${COMMEMORATIVE_SQL}) AND deleted_at IS NULL AND intel_entity_id IS NOT NULL`;
   if (!FORCE) where += ` AND (historical_narration IS NULL OR historical_narration = '')`;
   if (ONLY_IDS) where += ` AND id = ANY($1)`;
 

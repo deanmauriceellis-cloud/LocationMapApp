@@ -211,6 +211,9 @@ require('./lib/admin-witch-trials')(app, deps);
 // Admin Lint endpoints (S187) — gated by /admin Basic Auth
 require('./lib/admin-lint')(app, deps);
 
+// Admin Audit endpoints (S196) — surfaces salem_audit_log + revert path
+require('./lib/admin-audit')(app, deps);
+
 // Admin POI taxonomy endpoints (S190) — categories + subcategories CRUD
 require('./lib/admin-categories')(app, deps);
 
