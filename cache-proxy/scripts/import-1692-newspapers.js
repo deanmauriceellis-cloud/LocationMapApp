@@ -75,7 +75,6 @@ async function main() {
         lede TEXT,
         summary TEXT,
         tts_full_text TEXT NOT NULL,
-        body_points JSONB,
         sources_cited JSONB,
         events_referenced JSONB,
         imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -91,13 +90,12 @@ async function main() {
       await client.query(
         `INSERT INTO salem_newspapers_1692
            (date, day_of_week, long_date, crisis_phase, lede, summary, tts_full_text,
-            body_points, sources_cited, events_referenced)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb)`,
+            sources_cited, events_referenced)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb)`,
         [
           n.date, n.day_of_week || null, n.long_date || null,
           n.crisis_phase != null ? String(n.crisis_phase) : null,
           n.lede || null, n.summary || null, n.tts_full_text,
-          JSON.stringify(n.body_points || []),
           JSON.stringify(n.sources_cited || []),
           JSON.stringify(n.events_referenced || [])
         ]

@@ -45,7 +45,6 @@ async function main() {
       crisis_phase INTEGER NOT NULL,
       summary TEXT,
       lede TEXT,
-      body_points TEXT NOT NULL,
       tts_full_text TEXT NOT NULL,
       events_referenced TEXT NOT NULL,
       event_count INTEGER NOT NULL,
@@ -102,15 +101,14 @@ async function main() {
   console.log(`PG newspapers: ${papers.length}`);
   db.exec('DELETE FROM salem_witch_trials_newspapers');
   const insNews = db.prepare(`INSERT INTO salem_witch_trials_newspapers
-    (id,date,day_of_week,long_date,crisis_phase,summary,lede,body_points,tts_full_text,
+    (id,date,day_of_week,long_date,crisis_phase,summary,lede,tts_full_text,
      events_referenced,event_count,fact_count,primary_source_count,data_source,confidence,
      verified_date,generator_model,headline,headline_summary)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const insertPapers = db.transaction((rows) => {
     for (const r of rows) {
       insNews.run(r.id, r.date, r.day_of_week, r.long_date, r.crisis_phase,
         r.summary, r.lede,
-        typeof r.body_points === 'object' ? JSON.stringify(r.body_points) : r.body_points,
         r.tts_full_text,
         typeof r.events_referenced === 'object' ? JSON.stringify(r.events_referenced) : r.events_referenced,
         r.event_count, r.fact_count, r.primary_source_count,

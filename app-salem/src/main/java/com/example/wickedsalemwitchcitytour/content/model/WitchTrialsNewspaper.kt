@@ -33,7 +33,6 @@ data class WitchTrialsNewspaper(
 
     val summary: String? = null,
     val lede: String? = null,
-    @ColumnInfo(name = "body_points") val bodyPoints: String = "[]",
     @ColumnInfo(name = "tts_full_text") val ttsFullText: String,
 
     @ColumnInfo(name = "events_referenced") val eventsReferenced: String = "[]",

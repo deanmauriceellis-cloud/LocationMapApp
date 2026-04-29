@@ -36,7 +36,6 @@ import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import java.util.Calendar
 
 @Suppress("unused")
@@ -1130,35 +1129,24 @@ private fun buildNewspaperHtml(
         ?: paper.lede?.takeIf { it.isNotBlank() }
         ?: ""
 
-    // Body: use body_points as paragraphs (not bullets), fallback to ttsFullText
+    // Body: render the same Oracle Newspaper article that the Speak button and
+    // map-mode ambient narration read aloud — `tts_full_text`. Paragraph-split
+    // on blank lines or single newlines so the WebView lays out cleanly. S198:
+    // body_points was retired (it was a separately-authored summary that drifted
+    // from tts_full_text and made the printed page disagree with the audio).
     val bodyHtml = buildString {
-        val points = runCatching {
-            val arr = JSONArray(paper.bodyPoints)
-            (0 until arr.length()).map { arr.optString(it, "") }.filter { it.isNotBlank() }
-        }.getOrElse { emptyList() }
-
-        if (points.isNotEmpty()) {
-            for (pt in points) {
-                append("<p>")
-                append(renderHtmlWithLinks(pt, bioIndex, nameIndex))
-                append("</p>\n")
-            }
+        val paragraphs = paper.ttsFullText
+            .split(Regex("\n\n+|\n"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        if (paragraphs.isEmpty()) {
+            append("<p>")
+            append(renderHtmlWithLinks(paper.ttsFullText.trim(), bioIndex, nameIndex))
+            append("</p>\n")
         } else {
-            // Split ttsFullText into paragraphs on double newlines or single newlines
-            val paragraphs = paper.ttsFullText
-                .split(Regex("\n\n+|\n"))
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-            if (paragraphs.size > 1) {
-                for (p in paragraphs) {
-                    append("<p>")
-                    append(renderHtmlWithLinks(p, bioIndex, nameIndex))
-                    append("</p>\n")
-                }
-            } else {
-                // Single block — wrap in one paragraph
+            for (p in paragraphs) {
                 append("<p>")
-                append(renderHtmlWithLinks(paper.ttsFullText.trim(), bioIndex, nameIndex))
+                append(renderHtmlWithLinks(p, bioIndex, nameIndex))
                 append("</p>\n")
             }
         }

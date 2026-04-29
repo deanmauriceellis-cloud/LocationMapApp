@@ -528,8 +528,7 @@ CREATE TABLE IF NOT EXISTS salem_witch_trials_newspapers (
   -- Content (denormalized for fast read)
   summary                TEXT,                                   -- 1-2 sentence summary (card face)
   lede                   TEXT,                                   -- opening paragraph
-  body_points            JSONB DEFAULT '[]',                     -- bullet list of mid-article points
-  tts_full_text          TEXT NOT NULL,                          -- full narrative for TTS / detail screen body
+  tts_full_text          TEXT NOT NULL,                          -- full Oracle Newspaper article: drives BOTH map-mode TTS narration and the in-app newspaper page render (S198)
   -- Source attribution
   events_referenced      JSONB DEFAULT '[]',
   event_count            INTEGER DEFAULT 0,

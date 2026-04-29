@@ -29,7 +29,8 @@ const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 //   v12 (S192) — added historical_narration to SalemPoi
 //   v13 (S193) — added is_historical_tour to Tour
 //   v14 (S195) — added is_historical_property to SalemPoi
-const ROOM_IDENTITY_HASH_V11 = '5a42a013703bb605f5ad4f065309ee8a';
+//   v15 (S198) — dropped body_points from WitchTrialsNewspaper (Oracle Newspaper page now renders tts_full_text, matching the audio)
+const ROOM_IDENTITY_HASH_V15 = '3e927300be7b2a8971fa6afb4aa5af78';
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -107,10 +108,10 @@ if (!fs.existsSync(CONTENT_DB)) {
     const master = db.prepare('SELECT identity_hash FROM room_master_table WHERE id=42').get();
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
-    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V11) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V11} (v14)`);
+    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V15) {
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V15} (v15)`);
     } else {
-      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v14)`);
+      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v15)`);
     }
   } catch (e) {
     fail(`salem_content.db: open/query failed: ${e.message}`);

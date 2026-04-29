@@ -1,0 +1,1756 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 15,
+    "identityHash": "3e927300be7b2a8971fa6afb4aa5af78",
+    "entities": [
+      {
+        "tableName": "historical_figures",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `first_name` TEXT NOT NULL, `surname` TEXT NOT NULL, `born` TEXT, `died` TEXT, `age_in_1692` INTEGER, `role` TEXT NOT NULL, `faction` TEXT, `short_bio` TEXT NOT NULL, `full_bio` TEXT, `narration_script` TEXT, `appearance_description` TEXT, `role_in_crisis` TEXT, `historical_outcome` TEXT, `key_quotes` TEXT, `family_connections` TEXT, `primary_poi_id` TEXT, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstName",
+            "columnName": "first_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "surname",
+            "columnName": "surname",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "born",
+            "columnName": "born",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "died",
+            "columnName": "died",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ageIn1692",
+            "columnName": "age_in_1692",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "faction",
+            "columnName": "faction",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "shortBio",
+            "columnName": "short_bio",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullBio",
+            "columnName": "full_bio",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "narrationScript",
+            "columnName": "narration_script",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "appearanceDescription",
+            "columnName": "appearance_description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roleInCrisis",
+            "columnName": "role_in_crisis",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "historicalOutcome",
+            "columnName": "historical_outcome",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "keyQuotes",
+            "columnName": "key_quotes",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "familyConnections",
+            "columnName": "family_connections",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "primaryPoiId",
+            "columnName": "primary_poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "historical_facts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `date` TEXT, `date_precision` TEXT, `category` TEXT, `subcategory` TEXT, `poi_id` TEXT, `figure_id` TEXT, `source_citation` TEXT, `narration_script` TEXT, `confidentiality` TEXT NOT NULL, `tags` TEXT, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "datePrecision",
+            "columnName": "date_precision",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "subcategory",
+            "columnName": "subcategory",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "poiId",
+            "columnName": "poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "figureId",
+            "columnName": "figure_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sourceCitation",
+            "columnName": "source_citation",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "narrationScript",
+            "columnName": "narration_script",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "confidentiality",
+            "columnName": "confidentiality",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "tags",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "timeline_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `date` TEXT NOT NULL, `crisis_phase` TEXT, `description` TEXT NOT NULL, `poi_id` TEXT, `figures_involved` TEXT, `narration_script` TEXT, `is_anchor` INTEGER NOT NULL, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "crisisPhase",
+            "columnName": "crisis_phase",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "poiId",
+            "columnName": "poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "figuresInvolved",
+            "columnName": "figures_involved",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "narrationScript",
+            "columnName": "narration_script",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isAnchor",
+            "columnName": "is_anchor",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "primary_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `source_type` TEXT NOT NULL, `author` TEXT, `date` TEXT, `full_text` TEXT, `excerpt` TEXT, `figure_id` TEXT, `poi_id` TEXT, `narration_script` TEXT, `citation` TEXT, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "source_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "fullText",
+            "columnName": "full_text",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "excerpt",
+            "columnName": "excerpt",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "figureId",
+            "columnName": "figure_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "poiId",
+            "columnName": "poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "narrationScript",
+            "columnName": "narration_script",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "citation",
+            "columnName": "citation",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "tours",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `theme` TEXT NOT NULL, `description` TEXT NOT NULL, `estimated_minutes` INTEGER NOT NULL, `distance_km` REAL NOT NULL, `stop_count` INTEGER NOT NULL, `difficulty` TEXT NOT NULL, `seasonal` INTEGER NOT NULL, `icon_asset` TEXT, `sort_order` INTEGER NOT NULL, `is_historical_tour` INTEGER NOT NULL, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "theme",
+            "columnName": "theme",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estimatedMinutes",
+            "columnName": "estimated_minutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceKm",
+            "columnName": "distance_km",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stopCount",
+            "columnName": "stop_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "difficulty",
+            "columnName": "difficulty",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seasonal",
+            "columnName": "seasonal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconAsset",
+            "columnName": "icon_asset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sort_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isHistoricalTour",
+            "columnName": "is_historical_tour",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "tour_stops",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tour_id` TEXT NOT NULL, `poi_id` TEXT NOT NULL, `stop_order` INTEGER NOT NULL, `transition_narration` TEXT, `walking_minutes_from_prev` INTEGER, `distance_m_from_prev` INTEGER, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`tour_id`, `poi_id`))",
+        "fields": [
+          {
+            "fieldPath": "tourId",
+            "columnName": "tour_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "poiId",
+            "columnName": "poi_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stopOrder",
+            "columnName": "stop_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transitionNarration",
+            "columnName": "transition_narration",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "walkingMinutesFromPrev",
+            "columnName": "walking_minutes_from_prev",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "distanceMFromPrev",
+            "columnName": "distance_m_from_prev",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tour_id",
+            "poi_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "tour_legs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tour_id` TEXT NOT NULL, `from_stop_order` INTEGER NOT NULL, `to_stop_order` INTEGER NOT NULL, `from_poi_id` TEXT, `to_poi_id` TEXT, `from_lat` REAL, `from_lng` REAL, `to_lat` REAL, `to_lng` REAL, `distance_m` REAL NOT NULL, `duration_s` REAL NOT NULL, `edge_count` INTEGER NOT NULL, `geometry` TEXT NOT NULL, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`tour_id`, `from_stop_order`))",
+        "fields": [
+          {
+            "fieldPath": "tourId",
+            "columnName": "tour_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromStopOrder",
+            "columnName": "from_stop_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toStopOrder",
+            "columnName": "to_stop_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromPoiId",
+            "columnName": "from_poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "toPoiId",
+            "columnName": "to_poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "fromLat",
+            "columnName": "from_lat",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "fromLng",
+            "columnName": "from_lng",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "toLat",
+            "columnName": "to_lat",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "toLng",
+            "columnName": "to_lng",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "distanceM",
+            "columnName": "distance_m",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationS",
+            "columnName": "duration_s",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "edgeCount",
+            "columnName": "edge_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "geometry",
+            "columnName": "geometry",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tour_id",
+            "from_stop_order"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "events_calendar",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `venue_poi_id` TEXT, `event_type` TEXT NOT NULL, `description` TEXT, `start_date` TEXT, `end_date` TEXT, `hours` TEXT, `admission` TEXT, `website` TEXT, `recurring` INTEGER NOT NULL, `recurrence_pattern` TEXT, `seasonal_month` INTEGER, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `stale_after` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "venuePoiId",
+            "columnName": "venue_poi_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "event_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "startDate",
+            "columnName": "start_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "endDate",
+            "columnName": "end_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hours",
+            "columnName": "hours",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "admission",
+            "columnName": "admission",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "website",
+            "columnName": "website",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "recurring",
+            "columnName": "recurring",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recurrencePattern",
+            "columnName": "recurrence_pattern",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "seasonalMonth",
+            "columnName": "seasonal_month",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleAfter",
+            "columnName": "stale_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "salem_pois",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `lat` REAL NOT NULL, `lng` REAL NOT NULL, `address` TEXT, `status` TEXT, `category` TEXT NOT NULL, `subcategory` TEXT, `short_narration` TEXT, `long_narration` TEXT, `historical_narration` TEXT, `geofence_radius_m` INTEGER NOT NULL, `geofence_shape` TEXT NOT NULL, `corridor_points` TEXT, `priority` INTEGER NOT NULL, `wave` INTEGER, `voice_clip_asset` TEXT, `custom_voice_asset` TEXT, `cuisine_type` TEXT, `price_range` TEXT, `rating` REAL, `merchant_tier` INTEGER NOT NULL, `ad_priority` INTEGER NOT NULL, `historical_period` TEXT, `historical_note` TEXT, `admission_info` TEXT, `requires_transportation` INTEGER NOT NULL, `wheelchair_accessible` INTEGER NOT NULL, `seasonal` INTEGER NOT NULL, `phone` TEXT, `email` TEXT, `website` TEXT, `hours` TEXT, `hours_text` TEXT, `menu_url` TEXT, `reservations_url` TEXT, `order_url` TEXT, `description` TEXT, `short_description` TEXT, `custom_description` TEXT, `origin_story` TEXT, `image_asset` TEXT, `custom_icon_asset` TEXT, `action_buttons` TEXT, `secondary_categories` TEXT, `specialties` TEXT, `owners` TEXT, `year_established` INTEGER, `amenities` TEXT, `district` TEXT, `related_figure_ids` TEXT, `related_fact_ids` TEXT, `related_source_ids` TEXT, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `is_tour_poi` INTEGER NOT NULL, `is_civic_poi` INTEGER NOT NULL, `is_historical_property` INTEGER NOT NULL, `is_narrated` INTEGER NOT NULL, `default_visible` INTEGER NOT NULL, `has_announce_narration` INTEGER NOT NULL, `building_footprint_geojson` TEXT, `mhc_id` TEXT, `mhc_year_built` INTEGER, `mhc_style` TEXT, `mhc_nr_status` TEXT, `mhc_narrative` TEXT, `canonical_address_point_id` TEXT, `local_historic_district` TEXT, `parcel_owner_class` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lng",
+            "columnName": "lng",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subcategory",
+            "columnName": "subcategory",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "shortNarration",
+            "columnName": "short_narration",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "longNarration",
+            "columnName": "long_narration",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "historicalNarration",
+            "columnName": "historical_narration",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "geofenceRadiusM",
+            "columnName": "geofence_radius_m",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "geofenceShape",
+            "columnName": "geofence_shape",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "corridorPoints",
+            "columnName": "corridor_points",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wave",
+            "columnName": "wave",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "voiceClipAsset",
+            "columnName": "voice_clip_asset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "customVoiceAsset",
+            "columnName": "custom_voice_asset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "cuisineType",
+            "columnName": "cuisine_type",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "priceRange",
+            "columnName": "price_range",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "merchantTier",
+            "columnName": "merchant_tier",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "adPriority",
+            "columnName": "ad_priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "historicalPeriod",
+            "columnName": "historical_period",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "historicalNote",
+            "columnName": "historical_note",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "admissionInfo",
+            "columnName": "admission_info",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "requiresTransportation",
+            "columnName": "requires_transportation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wheelchairAccessible",
+            "columnName": "wheelchair_accessible",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seasonal",
+            "columnName": "seasonal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phone",
+            "columnName": "phone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "website",
+            "columnName": "website",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hours",
+            "columnName": "hours",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hoursText",
+            "columnName": "hours_text",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "menuUrl",
+            "columnName": "menu_url",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "reservationsUrl",
+            "columnName": "reservations_url",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "orderUrl",
+            "columnName": "order_url",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "shortDescription",
+            "columnName": "short_description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "customDescription",
+            "columnName": "custom_description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "originStory",
+            "columnName": "origin_story",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "imageAsset",
+            "columnName": "image_asset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "customIconAsset",
+            "columnName": "custom_icon_asset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "actionButtons",
+            "columnName": "action_buttons",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "secondaryCategories",
+            "columnName": "secondary_categories",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "specialties",
+            "columnName": "specialties",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "owners",
+            "columnName": "owners",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "yearEstablished",
+            "columnName": "year_established",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "amenities",
+            "columnName": "amenities",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "district",
+            "columnName": "district",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "relatedFigureIds",
+            "columnName": "related_figure_ids",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "relatedFactIds",
+            "columnName": "related_fact_ids",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "relatedSourceIds",
+            "columnName": "related_source_ids",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isTourPoi",
+            "columnName": "is_tour_poi",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isCivicPoi",
+            "columnName": "is_civic_poi",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isHistoricalProperty",
+            "columnName": "is_historical_property",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isNarrated",
+            "columnName": "is_narrated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultVisible",
+            "columnName": "default_visible",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hasAnnounceNarration",
+            "columnName": "has_announce_narration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "buildingFootprintGeojson",
+            "columnName": "building_footprint_geojson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "mhcId",
+            "columnName": "mhc_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "mhcYearBuilt",
+            "columnName": "mhc_year_built",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "mhcStyle",
+            "columnName": "mhc_style",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "mhcNrStatus",
+            "columnName": "mhc_nr_status",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "mhcNarrative",
+            "columnName": "mhc_narrative",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "canonicalAddressPointId",
+            "columnName": "canonical_address_point_id",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "localHistoricDistrict",
+            "columnName": "local_historic_district",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "parcelOwnerClass",
+            "columnName": "parcel_owner_class",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "salem_witch_trials_articles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `tile_order` INTEGER NOT NULL, `tile_kind` TEXT NOT NULL, `title` TEXT NOT NULL, `period_label` TEXT, `teaser` TEXT NOT NULL, `body` TEXT NOT NULL, `related_npc_ids` TEXT NOT NULL, `related_event_ids` TEXT NOT NULL, `related_newspaper_dates` TEXT NOT NULL, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `generator_model` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tileOrder",
+            "columnName": "tile_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tileKind",
+            "columnName": "tile_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "periodLabel",
+            "columnName": "period_label",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "teaser",
+            "columnName": "teaser",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "body",
+            "columnName": "body",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedNpcIds",
+            "columnName": "related_npc_ids",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedEventIds",
+            "columnName": "related_event_ids",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedNewspaperDates",
+            "columnName": "related_newspaper_dates",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "generatorModel",
+            "columnName": "generator_model",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "salem_witch_trials_npc_bios",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `display_name` TEXT, `tier` INTEGER NOT NULL, `role` TEXT NOT NULL, `faction` TEXT, `born_year` INTEGER, `died_year` INTEGER, `age_in_1692` INTEGER, `historical_outcome` TEXT, `bio` TEXT NOT NULL, `related_npc_ids` TEXT NOT NULL, `related_event_ids` TEXT NOT NULL, `related_newspaper_dates` TEXT NOT NULL, `portrait_asset` TEXT, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `generator_model` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tier",
+            "columnName": "tier",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "faction",
+            "columnName": "faction",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bornYear",
+            "columnName": "born_year",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "diedYear",
+            "columnName": "died_year",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ageIn1692",
+            "columnName": "age_in_1692",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "historicalOutcome",
+            "columnName": "historical_outcome",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bio",
+            "columnName": "bio",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedNpcIds",
+            "columnName": "related_npc_ids",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedEventIds",
+            "columnName": "related_event_ids",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedNewspaperDates",
+            "columnName": "related_newspaper_dates",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "portraitAsset",
+            "columnName": "portrait_asset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "generatorModel",
+            "columnName": "generator_model",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "salem_witch_trials_newspapers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `date` TEXT NOT NULL, `day_of_week` TEXT, `long_date` TEXT, `crisis_phase` INTEGER NOT NULL, `summary` TEXT, `lede` TEXT, `tts_full_text` TEXT NOT NULL, `events_referenced` TEXT NOT NULL, `event_count` INTEGER NOT NULL, `fact_count` INTEGER NOT NULL, `primary_source_count` INTEGER NOT NULL, `data_source` TEXT NOT NULL, `confidence` REAL NOT NULL, `verified_date` TEXT, `generator_model` TEXT, `headline` TEXT, `headline_summary` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dayOfWeek",
+            "columnName": "day_of_week",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "longDate",
+            "columnName": "long_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "crisisPhase",
+            "columnName": "crisis_phase",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lede",
+            "columnName": "lede",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ttsFullText",
+            "columnName": "tts_full_text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventsReferenced",
+            "columnName": "events_referenced",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventCount",
+            "columnName": "event_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "factCount",
+            "columnName": "fact_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "primarySourceCount",
+            "columnName": "primary_source_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dataSource",
+            "columnName": "data_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedDate",
+            "columnName": "verified_date",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "generatorModel",
+            "columnName": "generator_model",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "headline",
+            "columnName": "headline",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "headlineSummary",
+            "columnName": "headline_summary",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3e927300be7b2a8971fa6afb4aa5af78')"
+    ]
+  }
+}

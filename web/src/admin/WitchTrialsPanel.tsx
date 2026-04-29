@@ -58,7 +58,6 @@ interface WtNewspaper {
   crisis_phase: number
   summary: string | null
   lede: string | null
-  body_points: string
   tts_full_text: string
   headline: string | null
   headline_summary: string | null

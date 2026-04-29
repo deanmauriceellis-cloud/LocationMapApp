@@ -39,7 +39,7 @@ const BIO_UPDATABLE = [
 ];
 
 const NEWSPAPER_UPDATABLE = [
-  'summary', 'lede', 'body_points', 'tts_full_text',
+  'summary', 'lede', 'tts_full_text',
   'headline', 'headline_summary',
   'events_referenced',
   'data_source', 'confidence', 'verified_date', 'generator_model',
@@ -47,7 +47,7 @@ const NEWSPAPER_UPDATABLE = [
 
 const JSONB_FIELDS = new Set([
   'related_npc_ids', 'related_event_ids', 'related_newspaper_dates',
-  'body_points', 'events_referenced',
+  'events_referenced',
 ]);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ function buildUpdateClause(body, whitelist) {
 // ─── Route registration ─────────────────────────────────────────────────────
 
 module.exports = function adminWitchTrials(app, deps) {
-  const { pool } = deps;
+  const { pgPool: pool } = deps;
 
   // ── Articles ──────────────────────────────────────────────────────────────
 

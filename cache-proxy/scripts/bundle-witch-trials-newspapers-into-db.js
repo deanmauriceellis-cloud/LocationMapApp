@@ -49,7 +49,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 (async () => {
   const { rows } = await pool.query(`
     SELECT id, date, day_of_week, long_date, crisis_phase, summary, lede,
-           body_points, tts_full_text, events_referenced,
+           tts_full_text, events_referenced,
            event_count, fact_count, primary_source_count,
            data_source, confidence, verified_date, generator_model,
            headline, headline_summary
@@ -78,7 +78,6 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
       crisis_phase INTEGER NOT NULL,
       summary TEXT,
       lede TEXT,
-      body_points TEXT NOT NULL,
       tts_full_text TEXT NOT NULL,
       events_referenced TEXT NOT NULL,
       event_count INTEGER NOT NULL,
@@ -111,12 +110,12 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const insert = db.prepare(`
     INSERT OR REPLACE INTO salem_witch_trials_newspapers
       (id, date, day_of_week, long_date, crisis_phase, summary, lede,
-       body_points, tts_full_text, events_referenced,
+       tts_full_text, events_referenced,
        event_count, fact_count, primary_source_count,
        data_source, confidence, verified_date, generator_model,
        headline, headline_summary)
     VALUES (@id, @date, @day_of_week, @long_date, @crisis_phase, @summary, @lede,
-            @body_points, @tts_full_text, @events_referenced,
+            @tts_full_text, @events_referenced,
             @event_count, @fact_count, @primary_source_count,
             @data_source, @confidence, @verified_date, @generator_model,
             @headline, @headline_summary)
@@ -132,7 +131,6 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     crisis_phase: r.crisis_phase,
     summary: r.summary,
     lede: r.lede,
-    body_points: JSON.stringify(r.body_points || []),
     tts_full_text: r.tts_full_text,
     events_referenced: JSON.stringify(r.events_referenced || []),
     event_count: r.event_count || 0,
