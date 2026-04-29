@@ -41,10 +41,15 @@ const REPLACE = process.argv.includes('--replace');
 
 // Match lines like:
 //   [3/561] crowninshield_bentley_house (Crowninshield-Bentley House) ... ok (words=103, witch_trial=false, prompt_sha=e1e972c)
-//   [4/561] charter_street_historic_district (Charter Street Historic District) ... reject (words=57<60 (after stripping 1 violating sentences: ...))
+//   [4/561] charter_street_historic_district (Charter Street Historic District) ... reject (words=57<60 (after stripping ...))
 //   [10/561] world_war_ii_memorial (World War II Memorial) ... reject (empty)
 //   [5/10] bewitched_sculpture_samantha_statue (...) ... skip-commemorative-excluded (commemorative subject excluded: ...)
-const LINE_RE = /^\[(\d+)\/\d+\]\s+(\S+)\s+\(([^)]+)\)\s+\.\.\.\s+([\w-]+)(?:\s+\(([^)]*?)\))?\s*$/;
+//
+// Reject lines contain nested parens, so we capture status as a word and
+// then take everything after as the detail (may or may not be wrapped).
+// The poi name parenthetical is the FIRST '(...)' on the line — anchored
+// after the id token. Use a non-greedy [^()]* for that segment.
+const LINE_RE = /^\[(\d+)\/\d+\]\s+(\S+)\s+\(([^()]+)\)\s+\.\.\.\s+([\w-]+)(?:\s+(.+))?$/;
 
 async function main() {
   const text = fs.readFileSync(LOG_PATH, 'utf8');
@@ -54,7 +59,11 @@ async function main() {
     const m = LINE_RE.exec(ln);
     if (!m) continue;
     const [, _idx, poi_id, name, status, detailRaw] = m;
-    const detail = detailRaw || '';
+    // Strip outer parens if the detail is parenthesized (`reject (words=57<60 (...))`).
+    let detail = (detailRaw || '').trim();
+    if (detail.startsWith('(') && detail.endsWith(')')) {
+      detail = detail.slice(1, -1);
+    }
     const wordsMatch = detail.match(/words=(\d+)/);
     const attemptsMatch = detail.match(/attempt[s ]?(\d+)|(\d+) attempts?/i);
     records.push({
