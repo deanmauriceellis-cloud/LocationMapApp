@@ -561,7 +561,11 @@ class TourViewModel @Inject constructor(
      * The tag is typically `"sheet_${poi.id}"`.
      */
     fun speakSheetSection(tag: String, text: String, label: String, voiceId: String? = null) {
-        narrationManager.speakTaggedHint(tag, text, label, voiceId)
+        // S197 — every caller is an explicit user tap (POI sheet Speak button,
+        // Witch-Trials article/newspaper/bio Speak button). Bypass the
+        // AudioControl group gates so the toggles in the speaker menu only
+        // affect ambient/auto-triggered narration.
+        narrationManager.speakTaggedHint(tag, text, label, voiceId, userInitiated = true)
     }
 
     /** S113 — Cancel every queued sheet-read segment matching this tag. */

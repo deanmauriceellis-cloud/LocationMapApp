@@ -269,9 +269,13 @@ class NarrationManager @Inject constructor(
      * read-through on user click / sheet dismiss without affecting unrelated
      * ambient narration still queued.
      */
-    fun speakTaggedHint(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null) {
+    fun speakTaggedHint(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null, userInitiated: Boolean = false) {
         // S145 — infer kind from tag prefix (Witch-Trials / newspaper / oracle = ORACLE;
         // sheet_* / poi_* = POI). Unknown tags fall through (no gate).
+        // S197 — userInitiated=true bypasses AudioControl group gates so an
+        // explicit Speak-button tap inside Witch-Trials / POI-sheet always
+        // narrates regardless of the speaker-menu toggles (which gate the
+        // ambient/auto-triggered queue, not user taps).
         val inferredKind = inferKindFromTag(tag)
         enqueue(NarrationSegment(
             id = "${tag}_${System.nanoTime()}",
@@ -281,7 +285,8 @@ class NarrationManager @Inject constructor(
             voiceId = voiceId,
             kind = inferredKind,
             category = category,
-            refId = tag
+            refId = tag,
+            userInitiated = userInitiated
         ))
     }
 
@@ -292,7 +297,7 @@ class NarrationManager @Inject constructor(
      * Use for historical body content so history panel / nav cluster
      * classification, and any future body-vs-hint gating, behave correctly.
      */
-    fun speakTaggedNarration(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null) {
+    fun speakTaggedNarration(tag: String, text: String, poiName: String, voiceId: String? = null, category: String? = null, userInitiated: Boolean = false) {
         val inferredKind = inferKindFromTag(tag)
         enqueue(NarrationSegment(
             id = "${tag}_${System.nanoTime()}",
@@ -302,7 +307,8 @@ class NarrationManager @Inject constructor(
             voiceId = voiceId,
             kind = inferredKind,
             category = category,
-            refId = tag
+            refId = tag,
+            userInitiated = userInitiated
         ))
     }
 
@@ -432,20 +438,25 @@ class NarrationManager @Inject constructor(
         }
 
         // S145 #45 — AudioControl group/oracle gate.
-        when (segment.kind) {
-            NarrationKind.POI -> {
-                if (!AudioControl.isPoiSpeechEnabled(segment.category)) {
-                    DebugLogger.d(TAG, "AudioControl gate: POI group muted (cat=${segment.category}) — dropping ${segment.id}")
-                    return
+        // S197 — explicit user-initiated taps bypass the gate; the speaker-menu
+        // toggles are intended to mute AMBIENT / auto-triggered narration only,
+        // not the in-screen Speak button (Witch-Trials article, POI sheet).
+        if (!segment.userInitiated) {
+            when (segment.kind) {
+                NarrationKind.POI -> {
+                    if (!AudioControl.isPoiSpeechEnabled(segment.category)) {
+                        DebugLogger.d(TAG, "AudioControl gate: POI group muted (cat=${segment.category}) — dropping ${segment.id}")
+                        return
+                    }
                 }
-            }
-            NarrationKind.ORACLE -> {
-                if (!AudioControl.isOracleSpeechEnabled()) {
-                    DebugLogger.d(TAG, "AudioControl gate: Oracle muted — dropping ${segment.id}")
-                    return
+                NarrationKind.ORACLE -> {
+                    if (!AudioControl.isOracleSpeechEnabled()) {
+                        DebugLogger.d(TAG, "AudioControl gate: Oracle muted — dropping ${segment.id}")
+                        return
+                    }
                 }
+                null -> { /* legacy / transition / quote — no gate */ }
             }
-            null -> { /* legacy / transition / quote — no gate */ }
         }
 
         queue.addLast(segment)
@@ -745,7 +756,9 @@ data class NarrationSegment(
     /** S145 #45 — POI id or Oracle tag identifier, for NarrationHistory reference. */
     val refId: String? = null,
     /** S145 #45 — replays from NarrationHistory skip re-adding themselves back to history. */
-    val isReplay: Boolean = false
+    val isReplay: Boolean = false,
+    /** S197 — explicit user tap (Speak button) bypasses AudioControl group/oracle gates. */
+    val userInitiated: Boolean = false
 )
 
 enum class NarrationKind { POI, ORACLE }
