@@ -576,12 +576,22 @@ class NarrationManager @Inject constructor(
         while (i < text.length) {
             val c = text[i]
             sb.append(c)
-            if (c == '.' || c == '!' || c == '?') {
-                val nextIsBoundary = i + 1 >= text.length || text[i + 1].isWhitespace()
+            if (c == '.' || c == '!' || c == '?' || c == '…') {
+                // S197: a closing quote may sit between the terminator and the
+                // space (`said." Then he left.`). Peek past it when locating
+                // the boundary so quoted dialog doesn't merge with the next
+                // sentence.
+                var k = i + 1
+                val quoteFollows = k < text.length &&
+                    (text[k] == '"' || text[k] == '\'' || text[k] == '”' || text[k] == '’')
+                if (quoteFollows) k++
+                val nextIsBoundary = k >= text.length || text[k].isWhitespace()
                 if (nextIsBoundary && !isAbbreviation(sb, c) && !isNumberPeriod(text, i, c)) {
+                    if (quoteFollows) sb.append(text[i + 1])
                     val sent = sb.toString().trim()
                     if (sent.isNotEmpty()) out.add(sent)
                     sb.clear()
+                    if (quoteFollows) i++
                     while (i + 1 < text.length && text[i + 1].isWhitespace()) i++
                 }
             }
@@ -639,6 +649,8 @@ class NarrationManager @Inject constructor(
                 ';' -> PAUSE_SEMI
                 ':' -> PAUSE_COLON
                 '"', '”', '’' -> PAUSE_QUOTE
+                '—', '–' -> PAUSE_DASH       // S197 em-/en-dash mid-sentence beat
+                '…' -> PAUSE_ELLIPSIS        // S197 mid-sentence ellipsis
                 else -> 0L
             }
             if (pause > 0L && sb.length >= MIN_SUB_CHARS) {
@@ -674,21 +686,38 @@ class NarrationManager @Inject constructor(
     }
 
     companion object {
-        private const val PAUSE_COMMA  = 100L
-        private const val PAUSE_SEMI   = 200L
-        private const val PAUSE_COLON  = 200L
-        private const val PAUSE_PERIOD = 300L
-        private const val PAUSE_QUOTE  = 200L
+        private const val PAUSE_COMMA    = 100L
+        private const val PAUSE_SEMI     = 200L
+        private const val PAUSE_COLON    = 200L
+        private const val PAUSE_PERIOD   = 300L
+        private const val PAUSE_QUOTE    = 200L
+        private const val PAUSE_DASH     = 200L   // S197 em-/en-dash
+        private const val PAUSE_ELLIPSIS = 300L   // S197
 
         private const val TARGET_CHUNK_CHARS = 280   // sentence kept whole if ≤ this
-        private const val MIN_SUB_CHARS      = 60    // commas inside a sentence ignored until this far in
+        private const val MIN_SUB_CHARS      = 40    // S197: was 60 — earlier commas now get a beat
         private const val MIN_KEEP_CHARS     = 30    // pairs both shorter than this get merged
 
         // Lower-case words that, when followed by ".", do NOT end a sentence.
+        // S197: expanded with street/road, additional honorifics, era, state,
+        // and academic abbreviations common in Salem narration.
         private val ABBREVIATIONS = setOf(
-            "mr", "mrs", "ms", "dr", "st", "jr", "sr", "co", "inc", "ltd",
-            "corp", "capt", "rev", "hon", "gov", "pres", "maj", "gen", "lt",
-            "sgt", "mt", "ft", "mass", "vol", "no", "etc", "vs",
+            // titles
+            "mr", "mrs", "ms", "dr", "jr", "sr",
+            "capt", "rev", "hon", "gov", "pres", "maj", "gen", "lt", "sgt",
+            "adm", "col", "cpl", "pvt", "sen", "rep", "prof", "fr", "br",
+            "esq", "phd", "md",
+            // company / academic
+            "co", "inc", "ltd", "corp", "vol", "no", "pp", "ed", "et", "al",
+            // street / locality
+            "st", "ave", "blvd", "rd", "ln", "mt", "ft",
+            // era
+            "bc", "ad", "ca",
+            // states / regions
+            "mass", "conn", "vt", "calif", "fla", "penn", "pa",
+            // misc shorthand
+            "etc", "vs", "approx", "fig",
+            // multi-period acronyms
             "u.s", "u.k", "i.e", "e.g"
         )
     }
