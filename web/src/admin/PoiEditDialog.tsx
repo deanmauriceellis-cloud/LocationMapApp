@@ -488,6 +488,19 @@ export function PoiEditDialog({
   // category_id matches. Watch category so the subcategory list reacts.
   const currentCategory = (watch('category') as string | undefined) ?? ''
   const currentSubcategory = (watch('subcategory') as string | undefined) ?? ''
+  // S200 — commercial tier-0 prose gate. Mirror of AudioControl.groupForCategory's
+  // BUSINESSES bucket (Kotlin source of truth: app-salem/.../audio/AudioControl.kt).
+  // Tier-0 commercial POIs cannot carry editorial prose per attorney guidance —
+  // hide those fields and show a tier-bump notice instead.
+  const COMMERCIAL_CATEGORIES = new Set([
+    'FOOD_DRINK', 'SHOPPING', 'LODGING', 'HEALTHCARE', 'ENTERTAINMENT',
+    'AUTO_SERVICES', 'OFFICES', 'TOUR_COMPANIES', 'PSYCHIC', 'FINANCE',
+    'FUEL_CHARGING', 'TRANSIT', 'PARKING', 'EMERGENCY', 'WITCH_SHOP',
+    'SERVICES',
+  ])
+  const currentMerchantTier = Number(watch('merchant_tier') ?? 0)
+  const isCommercialTier0 =
+    COMMERCIAL_CATEGORIES.has(currentCategory.toUpperCase()) && currentMerchantTier === 0
 
   const sortedCategories = useMemo(
     () => [...categories].sort((a, b) => a.display_order - b.display_order),
@@ -1347,7 +1360,7 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
-                      {has('description') && (
+                      {has('description') && !isCommercialTier0 && (
                         <FieldRow label="Description" htmlFor="description">
                           <textarea
                             id="description"
@@ -1364,7 +1377,7 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
-                      {has('historical_note') && (
+                      {has('historical_note') && !isCommercialTier0 && (
                         <FieldRow label="Historical note" htmlFor="historical_note">
                           <textarea
                             id="historical_note"
@@ -1373,6 +1386,13 @@ export function PoiEditDialog({
                             className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-mono"
                           />
                         </FieldRow>
+                      )}
+                      {isCommercialTier0 && (has('description') || has('historical_note')) && (
+                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                          <strong>Tier 0 — template only.</strong> Commercial POIs render as
+                          name + sub-category + Website + Call buttons. Bump <em>Merchant tier</em>
+                          {' '}on the Operational tab to author custom description / narration.
+                        </div>
                       )}
                       {has('image_asset') && (
                         <FieldRow label="Image asset" htmlFor="image_asset">
@@ -1713,7 +1733,15 @@ export function PoiEditDialog({
                         ✨ Generate variants — 5 short / 5 long / 5 historic
                       </button>
 
-                      {has('short_narration') && (
+                      {isCommercialTier0 && (
+                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                          <strong>Tier 0 — template only.</strong> Commercial POIs do not narrate
+                          unless the user enables the &ldquo;Show All POIs&rdquo; FAB, in which
+                          case a synthesized template plays. Bump <em>Merchant tier</em>
+                          {' '}on the Operational tab to author custom narration + voice asset.
+                        </div>
+                      )}
+                      {has('short_narration') && !isCommercialTier0 && (
                         <FieldRow label="Short narration" htmlFor="short_narration">
                           <textarea
                             id="short_narration"
@@ -1723,7 +1751,7 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
-                      {has('long_narration') && (
+                      {has('long_narration') && !isCommercialTier0 && (
                         <FieldRow label="Long narration" htmlFor="long_narration">
                           <textarea
                             id="long_narration"
@@ -1733,7 +1761,7 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
-                      {has('historical_narration') && (
+                      {has('historical_narration') && !isCommercialTier0 && (
                         <FieldRow label="Historical narration (pre-1860 only)" htmlFor="historical_narration">
                           <textarea
                             id="historical_narration"

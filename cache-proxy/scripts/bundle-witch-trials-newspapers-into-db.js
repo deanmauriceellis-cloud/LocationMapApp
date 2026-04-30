@@ -42,8 +42,6 @@ if (!process.env.DATABASE_URL) {
 const SRC_DB = path.resolve(__dirname, '../../salem-content/salem_content.db');
 const ASSETS_DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
 const DB = SRC_DB;
-// S159 Phase 9Y.2b — Room schema v8 → v9 identity hash (9 MassGIS/MHC columns added)
-const ROOM_IDENTITY_V9 = '4ec9ae3528d8f55529cd6875c7b0adef';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 (async () => {
@@ -104,9 +102,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     console.log('Schema: added headline_summary column');
   }
 
-  // ── Update room_master_table identity hash to v9 ──
-  db.prepare("INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)").run(ROOM_IDENTITY_V9);
-  console.log(`Schema: room_master_table identity_hash set to ${ROOM_IDENTITY_V9}`);
+  // room_master_table is stamped canonically by align-asset-schema-to-room.js,
+  // which runs last in the publish chain. This script no longer writes it.
   const insert = db.prepare(`
     INSERT OR REPLACE INTO salem_witch_trials_newspapers
       (id, date, day_of_week, long_date, crisis_phase, summary, lede,

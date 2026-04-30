@@ -2478,8 +2478,13 @@ private fun SalemMainActivity.showHistoricSiteDetailDialog(poi: SalemPoi) {
         }
     }
 
-    // ── Body (historical note, with cross-linking) ──
-    val bodyContent = poi.historicalNote
+    // ── Body (historical content, with cross-linking) ──
+    // S200: historicalNarration is the canonical pre-1860 content for
+    // MASSGIS-sourced Historical Buildings (~375 rows have it populated but
+    // no historicalNote / description). Fall through to the older fields
+    // for hand-curated rows that pre-date the historical_narration column.
+    val bodyContent = poi.historicalNarration
+        ?: poi.historicalNote
         ?: poi.description
         ?: poi.shortDescription
         ?: "No historical information available for this site."

@@ -216,6 +216,7 @@ if (fs.existsSync(WT_PORTRAITS)) {
     'FOOD_DRINK', 'SHOPPING', 'LODGING', 'HEALTHCARE', 'ENTERTAINMENT',
     'AUTO_SERVICES', 'OFFICES', 'TOUR_COMPANIES', 'PSYCHIC', 'FINANCE',
     'FUEL_CHARGING', 'TRANSIT', 'PARKING', 'EMERGENCY', 'WITCH_SHOP',
+    'SERVICES', // S200 — operator+lawyer-confirmed commercial
   ]);
 
   let db;

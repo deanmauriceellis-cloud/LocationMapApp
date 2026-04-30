@@ -432,6 +432,41 @@ async function checkCivicFlagMismatch(pgPool) {
   ));
 }
 
+// S200 — commercial tier-0 prose drift. Per attorney guidance, commercial
+// POIs at merchant_tier=0 cannot carry editorial prose; they render as a
+// template (name + sub-cat + Website + Call). Any non-null prose value here
+// is drift from a bulk import or pre-S200 row that needs cleaning.
+async function checkCommercialTier0HasProse(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('commercial_tier0_has_prose', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, category
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND merchant_tier = 0
+      AND category IN (
+        'FOOD_DRINK','SHOPPING','LODGING','HEALTHCARE','ENTERTAINMENT',
+        'AUTO_SERVICES','OFFICES','TOUR_COMPANIES','PSYCHIC','FINANCE',
+        'FUEL_CHARGING','TRANSIT','PARKING','EMERGENCY','WITCH_SHOP','SERVICES'
+      )
+      AND (
+        COALESCE(TRIM(description),'') <> '' OR
+        COALESCE(TRIM(short_narration),'') <> '' OR
+        COALESCE(TRIM(long_narration),'') <> '' OR
+        COALESCE(TRIM(historical_note),'') <> '' OR
+        COALESCE(TRIM(historical_narration),'') <> '' OR
+        COALESCE(TRIM(custom_description),'') <> ''
+      )
+      ${suppress}
+    ORDER BY category, name
+    LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Commercial tier-0 POI has editorial prose populated. Per attorney guidance, only name + sub-category + Website + Call may render for unlicensed commercial POIs.`,
+    `Open the editor → Narration / General tabs → clear description / short_narration / long_narration / historical_note / historical_narration / custom_description. Or bump Merchant tier to author legitimate paid-tier content.`,
+  ));
+}
+
 async function checkContentNoDescription(pgPool) {
   const params = [ITEM_CAP];
   const suppress = suppressionClause('content_no_description', params);
@@ -781,6 +816,7 @@ const CHECKS = [
   { id: 'hist_pre1860_no_historical_narration', label: 'Pre-1860 Historical Buildings missing historical narration', category: 'Historical Buildings', severity: 'warn', run: checkHistPre1860NoHistoricalNarration },
   { id: 'historical_narration_needs_refinement', label: 'Historical narration needs refinement (quality issues)', category: 'Historical Buildings', severity: 'warn', run: checkHistoricalNarrationNeedsRefinement },
   { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'warn',  run: checkCivicFlagMismatch },
+  { id: 'commercial_tier0_has_prose',label: 'Commercial tier-0 POIs with editorial prose (legal cleaning)', category: 'Content', severity: 'error', run: checkCommercialTier0HasProse },
   { id: 'content_no_description',    label: 'POIs with no description text',              category: 'Content',    severity: 'info',  run: checkContentNoDescription },
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },
   { id: 'geo_outlier',               label: 'Outlier coordinates',                        category: 'Geography',  severity: 'error', run: checkGeoOutlier },

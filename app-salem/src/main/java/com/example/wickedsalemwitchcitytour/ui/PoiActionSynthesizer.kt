@@ -56,11 +56,15 @@ object PoiActionSynthesizer {
 
     fun buildActions(poi: SalemPoi): List<Action> {
         parseOverride(poi.actionButtons)?.let { return it }
+        // S200: Hours intentionally dropped from V1 free-tier action chips per
+        // operator+lawyer guidance. Reserved for paid commercial tier (V2),
+        // where merchant-supplied hours would render as authored business
+        // info under a tier-gated path. Also fixes the "Hours · null" leak
+        // that surfaced when poi.hours was the literal string "null".
         return buildList {
             poi.website?.takeIf { it.isNotBlank() }?.let { add(Action.VisitWebsite(it)) }
             poi.phone?.takeIf { it.isNotBlank() }?.let { add(Action.Call(it)) }
             add(Action.Directions(poi.lat, poi.lng))
-            poi.hours?.takeIf { it.isNotBlank() }?.let { add(Action.Hours(it)) }
         }
     }
 

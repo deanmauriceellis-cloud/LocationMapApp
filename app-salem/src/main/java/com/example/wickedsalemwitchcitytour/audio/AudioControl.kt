@@ -29,7 +29,8 @@ import android.content.SharedPreferences
  *   - AMBIENT    → PARKS_REC, EDUCATION
  *   - BUSINESSES → FOOD_DRINK, SHOPPING, LODGING, HEALTHCARE, ENTERTAINMENT,
  *                  AUTO_SERVICES, OFFICES, TOUR_COMPANIES, PSYCHIC, FINANCE,
- *                  FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY, WITCH_SHOP
+ *                  FUEL_CHARGING, TRANSIT, PARKING, EMERGENCY, WITCH_SHOP,
+ *                  SERVICES (S200 — operator+lawyer-confirmed commercial)
  *
  * Unknown categories default to MEANINGFUL (safe fallback for historic content
  * that has not yet been classified).
@@ -117,7 +118,7 @@ object AudioControl {
             "ENTERTAINMENT", "AUTO_SERVICES", "OFFICES",
             "TOUR_COMPANIES", "PSYCHIC", "FINANCE",
             "FUEL_CHARGING", "TRANSIT", "PARKING", "EMERGENCY",
-            "WITCH_SHOP"                                             -> Group.BUSINESSES
+            "WITCH_SHOP", "SERVICES"                                 -> Group.BUSINESSES
             else                                                     -> Group.MEANINGFUL
         }
     }

@@ -207,12 +207,12 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="16dp" />
 
-            <!-- Overview (short narration) -->
+            <!-- Short narration (poi.short_narration) -->
             <TextView
                 android:id="@+id/labelShort"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Overview"
+                android:text="Short narration"
                 android:textColor="@color/colorAccent"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -227,13 +227,13 @@
                 android:textSize="14sp"
                 android:lineSpacingMultiplier="1.3" />
 
-            <!-- About (description) -->
+            <!-- Description (poi.description) -->
             <TextView
                 android:id="@+id/labelAbout"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="About"
+                android:text="Description"
                 android:textColor="@color/colorAccent"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -250,13 +250,13 @@
                 android:lineSpacingMultiplier="1.3"
                 android:visibility="gone" />
 
-            <!-- The Story (long narration or narrationPass2) -->
+            <!-- Long narration (poi.long_narration) -->
             <TextView
                 android:id="@+id/labelStory"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="The Story"
+                android:text="Long narration"
                 android:textColor="@color/colorAccent"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -265,6 +265,29 @@
 
             <TextView
                 android:id="@+id/bodyStory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/salemTextPrimary"
+                android:textSize="14sp"
+                android:lineSpacingMultiplier="1.3"
+                android:visibility="gone" />
+
+            <!-- S200: Historical narration (poi.historical_narration, strict pre-1860) -->
+            <TextView
+                android:id="@+id/labelHistorical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Historical narration"
+                android:textColor="@color/colorAccent"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/bodyHistorical"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"

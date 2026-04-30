@@ -193,15 +193,22 @@ class PoiDetailSheet : DialogFragment() {
         if (stripped) {
             bindStrippedHero(view)
             bindStrippedOverview(view)
+            // S200: keep the prominent Visit Website button visible for tier-0
+            // commercial POIs (lawyer-allowed contact path; ACTION_VIEW handoff
+            // requires no permissions and exits the app to system browser).
+            bindWebsiteButton(view)
             hideNarrativeChrome(view)
             queueStrippedReadThrough()
         } else {
             bindHero(view)
             bindOverview(view)
             bindWebsiteButton(view)
-            val (shortText, aboutText, storyText) = bindNarrationSections(view)
+            val sections = bindNarrationSections(view)
             bindActions(view)
-            queueSheetReadThrough(shortText, aboutText, storyText)
+            // S200: historicalText is displayed visually + tap-to-speak. Auto-narration
+            // of historical_narration during sheet read is governed elsewhere by
+            // isHistoricalNarrationActive() (preserves the strict pre-1860 gating rule).
+            queueSheetReadThrough(sections.first, sections.second, sections.third)
         }
     }
 
@@ -248,12 +255,17 @@ class PoiDetailSheet : DialogFragment() {
         view.findViewById<ImageView>(R.id.overviewIcon).visibility = View.GONE
 
         view.findViewById<TextView>(R.id.overviewName).text = poi.name
-        view.findViewById<TextView>(R.id.overviewType).text = displayCategory(poi.category)
+        // S200: lawyer-allowed fields = name + category + sub-category + website + phone.
+        // Append sub-category to the type line; hours are intentionally not shown.
+        val sub = poi.subcategory?.takeIf { it.isNotBlank() }
+        val typeLine = if (sub != null) "${displayCategory(poi.category)} · $sub" else displayCategory(poi.category)
+        view.findViewById<TextView>(R.id.overviewType).text = typeLine
 
         bindInertText(view, R.id.overviewAddress, poi.address)
-        bindInertText(view, R.id.overviewPhone, poi.phone)
-        bindInertText(view, R.id.overviewWebsite, poi.website)
-        bindInertText(view, R.id.overviewHours, poi.hours ?: poi.hoursText)
+        bindCallableText(view, R.id.overviewPhone, poi.phone)
+        // Website is shown as the prominent btnWebsite button below; the small
+        // inert overviewWebsite TextView stays hidden in stripped mode to avoid
+        // redundancy.
     }
 
     private fun bindInertText(view: View, id: Int, value: String?) {
@@ -267,12 +279,32 @@ class PoiDetailSheet : DialogFragment() {
         }
     }
 
+    // S200: tap-to-call. ACTION_DIAL opens the system dialer with the number
+    // pre-filled but does NOT auto-dial — no CALL_PHONE permission needed,
+    // no Play Store data-safety implications, and gracefully no-ops on
+    // tablets without a SIM.
+    private fun bindCallableText(view: View, id: Int, value: String?) {
+        val tv = view.findViewById<TextView>(id)
+        val v = value?.takeIf { it.isNotBlank() } ?: return
+        tv.text = v
+        tv.visibility = View.VISIBLE
+        tv.setOnClickListener {
+            DebugLogger.i(TAG, "phone clicked id=${poi.id} num=$v")
+            cancelSheetRead()
+            try {
+                startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$v")))
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "Dialer launch failed: ${e.message}")
+            }
+        }
+        tv.isClickable = true
+    }
+
     private fun hideNarrativeChrome(view: View) {
-        // Hide everything below the contact row: dividers, narrative sections,
-        // Things-You-Can-Do header, action button container, and the big
-        // Visit-Website button.
+        // Hide narrative sections + Things-You-Can-Do action container. The
+        // Visit Website button stays visible (S200) — bindWebsiteButton wires
+        // its ACTION_VIEW handoff for stripped tier-0 commercial POIs.
         intArrayOf(
-            R.id.btnWebsite,
             R.id.divider1,
             R.id.labelShort, R.id.bodyShort,
             R.id.labelAbout, R.id.bodyAbout,
@@ -385,23 +417,28 @@ class PoiDetailSheet : DialogFragment() {
 
     // ── Narration sections ──────────────────────────────────────────────
 
-    private fun bindNarrationSections(view: View): Triple<String?, String?, String?> {
+    private fun bindNarrationSections(view: View): Quadruple<String?, String?, String?, String?> {
         val labelShort = view.findViewById<TextView>(R.id.labelShort)
         val bodyShort = view.findViewById<TextView>(R.id.bodyShort)
         val labelAbout = view.findViewById<TextView>(R.id.labelAbout)
         val bodyAbout = view.findViewById<TextView>(R.id.bodyAbout)
         val labelStory = view.findViewById<TextView>(R.id.labelStory)
         val bodyStory = view.findViewById<TextView>(R.id.bodyStory)
+        // S200: 4th section — Historical narration (strict pre-1860, MASSGIS).
+        val labelHistorical = view.findViewById<TextView>(R.id.labelHistorical)
+        val bodyHistorical = view.findViewById<TextView>(R.id.bodyHistorical)
 
         val shortText = poi.shortNarration?.takeIf { it.isNotBlank() }
         val aboutText = poi.description?.takeIf { it.isNotBlank() && it != shortText }
         val storyText = poi.longNarration?.takeIf { it.isNotBlank() }
             ?.takeIf { it != shortText && it != aboutText }
+        val historicalText = poi.historicalNarration?.takeIf { it.isNotBlank() }
+            ?.takeIf { it != shortText && it != aboutText && it != storyText }
 
         if (shortText != null) {
             bodyShort.text = shortText
             val tapToSpeak = View.OnClickListener {
-                DebugLogger.i(TAG, "tap-to-speak OVERVIEW id=${poi.id}")
+                DebugLogger.i(TAG, "tap-to-speak SHORT id=${poi.id}")
                 interruptAndSpeak(shortText)
             }
             labelShort.setOnClickListener(tapToSpeak)
@@ -416,7 +453,7 @@ class PoiDetailSheet : DialogFragment() {
             bodyAbout.visibility = View.VISIBLE
             bodyAbout.text = aboutText
             val tapToSpeak = View.OnClickListener {
-                DebugLogger.i(TAG, "tap-to-speak ABOUT id=${poi.id}")
+                DebugLogger.i(TAG, "tap-to-speak DESCRIPTION id=${poi.id}")
                 interruptAndSpeak(aboutText)
             }
             labelAbout.setOnClickListener(tapToSpeak)
@@ -428,15 +465,29 @@ class PoiDetailSheet : DialogFragment() {
             bodyStory.visibility = View.VISIBLE
             bodyStory.text = storyText
             val tapToSpeak = View.OnClickListener {
-                DebugLogger.i(TAG, "tap-to-speak STORY id=${poi.id}")
+                DebugLogger.i(TAG, "tap-to-speak LONG id=${poi.id}")
                 interruptAndSpeak(storyText)
             }
             labelStory.setOnClickListener(tapToSpeak)
             bodyStory.setOnClickListener(tapToSpeak)
         }
 
-        return Triple(shortText, aboutText, storyText)
+        if (historicalText != null) {
+            labelHistorical.visibility = View.VISIBLE
+            bodyHistorical.visibility = View.VISIBLE
+            bodyHistorical.text = historicalText
+            val tapToSpeak = View.OnClickListener {
+                DebugLogger.i(TAG, "tap-to-speak HISTORICAL id=${poi.id}")
+                interruptAndSpeak(historicalText)
+            }
+            labelHistorical.setOnClickListener(tapToSpeak)
+            bodyHistorical.setOnClickListener(tapToSpeak)
+        }
+
+        return Quadruple(shortText, aboutText, storyText, historicalText)
     }
+
+    private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     /** Interrupt all current TTS (ambient + sheet) and speak this text immediately. */
     private fun interruptAndSpeak(text: String) {
@@ -669,6 +720,8 @@ private fun salemPoiToJson(poi: SalemPoi): String = JSONObject().apply {
     put("category", poi.category)
     putOpt("short_narration", poi.shortNarration)
     putOpt("long_narration", poi.longNarration)
+    putOpt("historical_narration", poi.historicalNarration)
+    putOpt("historical_note", poi.historicalNote)
     putOpt("description", poi.description)
     putOpt("image_asset", poi.imageAsset)
     putOpt("phone", poi.phone)
@@ -693,6 +746,8 @@ private fun parseSalemPoi(s: String): SalemPoi? {
             category = o.getString("category"),
             shortNarration = o.optString("short_narration", "").takeIf { it.isNotEmpty() },
             longNarration = o.optString("long_narration", "").takeIf { it.isNotEmpty() },
+            historicalNarration = o.optString("historical_narration", "").takeIf { it.isNotEmpty() },
+            historicalNote = o.optString("historical_note", "").takeIf { it.isNotEmpty() },
             description = o.optString("description", "").takeIf { it.isNotEmpty() },
             imageAsset = o.optString("image_asset", "").takeIf { it.isNotEmpty() },
             phone = o.optString("phone", "").takeIf { it.isNotEmpty() },
