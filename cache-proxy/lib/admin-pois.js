@@ -180,6 +180,19 @@ function buildUpdateClause(body) {
     return { error: 'no updatable fields provided' };
   }
 
+  // S199: when category changes and the caller didn't explicitly set
+  // is_civic_poi, auto-sync the flag to the new category. Drift between the
+  // two was the root cause of M&M Contractors and ~178 other recategorized
+  // POIs still narrating during tour-mode under the Civic layer.
+  const bodyHasCategory = Object.prototype.hasOwnProperty.call(body, 'category');
+  const bodyHasCivic = Object.prototype.hasOwnProperty.call(body, 'is_civic_poi');
+  if (bodyHasCategory && !bodyHasCivic) {
+    const cat = String(body.category || '').toUpperCase();
+    setParts.push(`is_civic_poi = $${idx}`);
+    values.push(cat === 'CIVIC');
+    idx++;
+  }
+
   setParts.push(`updated_at = NOW()`);
   return { setSql: setParts.join(', '), values };
 }

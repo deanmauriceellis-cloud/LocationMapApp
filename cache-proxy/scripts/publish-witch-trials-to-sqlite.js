@@ -96,6 +96,17 @@ async function main() {
     );
   `);
 
+  // Safely convert any value to a SQLite-bindable type. Handles Postgres
+  // Date objects (from timestamptz columns), arrays/objects (jsonb), bools.
+  const s = v => {
+    if (v == null) return null;
+    if (typeof v === 'number' || typeof v === 'string' || typeof v === 'bigint') return v;
+    if (v instanceof Date) return v.toISOString();
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (Buffer.isBuffer(v)) return v;
+    return JSON.stringify(v);
+  };
+
   // --- Newspapers ---
   const { rows: papers } = await pool.query('SELECT * FROM salem_witch_trials_newspapers ORDER BY date');
   console.log(`PG newspapers: ${papers.length}`);
@@ -107,13 +118,13 @@ async function main() {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const insertPapers = db.transaction((rows) => {
     for (const r of rows) {
-      insNews.run(r.id, r.date, r.day_of_week, r.long_date, r.crisis_phase,
-        r.summary, r.lede,
-        r.tts_full_text,
-        typeof r.events_referenced === 'object' ? JSON.stringify(r.events_referenced) : r.events_referenced,
-        r.event_count, r.fact_count, r.primary_source_count,
-        r.data_source, r.confidence, r.verified_date, r.generator_model,
-        r.headline, r.headline_summary);
+      insNews.run(s(r.id), s(r.date), s(r.day_of_week), s(r.long_date), s(r.crisis_phase),
+        s(r.summary), s(r.lede),
+        s(r.tts_full_text),
+        s(r.events_referenced) || '[]',
+        s(r.event_count), s(r.fact_count), s(r.primary_source_count),
+        s(r.data_source), s(r.confidence), s(r.verified_date), s(r.generator_model),
+        s(r.headline), s(r.headline_summary));
     }
   });
   insertPapers(papers);
@@ -128,15 +139,6 @@ async function main() {
      bio,related_npc_ids,related_event_ids,related_newspaper_dates,portrait_asset,
      data_source,confidence,verified_date,generator_model)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-  // Safely convert any value to a SQLite-bindable type
-  const s = v => {
-    if (v == null) return null;
-    if (typeof v === 'number' || typeof v === 'string' || typeof v === 'bigint') return v;
-    if (v instanceof Date) return v.toISOString();
-    if (typeof v === 'boolean') return v ? 1 : 0;
-    if (Buffer.isBuffer(v)) return v;
-    return JSON.stringify(v);
-  };
   const insertBios = db.transaction((rows) => {
     for (const r of rows) {
       insBio.run(s(r.id), s(r.name), s(r.display_name), s(r.tier), s(r.role), s(r.faction),
@@ -162,11 +164,12 @@ async function main() {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const insertArts = db.transaction((rows) => {
     for (const r of rows) {
-      insArt.run(r.id, r.tile_order, r.tile_kind, r.title, r.period_label, r.teaser, r.body,
+      insArt.run(s(r.id), s(r.tile_order), s(r.tile_kind), s(r.title),
+        s(r.period_label), s(r.teaser), s(r.body),
         s(r.related_npc_ids) || '[]',
         s(r.related_event_ids) || '[]',
         s(r.related_newspaper_dates) || '[]',
-        r.data_source, r.confidence, r.verified_date, r.generator_model);
+        s(r.data_source), s(r.confidence), s(r.verified_date), s(r.generator_model));
     }
   });
   insertArts(articles);

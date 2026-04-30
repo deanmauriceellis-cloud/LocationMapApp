@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 /*
- * import-witch-trials-npc-bios.js — Phase 9X.5
+ * import-witch-trials-npc-bios.js — S199 rewrite
  *
- * Reads Tier-1 + Tier-2 NPC JSON files from
- *   ~/Development/Salem/data/json/npcs/
- * and upserts the 49 key figures into salem_witch_trials_npc_bios.
+ * Source of truth for the bio text is now
+ *   ~/Development/Salem/data/json/biographies/<id>.json (genbiographies output)
+ * which carries a ≤150 word tts_full_text already vetted against the new
+ * caps. We cross-reference
+ *   ~/Development/Salem/data/json/npcs/<id>.json
+ * for the metadata that biographies don't carry (role, faction, age in 1692,
+ * historical_outcome, display_name).
  *
- * Bio is assembled from the narrative.* subfields (life_before_1692,
- * role_in_crisis, emotional_arc, how_they_see_world, appearance) with
- * section headers. A "role_type" (judge/accuser/accused/clergy/official/other)
- * is derived from the JSON role+faction strings and stored in the
- * data_source JSON payload (we don't have a dedicated column for it;
- * the UI will re-derive it client-side from role as well).
+ * Cohort: Tier 1 + Tier 2 (the 49 People-of-Salem entries shipped in V1).
  *
  * Idempotent. Safe to re-run.
  *
@@ -40,6 +39,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 const NPCS_DIR = path.join(os.homedir(), 'Development/Salem/data/json/npcs');
+const BIOS_DIR = path.join(os.homedir(), 'Development/Salem/data/json/biographies');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 function parseYear(raw) {
@@ -50,46 +50,44 @@ function parseYear(raw) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-function assembleBio(npc) {
-  const n = npc.narrative || {};
-  const sections = [
-    ['Life Before 1692', n.life_before_1692],
-    ['Role in the Crisis', n.role_in_crisis],
-    ['Emotional Arc', n.emotional_arc],
-    ['How They Saw the World', n.how_they_see_world],
-    ['Inner Landscape', n.emotional_landscape],
-    ['Sermon Influence', n.sermon_influence],
-    ['Appearance', n.appearance],
-  ];
-  const parts = [];
-  for (const [label, text] of sections) {
-    const t = (text || '').trim();
-    if (!t) continue;
-    parts.push(`## ${label}\n\n${t}`);
-  }
-  if (!parts.length) {
-    const fallback = (npc.role || '').trim() || npc.name;
-    return `## Role\n\n${fallback}`;
-  }
-  return parts.join('\n\n');
+function loadJson(p) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) { return null; }
 }
 
 (async () => {
-  const files = fs.readdirSync(NPCS_DIR).filter(f => f.endsWith('.json'));
-  const keyFigures = [];
-  for (const f of files) {
-    let npc;
-    try {
-      npc = JSON.parse(fs.readFileSync(path.join(NPCS_DIR, f), 'utf8'));
-    } catch (e) {
-      continue;
-    }
-    if (npc.tier === 1 || npc.tier === 2) keyFigures.push(npc);
+  // 1) Build Tier-1+2 NPC index from npcs/ for metadata.
+  const npcIndex = new Map();
+  for (const f of fs.readdirSync(NPCS_DIR).filter(f => f.endsWith('.json'))) {
+    const n = loadJson(path.join(NPCS_DIR, f));
+    if (!n) continue;
+    if (n.tier === 1 || n.tier === 2) npcIndex.set(n.id, n);
   }
 
-  console.log(`Found ${keyFigures.length} Tier-1+Tier-2 figures in ${NPCS_DIR}`);
-  if (keyFigures.length === 0) {
-    console.error('FAILED: zero key figures located — aborting');
+  // 2) Read biographies/ and pair each Tier-1+2 bio with its npc metadata.
+  const bioFiles = fs.readdirSync(BIOS_DIR)
+    .filter(f => f.endsWith('.json') && !f.startsWith('_'));
+
+  const records = [];
+  const missingNpc = [];
+  const missingTts = [];
+  for (const f of bioFiles) {
+    const b = loadJson(path.join(BIOS_DIR, f));
+    if (!b || (b.tier !== 1 && b.tier !== 2)) continue;
+    const n = npcIndex.get(b.id);
+    if (!n) { missingNpc.push(b.id); continue; }
+    const tts = (b.tts_full_text || '').trim();
+    if (!tts) { missingTts.push(b.id); continue; }
+    records.push({ bio: b, npc: n, tts });
+  }
+
+  console.log(`Bios on disk: ${bioFiles.length} | Tier-1+2 NPCs in index: ${npcIndex.size} | Paired records: ${records.length}`);
+  if (missingNpc.length) console.warn(`  ${missingNpc.length} biographies have no NPC metadata: ${missingNpc.slice(0,5).join(', ')}${missingNpc.length>5?'...':''}`);
+  if (missingTts.length) console.warn(`  ${missingTts.length} biographies missing tts_full_text: ${missingTts.slice(0,5).join(', ')}${missingTts.length>5?'...':''}`);
+  const missingBioIds = [...npcIndex.keys()].filter(id => !records.find(r => r.bio.id === id));
+  if (missingBioIds.length) console.warn(`  ${missingBioIds.length} Tier-1+2 NPCs have no biography file yet: ${missingBioIds.slice(0,5).join(', ')}${missingBioIds.length>5?'...':''}`);
+
+  if (records.length === 0) {
+    console.error('FAILED: zero paired records — aborting');
     process.exit(1);
   }
 
@@ -121,38 +119,40 @@ function assembleBio(npc) {
   `;
 
   let ok = 0, fail = 0;
-  for (const npc of keyFigures) {
+  for (const { bio, npc, tts } of records) {
     try {
-      const bio = assembleBio(npc);
-      const born = parseYear(npc.born_year);
-      const died = parseYear(npc.died_year);
+      // born_year / died_year: prefer biographies/ born.date + died.date,
+      // fall back to npcs/ born_year / died_year if biographies parse blank.
+      const born = parseYear(bio?.born?.date) ?? parseYear(npc.born_year);
+      const died = parseYear(bio?.died?.date) ?? parseYear(npc.died_year);
       const age1692 = (typeof npc.age === 'number') ? npc.age : null;
+      const model = bio.model || 'salem-village (gemma3:27b)';
       await pool.query(upsert, [
-        npc.id,
-        npc.name,
+        bio.id,
+        bio.name || npc.name,
         npc.display_name || null,
-        npc.tier,
+        bio.tier,
         (npc.role || '').trim() || 'figure',
         (npc.faction || '').trim() || null,
         born,
         died,
         age1692,
         (npc.historical_outcome || '').trim() || null,
-        bio,
-        'salem_corpus',
+        tts,
+        'salem_oracle_biography',
         0.9,
-        'salem-corpus-npc-json',
+        model,
       ]);
       ok++;
     } catch (e) {
       fail++;
-      console.error(`  FAIL [${npc.id}]:`, e.message);
+      console.error(`  FAIL [${bio.id}]:`, e.message);
     }
   }
 
   const { rows: [{ count }] } = await pool.query(
     "SELECT COUNT(*)::int AS count FROM salem_witch_trials_npc_bios WHERE deleted_at IS NULL"
   );
-  console.log(`Upserted ${ok}/${keyFigures.length} (${fail} failures). Table now has ${count} active rows.`);
+  console.log(`Upserted ${ok}/${records.length} (${fail} failures). Table now has ${count} active rows.`);
   await pool.end();
 })().catch((e) => { console.error('FATAL:', e); process.exit(1); });

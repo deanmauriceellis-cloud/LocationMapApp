@@ -599,6 +599,18 @@ export function PoiEditDialog({
     }
   }, [currentCategory, currentSubcategory, subcategories, setValue])
 
+  // S199 — auto-sync is_civic_poi to the category. Drift between the two
+  // was the root cause of recategorized POIs (e.g. M&M Contractors → SERVICES)
+  // still narrating during tour-mode under the Civic layer. The backend also
+  // enforces this in admin-pois.js; this hook keeps the checkbox visually
+  // honest as the operator changes the category.
+  useEffect(() => {
+    const desired = currentCategory.trim().toUpperCase() === 'CIVIC'
+    if (watch('is_civic_poi') !== desired) {
+      setValue('is_civic_poi', desired, { shouldDirty: true })
+    }
+  }, [currentCategory, watch, setValue])
+
   // S190 — inline "+ Add new" forms for category + subcategory. Each is a
   // small expand/collapse panel below its dropdown. On save we POST to the
   // admin endpoint, then ask the parent to refetch the taxonomy so the
