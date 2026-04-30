@@ -8,7 +8,7 @@
 
 Planning + housekeeping session. Honest assessment of V1 readiness delivered; 24-question dialog with operator captured durable decisions for the Aug 1 internal ship target (one month tighter than the prior Sept 1 anchor in CLAUDE.md). Pre-pivot strategic docs (COMMERCIALIZATION.md, IP.md, CURRENT_TESTING.md) archived with banner; thin V1-truthful replacements written for COMMERCIALIZATION + IP. STATE.md TOP PRIORITY rewritten with S201/S202/S203/S204+ plan + V1 KEEP list (Halloween layer, 1906 time slider, tour certificate, Heritage Trail-yellow) + V1 SKIP list (Bark, hotel B2B, big beta program). Zero binary changes; zero code touched.
 
-Full session detail: `docs/session-logs/session-201-2026-04-29.md`. Commit: pending session-close roll.
+Full session detail: `docs/session-logs/session-201-2026-04-29.md`. Commit: `dd9078f`.
 
 ---
 
