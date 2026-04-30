@@ -12,12 +12,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 4302,
-    // Explicit HMR websocket config — when the server binds to 0.0.0.0
-    // Vite leaves the browser to guess how to reach the WS, which
-    // fails in Firefox ("can't establish connection to ws://localhost:4302").
-    // Pin it to the same host/port the browser uses to load the page.
+    // S205: HMR client opens its WebSocket to whatever host the browser
+    // loaded the page from (window.location.host) — works for localhost
+    // dev AND LAN access at http://10.0.0.229:4302/. The earlier explicit
+    // `host: 'localhost'` blocked LAN access because the LAN browser tried
+    // to dial its own localhost. clientPort kept so HMR survives any future
+    // reverse-proxy that maps the page port ≠ the WS port.
     hmr: {
-      host: 'localhost',
       protocol: 'ws',
       clientPort: 4302,
     },

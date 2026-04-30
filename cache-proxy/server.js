@@ -211,6 +211,10 @@ require('./lib/admin-witch-trials')(app, deps);
 // Admin Lint endpoints (S187) — gated by /admin Basic Auth
 require('./lib/admin-lint')(app, deps);
 
+// Admin auto-categorize endpoints (S205) — SalemIntelligence-driven
+// (cat, subcategory) suggestions for commercial POIs. Gated by /admin Basic Auth.
+require('./lib/admin-suggest-categorization')(app, deps);
+
 // Admin Audit endpoints (S196) — surfaces salem_audit_log + revert path
 require('./lib/admin-audit')(app, deps);
 

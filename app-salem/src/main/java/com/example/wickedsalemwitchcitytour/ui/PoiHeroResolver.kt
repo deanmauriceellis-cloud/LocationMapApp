@@ -109,10 +109,18 @@ object PoiHeroResolver {
         // S154: prefer subcategory-scoped files when the POI carries a
         // subcategory that matches a file-name prefix in the folder. Keeps a
         // bakery looking like a bakery, a bar looking like a bar, etc.
+        // S205: DB stores subcategory as "CATEGORY__short" (e.g. "FOOD_DRINK__cafes");
+        // strip the namespace prefix before matching since icon files are named
+        // by the short token alone (e.g. "cafes_witchcraft.webp"). substringAfter
+        // returns the original string when "__" is not present, so legacy bare
+        // tokens still work.
         val all = listingFor(context, folder)
         if (all.isEmpty()) return HeroResult.RedPlaceholder
 
-        val sub = poi.subcategory?.lowercase()?.takeIf { it.isNotBlank() }
+        val sub = poi.subcategory
+            ?.lowercase()
+            ?.substringAfter("__")
+            ?.takeIf { it.isNotBlank() }
         val pool = if (sub != null) {
             all.filter { it.startsWith("${sub}_", ignoreCase = true) }
                 .ifEmpty { all }

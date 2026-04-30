@@ -510,6 +510,170 @@ async function checkContentNoImage(pgPool) {
   ));
 }
 
+// ─── S205: Category / subcategory taxonomy lints ─────────────────────────────
+//
+// Per operator scope: HISTORICAL_BUILDINGS, CIVIC, and is_tour_poi=true items
+// are excluded from these checks. Those buckets are hand-curated landmark
+// content; subcategory hero variants exist for the commercial categories.
+//
+// PoiHeroResolver picks per-subcategory icons from `assets/poi-icons/<folder>/`
+// using the short token after `CATEGORY__`. The map below mirrors what's on
+// disk; bumping an icon folder requires updating both the asset folder and
+// this map together.
+
+const CATEGORY_ICON_TOKENS = {
+  FOOD_DRINK: ['bakeries','bars','breweries','butcher_shops','cafes','candy_stores','delis','distilleries','fast_food','ice_cream','liquor_stores','marketplaces','pastry_shops','pubs','restaurants','seafood_markets','wineries','wine_shops'],
+  SHOPPING: ['barber_shops','beauty_spa','bicycle_shops','bookstores','cannabis','clothing','convenience_stores','department_stores','drug_stores','dry_cleaners','electronics','florists','furniture','garden_centers','gift_shops','hair_salons','hardware_stores','jewelry','laundromats','malls','massage','opticians','pet_stores','phone_stores','shoe_stores','storage_rentals','supermarkets','tattoo_shops','thrift_stores','tobacco_shops','vape_shops','variety_stores'],
+  ENTERTAINMENT: ['arcades','arts_centres','bowling','cinemas','dance_studios','disc_golf','escape_rooms','event_venues','fitness','golf_courses','ice_rinks','marinas','mini_golf','nightclubs','sports_centres','stadiums','studios','theatres','water_parks'],
+  LODGING: ['campgrounds','guest_houses','hostels','hotels','motels','rv_parks'],
+  PARKS_REC: ['beaches','boat_ramps','dog_parks','drinking_water','fountains','gardens','nature_reserves','parks','picnic_sites','playgrounds','pools','rec_grounds','restrooms','shelters','skateparks','sports_fields','tracks'],
+  AUTO_SERVICES: ['car_washes','dealerships','parts_stores','rentals','repair_shops','tire_shops'],
+  HEALTHCARE: ['clinics','dentists','doctors','hospitals','nursing_homes','pharmacies','veterinary'],
+  OFFICES: ['companies','insurance','law_offices','real_estate','tax_advisors'],
+  EDUCATION: ['childcare','colleges','kindergartens','libraries','schools','universities'],
+  WITCH_SHOP: ['crystal_shops','herb_shops','metaphysical','occult_supplies','witchcraft_shops'],
+  PSYCHIC: ['palm_readings','psychic_readings','seances','spiritual_healers','tarot_readings'],
+  FINANCE: ['atms','banks'],
+  TOUR_COMPANIES: ['haunted_tours','historical_tours','night_tours','walking_tours'],
+  HISTORICAL_BUILDINGS: ['colonial_houses','literary_houses','maritime_houses','museum_houses','witch_trial_houses','museums'],
+  CIVIC: ['community_centres','courthouses','embassies','gov_offices','post_boxes','post_offices','recycling','social_services','town_halls'],
+  WORSHIP: ['places_of_worship'],
+};
+
+// Categories operator wants linted for missing-subcategory (rich icon variants
+// + commercial-ish content). Excludes WORSHIP (1 variant), and excludes the
+// hand-curated buckets HISTORICAL_BUILDINGS / CIVIC entirely (operator scope).
+const SUBCATEGORY_LINT_CATEGORIES = [
+  'FOOD_DRINK','SHOPPING','ENTERTAINMENT','LODGING','PARKS_REC',
+  'AUTO_SERVICES','HEALTHCARE','OFFICES','EDUCATION',
+  'WITCH_SHOP','PSYCHIC','FINANCE','TOUR_COMPANIES',
+];
+
+// Keyword → expected category map. Conservative: high-confidence single-word
+// or short-phrase signals only. Each rule fires when `name` matches the
+// pattern and the POI's current category is NOT in `expect`.
+const CATEGORY_KEYWORD_RULES = [
+  { pattern: /\b(dental|dentist|dds|orthodont|endodont|periodont)/i,                   expect: ['HEALTHCARE'],            label: 'dental'        },
+  { pattern: /\b(chiropract|optometr|podiatr|physio|acupunctur|veterinar|pediatric)/i, expect: ['HEALTHCARE'],            label: 'medical'       },
+  { pattern: /\b(hospital|urgent care|medical center|family practice|clinic)\b/i,      expect: ['HEALTHCARE'],            label: 'medical'       },
+  { pattern: /\b(pharmacy|pharmacies|drugstore|rite aid|cvs pharmacy)\b/i,             expect: ['HEALTHCARE','SHOPPING'], label: 'pharmacy'      },
+  { pattern: /\b(barbell|crossfit|pilates|yoga|fitness|gym|martial arts|kickbox)/i,    expect: ['ENTERTAINMENT','HEALTHCARE'], label: 'fitness'  },
+  { pattern: /\b(law office|law firm|attorney|esq\.|legal services|paralegal)/i,       expect: ['OFFICES'],               label: 'law'           },
+  { pattern: /\b(bank|credit union|atm|financial advisor|wealth management)/i,         expect: ['FINANCE','OFFICES'],     label: 'finance'       },
+  { pattern: /\b(insurance agency|insurance services)\b/i,                             expect: ['OFFICES','FINANCE'],     label: 'insurance'     },
+  { pattern: /\b(real estate|realty|realtor|sotheby|coldwell)/i,                       expect: ['OFFICES'],               label: 'real estate'   },
+  { pattern: /\b(auto repair|tire|muffler|transmission|collision|body shop|car wash|dealership)/i, expect: ['AUTO_SERVICES'], label: 'auto' },
+  { pattern: /\b(hotel|motel|inn|b&b|bed and breakfast|hostel|guest house|guesthouse)/i, expect: ['LODGING'],             label: 'lodging'       },
+  { pattern: /\b(church|temple|synagogue|mosque|chapel|congregation|parish)/i,         expect: ['WORSHIP'],               label: 'worship'       },
+  { pattern: /\b(school|academy|preschool|daycare|kindergarten|montessori|college|university)/i, expect: ['EDUCATION'], label: 'education'    },
+  { pattern: /\b(library|public library)/i,                                            expect: ['EDUCATION','CIVIC'],     label: 'library'       },
+  { pattern: /\b(psychic|tarot|medium|spiritual reading|palm read|fortune teller|seance)/i, expect: ['PSYCHIC','WITCH_SHOP'], label: 'psychic' },
+  { pattern: /\b(witch shop|metaphysical|occult|crystal|wiccan|magick)/i,              expect: ['WITCH_SHOP','PSYCHIC','SHOPPING'], label: 'witchy' },
+  { pattern: /\bghost tour|walking tour|haunted tour|historical tour\b/i,              expect: ['TOUR_COMPANIES','ENTERTAINMENT'], label: 'tour'  },
+  { pattern: /\b(post office|town hall|city hall|courthouse|community center|community centre)\b/i, expect: ['CIVIC','OFFICES'], label: 'civic' },
+];
+
+async function checkSubcatNamespaceMismatch(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('subcat_namespace_mismatch', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, category, subcategory
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND subcategory IS NOT NULL
+      AND subcategory <> ''
+      AND subcategory NOT LIKE category || '\\_\\_%'
+      ${suppress}
+    ORDER BY category, name
+    LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Subcategory "${r.subcategory}" doesn't match category "${r.category}". The CATEGORY__short namespace is wrong — hero icon will fall back to the wrong folder's variants.`,
+    `Open the editor → Operational tab → Subcategory: pick a value whose namespace matches the current category, OR change the category to match.`,
+  ));
+}
+
+async function checkCommercialMissingSubcategory(pgPool) {
+  const cats = SUBCATEGORY_LINT_CATEGORIES;
+  const params = [cats, ITEM_CAP];
+  const suppress = suppressionClause('commercial_missing_subcategory', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, category
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND COALESCE(is_tour_poi,false) = false
+      AND category = ANY($1)
+      AND (subcategory IS NULL OR subcategory = '')
+      ${suppress}
+    ORDER BY category, name
+    LIMIT $2
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Commercial POI in "${r.category}" has no subcategory — hero icon hash-picks randomly across the whole category folder (e.g. a taqueria might draw the bowling icon).`,
+    `Open the editor → Operational tab → set Subcategory to one of "${r.category}__<token>" matching what the POI actually is. Tokens are listed in poi-icons/${r.category.toLowerCase()}/ on disk.`,
+  ));
+}
+
+async function checkSubcatUnknownToken(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('subcat_unknown_token', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, category, subcategory
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND subcategory IS NOT NULL
+      AND subcategory <> ''
+      ${suppress}
+    ORDER BY category, name
+    LIMIT $1
+  `, params);
+  // Filter to rows whose short-token isn't a recognized icon name for the category.
+  const out = [];
+  for (const r of rows) {
+    const validTokens = CATEGORY_ICON_TOKENS[r.category];
+    if (!validTokens) continue; // unknown category — handled by other checks
+    const expectedPrefix = (r.category || '') + '__';
+    if (!r.subcategory.startsWith(expectedPrefix)) continue; // namespace mismatch — covered by subcat_namespace_mismatch
+    const token = r.subcategory.slice(expectedPrefix.length).toLowerCase();
+    if (!validTokens.includes(token)) {
+      out.push(poiItem(r,
+        `Subcategory token "${token}" has no matching icon in poi-icons/${r.category.toLowerCase()}/. Hero will fall back to the random category-pool pick.`,
+        `Open the editor → Operational tab → Subcategory: pick a value whose token matches one of [${validTokens.join(', ')}], or add a new icon variant + extend CATEGORY_ICON_TOKENS in cache-proxy/lib/admin-lint.js.`,
+      ));
+    }
+  }
+  return out;
+}
+
+async function checkCategoryKeywordMismatch(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('category_keyword_mismatch', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, category
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND COALESCE(is_tour_poi,false) = false
+      AND category NOT IN ('HISTORICAL_BUILDINGS','CIVIC')
+      ${suppress}
+    ORDER BY category, name
+    LIMIT $1
+  `, params);
+  const out = [];
+  for (const r of rows) {
+    const name = r.name || '';
+    for (const rule of CATEGORY_KEYWORD_RULES) {
+      if (rule.pattern.test(name) && !rule.expect.includes(r.category)) {
+        out.push(poiItem(r,
+          `Name matches "${rule.label}" keyword pattern but category is "${r.category}" (expected one of: ${rule.expect.join(', ')}).`,
+          `Open the editor → Operational tab → review category. If correct as-is, click Suppress.`,
+        ));
+        break; // one finding per POI
+      }
+    }
+  }
+  return out;
+}
+
 async function checkGeoOutlier(pgPool) {
   const params = [SALEM_CENTER_LAT, SALEM_CENTER_LNG, OUTLIER_KM, ITEM_CAP];
   const suppress = suppressionClause('geo_outlier', params);
@@ -824,6 +988,10 @@ const CHECKS = [
   { id: 'commercial_tier0_has_prose',label: 'Commercial tier-0 POIs with editorial prose (legal cleaning)', category: 'Content', severity: 'error', run: checkCommercialTier0HasProse },
   { id: 'content_no_description',    label: 'POIs with no description text',              category: 'Content',    severity: 'info',  run: checkContentNoDescription },
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },
+  { id: 'subcat_namespace_mismatch',     label: 'Subcategory namespace doesn\'t match category', category: 'Taxonomy', severity: 'error', run: checkSubcatNamespaceMismatch },
+  { id: 'subcat_unknown_token',          label: 'Subcategory token has no matching hero icon',   category: 'Taxonomy', severity: 'warn',  run: checkSubcatUnknownToken },
+  { id: 'commercial_missing_subcategory',label: 'Commercial POIs missing subcategory',           category: 'Taxonomy', severity: 'info',  run: checkCommercialMissingSubcategory },
+  { id: 'category_keyword_mismatch',     label: 'POI name suggests a different category',        category: 'Taxonomy', severity: 'warn',  run: checkCategoryKeywordMismatch },
   { id: 'geo_outlier',               label: 'Outlier coordinates',                        category: 'Geography',  severity: 'error', run: checkGeoOutlier },
   { id: 'geo_centroid_snap',         label: 'Geocoder fallback (3+ POIs at same point)',  category: 'Geography',  severity: 'warn',  run: checkGeoCentroidSnap },
   { id: 'duplicates',                label: 'Co-located POIs (within 15m)',               category: 'Duplicates', severity: 'warn',  run: checkDuplicates },

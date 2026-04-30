@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PoiRow } from './PoiTree'
+import { AutoCategorizeModal } from './AutoCategorizeModal'
 
 // ─── Types matching cache-proxy/lib/admin-lint.js ───────────────────────────
 
@@ -116,6 +117,8 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes 
   // suppressed entries for the selected check instead of active ones.
   const [showingSuppressed, setShowingSuppressed] = useState(false)
   const [suppressionsByCheck, setSuppressionsByCheck] = useState<Record<string, SuppressionRow[]>>({})
+  // S205 — auto-categorize modal
+  const [showAutoCat, setShowAutoCat] = useState(false)
 
   // ── Fetch lint results ────────────────────────────────────────────────────
   const fetchLint = useCallback(async () => {
@@ -294,17 +297,27 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes 
     <div className="flex h-full min-h-0 w-full">
       {/* Left tree */}
       <aside className="w-96 border-r border-slate-300 bg-white flex flex-col min-h-0">
-        <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+        <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Lint Issues</span>
-          <button
-            type="button"
-            onClick={() => void fetchLint()}
-            disabled={loading}
-            className="text-xs px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 disabled:opacity-50"
-            title="Re-run all instant checks"
-          >
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShowAutoCat(true)}
+              className="text-xs px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+              title="S205 — Auto-categorize commercial POIs from SalemIntelligence"
+            >
+              Auto-categorize
+            </button>
+            <button
+              type="button"
+              onClick={() => void fetchLint()}
+              disabled={loading}
+              className="text-xs px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 disabled:opacity-50"
+              title="Re-run all instant checks"
+            >
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto py-1 text-sm">
           {err && (
@@ -401,6 +414,13 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes 
           />
         )}
       </main>
+
+      {showAutoCat && (
+        <AutoCategorizeModal
+          onClose={() => setShowAutoCat(false)}
+          onApplied={() => { void fetchLint() }}
+        />
+      )}
     </div>
   )
 }
