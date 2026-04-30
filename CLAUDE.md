@@ -114,7 +114,7 @@ Read these files only when a specific question requires them — never at sessio
 - `docs/session-logs/session-NNN-*.md` — read a prior live log only when recovering from a killed session OR when the operator asks about a specific past session.
 - `~/Development/OMEN/notes/locationmapapp.md` — when addressing or acknowledging an OMEN note.
 - `~/Development/OMEN/directives/ACTIVE.md` — when an OMEN directive is relevant to current work.
-- Reference docs (`GOVERNANCE.md`, `IP.md`, `COMMERCIALIZATION.md`, `DESIGN-REVIEW.md`, `CURRENT_TESTING.md`) — on demand only.
+- Reference docs (`GOVERNANCE.md`, `IP.md`, `COMMERCIALIZATION.md`, `DESIGN-REVIEW.md`) — on demand only. (`CURRENT_TESTING.md` archived 2026-04-29 as pre-pivot — lint tab + session logs serve the testing-checklist role now.)
 
 ### No master plan
 
@@ -215,7 +215,7 @@ If OMEN needs any of that, it can read the live log directly — the path is in 
 
 > **Current state — phase, version, session count, top priority — lives in `STATE.md`.** This section is intentionally minimal so CLAUDE.md does not need to be touched every session. If you need to know what is in flight right now, read `STATE.md`.
 
-**Critical timing:** Salem 400+ quadricentennial is 2026. App must be in Play Store by **September 1, 2026** to capture October's 1M+ visitors. This is the only date that constrains every other planning decision.
+**Critical timing:** Salem 400+ quadricentennial is 2026. **Internal ship target: August 1, 2026** (operator-confirmed S201 V1 triage). Salem 400+ peak attendance is October 2026 (~1M visitors). Sept 1 was the prior public-facing anchor; Aug 1 is the live internal goal driving session pacing.
 
 ---
 
@@ -296,10 +296,9 @@ Under the lean-startup rule (2026-04-23), only `CLAUDE.md` and `MEMORY.md` are r
 | `~/Development/OMEN/notes/locationmapapp.md` | OMEN action items | Addressing or acknowledging an OMEN note |
 | `~/Development/OMEN/directives/ACTIVE.md` | OMEN directives | An OMEN directive is relevant to current work |
 | `GOVERNANCE.md` | Legal / compliance (56KB) | Work touches legal, privacy, or compliance |
-| `IP.md` | Patent / copyright register | Work touches a patentable innovation |
-| `COMMERCIALIZATION.md` | Business model (pre-S138 detail) | Work touches monetization — V1 posture is in this file's preamble, not in CLAUDE.md |
+| `IP.md` | V1 IP register (copyright, Form TX status, V1-novel patentable-angle backlog) | Work touches copyright, trademark, or patent posture — full pre-pivot 14-innovation register archived at `docs/archive/IP_removed_2026-04-29.md` |
+| `COMMERCIALIZATION.md` | V1 commercial posture (pricing, channels, merchant tier, open commercial items) | Work touches monetization, pricing, distribution channels, or merchant tier infrastructure — pre-pivot freemium/social vision archived at `docs/archive/COMMERCIALIZATION_removed_2026-04-29.md` |
 | `DESIGN-REVIEW.md` | Architecture decisions | Work touches a design previously reviewed |
-| `CURRENT_TESTING.md` | Test checklist | Entering Phase 10 or running regression |
 
 **No master plan** — deleted 2026-04-23 (S161); pre-park snapshot lives at `docs/archive/Parked_WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md`. Do not treat it as a plan-of-record.
 

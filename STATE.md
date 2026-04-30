@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-04-29 — Session 200 closed. Five distinct shipping arcs end-to-end. (1) **S198/S199 carry-forward #4 cleared** — `bundle-witch-trials-newspapers-into-db.js` no longer hard-codes a stale `ROOM_IDENTITY_V9` or writes `room_master_table`; align-asset-schema-to-room is the only stamper. (2) **Commercial-prose legal cleaning.** Per attorney guidance: 1439 commercial tier-0 POIs across 13 categories had description / short_narration / long_narration / historical_note / historical_narration / custom_description nulled in PG (CSV backup at `docs/archive/commercial-prose-wipe-2026-04-29/`). Stripped POI sheet upgraded with sub-category line, tap-to-call (`ACTION_DIAL`, zero permissions), prominent Visit Website (`ACTION_VIEW`), no hours. PoiEditDialog tier-aware field gate hides prose for tier-0 commercials (amber notice explains the tier-bump path). New `commercial_tier0_has_prose` lint check (severity error, count=0 post-wipe). 103 commercial-hero leak files (3.2 MB) pruned. SERVICES added to BUSINESSES bucket in AudioControl + verify + prune (was the 1-cat misalignment vs the 13-set the operator confirmed). Architecture preserves the merchant_tier monetization path — operator hand-authors demo POIs to showcase paid-tier display. (3) **MASSGIS landmark surfacing.** Witch Trials → Historic Sites of Salem fallback chain extended with `historicalNarration` first-priority — unlocked pre-1860 content for ~375 MASSGIS rows. PoiDetailSheet (regular marker tap) renders `historical_narration` in a new 4th body section (`bodyHistorical`); serializer + parser updated to round-trip the field through bundle args; auto-narration during sheet read still gated by `isHistoricalNarrationActive()` (preserves S192 strict pre-1860 rule); user can tap to manually trigger TTS. (4) **PoiDetailSheet field-naming alignment** — "Overview" / "About" / "The Story" relabeled to match admin column names ("Short narration", "Description", "Long narration"). New "Historical narration" section. Hours action chip removed entirely (also fixes `Hours · null` leak). (5) **384 Essex initial McIntire narration** authored from operator's first-hand knowledge — operator previously lived in the Sprague House. Memory `user_personal_context_beverly.md` updated to note operator's authority on personally-resided Salem properties. 528-char pre-1860 strict draft attributing the c. 1806 commission to Samuel McIntire late in his career. Discovered en route: SalemIntelligence's `mode_c_historic_building_details` is empty for most MASSGIS rows (architect/style/year never extracted); operator declined a MACRIS-detail-page scraper in favor of hand-authored content for canonical attributions. Final publish chain ran end-to-end after operator-confirmed admin edits (publish-pois 2219 → tours 2 → tour-legs 33 → bundle WT-* → align v15). APK on Lenovo HNY0CY0W. Operator session-end: "session end and we continue next session." Full detail in `docs/session-logs/session-200-2026-04-29.md`.
+**Last updated:** 2026-04-29 — **Session 201 (V1 launch triage in progress).** Operator-confirmed internal ship target **2026-08-01** (one month tighter than the prior Sept 1 anchor). Strategic doc cleanup applied: COMMERCIALIZATION.md / IP.md / CURRENT_TESTING.md (pre-pivot platform vision) archived to `docs/archive/_removed_2026-04-29.md`; thin V1-truthful replacements written for COMMERCIALIZATION.md + IP.md. New TOP PRIORITY block below captures the operator-confirmed plan: S201 (AAB rebuild + smoke + content drain), S202 (1-hour carry-forward triage), S203 (Tier-2 auto-bake + first Kotlin unit test), S204+ (V1 feature additions: Halloween layer + 1906 time slider + tour certificate + Heritage Trail-yellow). Skipped/deferred: Bark hero clips, hotel B2B (post-launch), large beta program (small 2-3 testers instead). Operator-side: Form TX (counsel handling), Play Console account (operator starts this week), keystore backup (covered, multiple secure methods), 4 privacy-policy [TBD] fields pending operator-relay. Marketing channel: Salem Chamber + local. **Session 200 close (prior):** Five distinct shipping arcs end-to-end. (1) S198/S199 carry-forward #4 cleared. (2) Commercial-prose legal cleaning. (3) MASSGIS landmark surfacing. (4) PoiDetailSheet field-naming alignment. (5) 384 Essex initial McIntire narration. Detail in `docs/session-logs/session-200-2026-04-29.md` and `docs/session-logs/session-201-2026-04-29.md`.
 
 **Previous (S199):** Three big shipped end-to-end. (1) **Salem Witch Trials content rewritten under attorney-driven word caps** — Oracle newspapers ≤250 words (avg 213, was 466), Witch Trial History tiles ≤150 (avg 166, was 369–419), People-of-Salem bios ≤150 (avg 135, was 2486 with the long fictional `narrative.*` concatenation). All three Salem Oracle generators (`Salem/cmd/{gennewspaper,gentiles,genbiographies}/`) got tightened prompts + dropped the duplicative "first POINTS repeats the lede" rule + a new `normalizeASCII()` helper. 267 generations on the RTX 3090 (gemma3:27b), 0 failures, 45 min. (2) **Import pipeline restructured** — bio import now reads `tts_full_text` from `data/json/biographies/` (was concatenating 7 fictional `narrative.*` sections out of `npcs/`). New JSON-direct importers replace the SalemIntelligence middleman. Incidental `publish-witch-trials-to-sqlite.js` Date-→-ISO `s()` wrapper extended to newspaper + article inserts. (3) **`is_civic_poi` drift across 179 POIs fixed** — operator field-discovered M&M Contractors narrating during a tour walk despite category=SERVICES; root cause flag never auto-cleared on category change. UPDATE 179 → 0 drift; bidirectional auto-sync wired in backend `buildUpdateClause()` + frontend useEffect. Full detail in `docs/session-logs/session-199-2026-04-29.md`.
 
@@ -14,97 +14,98 @@
 
 **Previous (S195):** Layers checkboxes (POIs Hist. Landmark / POIs Civic) repurposed from tour-mode-only widening into true global overrides gating eligibility in BOTH explore and tour modes. Phase A backfilled `is_historical_property=true` on 358 active HIST_BLDG; Phase B: Room v13 → v14, DAO `findNarrated*` widened, NarrationGeofenceManager unified eligibility gate. Per-POI Quality flags panel landed in PoiEditDialog. 123 POIs flipped to `is_civic_poi=true` (WORSHIP/EDUCATION/PARKS_REC). Heading-up rotation re-enabled GPS-only. 45-min drive test produced 1689 GPS points → ~3-4m systematic NW bias in Lenovo GPS chip (multipath, not basemap). Final `22b5e08`.
 
-**Previous (S189):** Diagnostic + planning session, no app or admin code changed. Synthesized a 10-section total launch review and built `docs/V1-LAUNCH-REVIEW-2026-04-27.odt` (13 KB) as an annotatable intake document. Operator's annotated copy drives S190+ planning. Critical findings flagged: Form TX copyright 23 days out and unconfirmed; 2026-04-20 lawyer meeting outcome not in any session log; privacy policy `[TBD]` placeholders unresolved; Play Console developer account not started; 365 dedup losers still soft-deleted in PG awaiting hard-delete pre-AAB; V1 feature-gating eyes-on smoke test from S180 still owed; single-medium upload-keystore backup.
-
-**Previous (S188):** Polish pass on S187's Geocode-candidates modal + a Witchy-only basemap with server-side auto-overzoom. The Geocodes modal now shows every duplicate's address/coords, geocodes each duplicate's address (cluster-wide best-match selection), and offers a per-candidate **Show on Map** that opens an in-map preview (purple POI dot + fuchsia "?" candidate marker + dashed line) with a smart `analyzeGeocodeConflict()` diagnoser that labels each case (good / warn / bad) and recommends one of five action buttons (Move POI / Validate stored / Hide candidate / Edit address / Cancel). New `salem_geocode_blacklist` PG table backs the **Hide this candidate** action — flagged candidates stop appearing in future Geocodes lookups for that POI. The preview panel can be escaped with `×` or `Esc`, has a Focus toggle that hides every other POI marker, a Show-all-candidates toggle that renders every Tiger hit across the cluster color-coded by rating, and a Re-fit button. Mapnik / Esri / OSM removed from the basemap picker (Witchy is the only basemap); `cache-proxy/lib/admin-tiles.js` gains `sharp`-backed auto-overzoom that walks UP up to 8 ancestor levels (crop+resize) or DOWN up to 2 child levels (stitch) when a (z,x,y) isn't baked, with a 500-entry LRU and `X-Tile-Source` headers for devtools introspection. Modal-hang regression fixed — soft-deleted POIs filtered out of dupe clusters (operator: "soft deleted are not concerns, just footnotes"), per-call Tiger timeout 15→5 s, 20 s wall-clock budget across the whole geocode-candidates call. Cache-proxy restarted on PID 68413 with everything live. Files NEW: none. Files MODIFIED: `cache-proxy/lib/{admin-lint.js, admin-tiles.js}`, `cache-proxy/package.json` (+sharp), `web/src/admin/{GeocodeCandidatesModal.tsx, AdminMap.tsx, AdminLayout.tsx}`. Full detail in `docs/session-logs/session-188-2026-04-26.md`.
-
-S187 standing (still valid): Admin Lint tab is the 4th view, 15 instant checks + on-demand address-geocode deep scan, Tiger MA fully loaded (~322 MB), `salem_lint_suppressions` for false-positive flagging. None of S188 changed the lint check set or counts.
-
-S186 standing (still valid): Tour Mode narration gate + mode-dependent Layers checkboxes (POIs Civic / POIs Hist. Landmark) + `is_civic_poi` Room v11 + 1-hour dedup persists across walk-sim restarts + `is_tour_poi=true` force-visible-and-force-audible. None of S187 touched the Android side. Detail in `docs/session-logs/session-186-2026-04-26.md`.
-
-S184 standing (still valid): Admin walking-route UX polish (anchor + clip + click-to-highlight + click-to-recenter + cancel for + Free / + POI modes). The same anchor + clip algorithm now runs in the app's tour overlay too (S185).
-
-S183 standing (still valid): Per-leg tour walking-route admin tool (backend + UI). PG table `salem_tour_legs` + 3 cache-proxy endpoints. App-side consumption now landed (S185).
-
-S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First signed AAB at `app-salem/build/outputs/bundle/release/app-salem-release.aab` (78 MB) — superseded by S185 rebuild but signing config + version code (10000) unchanged. Manifest network surface stripped, V1 feature gates R8-stripped, Room migrations locked, signingConfigs wired, upload keystore generated + OMEN-registered. S179: tour routing unified to live `Router.route()` against bundled walking graph; bake-time edge splitting (47,704 edges / 44,223 walkable nodes). S178: `:routing-jvm` extraction + 60m approach cap + surgical OSM ingest. S175: on-device Salem router. S174: web admin Tours tab CRUD. S172: animations live in SalemMainActivity. S171: custom WickedMap engine (replaces osmdroid; migration in progress, 338 osmdroid call sites still extant).
+> Older "Previous" entries (S180 / S183 / S184 / S186 / S187 / S188 / S189) trimmed S201 to keep STATE.md under the 200-line cap. Detail lives in `SESSION-LOG.md` + `SESSION-LOG-ARCHIVE.md` + per-session live logs at `docs/session-logs/session-NNN-*.md`.
 
 ---
 
-## TOP PRIORITY — Next Session (S201)
+## TOP PRIORITY — S201 V1 launch triage (operator-confirmed 2026-04-29)
 
-0. **Read operator's annotated `docs/V1-LAUNCH-REVIEW-2026-04-27.odt` first.** This intake document defines next-steps priorities and supersedes the engineering-only ranking below. Items 1–12 below remain valid as a backlog but should be re-ordered against the operator's annotated launch-review action plan (Week 1 / 2 / 3–4 / Month 2+ in §9 of the .odt). Critical operator-side blockers from the review are also tracked here as items 13–15.
+> **Internal ship target: 2026-08-01** (94 days). One month tighter than the prior Sept 1 anchor in CLAUDE.md / strategic docs. Salem 400+ peak attendance is October 2026.
 
-0a. **(S196 NEW) Multi-admin auth + actor-from-session wiring.** Add `salem_admin_users` table (username, hashed password, role, created_at). Update Basic Auth to verify against env user OR table. Wire admin write endpoints + scripts to `SET LOCAL "app.actor" = req.user` and `"app.source" = '<endpoint name>'` so the audit log gets attribution prospectively.
+### Operator-side legal / business (in flight)
 
-0b. **(S196 NEW) PoiEditDialog inline history panel.** Show the latest 20 audit entries for the open POI alongside the Quality Flags panel. Per-row Revert. Uses existing `GET /admin/salem/audit/entity/salem_pois/:id`.
+- **Form TX copyright** — counsel handling. Hard deadline **2026-05-20** (21 days). Confirm with lawyer this week that filing happens.
+- **2026-04-20 lawyer meeting** — happened, outcome captured by operator. **Operator owes me four privacy-policy fields** (operating entity name+type, jurisdiction, contact email, mailing address) so I can patch `docs/PRIVACY-POLICY-V1.md`.
+- **Play Console developer account** — operator starts this week. Multi-week ID-verification clock starts immediately.
+- **Upload keystore second-medium backup** — covered (operator confirmed multiple secure methods).
+- **TTS quality monitoring** — operator does end-to-end Lenovo listen-tests routinely as part of QC.
 
-0c. **(S196 NEW) Hand-author the 199 rejected narrations** (lint: `narration_regen_failed`). Operator-side. Many are post-1860 hb_* houses where SI dump has too few pre-1860 facts. Walk the lint tab, suppress accepted-silent, hand-author the rest.
+### S201 next-session actions (pre-AAB content drain + smoke)
 
-0d. **(S199 NEW)** Eyes-on the new shorter Witch Trials content + S200 commercial-template + S200 historical_narration display during a real walk on the Lenovo. Confirm 250/150/150 word caps feel right; confirm tier-0 commercials show only template; confirm MASSGIS rows now surface their pre-1860 narration on marker tap.
+1. **Bulk SQL hard-delete the 365 dedup losers** after FK-ref verification (`SELECT COUNT(*)` of FKs to those `id`s; if zero, single `DELETE`).
+2. **Bulk-Suppress all 199 `narration_regen_failed` lint flags** as accept-silent.
+3. **Audit `app-salem/src/main/assets/heroes/` (14 MB) vs `hero/` (12 MB)** — likely refactor leftover. Identify live vs legacy directory; delete the dead one.
+4. **Rebuild signed AAB with S185–S200 work + 30-min Lenovo smoke** against the 5-item V1 gating checklist: Visit Website ACTION_VIEW handoff, Find dialog Reviews/Comments hidden, Find Directions visible, toolbar gating (no Weather/Transit/CAMs/Aircraft/Radar), webcam "View Live" hidden.
 
-0e. **(S199 carry-forward)** Newspaper PK normalization — old `id = date` rows were a legacy from before `cmd/gennewspaper` adopted `id = "salem_oracle_" + date`. `bundle-witch-trials-newspapers-into-db.js` does INSERT OR REPLACE; if any future PG load brings back date-only ids the bundle will accumulate dupes. Pin a constraint OR add a delete-stale-ids step at top of bundle script.
+### S202 — dedicated 1-hour carry-forward triage
 
-0f. **(S200 NEW)** `civic_flag_mismatch` lint can flip back to STRICT now that S199 wired bidirectional auto-sync on category change — and S200 commercial cleanup proved the auto-sync holds. One-line change in `cache-proxy/lib/admin-lint.js`.
+Every open item in the **Backlog** section below + the **Carry-forward (still owed)** section + the OMEN open items gets a stamp: **V1 / V1.0.1 / V2**. STATE.md emerges with a clean V1 list. No new code in S202.
 
-0g. **(S200 NEW)** Operator hand-authors McIntire content for canonical attributions (Hamilton Hall, Gardner-Pingree, Joshua Ward already have grounded coverage; Hawkes + Peirce-Nichols already cite McIntire correctly; 384 Essex stub authored S200 from operator's first-hand knowledge). Other personally-known properties: operator dictates facts → publish chain. SalemIntelligence's `mode_c_historic_building_details` is empty for most MASSGIS rows; operator declined a MACRIS scraper, so any remaining architectural attributions need either operator first-hand knowledge or hand-authored research.
+### S203 — V1 tech-debt resolution
 
-0h. **(S192 carry-forward) Backfill `year_established` on the 500+ HIST_BLDG rows missing it.** Pull from SI + MHC. Reduces the lint cap-hit so other content gaps surface.
+- **Tier-2 auto-bake** — wrap `publish-salem-pois.js` + `publish-tours.js` + `publish-tour-legs.js` + `bundle-witch-trials-*` + `align-asset-schema-to-room.js` as a `preBuild`-dependent Gradle task with stale-bake warning. ~45 min. Removes a class of release-day footgun.
+- **First Kotlin unit test** on `NarrationGeofenceManager.setTourMode` — closes OMEN-004 phase 1 before the 2026-08-30 deadline. ~1 hour.
 
-0i. **(S195 NEW, still open) Driving mode considered explicitly.** S195 drive-test surfaced walking-tuned geofences (40m + serial TTS) are brittle at 10 m/s. V1 stance is a walking-only disclaimer. Driving mode is V2.
+### S204+ — V1 feature additions (priority order, KEPT for V1)
 
-13. **Form TX copyright filing — hard deadline 2026-05-20 (23 days from 2026-04-27).** $65, ~10 minutes online. File as Dean Maurice Ellis individually if entity not yet formed; assign later. Missing this loses statutory damages eligibility for any infringement during the launch window.
+1. **Halloween / October seasonal layer** — date-checked content overlay (different POI markers, ghost-tour POIs unlocked October 1, photo-spot pins, October-only event narration). Zero network. Reuse existing geofence + narration paths. Scope tight, ~1 week.
+2. **Time-slider basemap, 1906 only** for V1 (Sanborn 1906) — full 4-year slate (1890/1906/1950/1957) deferred to V1.0.1+. ~1 week for one year.
+3. **Tour-completion certificate (PDF on-device)** — end-of-tour souvenir with route + triggered POIs + date + Salem-themed border. Zero network. ~2-3 days.
+4. **Salem Heritage Trail polyline tour — YELLOW, not red** (the trail was repainted yellow). Hand-trace via admin or import official KML if available. ~1 day. See memory `reference_salem_heritage_trail_yellow.md`.
 
-14. **Play Console developer account application — multi-week ID-verification lead time.** $25 + government-issued ID. Independent of legal entity setup. Must start ASAP to not gate the Sept 1 ship target.
+### V1 features deferred / killed (S201 decisions)
 
-15. **Privacy policy `[TBD]` placeholders + 2026-04-20 lawyer meeting outcome.** Four placeholders (operating entity, contact email, mailing address, jurisdiction) blocking Play Console submission. Counsel meeting was 2026-04-20 (now 7 days past) — outcome not in any session log. Operator must confirm.
+- **Bark hero voice clips** — SKIPPED. Ship Android TTS only (operator does ongoing QC listen-tests).
+- **Hotel B2B partnerships** — post-launch only.
+- **Pre-launch beta** — small, 2–3 friendly-eyes testers (not the 5–10 program).
+- **iOS port** — scope effort/timing now, decide later.
+
+### Marketing (operator-led, content-only sessions before Aug 1)
+
+- **Channel:** Salem Chamber of Commerce + local-first.
+- **Asset packet** — drafted in a content-only session before Aug 1: 1-page sell sheet, feature graphic, 3-5 hero screenshots, 2-paragraph press blurb. Operator provides photos + final approval; I draft text + screenshot frames.
+
+### Architectural housekeeping applied this session (S201)
+
+- **`COMMERCIALIZATION.md`, `IP.md`** — replaced with thin V1-truthful stubs. Pre-pivot originals archived to `docs/archive/{COMMERCIALIZATION,IP}_removed_2026-04-29.md` with a "pre-pivot platform vision" banner.
+- **`CURRENT_TESTING.md`** — archived (lint tab + session logs serve the testing-checklist role now); no replacement.
+- **`CLAUDE.md` ship anchor** — updated from Sept 1 to Aug 1 (operator-confirmed internal target).
+- **`STATE.md` ship anchor** — this section.
 
 ---
 
-1. **Use the Lint tab + S188 map preview to drive content cleanup.** Same backlog as S188's intended TOP PRIORITY, now with sharper tooling. In rough order: backfill `year_established` on 500+ Historical Buildings (Lint → Open Editor); author narration for the 30 silent Civic POIs and the 8 museum tour-flags; hard-delete the 365 dedup losers pre-AAB; run the address-geocode deep scan and walk through results using the new map preview (Show on Map → Move POI / Validate / Hide / Edit). The Geocodes modal now also feeds the `salem_geocode_blacklist` table — every "Hide this candidate" decision persists across sessions.
+## Backlog from S185–S200 (will be triaged in S202)
 
-2. **Onboarding-to-nearest-point on tour start.** Operator request from S185: when user picks a tour and isn't on the polyline, route them to the nearest point on it before walk mode begins. Code path: `TourViewModel.startTour()` → fetch `tour_legs` → flatten polyline → find nearest segment to user's GPS → call `walkingDirections.getRoute(userLoc, nearestPoint)` → publish that as the active directions session. When user reaches it, switch to "tour-walking" mode (no live directions; user just follows the static polyline + POI geofence narration).
+These items remain valid carry-forwards; they need V1/V1.0.1/V2 classification in the dedicated S202 triage.
 
-3. **GPS-OBS heartbeat investigation.** Pre-existing Lenovo TB305FU quirk surfaced during S185 walk-sim debug: system GPS is delivering fixes (visible at `LocationManagerService` level) but the app's tour observer reports them as stale (`HEARTBEAT STALE — last fix 33s ago, narration reach-out suppressed`). Same family as the broken-motion-sensor issue noted in `feedback_lenovo_motion_sensor_broken.md`. Not introduced by S185, but compounds the "narration didn't fire" experience when walk-sim isn't active. Investigate why fresh fixes aren't reaching `lastFixAtMs` on this device.
-
-4. **Tier 2 — admin → build pipeline auto-bake** (S180 carry-forward, escalated by S185). Per `feedback_admin_changes_propagate_to_builds.md`. Wrap `publish-tours.js` + `publish-tour-legs.js` + `align-asset-schema-to-room.js` as a `preBuild`-dependent Gradle task with a "stale bake" warning when last-bake-mtime < last-admin-edit-mtime in PG. ~30-min job. Now critical since the publish chain has 3 scripts and getting any of them out of order leaves a destructive-migration footgun.
-
-5. **PRE-AAB — hard-delete dedup loser rows. Count corrected by S187 lint: 365** (S185 estimated 110). Lint tab → Cleanup → "Soft-deleted dedup losers (pre-AAB cleanup)" or run `DELETE FROM salem_pois WHERE data_source ILIKE '%dedup%loser%' OR data_source ILIKE '%address-dedup%loser%';` (verify zero FK refs first). Surfaced again in S185: 5 "Ledger" rows in PG, 3 narrated, 2 unnarrated dedup leftovers — likely contributing to confused geofence registration.
-
-6. **Re-author the 5 deleted Kotlin tours in PG** (S185 carry-forward). Operator wants them back as polyline-only tours via the web admin (path-only model — POIs govern narration). Each tour: insert `salem_tours` row, drop free waypoints onto the route in admin map, click Compute Route, eyeball-verify, re-run publish chain.
-
-7. **Continue eyes-on smoke test on Lenovo** (S180/S181/S182 carry-forward). Remaining items: POI detail Visit Website ACTION_VIEW external browser handoff, Find dialog Reviews/Comments hidden in V1, Find dialog Directions on-device router visible, toolbar gating (no Weather/Transit/CAMs/Aircraft/Radar buttons), webcam dialog "View Live" hidden. Worth interleaving since the next AAB rebuilds anyway.
-
-8. **OPERATOR-SIDE — second-medium copy of upload keystore.** One USB copy exists at `/media/witchdoctor/writable/wickedsalem-upload-key-backup-2026-04-26/`. Recommend encrypted cloud or a second USB stored elsewhere before first Play Console upload. Single-medium backups fail. Run `sudo bash ~/keys/backup-staging/copy-to-usb.sh` against a different mounted medium.
-
-9. **Tier 3 — Content-data fixes for outlier POIs** (S178 carry-forward). Two POIs have wrong coords causing >60m snap gaps even with S179's densified graph: `salem_common_2` at (42.5203, -70.8816) is 600m from actual Salem Common (~42.5232, -70.8908); `salem_willows` at (42.535, -70.86945) is mid-parking-lot. SQL UPDATE + re-bake + rebuild AAB.
-
-10. **OPERATOR-SIDE async** (no Claude action): Form TX copyright (lawyer handling, hard deadline 2026-05-20), Play Developer Account verification (multi-week lead time, will tackle in a later session), Privacy Policy public hosting (waiting on lawyer approval).
-
-11. **DEFERRED from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water-aware approach segments (post-V1). **Do not propose** as part of routing-quality work — see content-not-engineering rule.
-
-12. **DirectionsSession JVM tests** (still deferred). Convenience-not-correctness.
+- **(S196)** Multi-admin auth + actor-from-session wiring — `salem_admin_users` table, Basic Auth verification, `SET LOCAL "app.actor"` plumbing on admin write endpoints + scripts.
+- **(S196)** PoiEditDialog inline history panel — latest 20 audit entries alongside Quality Flags panel, per-row Revert.
+- **(S199)** Eyes-on the shorter Witch Trials content + S200 commercial template + S200 `historical_narration` display during a real Lenovo walk.
+- **(S199)** Newspaper PK normalization — pin constraint or add delete-stale-ids step at top of `bundle-witch-trials-newspapers-into-db.js` to defend against legacy `id = date` rows.
+- **(S200)** Tighten `civic_flag_mismatch` lint back to STRICT now that S199 wired bidirectional category↔civic auto-sync.
+- **(S200)** Operator hand-authors McIntire content for personally-known properties (384 Essex stub written S200; others pending operator first-hand knowledge or hand-research). SalemIntelligence `mode_c_historic_building_details` is empty for most MASSGIS rows; operator declined a MACRIS scraper.
+- **(S192)** Backfill `year_established` on 500+ HIST_BLDG rows missing it. Pull from SI + MHC.
+- **(S195)** Driving mode — V2 (V1 is walking-only disclaimer; geofences tuned for walking pace).
+- **(S185)** Re-author the 5 deleted Kotlin tours in PG as polyline-only tours via web admin.
+- **(S185)** Onboarding-to-nearest-point on tour start — `TourViewModel.startTour()` → fetch `tour_legs` → flatten polyline → nearest-point routing.
+- **(S185)** GPS-OBS heartbeat investigation on Lenovo TB305FU — fresh fixes not reaching `lastFixAtMs`.
+- **(S178)** Tier 3 outlier POI coord fixes — `salem_common_2` 600m off, `salem_willows` mid-parking-lot.
+- **(S179)** Lower priority: routing-jvm Option 2 mid-edge projection; walk-sim + DebugEndpoints `TourRouteLoader` cleanup; water-aware approach segments. Per content-not-engineering rule, do not propose as routing-quality work.
+- **(open)** DirectionsSession JVM tests.
 
 ---
 
-## TOP PRIORITY — Carry-forward (still owed from earlier sessions)
+### Older carry-forwards (S159–S172) — also S202 triage scope
 
-- **Water animation visual tuning** (S172) — operator's verdict was "not the best." Infrastructure complete (world-anchored 14185-anchor lat/lon grid, ANR-safe), but `~` curved-stroke shape doesn't sell as wave crests. Three directions documented in `docs/session-logs/session-172-2026-04-25.md`: different shape (irregular dash bundles / elliptical foam / parallel-to-coast angle), pre-rendered animated drawable (frame-anim PNG/WebP via AI Studio pipeline), or density bump (110m → 70m grid).
-
-- **osmdroid → WickedMapView migration** (S171/S172 carry). 338 osmdroid call sites still extant in `SalemMainActivity`. Stage 1 = layout swap + simple camera/lifecycle calls; Stage 2+ = per-feature overlay migration starting with POIs. Operator accepts temporary regressions in radar/aircraft/METAR/transit during migration.
-
-- **Field-test S169 fixes** (S168/S169/S171): walk-confirm walker dwells on every narrating POI (not just CPA winners) and exits cleanly; one-line manifest fix `android:launchMode="singleInstance"` on SplashActivity to stop launcher tap jumping past Katrina intro; flip `pickNextFromQueue` explore mode to tier-first / closest-tiebreaker (currently closest-first; spec is "historical then closest" per S169).
-
-- **POI location verifier** (S162) — UNBLOCK by checking TigerLine MA ingest status. Schema (`lat_proposed`/`lng_proposed`/`location_status` etc.) + 3 indexes shipped. Verifier itself blocked: `tiger.addr/addrfeat/edges/featnames` were empty for `statefp='25'` in S162. Re-check; if populated, write verifier, run against 1,761 active addressed POIs.
-
-- **S163 MHC hidden POIs companion importer** — wait for SalemIntelligence enrichment delivery, then write `tools/historical-buildings/import-si-enrichment.py` mirroring `import-to-salem-pois.py`.
-
-- **GPS + V1-offline regression check on next drive** (S161) — pull Lenovo debug log; expected zero "POI failed" / "Fill failed" toasts, zero `findItem(...) null` warnings, fix cadence ~1-2.5s while moving (no 20-30s gaps).
-
-- **Find type-search smoke test** (S165/S166) — install + smoke-test "dentist" / "lawyer" / "gym" / "coffee" before further Find work.
-
-- **Witchy tile bake bbox extension OR no-coverage UX hint** (S159) — operator's home in Beverly (42.5567, -70.8717) is north of S158 bake bbox max lat 42.545. Either extend the bake or render a "pan south to Salem" hint when viewport has no tile coverage.
-
-- **`verify-bundled-assets.js` provider list update** (S167 reversed S158). Tiles back in APK assets at `app-salem/src/main/assets/salem_tiles.sqlite` (Witchy-only, Salem city bbox). Script's check is valid again; needs updated provider list.
+- **(S172)** Water animation visual tuning — `~` stroke doesn't sell; alternatives in `docs/session-logs/session-172-2026-04-25.md`.
+- **(S171/S172)** osmdroid → WickedMapView migration — 338 call sites in `SalemMainActivity`. Operator accepts temp regressions during migration.
+- **(S168/S169/S171)** Field-test fixes — walk-confirm walker dwell on all narrating POIs; `launchMode="singleInstance"` on SplashActivity; `pickNextFromQueue` explore-mode tier-first ordering.
+- **(S162)** POI location verifier — blocked on TIGER MA ingest. Re-check `tiger.addr/addrfeat/edges/featnames` for `statefp='25'`.
+- **(S163)** MHC hidden-POI companion importer — wait for SalemIntelligence enrichment delivery.
+- **(S161)** GPS + V1-offline regression check on next drive — pull Lenovo debug log.
+- **(S165/S166)** Find type-search smoke test — "dentist"/"lawyer"/"gym"/"coffee".
+- **(S159)** Witchy tile-bake bbox extension OR no-coverage UX hint — operator's Beverly home (42.5567, -70.8717) is north of S158 bake max lat 42.545.
+- **(S167)** `verify-bundled-assets.js` provider list update — tiles back in APK assets, script needs Witchy-only provider list.
 
 ---
 
@@ -140,7 +141,7 @@ S180 standing (still valid): V1 Play Store gating chores DONE end-to-end. First 
 | **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
 | **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 195. Salem 400+ target 2026-09-01 aspirational.
+**Sessions completed:** 200 (S201 in progress). **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
 
 ---
 

@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 190, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 191, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 190, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 191, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 191: 2026-04-27 — Tour-flag bulk fix, two new lint checks, RHF reset race, dest_salem/haunted_happenings cleanup, hidden-POI narration bug diagnosed
+
+Mid-evening continuation immediately after S190. Diagnosed why "tour POI flags appear lost when moving a location" — `/move` is clean, `PUT` only sends RHF dirtyFields, but `PoiEditDialog.tsx`'s `useForm({ values: defaultValues })` was resetting the form on every parent `selectedPoi.poi` ref change (handlePoiMoved spreads a new object after a marker drag → unsaved checkbox toggles wiped). Fix: keyed `defaultValues` `useMemo` on `poi.id` only. Bulk-flipped 77 curated `HISTORICAL_BUILDINGS` rows (`data_source NOT LIKE '%massgis%'`) to `is_tour_poi=true` so the curated bucket is now 118/118 (MassGIS bucket stays 0/487 per S186); added `hist_curated_not_tour` lint check. Cleaned 2 stale `is_civic_poi=true` flags on rows whose `category` had been re-set to HISTORICAL_BUILDINGS (Witch House at Salem, Howard Street Cemetery — leftover from S186 bulk civic flag); added `civic_flag_mismatch` lint check (`is_civic_poi=true AND category<>'CIVIC'`). Two new synthetic admin tree categories `SOURCE:destination_salem` / `SOURCE:haunted_happenings` (new `dataSourceContains` helper; `categoryFilterMatches` honors source-needle keys; `buildTree` prepends source nodes flat, no subcategory layer; explicit `TreeNode` typing on `realNodes` to keep TS happy). Per operator: soft-deleted 67 POIs whose provenance was solely `destination_salem` and/or `haunted_happenings` (no OSM token); stripped those tokens from 63 OSM-bearing survivors via `regexp_replace((destination_salem|haunted_happenings)\+|\+(destination_salem|haunted_happenings)\M, '', 'g')`. Asset DB shrank 9.2 MB → 9.0 MB. Two full publish chains + APK reinstalls on Lenovo HNY0CY0W during the session. Operator then asked about hidden POIs still announcing — **diagnosed but not fixed**: `SalemPoiDao.findNarrated()` query gates on `is_narrated=1` only, ignoring `default_visible`; 1,155 hidden-but-narrated POIs (489 hist-bldg, 197 OFFICES, 147 HEALTHCARE, 133 CIVIC, 82 SHOPPING, 52 AUTO_SERVICES) load into `NarrationGeofenceManager.points` and fire ENTRY events in explore mode. Live evidence: 6 of last 10 narrations on device were `default_visible=false` (4 OFFICES + 2 CIVIC). Fix proposed (`AND default_visible=1` or `OR is_tour_poi=1`) but session-ended before applying — primary carry-forward to S192.
+
+Full session detail: `docs/session-logs/session-191-2026-04-27.md`. Commit: `4d560be`.
+
+---
 
 ## Session 190: 2026-04-27 — Admin taxonomy tooling, Geocodes tab, routing graph fix (coincident-node merge + island bridging)
 

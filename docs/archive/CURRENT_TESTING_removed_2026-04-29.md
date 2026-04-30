@@ -1,3 +1,19 @@
+# ARCHIVED 2026-04-29 — Pre-pivot platform vision
+
+> **This document has been archived.** It describes the pre-pivot generic-LocationMapApp platform: freemium with ads, social Socket.IO chat/comments, Overpass POI scanner, R-tree TFR/military/aircraft geofence engine, BlueStacks emulator testing. **None of this ships in V1.**
+>
+> The live V1 product is **Katrina's Mystic Visitors Guide** — a $19.99 flat-paid, fully-offline Salem walking-tour app. V1 truth lives in `STATE.md`, `CLAUDE.md`, and `docs/session-logs/`.
+>
+> Preserved here for historical context only. Do not treat as a V1 spec or hand to counsel as live documentation.
+>
+> **Archived during S201 (V1 launch triage), 2026-04-29.**
+
+---
+
+*Original document follows.*
+
+---
+
 # Social Layer Testing — Status
 
 ## Completed (all passed)
