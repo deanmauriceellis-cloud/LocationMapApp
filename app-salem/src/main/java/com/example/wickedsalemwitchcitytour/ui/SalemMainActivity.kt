@@ -57,6 +57,7 @@ import com.example.wickedsalemwitchcitytour.util.DebugEndpoints
 import com.example.wickedsalemwitchcitytour.util.DebugHttpServer
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.userdata.GpsTrackRecorder
+import com.example.wickedsalemwitchcitytour.userdata.KatrinaCameraManager
 import com.example.wickedsalemwitchcitytour.wickedmap.AnimatedWaterOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.FireflyOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.PolygonLibrary
@@ -374,8 +375,8 @@ class SalemMainActivity : AppCompatActivity() {
     }
     internal var idlePopulateState: IdlePopulateState? = null
 
-    // Zoom toggle (x1/x2/x3 quick zoom)
-    internal var zoomToggleLevel: Int = 0  // 0=x1, 1=x2, 2=x3
+    // Zoom toggle (x1/x2/x3/x4/x5 quick zoom). S202: default x2 per operator.
+    internal var zoomToggleLevel: Int = 1  // 0=x1, 1=x2, 2=x3, 3=x4, 4=x5
 
     // Walk simulator
     internal var walkSimJob: kotlinx.coroutines.Job? = null
@@ -564,6 +565,22 @@ class SalemMainActivity : AppCompatActivity() {
         if (uri != null) showCsvImportConfigDialog(uri)
     }
 
+    // ── Top-bar Camera (recon photos with GPS+compass EXIF) ──────────────
+    internal val katrinaCameraManager = KatrinaCameraManager(this)
+
+    internal val cameraCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        katrinaCameraManager.onCaptureResult(result.resultCode)
+    }
+
+    internal val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        DebugLogger.i("SalemMainActivity", "Camera permission result: granted=$granted")
+        katrinaCameraManager.onCameraPermissionResult(granted)
+    }
+
     // =========================================================================
     // LIFECYCLE
     // =========================================================================
@@ -604,6 +621,12 @@ class SalemMainActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowTitleEnabled(false)
         DebugLogger.i("SalemMainActivity", "setSupportActionBar complete — title hidden for slim toolbar")
 
+        // ── Top-bar Camera launchers wired to the recon manager ───────────
+        katrinaCameraManager.registerLaunchers(
+            captureLauncher    = cameraCaptureLauncher,
+            permissionLauncher = cameraPermissionLauncher
+        )
+
         // ── Menu manager — slim toolbar with 3 icons + grid dropdown ──────
         appBarMenuManager = AppBarMenuManager(
             context           = this,
@@ -618,6 +641,7 @@ class SalemMainActivity : AppCompatActivity() {
             tileSourceIcon = binding.root.findViewById(R.id.toolbarTileSourceIcon),
             homeIcon       = binding.root.findViewById(R.id.toolbarHomeIcon),
             aboutIcon      = binding.root.findViewById(R.id.toolbarAboutIcon),
+            cameraIcon     = binding.root.findViewById(R.id.toolbarCameraIcon),
             alertsBadge    = binding.root.findViewById(R.id.alertsBadge),
             layersBadge    = binding.root.findViewById(R.id.layersBadge)
         )
@@ -868,6 +892,7 @@ class SalemMainActivity : AppCompatActivity() {
         // S115: Motion tracker always on while visible — it's a trigger
         // sensor so it costs nothing until an event actually fires.
         motionTracker?.start()
+        katrinaCameraManager.onResume()
         DebugLogger.i("SalemMainActivity","onResume()")
     }
     override fun onPause() {
@@ -882,6 +907,7 @@ class SalemMainActivity : AppCompatActivity() {
         // visible. No cost to restart on the next onResume.
         deviceOrientationTracker?.stop()
         motionTracker?.stop()
+        katrinaCameraManager.onPause()
         DebugLogger.i("SalemMainActivity","onPause()")
     }
     override fun onDestroy() {
@@ -1102,10 +1128,10 @@ class SalemMainActivity : AppCompatActivity() {
             maxZoomLevel = MAP_MAX_OVERZOOM
             if (fromSplash) {
                 // Start on Salem at street level — no wasted tile loading
-                controller.setZoom(18.0)
+                controller.setZoom(19.0)
                 controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             } else {
-                controller.setZoom(18.0)
+                controller.setZoom(19.0)
                 controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             }
         }
@@ -1258,7 +1284,7 @@ class SalemMainActivity : AppCompatActivity() {
 
         // Phase 2: ease to street-level z18 (1000ms)
         map.postDelayed({
-            map.controller.animateTo(target, 18.0, 1000L)
+            map.controller.animateTo(target, 19.0, 1000L)
         }, 1100L)
 
         // Phase 3: welcome dialog once the zoom settles
@@ -1271,16 +1297,16 @@ class SalemMainActivity : AppCompatActivity() {
     internal fun setupZoomSlider() {
         val map = binding.mapView
 
-        // + button: zoom in
+        // + button: zoom in by 2 levels per tap (operator preference S202)
         binding.btnZoomIn.setOnClickListener {
-            val newZoom = (map.zoomLevelDouble + 1.0).coerceAtMost(map.maxZoomLevel)
+            val newZoom = (map.zoomLevelDouble + 2.0).coerceAtMost(map.maxZoomLevel)
             map.controller.setZoom(newZoom)
             updateZoomBubble()
         }
 
-        // − button: zoom out
+        // − button: zoom out by 2 levels per tap
         binding.btnZoomOut.setOnClickListener {
-            val newZoom = (map.zoomLevelDouble - 1.0).coerceAtLeast(map.minZoomLevel)
+            val newZoom = (map.zoomLevelDouble - 2.0).coerceAtLeast(map.minZoomLevel)
             map.controller.setZoom(newZoom)
             updateZoomBubble()
         }
@@ -1420,11 +1446,18 @@ class SalemMainActivity : AppCompatActivity() {
         }
     }
 
-    /** Set up the bottom-left magnification toggle (x1 → x2 → x3 → x1).
+    /** Set up the bottom-left magnification toggle (x1 → x2 → x3 → x4 → x5 → x1).
      *  Scales the map view visually without changing the actual zoom level. */
     internal fun setupZoomToggle() {
         val scaleFactors = floatArrayOf(1.0f, 1.5f, 2.0f, 2.5f, 3.0f) // x1–x5
         val labels = arrayOf("x1", "x2", "x3", "x4", "x5")
+
+        // S202: apply the default level (x2) immediately so the cold-start view
+        // matches the FAB label without requiring a tap.
+        val initialScale = scaleFactors[zoomToggleLevel]
+        binding.mapView.scaleX = initialScale
+        binding.mapView.scaleY = initialScale
+        binding.zoomToggleLabel.text = labels[zoomToggleLevel]
 
         binding.zoomToggleBtn.setOnClickListener {
             zoomToggleLevel = (zoomToggleLevel + 1) % 5
@@ -2605,7 +2638,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     private fun isGpsTrackVisible(): Boolean =
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
-            .getBoolean(GPS_TRACK_PREF_KEY, false)
+            .getBoolean(GPS_TRACK_PREF_KEY, true)
 
     private fun setGpsTrackVisible(visible: Boolean) {
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
@@ -2625,7 +2658,7 @@ class SalemMainActivity : AppCompatActivity() {
         // the user's last setting.
         if (!HEADING_UP_ENABLED) return false
         return getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
-            .getBoolean(HEADING_UP_PREF_KEY, false)
+            .getBoolean(HEADING_UP_PREF_KEY, true)
     }
 
     private fun setHeadingUpMode(enabled: Boolean) {
@@ -3059,9 +3092,9 @@ class SalemMainActivity : AppCompatActivity() {
                         performCinematicZoom(point)
                         fromSplash = false
                     } else {
-                        DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=18")
+                        DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=19")
                         binding.mapView.controller.animateTo(point)
-                        binding.mapView.controller.setZoom(18.0)
+                        binding.mapView.controller.setZoom(19.0)
                     }
                 } else {
                     // Continuous GPS follow — keep map centered on user
@@ -4323,6 +4356,14 @@ class SalemMainActivity : AppCompatActivity() {
             resetIdleTimer()
             DebugLogger.i("SalemMainActivity", "onAboutRequested")
             showAboutDialog()
+        }
+
+        // ── Top-bar Camera (recon photos) ─────────────────────────────────────
+
+        override fun onCameraReconRequested() {
+            resetIdleTimer()
+            DebugLogger.i("SalemMainActivity", "onCameraReconRequested")
+            katrinaCameraManager.requestCapture()
         }
 
         // ── Tours ─────────────────────────────────────────────────────────────

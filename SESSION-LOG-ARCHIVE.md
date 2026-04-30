@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 191, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 192, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 191, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 192, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 192: 2026-04-27 / 28 — Historical narration system end-to-end + 4 field-test fixes
+
+Built the third narration field `historical_narration` from PG column through to Lenovo. Generator script `cache-proxy/scripts/generate-historical-narrations.js` consolidates GROUND_TRUTH from SI dump + SI historical_note + local Salem JSON (buildings/biographies/facts) for 1692-trial-era entities; 6 prompt iterations of validator hardening (year guard, sentence-rescue, meta-gap ban, paces evasion, modern-business strip, abbreviation/initial guards). Backfilled `intel_entity_id` 53 → 565 via name+coords matcher. Operator approved 33 narrations across 3 review rounds; full population background run wrote 70 narrations (5 reject, 479 skip-not-pre1860, 11 skip-commemorative). Room v11→v12 schema bump + admin UI Historical Narration textarea + lint check `hist_pre1860_no_historical_narration` shipped. Field-test fixes shipped same session: hidden-POI narration visibility gate (S191 carry-forward — 5 `findNarrated*` queries gate on `default_visible OR is_tour_poi`), Oracle Newspaper silent bug (5 gate sites in SalemMainActivityNarration also honor `AudioControl.isOracleEnabled()`), Walking Tours infinite spinner (Room schema mismatch — fixed via publish + align), smart TTS chunker in NarrationManager (sentence-level + abbreviation/initial/number guards + sub-split for long sentences + pause hierarchy 100/200/300ms). Two new feedback memories saved (no-meta-gaps, narration-fields-purpose-separated).
+
+Full session detail: `docs/session-logs/session-192-2026-04-27.md`. Commit: `1e10473`.
+
+---
 
 ## Session 191: 2026-04-27 — Tour-flag bulk fix, two new lint checks, RHF reset race, dest_salem/haunted_happenings cleanup, hidden-POI narration bug diagnosed
 

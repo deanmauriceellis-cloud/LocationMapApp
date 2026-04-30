@@ -1,0 +1,31 @@
+<!--
+  WickedSalemWitchCityTour v1.0
+  Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+  Module: recon_shutter_button.xml — white circle with thin gap inside ring.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item>
+    <shape android:shape="oval">
+      <solid android:color="#FFFFFFFF" />
+    </shape>
+  </item>
+  <item
+    android:left="6dp"
+    android:top="6dp"
+    android:right="6dp"
+    android:bottom="6dp">
+    <shape android:shape="oval">
+      <solid android:color="#00000000" />
+      <stroke android:width="3dp" android:color="#88000000" />
+    </shape>
+  </item>
+  <item
+    android:left="10dp"
+    android:top="10dp"
+    android:right="10dp"
+    android:bottom="10dp">
+    <shape android:shape="oval">
+      <solid android:color="#FFFFFFFF" />
+    </shape>
+  </item>
+</layer-list>

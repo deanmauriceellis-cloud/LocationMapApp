@@ -43,6 +43,20 @@
             android:tooltipText="Home" />
 
         <ImageView
+            android:id="@+id/toolbarCameraIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_camera_recon"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Take recon photo (GPS+compass EXIF)"
+            android:tooltipText="Camera (GPS+compass EXIF)" />
+
+        <ImageView
             android:id="@+id/toolbarWeatherIcon"
             android:layout_width="36dp"
             android:layout_height="36dp"

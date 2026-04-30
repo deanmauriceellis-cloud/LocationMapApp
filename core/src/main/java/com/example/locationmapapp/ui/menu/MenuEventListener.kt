@@ -284,6 +284,13 @@ interface MenuEventListener {
     /** Show the About dialog with version and copyright info. */
     fun onAboutRequested()
 
+    /**
+     * Top-bar Camera button — capture a recon photo with full GPS + compass
+     * EXIF baked in. Default routes through [onStubAction] so non-Salem hosts
+     * (generic app) can compile without overriding.
+     */
+    fun onCameraReconRequested() { onStubAction("camera_recon") }
+
     // =========================================================================
     // SAFETY NET
     // =========================================================================

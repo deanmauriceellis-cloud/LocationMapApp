@@ -10,4 +10,5 @@
 -->
 <paths>
     <files-path name="geofence_databases" path="geofence_databases/" />
+    <external-files-path name="recon_camera_tmp" path="recon-camera-tmp/" />
 </paths>

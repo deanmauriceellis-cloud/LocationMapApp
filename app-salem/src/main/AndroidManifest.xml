@@ -13,6 +13,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- S202: top-level Camera menu (recon photos with full GPS+compass EXIF). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- S180: V1 zero-network rule — INTERNET, ACCESS_NETWORK_STATE
          permissions REMOVED. The OS denies any net access at the syscall
          layer regardless of code. Re-add for V2 alongside FeatureFlags
@@ -62,6 +66,13 @@
             android:name=".ui.DebugLogActivity"
             android:exported="false"
             android:label="Debug Log" />
+
+        <activity
+            android:name=".ui.ReconCaptureActivity"
+            android:exported="false"
+            android:label="Recon Camera"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

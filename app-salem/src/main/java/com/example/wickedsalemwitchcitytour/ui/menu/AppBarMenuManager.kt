@@ -144,6 +144,7 @@ class AppBarMenuManager(
         tileSourceIcon: ImageView? = null,
         homeIcon: ImageView? = null,
         aboutIcon: ImageView? = null,
+        cameraIcon: ImageView? = null,
         alertsBadge: TextView? = null,
         layersBadge: TextView? = null
     ): SlimToolbarRefs {
@@ -189,6 +190,12 @@ class AppBarMenuManager(
         aboutIcon?.let { icon ->
             icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
             icon.setOnClickListener { menuEventListener.onAboutRequested() }
+        }
+
+        // Camera icon — recon photo with full GPS+compass EXIF
+        cameraIcon?.let { icon ->
+            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            icon.setOnClickListener { menuEventListener.onCameraReconRequested() }
         }
 
         // Tile source picker icon — PopupMenu with Satellite / Street / Witchy.
@@ -1105,10 +1112,11 @@ class AppBarMenuManager(
             MenuPrefs.PREF_AIRCRAFT_DISPLAY, MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, MenuPrefs.PREF_POPULATE_POIS, MenuPrefs.PREF_MBTA_BUS_STOPS,
             MenuPrefs.PREF_ALERT_SOUND, MenuPrefs.PREF_CAMERA_OVERLAY, MenuPrefs.PREF_SCHOOL_OVERLAY, MenuPrefs.PREF_FLOOD_OVERLAY, MenuPrefs.PREF_CROSSING_OVERLAY,
             MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE,
-            // S168: install defaults off — Journey recorder and real-GPS-outside-Salem
-            // both start unchecked so a fresh-install user lands at Samantha's statue
-            // with a clean map and no breadcrumb polyline until they opt in.
-            MenuPrefs.PREF_RECORD_GPS, MenuPrefs.PREF_GPS_BBOX_OVERRIDE -> false
+            // S202: testing-window defaults flipped ON — recon walks need
+            // the breadcrumb polyline visible immediately and real GPS
+            // coords passing through even when the user is outside the
+            // Salem bbox. Operators can still uncheck either via Journey.
+            MenuPrefs.PREF_RECORD_GPS, MenuPrefs.PREF_GPS_BBOX_OVERRIDE -> true
             else -> true
         }
     }
