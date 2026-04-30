@@ -269,8 +269,13 @@ class SalemMainActivity : AppCompatActivity() {
      */
     internal var lastFixAtMs: Long = 0L
 
-    /** Treat the location stream as stale after this much silence (ms). */
-    internal val GPS_STALE_THRESHOLD_MS = 30_000L
+    /** Treat the location stream as stale after this much silence (ms).
+     *  S204: bumped 30s → 45s so the heartbeat doesn't toggle stale during
+     *  the idle-branch 30s subscription cadence (15-30s actual fixes).
+     *  S110's reach-out gate still catches the original problem (15-min-old
+     *  positions cycling through downtown POIs) — 45s is comfortably below
+     *  that order of magnitude. */
+    internal val GPS_STALE_THRESHOLD_MS = 45_000L
 
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
@@ -2854,6 +2859,45 @@ class SalemMainActivity : AppCompatActivity() {
                 bearingDeg = update.bearing
             )
 
+            // ── Adaptive GPS interval (S204: lifted above stationary-freeze gate) ──
+            //   On Lenovo TB305FU, TYPE_SIGNIFICANT_MOTION never fires
+            //   (memory: reference_lenovo_motion_sensor_broken.md), so
+            //   stationaryFrozen below stays true indefinitely whenever the
+            //   user pauses. The picker used to live AFTER the freeze gate's
+            //   early-return, which meant the subscription was stuck at the
+            //   60s startup interval forever — fixes arrived every ~27-60s,
+            //   and the GPS-OBS heartbeat (30s threshold) toggled stale
+            //   constantly. Lifting the picker above the freeze gate lets
+            //   the polling rate adjust on every fix regardless of freeze
+            //   state. The picker only reads update.speedMps and
+            //   tourViewModel.isNarrating(), so it has no dependency on
+            //   visible-layer state.
+            run {
+                val speedMpsNow = update.speedMps ?: 0f
+                val narrating = tourViewModel.isNarrating()
+                val desiredInterval = if (speedMpsNow > 0.5f || narrating) 2_500L else 30_000L
+                val gpsIntervalNowMs = android.os.SystemClock.elapsedRealtime()
+                if (desiredInterval != currentGpsIntervalMs) {
+                    if (desiredInterval != pendingGpsIntervalMs) {
+                        pendingGpsIntervalMs = desiredInterval
+                        pendingGpsIntervalSinceMs = gpsIntervalNowMs
+                    } else if (gpsIntervalNowMs - pendingGpsIntervalSinceMs >= GPS_INTERVAL_DWELL_MS) {
+                        currentGpsIntervalMs = desiredInterval
+                        val minInterval = if (desiredInterval == 2_500L) 1_000L else 15_000L
+                        DebugLogger.i(
+                            "SalemMainActivity",
+                            "GPS interval → ${desiredInterval}ms " +
+                            "(speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph, narrating=$narrating, " +
+                            "dwelled=${gpsIntervalNowMs - pendingGpsIntervalSinceMs}ms)"
+                        )
+                        viewModel.restartLocationUpdates(desiredInterval, minInterval)
+                        pendingGpsIntervalMs = 0L
+                    }
+                } else if (pendingGpsIntervalMs != 0L) {
+                    pendingGpsIntervalMs = 0L
+                }
+            }
+
             // ── S115: Stationary freeze gate ──
             //   When the motion tracker reports the device is physically still
             //   (no significant-motion event for 5+ seconds after 10s warmup)
@@ -2951,49 +2995,6 @@ class SalemMainActivity : AppCompatActivity() {
 
             // S112+: Update the user trigger ring debug overlay (12m/25m/50m) on every fix.
             updateUserTriggerRings(point)
-
-            // ── 1. Adaptive GPS interval ──
-            //   Moving or narrating:  2.5s — tight geofence detection needed.
-            //                                Same rate at highway speed as at
-            //                                walking pace; the former 10s branch
-            //                                for >20 mph caused constant flip-flop
-            //                                on speed boundaries and tore down
-            //                                the FLP subscription every few sec.
-            //   Truly idle:           30s  — battery saver, log-spam reduction.
-            //
-            //   Transitions are debounced: a candidate interval must persist
-            //   for [GPS_INTERVAL_DWELL_MS] before the picker commits to it.
-            //   Each commit is applied in place (no FLP teardown) via
-            //   [LocationManager.updateRequestParams].
-            //
-            //   S150 fix kept: the idle branch is reachable (driven by real
-            //   motion + TTS, not hard-coded `narrationActive=true`).
-            //   S161 fix: removed the >20 mph branch and added dwell debounce.
-            val speedMpsNow = update.speedMps ?: 0f
-            val narrating = tourViewModel.isNarrating()
-            val desiredInterval = if (speedMpsNow > 0.5f || narrating) 2_500L else 30_000L
-
-            val gpsIntervalNowMs = android.os.SystemClock.elapsedRealtime()
-            if (desiredInterval != currentGpsIntervalMs) {
-                if (desiredInterval != pendingGpsIntervalMs) {
-                    pendingGpsIntervalMs = desiredInterval
-                    pendingGpsIntervalSinceMs = gpsIntervalNowMs
-                } else if (gpsIntervalNowMs - pendingGpsIntervalSinceMs >= GPS_INTERVAL_DWELL_MS) {
-                    currentGpsIntervalMs = desiredInterval
-                    val minInterval = if (desiredInterval == 2_500L) 1_000L else 15_000L
-                    DebugLogger.i(
-                        "SalemMainActivity",
-                        "GPS interval → ${desiredInterval}ms " +
-                        "(speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph, narrating=$narrating, " +
-                        "dwelled=${gpsIntervalNowMs - pendingGpsIntervalSinceMs}ms)"
-                    )
-                    viewModel.restartLocationUpdates(desiredInterval, minInterval)
-                    pendingGpsIntervalMs = 0L
-                }
-            } else if (pendingGpsIntervalMs != 0L) {
-                // Candidate no longer desired — reset dwell so brief excursions don't count.
-                pendingGpsIntervalMs = 0L
-            }
 
             // ── 2. Proportional dead zone — drop fixes within 2× reported accuracy ──
             //    S109 fix: replaces the old fixed 100m threshold. At slow downtown driving

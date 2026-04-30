@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 193, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 194, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 193, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 194, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 194: 2026-04-28 — Historical narration QC tooling + Salem Oracle variant picker + commemorative-tribute rule captured
+
+QC pass over the S193 corpus surfaced 6 corrupted narrations that got NULLed (LLM refusal monologue + leading-foreign-word anchor failures). Triage rather than rebake — a tightened-pattern scoring run flagged 47/358 clean and 311/358 with at least one critical/soft hit, with operator clarifying the soft buckets (rambling, hedging) are draft-quality content worth keeping. Tooling shipped to surface the broken ones through the existing Lint workflow: new shared validator `cache-proxy/lib/historical-narration-validator.js` driving (1) a `historical_narration_needs_refinement` lint check that fires for self-ref / modern-leak / subject-absent / tag-echo / address-list patterns (89 POIs flagged); (2) tree color-dot indicators on `PoiTree.tsx` — each POI row gets a red/amber/sky dot when any lint check fires, with category and subcategory containers aggregating descendant max severity + flagged-count split in the count column; (3) `OracleVariantPicker.tsx`, a 5-short × 5-long × 5-historic generator that fires SI `/api/intel/chat` calls in parallel (concurrency=3) using distinct style prompts per variant, validates historic candidates against the same regex set (rejected variants show disabled with reasons), and hides the historic column for non-historical POIs. Also dropped the `currentCategory === 'HISTORICAL_BUILDINGS'` gate on the `historical_narration` field in `PoiEditDialog` so any POI can have one authored without a category change first. Operator side-note late session: commemorative POIs (statues / memorials / plaques / arches) tributing PRE-1860 subjects ARE eligible for `historical_narration` — narration's subject is the figure/event commemorated, not the post-1860 object (Hawthorne statue → Hawthorne the man, not the 1925 bronze; Bewitched statue stays excluded). Saved durable rule `feedback_commemoratives_are_historical_tributes.md` + carry-forward comment in `cache-proxy/scripts/generate-historical-narrations.js:766`. Generator implementation deferred to next session (needs a tribute prompt builder + relaxed year guard + STRICT_RULES rule #5 rewording). I started the generator path edits then reverted when operator said "next session we can work with that" — leaving the generator half-modified would have caused commemoratives to slip through and get the buildings prompt.
+
+Full session detail: `docs/session-logs/session-194-2026-04-28.md`. Final commits: `995ef12` (full S194 tooling), `f3ab266` (carry-forward marker).
+
+---
 
 ## Session 193: 2026-04-28 — Demo-bug fixes + dormant historical-tour wiring + +294 historical narrations baked + activate runtime path
 
