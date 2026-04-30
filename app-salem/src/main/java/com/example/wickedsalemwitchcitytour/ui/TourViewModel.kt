@@ -117,7 +117,69 @@ class TourViewModel @Inject constructor(
     // ── Tour actions (delegate to engine) ────────────────────────────────
 
     fun startTour(tourId: String) {
-        viewModelScope.launch { tourEngine.startTour(tourId) }
+        viewModelScope.launch {
+            tourEngine.startTour(tourId)
+            onboardToNearestPolylinePoint(tourId)
+        }
+    }
+
+    /**
+     * S203 — onboarding-to-nearest-point on tour start. If the user is more
+     * than [ONBOARD_THRESHOLD_M] away from the tour's polyline at start, route
+     * them to the nearest point on it before they start chasing the line. Skips
+     * if no GPS fix yet, no baked legs for this tour, or the user is already on
+     * (or within tolerance of) the polyline. Uses the same `computeAndApplyRoute`
+     * publish path as `getDirectionsTo`, so the active session arms drift +
+     * arrival detection automatically.
+     */
+    private suspend fun onboardToNearestPolylinePoint(tourId: String) {
+        val userLoc = tourEngine.lastLocation ?: run {
+            DebugLogger.i(TAG, "Onboarding: no GPS fix yet — skipping nearest-point route")
+            return
+        }
+        val legs = try {
+            repository.getTourLegs(tourId)
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Onboarding: failed to read tour_legs: ${e.message}")
+            return
+        }
+        if (legs.isEmpty()) {
+            DebugLogger.i(TAG, "Onboarding: no baked legs for $tourId — skipping")
+            return
+        }
+        val flattened = legs.flatMap { decodeGeometry(it.geometry) }
+        if (flattened.isEmpty()) return
+
+        var nearest: GeoPoint = flattened.first()
+        var nearestM: Double = haversineM(userLoc, nearest)
+        for (p in flattened) {
+            val d = haversineM(userLoc, p)
+            if (d < nearestM) { nearestM = d; nearest = p }
+        }
+
+        if (nearestM < ONBOARD_THRESHOLD_M) {
+            DebugLogger.i(TAG, "Onboarding: user is ${nearestM.toInt()}m from polyline — already on tour")
+            return
+        }
+        DebugLogger.i(TAG, "Onboarding: user ${nearestM.toInt()}m from polyline — routing to nearest point")
+        computeAndApplyRoute(userLoc, nearest)
+    }
+
+    private fun haversineM(a: GeoPoint, b: GeoPoint): Double {
+        val R = 6_371_000.0
+        val dLat = Math.toRadians(b.latitude - a.latitude)
+        val dLon = Math.toRadians(b.longitude - a.longitude)
+        val h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(a.latitude)) * Math.cos(Math.toRadians(b.latitude)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+    }
+
+    companion object {
+        /** Onboarding fires when the user is more than this many metres
+         *  from the nearest tour polyline point at startTour. 50 m matches
+         *  the WalkingDirections approach-anchor tolerance. */
+        private const val ONBOARD_THRESHOLD_M = 50.0
     }
 
     fun advanceToNextStop() = tourEngine.advanceToNextStop()

@@ -27,7 +27,12 @@ const { validateNarration } = require('./historical-narration-validator');
 
 const SALEM_CENTER_LAT = 42.5223;
 const SALEM_CENTER_LNG = -70.8950;
-const OUTLIER_KM = 3.0;
+// S203: bumped 3.0 → 5.0 km. Salem proper extends ~4 km west to the
+// Highland Ave / Vinnin Square plaza on the Peabody border, which has
+// dozens of legitimate POIs at real coords. The prior 3 km radius
+// flagged them all as "wrong"; 5 km covers the city while still
+// catching the ~6 km Danvers Witch-Trials sites (suppress those individually).
+const OUTLIER_KM = 5.0;
 const ITEM_CAP = 500;
 const ADDR_GEOCODE_MISMATCH_M = 100;
 const ADDR_GEOCODE_MAX_ITEMS = 300;
@@ -815,7 +820,7 @@ const CHECKS = [
   { id: 'hist_curated_not_tour',     label: 'Curated Historical Buildings missing tour flag', category: 'Historical Buildings', severity: 'warn',  run: checkHistCuratedNotTour },
   { id: 'hist_pre1860_no_historical_narration', label: 'Pre-1860 Historical Buildings missing historical narration', category: 'Historical Buildings', severity: 'warn', run: checkHistPre1860NoHistoricalNarration },
   { id: 'historical_narration_needs_refinement', label: 'Historical narration needs refinement (quality issues)', category: 'Historical Buildings', severity: 'warn', run: checkHistoricalNarrationNeedsRefinement },
-  { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'warn',  run: checkCivicFlagMismatch },
+  { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'error', run: checkCivicFlagMismatch },
   { id: 'commercial_tier0_has_prose',label: 'Commercial tier-0 POIs with editorial prose (legal cleaning)', category: 'Content', severity: 'error', run: checkCommercialTier0HasProse },
   { id: 'content_no_description',    label: 'POIs with no description text',              category: 'Content',    severity: 'info',  run: checkContentNoDescription },
   { id: 'content_no_image',          label: 'Tour POIs with no image',                    category: 'Content',    severity: 'info',  run: checkContentNoImage },

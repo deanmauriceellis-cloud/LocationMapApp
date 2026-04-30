@@ -102,6 +102,18 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     console.log('Schema: added headline_summary column');
   }
 
+  // S203 PK normalization defense — wipe stale rows before reinsert. The S198
+  // schema rewrite changed the PK semantics (legacy rows used `id = date`,
+  // current rows use distinct ids), so an `INSERT OR REPLACE` keyed on `id`
+  // would NOT match legacy rows and they'd survive as duplicates-by-date.
+  // Since this script always rewrites the full 202-row set in a single
+  // transaction, truncating first is safe and idempotent.
+  const stalePre = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_newspapers').get().c;
+  db.exec('DELETE FROM salem_witch_trials_newspapers');
+  if (stalePre > 0) {
+    console.log(`Pre-insert truncate: cleared ${stalePre} stale newspaper rows (defends against legacy id=date PK collisions).`);
+  }
+
   // room_master_table is stamped canonically by align-asset-schema-to-room.js,
   // which runs last in the publish chain. This script no longer writes it.
   const insert = db.prepare(`

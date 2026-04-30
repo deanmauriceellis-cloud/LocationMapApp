@@ -375,8 +375,9 @@ class SalemMainActivity : AppCompatActivity() {
     }
     internal var idlePopulateState: IdlePopulateState? = null
 
-    // Zoom toggle (x1/x2/x3/x4/x5 quick zoom). S202: default x2 per operator.
-    internal var zoomToggleLevel: Int = 1  // 0=x1, 1=x2, 2=x3, 3=x4, 4=x5
+    // Zoom toggle (x1/x2/x3/x4/x5 quick zoom). S203: build-type switch — recon
+    // builds boot at x2 for closer-in walking, release at x1 for first-launch overview.
+    internal var zoomToggleLevel: Int = BuildDefaults.MAGNIFY_LEVEL  // 0=x1, 1=x2, 2=x3, 3=x4, 4=x5
 
     // Walk simulator
     internal var walkSimJob: kotlinx.coroutines.Job? = null
@@ -1112,7 +1113,7 @@ class SalemMainActivity : AppCompatActivity() {
         // bypass persists across app restarts (operator field-test convenience).
         viewModel.bypassBboxClamp = prefs.getBoolean(
             MenuPrefs.PREF_GPS_BBOX_OVERRIDE,
-            MenuPrefs.PREF_GPS_BBOX_OVERRIDE_DEFAULT
+            BuildDefaults.GPS_BBOX_OVERRIDE
         )
         DebugLogger.i("SalemMainActivity", "setupMap() — tileSource=$tileSourceId fromSplash=$fromSplash bypassBbox=${viewModel.bypassBboxClamp}")
         binding.mapView.apply {
@@ -1128,10 +1129,10 @@ class SalemMainActivity : AppCompatActivity() {
             maxZoomLevel = MAP_MAX_OVERZOOM
             if (fromSplash) {
                 // Start on Salem at street level — no wasted tile loading
-                controller.setZoom(19.0)
+                controller.setZoom(BuildDefaults.DEFAULT_ZOOM)
                 controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             } else {
-                controller.setZoom(19.0)
+                controller.setZoom(BuildDefaults.DEFAULT_ZOOM)
                 controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             }
         }
@@ -1282,9 +1283,9 @@ class SalemMainActivity : AppCompatActivity() {
         map.controller.setZoom(MAP_MIN_ZOOM)
         map.controller.animateTo(target, 16.0, 1000L)
 
-        // Phase 2: ease to street-level z18 (1000ms)
+        // Phase 2: ease to street-level (1000ms) — z19 in recon builds, z18 retail
         map.postDelayed({
-            map.controller.animateTo(target, 19.0, 1000L)
+            map.controller.animateTo(target, BuildDefaults.DEFAULT_ZOOM, 1000L)
         }, 1100L)
 
         // Phase 3: welcome dialog once the zoom settles
@@ -1297,16 +1298,16 @@ class SalemMainActivity : AppCompatActivity() {
     internal fun setupZoomSlider() {
         val map = binding.mapView
 
-        // + button: zoom in by 2 levels per tap (operator preference S202)
+        // + button: zoom in by BuildDefaults.FAB_ZOOM_STEP per tap (recon: 2, retail: 1)
         binding.btnZoomIn.setOnClickListener {
-            val newZoom = (map.zoomLevelDouble + 2.0).coerceAtMost(map.maxZoomLevel)
+            val newZoom = (map.zoomLevelDouble + BuildDefaults.FAB_ZOOM_STEP).coerceAtMost(map.maxZoomLevel)
             map.controller.setZoom(newZoom)
             updateZoomBubble()
         }
 
-        // − button: zoom out by 2 levels per tap
+        // − button: zoom out by BuildDefaults.FAB_ZOOM_STEP per tap
         binding.btnZoomOut.setOnClickListener {
-            val newZoom = (map.zoomLevelDouble - 2.0).coerceAtLeast(map.minZoomLevel)
+            val newZoom = (map.zoomLevelDouble - BuildDefaults.FAB_ZOOM_STEP).coerceAtLeast(map.minZoomLevel)
             map.controller.setZoom(newZoom)
             updateZoomBubble()
         }
@@ -2638,7 +2639,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     private fun isGpsTrackVisible(): Boolean =
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
-            .getBoolean(GPS_TRACK_PREF_KEY, true)
+            .getBoolean(GPS_TRACK_PREF_KEY, BuildDefaults.GPS_TRACK_VISIBLE)
 
     private fun setGpsTrackVisible(visible: Boolean) {
         getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
@@ -2658,7 +2659,7 @@ class SalemMainActivity : AppCompatActivity() {
         // the user's last setting.
         if (!HEADING_UP_ENABLED) return false
         return getSharedPreferences(GPS_TRACK_PREFS, android.content.Context.MODE_PRIVATE)
-            .getBoolean(HEADING_UP_PREF_KEY, true)
+            .getBoolean(HEADING_UP_PREF_KEY, BuildDefaults.HEADING_UP)
     }
 
     private fun setHeadingUpMode(enabled: Boolean) {
@@ -3092,9 +3093,9 @@ class SalemMainActivity : AppCompatActivity() {
                         performCinematicZoom(point)
                         fromSplash = false
                     } else {
-                        DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=19")
+                        DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=${BuildDefaults.DEFAULT_ZOOM}")
                         binding.mapView.controller.animateTo(point)
-                        binding.mapView.controller.setZoom(19.0)
+                        binding.mapView.controller.setZoom(BuildDefaults.DEFAULT_ZOOM)
                     }
                 } else {
                     // Continuous GPS follow — keep map centered on user

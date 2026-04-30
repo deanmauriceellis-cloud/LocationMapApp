@@ -1111,12 +1111,11 @@ class AppBarMenuManager(
         return when (prefKey) {
             MenuPrefs.PREF_AIRCRAFT_DISPLAY, MenuPrefs.PREF_AUTO_FOLLOW_AIRCRAFT, MenuPrefs.PREF_POPULATE_POIS, MenuPrefs.PREF_MBTA_BUS_STOPS,
             MenuPrefs.PREF_ALERT_SOUND, MenuPrefs.PREF_CAMERA_OVERLAY, MenuPrefs.PREF_SCHOOL_OVERLAY, MenuPrefs.PREF_FLOOD_OVERLAY, MenuPrefs.PREF_CROSSING_OVERLAY,
-            MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE,
-            // S202: testing-window defaults flipped ON — recon walks need
-            // the breadcrumb polyline visible immediately and real GPS
-            // coords passing through even when the user is outside the
-            // Salem bbox. Operators can still uncheck either via Journey.
-            MenuPrefs.PREF_RECORD_GPS, MenuPrefs.PREF_GPS_BBOX_OVERRIDE -> true
+            MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE -> true
+            // S203: build-type switch — recon builds default these ON for testers
+            // walking with the debug APK; release / AAB defaults OFF for retail.
+            MenuPrefs.PREF_RECORD_GPS         -> com.example.wickedsalemwitchcitytour.ui.BuildDefaults.RECORD_GPS
+            MenuPrefs.PREF_GPS_BBOX_OVERRIDE  -> com.example.wickedsalemwitchcitytour.ui.BuildDefaults.GPS_BBOX_OVERRIDE
             else -> true
         }
     }

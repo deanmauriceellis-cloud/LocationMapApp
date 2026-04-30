@@ -138,6 +138,22 @@ if (!fs.existsSync(TILES_DB)) {
       } else {
         pass(`salem_tiles.sqlite: tiles = ${n} rows (>= 5000)`);
       }
+      // S203 / S167 carry-forward — Witchy is the only basemap shipping (S175).
+      // Any tile row with a different provider is a stale bake from the
+      // pre-S175 three-basemap era and should fail the build. Expected:
+      // exactly one provider == 'Salem-Custom'.
+      const ALLOWED_PROVIDERS = new Set(['Salem-Custom']);
+      const providers = db.prepare(
+        'SELECT provider, COUNT(*) AS c FROM tiles GROUP BY provider'
+      ).all();
+      const stale = providers.filter((p) => !ALLOWED_PROVIDERS.has(p.provider));
+      if (stale.length > 0) {
+        fail(`salem_tiles.sqlite: stale providers in bake: ${stale.map((s) => `${s.provider}=${s.c}`).join(', ')} (expected only 'Salem-Custom')`);
+      } else if (!providers.some((p) => p.provider === 'Salem-Custom')) {
+        fail(`salem_tiles.sqlite: 'Salem-Custom' provider missing — bake is incomplete`);
+      } else {
+        pass(`salem_tiles.sqlite: providers = ${providers.map((p) => `${p.provider}=${p.c}`).join(', ')}`);
+      }
     }
   } catch (e) {
     fail(`salem_tiles.sqlite: open/query failed: ${e.message}`);

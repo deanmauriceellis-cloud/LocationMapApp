@@ -93,11 +93,10 @@ object MenuPrefs {
      *  Journey → "Use Real GPS Outside Salem". */
     const val PREF_GPS_BBOX_OVERRIDE     = "gps_bbox_override_on"
     /** Default value for [PREF_GPS_BBOX_OVERRIDE]. Shared between the menu sync and
-     *  the startup pref read so they can't drift.
-     *  S202: testing-window default flipped to `true` so an operator/tester
-     *  outside Salem still gets their real GPS coords on the cursor and in
-     *  recon-photo EXIF. Toggle in Journey menu still works to clamp back. */
-    const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = true
+     *  the startup pref read so they can't drift. Default `false` — first launch
+     *  outside Salem clamps to the Samantha statue (the game's home base) so
+     *  narration/POIs work immediately. Toggle in Journey menu opts a tester in. */
+    const val PREF_GPS_BBOX_OVERRIDE_DEFAULT = false
 
     // ── POI source filters (S186 — Layers checkboxes, mode-dependent) ──────────
     // Each Layers checkbox (POIs Hist. Landmark, POIs Civic) has TWO prefs:

@@ -106,6 +106,14 @@ class NarrationGeofenceManager @Inject constructor(
 
     fun isTourMode(): Boolean = tourMode
 
+    /** S203 — exposed to unit tests so the gate-reset contract on
+     *  setTourMode(active=false, ...) can be verified without reflection. */
+    @androidx.annotation.VisibleForTesting
+    internal fun tourAllowsHistLandmarksForTest(): Boolean = tourAllowHistLandmarks
+
+    @androidx.annotation.VisibleForTesting
+    internal fun tourAllowsCivicForTest(): Boolean = tourAllowCivic
+
     /**
      * S193 — Historical Narration Mode.
      *

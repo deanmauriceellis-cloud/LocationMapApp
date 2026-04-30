@@ -45,6 +45,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // S203: recon-walk testing-window defaults — enabled in debug only.
+            // Flips PREF_RECORD_GPS, PREF_GPS_BBOX_OVERRIDE, GPS-track visibility,
+            // heading-up rotation, default zoom 19 (vs 18), FAB step ±2 (vs ±1),
+            // magnify FAB x2 (vs x1) for testers walking Salem with debug APK.
+            buildConfigField "boolean", "RECON_DEFAULTS", "true"
+        }
         release {
             // S180: minify on for V1 release. Const-eliminated FeatureFlags.V1_OFFLINE_ONLY
             // branches get stripped by R8; obfuscation reduces APK size.
@@ -56,11 +63,14 @@ android {
             if (ksPath && file(ksPath).exists()) {
                 signingConfig signingConfigs.release
             }
+            // S203: retail / Play-Store posture — fresh-install defaults.
+            buildConfigField "boolean", "RECON_DEFAULTS", "false"
         }
     }
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     compileOptions {
@@ -83,6 +93,15 @@ android {
         // OfflineTileManager can compare on-disk size to asset size cheaply
         // via AssetFileDescriptor.getLength().
         noCompress += ['sqlite']
+    }
+
+    // S203: pure-JVM unit tests can't link against android.* stubs (Process,
+    // Log, etc.) without Robolectric. returnDefaultValues=true lets calls into
+    // unmocked Android APIs return 0/null/false instead of throwing. Production
+    // code paths that exercise those APIs (e.g. DebugLogger.getPid) become
+    // no-ops in the test process — fine since the test asserts state, not logs.
+    testOptions {
+        unitTests.returnDefaultValues = true
     }
 }
 
@@ -184,6 +203,9 @@ dependencies {
     implementation 'io.socket:socket.io-client:2.1.0'
 
     testImplementation 'junit:junit:4.13.2'
+    // S203 — OMEN-004 unit-test seed. mockito-core lets pure JVM tests fake the
+    // Hilt-injected Context + SharedPreferences without standing up Robolectric.
+    testImplementation 'org.mockito:mockito-core:5.11.0'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
