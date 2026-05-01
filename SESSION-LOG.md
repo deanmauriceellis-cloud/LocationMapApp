@@ -10,7 +10,7 @@ Operator asked for a full V1-ship-lens code retrospective. Three Explore subagen
 
 Final doc: 836 lines. Sprint-ready backlog in §13.
 
-Full session detail: `docs/session-logs/session-208-2026-04-30.md`. Commit: pending session-close roll.
+Full session detail: `docs/session-logs/session-208-2026-04-30.md`. Commit: `1683ed9`.
 
 ---
 
