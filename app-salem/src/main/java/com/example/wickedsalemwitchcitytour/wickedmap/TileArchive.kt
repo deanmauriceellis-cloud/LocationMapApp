@@ -22,8 +22,12 @@ class TileArchive(archiveFile: File, private val provider: String = "Salem-Custo
         archiveFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY
     )
 
-    private val cache = object : LruCache<Long, Bitmap>(256) {
-        override fun sizeOf(key: Long, value: Bitmap): Int = 1
+    // Byte-sized cache: 1/8 of the runtime heap, capped at Int.MAX_VALUE.
+    // sizeOf returns the bitmap's actual allocation in bytes (API 19+).
+    private val cache = object : LruCache<Long, Bitmap>(
+        ((Runtime.getRuntime().maxMemory() / 8L).coerceAtMost(Int.MAX_VALUE.toLong())).toInt()
+    ) {
+        override fun sizeOf(key: Long, value: Bitmap): Int = value.allocationByteCount
     }
 
     private val missing = HashSet<Long>()

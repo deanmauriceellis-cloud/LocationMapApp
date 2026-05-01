@@ -100,8 +100,8 @@ dependencies {
     // Preference (PreferenceManager used in OSMDroid config)
     implementation 'androidx.preference:preference-ktx:1.2.1'
 
-    // Socket.IO client (chat)
-    implementation 'io.socket:socket.io-client:2.1.0'
+    // Socket.IO removed S211 — V1 ships zero-network. ChatRepository's
+    // realtime methods are no-op stubs gated upstream by V1_OFFLINE_ONLY.
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

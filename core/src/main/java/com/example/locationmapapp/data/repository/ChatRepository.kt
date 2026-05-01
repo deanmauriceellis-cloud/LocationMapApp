@@ -15,14 +15,9 @@ import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.network.LocalServerCircuitBreakerInterceptor
 import com.example.locationmapapp.util.network.OfflineModeInterceptor
 import com.google.gson.JsonParser
-import io.socket.client.IO
-import io.socket.client.Socket
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -48,122 +43,43 @@ class ChatRepository @Inject constructor(
         .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .build()
 
-    private var socket: Socket? = null
-    private var onMessageCallback: ((ChatMessage) -> Unit)? = null
-    private var onTypingCallback: ((String) -> Unit)? = null
-
-    // ── Socket.IO Lifecycle ──────────────────────────────────────────────────
+    // ── Realtime chat (Socket.IO) — gutted in S211 for V1 no-network rule ───
+    // Library dep removed; methods retained as no-op stubs because
+    // SocialViewModel still references them (gated upstream by
+    // FeatureFlags.V1_OFFLINE_ONLY in showChatDialog so they never fire).
 
     suspend fun connect() {
-        val token = authRepository.getValidAccessToken() ?: return
-        withContext(Dispatchers.IO) {
-            try {
-                if (socket?.connected() == true) return@withContext
-
-                val opts = IO.Options().apply {
-                    auth = mapOf("token" to token)
-                    forceNew = true
-                    reconnection = true
-                    reconnectionDelay = 2000
-                    reconnectionAttempts = 10
-                }
-                socket = IO.socket(BASE, opts)
-
-                socket?.on("new_message") { args ->
-                    if (args.isNotEmpty()) {
-                        try {
-                            val obj = args[0] as JSONObject
-                            val msg = ChatMessage(
-                                id = obj.getLong("id"),
-                                roomId = obj.getString("roomId"),
-                                userId = obj.getString("userId"),
-                                authorName = obj.getString("authorName"),
-                                content = obj.getString("content"),
-                                replyToId = if (obj.isNull("replyToId")) null else obj.getLong("replyToId"),
-                                sentAt = obj.getString("sentAt")
-                            )
-                            onMessageCallback?.invoke(msg)
-                        } catch (e: Exception) {
-                            DebugLogger.e(TAG, "Parse new_message error: ${e.message}")
-                        }
-                    }
-                }
-
-                socket?.on("user_typing") { args ->
-                    if (args.isNotEmpty()) {
-                        try {
-                            val obj = args[0] as JSONObject
-                            onTypingCallback?.invoke(obj.getString("displayName"))
-                        } catch (_: Exception) {}
-                    }
-                }
-
-                socket?.on(Socket.EVENT_DISCONNECT) { args ->
-                    val reason = if (args.isNotEmpty()) args[0].toString() else "unknown"
-                    DebugLogger.i(TAG, "Socket.IO disconnected: $reason")
-                }
-
-                socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-                    val err = if (args.isNotEmpty()) args[0].toString() else "unknown"
-                    DebugLogger.e(TAG, "Socket.IO connect error: $err")
-                }
-
-                // Wait for actual connection before returning
-                DebugLogger.i(TAG, "Socket.IO connecting to $BASE")
-                suspendCancellableCoroutine { cont ->
-                    socket?.on(Socket.EVENT_CONNECT) {
-                        DebugLogger.i(TAG, "Socket.IO connected")
-                        if (cont.isActive) cont.resume(Unit)
-                    }
-                    socket?.connect()
-                    // Timeout: don't block forever
-                    cont.invokeOnCancellation { socket?.off(Socket.EVENT_CONNECT) }
-                }
-            } catch (e: Exception) {
-                DebugLogger.e(TAG, "Socket.IO init error: ${e.message}")
-            }
-        }
+        // no-op: V1 ships zero-network. See feedback_v1_no_external_contact.
     }
 
     fun disconnect() {
-        socket?.disconnect()
-        socket?.off()
-        socket = null
-        DebugLogger.i(TAG, "Socket.IO disconnected")
+        // no-op
     }
 
-    fun isConnected(): Boolean = socket?.connected() == true
+    fun isConnected(): Boolean = false
 
     fun setOnMessageListener(callback: (ChatMessage) -> Unit) {
-        onMessageCallback = callback
+        // no-op
     }
 
     fun setOnTypingListener(callback: (String) -> Unit) {
-        onTypingCallback = callback
+        // no-op
     }
 
-    // ── Socket.IO Actions ────────────────────────────────────────────────────
-
     fun joinRoom(roomId: String) {
-        socket?.emit("join_room", roomId)
-        DebugLogger.d(TAG, "Joining room $roomId")
+        // no-op
     }
 
     fun leaveRoom(roomId: String) {
-        socket?.emit("leave_room", roomId)
+        // no-op
     }
 
     fun sendMessage(roomId: String, content: String, replyToId: Long? = null) {
-        val data = JSONObject().apply {
-            put("roomId", roomId)
-            put("content", content)
-            if (replyToId != null) put("replyToId", replyToId)
-        }
-        socket?.emit("send_message", data)
+        // no-op
     }
 
     fun sendTyping(roomId: String) {
-        socket?.emit("typing", roomId)
+        // no-op
     }
 
     // ── REST API ─────────────────────────────────────────────────────────────
