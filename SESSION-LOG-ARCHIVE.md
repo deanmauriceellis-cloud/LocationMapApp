@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 197, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 198, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 197, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 198, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 198: 2026-04-29 — Witch Trials admin tab unbroken + Oracle Newspaper page renders the same article it narrates (body_points retired)
+
+Two operator-driven fixes. (1) Witch Trials admin tab regression — `cache-proxy/lib/admin-witch-trials.js` destructured `pool` from `deps`, but the shared deps object exposes the connection as `pgPool` (every other admin module does so), so every list/get/put route was 500'ing with "Cannot read properties of undefined (reading 'query')". Stale leftover from before deps was renamed; never noticed because the tab was untouched. One-line alias fix (`const { pgPool: pool } = deps`); cache-proxy restart with `set -a; source .env; set +a` so DATABASE_URL is in env (admin-lint runs a startup query and crashes on `pgPool=null` otherwise). (2) `body_points` retired from `salem_witch_trials_newspapers` so the in-app Oracle Newspaper page renders the same article that the Speak button + map-mode ambient narration narrates. Operator: "I want what I hear and what I see to be identical … users will want to see/hear the same content." Pre-S198: visual page rendered `body_points` (LLM rewrite, ~1370 chars / 6 paragraphs); audio narrated `tts_full_text` (continuous prose, ~2740 chars). Same row, different fields, drift between them. Fix: `WitchTrialsMenuDialog.buildNewspaperHtml` now splits `paper.ttsFullText` on `\n\n+|\n` paragraphs (body_points fallback branch deleted, JSONArray import removed); `WitchTrialsNewspaper` Room entity loses `bodyPoints`; `@Database(version = 14)` → `15`; new identity_hash `3e927300be7b2a8971fa6afb4aa5af78` (regenerated via `kspDebugKotlin`); `verify-bundled-assets.js` constants bumped V11→V15. PG column dropped on both `salem_witch_trials_newspapers` (live) and orphan `salem_newspapers_1692`. Stripped from admin-witch-trials whitelist + JSONB set, salem-schema.sql, publish-witch-trials-to-sqlite.js, bundle-witch-trials-newspapers-into-db.js, import-1692-newspapers.js, web/src/admin/WitchTrialsPanel.tsx. Full publish chain ran; first bundle pass failed with NOT NULL constraint because asset DB had stale schema baked in (CREATE TABLE IF NOT EXISTS skipped the rewrite); align-asset-schema-to-room rewrote it to v15 (0 rows); re-running bundle + publish-witch-trials-to-sqlite repopulated 202/49/16. Build clean (~11s). Lenovo HNY0CY0W: uninstall + install (NEVER `-r` per memory). Carry-forward: de-hardcode bundle-witch-trials hash (v9 stale by 6 versions; harmless because align is the canonical stamper, but log line is misleading).
+
+Full session detail: `docs/session-logs/session-198-2026-04-29.md`. Final commit: rolled at S208 close.
+
+---
 
 ## Session 197: 2026-04-29 — TTS chunker punctuation/dialog/dash/ellipsis trip-ups + Witch-Trials Speak bypasses AudioControl gate
 
