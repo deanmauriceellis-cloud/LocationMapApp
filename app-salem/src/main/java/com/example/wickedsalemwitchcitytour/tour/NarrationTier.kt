@@ -46,6 +46,7 @@ object NarrationTierClassifier {
     private val categoryToTier: Map<String, NarrationTier> = mapOf(
         // ── HISTORIC tier ─────────────────────────────────────────────────
         "HISTORICAL_BUILDINGS" to NarrationTier.HISTORIC,
+        "HISTORICAL_LANDMARKS" to NarrationTier.HISTORIC,
         "CIVIC"              to NarrationTier.HISTORIC,
         "EDUCATION"          to NarrationTier.HISTORIC,
 

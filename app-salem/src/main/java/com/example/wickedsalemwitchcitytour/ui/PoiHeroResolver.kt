@@ -49,6 +49,9 @@ object PoiHeroResolver {
         // (colonial / literary / maritime / museum / witch-trial house).
         "TOUR_COMPANIES"      to "ghost_tour",
         "HISTORICAL_BUILDINGS" to "historic_house",
+        // S216 split — landmarks reuse the historic_house hero set for now;
+        // operator plans to regenerate distinct landmark imagery later.
+        "HISTORICAL_LANDMARKS" to "historic_house",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",

@@ -49,6 +49,7 @@ class ProximityDock(private val context: Context, private val rootView: View) {
         "PSYCHIC"             to "#AB47BC",
         "TOUR_COMPANIES"      to "#FF6F00",
         "HISTORICAL_BUILDINGS" to "#8D6E63",
+        "HISTORICAL_LANDMARKS" to "#A1887F",
         "ENTERTAINMENT"       to "#FF6F00",
         "PARKS_REC"           to "#2E7D32",
         "LODGING"             to "#7B1FA2",
@@ -71,6 +72,7 @@ class ProximityDock(private val context: Context, private val rootView: View) {
         // that never shipped). See PoiHeroResolver for rationale.
         "TOUR_COMPANIES"      to "ghost_tour",
         "HISTORICAL_BUILDINGS" to "historic_house",
+        "HISTORICAL_LANDMARKS" to "historic_house",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",

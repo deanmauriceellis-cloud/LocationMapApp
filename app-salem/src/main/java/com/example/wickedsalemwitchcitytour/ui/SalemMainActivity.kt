@@ -154,6 +154,12 @@ class SalemMainActivity : AppCompatActivity() {
     @Inject
     internal lateinit var salemRouterProvider: com.example.wickedsalemwitchcitytour.routing.SalemRouterProvider
 
+    /** S216: walking-route engine used to onboard the FAB-walker from current
+     *  position to the nearest point on the active tour polyline before the
+     *  walk-sim hands off to the tour itself. */
+    @Inject
+    internal lateinit var walkingDirections: com.example.wickedsalemwitchcitytour.tour.WalkingDirections
+
     /**
      * Magenta polyline that paints the user's recent GPS journey on the map.
      * Lazy-created in [initGpsTrackOverlay] during onCreate. Lives in the activity
@@ -1146,6 +1152,16 @@ class SalemMainActivity : AppCompatActivity() {
         binding.mapView.apply {
             setTileSource(TileSourceManager.buildSource(tileSourceId))
             setMultiTouchControls(true)
+            // S216: enable two-finger rotation gestures so the user can spin
+            // the map a full 360° regardless of heading-up state. In
+            // heading-up mode the next GPS bearing fix will resnap the
+            // canvas to bearing-up; in north-up mode the manual rotation
+            // sticks.
+            overlays.add(
+                org.osmdroid.views.overlay.gestures.RotationGestureOverlay(this).apply {
+                    isEnabled = true
+                }
+            )
             // Disable built-in zoom buttons — we use the custom slider instead
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setBuiltInZoomControls(false)
@@ -1561,20 +1577,16 @@ class SalemMainActivity : AppCompatActivity() {
     private val WALK_SIM_DWELL_COOLDOWN_MS: Long = 5_000L
 
     /**
-     * S125: Distance threshold (meters) at which the walk-sim treats the
-     * user as "not in Salem" and drops them at a random point along the
-     * tour route instead of the canonical step 0. Measured from the user's
-     * last real GPS fix to the first point of the loaded tour route.
-     *
-     * 3 km covers the broader Salem area (downtown ≈ 1 km² radius from
-     * the Heritage Trail anchor, plus generous padding for the Witch
-     * House, Pickering Wharf, Chestnut Street, etc.) while still
-     * triggering on dev-mode test runs from the operator's workshop /
-     * anywhere outside city limits. Randomization only fires on fresh
-     * walk starts — resumed walks (via the FAB pause/resume fields)
-     * always pick up where the walker left off regardless of location.
+     * S216: Below this many metres from the nearest point on the tour
+     * polyline we treat the walker as already "on the tour" and skip the
+     * onboarding leg — they just start at the nearest step. Above it, we
+     * build a real walking route from the user's position (real GPS or
+     * MANUAL long-press) to that nearest tour point and prepend it to the
+     * tour, so the walk-sim begins by approaching the tour rather than
+     * teleporting onto it. Operator rule: in Salem we onboard, out of
+     * Salem we drop straight onto waypoint 1.
      */
-    private val WALK_SIM_RANDOMIZE_THRESHOLD_M: Double = 3_000.0
+    private val ONBOARD_THRESHOLD_M: Float = 25f
 
     private fun startWalkSim() {
         // S125: wrap the whole cancel+start sequence under walkMutex so the
@@ -1630,7 +1642,7 @@ class SalemMainActivity : AppCompatActivity() {
             tourIsPaused -> {
                 DebugLogger.i("SalemMainActivity",
                     "Walk sim: tour '${activeTour!!.tour.name}' was Paused → resuming via startTour (idempotent)")
-                tourViewModel.startTour(activeTour!!.tour.id)
+                tourViewModel.startTour(activeTour!!.tour.id, skipOnboarding = true)
                 // S193: wait for resume to flip back to Active so refresh +
                 // route selection see populated activeTour.
                 val resumed = withTimeoutOrNull(3_000L) {
@@ -1650,7 +1662,7 @@ class SalemMainActivity : AppCompatActivity() {
                 }
                 DebugLogger.i("SalemMainActivity",
                     "Walk sim: no tour selected (state=$stateLabel) → auto-starting tour_WD1")
-                tourViewModel.startTour("tour_WD1")
+                tourViewModel.startTour("tour_WD1", skipOnboarding = true)
                 // S193: WAIT for the auto-started tour to reach Active before
                 // computing the route. Without this wait, `activeTour` stays
                 // null and the route selector below falls into the
@@ -1713,6 +1725,16 @@ class SalemMainActivity : AppCompatActivity() {
         // repeat for 1 hour regardless of how many times walk-sim is restarted.
         // Enable walk sim mode: expanded geofence radius + tighter reach-out
         narrationGeofenceManager.walkSimMode = true
+
+        // S216: kill any directions session that the TourViewModel
+        // tour-start onboarding (separate from this walk-sim onboarding) may
+        // have armed. Otherwise its drift-reroute loop fires every few fixes
+        // during the sim and drawWalkingRoute repaints a green directions
+        // polyline ON TOP of the per-leg overlays — the operator-visible
+        // "green keeps painting over the blue active leg" symptom. Clearing
+        // here also wipes the green directions polyline already on the map.
+        tourViewModel.clearDirections()
+
         walkSimRunning = true
         binding.btnWalkSim.text = "Stop"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
@@ -1724,132 +1746,107 @@ class SalemMainActivity : AppCompatActivity() {
             acquireWalkWakeLock("WickedSalem:walkSimUi")
             // S136: walk-sim speed 1.4 m/s — realistic walking pace.
             // Gives narration time to finish before hitting next POI.
-            val interpolated = interpolateWalkRoute(routePoints, 1.4f)
-            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
+            // S216: Resume detection runs against the BAKED tour polyline
+            // alone (no onboarding leg). If a fresh start added an onboarding
+            // leg, the saved size won't match this baseline, the resume gate
+            // fails, and we treat it as a brand-new fresh walk — re-onboarding
+            // from wherever the user is now.
+            val tourInterpolated = interpolateWalkRoute(routePoints, 1.4f)
 
-            // S125: FAB pause/resume — if the last paused walk was on the same
-            // route and we have a saved step index in-bounds, skip ahead.
-            // Otherwise treat this as a fresh walk and reset the marker.
             val isResume = walkSimResumeRouteLabel == routeLabel &&
-                walkSimResumeRouteSize == interpolated.size &&
-                walkSimResumeStepIdx in 1 until interpolated.size
+                walkSimResumeRouteSize == tourInterpolated.size &&
+                walkSimResumeStepIdx in 1 until tourInterpolated.size
 
-            val resumeFromStep = if (isResume) {
+            val interpolated: List<org.osmdroid.util.GeoPoint>
+            val resumeFromStep: Int
+
+            if (isResume) {
+                interpolated = tourInterpolated
+                resumeFromStep = walkSimResumeStepIdx
                 DebugLogger.i("WALK-SIM",
                     "RESUME: continuing '$routeLabel' from step ${walkSimResumeStepIdx}/${interpolated.size}")
                 toast("Resuming walk at step ${walkSimResumeStepIdx}/${interpolated.size}")
-                walkSimResumeStepIdx
             } else {
                 if (walkSimResumeStepIdx != 0 || walkSimResumeRouteLabel != null) {
                     DebugLogger.i("WALK-SIM",
                         "Fresh walk (resume state invalidated): label '${walkSimResumeRouteLabel}' → '$routeLabel', " +
-                        "size ${walkSimResumeRouteSize} → ${interpolated.size}, idx=${walkSimResumeStepIdx}")
+                            "size ${walkSimResumeRouteSize} → ${tourInterpolated.size}, idx=${walkSimResumeStepIdx}")
                 }
-                // S126 (operator ask): if the user picked a spot via map
-                // long-press (LocationMode.MANUAL), START THE WALK FROM THAT
-                // POINT — snap to the nearest interpolated step on the tour
-                // route, back off 15 steps so the walker approaches rather
-                // than spawning inside the geofence. Manual pick wins over
-                // both the random-start branch and the step-0 default.
-                val manualPt = if (viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL) {
-                    viewModel.currentLocation.value?.point
-                } else null
-                val firstPt = interpolated.firstOrNull()
-                val manualStartIdx: Int? = if (manualPt != null && interpolated.size > 10) {
-                    var bestStep = 0
+
+                // S216 onboarding (operator ask): if the user is in Salem
+                // (real GPS fix OR a MANUAL long-press), build a real walking
+                // route from their current position to the NEAREST point on
+                // the tour polyline and prepend it to the tour. The walker
+                // then walks naturally from where they are onto the tour and
+                // continues. If they're outside Salem (or have no fix at
+                // all), skip onboarding and start at waypoint 1.
+                val isManual = viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL
+                val userPt = if (isManual) viewModel.currentLocation.value?.point else lastGpsPoint
+                val source = if (isManual) "manual long-press" else "GPS"
+
+                if (userPt != null && SalemBounds.isInSalemBbox(userPt) && routePoints.isNotEmpty()) {
+                    var bestIdx = 0
                     var bestDist = Float.MAX_VALUE
-                    for (i in interpolated.indices) {
-                        val d = distanceBetween(interpolated[i], manualPt)
+                    for (i in routePoints.indices) {
+                        val d = distanceBetween(routePoints[i], userPt)
                         if (d < bestDist) {
                             bestDist = d
-                            bestStep = i
+                            bestIdx = i
                         }
                     }
-                    val backedOff = (bestStep - 15).coerceAtLeast(0)
-                    DebugLogger.i(
-                        "WALK-SIM",
-                        "MANUAL PICK — long-press at ${"%.5f".format(manualPt.latitude)},${"%.5f".format(manualPt.longitude)} " +
-                            "maps to step $bestStep (off by ${bestDist.toInt()}m), starting at step $backedOff/${interpolated.size}"
-                    )
-                    toast("Starting walk from picked location")
-                    backedOff
-                } else null
+                    val nearestPt = routePoints[bestIdx]
 
-                // S125 (2026-04-14 operator ask): if a fresh walk is starting and
-                // the user's real GPS puts them well outside Salem, drop the
-                // walker at a random point along the tour route so successive
-                // dev-mode test runs hit different neighborhoods. Threshold is
-                // distance to the first route point — anything over 3 km is
-                // "not in town" (covers home-office test runs, airports, etc.).
-                // When we ARE in Salem (or no GPS yet) we still start at step 0
-                // so the geofence trigger order matches the Heritage Trail's
-                // intended narrative arc.
-                val userPt = lastGpsPoint
-                if (manualStartIdx != null) {
-                    manualStartIdx
-                } else if (userPt != null && firstPt != null && interpolated.size > 10) {
-                    val distFromRouteStartM = distanceBetween(userPt, firstPt)
-                    if (distFromRouteStartM > WALK_SIM_RANDOMIZE_THRESHOLD_M) {
-                        // S125 (2026-04-14 v2): pick a random TOUR STOP, not a
-                        // random interpolated step. Landing on an arbitrary step
-                        // often dropped the walker in a POI desert (or at the
-                        // edge of a geofence it only grazed without entering),
-                        // so narration stayed silent for the first several
-                        // minutes. Anchoring to a stop guarantees immediate
-                        // ENTRY — the stop is whitelisted in Historical Mode
-                        // and its geofence fires as the walker approaches.
-                        //
-                        // Fallback to any-step randomization if the tour has
-                        // fewer than 3 stops (no "middle" to pick from).
-                        val tourPois = activeTour?.pois ?: emptyList()
-                        val startStepIdx = if (tourPois.size >= 3) {
-                            // Random stop index in [1, n-2] — skip first and
-                            // last so we land mid-tour, not at the natural
-                            // start/end points.
-                            val randStopIdx = (1 until tourPois.size - 1).random()
-                            val target = tourPois[randStopIdx]
-                            val targetPt = org.osmdroid.util.GeoPoint(target.lat, target.lng)
-                            // Find the interpolated step whose coord is
-                            // nearest this stop. Back off 15 steps (~30m at
-                            // 2m/s) so the walker approaches rather than
-                            // spawning inside the geofence — this gives the
-                            // narration engine a clean APPROACH → ENTRY arc.
-                            var bestStep = 0
-                            var bestDist = Float.MAX_VALUE
-                            for (i in interpolated.indices) {
-                                val d = distanceBetween(interpolated[i], targetPt)
-                                if (d < bestDist) {
-                                    bestDist = d
-                                    bestStep = i
-                                }
-                            }
-                            val backedOff = (bestStep - 15).coerceAtLeast(0)
-                            DebugLogger.i(
-                                "WALK-SIM",
-                                "OUT OF SALEM — random tour stop ${randStopIdx + 1}/${tourPois.size} " +
-                                    "'${target.name}' maps to step $bestStep (off by ${bestDist.toInt()}m), " +
-                                    "starting at step $backedOff/${interpolated.size}"
+                    if (bestDist > ONBOARD_THRESHOLD_M) {
+                        val onboard = walkingDirections.getRoute(userPt, nearestPt)
+                        val onboardPolyline = onboard?.polyline.orEmpty()
+                        if (onboardPolyline.size >= 2) {
+                            val combined = ArrayList<org.osmdroid.util.GeoPoint>(
+                                onboardPolyline.size + (routePoints.size - bestIdx)
                             )
-                            toast("Not in Salem — starting walk at '${target.name}'")
-                            backedOff
+                            combined.addAll(onboardPolyline)
+                            // Avoid duplicating the join point if onboard ended
+                            // close to routePoints[bestIdx].
+                            val gapM = distanceBetween(combined.last(), nearestPt)
+                            val tourStartIdx = if (gapM < 1f) bestIdx + 1 else bestIdx
+                            for (i in tourStartIdx until routePoints.size) combined.add(routePoints[i])
+                            interpolated = interpolateWalkRoute(combined, 1.4f)
+                            DebugLogger.i("WALK-SIM",
+                                "ONBOARD ($source) — ${onboardPolyline.size}pt routed walk from " +
+                                    "${"%.5f".format(userPt.latitude)},${"%.5f".format(userPt.longitude)} " +
+                                    "to tour step $bestIdx (${bestDist.toInt()}m off-tour) " +
+                                    "→ ${interpolated.size} interpolated steps total")
+                            toast("Walking to '$routeLabel' (${bestDist.toInt()}m onboarding)")
                         } else {
-                            val randomIdx = (0 until interpolated.size).random()
-                            DebugLogger.i(
-                                "WALK-SIM",
-                                "OUT OF SALEM — fallback random step $randomIdx/${interpolated.size} " +
-                                    "(tour has ${tourPois.size} stops, nothing to anchor to)"
+                            interpolated = interpolateWalkRoute(
+                                routePoints.subList(bestIdx, routePoints.size), 1.4f
                             )
-                            toast("Not in Salem — starting walk at random step ($randomIdx/${interpolated.size})")
-                            randomIdx
+                            DebugLogger.w("WALK-SIM",
+                                "ONBOARD ($source) — router returned no polyline; " +
+                                    "starting at nearest tour step $bestIdx (${bestDist.toInt()}m off)")
+                            toast("Starting at nearest point on '$routeLabel'")
                         }
-                        startStepIdx
                     } else {
-                        0
+                        interpolated = if (bestIdx == 0) tourInterpolated
+                            else interpolateWalkRoute(routePoints.subList(bestIdx, routePoints.size), 1.4f)
+                        DebugLogger.i("WALK-SIM",
+                            "User already on '$routeLabel' ($source, ${bestDist.toInt()}m from step $bestIdx) — " +
+                                "starting at step $bestIdx")
                     }
                 } else {
-                    0
+                    interpolated = tourInterpolated
+                    val reason = when {
+                        userPt == null -> "no fix"
+                        else -> "outside Salem"
+                    }
+                    DebugLogger.i("WALK-SIM",
+                        "$reason — starting at waypoint 1 of '$routeLabel'")
+                    toast(if (userPt == null) "No fix — starting at waypoint 1"
+                        else "Not in Salem — starting at waypoint 1")
                 }
+                resumeFromStep = 0
             }
+
+            DebugLogger.i("SalemMainActivity", "Walk sim: ${interpolated.size} steps at 1.4m/s")
             walkSimResumeRouteLabel = routeLabel
             walkSimResumeRouteSize = interpolated.size
 

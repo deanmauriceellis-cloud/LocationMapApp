@@ -112,6 +112,66 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas".toString())
 }
 
+// S216 — auto-bake content asset DB from Postgres before every build.
+// Wraps the four publish scripts (carry-forward from S180/S185) so that
+// any admin-tool edit to PG (POI coords, narration, tour legs, etc.)
+// reaches the bundled SQLite asset on the next `:app-salem:assembleDebug` /
+// `bundleRelease` without a manual run. The chain MUST execute in order:
+//   1. publish-salem-pois        (PG salem_pois          → SQLite salem_pois)
+//   2. publish-tours             (PG salem_tours/_stops  → SQLite tours/_stops)
+//   3. publish-tour-legs         (PG salem_tour_legs     → SQLite tour_legs +
+//                                 stamps Room identity_hash)
+//   4. align-asset-schema-to-room (rewrite all Room-managed tables with
+//                                 canonical createSql + stamp identity_hash
+//                                 + user_version on the asset)
+// align-asset MUST run last; skipping it leaves the asset on a stale
+// identity_hash and Room destructive-migrates on first launch (asset wipe).
+//
+// Each task uses inputs/outputs so Gradle can up-to-date check it: only a PG
+// schema change or a tracked file edit invalidates the bake. Result is "first
+// build of the day rebakes, subsequent builds are no-op".
+//
+// To skip the chain (e.g. clone-and-build without PG running):
+//   ./gradlew :app-salem:assembleDebug -PskipPublishChain
+def skipChain = project.hasProperty('skipPublishChain')
+
+tasks.register('publishSalemPois', Exec) {
+    group = 'salem-content'
+    description = 'PG salem_pois → bundled SQLite (publish-salem-pois.js)'
+    workingDir = rootProject.projectDir
+    commandLine 'node', 'cache-proxy/scripts/publish-salem-pois.js'
+    enabled = !skipChain
+}
+tasks.register('publishSalemTours', Exec) {
+    group = 'salem-content'
+    description = 'PG salem_tours/_stops → bundled SQLite (publish-tours.js)'
+    workingDir = rootProject.projectDir
+    commandLine 'node', 'cache-proxy/scripts/publish-tours.js'
+    enabled = !skipChain
+    mustRunAfter 'publishSalemPois'
+}
+tasks.register('publishSalemTourLegs', Exec) {
+    group = 'salem-content'
+    description = 'PG salem_tour_legs → bundled SQLite (publish-tour-legs.js)'
+    workingDir = rootProject.projectDir
+    commandLine 'node', 'cache-proxy/scripts/publish-tour-legs.js'
+    enabled = !skipChain
+    mustRunAfter 'publishSalemTours'
+}
+tasks.register('alignSalemAssetSchema', Exec) {
+    group = 'salem-content'
+    description = 'Stamp Room identity_hash + user_version on asset (align-asset-schema-to-room.js). MUST run last.'
+    workingDir = rootProject.projectDir
+    commandLine 'node', 'cache-proxy/scripts/align-asset-schema-to-room.js'
+    enabled = !skipChain
+    mustRunAfter 'publishSalemTourLegs'
+}
+tasks.register('publishSalemContent') {
+    group = 'salem-content'
+    description = 'Run the full PG → asset publish chain in order.'
+    dependsOn 'publishSalemPois', 'publishSalemTours', 'publishSalemTourLegs', 'alignSalemAssetSchema'
+}
+
 // S180 — verify-bundled-assets.js gate.
 // Catches the recurring failure mode where a content rebake silently wipes
 // or undersizes a Room table that a different script populates separately.
@@ -126,9 +186,14 @@ tasks.register('verifyBundledAssets', Exec) {
     // on workstations that don't have node installed); only treat actual
     // verification failure as a hard error.
     ignoreExitValue = false
+    // Verify must see the freshly aligned asset, so it runs AFTER the chain.
+    mustRunAfter 'alignSalemAssetSchema'
 }
 afterEvaluate {
     tasks.named('preBuild').configure {
+        if (!skipChain) {
+            dependsOn 'publishSalemContent'
+        }
         dependsOn 'verifyBundledAssets'
     }
 }

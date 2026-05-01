@@ -721,7 +721,6 @@ private fun salemPoiToJson(poi: SalemPoi): String = JSONObject().apply {
     putOpt("short_narration", poi.shortNarration)
     putOpt("long_narration", poi.longNarration)
     putOpt("historical_narration", poi.historicalNarration)
-    putOpt("historical_note", poi.historicalNote)
     putOpt("description", poi.description)
     putOpt("image_asset", poi.imageAsset)
     putOpt("phone", poi.phone)
@@ -747,7 +746,6 @@ private fun parseSalemPoi(s: String): SalemPoi? {
             shortNarration = o.optString("short_narration", "").takeIf { it.isNotEmpty() },
             longNarration = o.optString("long_narration", "").takeIf { it.isNotEmpty() },
             historicalNarration = o.optString("historical_narration", "").takeIf { it.isNotEmpty() },
-            historicalNote = o.optString("historical_note", "").takeIf { it.isNotEmpty() },
             description = o.optString("description", "").takeIf { it.isNotEmpty() },
             imageAsset = o.optString("image_asset", "").takeIf { it.isNotEmpty() },
             phone = o.optString("phone", "").takeIf { it.isNotEmpty() },

@@ -148,7 +148,6 @@ internal object FuzzySearchEngine {
         val addrLower = (poi.address ?: "").lowercase()
         val districtLower = (poi.district ?: "").lowercase()
         val specialtiesLower = (poi.specialties ?: "").lowercase()
-        val histLower = (poi.historicalNote ?: "").lowercase()
         val cuisineLower = (poi.cuisineType ?: "").lowercase()
 
         var s = 0f
@@ -182,7 +181,6 @@ internal object FuzzySearchEngine {
             if (subcatLower.contains(token) || catLower.contains(token)) s += 60f
             if (cuisineLower.contains(token) || specialtiesLower.contains(token)) s += 55f
             if (descLower.contains(token)) s += 40f
-            if (histLower.contains(token)) s += 30f
             if (addrLower.contains(token) || districtLower.contains(token)) s += 20f
         }
 

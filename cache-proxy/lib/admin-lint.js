@@ -458,7 +458,6 @@ async function checkCommercialTier0HasProse(pgPool) {
         COALESCE(TRIM(description),'') <> '' OR
         COALESCE(TRIM(short_narration),'') <> '' OR
         COALESCE(TRIM(long_narration),'') <> '' OR
-        COALESCE(TRIM(historical_note),'') <> '' OR
         COALESCE(TRIM(historical_narration),'') <> '' OR
         COALESCE(TRIM(custom_description),'') <> ''
       )
@@ -468,7 +467,7 @@ async function checkCommercialTier0HasProse(pgPool) {
   `, params);
   return rows.map(r => poiItem(r,
     `Commercial tier-0 POI has editorial prose populated. Per attorney guidance, only name + sub-category + Website + Call may render for unlicensed commercial POIs.`,
-    `Open the editor → Narration / General tabs → clear description / short_narration / long_narration / historical_note / historical_narration / custom_description. Or bump Merchant tier to author legitimate paid-tier content.`,
+    `Open the editor → Narration / General tabs → clear description / short_narration / long_narration / historical_narration / custom_description. Or bump Merchant tier to author legitimate paid-tier content.`,
   ));
 }
 

@@ -63,9 +63,21 @@ private const val COLOR_UPCOMING  = "#9E9E9E"  // gray
 private const val TOUR_ROUTE_COLOR  = "#22C55E"
 private const val TOUR_ROUTE_BORDER = "#15803D"
 
+// S216: the leg the user is currently walking is drawn bright blue; the
+// rest stay full-strength green (TOUR_ROUTE_COLOR / TOUR_ROUTE_BORDER) at
+// the original 6/10 stroke widths. As the user crosses a waypoint the
+// closest-leg detector flips the highlight onto the next leg.
+private const val TOUR_ROUTE_CURRENT_COLOR  = "#2196F3"
+private const val TOUR_ROUTE_CURRENT_BORDER = "#0D47A1"
+
 // Tour HUD overlay markers and polyline
 internal var tourRoutePolyline: Polyline? = null
 internal var tourRouteBorderPolyline: Polyline? = null
+// S216: per-leg polylines + matching borders, ordered by leg index. Empty
+// when the tour has no baked legs (we fall back to the single-polyline path).
+internal val tourLegPolylines       = mutableListOf<Polyline>()
+internal val tourLegBorderPolylines = mutableListOf<Polyline>()
+internal var tourCurrentLegIdx: Int = -1
 internal val tourStopMarkers = mutableListOf<Marker>()
 internal val tourTurnMarkers = mutableListOf<Marker>()
 internal var narrationBarView: View? = null
@@ -987,59 +999,89 @@ internal fun SalemMainActivity.removeNarrationBar() {
 internal suspend fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
     clearTourOverlays()
 
-    // S179: tour polyline is computed live against the bundled Salem walking
-    // graph via the same Router used for point-to-point directions. The
-    // pre-baked routeToNext / tour_legs assets from S178 are no longer
-    // consulted at runtime — geometry comes straight from
-    // WalkingDirections.getMultiStopRoute. Internal polyline waypoints stay
-    // hidden; only numbered stop markers and turn-by-turn intersection
-    // markers are drawn.
-    val route = tourViewModel.computeTourPolyline(activeTour)
-    if (route != null && route.polyline.isNotEmpty()) {
-        val border = Polyline().apply {
-            setPoints(route.polyline)
-            outlinePaint.color = Color.parseColor(TOUR_ROUTE_BORDER)
-            outlinePaint.strokeWidth = 10f
-            outlinePaint.isAntiAlias = true
-            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
-        }
-        binding.mapView.overlays.add(border)
-        tourRouteBorderPolyline = border
-
-        val routeLine = Polyline().apply {
-            setPoints(route.polyline)
-            outlinePaint.color = Color.parseColor(TOUR_ROUTE_COLOR)
-            outlinePaint.strokeWidth = 6f
-            outlinePaint.isAntiAlias = true
-            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
-        }
-        binding.mapView.overlays.add(routeLine)
-        tourRoutePolyline = routeLine
-
-        // Intersection / turn markers along the route — same treatment as
-        // point-to-point directions. Skip plain "continue" steps to avoid
-        // clutter on long multi-leg tours.
-        for (instruction in route.instructions) {
-            if (instruction.text.isBlank()) continue
-            if (instruction.text.lowercase().contains("continue")) continue
-            val marker = Marker(binding.mapView).apply {
-                position = instruction.location
-                title = instruction.text
-                snippet = "%.0f m".format(instruction.distanceM)
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                icon = MarkerIconHelper.dot(this@drawTourRoute, Color.parseColor(TOUR_ROUTE_COLOR))
+    // S216: when the tour has baked legs, draw each one as its own polyline
+    // so the overlay can highlight the leg the user is currently walking in
+    // blue and leave the rest green. Falls back to the single-polyline path
+    // for any tour without baked legs (preserves the runtime-routed overlay).
+    val legPolylines = tourViewModel.computeTourLegPolylines(activeTour)
+    if (legPolylines != null && legPolylines.isNotEmpty()) {
+        for ((i, pts) in legPolylines.withIndex()) {
+            if (pts.size < 2) continue
+            val border = Polyline().apply {
+                setPoints(pts)
+                outlinePaint.color = Color.parseColor(TOUR_ROUTE_BORDER)
+                outlinePaint.strokeWidth = 10f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
             }
-            binding.mapView.overlays.add(marker)
-            tourTurnMarkers.add(marker)
+            binding.mapView.overlays.add(border)
+            tourLegBorderPolylines.add(border)
+
+            val routeLine = Polyline().apply {
+                setPoints(pts)
+                outlinePaint.color = Color.parseColor(TOUR_ROUTE_COLOR)
+                outlinePaint.strokeWidth = 6f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            }
+            binding.mapView.overlays.add(routeLine)
+            tourLegPolylines.add(routeLine)
         }
+        tourCurrentLegIdx = -1
+        // Drive the initial highlight off the user's last known position so
+        // the active leg is blue immediately, before the next location fix.
+        lastGpsPoint?.let { applyTourLegHighlightFor(it) }
+            ?: viewModel.currentLocation.value?.point?.let { applyTourLegHighlightFor(it) }
 
         DebugLogger.i("SalemMainActivityTour",
-            "Drew tour '${activeTour.tour.id}' live route: ${route.polyline.size} pts, %.1fkm, ${route.instructions.size} turns".format(route.distanceKm))
+            "Drew tour '${activeTour.tour.id}' as ${tourLegPolylines.size} per-leg polylines (S216 active-leg highlight enabled)")
     } else {
-        DebugLogger.w("SalemMainActivityTour",
-            "Tour '${activeTour.tour.id}': could not compute multi-stop route")
+        // Fallback: no baked legs — runtime-routed single polyline.
+        val route = tourViewModel.computeTourPolyline(activeTour)
+        if (route != null && route.polyline.isNotEmpty()) {
+            val border = Polyline().apply {
+                setPoints(route.polyline)
+                outlinePaint.color = Color.parseColor(TOUR_ROUTE_BORDER)
+                outlinePaint.strokeWidth = 10f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            }
+            binding.mapView.overlays.add(border)
+            tourRouteBorderPolyline = border
+
+            val routeLine = Polyline().apply {
+                setPoints(route.polyline)
+                outlinePaint.color = Color.parseColor(TOUR_ROUTE_COLOR)
+                outlinePaint.strokeWidth = 6f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            }
+            binding.mapView.overlays.add(routeLine)
+            tourRoutePolyline = routeLine
+
+            for (instruction in route.instructions) {
+                if (instruction.text.isBlank()) continue
+                if (instruction.text.lowercase().contains("continue")) continue
+                val marker = Marker(binding.mapView).apply {
+                    position = instruction.location
+                    title = instruction.text
+                    snippet = "%.0f m".format(instruction.distanceM)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = MarkerIconHelper.dot(this@drawTourRoute, Color.parseColor(TOUR_ROUTE_COLOR))
+                }
+                binding.mapView.overlays.add(marker)
+                tourTurnMarkers.add(marker)
+            }
+            DebugLogger.i("SalemMainActivityTour",
+                "Drew tour '${activeTour.tour.id}' live route: ${route.polyline.size} pts, %.1fkm, ${route.instructions.size} turns".format(route.distanceKm))
+        } else {
+            DebugLogger.w("SalemMainActivityTour",
+                "Tour '${activeTour.tour.id}': could not compute multi-stop route")
+        }
     }
 
     // Numbered stop markers — drawn above the polyline regardless of
@@ -1085,11 +1127,146 @@ internal fun SalemMainActivity.clearTourOverlays() {
     tourRoutePolyline = null
     tourRouteBorderPolyline?.let { binding.mapView.overlays.remove(it) }
     tourRouteBorderPolyline = null
+    for (p in tourLegPolylines) binding.mapView.overlays.remove(p)
+    tourLegPolylines.clear()
+    for (p in tourLegBorderPolylines) binding.mapView.overlays.remove(p)
+    tourLegBorderPolylines.clear()
+    tourCurrentLegIdx = -1
     for (m in tourStopMarkers) binding.mapView.overlays.remove(m)
     tourStopMarkers.clear()
     for (m in tourTurnMarkers) binding.mapView.overlays.remove(m)
     tourTurnMarkers.clear()
     binding.mapView.invalidate()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// S216: ACTIVE-LEG HIGHLIGHT
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// When a tour is drawn from baked legs, each leg is its own Polyline (see
+// drawTourRoute above). The leg the user is currently walking is painted blue
+// and the rest green. The "current" leg is whichever leg has the closest
+// nearest-point to the user. Recomputed on every location update fed through
+// updateTourLocation.
+
+private fun distanceToSegmentSq(
+    px: Double, py: Double,
+    ax: Double, ay: Double,
+    bx: Double, by: Double,
+): Double {
+    val dx = bx - ax
+    val dy = by - ay
+    val lenSq = dx * dx + dy * dy
+    if (lenSq <= 0.0) {
+        val ex = px - ax
+        val ey = py - ay
+        return ex * ex + ey * ey
+    }
+    var t = ((px - ax) * dx + (py - ay) * dy) / lenSq
+    if (t < 0.0) t = 0.0 else if (t > 1.0) t = 1.0
+    val cx = ax + t * dx
+    val cy = ay + t * dy
+    val ex = px - cx
+    val ey = py - cy
+    return ex * ex + ey * ey
+}
+
+/**
+ * Find the leg index whose polyline has the closest point to `point`. Uses
+ * point-to-segment distance in squared lat/lng degrees — sufficient for
+ * "which leg is the user on" decisions over downtown-Salem distances. Ties
+ * are resolved in favour of the lower-index leg (i.e. the earlier leg in
+ * tour order), so a user standing exactly at a waypoint stays on the leg
+ * they were just walking until they actually move past it.
+ */
+private fun SalemMainActivity.findClosestLegIdx(point: GeoPoint): Int {
+    if (tourLegPolylines.isEmpty()) return -1
+    var bestIdx = -1
+    var bestDistSq = Double.MAX_VALUE
+    val px = point.latitude
+    val py = point.longitude
+    for ((idx, line) in tourLegPolylines.withIndex()) {
+        val pts = line.actualPoints ?: continue
+        if (pts.size < 2) continue
+        for (i in 1 until pts.size) {
+            val a = pts[i - 1]
+            val b = pts[i]
+            val d = distanceToSegmentSq(px, py, a.latitude, a.longitude, b.latitude, b.longitude)
+            if (d < bestDistSq) {
+                bestDistSq = d
+                bestIdx = idx
+            }
+        }
+    }
+    return bestIdx
+}
+
+/**
+ * S216: Full rebuild of the leg overlay z-order. Removes every leg polyline
+ * from the map and re-adds them in a guaranteed order:
+ *   1. All inactive borders (bottom)
+ *   2. All inactive lines
+ *   3. Active border
+ *   4. Active line (top)
+ *
+ * Cheaper than it looks (28 remove + 28 add per change, only fires when the
+ * walker crosses a leg boundary) and bulletproof against accumulated z-order
+ * drift from prior incremental lifts. Mutates the per-leg paint to the
+ * correct color + stroke before re-adding.
+ */
+private fun SalemMainActivity.rebuildLegOverlayOrder() {
+    val activeIdx = tourCurrentLegIdx
+    // 1. Detach everything first.
+    for (b in tourLegBorderPolylines) binding.mapView.overlays.remove(b)
+    for (l in tourLegPolylines)       binding.mapView.overlays.remove(l)
+
+    // 2. Repaint every leg with the right colors/widths.
+    for (i in tourLegPolylines.indices) {
+        val border = tourLegBorderPolylines[i]
+        val line   = tourLegPolylines[i]
+        if (i == activeIdx) {
+            border.outlinePaint.color = Color.parseColor(TOUR_ROUTE_CURRENT_BORDER)
+            border.outlinePaint.strokeWidth = 18f
+            line.outlinePaint.color = Color.parseColor(TOUR_ROUTE_CURRENT_COLOR)
+            line.outlinePaint.strokeWidth = 12f
+        } else {
+            border.outlinePaint.color = Color.parseColor(TOUR_ROUTE_BORDER)
+            border.outlinePaint.strokeWidth = 10f
+            line.outlinePaint.color = Color.parseColor(TOUR_ROUTE_COLOR)
+            line.outlinePaint.strokeWidth = 6f
+        }
+    }
+
+    // 3. Re-add inactive legs first, in original index order, borders before
+    //    lines. This keeps the inactive group's natural look (each leg's
+    //    line over its own border) without letting any inactive leg climb
+    //    above the active one.
+    for (i in tourLegBorderPolylines.indices) {
+        if (i == activeIdx) continue
+        binding.mapView.overlays.add(tourLegBorderPolylines[i])
+    }
+    for (i in tourLegPolylines.indices) {
+        if (i == activeIdx) continue
+        binding.mapView.overlays.add(tourLegPolylines[i])
+    }
+
+    // 4. Active leg goes on top — border first, then line.
+    if (activeIdx in tourLegBorderPolylines.indices) {
+        binding.mapView.overlays.add(tourLegBorderPolylines[activeIdx])
+        binding.mapView.overlays.add(tourLegPolylines[activeIdx])
+    }
+}
+
+internal fun SalemMainActivity.applyTourLegHighlightFor(point: GeoPoint) {
+    if (tourLegPolylines.isEmpty()) return
+    val idx = findClosestLegIdx(point)
+    if (idx < 0 || idx == tourCurrentLegIdx) return
+    val prev = tourCurrentLegIdx
+    tourCurrentLegIdx = idx
+    rebuildLegOverlayOrder()
+    binding.mapView.invalidate()
+    DebugLogger.i("SalemMainActivityTour",
+        "Active tour leg → $idx (was $prev)")
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1485,6 +1662,11 @@ internal fun SalemMainActivity.updateTourLocation(
     corridorManager?.checkPosition(point.latitude, point.longitude)?.forEach { trigger ->
         DebugLogger.i("SalemMainActivity", "Corridor triggered: ${trigger.corridor.name} (${trigger.distanceM.toInt()}m)")
     }
+
+    // S216: refresh which tour leg is highlighted in blue. No-op when the
+    // tour has no per-leg overlays (single-polyline fallback path) or when
+    // no tour is active.
+    applyTourLegHighlightFor(point)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

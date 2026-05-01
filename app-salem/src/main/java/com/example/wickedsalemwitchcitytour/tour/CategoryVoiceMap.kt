@@ -52,6 +52,7 @@ object CategoryVoiceMap {
         "TOUR_COMPANIES"      to UK_2,  // Male — dramatic storyteller
         "PSYCHIC"             to UK_3,  // Female soft — ethereal, mystical
         "HISTORICAL_BUILDINGS" to US_7, // Male narrator — documentary voice
+        "HISTORICAL_LANDMARKS" to US_7, // S216 split — reuse buildings voice
         "FOOD_DRINK"          to US_1,  // Female warm — welcoming
         "LODGING"             to US_8,  // Female crisp — professional hospitality
         "SHOPPING"            to US_3,  // Female bright — retail energy

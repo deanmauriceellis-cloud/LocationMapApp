@@ -112,7 +112,8 @@ object AudioControl {
     fun groupForCategory(categoryRaw: String?): Group {
         val c = categoryRaw?.uppercase() ?: return Group.MEANINGFUL
         return when (c) {
-            "HISTORICAL_BUILDINGS", "CIVIC", "WORSHIP"               -> Group.MEANINGFUL
+            "HISTORICAL_BUILDINGS", "HISTORICAL_LANDMARKS",
+            "CIVIC", "WORSHIP"                                        -> Group.MEANINGFUL
             "PARKS_REC", "EDUCATION"                                 -> Group.AMBIENT
             "FOOD_DRINK", "SHOPPING", "LODGING", "HEALTHCARE",
             "ENTERTAINMENT", "AUTO_SERVICES", "OFFICES",

@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close (kept the 10 most recent in SESSION-LOG.md after adding the S215 entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 205: 2026-04-30 — Category/subcategory lint pass + SI-driven auto-categorization (recovered + closed)
+
+Operator picked S205 carry-forward #4: lint POI categories/subcategories. Inventory surfaced a silent resolver bug — `PoiHeroResolver.kt` filtered icon files by `${subcategory}_` prefix, but DB stores `food_drink__cafes` while files are `cafes_*`, so per-subcategory hero icons never fired and every POI hash-picked across the full category folder; fix strips `CATEGORY__` namespace before prefix-match. Four new Taxonomy lint checks shipped (`subcat_namespace_mismatch` 2, `subcat_unknown_token` 24, `commercial_missing_subcategory` 1188 raw / 500 cap, `category_keyword_mismatch` 10). Phase 3 added SalemIntelligence-driven auto-categorization: 974/1188 (82%) of the missing-subcategory backlog have `intel_entity_id` for direct lookup, remaining 214 fall to fuzzy match; mapping engine has 20-primary SI→LMA map, refiner functions for ambiguous primaries, name-override layer that runs before SI mapping, and confidence tiers (≥0.9 same-cat → auto-apply, never silently changes category). Dry-run reports 918 proposals / 706 auto-eligible / 212 review. Web admin gained `AutoCategorizeModal.tsx` with summary cards, transition heatmap, color-coded review table, and "Apply auto-eligible (706)" CTA. Vite HMR config fixed for LAN access. Claude crashed mid-session before close protocol; recovery confirmed work was functionally complete (no half-applied state) and ran the close.
+
+Full session detail: `docs/session-logs/session-205-2026-04-30.md`. Commit: `769cebb`.
+
+---
 
 ## Session 204: 2026-04-30 — Lenovo device-verification pass: 7 V1 carry-forwards closed, GPS-OBS heartbeat root-cause fix shipped, 11 bios cleared of S192 meta-gap violations
 

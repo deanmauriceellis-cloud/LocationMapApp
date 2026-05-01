@@ -255,13 +255,20 @@ class NarrationGeofenceManager @Inject constructor(
         if (tourMode) return isTourEligible(point)
         if (historicalMode) {
             if (point.id in historicalAllowedIds) return true
-            if (point.historicalNote.isNullOrBlank()) return false
+            // S216: historical_note dropped — gate on historical_narration
+            // (the strict pre-1860 audio script) instead. POIs with no pre-1860
+            // narration authored fall through to the categorical check.
+            if (point.historicalNarration.isNullOrBlank()) return false
             return isCategoricallyHistorical(point)
         }
         // Pure explore mode — Layers checkboxes gate the hist-landmark and
-        // civic classes. POIs in neither class fall through to the permissive
-        // "everything narrates in Explore Salem" default.
-        if (point.isHistoricalProperty) return exploreAllowHistLandmarks
+        // civic classes. S216 split: HISTORICAL_LANDMARKS (MASSGIS-only,
+        // long-tail plaqued houses) is the layer-gated set; curated
+        // HISTORICAL_BUILDINGS narrate by default like every other POI. The
+        // is_historical_property flag is no longer the explore-mode gate
+        // criterion — it's still useful as metadata but spans both
+        // categories now.
+        if (point.category == "HISTORICAL_LANDMARKS") return exploreAllowHistLandmarks
         if (point.isCivicPoi) return exploreAllowCivic
         return true
     }
@@ -413,16 +420,17 @@ class NarrationGeofenceManager @Inject constructor(
         )
 
         /**
-         * S186 — categories the Layers "POIs Hist. Landmark" checkbox unsilences
-         * during Tour Mode. WORSHIP/PARKS_REC/EDUCATION/CIVIC + HIST_BLDG museums
-         * are NOT in this set — those are governed by per-POI flags
-         * (is_tour_poi / is_civic_poi) bulk-set at S186 PG migration. This set
-         * is the residual "labeled historic but unverified" categories that
-         * Salem mislabels heavily — strict pre-1860 year_established gate
-         * (applied separately) is what de-mislabels them.
+         * S216 — categories the Layers "POIs Hist. Landmark" checkbox
+         * unsilences during Tour Mode. After the S216 split, curated
+         * HISTORICAL_BUILDINGS POIs are no longer gated here — they always
+         * narrate in tour mode (subject to per-POI is_tour_poi force-audible
+         * + cooldowns). This set is now the layer-gated long tail:
+         * HISTORICAL_LANDMARKS (MASSGIS-only plaqued houses) plus the
+         * historically-mislabeled ENTERTAINMENT / LODGING residue from
+         * earlier ingestion passes.
          */
         private val TOUR_HIST_LANDMARK_CATEGORIES = setOf(
-            "HISTORICAL_BUILDINGS", "ENTERTAINMENT", "LODGING"
+            "HISTORICAL_LANDMARKS", "ENTERTAINMENT", "LODGING"
         )
 
         /**
@@ -483,7 +491,9 @@ class NarrationGeofenceManager @Inject constructor(
             return null
         }
         if (historicalMode) {
-            val hn = point.historicalNote
+            // S216: historical_note dropped — historicalMode now reads
+            // historical_narration directly (the strict pre-1860 script).
+            val hn = point.historicalNarration
             if (!hn.isNullOrBlank()) return hn
         }
         // S195 — when the POI is a Layers-gate hist landmark (any
@@ -513,7 +523,6 @@ class NarrationGeofenceManager @Inject constructor(
         return !point.longNarration.isNullOrBlank() ||
                !point.shortNarration.isNullOrBlank() ||
                !point.description.isNullOrBlank() ||
-               !point.historicalNote.isNullOrBlank() ||
                !point.historicalNarration.isNullOrBlank()
     }
 

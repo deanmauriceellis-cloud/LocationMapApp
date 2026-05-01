@@ -52,7 +52,7 @@ const UPDATABLE_FIELDS = [
   'cuisine_type', 'price_range', 'rating',
   'merchant_tier', 'ad_priority',
   // Historical/tour
-  'historical_period', 'historical_note', 'admission_info',
+  'historical_period', 'admission_info',
   'requires_transportation', 'wheelchair_accessible', 'seasonal',
   // Contact/hours
   'phone', 'email', 'website',

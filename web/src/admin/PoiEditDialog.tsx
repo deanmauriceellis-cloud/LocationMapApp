@@ -1377,17 +1377,8 @@ export function PoiEditDialog({
                           />
                         </FieldRow>
                       )}
-                      {has('historical_note') && !isCommercialTier0 && (
-                        <FieldRow label="Historical note" htmlFor="historical_note">
-                          <textarea
-                            id="historical_note"
-                            rows={3}
-                            {...reg('historical_note')}
-                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-mono"
-                          />
-                        </FieldRow>
-                      )}
-                      {isCommercialTier0 && (has('description') || has('historical_note')) && (
+                      {/* S216: historical_note column dropped; lifted into description. */}
+                      {isCommercialTier0 && has('description') && (
                         <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                           <strong>Tier 0 — template only.</strong> Commercial POIs render as
                           name + sub-category + Website + Call buttons. Bump <em>Merchant tier</em>

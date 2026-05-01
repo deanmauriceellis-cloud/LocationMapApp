@@ -116,10 +116,17 @@ class TourViewModel @Inject constructor(
 
     // ── Tour actions (delegate to engine) ────────────────────────────────
 
-    fun startTour(tourId: String) {
+    /**
+     * @param skipOnboarding S216 — true when the caller is the FAB walk-sim
+     * path. Walk-sim runs its own routed onboarding (see startWalkSim) and
+     * does not want this method also publishing a directions session, which
+     * spawns a green directions polyline + drift-reroute loop on top of the
+     * per-leg tour overlays.
+     */
+    fun startTour(tourId: String, skipOnboarding: Boolean = false) {
         viewModelScope.launch {
             tourEngine.startTour(tourId)
-            onboardToNearestPolylinePoint(tourId)
+            if (!skipOnboarding) onboardToNearestPolylinePoint(tourId)
         }
     }
 
@@ -420,6 +427,56 @@ class TourViewModel @Inject constructor(
             instructions = emptyList(),
             road = null,
         )
+    }
+
+    /**
+     * S216 — same per-leg clip + anchor logic as [assembleBakedTourRoute] but
+     * returns each leg's polyline separately so the map overlay can color the
+     * leg the user is currently walking differently from the rest. Ordered by
+     * `from_stop_order`. Returns null when no baked legs exist for the tour.
+     *
+     * Use this for the on-map overlay; use [computeTourPolyline] for any
+     * caller that just wants the merged polyline (walk-sim, fly-to bounds).
+     */
+    suspend fun computeTourLegPolylines(activeTour: ActiveTour): List<List<GeoPoint>>? {
+        val tourId = activeTour.tour.id
+        val legs = try {
+            repository.getTourLegs(tourId)
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "Failed to read baked legs for $tourId: ${e.message}")
+            return null
+        }
+        if (legs.isEmpty()) return null
+
+        val sorted = legs.sortedBy { it.fromStopOrder }
+        val out = ArrayList<List<GeoPoint>>(sorted.size)
+        for (leg in sorted) {
+            val routed = decodeGeometry(leg.geometry)
+            if (routed.size < 2) {
+                out.add(emptyList())
+                continue
+            }
+            val fromAnchor = if (leg.fromLat != null && leg.fromLng != null)
+                GeoPoint(leg.fromLat, leg.fromLng) else null
+            val toAnchor = if (leg.toLat != null && leg.toLng != null)
+                GeoPoint(leg.toLat, leg.toLng) else null
+
+            var startIdx = 0
+            var endIdx = routed.size - 1
+            if (fromAnchor != null) startIdx = closestIdx(routed, fromAnchor)
+            if (toAnchor != null) endIdx = closestIdx(routed, toAnchor)
+            if (startIdx > endIdx) {
+                startIdx = 0
+                endIdx = routed.size - 1
+            }
+
+            val legPolyline = ArrayList<GeoPoint>(endIdx - startIdx + 3)
+            if (fromAnchor != null) legPolyline.add(fromAnchor)
+            for (i in startIdx..endIdx) legPolyline.add(routed[i])
+            if (toAnchor != null) legPolyline.add(toAnchor)
+            out.add(legPolyline)
+        }
+        return out
     }
 
     /** Decode the bake's "lat,lng;lat,lng;..." string into GeoPoints. */

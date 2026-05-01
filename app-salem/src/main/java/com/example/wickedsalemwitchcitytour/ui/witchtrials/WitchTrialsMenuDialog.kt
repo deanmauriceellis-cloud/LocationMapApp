@@ -2351,8 +2351,8 @@ private fun SalemMainActivity.buildHistoricSiteRow(
         ellipsize = android.text.TextUtils.TruncateAt.END
     }
 
-    // Line 3: Historical note preview
-    val preview = (poi.historicalNote ?: poi.description ?: poi.shortDescription ?: "")
+    // Line 3: Historical preview (S216 — historical_note dropped; lifted into description)
+    val preview = (poi.description ?: poi.shortDescription ?: "")
         .take(120).let { if (it.length >= 120) "$it…" else it }
     val previewText = TextView(this).apply {
         text = preview
@@ -2480,11 +2480,10 @@ private fun SalemMainActivity.showHistoricSiteDetailDialog(poi: SalemPoi) {
 
     // ── Body (historical content, with cross-linking) ──
     // S200: historicalNarration is the canonical pre-1860 content for
-    // MASSGIS-sourced Historical Buildings (~375 rows have it populated but
-    // no historicalNote / description). Fall through to the older fields
-    // for hand-curated rows that pre-date the historical_narration column.
+    // S216: historical_note dropped; the strict pre-1860 historical_narration
+    // is the source of truth, falling back to description (which absorbed
+    // historical_note content during the column drop migration).
     val bodyContent = poi.historicalNarration
-        ?: poi.historicalNote
         ?: poi.description
         ?: poi.shortDescription
         ?: "No historical information available for this site."

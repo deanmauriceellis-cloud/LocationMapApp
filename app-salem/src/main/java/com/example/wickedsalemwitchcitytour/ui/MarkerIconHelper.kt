@@ -181,6 +181,10 @@ object MarkerIconHelper {
         "haunted_attraction"  to "haunted_attraction/haunted_house",
         "historic_house"      to "historic_house/colonial_house",
         "historical_buildings" to "tourism_history/historic_building",
+        // S216 split — HISTORICAL_LANDMARKS uses the same circle icon set as
+        // HISTORICAL_BUILDINGS (both render historic-tag POIs); only the
+        // gating + label differ.
+        "historical_landmarks" to "tourism_history/historic_building",
         "tour_companies"      to "ghost_tour/walking_tour",
         // Venue / Other / catch-all narration_point types
         "venue" to "entertainment/event_venue",
@@ -378,6 +382,8 @@ object MarkerIconHelper {
         // matches the existing `historic_house` palette; pink-purple for tour
         // companies groups them visually with `ghost_tour`.
         "historical_buildings" to Pair(R.drawable.ic_poi,          Color.parseColor("#8D6E63")),
+        // S216 — same icon, lighter brown so the two layers read distinct on the map.
+        "historical_landmarks" to Pair(R.drawable.ic_poi,          Color.parseColor("#A1887F")),
         "tour_companies"       to Pair(R.drawable.ic_poi,          Color.parseColor("#E040FB")),
     )
 

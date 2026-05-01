@@ -59,7 +59,6 @@ data class SalemPoi(
 
     // ── Historical ──
     @ColumnInfo(name = "historical_period") val historicalPeriod: String? = null,
-    @ColumnInfo(name = "historical_note") val historicalNote: String? = null,
     @ColumnInfo(name = "admission_info") val admissionInfo: String? = null,
     @ColumnInfo(name = "requires_transportation") val requiresTransportation: Boolean = false,
     @ColumnInfo(name = "wheelchair_accessible") val wheelchairAccessible: Boolean = true,
