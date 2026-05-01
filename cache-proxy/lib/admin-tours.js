@@ -98,11 +98,44 @@ module.exports = function(app, deps) {
   function routerAvailable() {
     return typeof deps.salemRoute === 'function' && typeof deps.salemBundle === 'function' && !!deps.salemBundle();
   }
+
+  // S214 — Snap a free lat/lng to the nearest walkable TigerLine edge.
+  // Returns null if the routing bundle isn't loaded or no edge is in range.
+  // Free waypoints (no poi_id) get snapped on insert and on every drag, so
+  // every saved waypoint is provably on a routable edge. POI-based stops are
+  // not snapped — their canonical position lives on salem_pois.
+  function snapToEdge(lat, lng) {
+    if (typeof deps.salemSnapEdge !== 'function') return null;
+    if (!isFiniteNumber(lat) || !isFiniteNumber(lng)) return null;
+    try {
+      return deps.salemSnapEdge(lat, lng);
+    } catch (err) {
+      console.warn('[AdminTours] snapToEdge error:', err.message);
+      return null;
+    }
+  }
   function routerVersion() {
     const b = deps.salemBundle && deps.salemBundle();
     if (!b || !b.meta) return null;
     return b.meta.built_at || `schema_v${b.meta.schema_version}-nodes${b.nodeCount}-edges${b.edgeCount}`;
   }
+  // S214 — preview-only edge snap for the admin map. UI calls this on every
+  // free-click (and on drag-end) so the marker can render at the snapped
+  // location *before* the row is committed. Persisted snap happens server-
+  // side in the POST/PATCH stop endpoints — this is a pure read.
+  app.get('/admin/salem/snap-edge', requirePg, (req, res) => {
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ error: 'lat and lng query params required' });
+    }
+    const snap = snapToEdge(lat, lng);
+    if (!snap) {
+      return res.status(404).json({ error: 'no walkable edge near input' });
+    }
+    res.json(snap);
+  });
+
   // SELECT effective stops for a tour in walk order. Each row has stop_id +
   // effective_lat/lng (override → POI fallback). Drops stops with no usable
   // coords from the leg list (they can't be routed).
@@ -170,6 +203,8 @@ module.exports = function(app, deps) {
                 s.lat AS override_lat,
                 s.lng AS override_lng,
                 s.name AS override_name,
+                s.edge_id,
+                s.edge_fraction,
                 s.updated_at,
                 p.name AS poi_name,
                 p.lat AS poi_lat,
@@ -207,17 +242,50 @@ module.exports = function(app, deps) {
       const values = [];
       let idx = 1;
 
+      // Resolve coordinate update. If lat OR lng is supplied, both must end up
+      // valid (we look up the existing row's other half if only one was sent).
+      // For free waypoints (poi_id IS NULL on the row) we snap to the nearest
+      // TigerLine edge and persist edge_id + edge_fraction along with the
+      // (potentially adjusted) lat/lng. POI-based stops never snap — their
+      // canonical position lives on salem_pois.
+      let snapInfo = null;
       if (Object.prototype.hasOwnProperty.call(body, 'lat') ||
           Object.prototype.hasOwnProperty.call(body, 'lng')) {
-        const err = validateLatLng(body.lat, body.lng);
-        if (err) return res.status(400).json({ error: err });
-        if (Object.prototype.hasOwnProperty.call(body, 'lat')) {
-          setParts.push(`lat = $${idx++}`);
-          values.push(body.lat);
+        let nextLat = body.lat;
+        let nextLng = body.lng;
+        if (nextLat == null || nextLng == null) {
+          const cur = await pgPool.query(
+            `SELECT lat, lng, poi_id FROM salem_tour_stops WHERE stop_id = $1 AND tour_id = $2`,
+            [stopId, tourId]
+          );
+          if (!cur.rows.length) return res.status(404).json({ error: 'Stop not found in this tour' });
+          if (nextLat == null) nextLat = cur.rows[0].lat;
+          if (nextLng == null) nextLng = cur.rows[0].lng;
         }
-        if (Object.prototype.hasOwnProperty.call(body, 'lng')) {
-          setParts.push(`lng = $${idx++}`);
-          values.push(body.lng);
+        const err = validateLatLng(nextLat, nextLng);
+        if (err) return res.status(400).json({ error: err });
+
+        // Decide whether to snap. Only snap if this row is a free waypoint
+        // (poi_id IS NULL). Look it up if we don't already have it.
+        const poiQ = await pgPool.query(
+          `SELECT poi_id FROM salem_tour_stops WHERE stop_id = $1 AND tour_id = $2`,
+          [stopId, tourId]
+        );
+        if (!poiQ.rows.length) return res.status(404).json({ error: 'Stop not found in this tour' });
+        const isFree = poiQ.rows[0].poi_id == null;
+
+        if (isFree) {
+          snapInfo = snapToEdge(nextLat, nextLng);
+          if (snapInfo) {
+            nextLat = snapInfo.snap_lat;
+            nextLng = snapInfo.snap_lng;
+          }
+        }
+        setParts.push(`lat = $${idx++}`); values.push(nextLat);
+        setParts.push(`lng = $${idx++}`); values.push(nextLng);
+        if (isFree) {
+          setParts.push(`edge_id = $${idx++}`); values.push(snapInfo ? snapInfo.edge_id : null);
+          setParts.push(`edge_fraction = $${idx++}`); values.push(snapInfo ? snapInfo.fraction : null);
         }
       }
 
@@ -249,6 +317,7 @@ module.exports = function(app, deps) {
                       SET ${setParts.join(', ')}
                     WHERE stop_id = $${idx++} AND tour_id = $${idx}
                 RETURNING stop_id, tour_id, poi_id, stop_order, lat, lng, name,
+                          edge_id, edge_fraction,
                           transition_narration, updated_at`;
 
       const { rows } = await pgPool.query(sql, values);
@@ -256,6 +325,15 @@ module.exports = function(app, deps) {
 
       // Echo effective coords for the client.
       const stop = rows[0];
+      if (snapInfo) {
+        stop.snap = {
+          edge_id: snapInfo.edge_id,
+          fraction: snapInfo.fraction,
+          snap_m: snapInfo.snap_m,
+          fullname: snapInfo.fullname,
+          mtfcc: snapInfo.mtfcc,
+        };
+      }
       let effectiveLat = stop.lat;
       let effectiveLng = stop.lng;
       if ((effectiveLat == null || effectiveLng == null) && stop.poi_id) {
@@ -441,20 +519,38 @@ module.exports = function(app, deps) {
         stopOrder = maxQ.rows[0].m + 1;
       }
 
+      // S214 — snap free waypoints to the nearest TigerLine edge before insert.
+      // hasPoi rows skip the snap (POI lat/lng is authoritative). hasCoords
+      // && hasPoi (caller supplied both) skips snap too — operator override.
+      let insertLat = hasCoords ? b.lat : null;
+      let insertLng = hasCoords ? b.lng : null;
+      let snapInfo = null;
+      if (hasCoords && !hasPoi) {
+        snapInfo = snapToEdge(b.lat, b.lng);
+        if (snapInfo) {
+          insertLat = snapInfo.snap_lat;
+          insertLng = snapInfo.snap_lng;
+        }
+      }
+
       const insQ = await client.query(
         `INSERT INTO salem_tour_stops
-           (tour_id, poi_id, stop_order, lat, lng, name, transition_narration)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (tour_id, poi_id, stop_order, lat, lng, name, transition_narration,
+            edge_id, edge_fraction)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING stop_id, tour_id, poi_id, stop_order, lat, lng, name,
+                   edge_id, edge_fraction,
                    transition_narration, updated_at`,
         [
           tourId,
           hasPoi ? b.poi_id : null,
           stopOrder,
-          hasCoords ? b.lat : null,
-          hasCoords ? b.lng : null,
+          insertLat,
+          insertLng,
           typeof b.name === 'string' ? b.name : null,
           typeof b.transition_narration === 'string' ? b.transition_narration : null,
+          snapInfo ? snapInfo.edge_id : null,
+          snapInfo ? snapInfo.fraction : null,
         ]
       );
 
@@ -478,6 +574,15 @@ module.exports = function(app, deps) {
       stop.effective_lat = effLat;
       stop.effective_lng = effLng;
       stop.effective_name = effName;
+      if (snapInfo) {
+        stop.snap = {
+          edge_id: snapInfo.edge_id,
+          fraction: snapInfo.fraction,
+          snap_m: snapInfo.snap_m,
+          fullname: snapInfo.fullname,
+          mtfcc: snapInfo.mtfcc,
+        };
+      }
       res.status(201).json(stop);
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});

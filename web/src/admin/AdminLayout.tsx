@@ -218,6 +218,18 @@ export function AdminLayout() {
   const [tourRefreshKey, setTourRefreshKey] = useState(0)
   const [addStopMode, setAddStopMode] = useState<AddStopMode>('none')
 
+  // S214 — Tour-mode preview filter. Mirrors the device's tour-mode narration
+  // gate (S186): is_tour_poi=true is the always-narrate baseline; Hist
+  // Landmark + Civic are opt-in classes the user can toggle in tour mode.
+  // Defaults match device tour-mode prefs (tour=ON, the others OFF). When a
+  // tour is active, the AdminMap narrows visible POIs to this set so the
+  // operator sees exactly which POIs will narrate during this tour.
+  const [tourModeFilter, setTourModeFilter] = useState<{
+    tourPois: boolean
+    histLandmark: boolean
+    civic: boolean
+  }>({ tourPois: true, histLandmark: false, civic: false })
+
   const handleTourSelect = useCallback((tour: TourSummary, stops: TourStop[]) => {
     setActiveTour(tour)
     setTourStops(stops)
@@ -689,6 +701,9 @@ export function AdminLayout() {
                 selectedLegOrder={selectedLegOrder}
                 onLegSelect={handleLegSelect}
                 onFocusStop={handleFocusStop}
+                pois={pois}
+                tourModeFilter={tourModeFilter}
+                onTourModeFilterChange={setTourModeFilter}
               />
             </div>
           </aside>
@@ -704,6 +719,7 @@ export function AdminLayout() {
               onClearCategoryFilter={() => setMapCategoryFilter(null)}
               categories={categories}
               activeTour={activeTour}
+              tourModeFilter={tourModeFilter}
               tourStops={tourStops}
               tourLegs={tourLegs}
               selectedLegOrder={selectedLegOrder}

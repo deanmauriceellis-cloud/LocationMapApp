@@ -40,6 +40,11 @@ export interface TourStop {
   effective_lat: number | null
   effective_lng: number | null
   effective_name: string | null
+  /** S214 — TigerLine edge this free waypoint is bound to. Null for POI-based
+   *  stops (POI lat/lng is authoritative) and for legacy free waypoints that
+   *  haven't been backfilled yet. */
+  edge_id?: number | null
+  edge_fraction?: number | null
   updated_at: string
 }
 

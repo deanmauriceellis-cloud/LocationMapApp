@@ -38,6 +38,7 @@ export interface PoiRow {
   data_source?: string
   mhc_id?: string | null
   is_tour_poi?: boolean
+  is_civic_poi?: boolean
   is_narrated?: boolean
   default_visible?: boolean
   has_announce_narration?: boolean

@@ -173,13 +173,90 @@ function loadBundle(filePath) {
       cells[cellIdx][cur[cellIdx]++] = i;
     }
 
+    // S214 — spatial grid over walkable EDGES for the admin tour-waypoint
+    // edge-foot snap. Uses the same cell grid as the node index (re-uses
+    // bounds + cellLat/cellLng) so the two indices agree on cell coordinates.
+    // An edge is "walkable" iff both endpoints are walkable. For each edge we
+    // place its index in every cell its bounding box overlaps — bbox is a
+    // tiny over-approximation but the grid is coarse enough that it's fine.
+    const edgeWalkable = new Uint8Array(edgeCount);
+    for (let i = 0; i < edgeCount; i++) {
+      edgeWalkable[i] = (nodeWalkable[srcIdx[i]] && nodeWalkable[tgtIdx[i]]) ? 1 : 0;
+    }
+    const edgeTally = new Int32Array(rows * cols);
+    function _edgeBbox(i) {
+      const p = edgePolylines[i];
+      if (!p || p.length < 4) {
+        const sLat = nodeLat[srcIdx[i]], sLng = nodeLng[srcIdx[i]];
+        const tLat = nodeLat[tgtIdx[i]], tLng = nodeLng[tgtIdx[i]];
+        return [Math.min(sLat, tLat), Math.min(sLng, tLng), Math.max(sLat, tLat), Math.max(sLng, tLng)];
+      }
+      let lo0 = Infinity, lo1 = Infinity, hi0 = -Infinity, hi1 = -Infinity;
+      for (let k = 0; k < p.length; k += 2) {
+        const a = p[k], b = p[k + 1];
+        if (a < lo0) lo0 = a; if (a > hi0) hi0 = a;
+        if (b < lo1) lo1 = b; if (b > hi1) hi1 = b;
+      }
+      return [lo0, lo1, hi0, hi1];
+    }
+    function _edgeCellRange(bbox) {
+      const r0 = clamp(((bbox[0] - minLat) / cellLat) | 0, 0, rows - 1);
+      const c0 = clamp(((bbox[1] - minLng) / cellLng) | 0, 0, cols - 1);
+      const r1 = clamp(((bbox[2] - minLat) / cellLat) | 0, 0, rows - 1);
+      const c1 = clamp(((bbox[3] - minLng) / cellLng) | 0, 0, cols - 1);
+      return [r0, c0, r1, c1];
+    }
+    for (let i = 0; i < edgeCount; i++) {
+      if (!edgeWalkable[i]) continue;
+      const [r0, c0, r1, c1] = _edgeCellRange(_edgeBbox(i));
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) edgeTally[r * cols + c]++;
+      }
+    }
+    const edgeCells = new Array(rows * cols);
+    for (let k = 0; k < edgeCells.length; k++) edgeCells[k] = new Int32Array(edgeTally[k]);
+    const edgeCur = new Int32Array(rows * cols);
+    for (let i = 0; i < edgeCount; i++) {
+      if (!edgeWalkable[i]) continue;
+      const [r0, c0, r1, c1] = _edgeCellRange(_edgeBbox(i));
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const cellIdx = r * cols + c;
+          edgeCells[cellIdx][edgeCur[cellIdx]++] = i;
+        }
+      }
+    }
+
+    // Cumulative segment lengths per edge (degrees, planar) — used to convert
+    // the snapped (segment, t) pair into a single fraction along the whole edge.
+    const edgeSegCum = new Array(edgeCount);
+    const edgeSegTotal = new Float64Array(edgeCount);
+    for (let i = 0; i < edgeCount; i++) {
+      const p = edgePolylines[i];
+      if (!p || p.length < 4) { edgeSegCum[i] = null; edgeSegTotal[i] = 0; continue; }
+      const segCount = (p.length / 2) - 1;
+      const cum = new Float64Array(segCount + 1);
+      let total = 0;
+      for (let s = 0; s < segCount; s++) {
+        const dlat = p[2 * (s + 1)] - p[2 * s];
+        const dlng = p[2 * (s + 1) + 1] - p[2 * s + 1];
+        total += Math.sqrt(dlat * dlat + dlng * dlng);
+        cum[s + 1] = total;
+      }
+      edgeSegCum[i] = cum;
+      edgeSegTotal[i] = total;
+    }
+
     return {
       nodeCount,
       edgeCount,
       nodeIds, nodeLat, nodeLng, nodeWalkable,
       edgeOffset, adjNeighbor, adjEdgeIdx, adjReversed,
       edgeId, edgeLengthM, edgeFullname, edgeMtfcc, edgePolylines,
+      srcIdx, tgtIdx,
+      edgeWalkable, edgeSegCum, edgeSegTotal,
       grid: { minLat, minLng, cellLat, cellLng, rows, cols, cells },
+      edgeGrid: { cells: edgeCells },
       meta,
       walkingPaceMps: parseFloat(meta.walking_pace_mps) || 1.4,
     };
@@ -219,6 +296,104 @@ function nearestWalkableNode(b, lat, lng) {
     if (best >= 0 && ring >= 1) return best;
   }
   return best >= 0 ? best : -1;
+}
+
+// S214 — Edge-foot snap. Finds the perpendicular projection of (lat,lng) onto
+// the nearest walkable TigerLine edge polyline. Returns null if no edge found
+// within the search rings.
+//
+// Result shape:
+//   { edge_idx, edge_id, fraction (0..1 along whole edge), snap_lat, snap_lng,
+//     snap_m (haversine), fullname, mtfcc, from_node_idx, to_node_idx }
+//
+// Used by the admin tour-waypoint placement / drag-drop flow so every saved
+// waypoint sits on a routable edge.
+function nearestWalkableEdge(b, lat, lng) {
+  const g = b.grid;
+  const eg = b.edgeGrid;
+  if (!eg) return null;
+  const centerRow = clamp(((lat - g.minLat) / g.cellLat) | 0, 0, g.rows - 1);
+  const centerCol = clamp(((lng - g.minLng) / g.cellLng) | 0, 0, g.cols - 1);
+  let bestIdx = -1;
+  let bestD2 = Infinity;
+  let bestFootLat = 0, bestFootLng = 0;
+  let bestSeg = -1;
+  let bestT = 0;
+  // Track candidates seen this scan so we don't re-evaluate an edge that lives
+  // in multiple cells (large/diagonal edges spill across cells).
+  const seen = new Set();
+  for (let ring = 0; ring <= 16; ring++) {
+    const r0 = Math.max(0, centerRow - ring);
+    const r1 = Math.min(g.rows - 1, centerRow + ring);
+    const c0 = Math.max(0, centerCol - ring);
+    const c1 = Math.min(g.cols - 1, centerCol + ring);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        if (ring > 0 && r !== r0 && r !== r1 && c !== c0 && c !== c1) continue;
+        const cell = eg.cells[r * g.cols + c];
+        for (let j = 0; j < cell.length; j++) {
+          const ei = cell[j];
+          if (seen.has(ei)) continue;
+          seen.add(ei);
+          const p = b.edgePolylines[ei];
+          const segCount = p && p.length >= 4 ? (p.length / 2) - 1 : 0;
+          if (segCount === 0) continue;
+          for (let s = 0; s < segCount; s++) {
+            const aLat = p[2 * s], aLng = p[2 * s + 1];
+            const bLat = p[2 * (s + 1)], bLng = p[2 * (s + 1) + 1];
+            const dlat = bLat - aLat;
+            const dlng = bLng - aLng;
+            const segLen2 = dlat * dlat + dlng * dlng;
+            let t = 0;
+            if (segLen2 > 0) {
+              t = ((lat - aLat) * dlat + (lng - aLng) * dlng) / segLen2;
+              if (t < 0) t = 0; else if (t > 1) t = 1;
+            }
+            const footLat = aLat + t * dlat;
+            const footLng = aLng + t * dlng;
+            const ddl = lat - footLat;
+            const ddg = lng - footLng;
+            const d2 = ddl * ddl + ddg * ddg;
+            if (d2 < bestD2) {
+              bestD2 = d2; bestIdx = ei;
+              bestFootLat = footLat; bestFootLng = footLng;
+              bestSeg = s; bestT = t;
+            }
+          }
+        }
+      }
+    }
+    // Once we have any hit, expand one more ring so a marginally-farther edge
+    // in a neighboring cell can still beat the current best, then stop. Same
+    // pattern as nearestWalkableNode.
+    if (bestIdx >= 0 && ring >= 1) break;
+  }
+  if (bestIdx < 0) return null;
+
+  // Convert (segment, t) → fraction along the whole edge.
+  const cum = b.edgeSegCum[bestIdx];
+  const total = b.edgeSegTotal[bestIdx];
+  let fraction = 0;
+  if (cum && total > 0) {
+    const segLen = cum[bestSeg + 1] - cum[bestSeg];
+    fraction = (cum[bestSeg] + bestT * segLen) / total;
+    if (fraction < 0) fraction = 0; else if (fraction > 1) fraction = 1;
+  }
+
+  const snapM = _haversineMSimple(lat, lng, bestFootLat, bestFootLng);
+  return {
+    edge_idx: bestIdx,
+    edge_id: b.edgeId[bestIdx],
+    fraction,
+    snap_lat: bestFootLat,
+    snap_lng: bestFootLng,
+    snap_m: snapM == null ? null : Math.round(snapM * 100) / 100,
+    fullname: b.edgeFullname[bestIdx] || null,
+    mtfcc: b.edgeMtfcc[bestIdx] || null,
+    from_node_idx: b.srcIdx[bestIdx],
+    to_node_idx: b.tgtIdx[bestIdx],
+    edge_length_m: b.edgeLengthM[bestIdx],
+  };
 }
 
 // ── Dijkstra (mirrors Router.kt) ────────────────────────────────────────────
@@ -712,5 +887,7 @@ module.exports = function (app, deps) {
     _bundle: () => bundle,
     _route: (a, b, c, d) => (bundle ? routeBundle(bundle, a, b, c, d) : null),
     _routeDiag: (a, b, c, d) => (bundle ? routeBundleDiag(bundle, a, b, c, d) : null),
+    // S214 — admin tour waypoint edge-foot snap.
+    _snapEdge: (lat, lng) => (bundle ? nearestWalkableEdge(bundle, lat, lng) : null),
   };
 };

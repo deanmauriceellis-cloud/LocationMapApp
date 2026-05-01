@@ -224,6 +224,10 @@ interface AdminMapProps {
   /** Tour-mode props (S174). When activeTour is set, the tour-stop layer
    *  renders numbered draggable waypoints over the basemap. */
   activeTour?: TourSummary | null
+  /** S214 — When activeTour is set, narrow visible POIs to the tour-mode
+   *  narration set (matches device S186 gate logic): is_tour_poi=true is the
+   *  always-narrate baseline; histLandmark + civic are opt-in classes. */
+  tourModeFilter?: { tourPois: boolean; histLandmark: boolean; civic: boolean } | null
   tourStops?: TourStop[] | null
   /** Precomputed walking legs (S183). When set, rendered as a green polyline
    *  overlay underneath the waypoints. */
@@ -731,6 +735,9 @@ interface MoveConfirmProps {
   subjectId: string
   from: { lat: number; lng: number }
   to: { lat: number; lng: number }
+  /** S214 — when present, the dialog shows the TigerLine edge the move will
+   *  snap to. Tour-stop drags populate this; POI drags leave it null. */
+  snap?: { fullname: string | null; snap_m: number; edge_id: number } | null
   onConfirm: () => void
   onCancel: () => void
   busy: boolean
@@ -743,6 +750,7 @@ function MoveConfirm({
   subjectId,
   from,
   to,
+  snap,
   onConfirm,
   onCancel,
   busy,
@@ -775,6 +783,18 @@ function MoveConfirm({
             <span>{distance.toFixed(1)} m</span>
           </div>
         </div>
+        {snap && (
+          <div className="mt-2 bg-fuchsia-50 border border-fuchsia-200 rounded p-2 text-xs text-fuchsia-900">
+            <div className="font-medium">Will snap to TigerLine edge</div>
+            <div className="font-mono mt-1">
+              {snap.fullname || '(unnamed edge)'}{' '}
+              <span className="text-fuchsia-700">· Δ {snap.snap_m.toFixed(1)} m</span>
+            </div>
+            <div className="text-fuchsia-700/80 text-[10px] mt-0.5">
+              edge_id {snap.edge_id}
+            </div>
+          </div>
+        )}
         {error && (
           <div className="mt-3 p-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded font-mono whitespace-pre-wrap break-words">
             {error}
@@ -1916,6 +1936,7 @@ export function AdminMap({
   lintIdFilterLabel,
   onClearLintIdFilter,
   activeTour,
+  tourModeFilter,
   tourStops,
   tourLegs,
   selectedLegOrder = null,
@@ -1971,6 +1992,25 @@ export function AdminMap({
     if (lintIdFilter && lintIdFilter.size > 0) {
       out = out.filter((p) => lintIdFilter.has(p.id))
     }
+    // S214 — Tour-mode preview. When a tour is active and at least one
+    // tour-mode class is enabled, narrow markers to the union of those
+    // classes. Mirrors the device's S186 narration gate so the operator
+    // sees exactly which POIs will narrate during this tour. Tour stops
+    // still render via TourStopLayer regardless of this filter.
+    if (activeTour && tourModeFilter) {
+      const { tourPois, histLandmark, civic } = tourModeFilter
+      if (tourPois || histLandmark || civic) {
+        out = out.filter((p) => {
+          if (tourPois && p.is_tour_poi) return true
+          if (histLandmark && isMassgisHistorical(p)) return true
+          if (civic && p.is_civic_poi) return true
+          return false
+        })
+      } else {
+        // All three off → show no POIs (operator explicitly turned everything off).
+        out = []
+      }
+    }
     // When the geocode preview is open AND focusMap is on, hide every POI
     // marker EXCEPT the source POI (single mode) or the source POI + every
     // dupe contributing a candidate (show-all mode).
@@ -1982,7 +2022,7 @@ export function AdminMap({
       out = out.filter(p => keep.has(p.id))
     }
     return out
-  }, [pois, categoryFilter, lintIdFilter, geocodePreview, focusMap, showAllCandidates])
+  }, [pois, categoryFilter, lintIdFilter, activeTour, tourModeFilter, geocodePreview, focusMap, showAllCandidates])
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -1991,6 +2031,43 @@ export function AdminMap({
   const [pendingStop, setPendingStop] = useState<PendingStopMove | null>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState<string | null>(null)
+
+  // S214 — snap-edge preview for the pending drag. Fetched off the
+  // admin/salem/snap-edge endpoint when the operator drops a marker; shown
+  // inside MoveConfirm so they see exactly which TigerLine edge the waypoint
+  // will end up bound to before committing.
+  const [pendingSnap, setPendingSnap] = useState<{
+    fullname: string | null
+    snap_m: number
+    edge_id: number
+    snap_lat: number
+    snap_lng: number
+  } | null>(null)
+  useEffect(() => {
+    if (!pendingStop) { setPendingSnap(null); return }
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/salem/snap-edge?lat=${pendingStop.to.lat}&lng=${pendingStop.to.lng}`,
+          { credentials: 'same-origin' },
+        )
+        if (cancelled) return
+        if (!res.ok) { setPendingSnap(null); return }
+        const j = await res.json()
+        setPendingSnap({
+          fullname: j.fullname ?? null,
+          snap_m: typeof j.snap_m === 'number' ? j.snap_m : 0,
+          edge_id: typeof j.edge_id === 'number' ? j.edge_id : 0,
+          snap_lat: j.snap_lat,
+          snap_lng: j.snap_lng,
+        })
+      } catch {
+        if (!cancelled) setPendingSnap(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [pendingStop])
 
   const handleStopDragEnd = useCallback((move: PendingStopMove) => {
     setPendingStop(move)
@@ -2039,15 +2116,22 @@ export function AdminMap({
         credentials: 'same-origin',
         body: JSON.stringify({ lat: pendingStop.to.lat, lng: pendingStop.to.lng }),
       })
+      let body: { lat?: number; lng?: number } | null = null
+      try { body = await res.json() } catch { /* not json */ }
       if (!res.ok) {
-        let msg = `${res.status} ${res.statusText}`
-        try {
-          const body = await res.json()
-          if (body?.error) msg = `${res.status} ${body.error}`
-        } catch { /* body wasn't JSON */ }
-        throw new Error(msg)
+        const errMsg = body && (body as { error?: string }).error
+          ? `${res.status} ${(body as { error?: string }).error}`
+          : `${res.status} ${res.statusText}`
+        throw new Error(errMsg)
       }
-      onStopMoved(pendingStop.stop.stop_id, pendingStop.to.lat, pendingStop.to.lng)
+      // S214 — server may have snapped the coords. Reposition the marker to
+      // the actually-stored location so it visually lands on the road instead
+      // of the operator's drop point. Fall back to drop coords if response
+      // didn't include lat/lng (older server, defensive).
+      const finalLat = typeof body?.lat === 'number' ? body.lat : pendingStop.to.lat
+      const finalLng = typeof body?.lng === 'number' ? body.lng : pendingStop.to.lng
+      pendingStop.marker.setLatLng([finalLat, finalLng])
+      onStopMoved(pendingStop.stop.stop_id, finalLat, finalLng)
       setPendingStop(null)
     } catch (e) {
       pendingStop.marker.setLatLng([pendingStop.from.lat, pendingStop.from.lng])
@@ -2357,6 +2441,11 @@ export function AdminMap({
           subjectId={`stop #${pendingStop.stop.stop_id} · order ${pendingStop.stop.stop_order}`}
           from={pendingStop.from}
           to={pendingStop.to}
+          snap={
+            // Free waypoints (no poi_id) get edge-snapped on the server.
+            // POI-based stops are not snapped, so we hide the snap panel.
+            pendingStop.stop.poi_id == null && pendingSnap ? pendingSnap : null
+          }
           busy={stopBusy}
           error={stopError}
           onConfirm={handleStopConfirm}

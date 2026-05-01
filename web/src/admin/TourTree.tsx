@@ -11,6 +11,8 @@
 // handles everything else.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { PoiRow } from './PoiTree'
+import { isMassgisHistorical } from './PoiTree'
 import type {
   ComputeRouteResponse,
   TourDetailResponse,
@@ -39,6 +41,13 @@ interface TourTreeProps {
   onLegSelect?: (legOrder: number) => void
   /** Click handler for a waypoint row — recenters the map on that stop. */
   onFocusStop?: (stopId: number) => void
+  /** S214 — POI list (for tour-mode preview counts). */
+  pois: PoiRow[] | null
+  /** S214 — Tour-mode preview filter. Mirrors device S186 narration gate:
+   *  is_tour_poi is the always-narrate baseline; histLandmark + civic are
+   *  opt-in classes the user can toggle in tour mode. */
+  tourModeFilter: { tourPois: boolean; histLandmark: boolean; civic: boolean }
+  onTourModeFilterChange: (next: { tourPois: boolean; histLandmark: boolean; civic: boolean }) => void
 }
 
 const ENDPOINT = '/api/admin/salem/tours'
@@ -66,6 +75,9 @@ export function TourTree({
   selectedLegOrder = null,
   onLegSelect,
   onFocusStop,
+  pois,
+  tourModeFilter,
+  onTourModeFilterChange,
 }: TourTreeProps) {
   const [tours, setTours] = useState<TourSummary[] | null>(null)
   const [tour, setTour] = useState<TourSummary | null>(null)
@@ -473,6 +485,12 @@ export function TourTree({
             )}
           </div>
 
+          <TourModePreview
+            pois={pois}
+            filter={tourModeFilter}
+            onChange={onTourModeFilterChange}
+          />
+
           <RouteSection
             tour={tour}
             stopCount={stops?.length ?? 0}
@@ -579,6 +597,96 @@ interface RouteSectionProps {
    * operator can fix bad legs without grepping the proxy log.
    */
   lastCompute: ComputeRouteResponse | null
+}
+
+// S214 — Tour-mode preview panel. Mirrors the device's S186 narration gate:
+// is_tour_poi=true is the always-narrate baseline; histLandmark and civic
+// are opt-in classes the user can toggle in tour mode. Each row shows the
+// app-wide count + a checkbox controlling whether that class renders on
+// the admin map. The total at the bottom is the union (no double-counting).
+interface TourModePreviewProps {
+  pois: PoiRow[] | null
+  filter: { tourPois: boolean; histLandmark: boolean; civic: boolean }
+  onChange: (next: { tourPois: boolean; histLandmark: boolean; civic: boolean }) => void
+}
+
+function TourModePreview({ pois, filter, onChange }: TourModePreviewProps) {
+  const counts = useMemo(() => {
+    const live = (pois ?? []).filter((p) => !p.deleted_at)
+    const tourPoiSet = new Set<string>()
+    const histLandmarkSet = new Set<string>()
+    const civicSet = new Set<string>()
+    for (const p of live) {
+      if (p.is_tour_poi) tourPoiSet.add(p.id)
+      if (isMassgisHistorical(p)) histLandmarkSet.add(p.id)
+      if (p.is_civic_poi) civicSet.add(p.id)
+    }
+    const audible = new Set<string>()
+    if (filter.tourPois) for (const id of tourPoiSet) audible.add(id)
+    if (filter.histLandmark) for (const id of histLandmarkSet) audible.add(id)
+    if (filter.civic) for (const id of civicSet) audible.add(id)
+    return {
+      tourPoi: tourPoiSet.size,
+      histLandmark: histLandmarkSet.size,
+      civic: civicSet.size,
+      audible: audible.size,
+    }
+  }, [pois, filter])
+
+  return (
+    <div className="px-3 py-2 border-b border-slate-200 bg-fuchsia-50/40">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1.5">
+        Tour-mode preview
+      </div>
+      <p className="text-[11px] text-slate-600 mb-2 leading-tight">
+        POIs that will narrate during this tour. Mirrors the device's tour-mode
+        gate: <code className="text-[10px]">is_tour_poi</code> always narrates;
+        Hist Landmark + Civic are opt-in.
+      </p>
+      <ul className="space-y-1">
+        <li>
+          <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filter.tourPois}
+              onChange={(e) => onChange({ ...filter, tourPois: e.target.checked })}
+              className="w-3.5 h-3.5 accent-fuchsia-600"
+            />
+            <span className="flex-1">Tour POIs <span className="text-[10px] text-slate-500">(is_tour_poi)</span></span>
+            <span className="tabular-nums text-slate-600">{counts.tourPoi}</span>
+          </label>
+        </li>
+        <li>
+          <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filter.histLandmark}
+              onChange={(e) => onChange({ ...filter, histLandmark: e.target.checked })}
+              className="w-3.5 h-3.5 accent-fuchsia-600"
+            />
+            <span className="flex-1">Historical Landmark <span className="text-[10px] text-slate-500">(MassGIS MHC)</span></span>
+            <span className="tabular-nums text-slate-600">{counts.histLandmark}</span>
+          </label>
+        </li>
+        <li>
+          <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filter.civic}
+              onChange={(e) => onChange({ ...filter, civic: e.target.checked })}
+              className="w-3.5 h-3.5 accent-fuchsia-600"
+            />
+            <span className="flex-1">Civic <span className="text-[10px] text-slate-500">(is_civic_poi)</span></span>
+            <span className="tabular-nums text-slate-600">{counts.civic}</span>
+          </label>
+        </li>
+      </ul>
+      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-fuchsia-200/60 text-xs">
+        <span className="font-medium text-slate-700">Will narrate (union)</span>
+        <span className="font-semibold tabular-nums text-fuchsia-700">{counts.audible}</span>
+      </div>
+    </div>
+  )
 }
 
 function RouteSection({

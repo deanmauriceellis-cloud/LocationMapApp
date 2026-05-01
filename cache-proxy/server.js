@@ -195,6 +195,7 @@ const salemRouterModule = require('./lib/salem-router')(app, deps);
 deps.salemRoute = salemRouterModule._route;
 deps.salemBundle = salemRouterModule._bundle;
 deps.salemRouteDiag = salemRouterModule._routeDiag;
+deps.salemSnapEdge = salemRouterModule._snapEdge;
 
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);
