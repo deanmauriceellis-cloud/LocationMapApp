@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 197-206. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 198-207. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 207: 2026-04-30 — Civic narration trim (long_narration nulled on 62 civic POIs)
+
+Operator: "civic POIs have too much information, like the memorials and statues — is there a way to control their narrative?" Walked the runtime gate in `NarrationGeofenceManager.kt:466-505`; initial proposed fix (make commemoratives honor BRIEF/STANDARD/DEEP) invalidated by DB inventory — all 67 civic POIs have empty `historical_narration`, none match the commemorative regex, none are pre-1860. Real source of bloat was `long_narration` heard at DEEP (15+ civic rows >800 chars, top: Historic Salem Inc 1,134 / AOH 1,020 / Bishop Fenwick 1,006 / Salem Common 931 / Salem Sound Coastwatch 991). Operator picked: NULL `long_narration` for all civic. Snapshotted 62 rows to `docs/archive/civic-long-narration-snapshot-2026-04-30.csv` (reversible), ran the UPDATE, verified 0 civic with long_narration remaining + 66/67 still have short_narration. Full publish chain (Room v15) + assembleDebug + Lenovo HNY0CY0W uninstall+install. No code changes. Carry-forward: operator validation drive, selective re-author from snapshot if any civic feels too thin.
+
+Full session detail: `docs/session-logs/session-207-2026-04-30.md`. Commit: `<sha>`.
+
+---
 
 ## Session 206: 2026-04-30 — Web admin verify + Lenovo deploy + drive forensic + 3 narration/visibility fixes
 
@@ -74,13 +82,4 @@ Two operator-driven fixes. (1) Witch Trials admin tab regression — `cache-prox
 
 Full session detail: `docs/session-logs/session-198-2026-04-29.md`. Commit: pending session-close roll.
 
----
-
-## Session 197: 2026-04-29 — TTS chunker punctuation/dialog/dash/ellipsis trip-ups + Witch-Trials Speak bypasses AudioControl gate
-
-Two targeted Android narration fixes off operator field-listening on the Lenovo. (1) S192 punctuation chunker in `NarrationManager.kt` extended with five trip-up handlers: closing-quote sentence boundary so quoted dialogue (`said." Then…`) splits cleanly, em-/en-dash mid-sentence beat (200ms `PAUSE_DASH`), single-char ellipsis `…` recognized as both sentence terminator and mid-sentence pause (300ms `PAUSE_ELLIPSIS`), `ABBREVIATIONS` expanded ~24 entries (Ave, Blvd, Rd, Ln, Esq, PhD, MD, Prof, Adm, Col, Cpl, Pvt, Sen, Rep, Fr, Br, BC, AD, Ca, Conn, Vt, Calif, Fla, Penn, Pa, al, pp, ed, approx, fig), and `MIN_SUB_CHARS` lowered 60 → 40 so commas in long sentences get an earlier explicit beat. Existing Mr/Mrs/St/Dr/Jr/Sr abbreviation guards preserved. (2) Operator reported the 9-dot-menu → Witch Trials → article/newspaper/bio Speak button silently dropped narration when Oracle Newspaper toggle was off (default OFF since S168). Root cause: `witchtrials_*` tags route to `NarrationKind.ORACLE`, then `enqueue()` drops at the AudioControl gate. Same dormant bug affected POI-sheet Speak for groups with their toggle off (BUSINESSES default OFF). Fix: added `userInitiated: Boolean = false` to `NarrationSegment`, threaded through `speakTaggedHint` / `speakTaggedNarration`. `enqueue()` skips the AudioControl group/oracle gates when `userInitiated=true`. `TourViewModel.speakSheetSection()` passes `userInitiated=true` — every one of its 11 callers (PoiDetailSheet × 7, WitchTrialsMenuDialog × 4) is a Speak-button tap by design. Auto-triggered ambient narration from `HistoricalHeadlineQueue` still respects the toggles. Two commits, two Lenovo reinstalls (uninstall + install). No DB / publish-chain work — bundled `salem_content.db` unchanged since S196 close.
-
-Full session detail: `docs/session-logs/session-197-2026-04-29.md`. Final commits: `fb410f7`, `215b86d`.
-
----
 

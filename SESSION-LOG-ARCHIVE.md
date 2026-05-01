@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 196, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 197, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 196, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 197, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 197: 2026-04-29 — TTS chunker punctuation/dialog/dash/ellipsis trip-ups + Witch-Trials Speak bypasses AudioControl gate
+
+Two targeted Android narration fixes off operator field-listening on the Lenovo. (1) S192 punctuation chunker in `NarrationManager.kt` extended with five trip-up handlers: closing-quote sentence boundary so quoted dialogue (`said." Then…`) splits cleanly, em-/en-dash mid-sentence beat (200ms `PAUSE_DASH`), single-char ellipsis `…` recognized as both sentence terminator and mid-sentence pause (300ms `PAUSE_ELLIPSIS`), `ABBREVIATIONS` expanded ~24 entries (Ave, Blvd, Rd, Ln, Esq, PhD, MD, Prof, Adm, Col, Cpl, Pvt, Sen, Rep, Fr, Br, BC, AD, Ca, Conn, Vt, Calif, Fla, Penn, Pa, al, pp, ed, approx, fig), and `MIN_SUB_CHARS` lowered 60 → 40 so commas in long sentences get an earlier explicit beat. Existing Mr/Mrs/St/Dr/Jr/Sr abbreviation guards preserved. (2) Operator reported the 9-dot-menu → Witch Trials → article/newspaper/bio Speak button silently dropped narration when Oracle Newspaper toggle was off (default OFF since S168). Root cause: `witchtrials_*` tags route to `NarrationKind.ORACLE`, then `enqueue()` drops at the AudioControl gate. Same dormant bug affected POI-sheet Speak for groups with their toggle off (BUSINESSES default OFF). Fix: added `userInitiated: Boolean = false` to `NarrationSegment`, threaded through `speakTaggedHint` / `speakTaggedNarration`. `enqueue()` skips the AudioControl group/oracle gates when `userInitiated=true`. `TourViewModel.speakSheetSection()` passes `userInitiated=true` — every one of its 11 callers (PoiDetailSheet × 7, WitchTrialsMenuDialog × 4) is a Speak-button tap by design. Auto-triggered ambient narration from `HistoricalHeadlineQueue` still respects the toggles. Two commits, two Lenovo reinstalls (uninstall + install). No DB / publish-chain work — bundled `salem_content.db` unchanged since S196 close.
+
+Full session detail: `docs/session-logs/session-197-2026-04-29.md`. Final commits: `fb410f7`, `215b86d`.
+
+---
 
 ## Session 196: 2026-04-28 / 29 — Hero leak fix + historical narration overhaul (344 regenerated) + admin audit log + revert UI
 
