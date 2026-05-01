@@ -419,6 +419,7 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes 
         <AutoCategorizeModal
           onClose={() => setShowAutoCat(false)}
           onApplied={() => { void fetchLint() }}
+          onOpenPoi={onOpenPoi}
         />
       )}
     </div>

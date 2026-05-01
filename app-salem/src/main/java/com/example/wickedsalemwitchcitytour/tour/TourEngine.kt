@@ -131,11 +131,11 @@ class TourEngine @Inject constructor(
             val menuPrefs = context.getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
             val allowHist = menuPrefs.getBoolean(
                 MenuPrefs.histLandmarkPrefKey(true),
-                MenuPrefs.histLandmarkPrefDefault(true)
+                MenuPrefs.histLandmarkPrefDefault(true, menuPrefs)
             )
             val allowCivic = menuPrefs.getBoolean(
                 MenuPrefs.civicPrefKey(true),
-                MenuPrefs.civicPrefDefault(true)
+                MenuPrefs.civicPrefDefault(true, menuPrefs)
             )
             narrationGeofenceManager.setTourMode(true, allowHist, allowCivic)
             DebugLogger.i(TAG, "Tour Mode ENABLED for '${tour.name}' — allowHist=$allowHist, allowCivic=$allowCivic")

@@ -2149,11 +2149,11 @@ class SalemMainActivity : AppCompatActivity() {
         if (activeTour != null && !showAllPoisActive) {
             val allowHist = menuPrefs.getBoolean(
                 MenuPrefs.histLandmarkPrefKey(true),
-                MenuPrefs.histLandmarkPrefDefault(true)
+                MenuPrefs.histLandmarkPrefDefault(true, menuPrefs)
             )
             val allowCivic = menuPrefs.getBoolean(
                 MenuPrefs.civicPrefKey(true),
-                MenuPrefs.civicPrefDefault(true)
+                MenuPrefs.civicPrefDefault(true, menuPrefs)
             )
             narrationGeofenceManager.setTourMode(true, allowHist, allowCivic)
             DebugLogger.i("SalemMainActivity",
@@ -2213,7 +2213,8 @@ class SalemMainActivity : AppCompatActivity() {
                         p.adPriority > 0 ||
                         p.category == "HISTORICAL_BUILDINGS" ||
                         p.isHistoricalProperty ||
-                        p.isCivicPoi
+                        p.isCivicPoi ||
+                        p.isTourPoi
                     }
                 }
                 // Phase 9R.0: when Historical Mode is on, strip out modern POIs
@@ -2236,11 +2237,11 @@ class SalemMainActivity : AppCompatActivity() {
                 val tourActive = menuEventListenerImpl.isTourActive()
                 val histLandmarkOn = menuPrefs.getBoolean(
                     MenuPrefs.histLandmarkPrefKey(tourActive),
-                    MenuPrefs.histLandmarkPrefDefault(tourActive)
+                    MenuPrefs.histLandmarkPrefDefault(tourActive, menuPrefs)
                 )
                 val civicOn = menuPrefs.getBoolean(
                     MenuPrefs.civicPrefKey(tourActive),
-                    MenuPrefs.civicPrefDefault(tourActive)
+                    MenuPrefs.civicPrefDefault(tourActive, menuPrefs)
                 )
                 val histLandmarkCats = setOf("HISTORICAL_BUILDINGS", "ENTERTAINMENT", "LODGING")
                 val points = if (showAllPoisActive) {

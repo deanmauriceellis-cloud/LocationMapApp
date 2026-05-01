@@ -36,9 +36,11 @@ interface AutoCategorizeResponse {
 interface Props {
   onClose: () => void
   onApplied: () => void
+  /** Click a row's POI name to open it in the standard PoiEditDialog. Closes this modal first. */
+  onOpenPoi?: (poiId: string) => void
 }
 
-export function AutoCategorizeModal({ onClose, onApplied }: Props) {
+export function AutoCategorizeModal({ onClose, onApplied, onOpenPoi }: Props) {
   const [phase, setPhase] = useState<'loading' | 'preview' | 'applying' | 'error'>('loading')
   const [resp, setResp] = useState<AutoCategorizeResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -279,7 +281,17 @@ export function AutoCategorizeModal({ onClose, onApplied }: Props) {
                               onChange={() => toggleRow(p.poi_id)}
                             />
                           </td>
-                          <td className="px-2 py-1 max-w-[280px] truncate" title={p.poi_name}>{p.poi_name}</td>
+                          <td className="px-2 py-1 max-w-[280px] truncate" title={onOpenPoi ? `Open ${p.poi_name} in POI editor` : p.poi_name}>
+                            {onOpenPoi ? (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onOpenPoi(p.poi_id); onClose() }}
+                                className="text-indigo-700 hover:text-indigo-900 hover:underline text-left truncate w-full"
+                              >
+                                {p.poi_name}
+                              </button>
+                            ) : p.poi_name}
+                          </td>
                           <td className={`px-2 py-1 ${catChange ? 'text-rose-700' : 'text-slate-600'}`}>
                             {p.current_category}{p.current_subcategory ? <span className="text-slate-400">/{p.current_subcategory.replace(p.current_category + '__', '')}</span> : ''}
                           </td>

@@ -9,6 +9,8 @@
 
 package com.example.locationmapapp.ui.menu
 
+import android.content.SharedPreferences
+
 @Suppress("unused")
 private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MenuPrefs.kt"
 
@@ -136,10 +138,26 @@ object MenuPrefs {
     // ── S186 helpers: pick the correct Layers pref for the active mode ────────
     fun histLandmarkPrefKey(tourActive: Boolean): String =
         if (tourActive) PREF_POI_HIST_LANDMARK_TOUR else PREF_POI_HIST_LANDMARK
-    fun histLandmarkPrefDefault(tourActive: Boolean): Boolean =
-        if (tourActive) PREF_POI_HIST_LANDMARK_TOUR_DEFAULT else PREF_POI_HIST_LANDMARK_DEFAULT
     fun civicPrefKey(tourActive: Boolean): String =
         if (tourActive) PREF_POI_CIVIC_TOUR else PREF_POI_CIVIC
-    fun civicPrefDefault(tourActive: Boolean): Boolean =
-        if (tourActive) PREF_POI_CIVIC_TOUR_DEFAULT else PREF_POI_CIVIC_DEFAULT
+
+    // S206 — when entering tour mode for the first time and the tour-mode pref
+    // has never been written, mirror the explore-mode pref instead of falling
+    // through to the hardcoded TOUR_DEFAULT=false. Pre-S206 trap: operator
+    // saw the Layers boxes checked in Explore (default ON), started a tour,
+    // and tour-mode prefs silently defaulted OFF — markers + narration
+    // disappeared until the operator re-checked the boxes mid-tour. With this
+    // mirror, "I had them checked" intuition holds. Once the operator
+    // explicitly toggles a tour-mode box, that written value wins and the
+    // mirror is moot.
+    fun histLandmarkPrefDefault(tourActive: Boolean, prefs: SharedPreferences? = null): Boolean = when {
+        !tourActive -> PREF_POI_HIST_LANDMARK_DEFAULT
+        prefs != null -> prefs.getBoolean(PREF_POI_HIST_LANDMARK, PREF_POI_HIST_LANDMARK_DEFAULT)
+        else -> PREF_POI_HIST_LANDMARK_TOUR_DEFAULT
+    }
+    fun civicPrefDefault(tourActive: Boolean, prefs: SharedPreferences? = null): Boolean = when {
+        !tourActive -> PREF_POI_CIVIC_DEFAULT
+        prefs != null -> prefs.getBoolean(PREF_POI_CIVIC, PREF_POI_CIVIC_DEFAULT)
+        else -> PREF_POI_CIVIC_TOUR_DEFAULT
+    }
 }

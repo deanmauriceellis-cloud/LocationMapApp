@@ -240,14 +240,14 @@ class AppBarMenuManager(
         // Defaults: explore=ON, tour=OFF.
         val tourActive = menuEventListener.isTourActive()
         val histKey = MenuPrefs.histLandmarkPrefKey(tourActive)
-        val histDefault = MenuPrefs.histLandmarkPrefDefault(tourActive)
+        val histDefault = MenuPrefs.histLandmarkPrefDefault(tourActive, prefs)
         val histLandmarkOn = prefs.getBoolean(histKey, histDefault)
         val histItem = popup.menu.add(GROUP_POI_FILTER, ITEM_HIST_LANDMARK, nextOrder++, "POIs Hist. Landmark")
         histItem.isCheckable = true
         histItem.isChecked = histLandmarkOn
 
         val civicKey = MenuPrefs.civicPrefKey(tourActive)
-        val civicDefault = MenuPrefs.civicPrefDefault(tourActive)
+        val civicDefault = MenuPrefs.civicPrefDefault(tourActive, prefs)
         val civicOn = prefs.getBoolean(civicKey, civicDefault)
         val civicItem = popup.menu.add(GROUP_POI_FILTER, ITEM_CIVIC, nextOrder++, "POIs Civic")
         civicItem.isCheckable = true
