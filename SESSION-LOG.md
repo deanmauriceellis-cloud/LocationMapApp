@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 202-211. Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 203-213 (S202 archived 2026-05-01 at S213 close to keep the window at 10 with the new S213 entry; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 213: 2026-05-01 — TTS pre-normalization (markdown strip + abbreviation expansion)
+
+Shipped a runtime text-normalization layer for the narration pipeline. New `NarrationManager.normalizeForTts()` (~125 LOC) strips Markdown emphasis (12 POIs had book-title italics like `*The Scarlet Letter*` being read as "asterisk") and expands the abbreviations the engine was mumbling — 88 `Capt.` → "Captain", 28 `Jr.` → "Junior", 26 `St.` (50-name saint allowlist disambiguates `St. Peter` → "Saint Peter" from `Hardy St.` → "Hardy Street"), 12 `Rev.`, 11 `Dr.`, 6 `Dea.`, 5 each `Bros./Col./Inc.`, plus state names, era markers, postnominals, and connectives — with class-specific period preservation: titles drop period before names (always followed by alpha word), states/streets/postnominals/companies keep period when sentence-terminal (lookahead `\s+[A-Z]|\s*$`), Jr./Sr. consult a sentence-starter allowlist (`He|She|It|This|After|...`) to disambiguate `Joseph Jr. House` (mid-sentence) from `Joseph Jr. He died` (sentence end), Mt./Ft. behave as title-style prefixes. 32-test JUnit suite (`NarrationManagerNormalizeTest.kt`) caught two real heuristic bugs in first run — Mt./Ft. were misclassified as trailing suffixes, B.C./A.D. were eating sentence-terminal periods — both fixed before close; final 32/32 PASS. Wired in `speak()` once before `chunkOnPunctuation` so the splitter sees normalized text. Debug APK installed on Lenovo HNY0CY0W via `adb uninstall && install` (not `-r` per memory). No DB / schema / publish-chain impact. Carry-forward S214: field listen-test on Lenovo to grow title/state/saint-name lists from any remaining mispronunciations; year-pronunciation pass if `1692` reading is bad; pronunciation-lexicon work on `Hathorne / Tituba / Bowdoin / Oyer and Terminer` is out of parsing scope and would need a phoneme-replacement table.
+
+Full session detail: `docs/session-logs/session-213-2026-05-01.md`. Commit: pending S213 close.
+
+---
 
 ## Session 211: 2026-04-30 — Socket.IO drop (V1 no-network)
 
@@ -78,11 +86,4 @@ Full session detail: `docs/session-logs/session-203-2026-04-30.md`. Commit: `a7a
 
 ---
 
-## Session 202: 2026-04-29 — Recon Camera (in-app CameraX + full GPS+compass EXIF) + testing-window default flips for wife's morning Salem walk
-
-Operator-pivoted scope. S201 had penciled S202 as a 1-hour V1/V1.0.1/V2 backlog triage; instead operator opened with "we have some critical needs we have to do so my wife can test this in the morning" and asked for a recon camera + auto-GPS-tracking. Two requests delivered: (1) **Recon Camera** end-to-end as a V1 feature — top-level slim-toolbar button next to Home (`ic_camera_recon` glyph), launches our own in-app CameraX `ReconCaptureActivity` (NOT system camera handoff) so we keep window control with an explicit X-close + back-button cancel + 84dp shutter. New `KatrinaCameraManager` orchestrator writes full EXIF (GPS lat/lon/alt/speed/track/img-direction/timestamp/processing-method/UserComment + Make/Model/Software) using raw FusedLocationClient.lastLocation (bypasses MainViewModel's Samantha-statue clamp) + ROTATION_VECTOR-derived compass azimuth; photos publish to MediaStore `Pictures/WickedSalem-Recon/` for USB MTP pull. CameraX 1.3.4 + ExifInterface 1.3.7 added. (2) **GPS auto-tracking** verified already wired (FusedLocationProvider + continuous animateTo at line 3067) — no code needed beyond runtime permission. Five testing-window defaults flipped per operator: `PREF_GPS_BBOX_OVERRIDE_DEFAULT` true (use real GPS outside Salem), `PREF_RECORD_GPS` default true, `isGpsTrackVisible` true (FAB lit + polyline visible), `isHeadingUpMode` true (map auto-rotates to movement bearing), default landing zoom 18→19, FAB +/- step ±1→±2, magnify FAB initial level x1→x2. Footgun discovered: `AppBarMenuManager.prefDefault()` had hardcoded `false` fallbacks for PREF_RECORD_GPS + PREF_GPS_BBOX_OVERRIDE that overrode the MenuPrefs constants — fixed in same edit (memory `feedback_appbar_pref_default_override.md`). Three crash/iteration cycles: (a) initial system-camera build crashed at field-init NPE on `applicationContext` (fixed via `by lazy` on context-dependent fields), (b) operator wanted camera on slim toolbar not Material overflow (moved + cleaned up), (c) operator wanted X-close not opaque system handoff (replaced with CameraX in-app activity). Five `adb -s HNY0CY0W uninstall && install` cycles (NEVER `-r` per memory). Lenovo at session end: 1.32 GB free RAM, 33 GB free storage. The S201-planned carry-forward triage rolls to S203, along with all 4 unfinished S201 actions (365 dedup losers, 199 narration-regen suppressions, heroes/hero/ audit, signed AAB rebuild).
-
-Full session detail: `docs/session-logs/session-202-2026-04-29.md`. Commit: `7859fbb`.
-
----
 

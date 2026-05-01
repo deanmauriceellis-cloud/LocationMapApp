@@ -527,9 +527,14 @@ class NarrationManager @Inject constructor(
         // gracefully and we get natural pauses between phrases. Last chunk
         // carries segment.id so the OnUtteranceCompleted callback still fires
         // exactly once at the end. Earlier chunks use derived ids.
-        val chunks = chunkOnPunctuation(segment.text)
+        // S213: normalize first — strips Markdown emphasis (book-title italics
+        // were being read as "asterisk") and expands abbreviations the engine
+        // would otherwise mumble ("Capt." → "Captain", "Mass." → "Massachusetts",
+        // "St. Peter" → "Saint Peter", "Hardy St." → "Hardy Street").
+        val normalized = normalizeForTts(segment.text)
+        val chunks = chunkOnPunctuation(normalized)
         if (chunks.size <= 1) {
-            tts?.speak(segment.text, TextToSpeech.QUEUE_FLUSH, params, segment.id)
+            tts?.speak(normalized, TextToSpeech.QUEUE_FLUSH, params, segment.id)
         } else {
             chunks.forEachIndexed { i, pair ->
                 val (chunk, pauseAfterMs) = pair
@@ -544,6 +549,170 @@ class NarrationManager @Inject constructor(
             }
         }
         DebugLogger.i(TAG, "Speaking: ${segment.type} — ${segment.poiName} voice=${voiceId ?: "default"} chunks=${chunks.size}")
+    }
+
+    /**
+     * S213 — normalize narration text before it reaches the TTS engine.
+     * Two responsibilities:
+     *   1. Strip Markdown emphasis. Italicized book titles (`*The Scarlet Letter*`,
+     *      foreign words like `*ningyô*`) leak straight into Android TTS, which
+     *      either pronounces "asterisk" or makes awkward swallowed pauses.
+     *   2. Expand abbreviations so the engine speaks the full word. The sentence
+     *      splitter already knows `Capt.`/`Rev.`/`Mass.` aren't sentence ends,
+     *      but the literal token still gets pronounced as "kapt"/"rev"/"mass".
+     *
+     * Period handling is per-class:
+     *   - Titles (Mr./Mrs./Dr./Capt./Rev./Sgt./Maj./Col./Hon./Prof./Dea./...)
+     *     always precede a name → drop the period.
+     *   - "St." is context-sensitive: followed by a known saint name → "Saint";
+     *     otherwise → "Street" (period kept when sentence-terminal so the
+     *     downstream splitter still finds the boundary).
+     *   - States, street suffixes, company suffixes, and Jr./Sr./Esq. keep their
+     *     period when the period is sentence-terminal (followed by `\s+[A-Z]`
+     *     or end-of-text), drop it otherwise. Jr./Sr. additionally consult a
+     *     small sentence-starter allowlist to disambiguate "Joseph Jr. House"
+     *     (mid-sentence) from "Joseph Jr. He died" (sentence end).
+     *
+     * Sentence boundaries that the original text relied on (real `.`/`!`/`?`)
+     * are preserved verbatim — this pass only rewrites tokens, never strips
+     * terminal punctuation that wasn't part of an abbreviation.
+     */
+    internal fun normalizeForTts(input: String): String {
+        var t = input
+
+        // ── 1. Strip Markdown emphasis (order matters: doubles before singles).
+        t = t.replace(Regex("""\*\*([^*\n]+?)\*\*"""), "$1")
+        t = t.replace(Regex("""__([^_\n]+?)__"""), "$1")
+        t = t.replace(Regex("""(?<![A-Za-z0-9])\*([^*\n]+?)\*(?![A-Za-z0-9])"""), "$1")
+        t = t.replace(Regex("""(?<![A-Za-z0-9])_([^_\n]+?)_(?![A-Za-z0-9])"""), "$1")
+        t = t.replace(Regex("""~~([^~\n]+?)~~"""), "$1")
+
+        // ── 2. Titles — always followed by a name. Drop period unconditionally
+        //    when there's a following alpha word.
+        val titles = listOf(
+            "Capt"  to "Captain",
+            "Rev"   to "Reverend",
+            "Gen"   to "General",
+            "Gov"   to "Governor",
+            "Sen"   to "Senator",
+            "Rep"   to "Representative",
+            "Pres"  to "President",
+            "Sgt"   to "Sergeant",
+            "Cpl"   to "Corporal",
+            "Pvt"   to "Private",
+            "Maj"   to "Major",
+            "Col"   to "Colonel",
+            "Adm"   to "Admiral",
+            "Lt"    to "Lieutenant",
+            "Hon"   to "Honorable",
+            "Prof"  to "Professor",
+            "Dea"   to "Deacon",
+            "Mr"    to "Mister",
+            "Mrs"   to "Missus",
+            "Ms"    to "Miss",
+            "Dr"    to "Doctor",
+            "Fr"    to "Father",
+            "Br"    to "Brother"
+        )
+        for ((abbr, full) in titles) {
+            t = t.replace(Regex("""\b${abbr}\.(?=\s+[A-Za-z])"""), full)
+        }
+
+        // ── 3. "St." — context-sensitive. Saint when followed by a known
+        //    Christian/biblical given name; Street otherwise.
+        val saintNames = setOf(
+            "Joseph", "Peter", "Paul", "John", "Mark", "Luke", "Matthew",
+            "Mary", "Anne", "Ann", "Anna", "Anthony", "Francis", "Michael",
+            "Nicholas", "James", "Andrew", "Catherine", "Thomas", "George",
+            "Stephen", "Patrick", "Augustine", "Theresa", "Teresa",
+            "Christopher", "Jude", "Pius", "Barbara", "Edmunds", "Joan",
+            "Bernard", "Benedict", "Ignatius", "Vincent", "Lawrence",
+            "Charles", "Margaret", "Cecilia", "Agnes", "Elizabeth", "Helen",
+            "Hilda", "Bridget", "Brigid", "Sebastian", "Rita", "Clare",
+            "Dominic", "Gabriel", "Raphael", "David", "Anselm", "Cyril",
+            "Methodius", "Polycarp"
+        )
+        val saintPattern = saintNames.joinToString("|")
+        t = t.replace(Regex("""\bSt\.\s+(${saintPattern})\b"""), "Saint $1")
+        // Anything left is the street-suffix usage.
+        t = t.replace(Regex("""\bSt\.(?=\s+[A-Z]|\s*$)"""), "Street.")
+        t = t.replace(Regex("""\bSt\."""), "Street")
+
+        // ── 4. States — "Salem, Mass." commonly ends a sentence. Keep period
+        //    when sentence-terminal; drop mid-sentence.
+        val regions = listOf(
+            "Mass"  to "Massachusetts",
+            "Conn"  to "Connecticut",
+            "Calif" to "California",
+            "Fla"   to "Florida",
+            "Penn"  to "Pennsylvania",
+            "Vt"    to "Vermont"
+        )
+        for ((abbr, full) in regions) {
+            t = t.replace(Regex("""\b${abbr}\.(?=\s+[A-Z]|\s*$)"""), "$full.")
+            t = t.replace(Regex("""\b${abbr}\."""), full)
+        }
+
+        // ── 5a. Trailing street suffixes — same sentence-end heuristic as states.
+        val streetTrailing = listOf(
+            "Ave"  to "Avenue",
+            "Blvd" to "Boulevard",
+            "Rd"   to "Road",
+            "Ln"   to "Lane"
+        )
+        for ((abbr, full) in streetTrailing) {
+            t = t.replace(Regex("""\b${abbr}\.(?=\s+[A-Z]|\s*$)"""), "$full.")
+            t = t.replace(Regex("""\b${abbr}\."""), full)
+        }
+
+        // ── 5b. Leading place-prefix abbrevs — Mt./Ft. precede a proper noun
+        //    ("Mt. Vernon", "Ft. Pickering"). Treat like titles: drop period
+        //    before any alpha word.
+        t = t.replace(Regex("""\bMt\.(?=\s+[A-Za-z])"""), "Mount")
+        t = t.replace(Regex("""\bFt\.(?=\s+[A-Za-z])"""), "Fort")
+
+        // ── 6. Postnominal name suffixes — Jr./Sr. need a sentence-starter
+        //    allowlist because "Joseph Jr. House" (mid-sentence) and
+        //    "Joseph Jr. He died" (sentence end) both fit `\s+[A-Z]`.
+        val sentenceStarters = "He|She|It|They|This|That|These|Those|" +
+            "After|Before|During|However|Then|Today|Yet|Still|" +
+            "In|On|At|By|From|Through|Within|Among|Across"
+        t = t.replace(Regex("""\bJr\.(?=\s+(${sentenceStarters})\b|\s*$)"""), "Junior.")
+        t = t.replace(Regex("""\bJr\."""), "Junior")
+        t = t.replace(Regex("""\bSr\.(?=\s+(${sentenceStarters})\b|\s*$)"""), "Senior.")
+        t = t.replace(Regex("""\bSr\."""), "Senior")
+        t = t.replace(Regex("""\bEsq\.(?=\s+[A-Z]|\s*$)"""), "Esquire.")
+        t = t.replace(Regex("""\bEsq\."""), "Esquire")
+
+        // ── 7. Company suffixes — usually end a name; keep period if sentence-terminal.
+        val companies = listOf(
+            "Bros" to "Brothers",
+            "Inc"  to "Incorporated",
+            "Co"   to "Company",
+            "Ltd"  to "Limited",
+            "Corp" to "Corporation"
+        )
+        for ((abbr, full) in companies) {
+            t = t.replace(Regex("""\b${abbr}\.(?=\s+[A-Z]|\s*$)"""), "$full.")
+            t = t.replace(Regex("""\b${abbr}\."""), full)
+        }
+
+        // ── 8. Mid-sentence shorthand connectives. Drop period; the meaning is
+        //    always continuation.
+        t = t.replace(Regex("""\bca\.\s+(\d)"""), "circa $1")
+        t = t.replace(Regex("""\betc\.(?=\s|,|;|$)"""), "etcetera")
+        t = t.replace(Regex("""\bvs\.(?=\s|,|$)"""), "versus")
+        t = t.replace(Regex("""\bapprox\.(?=\s)"""), "approximately")
+
+        // ── 9. Era markers — read as the two letters; preserve sentence period.
+        t = t.replace(Regex("""\bB\.C\.(?=\s+[A-Z]|\s*$)"""), "BC.")
+        t = t.replace(Regex("""\bB\.C\."""), "BC")
+        t = t.replace(Regex("""\bA\.D\.(?=\s+[A-Z]|\s*$)"""), "AD.")
+        t = t.replace(Regex("""\bA\.D\."""), "AD")
+
+        // ── 10. Collapse any double spaces introduced by replacements.
+        t = t.replace(Regex("""[ \t]{2,}"""), " ")
+        return t
     }
 
     /**

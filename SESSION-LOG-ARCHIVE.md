@@ -1,6 +1,14 @@
-# LocationMapApp — Session Log (Archive: v1.5.0 through Session 201, April 2026)
+# LocationMapApp — Session Log (Archive: v1.5.0 through Session 202, April 2026)
 
-> Archived from SESSION-LOG.md. Contains all sessions through Session 201, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Archived from SESSION-LOG.md. Contains all sessions through Session 202, plus the original v1.5.0–v1.5.50 archive at the bottom.
+
+## Session 202: 2026-04-29 — Recon Camera (in-app CameraX + full GPS+compass EXIF) + testing-window default flips for wife's morning Salem walk
+
+Operator-pivoted scope. S201 had penciled S202 as a 1-hour V1/V1.0.1/V2 backlog triage; instead operator opened with "we have some critical needs we have to do so my wife can test this in the morning" and asked for a recon camera + auto-GPS-tracking. Two requests delivered: (1) **Recon Camera** end-to-end as a V1 feature — top-level slim-toolbar button next to Home (`ic_camera_recon` glyph), launches our own in-app CameraX `ReconCaptureActivity` (NOT system camera handoff) so we keep window control with an explicit X-close + back-button cancel + 84dp shutter. New `KatrinaCameraManager` orchestrator writes full EXIF (GPS lat/lon/alt/speed/track/img-direction/timestamp/processing-method/UserComment + Make/Model/Software) using raw FusedLocationClient.lastLocation (bypasses MainViewModel's Samantha-statue clamp) + ROTATION_VECTOR-derived compass azimuth; photos publish to MediaStore `Pictures/WickedSalem-Recon/` for USB MTP pull. CameraX 1.3.4 + ExifInterface 1.3.7 added. (2) **GPS auto-tracking** verified already wired (FusedLocationProvider + continuous animateTo at line 3067) — no code needed beyond runtime permission. Five testing-window defaults flipped per operator: `PREF_GPS_BBOX_OVERRIDE_DEFAULT` true (use real GPS outside Salem), `PREF_RECORD_GPS` default true, `isGpsTrackVisible` true (FAB lit + polyline visible), `isHeadingUpMode` true (map auto-rotates to movement bearing), default landing zoom 18→19, FAB +/- step ±1→±2, magnify FAB initial level x1→x2. Footgun discovered: `AppBarMenuManager.prefDefault()` had hardcoded `false` fallbacks for PREF_RECORD_GPS + PREF_GPS_BBOX_OVERRIDE that overrode the MenuPrefs constants — fixed in same edit (memory `feedback_appbar_pref_default_override.md`). Three crash/iteration cycles: (a) initial system-camera build crashed at field-init NPE on `applicationContext` (fixed via `by lazy` on context-dependent fields), (b) operator wanted camera on slim toolbar not Material overflow (moved + cleaned up), (c) operator wanted X-close not opaque system handoff (replaced with CameraX in-app activity). Five `adb -s HNY0CY0W uninstall && install` cycles (NEVER `-r` per memory). Lenovo at session end: 1.32 GB free RAM, 33 GB free storage. The S201-planned carry-forward triage rolls to S203, along with all 4 unfinished S201 actions (365 dedup losers, 199 narration-regen suppressions, heroes/hero/ audit, signed AAB rebuild).
+
+Full session detail: `docs/session-logs/session-202-2026-04-29.md`. Commit: `7859fbb`.
+
+---
 
 ## Session 201: 2026-04-29 — V1 launch triage + strategic doc cleanup + Aug 1 ship anchor
 
