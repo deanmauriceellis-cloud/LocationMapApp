@@ -11,6 +11,7 @@ package com.example.wickedsalemwitchcitytour.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -927,6 +928,27 @@ class SalemMainActivity : AppCompatActivity() {
         // post-mortem reader can see what was open at destroy time.
         poiEncounterTracker.flushAll()
         DebugLogger.i("SalemMainActivity","onDestroy()")
+    }
+
+    /**
+     * S209 (W-H2): WickedMap memory-pressure release valve.
+     *
+     * `PolygonLibrary` parses `assets/wickedmap/polygons.json` once at first
+     * load and keeps the index resident for the life of the process. Under
+     * memory pressure we drop the index here; next time an overlay needs
+     * polygons, [PolygonLibrary.load] will re-read the asset.
+     *
+     * Note: the active animation overlays still hold their own slice of the
+     * polygon list, so this only frees the duplicate index — full release
+     * would also need to drop `wickedAnimationOverlay`. Deferred to V1.1+.
+     */
+    @Suppress("DEPRECATION") // TRIM_MEMORY_* deprecated in API 35; still dispatched on target API 34.
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            DebugLogger.i("SalemMainActivity", "onTrimMemory(level=$level) — dropping PolygonLibrary index")
+            PolygonLibrary.unload()
+        }
     }
 
     /**

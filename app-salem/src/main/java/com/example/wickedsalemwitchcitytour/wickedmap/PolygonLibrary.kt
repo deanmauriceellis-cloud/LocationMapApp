@@ -87,6 +87,23 @@ object PolygonLibrary {
     fun byKind(kind: String): List<WickedPolygon> = byKind[kind].orEmpty()
 
     /**
+     * Drop the parsed polygon index. Frees the `byKind` map and its inner
+     * lists; the underlying `WickedPolygon` objects survive only if the
+     * three animation overlays still hold them. Next call to [load] will
+     * reparse `assets/wickedmap/polygons.json` from scratch.
+     *
+     * Wired to `SalemMainActivity.onTrimMemory()` (S209, W-H2). Safe to call
+     * before [load] or multiple times.
+     */
+    fun unload() {
+        if (!loaded && byKind.isEmpty()) return
+        val freed = byKind.values.sumOf { it.size }
+        byKind.clear()
+        loaded = false
+        Log.i(TAG, "unloaded — freed index of $freed polygon entries")
+    }
+
+    /**
      * Parse a GeoJSON Polygon or MultiPolygon to a list of polygons (each a
      * list of rings; first ring is outer, rest are holes). Coordinates are
      * flipped from [lon, lat] to (lat, lon).
