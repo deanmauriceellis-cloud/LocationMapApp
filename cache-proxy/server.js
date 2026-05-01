@@ -196,6 +196,8 @@ deps.salemRoute = salemRouterModule._route;
 deps.salemBundle = salemRouterModule._bundle;
 deps.salemRouteDiag = salemRouterModule._routeDiag;
 deps.salemSnapEdge = salemRouterModule._snapEdge;
+// S215 — edge-point routing: takes stop objects {lat, lng, edge_id?, edge_fraction?}.
+deps.salemRouteEx = salemRouterModule._routeEx;
 
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);

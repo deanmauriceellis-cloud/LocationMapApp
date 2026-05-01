@@ -1,6 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
+> Then S204 archived 2026-05-01 at S215 close (kept the 10 most recent in SESSION-LOG.md after adding the S215 entry).
+
+## Session 204: 2026-04-30 — Lenovo device-verification pass: 7 V1 carry-forwards closed, GPS-OBS heartbeat root-cause fix shipped, 11 bios cleared of S192 meta-gap violations
+
+Operator framed: "let's continue with the Lenovo items." All 7 device-dependent V1 carry-forwards from S203 closed in one pass. Real bug found + fixed end-to-end on the Lenovo: **#11 GPS-OBS heartbeat** — adaptive GPS interval picker sat downstream of the stationary-freeze early-return, and on Lenovo TB305FU (`TYPE_SIGNIFICANT_MOTION` permanently broken) the freeze gate stayed true forever during dwells, so the picker never ran and the subscription stayed stuck at 60s; fixes arrived every ~27s, right at the edge of the 30s stale threshold, toggling stale constantly. Lifted picker upstream; stale threshold 30s → 45s; verified on Lenovo: subscription drops to 30s/min 15s after 10s dwell, fix cadence steady ~14s, sustained `HEARTBEAT ok`, zero STALE transitions over 3 min. **#3 Witch Trials content** audit found 11/49 NPC bios with S192 meta-gap violations ("Little is known...", "vanished from the historical record", etc.) — patched `Salem/cmd/genbiographies/main.go` prompt with new `== ANTI-META-GAP RULE (CRITICAL) ==` block + concrete VERDICT replacement examples, ran two LLM regen passes (cleared 8/11), hand-edited 3 stragglers' `historical_verdict_header` + `historical_verdict` + `role_summary` fields with recomputed `tts_full_text`; final audit: all 11 bios at 0 hits across 13 forbidden patterns. Re-bundled to APK + reinstalled. **Other six items:** #17 walker-dwell + S169 code intact (operator-skipped SplashActivity launchMode fix); #29 S150 fixes 1+3 code correct (DEEP install-default + 3 stationary escape hatches); #21 Find type-search smoke confirmed at engine + data layers (dentist→18, lawyer→33, gym→26, coffee→43); #25 walk-sim e2e basic machinery verified on Lenovo (FAB tap → tour auto-pick → 225-pt baked polyline → 1.4 m/s sustained, TTS-gated dwell armed, NARR-DWELL anchor-advance) — full POI loop deferred to operator field walk because Beverly desk-test triggered OUT OF SALEM fallback random-step; #20 V1-offline static posture verified (zero network perms / `V1_OFFLINE_ONLY` const / BuildDefaults release retail / OS-level network-incapable). Five-script publish chain ran clean before any device work (PG mutations from S203 propagated). Cross-repo carry-forward to S205: Salem repo prompt edits + 3 hand-edited bio JSONs need committing in that repo.
+
+Full session detail: `docs/session-logs/session-204-2026-04-30.md`. Commit: `eb58e29`.
+
+---
 
 ## Session 203: 2026-04-30 — V1 backlog drive-through (Phase A cleanup, V1/V1.0.1/V2 triage, six V1 items shipped; Phase D blocked on Lenovo)
 

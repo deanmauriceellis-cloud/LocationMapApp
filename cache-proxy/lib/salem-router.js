@@ -534,6 +534,408 @@ function routeBundle(b, fromLat, fromLng, toLat, toLng) {
   return routeBetween(b, sIdx, tIdx);
 }
 
+// ── Edge-point Dijkstra (S215 Phase 2 of waypoint-binding) ────────────────────
+//
+// Allows a route endpoint to be a point on a TigerLine edge — (edge_idx,
+// fraction) — instead of an integer node index. This is what makes legs
+// actually pass through mid-block waypoints persisted in salem_tour_stops by
+// S214 (edge_id, edge_fraction). Without this, routeBetween still pulls each
+// waypoint to the nearer node at compute time and the leg corner-cuts past
+// the snap point.
+//
+// Algorithm:
+//   - Same-edge fast path: src and dst on the same edge → polyline-between
+//     fractions, no Dijkstra.
+//   - Otherwise, seed Dijkstra from BOTH endpoints of src's bound edge with
+//     initial distances fraction*L (srcIdx end) and (1-fraction)*L (tgtIdx
+//     end). Run Dijkstra normally. The dst is reached when we relax to
+//     either endpoint of dst's bound edge; we pick whichever endpoint gives
+//     the lower (dist[X] + dst-side partial cost) total.
+//   - Geometry: snap-tail (src-edge partial polyline from src snap to chosen
+//     exit endpoint) + Dijkstra path + snap-head (dst-edge partial polyline
+//     from chosen entry endpoint to dst snap).
+//
+// An endpoint with no edge binding falls back to nearest-node snap (same as
+// routeBundle), so admin can mix POI-based stops (no edge binding — POI
+// lat/lng is canonical) with free waypoints (edge-bound) in one tour.
+
+// Returns interpolated [lat, lng] at the given fraction along an edge polyline.
+function _interpAlongEdge(b, edgeIdx, fraction) {
+  const p = b.edgePolylines[edgeIdx];
+  if (!p || p.length < 2) return null;
+  if (p.length < 4) return [p[0], p[1]];
+  if (fraction <= 0) return [p[0], p[1]];
+  if (fraction >= 1) return [p[p.length - 2], p[p.length - 1]];
+  const cum = b.edgeSegCum[edgeIdx];
+  const total = b.edgeSegTotal[edgeIdx];
+  if (!cum || total <= 0) return [p[0], p[1]];
+  const targetD = fraction * total;
+  // Binary search the segment containing targetD.
+  let lo = 0, hi = cum.length - 1;
+  while (lo + 1 < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] <= targetD) lo = mid; else hi = mid;
+  }
+  const segStart = cum[lo];
+  const segEnd = cum[lo + 1];
+  const segLen = segEnd - segStart;
+  const t = segLen > 0 ? (targetD - segStart) / segLen : 0;
+  const aLat = p[2 * lo], aLng = p[2 * lo + 1];
+  const bLat = p[2 * (lo + 1)], bLng = p[2 * (lo + 1) + 1];
+  return [aLat + t * (bLat - aLat), aLng + t * (bLng - aLng)];
+}
+
+// Returns [[lat, lng], ...] along an edge polyline from fromFrac to toFrac.
+// Reverses orientation if fromFrac > toFrac. Includes interpolated start/end
+// points so the returned polyline begins exactly at fromFrac and ends exactly
+// at toFrac.
+function edgePartialPolyline(b, edgeIdx, fromFrac, toFrac) {
+  const p = b.edgePolylines[edgeIdx];
+  if (!p || p.length < 2) return [];
+  const f0 = clamp(fromFrac, 0, 1);
+  const f1 = clamp(toFrac, 0, 1);
+  if (f0 === f1) {
+    const pt = _interpAlongEdge(b, edgeIdx, f0);
+    return pt ? [pt] : [];
+  }
+  const reversed = f0 > f1;
+  const a = reversed ? f1 : f0;
+  const c = reversed ? f0 : f1;
+
+  const startPt = _interpAlongEdge(b, edgeIdx, a);
+  const endPt = _interpAlongEdge(b, edgeIdx, c);
+  if (!startPt || !endPt) return [];
+
+  // Collect the polyline vertices strictly between a and c.
+  const out = [startPt];
+  if (p.length >= 4) {
+    const cum = b.edgeSegCum[edgeIdx];
+    const total = b.edgeSegTotal[edgeIdx];
+    if (cum && total > 0) {
+      const aD = a * total;
+      const cD = c * total;
+      // Vertex k corresponds to cumulative distance cum[k]. Polyline has
+      // (cum.length) vertices indexed 0..cum.length-1.
+      for (let k = 0; k < cum.length; k++) {
+        if (cum[k] > aD && cum[k] < cD) {
+          out.push([p[2 * k], p[2 * k + 1]]);
+        }
+      }
+    }
+  }
+  out.push(endPt);
+  if (reversed) out.reverse();
+  return out;
+}
+
+// Resolves an endpoint spec to {node_idx?, edge_idx?, fraction?, snap_lat?,
+// snap_lng?}. Returns null if no valid resolution.
+function _resolveEndpoint(b, ep) {
+  if (!ep) return null;
+  if (ep.edge_idx != null && ep.fraction != null) {
+    const fIdx = ep.edge_idx | 0;
+    if (fIdx < 0 || fIdx >= b.edgeCount) return null;
+    if (!b.edgeWalkable[fIdx]) return null;
+    const f = clamp(+ep.fraction, 0, 1);
+    const snap = _interpAlongEdge(b, fIdx, f);
+    return {
+      edge_idx: fIdx,
+      fraction: f,
+      snap_lat: snap ? snap[0] : (ep.lat ?? null),
+      snap_lng: snap ? snap[1] : (ep.lng ?? null),
+    };
+  }
+  if (ep.node_idx != null) {
+    const nIdx = ep.node_idx | 0;
+    if (nIdx < 0 || nIdx >= b.nodeCount) return null;
+    return {
+      node_idx: nIdx,
+      snap_lat: b.nodeLat[nIdx],
+      snap_lng: b.nodeLng[nIdx],
+    };
+  }
+  if (ep.lat != null && ep.lng != null) {
+    const nIdx = nearestWalkableNode(b, +ep.lat, +ep.lng);
+    if (nIdx < 0) return null;
+    return {
+      node_idx: nIdx,
+      snap_lat: b.nodeLat[nIdx],
+      snap_lng: b.nodeLng[nIdx],
+    };
+  }
+  return null;
+}
+
+// Two-pseudo-source Dijkstra: src endpoints are already-relaxed nodes with
+// given initial distances. Returns prev arrays + dist array.
+function _dijkstraTwoSource(b, sources, stopAtSet) {
+  const n = b.nodeCount;
+  const dist = new Float64Array(n);
+  for (let i = 0; i < n; i++) dist[i] = Infinity;
+  const prevNode = new Int32Array(n);
+  const prevEdgeIdx = new Int32Array(n);
+  const prevReversed = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { prevNode[i] = -1; prevEdgeIdx[i] = -1; }
+  const heap = new MinHeap();
+  for (const s of sources) {
+    if (s.idx >= 0 && s.idx < n && s.cost < dist[s.idx]) {
+      dist[s.idx] = s.cost;
+      heap.push(s.cost, s.idx);
+    }
+  }
+  let stopHits = 0;
+  const stopWanted = stopAtSet ? stopAtSet.size : 0;
+  while (heap.size > 0) {
+    const top = heap.pop();
+    const d = top[0], u = top[1];
+    if (d > dist[u]) continue;
+    if (stopAtSet && stopAtSet.has(u)) {
+      stopHits++;
+      if (stopHits >= stopWanted) break;
+    }
+    const start = b.edgeOffset[u];
+    const end = b.edgeOffset[u + 1];
+    for (let k = start; k < end; k++) {
+      const v = b.adjNeighbor[k];
+      const eIdx = b.adjEdgeIdx[k];
+      const nd = d + b.edgeLengthM[eIdx];
+      if (nd < dist[v]) {
+        dist[v] = nd;
+        prevNode[v] = u;
+        prevEdgeIdx[v] = eIdx;
+        prevReversed[v] = b.adjReversed[k];
+        heap.push(nd, v);
+      }
+    }
+  }
+  return { dist, prevNode, prevEdgeIdx, prevReversed };
+}
+
+// Builds the geometry+edges segment for a Dijkstra-reconstructed node-to-node
+// path. `targetIdx` is the end node; the walk-back stops when prevNode goes
+// negative (initial-source node). Returns { geometry, edges, distanceM }
+// where geometry is [[lat,lng],...] in travel order from the source endpoint
+// to targetIdx (exclusive of any pre-pended snap-tail).
+function _reconstructFromDijkstra(b, prevNode, prevEdgeIdx, prevReversed, sourceIdx, targetIdx) {
+  if (sourceIdx === targetIdx) {
+    return {
+      geometry: [[b.nodeLat[targetIdx], b.nodeLng[targetIdx]]],
+      edges: [],
+      distanceM: 0,
+    };
+  }
+  const edgeStack = [];
+  const reversedStack = [];
+  let cur = targetIdx;
+  while (cur !== sourceIdx && prevNode[cur] !== -1) {
+    edgeStack.push(prevEdgeIdx[cur]);
+    reversedStack.push(prevReversed[cur]);
+    cur = prevNode[cur];
+  }
+  if (cur !== sourceIdx) return null; // didn't reach the actual source
+  edgeStack.reverse();
+  reversedStack.reverse();
+
+  const geometry = [];
+  const edges = [];
+  let totalM = 0;
+  // Seed with source endpoint coords.
+  geometry.push([b.nodeLat[sourceIdx], b.nodeLng[sourceIdx]]);
+  for (let i = 0; i < edgeStack.length; i++) {
+    const eIdx = edgeStack[i];
+    const rev = reversedStack[i] === 1;
+    const packed = b.edgePolylines[eIdx];
+    const lengthM = b.edgeLengthM[eIdx];
+    totalM += lengthM;
+    const polyline = [];
+    if (!rev) {
+      for (let p = 0; p < packed.length; p += 2) polyline.push([packed[p], packed[p + 1]]);
+    } else {
+      for (let p = packed.length - 2; p >= 0; p -= 2) polyline.push([packed[p], packed[p + 1]]);
+    }
+    edges.push({
+      edge_id: b.edgeId[eIdx],
+      fullname: b.edgeFullname[eIdx],
+      mtfcc: b.edgeMtfcc[eIdx],
+      length_m: lengthM,
+      polyline,
+    });
+    // Skip duplicate join (first vertex of each edge equals last of prior).
+    for (let j = 1; j < polyline.length; j++) geometry.push(polyline[j]);
+  }
+  return { geometry, edges, distanceM: totalM };
+}
+
+function routeBetweenEdgePoints(b, srcEP, dstEP) {
+  const src = _resolveEndpoint(b, srcEP);
+  const dst = _resolveEndpoint(b, dstEP);
+  if (!src || !dst) return null;
+
+  // ── Same-edge fast path. Both endpoints bound to the same edge: just emit
+  // the polyline-between-fractions, no Dijkstra needed.
+  if (src.edge_idx != null && dst.edge_idx != null && src.edge_idx === dst.edge_idx) {
+    const partial = edgePartialPolyline(b, src.edge_idx, src.fraction, dst.fraction);
+    const distanceM =
+      Math.abs(dst.fraction - src.fraction) * b.edgeLengthM[src.edge_idx];
+    return {
+      geometry: partial,
+      distanceM,
+      durationS: distanceM / b.walkingPaceMps,
+      edges: [{
+        edge_id: b.edgeId[src.edge_idx],
+        fullname: b.edgeFullname[src.edge_idx],
+        mtfcc: b.edgeMtfcc[src.edge_idx],
+        length_m: distanceM,
+        polyline: partial,
+      }],
+    };
+  }
+
+  // ── Seed Dijkstra. Edge-point endpoints contribute TWO sources (both edge
+  // endpoints, with partial-edge initial costs). Node endpoints contribute one.
+  const sources = [];
+  if (src.edge_idx != null) {
+    const eIdx = src.edge_idx;
+    const L = b.edgeLengthM[eIdx];
+    sources.push({ idx: b.srcIdx[eIdx], cost: src.fraction * L });
+    sources.push({ idx: b.tgtIdx[eIdx], cost: (1 - src.fraction) * L });
+  } else {
+    sources.push({ idx: src.node_idx, cost: 0 });
+  }
+
+  // ── Build the dst stop-set and partial-cost map.
+  const stopAt = new Set();
+  const dstPartial = new Map(); // node_idx → partial cost from that endpoint to dst snap
+  if (dst.edge_idx != null) {
+    const eIdx = dst.edge_idx;
+    const L = b.edgeLengthM[eIdx];
+    const u = b.srcIdx[eIdx], v = b.tgtIdx[eIdx];
+    stopAt.add(u); stopAt.add(v);
+    dstPartial.set(u, dst.fraction * L);
+    dstPartial.set(v, (1 - dst.fraction) * L);
+  } else {
+    stopAt.add(dst.node_idx);
+    dstPartial.set(dst.node_idx, 0);
+  }
+
+  const { dist, prevNode, prevEdgeIdx, prevReversed } =
+    _dijkstraTwoSource(b, sources, stopAt);
+
+  // ── Pick the dst endpoint with the lowest total cost.
+  let bestEntry = -1;
+  let bestTotal = Infinity;
+  for (const [nIdx, partial] of dstPartial) {
+    const dv = dist[nIdx];
+    if (!isFinite(dv)) continue;
+    const total = dv + partial;
+    if (total < bestTotal) { bestTotal = total; bestEntry = nIdx; }
+  }
+  if (bestEntry < 0) return null;
+
+  // ── Walk back to determine which src endpoint we exited from.
+  let cur = bestEntry;
+  while (prevNode[cur] !== -1) cur = prevNode[cur];
+  const exitNode = cur; // initial-source node we ultimately came from
+
+  // ── Reconstruct the Dijkstra-portion geometry.
+  const recon = _reconstructFromDijkstra(b, prevNode, prevEdgeIdx, prevReversed, exitNode, bestEntry);
+  if (!recon) return null;
+
+  // ── Build the full geometry: snap-tail (src) + recon + snap-head (dst).
+  const geometry = [];
+  const edges = [];
+  let totalM = 0;
+
+  if (src.edge_idx != null) {
+    // Snap-tail: from src snap (src.fraction) to whichever edge endpoint we
+    // exited at. exitNode is one of {srcIdx[edge], tgtIdx[edge]} of the src
+    // edge; pick the corresponding endpoint fraction.
+    const eIdx = src.edge_idx;
+    const exitFrac = exitNode === b.srcIdx[eIdx] ? 0 : 1;
+    const tail = edgePartialPolyline(b, eIdx, src.fraction, exitFrac);
+    const tailM = Math.abs(exitFrac - src.fraction) * b.edgeLengthM[eIdx];
+    if (tail.length > 0) {
+      for (let i = 0; i < tail.length; i++) geometry.push(tail[i]);
+      edges.push({
+        edge_id: b.edgeId[eIdx],
+        fullname: b.edgeFullname[eIdx],
+        mtfcc: b.edgeMtfcc[eIdx],
+        length_m: tailM,
+        polyline: tail,
+      });
+      totalM += tailM;
+    }
+  }
+
+  // Append Dijkstra polyline (skip first vertex if we already have a tail —
+  // it'll be the same as the exit endpoint).
+  const skipFirst = geometry.length > 0;
+  for (let i = 0; i < recon.geometry.length; i++) {
+    if (skipFirst && i === 0) continue;
+    geometry.push(recon.geometry[i]);
+  }
+  for (const e of recon.edges) edges.push(e);
+  totalM += recon.distanceM;
+
+  if (dst.edge_idx != null) {
+    // Snap-head: from chosen entry endpoint to dst snap.
+    const eIdx = dst.edge_idx;
+    const entryFrac = bestEntry === b.srcIdx[eIdx] ? 0 : 1;
+    const head = edgePartialPolyline(b, eIdx, entryFrac, dst.fraction);
+    const headM = Math.abs(dst.fraction - entryFrac) * b.edgeLengthM[eIdx];
+    if (head.length > 0) {
+      // Skip first vertex (same as bestEntry node).
+      for (let i = 1; i < head.length; i++) geometry.push(head[i]);
+      edges.push({
+        edge_id: b.edgeId[eIdx],
+        fullname: b.edgeFullname[eIdx],
+        mtfcc: b.edgeMtfcc[eIdx],
+        length_m: headM,
+        polyline: head,
+      });
+      totalM += headM;
+    }
+  }
+
+  return {
+    geometry,
+    distanceM: totalM,
+    durationS: totalM / b.walkingPaceMps,
+    edges,
+  };
+}
+
+// Stop-object signature: each stop = { lat, lng, edge_id?, edge_fraction? }.
+// edge_id here is the TigerLine edge_id (from salem_tour_stops), NOT the
+// router-internal edge_idx — we look it up.
+function _stopToEndpoint(b, stop) {
+  if (!stop) return null;
+  if (stop.edge_id != null && stop.edge_fraction != null) {
+    const eId = +stop.edge_id;
+    // Find edge_idx by scanning edgeId. Cache the lookup on the bundle so
+    // repeated leg computes don't re-scan. ~17K edges → fine to scan once.
+    if (!b._edgeIdToIdx) {
+      const m = new Map();
+      for (let i = 0; i < b.edgeCount; i++) m.set(b.edgeId[i], i);
+      b._edgeIdToIdx = m;
+    }
+    const eIdx = b._edgeIdToIdx.get(eId);
+    if (eIdx != null) {
+      return { edge_idx: eIdx, fraction: +stop.edge_fraction, lat: stop.lat, lng: stop.lng };
+    }
+    // Fall through to nearest-node snap if the edge_id is stale (e.g. a
+    // routing-bundle rebake renumbered an edge — shouldn't happen but be safe).
+  }
+  return { lat: stop.lat, lng: stop.lng };
+}
+
+function routeBundleEx(b, srcStop, dstStop) {
+  const srcEP = _stopToEndpoint(b, srcStop);
+  const dstEP = _stopToEndpoint(b, dstStop);
+  if (!srcEP || !dstEP) return null;
+  return routeBetweenEdgePoints(b, srcEP, dstEP);
+}
+
 // S190 — diagnostic-only helper for the admin tools layer. Returns the
 // nearest-node info that routeBundle uses internally, plus haversine
 // meter distances, so the admin tour-route logger can explain WHY a leg
@@ -889,5 +1291,9 @@ module.exports = function (app, deps) {
     _routeDiag: (a, b, c, d) => (bundle ? routeBundleDiag(bundle, a, b, c, d) : null),
     // S214 — admin tour waypoint edge-foot snap.
     _snapEdge: (lat, lng) => (bundle ? nearestWalkableEdge(bundle, lat, lng) : null),
+    // S215 — edge-point Dijkstra. Routes between two stop objects that may
+    // carry edge_id+edge_fraction bindings, so legs actually pass through
+    // mid-block waypoints persisted by S214.
+    _routeEx: (srcStop, dstStop) => (bundle ? routeBundleEx(bundle, srcStop, dstStop) : null),
   };
 };

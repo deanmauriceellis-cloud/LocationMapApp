@@ -143,9 +143,12 @@ module.exports = function(app, deps) {
     const { rows } = await client.query(
       `SELECT s.stop_id,
               s.stop_order,
+              s.poi_id,
               COALESCE(s.lat, p.lat) AS lat,
               COALESCE(s.lng, p.lng) AS lng,
-              COALESCE(s.name, p.name) AS name
+              COALESCE(s.name, p.name) AS name,
+              s.edge_id,
+              s.edge_fraction
          FROM salem_tour_stops s
     LEFT JOIN salem_pois p ON p.id = s.poi_id
         WHERE s.tour_id = $1
@@ -803,8 +806,20 @@ module.exports = function(app, deps) {
 
         let r;
         const tLeg = Date.now();
+        // S215 — prefer edge-point routing when either endpoint carries an
+        // edge binding (free waypoints persisted by S214). Falls back to
+        // node-snap automatically for POI-based stops with no binding.
+        const useEx =
+          typeof deps.salemRouteEx === 'function' &&
+          ((a.edge_id != null && a.edge_fraction != null) ||
+            (b.edge_id != null && b.edge_fraction != null));
         try {
-          r = deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
+          r = useEx
+            ? deps.salemRouteEx(
+                { lat: a.lat, lng: a.lng, edge_id: a.edge_id, edge_fraction: a.edge_fraction },
+                { lat: b.lat, lng: b.lng, edge_id: b.edge_id, edge_fraction: b.edge_fraction },
+              )
+            : deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
         } catch (err) {
           console.log(
             `[AdminTours]   leg ${legOrder} ERROR  ${fromLabel} → ${toLabel}  ${err.message}`,
@@ -985,7 +1000,17 @@ module.exports = function(app, deps) {
       const fromLabel = `${a.name ?? a.stop_id} (${a.stop_id})`;
       const toLabel = `${b.name ?? b.stop_id} (${b.stop_id})`;
       const tLeg = Date.now();
-      const r = deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
+      // S215 — edge-point routing when either endpoint has an edge binding.
+      const useEx =
+        typeof deps.salemRouteEx === 'function' &&
+        ((a.edge_id != null && a.edge_fraction != null) ||
+          (b.edge_id != null && b.edge_fraction != null));
+      const r = useEx
+        ? deps.salemRouteEx(
+            { lat: a.lat, lng: a.lng, edge_id: a.edge_id, edge_fraction: a.edge_fraction },
+            { lat: b.lat, lng: b.lng, edge_id: b.edge_id, edge_fraction: b.edge_fraction },
+          )
+        : deps.salemRoute(a.lat, a.lng, b.lat, b.lng);
       if (!r || !r.geometry || r.geometry.length < 2) {
         const straightM = Math.round(haversineMeters(a.lat, a.lng, b.lat, b.lng));
         let diagInfo = null;
