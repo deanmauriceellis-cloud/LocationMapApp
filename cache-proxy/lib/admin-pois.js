@@ -36,6 +36,27 @@
  */
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-pois.js';
 
+const {
+  tigerPool,
+  geocodeOneAddress,
+  snapToNearestEdge,
+  findEdgeByStreetName,
+  extractStreetFromAddress,
+  haversineKm,
+} = require('./tiger-geocode');
+
+// S218 — Salem-area sanity filter. Tiger.geocode can match a fuzzy
+// "Wharf St, Salem MA" to a Wharf St in another town when the city/zip
+// match is weak (operator hit a 33 km proposal mid-S218 review, rating 18).
+// For the per-POI Validate workflow, candidates outside the Salem area are
+// almost always wrong-town hits — drop them and let the operator fix the
+// address. Center matches admin-lint.js. 15 km radius covers Salem,
+// Beverly, Peabody, Danvers, Marblehead, Lynn — anywhere a Salem-listed
+// POI could plausibly sit.
+const VALIDATE_SALEM_CENTER_LAT = 42.5223;
+const VALIDATE_SALEM_CENTER_LNG = -70.8950;
+const VALIDATE_SALEM_RADIUS_M = 15000;
+
 // ─── Unified field whitelist ────────────────────────────────────────────────
 
 const UPDATABLE_FIELDS = [
@@ -492,10 +513,23 @@ module.exports = function(app, deps) {
   // S162: Commit a verifier-proposed coordinate. Copies lat_proposed/lng_proposed
   // into lat/lng, marks status='accepted', clears the proposal columns. Mirrors
   // /move semantics (admin_dirty stamped). 409 if there's no proposal to accept.
+  //
+  // S218 — body {lat, lng} optional override. The proposal-review UI lets the
+  // operator drag the proposed pin before accepting; the dragged position is
+  // sent in the body and committed instead of the stored lat_proposed. Without
+  // a body, behavior is unchanged from S162.
   app.post('/admin/salem/pois/:id/accept-proposed-location', requirePg, async (req, res) => {
     try {
       const id = getId(req, res);
       if (!id) return;
+
+      const overrideLat = req.body && req.body.lat != null ? Number(req.body.lat) : null;
+      const overrideLng = req.body && req.body.lng != null ? Number(req.body.lng) : null;
+      const hasOverride = overrideLat != null && overrideLng != null
+        && Number.isFinite(overrideLat) && Number.isFinite(overrideLng);
+      if (hasOverride && (overrideLat < -90 || overrideLat > 90 || overrideLng < -180 || overrideLng > 180)) {
+        return res.status(400).json({ error: 'lat/lng out of range' });
+      }
 
       const existing = await pgPool.query(
         `SELECT id, lat, lng, lat_proposed, lng_proposed, deleted_at
@@ -507,14 +541,17 @@ module.exports = function(app, deps) {
       if (row.deleted_at) {
         return res.status(409).json({ error: 'POI is soft-deleted; restore it before accepting' });
       }
-      if (row.lat_proposed == null || row.lng_proposed == null) {
+      if (!hasOverride && (row.lat_proposed == null || row.lng_proposed == null)) {
         return res.status(409).json({ error: 'No proposed coordinates to accept' });
       }
 
+      const finalLat = hasOverride ? overrideLat : parseFloat(row.lat_proposed);
+      const finalLng = hasOverride ? overrideLng : parseFloat(row.lng_proposed);
+
       const { rows } = await pgPool.query(
         `UPDATE salem_pois
-            SET lat = lat_proposed,
-                lng = lng_proposed,
+            SET lat = $2,
+                lng = $3,
                 location_status = 'accepted',
                 lat_proposed = NULL,
                 lng_proposed = NULL,
@@ -526,7 +563,7 @@ module.exports = function(app, deps) {
                 updated_at = NOW()
           WHERE id = $1
           RETURNING lat, lng`,
-        [id]
+        [id, finalLat, finalLng]
       );
 
       res.json({
@@ -534,9 +571,456 @@ module.exports = function(app, deps) {
         from: { lat: parseFloat(row.lat), lng: parseFloat(row.lng) },
         to: { lat: parseFloat(rows[0].lat), lng: parseFloat(rows[0].lng) },
         location_status: 'accepted',
+        used_override: hasOverride,
       });
     } catch (err) {
       console.error('[AdminPois] accept-proposed-location error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── POST /admin/salem/pois/:id/discard-proposed-location ────────────────
+  // S218: Operator clicked Cancel in the proposal-review panel. Clears the
+  // proposal columns and resets location_status to 'unverified' so the next
+  // Validate run starts clean. Does NOT touch live lat/lng.
+  app.post('/admin/salem/pois/:id/discard-proposed-location', requirePg, async (req, res) => {
+    try {
+      const id = getId(req, res);
+      if (!id) return;
+
+      const { rows } = await pgPool.query(
+        `UPDATE salem_pois
+            SET lat_proposed = NULL,
+                lng_proposed = NULL,
+                location_source = NULL,
+                location_status = 'unverified',
+                location_drift_m = NULL,
+                location_geocoder_rating = NULL,
+                updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, lat_proposed, lng_proposed, location_status`,
+        [id]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Not found' });
+      res.json({ id, location_status: rows[0].location_status });
+    } catch (err) {
+      console.error('[AdminPois] discard-proposed-location error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── POST /admin/salem/pois/:id/validate-location-tiger ──────────────────
+  // S218: Per-POI TigerLine validation. Reads the POI's address, runs
+  // tiger.geocode() with the same variant ladder as the lint deep scan,
+  // snaps the best candidate to the nearest tiger.edges centerline so the
+  // proposal sits literally on the road, and writes
+  // lat_proposed/lng_proposed/location_source='tigerline'/drift/rating.
+  // Does NOT touch live lat/lng — operator commits via the existing
+  // /accept-proposed-location endpoint after eyeballing the proposal on
+  // the admin map.
+  //
+  // Response shapes:
+  //   200 { status: 'proposed', proposal: {...}, poi: {...} }
+  //   200 { status: 'no_match', warnings: [...] }   — Tiger returned 0 candidates
+  //   400 { error: 'no_address' }                   — POI has no usable address
+  //   404 { error: 'Not found' }
+  //   409 { error: 'POI is soft-deleted' }
+  app.post('/admin/salem/pois/:id/validate-location-tiger', requirePg, async (req, res) => {
+    let tigerClient = null;
+    const reqStart = Date.now();
+    try {
+      const id = getId(req, res);
+      if (!id) return;
+      const tag = `[validate-tiger ${id}]`;
+      console.log(`${tag} ───────────────────────────────────────────────────────────`);
+      console.log(`${tag} START`);
+
+      const existing = await pgPool.query(
+        `SELECT id, name, lat, lng, address, deleted_at
+           FROM salem_pois WHERE id = $1`,
+        [id]
+      );
+      if (!existing.rows.length) {
+        console.log(`${tag} POI not found → 404`);
+        return res.status(404).json({ error: 'Not found' });
+      }
+      const poi = existing.rows[0];
+      console.log(`${tag} POI name="${poi.name}" current=(${Number(poi.lat).toFixed(5)}, ${Number(poi.lng).toFixed(5)}) address="${poi.address}"`);
+      if (poi.deleted_at) {
+        console.log(`${tag} POI is soft-deleted → 409`);
+        return res.status(409).json({ error: 'POI is soft-deleted; restore it before validating' });
+      }
+      if (!poi.address || !String(poi.address).trim()) {
+        console.log(`${tag} POI has no address → 400 no_address`);
+        return res.status(400).json({ error: 'no_address', message: 'POI has no usable address to geocode' });
+      }
+
+      tigerClient = await tigerPool().connect();
+      // Per-call statement_timeout matches the lint flow (5s — the modal-
+      // budget tightening from S188). A single-POI validate doesn't need
+      // the 15s ceiling the deep scan uses.
+      await tigerClient.query(`SET statement_timeout = '5s'`);
+
+      const lat0 = poi.lat != null ? parseFloat(poi.lat) : null;
+      const lng0 = poi.lng != null ? parseFloat(poi.lng) : null;
+      const { candidates, warnings } = await geocodeOneAddress(
+        tigerClient, poi.address, lat0, lng0, 3, `${tag} [geocode]`
+      );
+
+      if (candidates.length === 0) {
+        console.log(`${tag} geocode returned ZERO candidates`);
+        tigerClient.release();
+        tigerClient = null;
+        console.log(`${tag} END status=no_match (${Date.now() - reqStart}ms)`);
+        return res.json({ status: 'no_match', warnings });
+      }
+
+      // S218 — drop candidates outside the Salem area (15 km radius). Tiger
+      // can return high-rating matches for a wrong-town street when the city
+      // tag is fuzzy; those land kilometers away and would write a bogus
+      // proposal. Annotate dropped candidates in warnings so the operator
+      // can tell address-fix from no-match-at-all.
+      const inArea = [];
+      console.log(`${tag} Salem-area filter: ${candidates.length} candidates, radius ${VALIDATE_SALEM_RADIUS_M}m`);
+      for (const c of candidates) {
+        const dFromSalem = haversineKm(
+          VALIDATE_SALEM_CENTER_LAT, VALIDATE_SALEM_CENTER_LNG, c.lat, c.lng,
+        ) * 1000;
+        const inSalem = dFromSalem <= VALIDATE_SALEM_RADIUS_M;
+        console.log(`${tag}   r${c.rating} (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}) ${(dFromSalem/1000).toFixed(1)}km from Salem ${inSalem ? '✓ kept' : '✗ DROPPED ' + c.normalized_address}`);
+        if (inSalem) {
+          inArea.push(c);
+        } else {
+          warnings.push(
+            `Dropped Tiger candidate (rating ${c.rating}, ${(dFromSalem / 1000).toFixed(1)} km from Salem) — likely wrong-town match for "${c.normalized_address}".`
+          );
+        }
+      }
+      console.log(`${tag} Salem-area filter result: ${inArea.length} kept / ${candidates.length - inArea.length} dropped`);
+      // S218 — street-name fallback. When tiger.geocode can't land on a
+      // Salem-area candidate (Tiger has the street but not the house number,
+      // or has the street only outside Salem), search tiger.edges by street
+      // name within 2 km of the POI's current coords. Lets us still propose
+      // a useful location for POIs like Sea Level Oyster Bar (94 Wharf St,
+      // Salem — Tiger's Salem Wharf St addresses go 1–72 only). The
+      // candidate is on the actual named street near the POI, so the
+      // operator can drag to fine-tune the building location.
+      if (inArea.length === 0) {
+        const street = extractStreetFromAddress(poi.address);
+        console.log(`${tag} street fallback: extracted street="${street}" from address="${poi.address}"`);
+        if (lat0 != null && lng0 != null && street) {
+          const fb = await findEdgeByStreetName(tigerClient, street, lat0, lng0, 2000, `${tag} [fallback]`);
+          if (fb) {
+            tigerClient.release();
+            tigerClient = null;
+            const driftM = Math.round(haversineKm(lat0, lng0, fb.lat, fb.lng) * 1000);
+            const fallbackWarning =
+              `Tiger has no house-numbered match for "${poi.address}" in Salem. ` +
+              `Snapped to ${fb.edge_fullname} ${fb.snap_distance_m} m from current coords. ` +
+              `Drag the pin to the actual building before accepting.`;
+            warnings.push(fallbackWarning);
+            const updated = await pgPool.query(
+              `UPDATE salem_pois
+                  SET lat_proposed = $2,
+                      lng_proposed = $3,
+                      location_source = 'tigerline_street_fallback',
+                      location_status = 'needs_review',
+                      location_drift_m = $4,
+                      location_geocoder_rating = NULL,
+                      location_verified_at = NOW(),
+                      updated_at = NOW()
+                WHERE id = $1
+                RETURNING id, lat, lng, lat_proposed, lng_proposed,
+                          location_source, location_status, location_drift_m,
+                          location_geocoder_rating, location_verified_at,
+                          location_truth_of_record`,
+              [id, fb.lat, fb.lng, driftM]
+            );
+            console.log(`${tag} END status=proposed (street_fallback) drift=${driftM}m source=tigerline_street_fallback (${Date.now() - reqStart}ms)`);
+            return res.json({
+              status: 'proposed',
+              proposal: {
+                lat: fb.lat,
+                lng: fb.lng,
+                rating: null,
+                drift_m: driftM,
+                normalized_address: `${street} (street fallback — no house number in Tiger)`,
+                snapped_to_edge: {
+                  tlid: fb.edge_tlid,
+                  fullname: fb.edge_fullname,
+                  snap_distance_m: fb.snap_distance_m,
+                },
+                candidate_count: 0,
+                fallback: 'street_name_only',
+              },
+              warnings,
+              poi: updated.rows[0],
+            });
+          }
+          console.log(`${tag} street fallback found no edge near POI`);
+        } else {
+          console.log(`${tag} cannot run street fallback (lat0=${lat0} lng0=${lng0} street=${street})`);
+        }
+        tigerClient.release();
+        tigerClient = null;
+        console.log(`${tag} END status=no_match (Salem filter dropped all + fallback exhausted) (${Date.now() - reqStart}ms)`);
+        return res.json({
+          status: 'no_match',
+          warnings: warnings.length
+            ? warnings
+            : ['No Tiger candidates within 15 km of Salem.'],
+        });
+      }
+
+      // Lowest rating wins (0 = exact house-number match, 100 = city centroid).
+      const best = inArea[0];
+      console.log(`${tag} BEST candidate: r${best.rating} (${best.lat.toFixed(5)}, ${best.lng.toFixed(5)}) "${best.normalized_address}"`);
+
+      // Snap to nearest street centerline within 50m. If the geocode result
+      // is already on a road, the snap moves it 0–8 m onto the centerline;
+      // if no edge is within 50m (rare — open lot, lakeside), we keep the
+      // raw Tiger point.
+      const snapped = await snapToNearestEdge(tigerClient, best.lat, best.lng, 50, `${tag} [snap]`);
+      const finalLat = snapped ? snapped.lat : best.lat;
+      const finalLng = snapped ? snapped.lng : best.lng;
+
+      tigerClient.release();
+      tigerClient = null;
+
+      const driftM = lat0 != null && lng0 != null
+        ? Math.round(haversineKm(lat0, lng0, finalLat, finalLng) * 1000)
+        : null;
+
+      // Status: verified if rating < 5 AND drift < 10m, else needs_review.
+      // Operator confirms via Accept proposed coordinates regardless.
+      const newStatus = (best.rating < 5 && driftM != null && driftM < 10)
+        ? 'verified' : 'needs_review';
+      console.log(`${tag} writing proposal: final=(${finalLat.toFixed(5)}, ${finalLng.toFixed(5)}) drift=${driftM}m status=${newStatus} source=tigerline rating=${best.rating}`);
+
+      const updated = await pgPool.query(
+        `UPDATE salem_pois
+            SET lat_proposed = $2,
+                lng_proposed = $3,
+                location_source = 'tigerline',
+                location_status = $4,
+                location_drift_m = $5,
+                location_geocoder_rating = $6,
+                location_verified_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, lat, lng, lat_proposed, lng_proposed,
+                    location_source, location_status, location_drift_m,
+                    location_geocoder_rating, location_verified_at,
+                    location_truth_of_record`,
+        [id, finalLat, finalLng, newStatus, driftM, best.rating]
+      );
+
+      console.log(`${tag} END status=proposed (${Date.now() - reqStart}ms)`);
+      res.json({
+        status: 'proposed',
+        proposal: {
+          lat: finalLat,
+          lng: finalLng,
+          rating: best.rating,
+          drift_m: driftM,
+          normalized_address: best.normalized_address,
+          snapped_to_edge: snapped ? {
+            tlid: snapped.edge_tlid,
+            fullname: snapped.edge_fullname,
+            snap_distance_m: snapped.snap_distance_m,
+          } : null,
+          candidate_count: candidates.length,
+        },
+        warnings,
+        poi: updated.rows[0],
+      });
+    } catch (err) {
+      console.error(`[validate-tiger] ERROR after ${Date.now() - reqStart}ms:`, err.stack || err.message);
+      res.status(500).json({ error: err.message });
+    } finally {
+      if (tigerClient) {
+        try { tigerClient.release(); } catch (_) {}
+      }
+    }
+  });
+
+  // ─── POST /admin/salem/pois/:id/geocode-via-google ───────────────────────
+  // S218: ask Google's Geocoding API where a POI's address actually is, then
+  // hand off to the same proposal-review flow Tiger validate uses (same
+  // lat_proposed columns, same review panel, same Accept/Cancel/Drag UX).
+  // Useful when Tiger interpolation lands in a parking lot — Google's
+  // ROOFTOP / RANGE_INTERPOLATED matches honor real building positions.
+  //
+  // Requires GOOGLE_GEOCODE_API_KEY env var. Same Salem-area sanity filter
+  // as the Tiger flow (15 km from Salem center) so wrong-town matches don't
+  // write a bogus proposal.
+  app.post('/admin/salem/pois/:id/geocode-via-google', requirePg, async (req, res) => {
+    const reqStart = Date.now();
+    try {
+      const id = getId(req, res);
+      if (!id) return;
+      const tag = `[geocode-google ${id}]`;
+      console.log(`${tag} ───────────────────────────────────────────────────────────`);
+      console.log(`${tag} START`);
+
+      const apiKey = process.env.GOOGLE_GEOCODE_API_KEY;
+      if (!apiKey) {
+        console.log(`${tag} GOOGLE_GEOCODE_API_KEY not configured → 503`);
+        return res.status(503).json({ error: 'GOOGLE_GEOCODE_API_KEY not configured on cache-proxy' });
+      }
+
+      const existing = await pgPool.query(
+        `SELECT id, name, lat, lng, address, deleted_at
+           FROM salem_pois WHERE id = $1`,
+        [id]
+      );
+      if (!existing.rows.length) {
+        console.log(`${tag} POI not found → 404`);
+        return res.status(404).json({ error: 'Not found' });
+      }
+      const poi = existing.rows[0];
+      console.log(`${tag} POI name="${poi.name}" current=(${Number(poi.lat).toFixed(5)}, ${Number(poi.lng).toFixed(5)}) address="${poi.address}"`);
+      if (poi.deleted_at) {
+        return res.status(409).json({ error: 'POI is soft-deleted; restore it before validating' });
+      }
+      if (!poi.address || !String(poi.address).trim()) {
+        console.log(`${tag} POI has no address → 400 no_address`);
+        return res.status(400).json({ error: 'no_address', message: 'POI has no usable address to geocode' });
+      }
+
+      // Use Places API (New) Text Search. The legacy /place/textsearch
+      // endpoint returns REQUEST_DENIED on projects created after Google
+      // deprecated it. New API: POST with JSON body, key in header, field
+      // mask required. Better for business POIs because it resolves to the
+      // actual storefront, not address-interpolation.
+      const query = `${poi.name || ''} ${poi.address}`.trim();
+      const url = `https://places.googleapis.com/v1/places:searchText`;
+      console.log(`${tag} Places API (New) Text Search query="${query}"`);
+      const t0 = Date.now();
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      let body;
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.id,places.types',
+          },
+          body: JSON.stringify({ textQuery: query }),
+          signal: ctrl.signal,
+        });
+        body = await r.json();
+      } catch (e) {
+        clearTimeout(timer);
+        console.log(`${tag} Google fetch FAILED in ${Date.now() - t0}ms: ${e.message}`);
+        return res.status(502).json({ error: 'Google Places API request failed', message: e.message });
+      }
+      clearTimeout(timer);
+      const places = body.places || [];
+      console.log(`${tag} Google responded in ${Date.now() - t0}ms places=${places.length}${body.error ? ' error=' + JSON.stringify(body.error) : ''}`);
+
+      if (body.error) {
+        const errMsg = body.error.message || JSON.stringify(body.error);
+        console.log(`${tag} Google API error: ${body.error.status || ''} ${errMsg}`);
+        return res.status(502).json({ error: `Google Places API: ${body.error.status || 'error'}`, message: errMsg });
+      }
+      if (places.length === 0) {
+        console.log(`${tag} END status=no_match (zero places) (${Date.now() - reqStart}ms)`);
+        return res.json({ status: 'no_match', warnings: ['Google returned no places for this query.'] });
+      }
+
+      // Take the top result (Google sorts by relevance). Filter to Salem
+      // area to catch wrong-town matches just like the Tiger flow.
+      const warnings = [];
+      let chosen = null;
+      for (const r of places) {
+        const lat = r.location?.latitude;
+        const lng = r.location?.longitude;
+        if (lat == null || lng == null) continue;
+        const displayName = r.displayName?.text || r.id;
+        const dFromSalem = haversineKm(
+          VALIDATE_SALEM_CENTER_LAT, VALIDATE_SALEM_CENTER_LNG, lat, lng,
+        ) * 1000;
+        const inArea = dFromSalem <= VALIDATE_SALEM_RADIUS_M;
+        console.log(`${tag}   "${displayName}" (${lat.toFixed(5)}, ${lng.toFixed(5)}) ${(dFromSalem/1000).toFixed(1)}km from Salem ${inArea ? '✓' : '✗ DROPPED'} "${r.formattedAddress}"`);
+        if (!inArea) {
+          warnings.push(
+            `Dropped Google candidate "${displayName}" (${(dFromSalem / 1000).toFixed(1)} km from Salem) — likely wrong-town match for "${r.formattedAddress}".`
+          );
+          continue;
+        }
+        if (!chosen) {
+          chosen = {
+            geometry: { location: { lat, lng } },
+            formatted_address: r.formattedAddress,
+            name: displayName,
+            place_id: r.id,
+          };
+        }
+      }
+
+      if (!chosen) {
+        console.log(`${tag} END status=no_match (all results outside Salem) (${Date.now() - reqStart}ms)`);
+        return res.json({
+          status: 'no_match',
+          warnings: warnings.length ? warnings : ['No Google candidates within 15 km of Salem.'],
+        });
+      }
+
+      const lat0 = poi.lat != null ? parseFloat(poi.lat) : null;
+      const lng0 = poi.lng != null ? parseFloat(poi.lng) : null;
+      const finalLat = chosen.geometry.location.lat;
+      const finalLng = chosen.geometry.location.lng;
+      const driftM = lat0 != null && lng0 != null
+        ? Math.round(haversineKm(lat0, lng0, finalLat, finalLng) * 1000)
+        : null;
+      // Places Text Search returns business storefronts directly. Treat as
+      // 'verified' if drift < 30m (operator already had it close), else
+      // needs_review so they can confirm via map.
+      const newStatus = (driftM != null && driftM < 30)
+        ? 'verified' : 'needs_review';
+      console.log(`${tag} writing proposal: final=(${finalLat.toFixed(5)}, ${finalLng.toFixed(5)}) drift=${driftM}m status=${newStatus} source=google name="${chosen.name}"`);
+
+      const updated = await pgPool.query(
+        `UPDATE salem_pois
+            SET lat_proposed = $2,
+                lng_proposed = $3,
+                location_source = 'google',
+                location_status = $4,
+                location_drift_m = $5,
+                location_geocoder_rating = NULL,
+                location_verified_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, lat, lng, lat_proposed, lng_proposed,
+                    location_source, location_status, location_drift_m,
+                    location_geocoder_rating, location_verified_at,
+                    location_truth_of_record`,
+        [id, finalLat, finalLng, newStatus, driftM]
+      );
+
+      console.log(`${tag} END status=proposed (${Date.now() - reqStart}ms)`);
+      res.json({
+        status: 'proposed',
+        proposal: {
+          lat: finalLat,
+          lng: finalLng,
+          rating: null,
+          drift_m: driftM,
+          normalized_address: chosen.formatted_address,
+          snapped_to_edge: null,
+          candidate_count: places.length,
+          source: 'google',
+          google_name: chosen.name,
+          place_id: chosen.place_id,
+        },
+        warnings,
+        poi: updated.rows[0],
+      });
+    } catch (err) {
+      console.error(`[geocode-google] ERROR after ${Date.now() - reqStart}ms:`, err.stack || err.message);
       res.status(500).json({ error: err.message });
     }
   });

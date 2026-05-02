@@ -287,6 +287,19 @@ interface AdminMapProps {
   onGeocodePreviewValidateStored?: () => void | Promise<void>
   /** Open the source POI's editor focused on the address field. */
   onGeocodePreviewEditAddress?: () => void
+  /** S218 — proposal review mode. When set, the editor dialog is closed,
+   *  the map flies to the proposal at z20, and the fuchsia "?" pin becomes
+   *  draggable so the operator can fine-tune before clicking Accept. The
+   *  small floating panel with Accept/Cancel lives in AdminLayout. */
+  proposalReview?: {
+    poi: PoiRow
+    /** Effective drag position (overrides poi.lat_proposed/lng_proposed when set). */
+    dragLat: number | null
+    dragLng: number | null
+    /** Bumped when the parent wants to (re-)fly to the proposal at z20. */
+    flyNonce: number
+  } | null
+  onProposalDrag?: (lat: number, lng: number) => void
 }
 
 export interface PendingStopMove {
@@ -1272,6 +1285,121 @@ function DirectionsLayer({ target, source, onResult }: DirectionsLayerProps) {
   return null
 }
 
+// ─── Proposal preview (S218) ────────────────────────────────────────────────
+// When the selected POI has lat_proposed/lng_proposed set (typically from
+// the PoiEditDialog "Validate via TigerLine" button), drop a fuchsia "?"
+// pin at the proposed location + dashed line back to the live coords so
+// the operator can eyeball the move before clicking Accept proposed
+// coordinates. Lighter than the cluster-aware GeocodePreviewLayer below
+// because there's no candidate list — just one stored point + one proposal.
+
+interface ProposalPreviewLayerProps {
+  poi: PoiRow
+  /** S218 — when in proposal-review mode, the pin is draggable + uses the
+   *  caller-supplied dragLat/dragLng instead of poi.lat_proposed so the dashed
+   *  line and pin track each drag without round-tripping the DB. */
+  draggable?: boolean
+  dragLat?: number | null
+  dragLng?: number | null
+  onDrag?: (lat: number, lng: number) => void
+}
+
+function ProposalPreviewLayer({
+  poi, draggable = false, dragLat = null, dragLng = null, onDrag,
+}: ProposalPreviewLayerProps) {
+  const map = useMap()
+  const layerRef = useRef<L.LayerGroup | null>(null)
+
+  // Effective proposed coords: dragLat/dragLng override the stored proposal
+  // when the operator is mid-drag in review mode.
+  const propLat = dragLat != null ? dragLat : poi.lat_proposed
+  const propLng = dragLng != null ? dragLng : poi.lng_proposed
+
+  useEffect(() => {
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current)
+      layerRef.current = null
+    }
+    if (propLat == null || propLng == null) return
+    if (poi.lat == null || poi.lng == null) return
+
+    const group = L.layerGroup()
+
+    L.polyline(
+      [[poi.lat as number, poi.lng as number],
+       [propLat as number, propLng as number]],
+      { color: '#a21caf', weight: 3, dashArray: '6 6', opacity: 0.85 },
+    ).addTo(group)
+
+    const proposalIcon = L.divIcon({
+      className: 'proposal-marker',
+      html: `<div style="background:#a21caf;color:#fff;border:3px solid #fdf4ff;
+                         border-radius:50%;width:30px;height:30px;line-height:24px;
+                         text-align:center;font-weight:700;font-size:16px;
+                         box-shadow:0 2px 6px rgba(0,0,0,0.4);
+                         cursor:${draggable ? 'grab' : 'default'};">?</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15],
+    })
+    const driftLine = poi.location_drift_m != null
+      ? `${Number(poi.location_drift_m).toFixed(1)} m from current`
+      : ''
+    const ratingLine = poi.location_geocoder_rating != null
+      ? `Tiger rating ${poi.location_geocoder_rating}`
+      : ''
+    const tip = [
+      draggable ? 'Drag to fine-tune' : 'Proposed location',
+      poi.location_source ?? null, ratingLine, driftLine,
+    ].filter(Boolean).join('<br>')
+    const m = L.marker(
+      [propLat as number, propLng as number],
+      { icon: proposalIcon, zIndexOffset: 1100, draggable, autoPan: true },
+    ).bindTooltip(tip, { direction: 'top', offset: [0, -15] })
+    if (draggable && onDrag) {
+      m.on('dragend', (ev) => {
+        const ll = (ev.target as L.Marker).getLatLng()
+        onDrag(ll.lat, ll.lng)
+      })
+    }
+    m.addTo(group)
+
+    group.addTo(map)
+    layerRef.current = group
+
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current)
+        layerRef.current = null
+      }
+    }
+  }, [
+    map, draggable, onDrag,
+    poi.lat, poi.lng, propLat, propLng,
+    poi.location_drift_m, poi.location_geocoder_rating, poi.location_source,
+  ])
+
+  return null
+}
+
+// S218 — Fly the map to the active proposal at zoom 20 when proposal-review
+// mode opens. Triggered by `nonce` so the operator can re-fly with the same
+// coords (e.g. after an inadvertent pan) without remounting the layer.
+interface FlyToProposalProps {
+  lat: number | null
+  lng: number | null
+  nonce: number
+}
+function FlyToProposal({ lat, lng, nonce }: FlyToProposalProps) {
+  const map = useMap()
+  const lastNonceRef = useRef<number>(-1)
+  useEffect(() => {
+    if (lat == null || lng == null) return
+    if (nonce === lastNonceRef.current) return
+    lastNonceRef.current = nonce
+    map.flyTo([lat, lng], 20, { duration: 0.6 })
+  }, [lat, lng, nonce, map])
+  return null
+}
+
 // ─── Geocode candidate preview (S188) ───────────────────────────────────────
 
 interface GeocodePreviewLayerProps {
@@ -1956,6 +2084,8 @@ export function AdminMap({
   onGeocodePreviewCancel,
   onGeocodePreviewValidateStored,
   onGeocodePreviewEditAddress,
+  proposalReview,
+  onProposalDrag,
 }: AdminMapProps) {
   // S188 — geocode-preview view mode. `focusMap` hides every POI marker
   // outside the cluster; `showAll` renders every Tiger candidate at once.
@@ -2353,6 +2483,32 @@ export function AdminMap({
             fitNonce={fitNonce}
           />
         )}
+        {/* S218 — proposal review mode: draggable pin + auto-fly to z20 */}
+        {!geocodePreview && proposalReview && (
+          <>
+            <ProposalPreviewLayer
+              poi={proposalReview.poi}
+              draggable
+              dragLat={proposalReview.dragLat}
+              dragLng={proposalReview.dragLng}
+              onDrag={onProposalDrag}
+            />
+            <FlyToProposal
+              lat={proposalReview.dragLat ?? proposalReview.poi.lat_proposed ?? null}
+              lng={proposalReview.dragLng ?? proposalReview.poi.lng_proposed ?? null}
+              nonce={proposalReview.flyNonce}
+            />
+          </>
+        )}
+        {/* Read-only proposal preview (selected POI has a proposal but
+            we're not in review mode) */}
+        {!geocodePreview
+          && !proposalReview
+          && selectedPoi
+          && selectedPoi.poi.lat_proposed != null
+          && selectedPoi.poi.lng_proposed != null && (
+            <ProposalPreviewLayer poi={selectedPoi.poi} />
+          )}
       </MapContainer>
       {TILE_PROVIDERS.length > 1 && (
         <TileProviderPicker

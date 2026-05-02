@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 207-217 (S206 archived 2026-05-01 at S217 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 208-218 (S207 archived 2026-05-02 at S218 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 218: 2026-05-01 — Per-POI location validate workflow (TigerLine + Google Places) with map-review UX
+
+S218 shipped a fully-featured per-POI location validation workflow for the admin tool. Top-of-card **Validate via TigerLine** (fuchsia) and **Validate via Google** (sky blue) buttons + Lint-tab per-row equivalents both run server-side geocoding (PostGIS Tiger or Google Places API New), filter to the Salem area (15 km drops wrong-town matches), and route into a unified proposal-review mode: the editor closes, the map flies to the proposal at zoom 20, the fuchsia "?" pin is draggable, and a small floating panel shows current/proposed coords + source pill + drift (with amber/rose warning bands at 1 km / 5 km) + Accept/Cancel/Re-center/"Ask Google ↗"-link. Tiger path includes snap-to-edge (50 m) + street-name-near-POI fallback (KNN on `tiger.edges` for cases like Sea Level Oyster Bar where Tiger's house-number range doesn't include #94 in Salem); Google path uses Places API (New) Text Search with `<name> <address>` query for storefront-level accuracy (resolves Salem Witch Village → 11 m vs Tiger's 113 m parking-lot interpolation). Backend lives in `cache-proxy/lib/admin-pois.js` (three new endpoints: `/validate-location-tiger`, `/geocode-via-google`, `/discard-proposed-location`; existing `/accept-proposed-location` extended to take optional `{lat,lng}` body for committing the dragged-pin position) + new `cache-proxy/lib/tiger-geocode.js` (refactored shared helpers with verbose `[validate-tiger <poi_id>]`/`[geocode-google <poi_id>]` logging across every step). Frontend: new `web/src/admin/ProposalReviewPanel.tsx` floating bottom-right panel + `ProposalPreviewLayer` draggable in `AdminMap.tsx` + `proposalReview` state machine in `AdminLayout.tsx` + Validate buttons in `PoiEditDialog.tsx` header and `LintTab.tsx` per-row. Wrote `docs/TIGERLINE.md` (~370 lines) as operator reference covering both pipelines, drift bands, log recipes, MassGIS L3 integration plan for future work. No DB schema changes (S162 columns carried the entire workflow); no Android impact.
+
+Full session detail: `docs/session-logs/session-218-2026-05-01.md`. Commit: `<TBD>`.
+
+---
 
 ## Session 217: 2026-05-01 — Category-aware FAB POI narration + Show-All-POIs FAB overrides every gate
 
@@ -78,10 +86,3 @@ Full session detail: `docs/session-logs/session-208-2026-04-30.md`. Commit: `168
 
 ---
 
-## Session 207: 2026-04-30 — Civic narration trim (long_narration nulled on 62 civic POIs)
-
-Operator: "civic POIs have too much information, like the memorials and statues — is there a way to control their narrative?" Walked the runtime gate in `NarrationGeofenceManager.kt:466-505`; initial proposed fix (make commemoratives honor BRIEF/STANDARD/DEEP) invalidated by DB inventory — all 67 civic POIs have empty `historical_narration`, none match the commemorative regex, none are pre-1860. Real source of bloat was `long_narration` heard at DEEP (15+ civic rows >800 chars, top: Historic Salem Inc 1,134 / AOH 1,020 / Bishop Fenwick 1,006 / Salem Common 931 / Salem Sound Coastwatch 991). Operator picked: NULL `long_narration` for all civic. Snapshotted 62 rows to `docs/archive/civic-long-narration-snapshot-2026-04-30.csv` (reversible), ran the UPDATE, verified 0 civic with long_narration remaining + 66/67 still have short_narration. Full publish chain (Room v15) + assembleDebug + Lenovo HNY0CY0W uninstall+install. No code changes. Carry-forward: operator validation drive, selective re-author from snapshot if any civic feels too thin.
-
-Full session detail: `docs/session-logs/session-207-2026-04-30.md`. Commit: `49f30c5`.
-
----

@@ -21,6 +21,7 @@ import { LintTab } from './LintTab'
 import { GeocodesTab } from './GeocodesTab'
 import { GeocodeCandidatesModal } from './GeocodeCandidatesModal'
 import { AuditTab } from './AuditTab'
+import { ProposalReviewPanel } from './ProposalReviewPanel'
 
 type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes' | 'audit'
 
@@ -76,6 +77,22 @@ export function AdminLayout() {
       .then(body => setPois(body.pois ?? null))
       .catch(() => {})
   }, [])
+
+  // S218 — proposal review state. Set when the operator clicks "Validate via
+  // TigerLine" inside PoiEditDialog. The editor closes, the map flies to the
+  // proposal at z20, the fuchsia "?" pin becomes draggable, and a small
+  // floating panel offers Accept/Cancel. The drag position lives in this
+  // state so the dashed line + pin track the mouse without DB round-trips;
+  // the position is committed on Accept (with body override) or discarded.
+  const [proposalReview, setProposalReview] = useState<{
+    poi: PoiRow
+    dragLat: number | null
+    dragLng: number | null
+    flyNonce: number
+  } | null>(null)
+  const [proposalAcceptBusy, setProposalAcceptBusy] = useState(false)
+  const [proposalCancelBusy, setProposalCancelBusy] = useState(false)
+  const [proposalError, setProposalError] = useState<string | null>(null)
 
   // S188 — geocode-candidate map preview state. When set, AdminMap renders
   // the source POI + a temp marker at the candidate lat/lng + a line, plus
@@ -192,6 +209,98 @@ export function AdminLayout() {
     setSelectedPoi({ poi: sourcePoi })
     setEditOpen(true)
   }, [geocodePreview])
+  // S218 — Proposal review handlers
+  const handleEnterProposalReview = useCallback((updatedPoi: PoiRow) => {
+    setProposalReview({
+      poi: updatedPoi,
+      dragLat: null,
+      dragLng: null,
+      flyNonce: Date.now(),
+    })
+    setProposalError(null)
+    setEditOpen(false)  // close the big editor; small panel takes over
+  }, [])
+  const handleProposalDrag = useCallback((lat: number, lng: number) => {
+    setProposalReview((prev) => prev ? { ...prev, dragLat: lat, dragLng: lng } : prev)
+  }, [])
+  const handleProposalRecenter = useCallback(() => {
+    setProposalReview((prev) => prev ? { ...prev, flyNonce: Date.now() } : prev)
+  }, [])
+  const handleProposalAccept = useCallback(async () => {
+    if (!proposalReview) return
+    const { poi, dragLat, dragLng } = proposalReview
+    setProposalAcceptBusy(true)
+    setProposalError(null)
+    try {
+      const body = (dragLat != null && dragLng != null)
+        ? JSON.stringify({ lat: dragLat, lng: dragLng })
+        : undefined
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}/accept-proposed-location`,
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          ...(body ? { headers: { 'Content-Type': 'application/json' }, body } : {}),
+        },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try { const b = await res.json(); if (b?.error) msg = `${res.status} ${b.error}` } catch {}
+        throw new Error(msg)
+      }
+      // Refetch the POI so the tree + map show the new live coords.
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
+        { credentials: 'same-origin' },
+      )
+      if (fresh.ok) {
+        const updated = (await fresh.json()) as PoiRow
+        setPois((prev) => prev
+          ? prev.map((r) => r.id === updated.id ? { ...r, ...updated } : r)
+          : prev)
+        setSelectedPoi({ poi: updated })
+      }
+      setProposalReview(null)
+    } catch (e) {
+      setProposalError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setProposalAcceptBusy(false)
+    }
+  }, [proposalReview])
+  const handleProposalCancel = useCallback(async () => {
+    if (!proposalReview) return
+    const { poi } = proposalReview
+    setProposalCancelBusy(true)
+    setProposalError(null)
+    try {
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}/discard-proposed-location`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try { const b = await res.json(); if (b?.error) msg = `${res.status} ${b.error}` } catch {}
+        throw new Error(msg)
+      }
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
+        { credentials: 'same-origin' },
+      )
+      if (fresh.ok) {
+        const updated = (await fresh.json()) as PoiRow
+        setPois((prev) => prev
+          ? prev.map((r) => r.id === updated.id ? { ...r, ...updated } : r)
+          : prev)
+        setSelectedPoi({ poi: updated })
+      }
+      setProposalReview(null)
+    } catch (e) {
+      setProposalError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setProposalCancelBusy(false)
+    }
+  }, [proposalReview])
+
   // S177 P5 — Directions overlay target. When set, AdminMap fetches a route
   // from the current map center to this POI and renders a polyline.
   const [directionsTarget, setDirectionsTarget] = useState<PoiRow | null>(null)
@@ -484,6 +593,88 @@ export function AdminLayout() {
     setView('pois')
   }, [resolvePoi])
 
+  // S218 — Lint shortcut: skip the editor, jump straight to proposal-review.
+  // Used by the "Validate" button on the addr_geocode_mismatch check (and any
+  // future check) so the operator can chew through "lots of POIs" without
+  // opening a full editor card per row.
+  const handleLintValidate = useCallback(async (poiId: string) => {
+    try {
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poiId)}/validate-location-tiger`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try { const b = await res.json(); if (b?.error) msg = `${res.status} ${b.error}` } catch {}
+        window.alert(`Validate failed: ${msg}`)
+        return
+      }
+      const body = await res.json() as { status: 'proposed' | 'no_match'; warnings?: string[] }
+      if (body.status === 'no_match') {
+        window.alert(`Tiger returned no match for this POI's address.${body.warnings?.length ? '\n' + body.warnings.join('\n') : ''}`)
+        return
+      }
+      // Refetch fresh POI row so proposalReview has lat_proposed/lng_proposed.
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poiId)}`,
+        { credentials: 'same-origin' },
+      )
+      if (!fresh.ok) {
+        window.alert(`Validate succeeded but failed to refetch POI ${poiId}.`)
+        return
+      }
+      const updated = (await fresh.json()) as PoiRow
+      setPois((prev) => prev
+        ? prev.map((r) => r.id === updated.id ? { ...r, ...updated } : r)
+        : prev)
+      setSelectedPoi({ poi: updated })
+      setView('pois')   // proposal-review panel only renders inside the POI view
+      setEditOpen(false)
+      handleEnterProposalReview(updated)
+    } catch (e) {
+      window.alert(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [handleEnterProposalReview])
+
+  // S218 — Google Places version of the Lint shortcut.
+  const handleLintValidateGoogle = useCallback(async (poiId: string) => {
+    try {
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poiId)}/geocode-via-google`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try { const b = await res.json(); if (b?.error) msg = b.message ? `${b.error}: ${b.message}` : `${res.status} ${b.error}` } catch {}
+        window.alert(`Google validate failed: ${msg}`)
+        return
+      }
+      const body = await res.json() as { status: 'proposed' | 'no_match'; warnings?: string[] }
+      if (body.status === 'no_match') {
+        window.alert(`Google returned no match.${body.warnings?.length ? '\n' + body.warnings.join('\n') : ''}`)
+        return
+      }
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poiId)}`,
+        { credentials: 'same-origin' },
+      )
+      if (!fresh.ok) {
+        window.alert(`Google validate succeeded but failed to refetch POI ${poiId}.`)
+        return
+      }
+      const updated = (await fresh.json()) as PoiRow
+      setPois((prev) => prev
+        ? prev.map((r) => r.id === updated.id ? { ...r, ...updated } : r)
+        : prev)
+      setSelectedPoi({ poi: updated })
+      setView('pois')
+      setEditOpen(false)
+      handleEnterProposalReview(updated)
+    } catch (e) {
+      window.alert(`Google validate failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [handleEnterProposalReview])
+
   const handleLintOpenTour = useCallback((tourId: string) => {
     setView('tours')
     // Tour selection wiring is owned by TourTree; operator picks the tour
@@ -670,6 +861,8 @@ export function AdminLayout() {
             onShowPoiOnMap={handleLintShowPoiOnMap}
             onOpenTour={handleLintOpenTour}
             onOpenGeocodes={handleLintOpenGeocodes}
+            onValidateTiger={handleLintValidate}
+            onValidateGoogle={handleLintValidateGoogle}
           />
         </div>
       ) : view === 'geocodes' ? (
@@ -777,7 +970,22 @@ export function AdminLayout() {
                 onGeocodePreviewCancel={handleGeocodePreviewCancel}
                 onGeocodePreviewValidateStored={handleGeocodePreviewValidateStored}
                 onGeocodePreviewEditAddress={handleGeocodePreviewEditAddress}
+                proposalReview={proposalReview}
+                onProposalDrag={handleProposalDrag}
               />
+              {proposalReview && (
+                <ProposalReviewPanel
+                  poi={proposalReview.poi}
+                  dragLat={proposalReview.dragLat}
+                  dragLng={proposalReview.dragLng}
+                  acceptBusy={proposalAcceptBusy}
+                  cancelBusy={proposalCancelBusy}
+                  errorMessage={proposalError}
+                  onAccept={handleProposalAccept}
+                  onCancel={handleProposalCancel}
+                  onRecenter={handleProposalRecenter}
+                />
+              )}
             </main>
           </div>
         </>
@@ -846,6 +1054,7 @@ export function AdminLayout() {
         onDeleted={handlePoiDeleted}
         onClose={handleEditClose}
         onShowDirections={handleShowDirections}
+        onEnterProposalReview={handleEnterProposalReview}
       />
     </div>
   )

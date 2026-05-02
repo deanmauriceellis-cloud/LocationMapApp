@@ -170,6 +170,12 @@ export interface PoiEditDialogProps {
    * fetches /api/salem/route from the map center and draws the polyline.
    */
   onShowDirections?: (poi: PoiRow) => void
+  /**
+   * S218 — after a successful Validate-via-TigerLine call, hand control over
+   * to AdminLayout's proposal-review mode (closes the editor, flies map to
+   * the proposal at z20, draggable pin, small Accept/Cancel panel).
+   */
+  onEnterProposalReview?: (updatedPoi: PoiRow) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -417,7 +423,7 @@ function LocationVerifyPanel({
           title={
             hasProposal
               ? 'Copy lat_proposed → lat, clear the proposal, mark accepted'
-              : 'Run the verifier first to produce a proposal'
+              : 'Click "Validate via TigerLine" at the top of this card to produce a proposal first'
           }
         >
           {acceptBusy ? 'Accepting…' : 'Accept proposed coordinates'}
@@ -459,6 +465,7 @@ export function PoiEditDialog({
   onDeleted,
   onClose,
   onShowDirections,
+  onEnterProposalReview,
 }: PoiEditDialogProps) {
   // ─── Form state ────────────────────────────────────────────────────────────
   // Only re-init when the POI *identity* changes (open-on-different-row).
@@ -727,6 +734,14 @@ export function PoiEditDialog({
   // action that copies lat_proposed→lat and clears the proposal columns.
   const [acceptBusy, setAcceptBusy] = useState(false)
   const [acceptError, setAcceptError] = useState<string | null>(null)
+  // S218 — Validate via TigerLine flow. POSTs to /validate-location-tiger
+  // which writes lat_proposed/lng_proposed; the existing acceptProposed
+  // button then commits if the operator likes the proposal.
+  const [validateBusy, setValidateBusy] = useState(false)
+  const [validateError, setValidateError] = useState<string | null>(null)
+  const [validateInfo, setValidateInfo] = useState<string | null>(null)
+  // S218 — Same flow as Validate via TigerLine but hits Google Places API.
+  const [googleBusy, setGoogleBusy] = useState(false)
 
   // ─── Oracle sub-dialog state (9P.10b) ──────────────────────────────────────
   // The "Generate with Salem Oracle" button on the Narration tab (and General
@@ -899,6 +914,8 @@ export function PoiEditDialog({
     setSaveError(null)
     setConfirmDelete(false)
     setDeleteError(null)
+    setValidateError(null)
+    setValidateInfo(null)
     onClose()
   }, [isDirty, onClose])
 
@@ -970,6 +987,129 @@ export function PoiEditDialog({
     }
   }, [poi, onSaved, reset])
 
+  // ─── S218: Validate via Google (Places API New) ───────────────────────────
+  // Same proposal-review flow as Tiger but writes location_source='google'.
+  const handleValidateGoogle = useCallback(async () => {
+    if (!poi) return
+    setGoogleBusy(true)
+    setValidateError(null)
+    try {
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}/geocode-via-google`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try {
+          const body = await res.json()
+          if (body?.error) msg = body.message ? `${body.error}: ${body.message}` : `${res.status} ${body.error}`
+        } catch { /* not JSON */ }
+        throw new Error(msg)
+      }
+      const body = await res.json() as {
+        status: 'proposed' | 'no_match'
+        warnings?: string[]
+      }
+      if (body.status === 'no_match') {
+        const lines: string[] = ['Google returned no usable match.']
+        if (body.warnings && body.warnings.length) {
+          for (const w of body.warnings) lines.push(`• ${w}`)
+        }
+        setValidateError(lines.join('\n'))
+        return
+      }
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
+        { credentials: 'same-origin' },
+      )
+      let updated: PoiRow | null = null
+      if (fresh.ok) {
+        updated = (await fresh.json()) as PoiRow
+        onSaved(updated)
+        reset(buildDefaults(updated))
+      }
+      if (onEnterProposalReview && updated) {
+        onEnterProposalReview(updated)
+      }
+    } catch (e) {
+      setValidateError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setGoogleBusy(false)
+    }
+  }, [poi, onSaved, reset, onEnterProposalReview])
+
+  // ─── S218: Validate via TigerLine ──────────────────────────────────────────
+  // Runs tiger.geocode() on the POI's stored address, snaps to nearest street
+  // edge, writes the result as a proposal. Operator confirms via the existing
+  // Accept proposed coordinates button after eyeballing the map preview.
+  const handleValidateTiger = useCallback(async () => {
+    if (!poi) return
+    setValidateBusy(true)
+    setValidateError(null)
+    setValidateInfo(null)
+    try {
+      const res = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}/validate-location-tiger`,
+        { method: 'POST', credentials: 'same-origin' },
+      )
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`
+        try {
+          const body = await res.json()
+          if (body?.error) msg = body.message ? `${body.error}: ${body.message}` : `${res.status} ${body.error}`
+        } catch { /* not JSON */ }
+        throw new Error(msg)
+      }
+      const body = await res.json() as {
+        status: 'proposed' | 'no_match'
+        proposal?: {
+          lat: number; lng: number; rating: number; drift_m: number | null
+          normalized_address: string
+          snapped_to_edge: { tlid: string; fullname: string; snap_distance_m: number } | null
+        }
+        warnings?: string[]
+      }
+      if (body.status === 'no_match') {
+        const lines: string[] = ['Tiger returned no usable match for this address.']
+        if (body.warnings && body.warnings.length) {
+          for (const w of body.warnings) lines.push(`• ${w}`)
+        }
+        // Use the rose top-of-card banner so the operator sees this without
+        // having to scroll. (validateInfo isn't rendered anywhere after the
+        // S218 header refactor; success now hands off to the review panel.)
+        setValidateError(lines.join('\n'))
+        return
+      }
+      // Success — refetch the POI row so the panel re-renders with the new
+      // proposed coords / drift / rating.
+      const fresh = await fetch(
+        `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
+        { credentials: 'same-origin' },
+      )
+      let updated: PoiRow | null = null
+      if (fresh.ok) {
+        updated = (await fresh.json()) as PoiRow
+        onSaved(updated)
+        reset(buildDefaults(updated))
+      }
+      const p = body.proposal!
+      const edge = p.snapped_to_edge
+        ? ` · snapped to ${p.snapped_to_edge.fullname} (${p.snapped_to_edge.snap_distance_m} m)`
+        : ' · no edge within 50 m to snap to'
+      setValidateInfo(`Proposed: ${p.lat.toFixed(7)}, ${p.lng.toFixed(7)} · rating ${p.rating} · drift ${p.drift_m ?? '—'} m${edge}`)
+      // S218 — hand control to AdminLayout's proposal-review mode: closes the
+      // dialog, flies the map to the proposal at z20, makes the pin draggable,
+      // shows the small floating Accept/Cancel panel.
+      if (onEnterProposalReview && updated) {
+        onEnterProposalReview(updated)
+      }
+    } catch (e) {
+      setValidateError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setValidateBusy(false)
+    }
+  }, [poi, onSaved, reset, onEnterProposalReview])
+
   // ─── Render guards ─────────────────────────────────────────────────────────
   if (!poi) return null
 
@@ -1019,8 +1159,8 @@ export function PoiEditDialog({
           >
             <DialogPanel className="w-[800px] max-w-[95vw] max-h-[90vh] flex flex-col bg-white rounded-lg shadow-xl text-slate-800">
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                <div className="min-w-0">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200">
+                <div className="min-w-0 flex-1">
                   <DialogTitle className="text-base font-semibold truncate">
                     {poi.name || '(unnamed)'}
                   </DialogTitle>
@@ -1033,15 +1173,59 @@ export function PoiEditDialog({
                     )}
                   </p>
                 </div>
+                {/* S218 — top-of-card Validate buttons so the operator can run
+                    Tiger or Google geocoding on the open POI without scrolling
+                    to the Location tab. Both disabled if the POI has no address. */}
+                <button
+                  type="button"
+                  onClick={handleValidateTiger}
+                  disabled={validateBusy || googleBusy || !poi.address}
+                  className={[
+                    'shrink-0 px-3 py-1.5 text-xs font-medium rounded',
+                    validateBusy || googleBusy || !poi.address
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'bg-fuchsia-600 text-white hover:bg-fuchsia-700',
+                  ].join(' ')}
+                  title={
+                    poi.address
+                      ? 'Geocode this POI\'s address via TigerLine and snap to the nearest street edge. Closes the editor and switches to the map review panel.'
+                      : 'POI has no address to geocode'
+                  }
+                >
+                  {validateBusy ? 'Validating…' : 'Validate via TigerLine'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleValidateGoogle}
+                  disabled={googleBusy || validateBusy || !poi.address}
+                  className={[
+                    'shrink-0 px-3 py-1.5 text-xs font-medium rounded',
+                    googleBusy || validateBusy || !poi.address
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'bg-sky-600 text-white hover:bg-sky-700',
+                  ].join(' ')}
+                  title={
+                    poi.address
+                      ? 'Look up this POI in Google Places (storefront-level accuracy). Closes the editor and switches to the map review panel.'
+                      : 'POI has no address to geocode'
+                  }
+                >
+                  {googleBusy ? 'Asking Google…' : 'Validate via Google'}
+                </button>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+                  className="shrink-0 text-slate-400 hover:text-slate-700 text-xl leading-none"
                   aria-label="Close"
                 >
                   ×
                 </button>
               </div>
+              {validateError && (
+                <div className="mx-4 mt-2 p-2 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded whitespace-pre-line">
+                  <span className="font-semibold">Validate via TigerLine:</span>{'\n'}{validateError}
+                </div>
+              )}
 
               {poi.deleted_at && (
                 <div className="mx-4 mt-3 p-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded">

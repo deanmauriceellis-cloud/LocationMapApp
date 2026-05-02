@@ -83,6 +83,15 @@ export interface LintTabProps {
   onOpenTour: (tourId: string) => void
   /** Called when operator clicks "Geocodes" — opens the geocode-candidates modal. */
   onOpenGeocodes: (poiId: string) => void
+  /**
+   * S218 — Called when operator clicks "Validate" on a POI item. Skips the
+   * editor and jumps straight to proposal-review mode (Tiger geocode + snap
+   * + map flyto z20 + draggable pin + Accept/Cancel panel). Useful for
+   * burning through long lists like the addr_geocode_mismatch deep-scan.
+   */
+  onValidateTiger: (poiId: string) => void
+  /** S218 — Google Places API equivalent of onValidateTiger. */
+  onValidateGoogle: (poiId: string) => void
 }
 
 interface SuppressionRow {
@@ -105,7 +114,7 @@ function severityStyles(sev: LintCheck['severity']) {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes }: LintTabProps) {
+export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes, onValidateTiger, onValidateGoogle }: LintTabProps) {
   const [data, setData] = useState<LintResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -406,6 +415,8 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes 
             onShowPoiOnMap={onShowPoiOnMap}
             onOpenTour={onOpenTour}
             onOpenGeocodes={onOpenGeocodes}
+            onValidateTiger={onValidateTiger}
+            onValidateGoogle={onValidateGoogle}
             onSuppress={suppressItem}
             onUnsuppress={unsuppressItem}
             suppressions={suppressionsByCheck[selectedCheck.id] ?? []}
@@ -436,6 +447,8 @@ interface CheckDetailPaneProps {
   onShowPoiOnMap: (poiId: string, checkPoiIds: string[], checkLabel: string) => void
   onOpenTour: (tourId: string) => void
   onOpenGeocodes: (poiId: string) => void
+  onValidateTiger: (poiId: string) => void
+  onValidateGoogle: (poiId: string) => void
   onSuppress: (poiId: string, checkId: string) => void
   onUnsuppress: (poiId: string, checkId: string) => void
   suppressions: SuppressionRow[]
@@ -445,7 +458,7 @@ interface CheckDetailPaneProps {
 
 function CheckDetailPane({
   check, addrStatus, onRunAddrGeocode,
-  onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes,
+  onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes, onValidateTiger, onValidateGoogle,
   onSuppress, onUnsuppress, suppressions, showingSuppressed, onToggleSuppressed,
 }: CheckDetailPaneProps) {
   const sev = severityStyles(check.severity)
@@ -591,6 +604,22 @@ function CheckDetailPane({
                         className="px-2 py-1 text-[11px] rounded bg-slate-200 hover:bg-slate-300 text-slate-700 whitespace-nowrap"
                       >
                         Show on Map
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onValidateTiger(item.entity_id)}
+                        className="px-2 py-1 text-[11px] rounded bg-fuchsia-600 hover:bg-fuchsia-700 text-white whitespace-nowrap"
+                        title="Run TigerLine geocode + snap-to-edge, then jump to the map review panel (skips the editor)"
+                      >
+                        Validate (Tiger)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onValidateGoogle(item.entity_id)}
+                        className="px-2 py-1 text-[11px] rounded bg-sky-600 hover:bg-sky-700 text-white whitespace-nowrap"
+                        title="Look up this POI in Google Places, then jump to the map review panel"
+                      >
+                        Validate (Google)
                       </button>
                       <button
                         type="button"

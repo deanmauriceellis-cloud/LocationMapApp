@@ -24,6 +24,12 @@ const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-lint.js';
 
 const { Pool } = require('pg');
 const { validateNarration } = require('./historical-narration-validator');
+const {
+  tigerPool,
+  normalizeAddressForTiger,
+  haversineKm,
+  geocodeOneAddress,
+} = require('./tiger-geocode');
 
 const SALEM_CENTER_LAT = 42.5223;
 const SALEM_CENTER_LNG = -70.8950;
@@ -37,95 +43,8 @@ const ITEM_CAP = 500;
 const ADDR_GEOCODE_MISMATCH_M = 100;
 const ADDR_GEOCODE_MAX_ITEMS = 300;
 
-// ─── Tiger pool (peer auth, mirrors lib/salem-router.js) ────────────────────
-
-let _tigerPool = null;
-function tigerPool() {
-  if (_tigerPool) return _tigerPool;
-  const opts = process.env.TIGER_DATABASE_URL
-    ? { connectionString: process.env.TIGER_DATABASE_URL, max: 2 }
-    : { host: process.env.PGHOST || '/var/run/postgresql', database: 'tiger', max: 2 };
-  _tigerPool = new Pool({ ...opts, connectionTimeoutMillis: 5000 });
-  _tigerPool.on('error', (err) => console.error('[admin-lint] tiger pool error:', err.message));
-  return _tigerPool;
-}
-
-// ─── Address normalization for tiger.geocode ────────────────────────────────
-// Tiger's geocoder is picky: "10 Main St, Salem, MA 01970, USA" returns ZERO
-// candidates because of the trailing ", USA". Same address without "USA"
-// returns a perfect rating-0 match. Normalize before handing it off.
-function normalizeAddressForTiger(raw) {
-  if (!raw) return raw;
-  let s = String(raw).trim();
-  // Drop a trailing country tag.
-  s = s.replace(/,?\s*(USA|United States(?: of America)?|U\.S\.A\.?|U\.S\.)\s*$/i, '');
-  // Collapse whitespace + trailing comma.
-  s = s.replace(/\s*,\s*$/g, '').replace(/\s+/g, ' ').trim();
-  return s;
-}
-
-// ─── Haversine (km) ──────────────────────────────────────────────────────────
-
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const toRad = (d) => d * Math.PI / 180;
-  const R = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.asin(Math.sqrt(a));
-}
-
-// ─── Tiger geocoder helpers ─────────────────────────────────────────────────
-// Run tiger.geocode() on one address against an already-borrowed client
-// (caller manages SET statement_timeout). Tries the same variant ladder as
-// the original geocode-candidates path: as-is, abbreviated street types, and
-// w/o ZIP. Returns { candidates, warnings }.
-async function geocodeOneAddress(client, rawAddress, sourceLat, sourceLng, limit) {
-  const baseAddress = normalizeAddressForTiger(rawAddress);
-  const expanded = baseAddress
-    .replace(/\bStreet\b/gi, 'St')
-    .replace(/\bAvenue\b/gi, 'Ave')
-    .replace(/\bRoad\b/gi, 'Rd')
-    .replace(/\bDrive\b/gi, 'Dr')
-    .replace(/\bSquare\b/gi, 'Sq')
-    .replace(/\bCourt\b/gi, 'Ct')
-    .replace(/\bLane\b/gi, 'Ln')
-    .replace(/\bBoulevard\b/gi, 'Blvd');
-  const noZip = expanded.replace(/\b\d{5}(?:-\d{4})?\b/g, '').replace(/\s+,/g, ',').trim();
-  const variants = Array.from(new Set([baseAddress, expanded, noZip].filter(Boolean)));
-
-  let rows = [];
-  const warnings = [];
-  for (const v of variants) {
-    try {
-      const r = await client.query(
-        `SELECT rating,
-                ST_Y(geomout) AS glat,
-                ST_X(geomout) AS glng,
-                pprint_addy(addy) AS normalized_address
-         FROM tiger.geocode($1, $2)
-         ORDER BY rating ASC`,
-        [v, limit],
-      );
-      if (r.rows.length > 0) {
-        rows = r.rows;
-        if (r.rows.some(x => x.rating < 90)) break;
-      }
-    } catch (e) {
-      warnings.push(`Variant "${v}" timed out (>15s) — no street-level match in Tiger.`);
-    }
-  }
-  const candidates = rows.map(r => ({
-    rating: r.rating,
-    lat: r.glat,
-    lng: r.glng,
-    normalized_address: r.normalized_address,
-    distance_m: Math.round(haversineKm(sourceLat, sourceLng, r.glat, r.glng) * 1000),
-  }));
-  return { candidates, warnings };
-}
+// Tiger pool, address normalization, haversineKm, and geocodeOneAddress
+// extracted to ./tiger-geocode.js (S218) so admin-pois can share them.
 
 // Across the whole cluster (focal + dupes), pick the geocode candidate that
 // most strongly anchors the cluster: lowest Tiger rating wins (0 = exact

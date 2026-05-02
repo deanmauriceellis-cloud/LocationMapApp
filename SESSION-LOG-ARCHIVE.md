@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 207: 2026-04-30 — Civic narration trim (long_narration nulled on 62 civic POIs)
+
+Operator: "civic POIs have too much information, like the memorials and statues — is there a way to control their narrative?" Walked the runtime gate in `NarrationGeofenceManager.kt:466-505`; initial proposed fix (make commemoratives honor BRIEF/STANDARD/DEEP) invalidated by DB inventory — all 67 civic POIs have empty `historical_narration`, none match the commemorative regex, none are pre-1860. Real source of bloat was `long_narration` heard at DEEP (15+ civic rows >800 chars, top: Historic Salem Inc 1,134 / AOH 1,020 / Bishop Fenwick 1,006 / Salem Common 931 / Salem Sound Coastwatch 991). Operator picked: NULL `long_narration` for all civic. Snapshotted 62 rows to `docs/archive/civic-long-narration-snapshot-2026-04-30.csv` (reversible), ran the UPDATE, verified 0 civic with long_narration remaining + 66/67 still have short_narration. Full publish chain (Room v15) + assembleDebug + Lenovo HNY0CY0W uninstall+install. No code changes. Carry-forward: operator validation drive, selective re-author from snapshot if any civic feels too thin.
+
+Full session detail: `docs/session-logs/session-207-2026-04-30.md`. Commit: `49f30c5`.
+
+---
 
 ## Session 206: 2026-04-30 — Web admin verify + Lenovo deploy + drive forensic + 3 narration/visibility fixes
 
