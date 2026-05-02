@@ -1,7 +1,17 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 208: 2026-04-30 — V1 Code Retrospective (full opinionated audit + WickedMap addendum)
+
+Operator asked for a full V1-ship-lens code retrospective. Three Explore subagents in parallel (Android / web+cache-proxy+PG / build pipeline+content+tests+repo) produced findings; verified high-impact claims directly before writing. Wrote 712-line retrospective at `docs/retrospectives/V1-CODE-RETROSPECTIVE-2026-04-30.md`, opened in operator's GUI editor. After review, ran 9 dialog questions; operator decisions reordered the sprint plan. Headline: one real BLOCKER (DebugHttpServer ships in release, no `BuildConfig.DEBUG` guard, no `src/debug/` source set — confirmed at `SalemMainActivity.kt:615`); operator chose Option B (move to `src/debug/`). Spawned a focused WickedMap audit after operator corrected agent assumption that it was "parked R&D" — it's the LIVE V1 primary basemap. WickedMap addendum surfaced two HIGH items: TileArchive LruCache sized by count not bytes (256 × 256 KB = 64 MB OOM risk on low-RAM), PolygonLibrary parsed JSON resident forever with no `onTrimMemory` hook. Engine itself is well-architected (synchronization discipline, no allocations in onDraw, polygon clipping, deterministic seeding). osmdroid → WickedMapView is an in-progress migration ("trapped by hooks"), both ship in V1. Other V1 backlog: `!!` cleanup in walk-sim, geofence-math unit tests (highest test ROI, confirmed by operator as #1 real-world bug source), SharedPreferences-backed dedup mirror (S110 close), `.gitignore` cleanup (`.~lock.*`, `*.odt#`, `qcis/`, three big binary asset DBs — stop-the-bleeding only, no history rewrite), Socket.IO drop, partial index on `salem_pois(deleted_at)`. Demoted: publish-chain Gradle wrapper (operator: "minimal pain, muscle memory"), Activity refactor (operator: "manageable, split helps"). V2 onboarding bundle (1+ helper likely): BUILD.md + CI + pre-commit hook for Room schema bumps + publish-chain wrapper. No code changes, no schema, no publish chain runs this session — research + doc only.
+
+Final doc: 836 lines. Sprint-ready backlog in §13.
+
+Full session detail: `docs/session-logs/session-208-2026-04-30.md`. Commit: `1683ed9`.
+
+---
 
 ## Session 207: 2026-04-30 — Civic narration trim (long_narration nulled on 62 civic POIs)
 

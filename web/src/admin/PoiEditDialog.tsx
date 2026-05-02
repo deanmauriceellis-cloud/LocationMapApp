@@ -80,6 +80,7 @@ import {
   type OraclePrimarySource,
 } from './oracleClient'
 import { OracleVariantPicker } from './OracleVariantPicker'
+import SubtopicEditor from './SubtopicEditor'
 
 // ─── Oracle audit log (9P.10b) ────────────────────────────────────────────
 //
@@ -1944,6 +1945,24 @@ export function PoiEditDialog({
                             {...reg('historical_narration')}
                             className="w-full px-2 py-1 text-sm border border-slate-300 rounded font-serif"
                             placeholder="Strict pre-1860 narration. Powers Historical Tour mode. Modern context belongs in short/long narration."
+                          />
+                        </FieldRow>
+                      )}
+                      {has('narration_subtopics') && !isCommercialTier0 && (
+                        <FieldRow
+                          label="Subtopics"
+                          htmlFor="narration_subtopics_editor"
+                          hint="Story-shaped overflow cards. Rendered as scrollable chips on the POI detail sheet."
+                        >
+                          <SubtopicEditor
+                            value={(watch('narration_subtopics') as string) ?? ''}
+                            onChange={(next) =>
+                              setValue('narration_subtopics', next, {
+                                shouldDirty: true,
+                                shouldValidate: false,
+                                shouldTouch: true,
+                              })
+                            }
                           />
                         </FieldRow>
                       )}

@@ -207,6 +207,52 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="16dp" />
 
+            <!-- Subtopics — S219. Horizontal chip strip + vertical collapsible body
+                 cards. Hidden when poi.narration_subtopics is null/empty/malformed. -->
+            <TextView
+                android:id="@+id/labelSubtopics"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Explore subtopics"
+                android:textColor="@color/colorAccent"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:visibility="gone" />
+
+            <HorizontalScrollView
+                android:id="@+id/subtopicChipScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:scrollbars="none"
+                android:fadingEdge="horizontal"
+                android:fadingEdgeLength="24dp"
+                android:visibility="gone">
+                <LinearLayout
+                    android:id="@+id/subtopicChipRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <LinearLayout
+                android:id="@+id/subtopicBodyStack"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/subtopicDivider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33FFFFFF"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="14dp"
+                android:visibility="gone" />
+
             <!-- Short narration (poi.short_narration) -->
             <TextView
                 android:id="@+id/labelShort"

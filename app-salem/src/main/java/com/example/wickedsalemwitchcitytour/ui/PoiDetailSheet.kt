@@ -36,6 +36,7 @@ import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import dagger.hilt.android.AndroidEntryPoint
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -203,6 +204,7 @@ class PoiDetailSheet : DialogFragment() {
             bindHero(view)
             bindOverview(view)
             bindWebsiteButton(view)
+            bindSubtopics(view)
             val sections = bindNarrationSections(view)
             bindActions(view)
             // S200: historicalText is displayed visually + tap-to-speak. Auto-narration
@@ -489,6 +491,109 @@ class PoiDetailSheet : DialogFragment() {
 
     private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
+    // ── Subtopics (S219) ────────────────────────────────────────────────
+    //
+    // narration_subtopics is a JSONB array of {header, body, source_kind?,
+    // source_ref?} — companion content rendered as a horizontal chip strip
+    // and a vertical stack of collapsible body cards. HARD RULE
+    // (feedback_narration_storytelling_with_subtopics): every chip is
+    // visible, no "More" overflow, all bodies tappable.
+
+    private data class Subtopic(val header: String, val body: String)
+
+    private fun parseSubtopics(json: String?): List<Subtopic> {
+        if (json.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(json)
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val header = o.optString("header", "").trim()
+                val body = o.optString("body", "").trim()
+                if (header.isEmpty() || body.isEmpty()) null else Subtopic(header, body)
+            }
+        }.getOrElse {
+            DebugLogger.i(TAG, "subtopics parse failed for poi=${poi.id}: ${it.message}")
+            emptyList()
+        }
+    }
+
+    private fun bindSubtopics(view: View) {
+        val items = parseSubtopics(poi.narrationSubtopics)
+        val label = view.findViewById<TextView>(R.id.labelSubtopics)
+        val chipScroll = view.findViewById<View>(R.id.subtopicChipScroll)
+        val chipRow = view.findViewById<LinearLayout>(R.id.subtopicChipRow)
+        val bodyStack = view.findViewById<LinearLayout>(R.id.subtopicBodyStack)
+        val divider = view.findViewById<View>(R.id.subtopicDivider)
+
+        if (items.isEmpty()) {
+            label.visibility = View.GONE
+            chipScroll.visibility = View.GONE
+            bodyStack.visibility = View.GONE
+            divider.visibility = View.GONE
+            return
+        }
+
+        label.visibility = View.VISIBLE
+        chipScroll.visibility = View.VISIBLE
+        bodyStack.visibility = View.VISIBLE
+        divider.visibility = View.VISIBLE
+        chipRow.removeAllViews()
+        bodyStack.removeAllViews()
+
+        val inflater = LayoutInflater.from(view.context)
+        val chips = mutableListOf<TextView>()
+        val cards = mutableListOf<View>()
+
+        items.forEachIndexed { index, sub ->
+            val chip = inflater.inflate(R.layout.subtopic_chip, chipRow, false) as TextView
+            chip.text = sub.header
+            chipRow.addView(chip)
+            chips += chip
+
+            val card = inflater.inflate(R.layout.subtopic_body_card, bodyStack, false)
+            card.findViewById<TextView>(R.id.subtopicCardHeader).text = sub.header
+            card.findViewById<TextView>(R.id.subtopicCardBody).text = sub.body
+            bodyStack.addView(card)
+            cards += card
+        }
+
+        fun toggle(index: Int, expand: Boolean) {
+            chips[index].isSelected = expand
+            val card = cards[index]
+            val body = card.findViewById<TextView>(R.id.subtopicCardBody)
+            val chevron = card.findViewById<TextView>(R.id.subtopicCardChevron)
+            body.visibility = if (expand) View.VISIBLE else View.GONE
+            chevron.text = if (expand) "▴" else "▾"
+        }
+
+        items.forEachIndexed { index, sub ->
+            val chip = chips[index]
+            val card = cards[index]
+            val headerRow = card.findViewById<View>(R.id.subtopicCardHeaderRow)
+            val body = card.findViewById<TextView>(R.id.subtopicCardBody)
+
+            chip.setOnClickListener {
+                val nowExpanded = chip.isSelected.not()
+                toggle(index, nowExpanded)
+                if (nowExpanded) {
+                    DebugLogger.i(TAG, "tap-chip subtopic#$index id=${poi.id} header=${sub.header}")
+                    chipScroll.post {
+                        val left = chip.left - 32
+                        (chipScroll as? android.widget.HorizontalScrollView)?.smoothScrollTo(left.coerceAtLeast(0), 0)
+                    }
+                }
+            }
+            headerRow.setOnClickListener {
+                val nowExpanded = chip.isSelected.not()
+                toggle(index, nowExpanded)
+            }
+            body.setOnClickListener {
+                DebugLogger.i(TAG, "tap-to-speak subtopic#$index id=${poi.id} header=${sub.header}")
+                interruptAndSpeak(sub.body)
+            }
+        }
+    }
+
     /** Interrupt all current TTS (ambient + sheet) and speak this text immediately. */
     private fun interruptAndSpeak(text: String) {
         tourViewModel.stopNarration()
@@ -721,6 +826,7 @@ private fun salemPoiToJson(poi: SalemPoi): String = JSONObject().apply {
     putOpt("short_narration", poi.shortNarration)
     putOpt("long_narration", poi.longNarration)
     putOpt("historical_narration", poi.historicalNarration)
+    putOpt("narration_subtopics", poi.narrationSubtopics)
     putOpt("description", poi.description)
     putOpt("image_asset", poi.imageAsset)
     putOpt("phone", poi.phone)
@@ -746,6 +852,7 @@ private fun parseSalemPoi(s: String): SalemPoi? {
             shortNarration = o.optString("short_narration", "").takeIf { it.isNotEmpty() },
             longNarration = o.optString("long_narration", "").takeIf { it.isNotEmpty() },
             historicalNarration = o.optString("historical_narration", "").takeIf { it.isNotEmpty() },
+            narrationSubtopics = o.optString("narration_subtopics", "").takeIf { it.isNotEmpty() },
             description = o.optString("description", "").takeIf { it.isNotEmpty() },
             imageAsset = o.optString("image_asset", "").takeIf { it.isNotEmpty() },
             phone = o.optString("phone", "").takeIf { it.isNotEmpty() },

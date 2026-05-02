@@ -15,7 +15,9 @@ export const UPDATABLE_FIELDS = [
   // Taxonomy
   'category', 'subcategory',
   // Narration
-  'short_narration', 'long_narration',
+  'short_narration', 'long_narration', 'historical_narration',
+  // S219 — JSONB array {header, body, source_kind?, source_ref?} powering scrollable subtopic cards
+  'narration_subtopics',
   'geofence_radius_m', 'geofence_shape', 'corridor_points',
   'priority', 'wave',
   'voice_clip_asset', 'custom_voice_asset',
@@ -62,6 +64,7 @@ export const JSONB_FIELDS: ReadonlySet<string> = new Set([
   'secondary_categories', 'specialties', 'owners', 'amenities',
   'related_figure_ids', 'related_fact_ids', 'related_source_ids',
   'source_categories', 'tags',
+  'narration_subtopics',
 ])
 
 // Boolean columns (rendered as checkboxes).

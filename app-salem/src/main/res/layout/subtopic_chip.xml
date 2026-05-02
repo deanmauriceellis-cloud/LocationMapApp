@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S219 — Subtopic chip. Inflated programmatically per subtopic by
+  PoiDetailSheet.bindSubtopics(). Selected state flips the fill via
+  android:state_selected="true" in subtopic_chip_bg.xml.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="6dp"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:background="@drawable/subtopic_chip_bg"
+    android:textColor="@color/salemTextPrimary"
+    android:textSize="13sp"
+    android:textStyle="bold"
+    android:singleLine="true"
+    android:ellipsize="end"
+    android:maxWidth="240dp"
+    android:clickable="true"
+    android:focusable="true" />

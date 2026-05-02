@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S219 — Subtopic body card. Inflated per subtopic by
+  PoiDetailSheet.bindSubtopics(). Header is always visible; body collapses on
+  tap. Tapping the corresponding chip in the strip above also expands this.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginTop="6dp"
+    android:padding="12dp"
+    android:background="@drawable/subtopic_card_bg">
+
+    <LinearLayout
+        android:id="@+id/subtopicCardHeaderRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:id="@+id/subtopicCardHeader"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/colorAccent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/subtopicCardChevron"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="▾"
+            android:textColor="@color/colorAccent"
+            android:textSize="14sp"
+            android:paddingStart="8dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/subtopicCardBody"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/salemTextPrimary"
+        android:textSize="14sp"
+        android:lineSpacingMultiplier="1.35"
+        android:visibility="gone" />
+</LinearLayout>

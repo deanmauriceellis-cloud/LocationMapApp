@@ -66,6 +66,9 @@ const UPDATABLE_FIELDS = [
   'category', 'subcategory',
   // Narration
   'short_narration', 'long_narration', 'historical_narration',
+  // S219 — JSONB array of {header, body, source_kind?, source_ref?}; powers
+  // scrollable subtopic cards on the POI detail sheet (storytelling-with-subtopics rule)
+  'narration_subtopics',
   'geofence_radius_m', 'geofence_shape', 'corridor_points',
   'priority', 'wave',
   'voice_clip_asset', 'custom_voice_asset',
@@ -120,6 +123,7 @@ const JSONB_FIELDS = new Set([
   'secondary_categories', 'specialties', 'owners', 'amenities',
   'related_figure_ids', 'related_fact_ids', 'related_source_ids',
   'source_categories', 'tags',
+  'narration_subtopics',
 ]);
 
 // ─── Validation helpers ──────────────────────────────────────────────────────
