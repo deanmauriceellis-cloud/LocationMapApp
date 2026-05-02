@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 209-219 (S208 archived 2026-05-02 at S219 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 210-220 (S209 archived 2026-05-02 at S220 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 220: 2026-05-02 — Subtopic UI on narration banner + auto-gen pipeline (497 POIs)
+
+Finished the storytelling-with-subtopics surface coverage on the runtime side: extracted `SubtopicRenderer.kt` shared util and wired it into the ambient/tour-stop narration banner (`narration_bottom_sheet.xml` + `showNarrationSheet()`); newspaper headline mode explicitly hides the block. Built `cache-proxy/scripts/auto-gen-narration-subtopics.js` — a fenced auto-generator that synthesizes subtopic candidates from local sources only (provenance-pause-respecting): figure detection across the 49 NPC bios + adjacency to the nearest eligible POI ≤200 m. Eligibility fence baked from operator's mid-session refinement: only `category IN (HISTORICAL_LANDMARKS, HISTORICAL_BUILDINGS, CIVIC, WORSHIP)` OR `is_historical_property/is_civic_poi/is_witch_trial_site=true` (commercial categories excluded; `is_tour_poi` excluded due to data-quality pollution). Live run: 497 / 652 eligible POIs got cards (12 with figure detection + 485 adjacency-only). Operator visual sign-off on Lenovo HNY0CY0W: "works well — needs to be refined a lot more but very useful." Carry-forward: `is_tour_poi` Lint-tab cleanup needed (Young World Academy etc. spurious-flagged).
+
+Full session detail: `docs/session-logs/session-220-2026-05-02.md`. Commit: `<sha>`.
+
+---
 
 ## Session 219: 2026-05-02 — Storytelling-with-subtopics framework + Old Burying Point worked example
 
@@ -75,10 +83,4 @@ Wraps up the WickedMap memory-hardening pair started in S209 (W-H2 PolygonLibrar
 Full session detail: `docs/session-logs/session-210-2026-04-30.md`. Commit: `6656326`.
 
 ---
-
-## Session 209: 2026-04-30 — DebugHttpServer disabled + PolygonLibrary memory hook (W-H2)
-
-Two S208-retrospective sprint items shipped. (1) **DebugHttpServer hard-disabled.** Both `app-salem/.../util/DebugHttpServer.kt` (160 → 32 LOC) and `app/.../util/DebugHttpServer.kt` (159 → 30 LOC) gutted to no-op shells: `start()`/`stop()` are empty bodies, `ServerSocket(4303)` is gone from the codebase, V1 no-network rule (`feedback_v1_no_external_contact`) is now enforced at the source. `endpoints: DebugEndpoints?` retained as in-process holder so the two `cancelWalkAndJoin()` consumers (`SalemMainActivity.kt:1569`, `SalemMainActivityDirections.kt:383`) keep resolving — no caller changes needed (operator-chosen "gut socket, keep holder" scope). (2) **W-H2 PolygonLibrary memory hook.** Added `PolygonLibrary.unload()` (idempotent — frees the `byKind` index, resets `loaded` flag, logs entries freed) and an `onTrimMemory(level: Int)` override in `SalemMainActivity` that calls it at `TRIM_MEMORY_RUNNING_LOW` and above. Limitation explicitly documented in code comment: the active animation overlays (`AnimatedWaterOverlay`/`FireflyOverlay`/`RollingGrassOverlay`) each hold their own `polygons: List<WickedPolygon>` slice, so this frees only the duplicate index — full release of the `WickedPolygon` objects requires also dropping `wickedAnimationOverlay` on critical pressure, deferred to V1.1+. Threshold `>= TRIM_MEMORY_RUNNING_LOW` covers all higher-pressure constants (RUNNING_CRITICAL/MODERATE/COMPLETE/BACKGROUND) since they're numerically larger. `@Suppress("DEPRECATION")` on the override since `TRIM_MEMORY_*` constants are deprecated in API 35 but still dispatched on the target API 34. `./gradlew :app-salem:compileDebugKotlin :app:compileDebugKotlin` BUILD SUCCESSFUL — only pre-existing warnings remain (`setBuiltInZoomControls` osmdroid deprecation, one always-false condition at `SalemMainActivity.kt:1690`). No DB schema bump, no publish chain, no Room migration. S209 backlog still includes W-H1 (TileArchive LruCache byte-sizing), `!!` cleanup, geofence unit tests, dedup SharedPreferences mirror, `.gitignore` cleanup, partial index, Socket.IO drop — all carry-forward to S210+.
-
-Full session detail: `docs/session-logs/session-209-2026-04-30.md`. Commit: `328be23`.
 

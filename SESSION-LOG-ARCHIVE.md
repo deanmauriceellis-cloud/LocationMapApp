@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 209: 2026-04-30 — DebugHttpServer disabled + PolygonLibrary memory hook (W-H2)
+
+Two S208-retrospective sprint items shipped. (1) **DebugHttpServer hard-disabled.** Both `app-salem/.../util/DebugHttpServer.kt` (160 → 32 LOC) and `app/.../util/DebugHttpServer.kt` (159 → 30 LOC) gutted to no-op shells: `start()`/`stop()` are empty bodies, `ServerSocket(4303)` is gone from the codebase, V1 no-network rule (`feedback_v1_no_external_contact`) is now enforced at the source. `endpoints: DebugEndpoints?` retained as in-process holder so the two `cancelWalkAndJoin()` consumers (`SalemMainActivity.kt:1569`, `SalemMainActivityDirections.kt:383`) keep resolving — no caller changes needed (operator-chosen "gut socket, keep holder" scope). (2) **W-H2 PolygonLibrary memory hook.** Added `PolygonLibrary.unload()` (idempotent — frees the `byKind` index, resets `loaded` flag, logs entries freed) and an `onTrimMemory(level: Int)` override in `SalemMainActivity` that calls it at `TRIM_MEMORY_RUNNING_LOW` and above. Limitation explicitly documented in code comment: the active animation overlays (`AnimatedWaterOverlay`/`FireflyOverlay`/`RollingGrassOverlay`) each hold their own `polygons: List<WickedPolygon>` slice, so this frees only the duplicate index — full release of the `WickedPolygon` objects requires also dropping `wickedAnimationOverlay` on critical pressure, deferred to V1.1+. Threshold `>= TRIM_MEMORY_RUNNING_LOW` covers all higher-pressure constants (RUNNING_CRITICAL/MODERATE/COMPLETE/BACKGROUND) since they're numerically larger. `@Suppress("DEPRECATION")` on the override since `TRIM_MEMORY_*` constants are deprecated in API 35 but still dispatched on the target API 34. `./gradlew :app-salem:compileDebugKotlin :app:compileDebugKotlin` BUILD SUCCESSFUL — only pre-existing warnings remain (`setBuiltInZoomControls` osmdroid deprecation, one always-false condition at `SalemMainActivity.kt:1690`). No DB schema bump, no publish chain, no Room migration. S209 backlog still includes W-H1 (TileArchive LruCache byte-sizing), `!!` cleanup, geofence unit tests, dedup SharedPreferences mirror, `.gitignore` cleanup, partial index, Socket.IO drop — all carry-forward to S210+.
+
+Full session detail: `docs/session-logs/session-209-2026-04-30.md`. Commit: `328be23`.
+
+---
 
 ## Session 208: 2026-04-30 — V1 Code Retrospective (full opinionated audit + WickedMap addendum)
 

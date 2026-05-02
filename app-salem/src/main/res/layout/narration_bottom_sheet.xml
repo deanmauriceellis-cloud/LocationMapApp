@@ -110,6 +110,61 @@
 
     </ScrollView>
 
+    <!-- ── Subtopics block (S220) ───────────────────────────────────────
+         Same chip strip + collapsible body card pattern as the POI
+         Detail Sheet. Hidden when narration_subtopics is empty/missing,
+         and explicitly hidden by showNewspaperSheet() for headline mode. -->
+    <View
+        android:id="@+id/subtopicDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#33AB47BC"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/labelSubtopics"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="16dp"
+        android:text="Explore subtopics"
+        android:textColor="#AB47BC"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <HorizontalScrollView
+        android:id="@+id/subtopicChipScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:scrollbars="none"
+        android:fadingEdge="horizontal"
+        android:fadingEdgeLength="20dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/subtopicChipRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <LinearLayout
+        android:id="@+id/subtopicBodyStack"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:orientation="vertical"
+        android:visibility="gone" />
+
     <!-- Queue indicator -->
     <TextView
         android:id="@+id/queueIndicator"

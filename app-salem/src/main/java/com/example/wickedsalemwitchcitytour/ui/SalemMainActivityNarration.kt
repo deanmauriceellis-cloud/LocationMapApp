@@ -1346,6 +1346,15 @@ internal fun SalemMainActivity.showNewspaperSheet(
     // Image: hidden for newspaper
     sheet.findViewById<View>(R.id.narrationImage)?.visibility = View.GONE
 
+    // S220: subtopics are POI-only; never render on a newspaper headline.
+    hideSubtopics(
+        label = sheet.findViewById(R.id.labelSubtopics),
+        chipScroll = sheet.findViewById(R.id.subtopicChipScroll),
+        chipRow = sheet.findViewById(R.id.subtopicChipRow),
+        bodyStack = sheet.findViewById(R.id.subtopicBodyStack),
+        divider = sheet.findViewById(R.id.subtopicDivider),
+    )
+
     // Title: headline from the headline queue
     val headlineText = segment.text.let { fullText ->
         // Extract the headline — it's between the dateline period and the body start
@@ -1470,6 +1479,24 @@ internal fun SalemMainActivity.showNarrationSheet(point: SalemPoi) {
         ?: point.description
         ?: "Narration coming soon."
     sheet.findViewById<TextView>(R.id.narrationText)?.text = narrationText
+
+    // S220: Subtopic chip strip + collapsible body cards on the narration banner.
+    // Same pattern as PoiDetailSheet — tap chip toggles the card; tap body
+    // interrupts current TTS and speaks the subtopic.
+    renderSubtopics(
+        label = sheet.findViewById(R.id.labelSubtopics),
+        chipScroll = sheet.findViewById(R.id.subtopicChipScroll),
+        chipRow = sheet.findViewById(R.id.subtopicChipRow),
+        bodyStack = sheet.findViewById(R.id.subtopicBodyStack),
+        divider = sheet.findViewById(R.id.subtopicDivider),
+        items = parseSubtopics(point.narrationSubtopics, "NarrationBanner", point.id),
+        onSpeakBody = { sub ->
+            tourViewModel.stopNarration()
+            tourViewModel.speakNarration(sub.body, point.name)
+        },
+        logTag = "NarrationBanner",
+        logId = point.id,
+    )
 
     // Distance
     val loc = viewModel.currentLocation.value?.point
