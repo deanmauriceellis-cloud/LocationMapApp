@@ -8,7 +8,7 @@
 
 Baked the new HARD RULE end-to-end: warm narrations with overflow facts as scrollable subtopic cards. Added `salem_pois.narration_subtopics` JSONB, extended the publish chain, bumped Room v16→v17, built a structured `SubtopicEditor` in the admin (header/body cards with word-count + source_kind/source_ref + reorder), and rendered the full chip-strip + collapsible body cards on the POI Detail Sheet (all chips visible, no pagination, no "More" overflow). Authored 5 worked-example subtopics on Old Burying Point (Hathorne / Bradstreet / Richard More / Death's Heads & Willows / adjacent Witch Trials Memorial). Operator-confirmed visual on Lenovo HNY0CY0W after the parseSalemPoi/salemPoiToJson Bundle-serializer footgun was discovered + fixed.
 
-Full session detail: `docs/session-logs/session-219-2026-05-02.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-219-2026-05-02.md`. Commit: `84ab1e2`.
 
 ---
 
