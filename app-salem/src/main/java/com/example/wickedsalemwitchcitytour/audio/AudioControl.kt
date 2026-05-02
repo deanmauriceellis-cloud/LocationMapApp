@@ -54,6 +54,21 @@ object AudioControl {
     private val listeners = mutableListOf<ChangeListener>()
     private var prefs: SharedPreferences? = null
 
+    /**
+     * S217 — "Show All POIs" FAB override.
+     *
+     * Operator rule: when the FAB is on, ALL POIs narrate, regardless of:
+     *   - tour-mode gate (is_tour_poi / Layers checkboxes)
+     *   - audio-group toggles (Meaningful / Ambient / Businesses)
+     *   - historical-mode gate
+     *
+     * In-memory only: the FAB always starts OFF on cold launch. Pushed from
+     * [com.example.wickedsalemwitchcitytour.ui.SalemMainActivity.refreshHistoricalModeForActiveTour]
+     * whenever the FAB or tour state changes.
+     */
+    @Volatile
+    private var showAllOverride: Boolean = false
+
     fun init(context: Context) {
         if (prefs != null) return
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -124,10 +139,27 @@ object AudioControl {
         }
     }
 
-    fun isPoiSpeechEnabled(categoryRaw: String?): Boolean = when (groupForCategory(categoryRaw)) {
-        Group.MEANINGFUL -> isMeaningfulEnabled()
-        Group.AMBIENT    -> isAmbientEnabled()
-        Group.BUSINESSES -> isBusinessesEnabled()
+    fun isPoiSpeechEnabled(categoryRaw: String?): Boolean {
+        if (showAllOverride) return true
+        return when (groupForCategory(categoryRaw)) {
+            Group.MEANINGFUL -> isMeaningfulEnabled()
+            Group.AMBIENT    -> isAmbientEnabled()
+            Group.BUSINESSES -> isBusinessesEnabled()
+        }
+    }
+
+    /** S217 — true when the "Show All POIs" FAB is on (operator override). */
+    fun isShowAllOverride(): Boolean = showAllOverride
+
+    /** S217 — pushed from SalemMainActivity when the FAB or tour state changes. */
+    fun setShowAllOverride(on: Boolean) {
+        if (showAllOverride == on) return
+        showAllOverride = on
+        com.example.locationmapapp.util.DebugLogger.i(
+            "AudioControl",
+            "Show-All-POI override → $on (bypasses tour/layers/audio-group gates)"
+        )
+        notifyListeners()
     }
 
     fun isOracleSpeechEnabled(): Boolean = isOracleEnabled()

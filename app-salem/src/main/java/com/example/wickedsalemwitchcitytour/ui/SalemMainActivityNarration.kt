@@ -923,7 +923,8 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         val enabled = audio.isPoiSpeechEnabled(point.category)
         DebugLogger.d("NARR-GATE",
             "${point.name} category=${point.category} group=$group enabled=$enabled " +
-            "jumpToFront=$jumpToFront (M=${audio.isMeaningfulEnabled()} " +
+            "jumpToFront=$jumpToFront override=${audio.isShowAllOverride()} " +
+            "(M=${audio.isMeaningfulEnabled()} " +
             "A=${audio.isAmbientEnabled()} B=${audio.isBusinessesEnabled()})")
         if (!jumpToFront && !enabled) {
             DebugLogger.d("NARR-QUEUE",
@@ -939,8 +940,13 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
     // the user might still want to hear after switching to STANDARD / DEEP.
     // S154: stripped POIs bypass this gate — they speak name+address regardless
     // of whether any SI narration text is populated in the DB.
+    // S217: FAB show-all override also bypasses — non-stripped POIs with no
+    // narration text fall through to the "You are at <name>." orientation hint
+    // (the else branch at the bottom of this enqueue) so the user still hears
+    // every POI when the FAB is on.
     if (!PoiContentPolicy.shouldStripContent(point) &&
-        !narrationGeofenceManager.hasAnyNarrationText(point)) {
+        !narrationGeofenceManager.hasAnyNarrationText(point) &&
+        !com.example.wickedsalemwitchcitytour.audio.AudioControl.isShowAllOverride()) {
         DebugLogger.d("NARR-QUEUE", "SKIP (no narrative): ${point.name}")
         return
     }

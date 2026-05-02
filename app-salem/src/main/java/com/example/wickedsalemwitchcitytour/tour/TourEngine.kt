@@ -11,7 +11,6 @@ package com.example.wickedsalemwitchcitytour.tour
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.SalemContentRepository
@@ -121,24 +120,14 @@ class TourEngine @Inject constructor(
             persistProgress(activeTour)
             geofenceManager.loadStops(stops, pois)
 
-            // S186 — Tour Mode narration gate. Restricts narration to POIs flagged
-            // is_tour_poi=true, plus optional unsilencing via Layers checkboxes:
-            //   - PREF_POI_HIST_LANDMARK → HIST_BLDG/ENT/LODGE with year ≤ 1860
-            //   - PREF_POI_CIVIC         → POIs flagged is_civic_poi=true
-            // Replaces the S185 empty-stops auto-skip and the HERITAGE_TRAIL-only
-            // Historical Mode. Reads current Layers state at start; SalemMainActivity
-            // re-pushes setTourMode() if either checkbox is toggled mid-tour.
-            val menuPrefs = context.getSharedPreferences(MenuPrefs.PREFS_NAME, Context.MODE_PRIVATE)
-            val allowHist = menuPrefs.getBoolean(
-                MenuPrefs.histLandmarkPrefKey(true),
-                MenuPrefs.histLandmarkPrefDefault(true, menuPrefs)
-            )
-            val allowCivic = menuPrefs.getBoolean(
-                MenuPrefs.civicPrefKey(true),
-                MenuPrefs.civicPrefDefault(true, menuPrefs)
-            )
-            narrationGeofenceManager.setTourMode(true, allowHist, allowCivic)
-            DebugLogger.i(TAG, "Tour Mode ENABLED for '${tour.name}' — allowHist=$allowHist, allowCivic=$allowCivic")
+            // S217 — Tour Mode is owned by SalemMainActivity.refreshHistoricalModeForActiveTour,
+            // which observes tourState and the FAB. Calling setTourMode here used
+            // to race with the Activity's observer when the "Show All POIs" FAB
+            // was already on at tour-start: the observer would correctly disable
+            // tour-mode (FAB-on rule), then this line re-enabled it, leaving the
+            // user's FAB-on intent silently overridden. The Activity now reads
+            // its own Layers prefs and pushes setTourMode + the show-all
+            // override; we just emit the historical-narration-mode flag below.
 
             // S193 — Historical Narration Mode. When the tour is flagged
             // is_historical_tour=true, NarrationGeofenceManager returns
@@ -369,11 +358,13 @@ class TourEngine @Inject constructor(
             val dist = haversineM(point.latitude, point.longitude, poi.lat, poi.lng)
             if (dist <= AMBIENT_RADIUS_M) {
                 ambientHintedPois.add(poi.id)
-                // S154: stripped commercial POIs get the name+address line,
+                // S154: stripped commercial POIs get the category-aware line,
                 // never the SI-generated shortNarration.
+                // S217: line shape now matches PoiContentPolicy.strippedAnnouncement —
+                // "You are near [the ]Name, a <noun-phrase>." (no address).
                 val hint = if (PoiContentPolicy.shouldStripByCategory(poi.category)) {
-                    val addr = poi.address.takeIf { it.isNotBlank() }
-                    if (addr != null) "You are near ${poi.name}, at $addr." else "You are near ${poi.name}."
+                    com.example.wickedsalemwitchcitytour.content.BusinessLabel
+                        .strippedSentence(poi.name, poi.category, poi.subcategories)
                 } else {
                     poi.shortNarration ?: "You're near ${poi.name}."
                 }

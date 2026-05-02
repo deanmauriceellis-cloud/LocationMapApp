@@ -2165,6 +2165,13 @@ class SalemMainActivity : AppCompatActivity() {
             MenuPrefs.civicPrefDefault(false)
         )
         narrationGeofenceManager.setExploreLayerPrefs(exploreAllowHist, exploreAllowCivic)
+        // S217 — push the show-all-POI override BEFORE the tour-mode plumbing
+        // below, so any racing geofence evaluation sees the override flag in
+        // the same direction as the FAB. AudioControl is the single read-side
+        // authority that NarrationGeofenceManager.isHistoricalQualified +
+        // AudioControl.isPoiSpeechEnabled both consult.
+        com.example.wickedsalemwitchcitytour.audio.AudioControl
+            .setShowAllOverride(showAllPoisActive)
         if (activeTour != null && !showAllPoisActive) {
             val allowHist = menuPrefs.getBoolean(
                 MenuPrefs.histLandmarkPrefKey(true),

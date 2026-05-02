@@ -251,6 +251,9 @@ class NarrationGeofenceManager @Inject constructor(
      *      narrates by default (explore is permissive baseline).
      */
     private fun isHistoricalQualified(point: SalemPoi): Boolean {
+        // S217 — "Show All POIs" FAB override. When the operator turns the
+        // FAB on, ALL POIs narrate regardless of tour/layers/historical gates.
+        if (com.example.wickedsalemwitchcitytour.audio.AudioControl.isShowAllOverride()) return true
         if (point.isTourPoi) return true
         if (tourMode) return isTourEligible(point)
         if (historicalMode) {

@@ -53,10 +53,10 @@ object PoiContentPolicy {
     fun shouldStripByCategory(categoryRaw: String?): Boolean =
         shouldStripByCategoryAndTier(categoryRaw, 0)
 
-    /** Short TTS line used when a stripped POI enters its geofence. */
-    fun strippedAnnouncement(poi: SalemPoi): String {
-        val name = poi.name
-        val addr = poi.address?.takeIf { it.isNotBlank() }
-        return if (addr != null) "You are near $name, at $addr." else "You are near $name."
-    }
+    /**
+     * Short TTS line used when a stripped POI enters its geofence.
+     * S217 — category-aware sentence: "You are near [the ]Name, a <noun-phrase>."
+     */
+    fun strippedAnnouncement(poi: SalemPoi): String =
+        BusinessLabel.strippedSentence(poi.name, poi.category, poi.subcategory)
 }
