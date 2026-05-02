@@ -221,6 +221,12 @@ interface AdminMapProps {
   /** Optional label shown in the floating filter banner. */
   lintIdFilterLabel?: string | null
   onClearLintIdFilter?: () => void
+  /** S221 — search-driven id filter. Mirrors the PoiTree search box: when
+   *  the operator types in the tree's search, the map narrows to the matching
+   *  set so what they see in the tree is what they see on the map. */
+  searchIdFilter?: Set<string> | null
+  /** Label for the floating filter banner (raw search term). */
+  searchIdFilterLabel?: string | null
   /** Tour-mode props (S174). When activeTour is set, the tour-stop layer
    *  renders numbered draggable waypoints over the basemap. */
   activeTour?: TourSummary | null
@@ -2063,6 +2069,8 @@ export function AdminMap({
   lintIdFilter,
   lintIdFilterLabel,
   onClearLintIdFilter,
+  searchIdFilter,
+  searchIdFilterLabel,
   activeTour,
   tourModeFilter,
   tourStops,
@@ -2122,6 +2130,10 @@ export function AdminMap({
     if (lintIdFilter && lintIdFilter.size > 0) {
       out = out.filter((p) => lintIdFilter.has(p.id))
     }
+    // S221 — search-driven filter mirrors the PoiTree search box.
+    if (searchIdFilter) {
+      out = out.filter((p) => searchIdFilter.has(p.id))
+    }
     // S214 — Tour-mode preview. When a tour is active and at least one
     // tour-mode class is enabled, narrow markers to the union of those
     // classes. Mirrors the device's S186 narration gate so the operator
@@ -2152,7 +2164,7 @@ export function AdminMap({
       out = out.filter(p => keep.has(p.id))
     }
     return out
-  }, [pois, categoryFilter, lintIdFilter, activeTour, tourModeFilter, geocodePreview, focusMap, showAllCandidates])
+  }, [pois, categoryFilter, lintIdFilter, searchIdFilter, activeTour, tourModeFilter, geocodePreview, focusMap, showAllCandidates])
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -2545,6 +2557,15 @@ export function AdminMap({
           >
             clear
           </button>
+        </div>
+      )}
+      {searchIdFilter && (
+        <div className="absolute top-2 right-2 z-[500]
+                        bg-sky-700 text-white text-xs px-3 py-1 rounded-full shadow">
+          Search: <strong>“{searchIdFilterLabel}”</strong>
+          <span className="ml-1 text-white/80 tabular-nums">
+            ({searchIdFilter.size.toLocaleString()})
+          </span>
         </div>
       )}
       {pending && (

@@ -16,10 +16,18 @@ import org.json.JSONArray
 
 /**
  * Subtopic — one storytelling card inside the narration_subtopics JSONB column.
- * Schema is `[{header, body, source_kind?, source_ref?}]`; only header + body
- * are rendered today.
+ * Schema is `[{header, body, source_kind?, source_ref?}]`. `source_kind` and
+ * `source_ref` (S221) carry provenance for auto-gen cards: e.g. an
+ * adjacency card has `source_kind="adjacent_poi"` and `source_ref` set to the
+ * linked POI's id, which surfaces as a tappable "Open <linked POI>" button on
+ * the card body.
  */
-data class Subtopic(val header: String, val body: String)
+data class Subtopic(
+    val header: String,
+    val body: String,
+    val sourceKind: String? = null,
+    val sourceRef: String? = null,
+)
 
 /**
  * Tolerant parser. Bad JSON or missing fields → empty list, never throws.
@@ -32,7 +40,10 @@ fun parseSubtopics(json: String?, logTag: String = "SubtopicRenderer", logId: St
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
             val header = o.optString("header", "").trim()
             val body = o.optString("body", "").trim()
-            if (header.isEmpty() || body.isEmpty()) null else Subtopic(header, body)
+            if (header.isEmpty() || body.isEmpty()) return@mapNotNull null
+            val sourceKind = o.optString("source_kind", "").trim().takeIf { it.isNotEmpty() }
+            val sourceRef = o.optString("source_ref", "").trim().takeIf { it.isNotEmpty() }
+            Subtopic(header, body, sourceKind, sourceRef)
         }
     }.getOrElse {
         DebugLogger.i(logTag, "subtopics parse failed id=$logId: ${it.message}")
@@ -62,6 +73,8 @@ fun renderSubtopics(
     divider: View?,
     items: List<Subtopic>,
     onSpeakBody: (Subtopic) -> Unit,
+    onOpenLinkedPoi: ((poiId: String) -> Unit)? = null,
+    resolveLinkedPoiName: ((poiId: String) -> String?)? = null,
     logTag: String = "SubtopicRenderer",
     logId: String = "",
 ) {
@@ -107,8 +120,13 @@ fun renderSubtopics(
         val card = cards[index]
         val body = card.findViewById<TextView>(R.id.subtopicCardBody)
         val chevron = card.findViewById<TextView>(R.id.subtopicCardChevron)
+        val openLink = card.findViewById<TextView>(R.id.subtopicCardOpenLink)
         body.visibility = if (expand) View.VISIBLE else View.GONE
         chevron.text = if (expand) "▴" else "▾"
+        // The Open-linked-POI link is conceptually part of the expanded card;
+        // hide it when collapsed and only show it when the card is expanded
+        // AND it's a wired adjacent_poi card (text != "").
+        openLink.visibility = if (expand && openLink.text.isNotBlank()) View.VISIBLE else View.GONE
     }
 
     items.forEachIndexed { index, sub ->
@@ -116,6 +134,31 @@ fun renderSubtopics(
         val card = cards[index]
         val headerRow = card.findViewById<View>(R.id.subtopicCardHeaderRow)
         val body = card.findViewById<TextView>(R.id.subtopicCardBody)
+        val openLink = card.findViewById<TextView>(R.id.subtopicCardOpenLink)
+
+        // S221 — adjacent_poi cards get a tappable "Open <linked POI>" link
+        // under the body. Only rendered when caller supplied an
+        // onOpenLinkedPoi handler AND the card carries source_kind +
+        // source_ref + the linked POI is resolvable.
+        val openHandler = onOpenLinkedPoi
+        val linkedPoiId = sub.sourceRef?.takeIf {
+            sub.sourceKind == "adjacent_poi" && openHandler != null
+        }
+        if (linkedPoiId != null && openHandler != null) {
+            val resolvedName = resolveLinkedPoiName?.invoke(linkedPoiId)
+            val linkLabel = if (!resolvedName.isNullOrBlank()) "▸ Open $resolvedName" else "▸ Open linked property"
+            openLink.text = linkLabel
+            openLink.setOnClickListener {
+                DebugLogger.i(logTag, "tap-open-linked subtopic#$index id=$logId target=$linkedPoiId")
+                openHandler.invoke(linkedPoiId)
+            }
+        } else {
+            openLink.text = ""
+            openLink.setOnClickListener(null)
+        }
+        // Visibility is governed by toggle() — link only appears when the
+        // card is expanded AND has a non-blank label.
+        openLink.visibility = View.GONE
 
         chip.setOnClickListener {
             val nowExpanded = chip.isSelected.not()

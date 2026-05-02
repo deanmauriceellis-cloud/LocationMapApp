@@ -201,6 +201,51 @@ class TourViewModel @Inject constructor(
 
     fun dismissCompletion() = tourEngine.dismissCompletion()
 
+    // ── Detour (S221) ─────────────────────────────────────────────────────
+
+    /**
+     * Where to route the user when they tap "Return to tour" from the
+     * detour banner.
+     */
+    enum class ReturnTarget { NEAREST_POINT, LAST_STOP }
+
+    /**
+     * Begin a detour to the POI identified by [poiId] / [poiName]. The
+     * underlying tour is paused and the narration gate is relaxed so anything
+     * eligible speaks while the user walks. The Activity observer paints the
+     * floating banner + the orange out-route polyline once it sees
+     * [TourState.Detour].
+     */
+    fun startDetour(poiId: String, poiName: String) {
+        tourEngine.startDetour(detourPoiId = poiId, detourPoiName = poiName)
+    }
+
+    /**
+     * End a detour and resume the underlying tour. [target] picks where
+     * the rejoin polyline points to: the geographically nearest tour-path
+     * point or the last tour stop the user paused at.
+     *
+     * The actual route line is computed and rendered by SalemMainActivity
+     * via [WalkingDirections]; this method just flips engine state.
+     */
+    fun returnToTourFromDetour(@Suppress("UNUSED_PARAMETER") target: ReturnTarget) {
+        // [target] is consumed by the Activity-side polyline renderer; the
+        // engine itself doesn't care which direction the rejoin polyline
+        // points — it only cares that the user opted to rejoin (true).
+        tourEngine.endDetour(rejoin = true)
+    }
+
+    /**
+     * End the detour, but leave the tour persisted so a future session can
+     * resume it (the "continue later" path).
+     */
+    fun stopTourFromDetour() {
+        tourEngine.endDetour(rejoin = false)
+    }
+
+    /** True iff a detour is in progress. */
+    fun isDetourActive(): Boolean = tourEngine.isDetourActive()
+
     fun addStop(poiId: String) {
         viewModelScope.launch { tourEngine.addStop(poiId) }
     }
@@ -632,6 +677,11 @@ class TourViewModel @Inject constructor(
     /** Load all narrated POIs from the unified salem_pois table */
     suspend fun loadNarrationPoints(): List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi> {
         return repository.getNarratedPois()
+    }
+
+    /** Look up a single SalemPoi by id (S221 — used by detour overlay). */
+    suspend fun getSalemPoiById(id: String): com.example.wickedsalemwitchcitytour.content.model.SalemPoi? {
+        return repository.getPoiById(id)
     }
 
     /** Load narrated POIs within a bounding box (viewport-filtered) */

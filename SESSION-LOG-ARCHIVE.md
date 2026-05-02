@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 210: 2026-04-30 — TileArchive LruCache by bytes (W-H1)
+
+Wraps up the WickedMap memory-hardening pair started in S209 (W-H2 PolygonLibrary unload). Single-file change at `app-salem/.../wickedmap/TileArchive.kt:25-31` — switched the bitmap cache from a 256-entry count cap (`LruCache<Long, Bitmap>(256)` with `sizeOf = 1`, worst-case ~64 MB at 256×256 ARGB tiles) to a byte-budget cap sized at `Runtime.getRuntime().maxMemory() / 8` with `sizeOf` returning each bitmap's `allocationByteCount`. Defensive `Long`-math `(maxMemory / 8L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()` guards against the future case where `Runtime.maxMemory()` exceeds Int.MAX_VALUE. On a typical Android heap (~256 MB) the cache budget lands ~32 MB ≈ 128 ARGB-8888 tiles — comfortably above the ~50-tile single-viewport need plus prefetch ring, well under the prior 64 MB worst case, and shrinks proportionally with whatever heap the OS hands the process. `minSdk 26` makes `Bitmap.allocationByteCount` (API 19+) unconditionally safe — no API-level branch needed. `./gradlew :app-salem:compileDebugKotlin` BUILD SUCCESSFUL in 2s, no new warnings. No DB schema bump, no publish chain, no Room migration. WickedMap memory pair (W-H1 + W-H2) now complete; remaining S208 retrospective backlog: ChatRepository REST drop (S211 sibling), geofence-math unit tests (highest test-ROI), `!!` cleanup in walk-sim, dedup SharedPreferences mirror tidy, `.gitignore` cleanup, partial DB index, V1.1+ extend `onTrimMemory` at `TRIM_MEMORY_RUNNING_CRITICAL` to drop `wickedAnimationOverlay`.
+
+Full session detail: `docs/session-logs/session-210-2026-04-30.md`. Commit: `6656326`.
+
+---
 
 ## Session 209: 2026-04-30 — DebugHttpServer disabled + PolygonLibrary memory hook (W-H2)
 

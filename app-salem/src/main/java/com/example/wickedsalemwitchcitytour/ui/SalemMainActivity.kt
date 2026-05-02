@@ -168,6 +168,16 @@ class SalemMainActivity : AppCompatActivity() {
     internal var gpsTrackOverlay: Polyline? = null
 
     /**
+     * S221 — Detour route overlays. Painted while [TourState.Detour] is
+     * active and dropped on transition back to [TourState.Active] /
+     * [TourState.Paused]. The "out" polyline is the route from the user's
+     * current GPS to the detour POI; the "rejoin" polyline is rendered
+     * after the operator taps Return-to-tour and picks a target.
+     */
+    internal var detourOutPolyline: Polyline? = null
+    internal var detourRejoinPolyline: Polyline? = null
+
+    /**
      * S112+: User trigger ring debug overlay — three concentric outline circles
      * centered on the user's GPS position at 20m / 30m / 40m radii. No fill.
      * Updated on every GPS fix from observeViewModel(). Each ring matches one
@@ -782,6 +792,9 @@ class SalemMainActivity : AppCompatActivity() {
         initGpsTrackOverlay()
         setupGpsToggleButton()
         setupHeadingUpButton()
+        // S221 — wire the detour banner's tap once; visibility is driven by
+        // observeTourState reacting to TourState.Detour.
+        wireDetourBanner()
         // ── POI proximity tracker (S110): prune old encounters at startup ──
         poiEncounterTracker.pruneStaleAtStartup()
         observeViewModel()

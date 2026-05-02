@@ -59,6 +59,14 @@ class TourEngine @Inject constructor(
     private val KEY_DISTANCE_WALKED = "distance_walked"
     private val KEY_ELAPSED_BEFORE_PAUSE = "elapsed_before_pause"
     private val KEY_CUSTOM_STOP_ORDER = "custom_stop_order"
+    // S221 — detour persistence keys. Presence of KEY_DETOUR_POI_ID under an
+    // already-paused tour means we should restore as TourState.Detour rather
+    // than TourState.Paused, and the activity should re-render the floating
+    // detour banner on relaunch.
+    private val KEY_DETOUR_POI_ID = "detour_poi_id"
+    private val KEY_DETOUR_POI_NAME = "detour_poi_name"
+    private val KEY_DETOUR_PREV_HIST_LANDMARK = "detour_prev_hist_landmark_tour"
+    private val KEY_DETOUR_PREV_CIVIC = "detour_prev_civic_tour"
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -291,6 +299,109 @@ class TourEngine @Inject constructor(
         persistProgress(updated)
         DebugLogger.i(TAG, "Tour resumed: ${activeTour.tour.name}")
     }
+
+    // ── Detour Lifecycle (S221) ───────────────────────────────────────────
+
+    /**
+     * Start a detour from the active tour. Pauses the underlying tour
+     * (reusing [pauseTour]'s persistence), captures the current Layer-toggle
+     * gate flags so they can be re-applied on return, fully relaxes the
+     * narration gate (so other POIs encountered en-route to the detour
+     * target actually speak), and emits [TourState.Detour].
+     *
+     * No-op unless a tour is currently Active.
+     */
+    fun startDetour(detourPoiId: String, detourPoiName: String) {
+        val current = activeOrNull() ?: run {
+            DebugLogger.w(TAG, "startDetour called with no Active tour — ignored")
+            return
+        }
+        // Snapshot the current Layer-toggle pref state directly from the
+        // gate manager so we don't depend on an Activity-owned SharedPreferences.
+        val prevHistLandmark = narrationGeofenceManager.currentTourAllowHistLandmarks()
+        val prevCivic = narrationGeofenceManager.currentTourAllowCivic()
+
+        // Reuse pauseTour's persistence path — it writes the underlying
+        // active-tour keys (current stop, completed, elapsed, etc.) and
+        // emits TourState.Paused. We then overwrite with TourState.Detour.
+        pauseTour()
+        prefs.edit()
+            .putString(KEY_DETOUR_POI_ID, detourPoiId)
+            .putString(KEY_DETOUR_POI_NAME, detourPoiName)
+            .putBoolean(KEY_DETOUR_PREV_HIST_LANDMARK, prevHistLandmark)
+            .putBoolean(KEY_DETOUR_PREV_CIVIC, prevCivic)
+            .apply()
+
+        // Relax the gate fully — anything eligible narrates while detoured.
+        narrationGeofenceManager.setTourMode(active = false)
+
+        _tourState.value = TourState.Detour(
+            activeTour = current.copy(
+                progress = current.progress.copy(
+                    elapsedMs = System.currentTimeMillis() - current.progress.startTimeMs + current.progress.elapsedMs
+                ).also { it.totalStopCount = current.stops.size }
+            ),
+            detourPoiId = detourPoiId,
+            detourPoiName = detourPoiName,
+        )
+        DebugLogger.i(TAG, "Detour started → $detourPoiName ($detourPoiId)")
+    }
+
+    /**
+     * End the current detour.
+     *
+     * @param rejoin true → re-apply the saved Layer-toggle prefs and
+     *   resume the underlying tour ([TourState.Active]). The caller is
+     *   responsible for routing the user to either the nearest tour
+     *   polyline point or the last stop (see TourViewModel.ReturnTarget).
+     *   false → drop detour metadata but leave the tour in [TourState.Paused]
+     *   so the existing [restoreIfSaved] path will offer to resume it on
+     *   the next session ("continue later").
+     *
+     * No-op unless current state is [TourState.Detour].
+     */
+    fun endDetour(rejoin: Boolean) {
+        val state = _tourState.value
+        if (state !is TourState.Detour) {
+            DebugLogger.w(TAG, "endDetour called with state=$state — ignored")
+            return
+        }
+        val prevHistLandmark = prefs.getBoolean(KEY_DETOUR_PREV_HIST_LANDMARK, false)
+        val prevCivic = prefs.getBoolean(KEY_DETOUR_PREV_CIVIC, false)
+
+        prefs.edit()
+            .remove(KEY_DETOUR_POI_ID)
+            .remove(KEY_DETOUR_POI_NAME)
+            .remove(KEY_DETOUR_PREV_HIST_LANDMARK)
+            .remove(KEY_DETOUR_PREV_CIVIC)
+            .apply()
+
+        if (rejoin) {
+            // Re-apply the gate prefs that were live before the detour, then
+            // resume the underlying tour. The Active state is the trigger
+            // for the Activity to drop the detour banner + polylines.
+            narrationGeofenceManager.setTourMode(
+                active = true,
+                allowHistLandmarks = prevHistLandmark,
+                allowCivic = prevCivic,
+            )
+            // Stage the underlying tour as Paused so resumeTour's contract
+            // (state must be Paused) is satisfied, then resume.
+            _tourState.value = TourState.Paused(state.activeTour)
+            resumeTour()
+            DebugLogger.i(TAG, "Detour ended → REJOIN (allowHist=$prevHistLandmark, allowCivic=$prevCivic)")
+        } else {
+            // "Stop tour, continue later" — leave the underlying tour in
+            // Paused. Persisted progress already lives in the prefs from
+            // the original pauseTour() call, so restoreIfSaved() on next
+            // launch will offer to resume.
+            _tourState.value = TourState.Paused(state.activeTour)
+            DebugLogger.i(TAG, "Detour ended → tour PAUSED for next session")
+        }
+    }
+
+    /** True iff a detour is currently active. */
+    fun isDetourActive(): Boolean = _tourState.value is TourState.Detour
 
     /** End the tour and emit completion summary. */
     fun endTour() {
@@ -641,7 +752,20 @@ class TourEngine @Inject constructor(
 
             val activeTour = ActiveTour(tour, stops, pois, progress)
             geofenceManager.loadStops(stops, pois)
-            _tourState.value = TourState.Paused(activeTour)
+
+            // S221 — if a detour was in progress, restore as TourState.Detour
+            // so the floating banner re-renders. Otherwise, plain Paused.
+            val detourPoiId = prefs.getString(KEY_DETOUR_POI_ID, null)
+            val detourPoiName = prefs.getString(KEY_DETOUR_POI_NAME, null)
+            _tourState.value = if (detourPoiId != null && detourPoiName != null) {
+                // Gate stays relaxed across the relaunch — caller can re-apply
+                // by tapping Return-to-tour, which calls endDetour(rejoin=true).
+                narrationGeofenceManager.setTourMode(active = false)
+                DebugLogger.i(TAG, "Restored MID-DETOUR → $detourPoiName")
+                TourState.Detour(activeTour, detourPoiId, detourPoiName)
+            } else {
+                TourState.Paused(activeTour)
+            }
 
             DebugLogger.i(TAG, "Restored tour: ${tour.name} at stop ${progress.currentStopIndex}/${stops.size}")
             return true
@@ -703,6 +827,10 @@ class TourEngine @Inject constructor(
     private fun activeOrPausedOrNull(): ActiveTour? = when (val state = _tourState.value) {
         is TourState.Active -> state.activeTour
         is TourState.Paused -> state.activeTour
+        // S221 — Detour keeps the underlying tour query-able (polyline,
+        // current stop, etc.) so the activity can render the tour overlay
+        // and compute return-to-tour routes against it.
+        is TourState.Detour -> state.activeTour
         else -> null
     }
 

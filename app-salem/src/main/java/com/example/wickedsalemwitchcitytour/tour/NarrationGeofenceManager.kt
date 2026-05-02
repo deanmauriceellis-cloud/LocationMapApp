@@ -106,6 +106,12 @@ class NarrationGeofenceManager @Inject constructor(
 
     fun isTourMode(): Boolean = tourMode
 
+    /** S221 — exposed so TourEngine can snapshot the active Layer-toggle
+     *  flags at detour start and restore them on return-to-tour without
+     *  re-reading SharedPreferences (which the Activity owns). */
+    fun currentTourAllowHistLandmarks(): Boolean = tourAllowHistLandmarks
+    fun currentTourAllowCivic(): Boolean = tourAllowCivic
+
     /** S203 — exposed to unit tests so the gate-reset contract on
      *  setTourMode(active=false, ...) can be verified without reflection. */
     @androidx.annotation.VisibleForTesting

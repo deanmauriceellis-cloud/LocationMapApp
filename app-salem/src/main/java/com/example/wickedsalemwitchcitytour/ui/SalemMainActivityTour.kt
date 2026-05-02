@@ -816,6 +816,7 @@ internal fun SalemMainActivity.observeTourState() {
                 is TourState.Idle -> {
                     clearTourOverlays()
                     removeTourHud()
+                    clearDetourVisuals()
                 }
                 is TourState.Loading -> {
                     statusLineManager.set(StatusLineManager.Priority.TOUR, "Loading tour…")
@@ -830,6 +831,7 @@ internal fun SalemMainActivity.observeTourState() {
                         StatusLineManager.Priority.TOUR,
                         "Tour: $stopNum/$total — ${poi?.name ?: "Unknown"}"
                     )
+                    clearDetourVisuals()
                 }
                 is TourState.Paused -> {
                     val poi = state.activeTour.currentPoi
@@ -837,17 +839,32 @@ internal fun SalemMainActivity.observeTourState() {
                         StatusLineManager.Priority.TOUR,
                         "Tour paused — ${poi?.name ?: "Unknown"}"
                     )
+                    clearDetourVisuals()
+                }
+                is TourState.Detour -> {
+                    // S221 — keep the tour overlay + HUD up so the operator
+                    // can still see where the tour goes; layer the orange
+                    // detour route + persistent banner on top.
+                    drawTourRoute(state.activeTour)
+                    updateTourHud(state.activeTour)
+                    statusLineManager.set(
+                        StatusLineManager.Priority.TOUR,
+                        "Detour → ${state.detourPoiName}"
+                    )
+                    applyDetourState(state)
                 }
                 is TourState.Completed -> {
                     clearTourOverlays()
                     removeTourHud()
                     statusLineManager.clear(StatusLineManager.Priority.TOUR)
+                    clearDetourVisuals()
                     showTourCompletionDialog(state.summaryStats)
                 }
                 is TourState.Error -> {
                     clearTourOverlays()
                     removeTourHud()
                     statusLineManager.clear(StatusLineManager.Priority.TOUR)
+                    clearDetourVisuals()
                     Toast.makeText(this@observeTourState, state.message, Toast.LENGTH_LONG).show()
                 }
             }

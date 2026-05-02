@@ -508,13 +508,65 @@ function useElementSize(): [
 
 // ─── Search match ────────────────────────────────────────────────────────────
 
-function poiSearchMatch(node: NodeApi<TreeNode>, term: string): boolean {
-  const t = term.trim().toLowerCase()
-  if (!t) return true
-  if (node.data.type === 'poi') {
-    return node.data.label.toLowerCase().includes(t)
+/**
+ * Tokenize a free-text query into lowercase whitespace-separated tokens.
+ * Empty / whitespace-only input yields an empty array (= match everything).
+ */
+export function tokenizeSearch(term: string): string[] {
+  return term.trim().toLowerCase().split(/\s+/).filter(Boolean)
+}
+
+/**
+ * Fuzzy multi-field search predicate used by both the tree's row filter and
+ * the map's POI filter. A POI matches when EVERY token appears (substring) in
+ * the combined haystack assembled from name, id, address, all three narration
+ * fields, the human-readable category + subcategory labels, and the slug-form
+ * of category/subcategory IDs (so "bed" matches the "Bed & Breakfast"
+ * subcategory whose id is `LODGING__bed_and_breakfast`).
+ */
+export function poiMatchesQuery(
+  poi: PoiRow,
+  tokens: string[],
+  categories: CategoryRow[],
+  subcategories: SubcategoryRow[],
+): boolean {
+  if (tokens.length === 0) return true
+  const cat = categories.find((c) => c.id === poi.category)?.label ?? ''
+  const sub = subcategories.find((s) => s.id === poi.subcategory)?.label ?? ''
+  const slugSpace = (s: unknown): string =>
+    typeof s === 'string' ? s.replace(/_/g, ' ') : ''
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+  const haystack = [
+    poi.name,
+    poi.id,
+    str(poi.address),
+    str(poi.description),
+    str(poi.short_narration),
+    str(poi.long_narration),
+    str(poi.historical_narration),
+    cat,
+    sub,
+    slugSpace(poi.category),
+    slugSpace(poi.subcategory),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return tokens.every((t) => haystack.includes(t))
+}
+
+function makePoiSearchMatch(
+  categories: CategoryRow[],
+  subcategories: SubcategoryRow[],
+) {
+  return (node: NodeApi<TreeNode>, term: string): boolean => {
+    const tokens = tokenizeSearch(term)
+    if (tokens.length === 0) return true
+    if (node.data.type === 'poi' && node.data.poi) {
+      return poiMatchesQuery(node.data.poi, tokens, categories, subcategories)
+    }
+    return false
   }
-  return false
 }
 
 // ─── Node renderer ───────────────────────────────────────────────────────────
@@ -623,6 +675,11 @@ export interface PoiTreeProps {
    * "(no subcategory)" bucket for unassigned POIs.
    */
   subcategories?: SubcategoryRow[]
+  /**
+   * Fires whenever the operator edits the search box. AdminLayout mirrors
+   * this into the AdminMap filter so the map narrows to matching POIs.
+   */
+  onSearchChange?: (term: string) => void
 }
 
 export function PoiTree({
@@ -632,6 +689,7 @@ export function PoiTree({
   externalPois,
   categories,
   subcategories,
+  onSearchChange,
 }: PoiTreeProps) {
   const lastCategoryRef = useRef<string | null>(null)
   const [pois, setPois] = useState<PoiRow[] | null>(null)
@@ -688,6 +746,16 @@ export function PoiTree({
     () => makeCategoryLabelLookup(categories ?? []),
     [categories],
   )
+
+  const searchMatchFn = useMemo(
+    () => makePoiSearchMatch(categories ?? [], subcategories ?? []),
+    [categories, subcategories],
+  )
+
+  // Bubble the live search term up so AdminLayout can drive the map filter.
+  useEffect(() => {
+    onSearchChange?.(searchTerm)
+  }, [searchTerm, onSearchChange])
 
   const treeData = useMemo(() => {
     if (!effectivePois) return []
@@ -810,7 +878,7 @@ export function PoiTree({
               disableDrag={true}
               disableDrop={true}
               searchTerm={searchTerm}
-              searchMatch={poiSearchMatch}
+              searchMatch={searchMatchFn}
               onActivate={handleActivate}
             >
               {PoiNode}

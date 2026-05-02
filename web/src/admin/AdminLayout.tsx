@@ -10,7 +10,14 @@
 //   └──────────────────────┴──────────────────────────────────────────────┘
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PoiTree, type PoiRow, type PoiSelection, type CategorySelection } from './PoiTree'
+import {
+  PoiTree,
+  poiMatchesQuery,
+  tokenizeSearch,
+  type PoiRow,
+  type PoiSelection,
+  type CategorySelection,
+} from './PoiTree'
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog, type CategoryRow, type SubcategoryRow } from './PoiEditDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
@@ -42,6 +49,13 @@ export function AdminLayout() {
   const handleCategorySelect = useCallback((sel: CategorySelection) => {
     setMapCategoryFilter(sel.category)
   }, [])
+
+  // S221 — search-driven map filter. PoiTree mirrors its search box up here
+  // via onSearchChange; we tokenize the term, fuzzy-match POIs against name +
+  // id + address + narration text + category/subcategory labels, and pass
+  // the resulting id set to AdminMap so the map narrows in lockstep with
+  // the tree. Empty search → null filter (no narrowing).
+  const [poiSearchTerm, setPoiSearchTerm] = useState('')
 
   // Shared POI dataset — populated by PoiTree's onDataLoaded callback
   const [pois, setPois] = useState<PoiRow[] | null>(null)
@@ -737,6 +751,19 @@ export function AdminLayout() {
     [],
   )
 
+  // S221 — search id filter for the map. Recomputed whenever the search
+  // term, POI list, or taxonomy changes. Empty term → null (map shows
+  // everything that other filters allow).
+  const poiSearchIdFilter = useMemo<Set<string> | null>(() => {
+    const tokens = tokenizeSearch(poiSearchTerm)
+    if (tokens.length === 0 || !pois) return null
+    const ids = new Set<string>()
+    for (const p of pois) {
+      if (poiMatchesQuery(p, tokens, categories, subcategories)) ids.add(p.id)
+    }
+    return ids
+  }, [poiSearchTerm, pois, categories, subcategories])
+
   const handleLogout = useCallback(() => {
     try {
       const xhr = new XMLHttpRequest()
@@ -945,6 +972,7 @@ export function AdminLayout() {
                   externalPois={pois}
                   categories={categories}
                   subcategories={subcategories}
+                  onSearchChange={setPoiSearchTerm}
                 />
               </div>
             </aside>
@@ -962,6 +990,8 @@ export function AdminLayout() {
                 lintIdFilter={lintIdFilter}
                 lintIdFilterLabel={lintIdFilterLabel}
                 onClearLintIdFilter={clearLintIdFilter}
+                searchIdFilter={poiSearchIdFilter}
+                searchIdFilterLabel={poiSearchTerm.trim() || null}
                 directionsTarget={directionsTarget}
                 onClearDirections={handleClearDirections}
                 geocodePreview={geocodePreview}

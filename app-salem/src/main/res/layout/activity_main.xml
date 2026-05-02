@@ -256,6 +256,12 @@
     <!-- Proximity dock: nearby POI icons at bottom of screen (Phase 9T) -->
     <include layout="@layout/proximity_dock" />
 
+    <!-- S221 — Persistent detour banner. Pinned to the top of the map; only
+         visible while TourState.Detour is active. Tap opens manage-dialog.
+         Accessed via binding.root.findViewById since the included layout has
+         no <layout>/data-binding wrapper. -->
+    <include layout="@layout/detour_banner" />
+
     <!-- Narration bottom sheet: slides up on geofence trigger or dock tap (Phase 9T) -->
     <include layout="@layout/narration_bottom_sheet" />
 

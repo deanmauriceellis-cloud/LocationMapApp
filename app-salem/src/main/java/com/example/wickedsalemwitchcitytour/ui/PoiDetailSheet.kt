@@ -30,6 +30,8 @@ import android.widget.TextView
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.FeatureFlags
 import com.example.wickedsalemwitchcitytour.R
@@ -206,6 +208,7 @@ class PoiDetailSheet : DialogFragment() {
             bindSubtopics(view)
             val sections = bindNarrationSections(view)
             bindActions(view)
+            bindDetourButton(view)
             // S200: historicalText is displayed visually + tap-to-speak. Auto-narration
             // of historical_narration during sheet read is governed elsewhere by
             // isHistoricalNarrationActive() (preserves the strict pre-1860 gating rule).
@@ -503,17 +506,41 @@ class PoiDetailSheet : DialogFragment() {
 
     private fun bindSubtopics(view: View) {
         val items = parseSubtopics(poi.narrationSubtopics, TAG, poi.id)
-        renderSubtopics(
-            label = view.findViewById(R.id.labelSubtopics),
-            chipScroll = view.findViewById(R.id.subtopicChipScroll),
-            chipRow = view.findViewById(R.id.subtopicChipRow),
-            bodyStack = view.findViewById(R.id.subtopicBodyStack),
-            divider = view.findViewById(R.id.subtopicDivider),
-            items = items,
-            onSpeakBody = { sub -> interruptAndSpeak(sub.body) },
-            logTag = TAG,
-            logId = poi.id,
-        )
+        val labelView = view.findViewById<TextView>(R.id.labelSubtopics)
+        val chipScrollView = view.findViewById<View>(R.id.subtopicChipScroll)
+        val chipRowView = view.findViewById<LinearLayout>(R.id.subtopicChipRow)
+        val bodyStackView = view.findViewById<LinearLayout>(R.id.subtopicBodyStack)
+        val dividerView = view.findViewById<View>(R.id.subtopicDivider)
+        // S221 — async-fetch any adjacent_poi names so the inline
+        // "Open <name>" link shows the real label, then render.
+        viewLifecycleOwner.lifecycleScope.launch {
+            val nameCache = mutableMapOf<String, String>()
+            items
+                .filter { it.sourceKind == "adjacent_poi" && !it.sourceRef.isNullOrBlank() }
+                .map { it.sourceRef!! }
+                .distinct()
+                .forEach { id ->
+                    val n = tourViewModel.getSalemPoiById(id)?.name
+                    if (!n.isNullOrBlank()) nameCache[id] = n
+                }
+            renderSubtopics(
+                label = labelView,
+                chipScroll = chipScrollView,
+                chipRow = chipRowView,
+                bodyStack = bodyStackView,
+                divider = dividerView,
+                items = items,
+                onSpeakBody = { sub -> interruptAndSpeak(sub.body) },
+                onOpenLinkedPoi = { poiId ->
+                    val host = activity as? SalemMainActivity ?: return@renderSubtopics
+                    dismiss()
+                    host.openPoiDetailFromSubtopic(poiId)
+                },
+                resolveLinkedPoiName = { poiId -> nameCache[poiId] },
+                logTag = TAG,
+                logId = poi.id,
+            )
+        }
     }
 
     /** Interrupt all current TTS (ambient + sheet) and speak this text immediately. */
@@ -584,6 +611,49 @@ class PoiDetailSheet : DialogFragment() {
             }
             container.addView(btn)
         }
+    }
+
+    /**
+     * S221 — "Take a detour and walk there?" button. Inserted into the
+     * actions container beneath the regular action buttons. Only visible
+     * when a tour is currently Active AND this sheet's POI is not the
+     * current tour stop AND we're not already mid-detour.
+     */
+    private fun bindDetourButton(view: View) {
+        val container = view.findViewById<LinearLayout>(R.id.actionsContainer) ?: return
+        val state = tourViewModel.tourState.value
+        val activeTour = (state as? com.example.wickedsalemwitchcitytour.tour.TourState.Active)?.activeTour
+            ?: return
+        // Skip if this sheet is showing the current tour stop itself.
+        if (activeTour.currentPoi?.id == poi.id) return
+        // Already on a detour? Hide; one detour at a time.
+        if (tourViewModel.isDetourActive()) return
+
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        val btn = TextView(requireContext()).apply {
+            text = "Take a detour and walk there?"
+            textSize = 14f
+            setTextColor(Color.parseColor("#FFFFFF"))
+            gravity = Gravity.CENTER
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#FF8C00")) // matches detour out-route polyline
+                cornerRadius = dp(8).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                DebugLogger.i(TAG, "tap-detour id=${poi.id} name=${poi.name}")
+                tourViewModel.startDetour(poiId = poi.id, poiName = poi.name)
+                dismiss()
+            }
+        }
+        container.addView(btn)
     }
 
     private fun onActionClicked(action: PoiActionSynthesizer.Action) {

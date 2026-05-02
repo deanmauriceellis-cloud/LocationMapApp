@@ -1483,20 +1483,41 @@ internal fun SalemMainActivity.showNarrationSheet(point: SalemPoi) {
     // S220: Subtopic chip strip + collapsible body cards on the narration banner.
     // Same pattern as PoiDetailSheet — tap chip toggles the card; tap body
     // interrupts current TTS and speaks the subtopic.
-    renderSubtopics(
-        label = sheet.findViewById(R.id.labelSubtopics),
-        chipScroll = sheet.findViewById(R.id.subtopicChipScroll),
-        chipRow = sheet.findViewById(R.id.subtopicChipRow),
-        bodyStack = sheet.findViewById(R.id.subtopicBodyStack),
-        divider = sheet.findViewById(R.id.subtopicDivider),
-        items = parseSubtopics(point.narrationSubtopics, "NarrationBanner", point.id),
-        onSpeakBody = { sub ->
-            tourViewModel.stopNarration()
-            tourViewModel.speakNarration(sub.body, point.name)
-        },
-        logTag = "NarrationBanner",
-        logId = point.id,
-    )
+    // S221: parse first, async-fetch any adjacent_poi names so the inline
+    // "Open <name>" link can show the real label, then render.
+    val subtopicItems = parseSubtopics(point.narrationSubtopics, "NarrationBanner", point.id)
+    val labelView: TextView? = sheet.findViewById(R.id.labelSubtopics)
+    val chipScrollView: View? = sheet.findViewById(R.id.subtopicChipScroll)
+    val chipRowView: android.widget.LinearLayout? = sheet.findViewById(R.id.subtopicChipRow)
+    val bodyStackView: android.widget.LinearLayout? = sheet.findViewById(R.id.subtopicBodyStack)
+    val dividerView: View? = sheet.findViewById(R.id.subtopicDivider)
+    lifecycleScope.launch {
+        val nameCache = mutableMapOf<String, String>()
+        subtopicItems
+            .filter { it.sourceKind == "adjacent_poi" && !it.sourceRef.isNullOrBlank() }
+            .map { it.sourceRef!! }
+            .distinct()
+            .forEach { id ->
+                val n = tourViewModel.getSalemPoiById(id)?.name
+                if (!n.isNullOrBlank()) nameCache[id] = n
+            }
+        renderSubtopics(
+            label = labelView,
+            chipScroll = chipScrollView,
+            chipRow = chipRowView,
+            bodyStack = bodyStackView,
+            divider = dividerView,
+            items = subtopicItems,
+            onSpeakBody = { sub ->
+                tourViewModel.stopNarration()
+                tourViewModel.speakNarration(sub.body, point.name)
+            },
+            onOpenLinkedPoi = { poiId -> openPoiDetailFromSubtopic(poiId) },
+            resolveLinkedPoiName = { poiId -> nameCache[poiId] },
+            logTag = "NarrationBanner",
+            logId = point.id,
+        )
+    }
 
     // Distance
     val loc = viewModel.currentLocation.value?.point

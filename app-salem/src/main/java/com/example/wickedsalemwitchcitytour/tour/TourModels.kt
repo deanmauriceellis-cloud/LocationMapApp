@@ -99,6 +99,20 @@ sealed class TourState {
     /** Tour is paused (user-initiated). */
     data class Paused(val activeTour: ActiveTour) : TourState()
 
+    /**
+     * S221 — Tour is paused while the user takes a *detour* to another POI
+     * (typically opened from a subtopic adjacency card). The narration gate
+     * is fully relaxed during a detour so any nearby property speaks; the
+     * persistent floating banner offers Return-to-tour or Stop-tour-continue-later.
+     * Distinct from [Paused] (user-initiated) so the UI can pick the right
+     * surface — a detour shows the banner; a plain pause does not.
+     */
+    data class Detour(
+        val activeTour: ActiveTour,
+        val detourPoiId: String,
+        val detourPoiName: String,
+    ) : TourState()
+
     /** Tour has been completed. */
     data class Completed(val activeTour: ActiveTour, val summaryStats: TourSummary) : TourState()
 

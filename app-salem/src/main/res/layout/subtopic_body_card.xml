@@ -49,4 +49,20 @@
         android:textSize="14sp"
         android:lineSpacingMultiplier="1.35"
         android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/subtopicCardOpenLink"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="@color/colorAccent"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
 </LinearLayout>
