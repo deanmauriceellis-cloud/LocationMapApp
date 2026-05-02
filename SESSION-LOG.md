@@ -8,7 +8,7 @@
 
 Finished the storytelling-with-subtopics surface coverage on the runtime side: extracted `SubtopicRenderer.kt` shared util and wired it into the ambient/tour-stop narration banner (`narration_bottom_sheet.xml` + `showNarrationSheet()`); newspaper headline mode explicitly hides the block. Built `cache-proxy/scripts/auto-gen-narration-subtopics.js` — a fenced auto-generator that synthesizes subtopic candidates from local sources only (provenance-pause-respecting): figure detection across the 49 NPC bios + adjacency to the nearest eligible POI ≤200 m. Eligibility fence baked from operator's mid-session refinement: only `category IN (HISTORICAL_LANDMARKS, HISTORICAL_BUILDINGS, CIVIC, WORSHIP)` OR `is_historical_property/is_civic_poi/is_witch_trial_site=true` (commercial categories excluded; `is_tour_poi` excluded due to data-quality pollution). Live run: 497 / 652 eligible POIs got cards (12 with figure detection + 485 adjacency-only). Operator visual sign-off on Lenovo HNY0CY0W: "works well — needs to be refined a lot more but very useful." Carry-forward: `is_tour_poi` Lint-tab cleanup needed (Young World Academy etc. spurious-flagged).
 
-Full session detail: `docs/session-logs/session-220-2026-05-02.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-220-2026-05-02.md`. Commit: `9112992`.
 
 ---
 
