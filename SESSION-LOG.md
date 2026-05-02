@@ -8,7 +8,7 @@
 
 Two operator-driven UX changes. (1) New `BusinessLabel.kt` builds a curated `(category, subcategory) → singular noun-phrase` map (16 BUSINESSES-group categories + ~55 subcategories). `PoiContentPolicy.strippedAnnouncement` and `TourEngine.checkAmbientProximity` both emit `"You are near [the ]<name>, a <phrase>."` Subcategory absorbs category when redundant ("walking tour company", not "walking tour tour company"); `the` skipped for `The …` and possessive `'s` names; defensive leaf-humanization for any new enum added later. (2) Operator rule locked: when the "Show All POIs" FAB is on, ALL POIs narrate, period — bypasses tour gate, Layers checkboxes, Audio Control group toggles (Meaningful/Ambient/Businesses), and the no-narration-text early skip. New in-memory `AudioControl.showAllOverride` flag (resets to OFF every cold launch); `NarrationGeofenceManager.isHistoricalQualified` and `AudioControl.isPoiSpeechEnabled` both short-circuit to true when set; `SalemMainActivity.refreshHistoricalModeForActiveTour` pushes the flag on every FAB tap / tour-state transition / Layers-toggle / walk-sim start. Removed `TourEngine.startTour`'s direct `setTourMode(true,…)` call (and the `MenuPrefs` import) — that line was racing with the Activity observer and overriding the FAB-on intent at tour start, which is why operator's reproducer "toggle the FAB off then on" was a workaround. NARR-GATE diagnostic log now includes `override=` for field debugging. No Room schema impact (Kotlin-only). APK on Lenovo HNY0CY0W via auto-bake `assembleDebug` + `adb uninstall && install`.
 
-Full session detail: `docs/session-logs/session-217-2026-05-01.md`. Commit: `<TBD>`.
+Full session detail: `docs/session-logs/session-217-2026-05-01.md`. Commit: `0c259fa`.
 
 ---
 
