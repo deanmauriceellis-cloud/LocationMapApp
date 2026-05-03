@@ -8,7 +8,7 @@
 
 Two cheap chores cleared. (1) **dotenv autoload** for cache-proxy: `cache-proxy/server.js` now calls `require('dotenv').config()` at the top, with `dotenv@^16.6.1` added to `cache-proxy/package.json`. Plain `npm start` survives a reboot — no need for the spawning shell to `set -a; source .env; set +a` first. Verified: killed S222 PID 19753, restarted via plain `npm start`, new PID 501902 came up clean with PostgreSQL connected, smoke-tested `/db/pois/stats` (200, 3558 POIs) and `/db/pois/categories` (200 in 3.7 ms). (2) **Stale priority-block item retired** — verified at `cache-proxy/scripts/publish-tour-legs.js:50–70` that S193 already implemented the dynamic Room schema-JSON read via `readLatestRoomIdentity()`; CLAUDE.md item #6 ("de-hardcode Room identity_hash, currently stamps v10") was wrong. Removed bullet, renumbered engineering items 7-13 → 6-12, refreshed the S188-close cache-proxy state line to reflect the new dotenv autoload posture and current runtime deps over baseline (`sharp@0.34+` from S188, `dotenv@16+` from S223). Removed bullet archived to `docs/archive/CLAUDE.md_priority_item_6_removed_2026-05-03.md`. No Android build, no Room bump, no publish chain re-run. Services left running: cache-proxy PID 501902 (4300, S223 dotenv autoload live), web/Vite PID 19377 (4302).
 
-Full session detail: `docs/session-logs/session-223-2026-05-03.md`. Commit: `<pending>`.
+Full session detail: `docs/session-logs/session-223-2026-05-03.md`. Commit: `3ab7566`.
 
 ---
 
