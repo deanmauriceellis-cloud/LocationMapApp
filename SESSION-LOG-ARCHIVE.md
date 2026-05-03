@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close, S211 archived 2026-05-03 at S222 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 211: 2026-04-30 — Socket.IO drop (V1 no-network)
+
+Sibling of S209's DebugHttpServer disable. `io.socket:socket.io-client:2.1.0` removed from all three module gradle files (`core`, `app`, `app-salem`) and `ChatRepository.kt` (247 → 163 LOC) gutted of all Socket.IO surface — `import io.socket.client.IO`/`Socket`, the `socket: Socket?` field, the on/off/emit/connect/disconnect calls, the option-builder, and the `suspendCancellableCoroutine`-based connect-and-wait flow. Public method signatures preserved (`connect`/`disconnect`/`isConnected`/`joinRoom`/`leaveRoom`/`sendMessage`/`sendTyping`/`setOnMessageListener`/`setOnTypingListener`) so `SocialViewModel` callers in both `app` and `app-salem` still compile unchanged — bodies become no-op stubs that log nothing and return `false`/`Unit`. Runtime gate already existed at `SalemMainActivitySocial.kt:218-221` (`if (FeatureFlags.V1_OFFLINE_ONLY) { ... return }` in `showChatDialog`), so the V1 violation surface was the library being **linked into the APK**, not a live socket. REST methods (`fetchRooms`/`createRoom`/`fetchMessages` + `OkHttpClient` + hardcoded `BASE = "http://10.0.0.229:4300"`) **left in place** — operator scope was Socket.IO drop, not full ChatRepository nuking; the REST surface is gated by the same `showChatDialog` early-return so it never fires on V1, and dropping it is a cleaner stand-alone S212 task. Compile-clean across all three modules in 9s; `grep -rn "io\.socket\|socket\.io-client"` returns zero matches outside `docs/` and `build/`. Two V1 zero-network sources are now sealed (DebugHttpServer S209, Socket.IO S211); ChatRepository REST drop is the matching S212+ carry-forward.
+
+Full session detail: `docs/session-logs/session-211-2026-04-30.md`. Commit: `6656326`.
+
+---
 
 ## Session 210: 2026-04-30 — TileArchive LruCache by bytes (W-H1)
 

@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 211-221 (S210 archived 2026-05-02 at S221 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 213-222 (S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 222: 2026-05-02 → 2026-05-03 — Restart web-admin services post-reboot
+
+Short utility session. Read S221 + summarized for operator. Operator asked to bring the web-admin services back up after a host reboot: started Vite (web/ on 4302) cleanly; cache-proxy `npm start` crashed at `admin-lint.js:1026` because `cache-proxy/server.js` reads `process.env.DATABASE_URL` directly without `dotenv` — `npm start` doesn't source `cache-proxy/.env`, so PG was unconfigured and admin-lint's bootstrap `pgPool.query(...)` blew up on null. Worked around by sourcing the env into the spawning shell (`(set -a; source .env; set +a; node server.js …)`); cache-proxy then came up clean on 4300 with PostgreSQL connected, auto-import enabled, OpenSky OAuth2 configured. SalemIntelligence (8089) + Salem Oracle (8088) intentionally NOT started — both still paused per provenance-reformulation gate. Services left running across the session boundary at operator request. **Carry-forward:** add `dotenv` to cache-proxy and `require('dotenv').config()` at top of server.js (or wrap `npm start` in an env-sourcing shim) so reboot recovery is one command.
+
+Full session detail: `docs/session-logs/session-222-2026-05-02.md`. Commit: `<TBD-S222>`.
+
+---
 
 ## Session 221: 2026-05-02 — Tour detour feature + web admin fuzzy search + 2 GB stale-file recovery
 
@@ -73,14 +81,6 @@ Full session detail: `docs/session-logs/session-214-2026-05-01.md`. Commit: `f91
 Shipped a runtime text-normalization layer for the narration pipeline. New `NarrationManager.normalizeForTts()` (~125 LOC) strips Markdown emphasis (12 POIs had book-title italics like `*The Scarlet Letter*` being read as "asterisk") and expands the abbreviations the engine was mumbling — 88 `Capt.` → "Captain", 28 `Jr.` → "Junior", 26 `St.` (50-name saint allowlist disambiguates `St. Peter` → "Saint Peter" from `Hardy St.` → "Hardy Street"), 12 `Rev.`, 11 `Dr.`, 6 `Dea.`, 5 each `Bros./Col./Inc.`, plus state names, era markers, postnominals, and connectives — with class-specific period preservation: titles drop period before names (always followed by alpha word), states/streets/postnominals/companies keep period when sentence-terminal (lookahead `\s+[A-Z]|\s*$`), Jr./Sr. consult a sentence-starter allowlist (`He|She|It|This|After|...`) to disambiguate `Joseph Jr. House` (mid-sentence) from `Joseph Jr. He died` (sentence end), Mt./Ft. behave as title-style prefixes. 32-test JUnit suite (`NarrationManagerNormalizeTest.kt`) caught two real heuristic bugs in first run — Mt./Ft. were misclassified as trailing suffixes, B.C./A.D. were eating sentence-terminal periods — both fixed before close; final 32/32 PASS. Wired in `speak()` once before `chunkOnPunctuation` so the splitter sees normalized text. Debug APK installed on Lenovo HNY0CY0W via `adb uninstall && install` (not `-r` per memory). No DB / schema / publish-chain impact. Carry-forward S214: field listen-test on Lenovo to grow title/state/saint-name lists from any remaining mispronunciations; year-pronunciation pass if `1692` reading is bad; pronunciation-lexicon work on `Hathorne / Tituba / Bowdoin / Oyer and Terminer` is out of parsing scope and would need a phoneme-replacement table.
 
 Full session detail: `docs/session-logs/session-213-2026-05-01.md`. Commit: `866375b`.
-
----
-
-## Session 211: 2026-04-30 — Socket.IO drop (V1 no-network)
-
-Sibling of S209's DebugHttpServer disable. `io.socket:socket.io-client:2.1.0` removed from all three module gradle files (`core`, `app`, `app-salem`) and `ChatRepository.kt` (247 → 163 LOC) gutted of all Socket.IO surface — `import io.socket.client.IO`/`Socket`, the `socket: Socket?` field, the on/off/emit/connect/disconnect calls, the option-builder, and the `suspendCancellableCoroutine`-based connect-and-wait flow. Public method signatures preserved (`connect`/`disconnect`/`isConnected`/`joinRoom`/`leaveRoom`/`sendMessage`/`sendTyping`/`setOnMessageListener`/`setOnTypingListener`) so `SocialViewModel` callers in both `app` and `app-salem` still compile unchanged — bodies become no-op stubs that log nothing and return `false`/`Unit`. Runtime gate already existed at `SalemMainActivitySocial.kt:218-221` (`if (FeatureFlags.V1_OFFLINE_ONLY) { ... return }` in `showChatDialog`), so the V1 violation surface was the library being **linked into the APK**, not a live socket. REST methods (`fetchRooms`/`createRoom`/`fetchMessages` + `OkHttpClient` + hardcoded `BASE = "http://10.0.0.229:4300"`) **left in place** — operator scope was Socket.IO drop, not full ChatRepository nuking; the REST surface is gated by the same `showChatDialog` early-return so it never fires on V1, and dropping it is a cleaner stand-alone S212 task. Compile-clean across all three modules in 9s; `grep -rn "io\.socket\|socket\.io-client"` returns zero matches outside `docs/` and `build/`. Two V1 zero-network sources are now sealed (DebugHttpServer S209, Socket.IO S211); ChatRepository REST drop is the matching S212+ carry-forward.
-
-Full session detail: `docs/session-logs/session-211-2026-04-30.md`. Commit: `6656326`.
 
 ---
 
