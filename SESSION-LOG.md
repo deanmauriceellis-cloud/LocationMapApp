@@ -8,7 +8,7 @@
 
 Short utility session. Read S221 + summarized for operator. Operator asked to bring the web-admin services back up after a host reboot: started Vite (web/ on 4302) cleanly; cache-proxy `npm start` crashed at `admin-lint.js:1026` because `cache-proxy/server.js` reads `process.env.DATABASE_URL` directly without `dotenv` — `npm start` doesn't source `cache-proxy/.env`, so PG was unconfigured and admin-lint's bootstrap `pgPool.query(...)` blew up on null. Worked around by sourcing the env into the spawning shell (`(set -a; source .env; set +a; node server.js …)`); cache-proxy then came up clean on 4300 with PostgreSQL connected, auto-import enabled, OpenSky OAuth2 configured. SalemIntelligence (8089) + Salem Oracle (8088) intentionally NOT started — both still paused per provenance-reformulation gate. Services left running across the session boundary at operator request. **Carry-forward:** add `dotenv` to cache-proxy and `require('dotenv').config()` at top of server.js (or wrap `npm start` in an env-sourcing shim) so reboot recovery is one command.
 
-Full session detail: `docs/session-logs/session-222-2026-05-02.md`. Commit: `<TBD-S222>`.
+Full session detail: `docs/session-logs/session-222-2026-05-02.md`. Commit: `69d7c66`.
 
 ---
 
