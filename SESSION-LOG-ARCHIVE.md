@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close, S211 archived 2026-05-03 at S222 close (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close, S211 archived 2026-05-03 at S222 close, S213 archived 2026-05-03 at S223 close (note S212 was skipped by the operator) (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 213: 2026-05-01 — TTS pre-normalization (markdown strip + abbreviation expansion)
+
+Shipped a runtime text-normalization layer for the narration pipeline. New `NarrationManager.normalizeForTts()` (~125 LOC) strips Markdown emphasis (12 POIs had book-title italics like `*The Scarlet Letter*` being read as "asterisk") and expands the abbreviations the engine was mumbling — 88 `Capt.` → "Captain", 28 `Jr.` → "Junior", 26 `St.` (50-name saint allowlist disambiguates `St. Peter` → "Saint Peter" from `Hardy St.` → "Hardy Street"), 12 `Rev.`, 11 `Dr.`, 6 `Dea.`, 5 each `Bros./Col./Inc.`, plus state names, era markers, postnominals, and connectives — with class-specific period preservation: titles drop period before names (always followed by alpha word), states/streets/postnominals/companies keep period when sentence-terminal (lookahead `\s+[A-Z]|\s*$`), Jr./Sr. consult a sentence-starter allowlist (`He|She|It|This|After|...`) to disambiguate `Joseph Jr. House` (mid-sentence) from `Joseph Jr. He died` (sentence end), Mt./Ft. behave as title-style prefixes. 32-test JUnit suite (`NarrationManagerNormalizeTest.kt`) caught two real heuristic bugs in first run — Mt./Ft. were misclassified as trailing suffixes, B.C./A.D. were eating sentence-terminal periods — both fixed before close; final 32/32 PASS. Wired in `speak()` once before `chunkOnPunctuation` so the splitter sees normalized text. Debug APK installed on Lenovo HNY0CY0W via `adb uninstall && install` (not `-r` per memory). No DB / schema / publish-chain impact. Carry-forward S214: field listen-test on Lenovo to grow title/state/saint-name lists from any remaining mispronunciations; year-pronunciation pass if `1692` reading is bad; pronunciation-lexicon work on `Hathorne / Tituba / Bowdoin / Oyer and Terminer` is out of parsing scope and would need a phoneme-replacement table.
+
+Full session detail: `docs/session-logs/session-213-2026-05-01.md`. Commit: `866375b`.
+
+---
 
 ## Session 211: 2026-04-30 — Socket.IO drop (V1 no-network)
 

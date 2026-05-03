@@ -16,7 +16,7 @@
 - **Witchy is the only basemap; auto-overzoom is server-side.** Mapnik / Esri / OSM-online removed from the picker. `cache-proxy/lib/admin-tiles.js` now serves auto-resized Witchy tiles when (z,x,y) isn't baked: walks UP up to 8 ancestor levels (`sharp` crop+resize) or DOWN up to 2 child levels (stitch 2^dz × 2^dz). 500-entry LRU. `X-Tile-Source: exact | overzoom-up-N | overzoom-down-N` header on every response for devtools debugging. New runtime dep: `sharp@0.34+`. Operator rule baked: only Witchy bundle, no online fallback.
 - **Soft-deleted POIs are footnotes only.** Operator-confirmed S188 rule: dupe cluster query in geocode-candidates filters `deleted_at IS NULL`. They don't surface as decision targets and Tiger doesn't burn budget on them. Lint tab still shows the soft-deleted dedup losers in their own check (Cleanup → "Soft-deleted dedup losers, pre-AAB cleanup") because that's the whole point of that check.
 - **Modal can never hang.** Per-call Tiger `statement_timeout` dropped 15 s → 5 s. New 20 s wall-clock budget across the entire `/geocode-candidates` call; once exhausted, remaining dupes return with `geocode_warning: 'skipped — modal time budget exhausted'`. Worst-case 26 × 15 s = 6.5 min has become 20 s hard cap.
-- **Cache-proxy currently running on PID 68413** with all S188 changes live (re-launched mid-session). Vite dev server still on 4302. `npm install --save sharp` was added to `cache-proxy/package.json` — anyone re-cloning needs `npm install` in `cache-proxy/`.
+- **Cache-proxy autoloads `cache-proxy/.env` now** (S223). Plain `npm start` works after a reboot — no need to `set -a; source .env; set +a` in the spawning shell first. Added `dotenv` to `cache-proxy/package.json`; `require('dotenv').config()` at top of `server.js`. New runtime deps over the original baseline: `sharp@0.34+` (S188 — auto-overzoom) and `dotenv@16+` (S223). Anyone re-cloning needs `npm install` in `cache-proxy/`.
 
 ### State as of S187 close
 
@@ -52,21 +52,19 @@
 
 5. **Suppress lighthouse-style false positives as you encounter them.** Per-item Suppress button. Once suppressed they stop appearing; toggleable via the Suppressed (N) header button.
 
-6. **De-hardcode the Room identity_hash in `cache-proxy/scripts/publish-tour-legs.js`** (S186 carry-forward). Currently stamps `dad6c01b8e5f8fed0ae9ff6f8ef7432d` (v10). Read latest from `app-salem/schemas/<DB>/<v>.json` instead.
+6. **Onboarding-to-nearest-point on tour start** (S185 carry-forward, still owed). When user picks a tour and isn't on the polyline, route them to the nearest point on it before walk mode begins. Path: `TourViewModel.startTour()` → fetch `tour_legs` → flatten polyline → find nearest segment → `walkingDirections.getRoute(userLoc, nearestPoint)` → publish as active directions session.
 
-7. **Onboarding-to-nearest-point on tour start** (S185 carry-forward, still owed). When user picks a tour and isn't on the polyline, route them to the nearest point on it before walk mode begins. Path: `TourViewModel.startTour()` → fetch `tour_legs` → flatten polyline → find nearest segment → `walkingDirections.getRoute(userLoc, nearestPoint)` → publish as active directions session.
+7. **GPS-OBS heartbeat investigation** (S185 carry-forward). Lenovo TB305FU quirk: system GPS delivers fixes but app's tour observer reports them stale. Same family as broken-motion-sensor issue. Investigate why fresh fixes aren't reaching `lastFixAtMs`.
 
-8. **GPS-OBS heartbeat investigation** (S185 carry-forward). Lenovo TB305FU quirk: system GPS delivers fixes but app's tour observer reports them stale. Same family as broken-motion-sensor issue. Investigate why fresh fixes aren't reaching `lastFixAtMs`.
+8. **Tier 2 — admin → build pipeline auto-bake** (S180/S185 carry-forward, escalated). Wrap `publish-salem-pois.js` + `publish-tours.js` + `publish-tour-legs.js` + `align-asset-schema-to-room.js` as a `preBuild`-dependent Gradle task with stale-bake warning. Critical since the publish chain has 4 scripts now and getting any out of order leaves a destructive-migration footgun.
 
-9. **Tier 2 — admin → build pipeline auto-bake** (S180/S185 carry-forward, escalated). Wrap `publish-salem-pois.js` + `publish-tours.js` + `publish-tour-legs.js` + `align-asset-schema-to-room.js` as a `preBuild`-dependent Gradle task with stale-bake warning. Critical since the publish chain has 4 scripts now and getting any out of order leaves a destructive-migration footgun.
+9. **Re-author the 5 deleted Kotlin tours in PG** (S185 carry-forward). Polyline-only tours via web admin. Each: insert `salem_tours` row, drop free waypoints, click Compute Route, eyeball-verify, re-run publish chain.
 
-10. **Re-author the 5 deleted Kotlin tours in PG** (S185 carry-forward). Polyline-only tours via web admin. Each: insert `salem_tours` row, drop free waypoints, click Compute Route, eyeball-verify, re-run publish chain.
+10. **Continue eyes-on smoke test on Lenovo** (S180/S181/S182 carry-forward): POI detail Visit Website ACTION_VIEW handoff; Find dialog Reviews/Comments hidden; Find Directions on-device router; toolbar gating; webcam dialog "View Live" hidden.
 
-11. **Continue eyes-on smoke test on Lenovo** (S180/S181/S182 carry-forward): POI detail Visit Website ACTION_VIEW handoff; Find dialog Reviews/Comments hidden; Find Directions on-device router; toolbar gating; webcam dialog "View Live" hidden.
+11. **Outlier POI coordinate fixes** (now surfaced by lint `geo_outlier`, 75 flagged). `salem_common_2` 600m off; `salem_willows` mid-parking-lot; rest discoverable via the lint tab. Use the Geocodes modal to validate-or-override.
 
-12. **Outlier POI coordinate fixes** (now surfaced by lint `geo_outlier`, 75 flagged). `salem_common_2` 600m off; `salem_willows` mid-parking-lot; rest discoverable via the lint tab. Use the Geocodes modal to validate-or-override.
-
-13. **Deferred from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; admin vertex hand-editing for `salem_tour_legs`.
+12. **Deferred from S179** (lower priority): Option 2 runtime mid-edge projection in `:routing-jvm` Router; walk-sim + DebugEndpoints `TourRouteLoader` cleanup → full retirement of S178 P6 dead data; water animation visual tuning; admin vertex hand-editing for `salem_tour_legs`.
 
 **Operator-side (Claude cannot do these for you):**
 

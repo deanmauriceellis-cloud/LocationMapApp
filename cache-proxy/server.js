@@ -8,6 +8,11 @@
  */
 const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module server.js';
 
+// S223: load cache-proxy/.env so `npm start` works after a reboot without the
+// spawning shell having to `set -a; source .env; set +a` first. Prior to this,
+// admin-lint.js crashed on first DB query because DATABASE_URL was unset.
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+
 const express = require('express');
 const { Pool } = require('pg');
 const http = require('http');
