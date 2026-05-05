@@ -33,7 +33,6 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.example.locationmapapp.util.DebugLogger
-import com.example.locationmapapp.util.FeatureFlags
 import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
@@ -397,24 +396,10 @@ class PoiDetailSheet : DialogFragment() {
             // ACTION_VIEW. Our app does not load the URL itself (no INTERNET
             // permission, no in-app WebView). Whatever browser the user has
             // installed handles the network request with its own permission.
-            // V2 reverts to in-app WebView via showFullScreenWebView.
-            if (FeatureFlags.V1_OFFLINE_ONLY) {
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site)))
-                } catch (e: Exception) {
-                    DebugLogger.w(TAG, "External browser launch failed: ${e.message}")
-                }
-                return@setOnClickListener
-            }
-            val hostActivity = this.activity as? SalemMainActivity
-            if (hostActivity != null) {
-                hostActivity.showFullScreenWebView(site, poi.name)
-            } else {
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site)))
-                } catch (e: Exception) {
-                    DebugLogger.w(TAG, "Fallback browser failed: ${e.message}")
-                }
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site)))
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "External browser launch failed: ${e.message}")
             }
         }
     }
@@ -661,15 +646,11 @@ class PoiDetailSheet : DialogFragment() {
         cancelSheetRead()
         when (action) {
             is PoiActionSynthesizer.Action.VisitWebsite -> {
-                if (FeatureFlags.V1_OFFLINE_ONLY) {
-                    // V1: hand off to external browser via ACTION_VIEW.
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(action.url)))
-                    } catch (e: Exception) {
-                        DebugLogger.w(TAG, "External browser launch failed: ${e.message}")
-                    }
-                } else {
-                    (activity as? SalemMainActivity)?.showFullScreenWebView(action.url, poi.name)
+                // V1: hand off to external browser via ACTION_VIEW.
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(action.url)))
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "External browser launch failed: ${e.message}")
                 }
             }
             is PoiActionSynthesizer.Action.Call -> {
@@ -687,16 +668,6 @@ class PoiDetailSheet : DialogFragment() {
                 if (host != null) {
                     host.walkTo(org.osmdroid.util.GeoPoint(action.lat, action.lng))
                     dismiss()
-                } else if (!FeatureFlags.V1_OFFLINE_ONLY) {
-                    // S180: V1 zero-network — geo: ACTION_VIEW fallback gated.
-                    // (No-op in V1; on-device walkTo is the only path.)
-                    val label = Uri.encode(poi.name)
-                    val geo = Uri.parse("geo:${action.lat},${action.lng}?q=${action.lat},${action.lng}($label)")
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, geo))
-                    } catch (e: Exception) {
-                        DebugLogger.w(TAG, "No maps app available: ${e.message}")
-                    }
                 }
             }
             is PoiActionSynthesizer.Action.Hours -> { /* inline display only */ }

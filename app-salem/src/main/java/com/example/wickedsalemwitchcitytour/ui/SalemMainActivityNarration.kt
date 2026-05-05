@@ -960,17 +960,6 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
     // Newspapers always yield; jumpToFront (explicit user tap) still preempts.
     val wasInterruptingPriorPoi = currentNarration != null && currentNarration?.id != point.id
 
-    // S146 POI-priority fix: stamp the cancel timestamp so the Idle observer
-    // doesn't race with our main-thread enqueue and wipe currentNarration.
-    narrationCancelForPoiAtMs = System.currentTimeMillis()
-    tourViewModel.cancelSegmentsWithTag("newspaper_1692")
-
-    if (jumpToFront && wasInterruptingPriorPoi) {
-        DebugLogger.i("NARR-QUEUE",
-            "User-tap preempt: ${point.name} replaces '${currentNarration?.name}'")
-        tourViewModel.cancelSegmentsWithTag("poi_narration")
-        currentNarration = null
-    }
     DebugLogger.i("NARR-QUEUE", "enqueueNarration: ${point.name} tier=$tier ad=${point.adPriority} jumpToFront=$jumpToFront currentNarration=${currentNarration?.name} queueSize=${narrationQueue.size}")
     // Don't add duplicates
     if (point.id == currentNarration?.id) {
@@ -983,6 +972,29 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
     }
 
     if (jumpToFront || currentNarration == null) {
+        // S146 POI-priority fix: stamp the cancel timestamp so the Idle observer
+        // doesn't race with our main-thread enqueue and wipe currentNarration
+        // before this direct-play assignment lands.
+        // S224 fix: only bump on the direct-play path. When the enqueue is
+        // queue-only (a POI is currently playing), bumping the timestamp would
+        // suppress the *outgoing* POI's natural Idle event in the 500ms window
+        // — and that Idle is exactly what advances the queue. Witnessed walking
+        // tour_LongWalk: Lappin Park finished → Rockafellas auto-ENTRY queued
+        // 13ms later → Lappin Park's Idle suppressed → Rockafellas sat in
+        // queue forever, walker frozen at one step, every 180s safety-cap
+        // cycle re-fired Rockafellas. The cancel of newspaper_1692 also moves
+        // here for the same reason: only kill the newspaper when we're about
+        // to direct-play; queue-only adds let any in-flight newspaper finish.
+        narrationCancelForPoiAtMs = System.currentTimeMillis()
+        tourViewModel.cancelSegmentsWithTag("newspaper_1692")
+
+        if (jumpToFront && wasInterruptingPriorPoi) {
+            DebugLogger.i("NARR-QUEUE",
+                "User-tap preempt: ${point.name} replaces '${currentNarration?.name}'")
+            tourViewModel.cancelSegmentsWithTag("poi_narration")
+            currentNarration = null
+        }
+
         // Play immediately (user tapped or nothing playing).
         // S118: Play the point DIRECTLY — do not route through
         // pickNextFromQueue() which applies bearing/distance filters

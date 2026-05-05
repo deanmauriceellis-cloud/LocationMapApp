@@ -21,11 +21,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import android.webkit.RenderProcessGoneDetail
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -40,7 +35,6 @@ import com.example.locationmapapp.data.model.GeocodeSuggestion
 import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategories
 import com.example.wickedsalemwitchcitytour.ui.menu.PoiCategory
 import com.example.locationmapapp.util.DebugLogger
-import com.example.locationmapapp.util.FeatureFlags
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1133,7 +1127,6 @@ internal fun SalemMainActivity.poiCategoryColor(categoryTag: String): Int {
         ?: Color.parseColor("#757575")
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationmapapp.data.model.FindResult) {
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
@@ -1302,76 +1295,22 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         setBackgroundColor(Color.parseColor("#111111"))
     }
 
-    // Spinner while resolving
-    val loadingLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
+    // S224: V1 ships zero-network, so the website area is always the offline
+    // placeholder. The pre-S224 spinner-then-fetch dance + Resolved URL var +
+    // findViewModel.fetchPoiWebsiteDirectly lifecycleScope.launch were V2-only
+    // and dragged in showFullScreenWebView (an in-app WebView). Deleted as
+    // V1-gated dead code; re-author against a proper website-resolution path
+    // for V2.
+    websiteArea.addView(TextView(this).apply {
+        text = "Website unavailable offline"
+        textSize = 13f
+        setTextColor(Color.parseColor("#616161"))
         gravity = android.view.Gravity.CENTER
         layoutParams = android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT
         )
-    }
-    loadingLayout.addView(android.widget.ProgressBar(this))
-    loadingLayout.addView(TextView(this).apply {
-        text = "Resolving website..."
-        textSize = 12f
-        setTextColor(Color.parseColor("#757575"))
-        gravity = android.view.Gravity.CENTER
-        setPadding(0, dp(8), 0, 0)
     })
-    websiteArea.addView(loadingLayout)
-    if (FeatureFlags.V1_OFFLINE_ONLY) {
-        // V1: replace spinner immediately with offline placeholder.
-        websiteArea.removeAllViews()
-        websiteArea.addView(TextView(this).apply {
-            text = "Website unavailable offline"
-            textSize = 13f
-            setTextColor(Color.parseColor("#616161"))
-            gravity = android.view.Gravity.CENTER
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        })
-    }
-
-    // Resolved URL stored here for Reviews button fallback
-    var resolvedUrl: String? = null
-
-    // S180: V1 zero-network gate. R8 strips the V2 branch from release.
-    if (!FeatureFlags.V1_OFFLINE_ONLY) lifecycleScope.launch {
-        val websiteInfo = findViewModel.fetchPoiWebsiteDirectly(
-            result.type, result.id, result.name, result.lat, result.lon
-        )
-        websiteArea.removeAllViews()
-        val siteUrl = websiteInfo?.url
-        if (siteUrl != null) {
-            resolvedUrl = siteUrl
-            websiteArea.addView(TextView(this@showPoiDetailDialog).apply {
-                text = "\uD83C\uDF10  Load Website"
-                textSize = 18f
-                setTextColor(Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                gravity = android.view.Gravity.CENTER
-                setBackgroundColor(Color.parseColor("#1565C0"))
-                layoutParams = android.widget.FrameLayout.LayoutParams(
-                    dp(260), dp(56)
-                ).apply { gravity = android.view.Gravity.CENTER }
-                setOnClickListener { showFullScreenWebView(siteUrl, result.name ?: "Website") }
-            })
-        } else {
-            websiteArea.addView(TextView(this@showPoiDetailDialog).apply {
-                text = "No website available"
-                textSize = 14f
-                setTextColor(Color.parseColor("#616161"))
-                gravity = android.view.Gravity.CENTER
-                layoutParams = android.widget.FrameLayout.LayoutParams(
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-                )
-            })
-        }
-    }
 
     // ── Action buttons ──
     val buttonContainer = LinearLayout(this).apply {
@@ -1424,25 +1363,9 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         }
     })
 
-    // Reviews button (gated S180: V1 zero-network — Yelp launch removed)
-    if (!FeatureFlags.V1_OFFLINE_ONLY) {
-        buttonContainer.addView(TextView(this).apply {
-            text = "Reviews"
-            textSize = 11f
-            setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            gravity = android.view.Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#F57F17"))
-            layoutParams = buttonLp
-            setPadding(dp(4), dp(8), dp(4), dp(8))
-            setOnClickListener {
-                val name = Uri.encode(result.name ?: "")
-                val loc = Uri.encode("${result.lat},${result.lon}")
-                val yelpUrl = "https://www.yelp.com/search?find_desc=$name&find_loc=$loc"
-                showFullScreenWebView(yelpUrl, "Reviews")
-            }
-        })
-    }
+    // S224: Reviews button (Yelp launch via in-app WebView) deleted —
+    // V1-gated dead code. Reviews are not in V1 scope; reauthor against
+    // a curated source (or just bring it back behind the flag) in V2.
 
     // Map button
     buttonContainer.addView(TextView(this).apply {
@@ -1494,209 +1417,20 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
         }
     })
 
-    // ── Comments Section ──
-    val commentsSection = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(16), dp(8), dp(16), dp(8))
-    }
+    // S224: Comments Section deleted as V1-gated dead code.
+    // Was a socialViewModel-driven comments + voting + auth panel rendered
+    // inside the POI detail dialog; the addView call was already gated to
+    // !V1_OFFLINE_ONLY so it never appeared in V1, but the builder + render
+    // function + observers were all dragging socialViewModel into this code
+    // path. Re-author against a fresh server-backed comments service for V2.
 
-    val commentsHeader = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = android.view.Gravity.CENTER_VERTICAL
-        setPadding(0, dp(4), 0, dp(4))
-    }
-    val commentsTitle = TextView(this).apply {
-        text = "Comments"
-        textSize = 14f
-        setTextColor(Color.parseColor("#9E9E9E"))
-        setTypeface(null, android.graphics.Typeface.BOLD)
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-    }
-    val addCommentBtn = TextView(this).apply {
-        text = "+ Add"
-        textSize = 13f
-        setTextColor(Color.parseColor("#64B5F6"))
-        visibility = if (socialViewModel.isLoggedIn()) View.VISIBLE else View.GONE
-    }
-    commentsHeader.addView(commentsTitle)
-    commentsHeader.addView(addCommentBtn)
-    commentsSection.addView(commentsHeader)
 
-    val commentsList = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-    }
-    val commentsLoading = TextView(this).apply {
-        text = "Loading comments..."
-        textSize = 12f
-        setTextColor(Color.parseColor("#80FFFFFF"))
-        setPadding(0, dp(4), 0, dp(4))
-    }
-    commentsList.addView(commentsLoading)
-    commentsSection.addView(commentsList)
-
-    // Load comments from server
-    val osmType = result.type
-    val osmId = result.id
-    // S180: V1 zero-network gate.
-    if (!FeatureFlags.V1_OFFLINE_ONLY) socialViewModel.loadComments(osmType, osmId)
-
-    fun renderComments(comments: List<com.example.locationmapapp.data.model.PoiComment>) {
-        commentsList.removeAllViews()
-        if (comments.isEmpty()) {
-            commentsList.addView(TextView(this).apply {
-                text = "No comments yet"
-                textSize = 12f
-                setTextColor(Color.parseColor("#80FFFFFF"))
-                setPadding(0, dp(4), 0, dp(4))
-            })
-            return
-        }
-        commentsTitle.text = "Comments (${comments.size})"
-        for (comment in comments.take(20)) {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#2A2A2A"))
-                setPadding(dp(10), dp(8), dp(10), dp(8))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dp(4) }
-            }
-            // Author line: name + time
-            val authorLine = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-            }
-            authorLine.addView(TextView(this).apply {
-                text = comment.authorName
-                textSize = 12f
-                setTextColor(Color.parseColor("#4FC3F7"))
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            })
-            // Relative time
-            val relTime = try {
-                val instant = java.time.Instant.parse(comment.createdAt)
-                val dur = java.time.Duration.between(instant, java.time.Instant.now())
-                when {
-                    dur.toMinutes() < 1 -> "just now"
-                    dur.toMinutes() < 60 -> "${dur.toMinutes()}m ago"
-                    dur.toHours() < 24 -> "${dur.toHours()}h ago"
-                    dur.toDays() < 30 -> "${dur.toDays()}d ago"
-                    else -> comment.createdAt.take(10)
-                }
-            } catch (_: Exception) { comment.createdAt.take(10) }
-            authorLine.addView(TextView(this).apply {
-                text = relTime
-                textSize = 11f
-                setTextColor(Color.parseColor("#666666"))
-            })
-            card.addView(authorLine)
-
-            // Rating stars
-            val r = comment.rating
-            if (r != null && r > 0) {
-                card.addView(TextView(this).apply {
-                    text = "\u2605".repeat(r) + "\u2606".repeat(5 - r)
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#FFB300"))
-                    setPadding(0, dp(2), 0, 0)
-                })
-            }
-
-            // Content
-            card.addView(TextView(this).apply {
-                text = comment.content
-                textSize = 13f
-                setTextColor(Color.WHITE)
-                setPadding(0, dp(4), 0, dp(2))
-            })
-
-            // Vote row
-            val voteRow = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(0, dp(4), 0, 0)
-            }
-            val upBtn = TextView(this).apply {
-                text = "\u25B2 ${comment.upvotes}"
-                textSize = 11f
-                setTextColor(if (comment.viewerVote == 1) Color.parseColor("#4CAF50") else Color.parseColor("#666666"))
-                setPadding(0, 0, dp(12), 0)
-            }
-            val downBtn = TextView(this).apply {
-                text = "\u25BC ${comment.downvotes}"
-                textSize = 11f
-                setTextColor(if (comment.viewerVote == -1) Color.parseColor("#F44336") else Color.parseColor("#666666"))
-            }
-            if (socialViewModel.isLoggedIn()) {
-                upBtn.setOnClickListener {
-                    socialViewModel.voteOnComment(comment.id, 1) { counts ->
-                        runOnUiThread {
-                            if (counts != null) {
-                                upBtn.text = "\u25B2 ${counts.first}"
-                                downBtn.text = "\u25BC ${counts.second}"
-                                upBtn.setTextColor(Color.parseColor("#4CAF50"))
-                                downBtn.setTextColor(Color.parseColor("#666666"))
-                            }
-                        }
-                    }
-                }
-                downBtn.setOnClickListener {
-                    socialViewModel.voteOnComment(comment.id, -1) { counts ->
-                        runOnUiThread {
-                            if (counts != null) {
-                                upBtn.text = "\u25B2 ${counts.first}"
-                                downBtn.text = "\u25BC ${counts.second}"
-                                upBtn.setTextColor(Color.parseColor("#666666"))
-                                downBtn.setTextColor(Color.parseColor("#F44336"))
-                            }
-                        }
-                    }
-                }
-            }
-            voteRow.addView(upBtn)
-            voteRow.addView(downBtn)
-
-            // Delete button for own comments (hide if already deleted)
-            val currentUser = socialViewModel.authUser.value
-            if (!comment.isDeleted && currentUser != null && (currentUser.id == comment.userId || currentUser.role in listOf("owner", "support"))) {
-                voteRow.addView(View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
-                })
-                voteRow.addView(TextView(this).apply {
-                    text = "Delete"
-                    textSize = 11f
-                    setTextColor(Color.parseColor("#EF5350"))
-                    setOnClickListener {
-                        socialViewModel.deleteComment(comment.id, osmType, osmId)
-                    }
-                })
-            }
-
-            card.addView(voteRow)
-            commentsList.addView(card)
-        }
-    }
-
-    if (!FeatureFlags.V1_OFFLINE_ONLY) socialViewModel.poiComments.observe(this) { comments ->
-        renderComments(comments ?: emptyList())
-    }
-
-    // Add comment sub-dialog
-    addCommentBtn.setOnClickListener {
-        showAddCommentDialog(osmType, osmId)
-    }
 
     // ── Container ──
     val scrollContent = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         addView(infoContainer)
         addView(websiteArea)
-        // S180: V1 zero-network — Comments section relies on socialViewModel
-        // (loadComments + voting + auth). Hidden in V1; section is still
-        // constructed above but never rendered. R8 may strip it in release.
-        if (!FeatureFlags.V1_OFFLINE_ONLY) addView(commentsSection)
         addView(buttonContainer)
     }
     val scrollView = android.widget.ScrollView(this).apply {
@@ -1727,96 +1461,12 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
     dialog.show()
 }
 
-@SuppressLint("SetJavaScriptEnabled")
-internal fun SalemMainActivity.showFullScreenWebView(url: String, title: String) {
-    val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-
-    val density = resources.displayMetrics.density
-    val dp = { v: Int -> (v * density).toInt() }
-    var webView: android.webkit.WebView? = null
-
-    // ── Top bar: back + title + close ──
-    val backBtn = TextView(this).apply {
-        text = "\u2190"
-        textSize = 22f
-        setTextColor(Color.WHITE)
-        setPadding(dp(12), dp(6), dp(12), dp(6))
-        setOnClickListener {
-            if (webView?.canGoBack() == true) webView?.goBack() else dialog.dismiss()
-        }
-    }
-    val titleText = TextView(this).apply {
-        text = title
-        textSize = 16f
-        setTextColor(Color.WHITE)
-        setTypeface(null, android.graphics.Typeface.BOLD)
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        maxLines = 1
-        ellipsize = android.text.TextUtils.TruncateAt.END
-    }
-    val closeBtn = TextView(this).apply {
-        text = "\u2715"
-        textSize = 20f
-        setTextColor(Color.WHITE)
-        setPadding(dp(12), dp(6), dp(12), dp(6))
-        setOnClickListener { dialog.dismiss() }
-    }
-    val topBar = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = android.view.Gravity.CENTER_VERTICAL
-        setBackgroundColor(Color.parseColor("#1A1A1A"))
-        setPadding(dp(4), dp(4), dp(4), dp(4))
-        addView(backBtn)
-        addView(titleText)
-        addView(closeBtn)
-    }
-
-    // ── WebView ──
-    val wv = android.webkit.WebView(this).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        )
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
-        settings.builtInZoomControls = true
-        settings.displayZoomControls = false
-        settings.setSupportZoom(true)
-        setInitialScale(0)
-        setBackgroundColor(Color.BLACK)
-        webViewClient = object : android.webkit.WebViewClient() {
-            override fun onRenderProcessGone(
-                view: android.webkit.WebView?,
-                detail: android.webkit.RenderProcessGoneDetail?
-            ): Boolean {
-                dialog.dismiss()
-                return true
-            }
-        }
-        loadUrl(url)
-    }
-    webView = wv
-
-    val container = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Color.BLACK)
-        addView(topBar)
-        addView(wv)
-    }
-
-    dialog.setContentView(container)
-    dialog.window?.let { win ->
-        win.setLayout(
-            android.view.WindowManager.LayoutParams.MATCH_PARENT,
-            android.view.WindowManager.LayoutParams.MATCH_PARENT
-        )
-        win.setBackgroundDrawableResource(android.R.color.transparent)
-    }
-    dialog.setOnDismissListener { wv.destroy() }
-    dialog.show()
-}
+// S224: showFullScreenWebView (in-app WebView for the V2 Reviews/Visit-Website
+// flows) deleted as V1-gated dead code. All three call sites — Find dialog
+// Reviews + Find dialog "Load Website" + PoiDetailSheet website button + the
+// PoiDetailSheet VisitWebsite action — were under !V1_OFFLINE_ONLY branches
+// or inside V2-only fallbacks. V1 hands every URL to the OS via ACTION_VIEW.
+// Re-author against `androidx.browser` Custom Tabs (or a WebView shim) for V2.
 
 /** Distance in meters between two GeoPoints (null-safe — returns MAX_VALUE if from is null). */
 internal fun SalemMainActivity.distanceBetween(from: GeoPoint?, to: GeoPoint): Float {

@@ -1175,9 +1175,11 @@ class SalemMainActivity : AppCompatActivity() {
                     isEnabled = true
                 }
             )
-            // Disable built-in zoom buttons — we use the custom slider instead
+            // Disable built-in zoom buttons — we use the custom slider instead.
+            // `setBuiltInZoomControls(false)` is the deprecated WebView-style
+            // call; osmdroid's CustomZoomButtonsController.Visibility is the
+            // current API and the only one that has effect here.
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
-            setBuiltInZoomControls(false)
             minZoomLevel = MAP_MIN_ZOOM
             // Allow overzoom to 21: tiles top out at z19 (USGS_MAX_ZOOM), osmdroid
             // upsamples beyond that. Trade pixel detail for POI-marker separation
@@ -1710,27 +1712,27 @@ class SalemMainActivity : AppCompatActivity() {
         // Downtown perimeter loop). If the active tour has no baked
         // polyline that's a content-side gap to fix in admin/Compute Route,
         // not something to paper over with a wrong route.
+        // S224 — every branch above either assigned `activeTour` or returned,
+        // so `activeTour` is non-null here. Pin it as an immutable val so the
+        // rest of the function can drop the `!!` chain. Kotlin can't smart-cast
+        // a `var`, hence the explicit unwrap (the only path that could leave it
+        // null was in the else-branch and that path returns@withLock).
+        val resolvedTour = activeTour!!
         val routePoints: List<org.osmdroid.util.GeoPoint>
         val routeLabel: String
-        if (activeTour == null) {
-            DebugLogger.w("SalemMainActivity",
-                "Walk sim aborted — no active tour (state=${tourViewModel.tourState.value})")
-            toast("Pick a tour first")
-            return@withLock
-        }
-        val bakedRoute = tourViewModel.computeTourPolyline(activeTour!!)
+        val bakedRoute = tourViewModel.computeTourPolyline(resolvedTour)
         val bakedPolyline = bakedRoute?.polyline.orEmpty()
         if (bakedPolyline.size < 2) {
             DebugLogger.w("SalemMainActivity",
-                "Walk sim aborted — tour '${activeTour!!.tour.name}' has no baked polyline " +
+                "Walk sim aborted — tour '${resolvedTour.tour.name}' has no baked polyline " +
                 "(tour_legs empty). Author the route in admin and re-publish.")
-            toast("Tour '${activeTour!!.tour.name}' has no route — author it in admin")
+            toast("Tour '${resolvedTour.tour.name}' has no route — author it in admin")
             return@withLock
         }
         routePoints = bakedPolyline
-        routeLabel = activeTour!!.tour.name
+        routeLabel = resolvedTour.tour.name
         DebugLogger.i("SalemMainActivity",
-            "Walk sim using baked tour_legs polyline: '${activeTour!!.tour.name}' (${bakedPolyline.size} points)")
+            "Walk sim using baked tour_legs polyline: '${resolvedTour.tour.name}' (${bakedPolyline.size} points)")
         // S186: do NOT reset the narration session here. The 1-hour repeat
         // window must hold across walk-sim start/stop within the same process —
         // it is only cleared on cold start (onCreate with savedInstanceState=null,

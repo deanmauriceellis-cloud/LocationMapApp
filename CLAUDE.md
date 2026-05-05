@@ -89,27 +89,28 @@
 
 ---
 
-## Session Start Protocol — lean (2026-04-23)
+## Session Start Protocol — lean+state (2026-05-04)
 
-Operator rule: **startup reads must be kept minimal to conserve tokens.** At session start, rely on what the harness auto-loads (`CLAUDE.md` + `MEMORY.md`). Everything else is deferred until a specific question requires it.
+Operator rule: **startup reads must be kept minimal to conserve tokens, but `STATE.md` and the most recent session log are now mandatory** so the session opens with current phase + last-session context already in mind. Originally lean-only (S161, 2026-04-23); amended 2026-05-04 (S224) — operator: "we always read state.md and the last session log in session start."
 
 Do ONLY this at session start:
 
 0. **Sync with remote** — `git fetch origin`, compare HEAD vs `origin/master`. Pull if behind. Alert if diverged. Never work on stale state.
-1. **Open live conversation log** — Create `docs/session-logs/session-NNN-YYYY-MM-DD.md` with a minimal header (date, branch, HEAD, recovery state). This is the canonical record of the session and the crash-recovery mechanism — append significant actions, decisions, and code changes as they happen.
-2. **One-line greeting** — Brief the operator: "Session N opened. What's on the docket?" Do NOT pre-emptively summarize `STATE.md`, phase status, carry-forwards, the most recent session log, or OMEN items.
-3. **Await direction.** Never execute work before the operator confirms scope.
+1. **Read `STATE.md`** — current phase, TOP PRIORITY, carry-forwards. Mandatory.
+2. **Read the most recent `docs/session-logs/session-NNN-*.md`** — last session's live log, for continuity. Mandatory.
+3. **Open live conversation log** — Create `docs/session-logs/session-NNN-YYYY-MM-DD.md` with a minimal header (date, branch, HEAD, recovery state). This is the canonical record of the session and the crash-recovery mechanism — append significant actions, decisions, and code changes as they happen.
+4. **One-line greeting** — Brief the operator: "Session N opened. What's on the docket?" Optionally include one tight sentence of carry-forward context if STATE.md or the last log surfaced something the operator likely needs reminded of. Do NOT dump phase status, carry-forwards, or OMEN items.
+5. **Await direction.** Never execute work before the operator confirms scope.
 
-`CLAUDE.md` and `MEMORY.md` load automatically. That is the complete startup read set.
+`CLAUDE.md` and `MEMORY.md` load automatically; `STATE.md` + last session log are read manually as part of the protocol. That is the complete startup read set.
 
 ### Everything else is ON-DEMAND
 
 Read these files only when a specific question requires them — never at session start:
 
-- `STATE.md` — when the operator asks for status, current phase, TOP PRIORITY, or carry-forward items.
-- `SESSION-LOG.md` — when reconstructing recent work. **Never** at session start.
+- `SESSION-LOG.md` — when reconstructing recent work beyond the last session.
 - `SESSION-LOG-ARCHIVE.md` — only for historical investigation.
-- `docs/session-logs/session-NNN-*.md` — read a prior live log only when recovering from a killed session OR when the operator asks about a specific past session.
+- Older `docs/session-logs/session-NNN-*.md` (anything but the most recent) — read when the operator asks about a specific past session.
 - `~/Development/OMEN/notes/locationmapapp.md` — when addressing or acknowledging an OMEN note.
 - `~/Development/OMEN/directives/ACTIVE.md` — when an OMEN directive is relevant to current work.
 - Reference docs (`GOVERNANCE.md`, `IP.md`, `COMMERCIALIZATION.md`, `DESIGN-REVIEW.md`) — on demand only. (`CURRENT_TESTING.md` archived 2026-04-29 as pre-pivot — lint tab + session logs serve the testing-checklist role now.)
@@ -120,7 +121,7 @@ As of 2026-04-23 (S161), the master plan was deleted and its pre-park snapshot m
 
 ### Recovery from a killed session
 
-If the prior session was killed (context overflow, disconnection), read the most recent `docs/session-logs/session-NNN-YYYY-MM-DD.md` before proceeding. Otherwise the normal lean startup applies.
+The most recent live log is now read every session, so killed-session recovery is automatic.
 
 ## Live Conversation Log
 
@@ -280,16 +281,16 @@ LocationMapApp_v1.5/
 
 ## Key Reference Files
 
-Under the lean-startup rule (2026-04-23), only `CLAUDE.md` and `MEMORY.md` are read at session start — both auto-load. Every other file listed here is **on-demand only** and should be read only when a specific question requires it.
+Under the amended startup rule (2026-05-04, S224): `CLAUDE.md` + `MEMORY.md` auto-load, AND `STATE.md` + the most recent `docs/session-logs/session-NNN-*.md` are read manually as part of session start. Every other file listed here is **on-demand only** and should be read only when a specific question requires it.
 
 | File | Purpose | Read when |
 |------|---------|-----------|
 | `CLAUDE.md` | This file | Auto-loaded |
 | `MEMORY.md` (user-config) | Persistent feedback, project, reference, user memories | Auto-loaded |
+| `STATE.md` | Current snapshot — TOP PRIORITY, phase status, carry-forwards | **Read every session start** (S224 rule) |
+| `docs/session-logs/session-NNN-*.md` (most recent) | Last session's live log | **Read every session start** (S224 rule) — older logs are on-demand |
 | `MASTER_SESSION_REFERENCE.md` | Topic-indexed lookup of prior work — phrasing index + per-topic markers + paths | Operator says "read MASTER_SESSION_REFERENCE about [topic]" — read THIS file + only the one live log it points to (keeps context small and directed) |
-| `STATE.md` | Current snapshot — TOP PRIORITY, phase status, carry-forwards | Operator asks for status, or current phase needs confirming |
-| `docs/session-logs/session-NNN-*.md` | Per-session live log | Recovering from a killed session, or operator asks about a specific past session |
-| `SESSION-LOG.md` | Rolling 10-session summary | Reconstructing recent work — NEVER at session start |
+| `SESSION-LOG.md` | Rolling 10-session summary | Reconstructing recent work beyond the last session |
 | `SESSION-LOG-ARCHIVE.md` | Older session summaries | Historical investigation |
 | `~/Development/OMEN/notes/locationmapapp.md` | OMEN action items | Addressing or acknowledging an OMEN note |
 | `~/Development/OMEN/directives/ACTIVE.md` | OMEN directives | An OMEN directive is relevant to current work |
