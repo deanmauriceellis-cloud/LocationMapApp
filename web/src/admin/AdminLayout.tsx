@@ -20,6 +20,7 @@ import {
 } from './PoiTree'
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog, type CategoryRow, type SubcategoryRow } from './PoiEditDialog'
+import { PoiCreateDialog } from './PoiCreateDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
 import { TourTree, type AddStopMode } from './TourTree'
 import type { TourLeg, TourStop, TourSummary } from './tourTypes'
@@ -323,6 +324,31 @@ export function AdminLayout() {
   }, [])
   const handleClearDirections = useCallback(() => {
     setDirectionsTarget(null)
+  }, [])
+
+  // S225 — add-POI place-mode. Header "+ New POI" button toggles this on,
+  // next map click captures lat/lng → opens PoiCreateDialog. Click on a POI
+  // marker still selects (effectiveOnPoiSelect short-circuits in addStopMode
+  // 'poi' but not in this mode — we want raw map clicks only).
+  const [addPoiMode, setAddPoiMode] = useState(false)
+  const [createPoiCoords, setCreatePoiCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const handleEnterAddPoiMode = useCallback(() => setAddPoiMode(true), [])
+  const handleCancelAddPoiMode = useCallback(() => setAddPoiMode(false), [])
+  const handleMapClickAddPoi = useCallback((lat: number, lng: number) => {
+    setAddPoiMode(false)
+    setCreatePoiCoords({ lat, lng })
+  }, [])
+  const handleCreatePoiClose = useCallback(() => {
+    setCreatePoiCoords(null)
+  }, [])
+  const handlePoiCreated = useCallback((created: PoiRow) => {
+    // Append to the cached list so the marker pops on the map immediately.
+    setPois((prev) => prev ? [...prev, created] : [created])
+    // Open the full editor on the new POI so the operator can fill narration,
+    // flags, hours, etc. without a second click.
+    setSelectedPoi({ poi: created })
+    setEditOpen(true)
+    setCreatePoiCoords(null)
   }, [])
 
   // Tour-mode state (S174)
@@ -848,6 +874,15 @@ export function AdminLayout() {
           <>
             <button
               type="button"
+              onClick={handleEnterAddPoiMode}
+              disabled={addPoiMode}
+              title="Click to enter place-mode, then click the map to drop a new POI"
+              className="px-3 py-1 text-sm rounded bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {addPoiMode ? '+ New POI…' : '+ New POI'}
+            </button>
+            <button
+              type="button"
               onClick={handleHighlightDuplicates}
               className="px-3 py-1 text-sm rounded bg-slate-700 hover:bg-slate-600 transition-colors"
             >
@@ -1002,6 +1037,9 @@ export function AdminLayout() {
                 onGeocodePreviewEditAddress={handleGeocodePreviewEditAddress}
                 proposalReview={proposalReview}
                 onProposalDrag={handleProposalDrag}
+                addPoiMode={addPoiMode}
+                onCancelAddPoiMode={handleCancelAddPoiMode}
+                onMapClickAddPoi={handleMapClickAddPoi}
               />
               {proposalReview && (
                 <ProposalReviewPanel
@@ -1068,6 +1106,20 @@ export function AdminLayout() {
           setSelectedPoi({ poi: focal })
           setView('pois')
         }}
+      />
+
+      {/* Create dialog (S225) — opens after the operator clicks the map in
+          "+ New POI" place-mode. On success, AdminLayout forwards the new
+          row to PoiEditDialog so the operator can fill the rest. */}
+      <PoiCreateDialog
+        open={createPoiCoords != null}
+        lat={createPoiCoords?.lat ?? null}
+        lng={createPoiCoords?.lng ?? null}
+        categories={categories}
+        subcategories={subcategories}
+        onTaxonomyChanged={refetchTaxonomy}
+        onCreated={handlePoiCreated}
+        onClose={handleCreatePoiClose}
       />
 
       {/* Edit dialog (POI view only) */}

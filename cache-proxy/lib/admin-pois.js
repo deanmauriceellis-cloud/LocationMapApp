@@ -424,6 +424,115 @@ module.exports = function(app, deps) {
     }
   });
 
+  // ─── POST /admin/salem/pois — create new POI ─────────────────────────────
+  // S225: operator-driven add of POIs missing from the dataset. Required body
+  // fields: name, lat, lng, category. Optional id (auto-generated from a slug
+  // of the name + a 6-char random suffix when absent). All other UPDATABLE_FIELDS
+  // accepted. data_source defaults to 'admin_create' so these rows are
+  // distinguishable from BCS / massgis_mhc / unified_migration imports.
+  app.post('/admin/salem/pois', requirePg, async (req, res) => {
+    try {
+      const body = req.body;
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({ error: 'request body must be a JSON object' });
+      }
+
+      // ── Required: name, lat, lng, category ───────────────────────────────
+      const name = typeof body.name === 'string' ? body.name.trim() : '';
+      if (!name) return res.status(400).json({ error: 'name is required' });
+
+      const lat = typeof body.lat === 'number' ? body.lat : Number(body.lat);
+      const lng = typeof body.lng === 'number' ? body.lng : Number(body.lng);
+      const llErr = validateLatLng(lat, lng);
+      if (llErr) return res.status(400).json({ error: llErr });
+
+      const category = typeof body.category === 'string' ? body.category.trim() : '';
+      if (!category) return res.status(400).json({ error: 'category is required' });
+
+      // ── id: caller may supply, otherwise generate slug + 6-hex suffix ────
+      let id = typeof body.id === 'string' ? body.id.trim() : '';
+      if (!id) {
+        const slug = name.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 40) || 'poi';
+        const suffix = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+        id = `${slug}_${suffix}`;
+      }
+      if (!/^[a-z0-9_-]+$/i.test(id)) {
+        return res.status(400).json({ error: 'id must contain only letters, digits, underscore, hyphen' });
+      }
+      const exists = await pgPool.query(`SELECT 1 FROM salem_pois WHERE id = $1`, [id]);
+      if (exists.rows.length) {
+        return res.status(409).json({ error: `POI id "${id}" already exists` });
+      }
+
+      // ── Build column / value lists from the whitelist (skips columns the
+      //    body didn't supply; PG defaults fill the rest). Required cols are
+      //    forced in regardless. JSONB fields stringified; data_source
+      //    defaults to 'admin_create' unless caller overrode. ─────────────
+      const cols = ['id', 'name', 'lat', 'lng', 'category'];
+      const placeholders = ['$1', '$2', '$3', '$4', '$5'];
+      const values = [id, name, lat, lng, category];
+      let idx = 6;
+
+      const skip = new Set(['id', 'name', 'lat', 'lng', 'category']);
+      for (const field of UPDATABLE_FIELDS) {
+        if (skip.has(field)) continue;
+        if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+        let value = body[field];
+        if (JSONB_FIELDS.has(field)) {
+          try {
+            value = JSON.stringify(value ?? (field === 'amenities' ? {} : []));
+          } catch (e) {
+            return res.status(400).json({ error: `${field}: invalid JSON value (${e.message})` });
+          }
+          cols.push(field);
+          placeholders.push(`$${idx}::jsonb`);
+        } else {
+          cols.push(field);
+          placeholders.push(`$${idx}`);
+        }
+        values.push(value);
+        idx++;
+      }
+
+      // data_source default for admin-created rows.
+      if (!cols.includes('data_source')) {
+        cols.push('data_source');
+        placeholders.push(`$${idx}`);
+        values.push('admin_create');
+        idx++;
+      }
+
+      // is_civic_poi auto-sync (mirrors S199 logic in buildUpdateClause) —
+      // only applied if the caller didn't supply it explicitly.
+      if (!cols.includes('is_civic_poi')) {
+        cols.push('is_civic_poi');
+        placeholders.push(`$${idx}`);
+        values.push(category.toUpperCase() === 'CIVIC');
+        idx++;
+      }
+
+      // Stamp the admin-edit flags so downstream rebuilds see this row.
+      cols.push('admin_dirty', 'admin_dirty_at');
+      placeholders.push('TRUE', 'NOW()');
+
+      const sql = `INSERT INTO salem_pois (${cols.join(', ')})
+                   VALUES (${placeholders.join(', ')})
+                   RETURNING *`;
+      const { rows } = await pgPool.query(sql, values);
+      res.status(201).json(rows[0]);
+    } catch (err) {
+      // FK violation on category / subcategory comes back as code 23503.
+      if (err && err.code === '23503') {
+        return res.status(400).json({ error: `unknown category or subcategory: ${err.detail || err.message}` });
+      }
+      console.error('[AdminPois] create error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─── PUT /admin/salem/pois/:id — partial update ──────────────────────────
   app.put('/admin/salem/pois/:id', requirePg, async (req, res) => {
     try {

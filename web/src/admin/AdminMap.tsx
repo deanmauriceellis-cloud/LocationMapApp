@@ -254,6 +254,11 @@ interface AdminMapProps {
   onCancelAddStopMode?: () => void
   onMapClickAddFree?: (lat: number, lng: number) => void
   onPickPoiForStop?: (poi: PoiRow) => void
+  /** S225 — add-POI mode: header "+ New POI" button enables, next map click
+   *  captures lat/lng so the parent can open PoiCreateDialog. */
+  addPoiMode?: boolean
+  onCancelAddPoiMode?: () => void
+  onMapClickAddPoi?: (lat: number, lng: number) => void
   /** S177 P5 — when set, draw a walking route from current map center to
    *  this POI using /api/salem/route. */
   directionsTarget?: PoiRow | null
@@ -2083,6 +2088,9 @@ export function AdminMap({
   addStopMode = 'none',
   onCancelAddStopMode,
   onMapClickAddFree,
+  addPoiMode = false,
+  onCancelAddPoiMode,
+  onMapClickAddPoi,
   onPickPoiForStop,
   directionsTarget,
   onClearDirections,
@@ -2231,9 +2239,15 @@ export function AdminMap({
 
   const handleMapClickAddFree = useCallback(
     (lat: number, lng: number) => {
+      // S225: when add-POI mode is on, the click is for the create flow;
+      // otherwise it's a tour-stop free-waypoint drop.
+      if (addPoiMode && onMapClickAddPoi) {
+        onMapClickAddPoi(lat, lng)
+        return
+      }
       if (onMapClickAddFree) onMapClickAddFree(lat, lng)
     },
-    [onMapClickAddFree],
+    [addPoiMode, onMapClickAddPoi, onMapClickAddFree],
   )
 
   const handleStopCancel = useCallback(() => {
@@ -2390,17 +2404,21 @@ export function AdminMap({
     }
   }, [pending, onPoiMoved])
 
-  // Esc cancels add-stop mode (free/POI). Listener is global so it works
-  // whether the map or the side panel has focus. Declared before the early
-  // return below so hook order stays stable across renders.
+  // Esc cancels add-stop mode (free/POI) and S225 add-POI mode. Listener is
+  // global so it works whether the map or the side panel has focus. Declared
+  // before the early return below so hook order stays stable across renders.
   useEffect(() => {
-    if (addStopMode === 'none' || !onCancelAddStopMode) return
+    const stopActive = addStopMode !== 'none' && onCancelAddStopMode
+    const poiActive = addPoiMode && onCancelAddPoiMode
+    if (!stopActive && !poiActive) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancelAddStopMode()
+      if (e.key !== 'Escape') return
+      if (poiActive) onCancelAddPoiMode!()
+      else if (stopActive) onCancelAddStopMode!()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [addStopMode, onCancelAddStopMode])
+  }, [addStopMode, onCancelAddStopMode, addPoiMode, onCancelAddPoiMode])
 
   if (!pois && !tourStops) {
     return (
@@ -2411,8 +2429,8 @@ export function AdminMap({
   }
 
   return (
-    <div className={`absolute inset-0 ${addStopMode !== 'none' ? 'cursor-crosshair' : ''}`}>
-      {addStopMode !== 'none' && (
+    <div className={`absolute inset-0 ${(addStopMode !== 'none' || addPoiMode) ? 'cursor-crosshair' : ''}`}>
+      {addStopMode !== 'none' && !addPoiMode && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[600]
                         bg-amber-500 text-white text-xs pl-3 pr-1 py-1 rounded-full shadow
                         flex items-center gap-2">
@@ -2428,6 +2446,23 @@ export function AdminMap({
             title="Cancel add-stop mode"
             className="rounded-full w-5 h-5 leading-none flex items-center justify-center
                        bg-amber-700 hover:bg-amber-800 text-white text-sm"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {addPoiMode && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[600]
+                        bg-emerald-600 text-white text-xs pl-3 pr-1 py-1 rounded-full shadow
+                        flex items-center gap-2">
+          <span>Click the map to drop a new POI</span>
+          <span className="text-emerald-100 text-[10px]">(Esc to cancel)</span>
+          <button
+            type="button"
+            onClick={onCancelAddPoiMode}
+            title="Cancel add-POI mode"
+            className="rounded-full w-5 h-5 leading-none flex items-center justify-center
+                       bg-emerald-800 hover:bg-emerald-900 text-white text-sm"
           >
             ×
           </button>
@@ -2454,11 +2489,11 @@ export function AdminMap({
           onPoiSelect={effectiveOnPoiSelect}
           onDragEnd={handleDragEnd}
         />
-        {addStopMode !== 'free' && (
+        {addStopMode !== 'free' && !addPoiMode && (
           <ParcelHitTest pois={filteredPois ?? []} onPoiSelect={effectiveOnPoiSelect} />
         )}
         <MapClickAddListener
-          active={addStopMode === 'free'}
+          active={addStopMode === 'free' || addPoiMode}
           onClick={handleMapClickAddFree}
         />
         <FlyToSelected selectedPoi={selectedPoi} minZoom={selectedPoiMinZoom} />
