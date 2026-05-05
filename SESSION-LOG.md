@@ -8,7 +8,7 @@
 
 Operator-driven sprint while SI provenance reformulation continues. Net new flow: `+ New POI` header button (POIs view, emerald-600) enters place-mode → click the map → small `PoiCreateDialog` (Name + Category w/ inline `+ Add new` + optional Subcategory/Address) → POST `/admin/salem/pois` → full PoiEditDialog opens on the new row for narration/flags/hours/images. Backend ~95 LOC in `cache-proxy/lib/admin-pois.js` (auto-slug id, JSONB whitelist serialization, FK 400, dup-id 409, `data_source='admin_create'` + `admin_dirty=TRUE` stamping); new `web/src/admin/PoiCreateDialog.tsx` (~290 LOC); `AdminMap.tsx` + `AdminLayout.tsx` wired with `addPoiMode` mirroring the existing tour-stop add-mode pattern (reuses `MapClickAddListener`, distinct emerald banner, ParcelHitTest gated off in place-mode, Esc handler extended). All five validation paths smoke-tested via curl (happy / missing name / lat=91 / unknown category / duplicate id) — all return clean error messages, test row cleaned up. `npx tsc --noEmit` clean; Vite HMR clean; cache-proxy restarted via `npm start` (S223 dotenv autoload live). No Android build, no Room schema bump (admin-only feature). Find-menu-refinement docket queued at S224 close deferred — operator pivoted to POI creation; docket carries forward for later sessions when the new categories need Find-menu tiles.
 
-Full session detail: `docs/session-logs/session-225-2026-05-05.md`. Commit: `<TBD>`.
+Full session detail: `docs/session-logs/session-225-2026-05-05.md`. Commit: `122f969`.
 
 ---
 
