@@ -8,7 +8,7 @@
 
 Shipped a new debug-only top-bar camera button next to the existing recon-camera that auto-fires the rear camera every N seconds while a session-scoped toggle is ON, baking GPS lat/lon/alt/speed/track + compass heading EXIF and publishing to `Pictures/WickedSalemRecon/`. Six surfaces: `BuildDefaults.GPS_BURST_ENABLED` const (R8-stripped from retail via existing `RECON_DEFAULTS` BuildConfig field); `toolbarGpsBurstIcon` ImageView in `toolbar_two_row.xml` (default GONE); `MenuEventListener.onGpsBurstToggled(enabled)` interface stub; `AppBarMenuManager.setupSlimToolbar` extended with `gpsBurstIcon` param + session-scoped toggle (WHITE↔#E53935 red tint, never persisted); new `GpsBurstCameraManager.kt` (~370 LOC, headless CameraX `ImageCapture` only, no Preview surface — silent background capture); `SalemMainActivity` Hilt-injects `LocationManager` and lifecycle-wires the manager. Operator field-tested on a 34-min Beverly→Salem loop walk producing 485 photos (1.14 GB); pulled via `adb pull`, organized into per-session folders with GPX + GeoJSON + CSV + summary via new `tools/pull-and-organize-burst-photos.py` (split rule: gap > 120 s = new session); wiped device after. Round-2 tuning based on captured histogram (median 4 s on a 3 s throttle because Lenovo serves GPS fixes ~every 2 s): GPS poll 1 Hz → 2 Hz, throttle 3 s → 2 s, flash forced OFF on builder + live `ImageCapture` instance. Field validation of the new cadence + actual POI/path-alignment review of the captured imagery owed for next session.
 
-Full session detail: `docs/session-logs/session-228-2026-05-06.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-228-2026-05-06.md`. Commit: `bd488d2`.
 
 ---
 
