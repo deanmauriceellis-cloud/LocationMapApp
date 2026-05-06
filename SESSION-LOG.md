@@ -8,7 +8,7 @@
 
 Wired the S170 sprite figures into the running app as an admin-driven, per-POI haunt effect. Six surfaces touched: (1) Room v17 → v18 with 6 new `haunt_*` columns on `salem_pois` (sprite id + outer/inner range/interval + enabled, identity `e6c5a128efdd9949f7297c88ada7d698`); (2) cache-proxy `admin-pois.js` UPDATABLE_FIELDS extended; (3) new **Haunt** tab in `web/src/admin/PoiEditDialog.tsx` with sprite dropdown + 4 numeric inputs + Enabled toggle, plus a generous dialog resize (1100 × 95 vh) so warnings don't crowd the form; (4) 7 sprite WebPs (~992 KB) bundled into `app-salem/src/main/assets/sprites/`; (5) new `SpriteOverlay.kt` (~190 LOC) implementing `MapOverlay` with two-band cadence + 1-second swoop (bell-curve alpha + float-up + scale curve) + lazy bitmap cache; (6) `SalemMainActivity.setupMap` wires SpriteOverlay alongside water/firefly/grass + injects `SalemPoiDao` for haunt-config seeding + feeds GPS to overlay every fix. Post-deploy snag — admin-created POI without narration was filtered out of the marker loader (`is_narrated=true` requirement); fix: loosen `findNarrated()` to also surface `haunt_sprite_id IS NOT NULL AND haunt_enabled = 1` rows. Field-walk verification of the actual swoop firing on Lenovo owed.
 
-Full session detail: `docs/session-logs/session-226-2026-05-05.md`. Commit: `<sha-pending>`.
+Full session detail: `docs/session-logs/session-226-2026-05-05.md`. Commit: `7534483`.
 
 ---
 
