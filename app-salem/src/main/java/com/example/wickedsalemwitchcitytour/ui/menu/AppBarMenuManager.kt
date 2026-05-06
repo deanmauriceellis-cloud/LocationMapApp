@@ -74,6 +74,11 @@ class AppBarMenuManager(
         get() = prefs.getInt(MenuPrefs.PREF_RADAR_FREQ, MenuPrefs.DEFAULT_RADAR_FREQ_MIN)
         set(v) { prefs.edit().putInt(MenuPrefs.PREF_RADAR_FREQ, v).apply() }
 
+    // S228 — session-scoped GPS-burst toggle state. Not persisted; every cold
+    // start opens with burst OFF so the operator can't accidentally leave it
+    // on between sessions and burn the gallery.
+    private var gpsBurstActive: Boolean = false
+
     // ─────────────────────────────────────────────────────────────────────────
     // PHASE 1 — called from onCreate (no menu items exist yet)
     // ─────────────────────────────────────────────────────────────────────────
@@ -145,6 +150,7 @@ class AppBarMenuManager(
         homeIcon: ImageView? = null,
         aboutIcon: ImageView? = null,
         cameraIcon: ImageView? = null,
+        gpsBurstIcon: ImageView? = null,
         alertsBadge: TextView? = null,
         layersBadge: TextView? = null
     ): SlimToolbarRefs {
@@ -196,6 +202,27 @@ class AppBarMenuManager(
         cameraIcon?.let { icon ->
             icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
             icon.setOnClickListener { menuEventListener.onCameraReconRequested() }
+        }
+
+        // S228 — GPS-burst camera toggle (debug-only, gated by BuildDefaults.GPS_BURST_ENABLED).
+        // Tap toggles the burst state. Tint: WHITE when OFF, RED (#E53935) when ON.
+        // State is session-scoped (not persisted) — every cold start opens with burst OFF.
+        gpsBurstIcon?.let { icon ->
+            if (!com.example.wickedsalemwitchcitytour.ui.BuildDefaults.GPS_BURST_ENABLED) {
+                icon.visibility = View.GONE
+            } else {
+                icon.visibility = View.VISIBLE
+                icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+                icon.setOnClickListener {
+                    val newState = !gpsBurstActive
+                    gpsBurstActive = newState
+                    icon.imageTintList = ColorStateList.valueOf(
+                        if (newState) Color.parseColor("#E53935") else Color.WHITE
+                    )
+                    DebugLogger.i(TAG, "GPS-burst toggle → $newState")
+                    menuEventListener.onGpsBurstToggled(newState)
+                }
+            }
         }
 
         // Tile source picker icon — PopupMenu with Satellite / Street / Witchy.

@@ -56,6 +56,23 @@
             android:contentDescription="Take recon photo (GPS+compass EXIF)"
             android:tooltipText="Camera (GPS+compass EXIF)" />
 
+        <!-- S228 — GPS-burst camera. Visible only when BuildDefaults.GPS_BURST_ENABLED
+             (debug builds). Toggle ON = auto-shoot every 3s on each new fix; OFF = idle. -->
+        <ImageView
+            android:id="@+id/toolbarGpsBurstIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_camera_recon"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:contentDescription="GPS-burst camera (auto-shoot every 3s while ON)"
+            android:tooltipText="GPS-burst camera (toggle)" />
+
         <ImageView
             android:id="@+id/toolbarWeatherIcon"
             android:layout_width="36dp"

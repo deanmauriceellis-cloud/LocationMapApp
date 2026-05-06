@@ -30,6 +30,11 @@ object BuildDefaults {
     const val GPS_TRACK_VISIBLE: Boolean = BuildConfig.RECON_DEFAULTS
     const val HEADING_UP:        Boolean = BuildConfig.RECON_DEFAULTS
 
+    // S228 — second toolbar camera that auto-fires every 3s while the toggle is
+    // ON, for post-walk POI/path-alignment QC. Headless CameraX, no preview.
+    // Const so R8 strips the toolbar wiring + controller refs in retail.
+    const val GPS_BURST_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
+
     val DEFAULT_ZOOM:   Double = if (BuildConfig.RECON_DEFAULTS) 19.0 else 18.0
     val FAB_ZOOM_STEP:  Double = if (BuildConfig.RECON_DEFAULTS) 2.0 else 1.0
     val MAGNIFY_LEVEL:  Int    = if (BuildConfig.RECON_DEFAULTS) 1   else 0

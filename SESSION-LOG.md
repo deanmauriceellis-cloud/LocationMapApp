@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 218-227 (S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 219-228 (S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 228: 2026-05-06 — GPS-burst camera (debug-only second toolbar button) + organizer tooling
+
+Shipped a new debug-only top-bar camera button next to the existing recon-camera that auto-fires the rear camera every N seconds while a session-scoped toggle is ON, baking GPS lat/lon/alt/speed/track + compass heading EXIF and publishing to `Pictures/WickedSalemRecon/`. Six surfaces: `BuildDefaults.GPS_BURST_ENABLED` const (R8-stripped from retail via existing `RECON_DEFAULTS` BuildConfig field); `toolbarGpsBurstIcon` ImageView in `toolbar_two_row.xml` (default GONE); `MenuEventListener.onGpsBurstToggled(enabled)` interface stub; `AppBarMenuManager.setupSlimToolbar` extended with `gpsBurstIcon` param + session-scoped toggle (WHITE↔#E53935 red tint, never persisted); new `GpsBurstCameraManager.kt` (~370 LOC, headless CameraX `ImageCapture` only, no Preview surface — silent background capture); `SalemMainActivity` Hilt-injects `LocationManager` and lifecycle-wires the manager. Operator field-tested on a 34-min Beverly→Salem loop walk producing 485 photos (1.14 GB); pulled via `adb pull`, organized into per-session folders with GPX + GeoJSON + CSV + summary via new `tools/pull-and-organize-burst-photos.py` (split rule: gap > 120 s = new session); wiped device after. Round-2 tuning based on captured histogram (median 4 s on a 3 s throttle because Lenovo serves GPS fixes ~every 2 s): GPS poll 1 Hz → 2 Hz, throttle 3 s → 2 s, flash forced OFF on builder + live `ImageCapture` instance. Field validation of the new cadence + actual POI/path-alignment review of the captured imagery owed for next session.
+
+Full session detail: `docs/session-logs/session-228-2026-05-06.md`. Commit: `<sha>`.
+
+---
 
 ## Session 227: 2026-05-05 → 2026-05-06 — Haunt refinement (duration knob + screen-aligned upright fix)
 
@@ -73,14 +81,6 @@ Full session detail: `docs/session-logs/session-220-2026-05-02.md`. Commit: `911
 Baked the new HARD RULE end-to-end: warm narrations with overflow facts as scrollable subtopic cards. Added `salem_pois.narration_subtopics` JSONB, extended the publish chain, bumped Room v16→v17, built a structured `SubtopicEditor` in the admin (header/body cards with word-count + source_kind/source_ref + reorder), and rendered the full chip-strip + collapsible body cards on the POI Detail Sheet (all chips visible, no pagination, no "More" overflow). Authored 5 worked-example subtopics on Old Burying Point (Hathorne / Bradstreet / Richard More / Death's Heads & Willows / adjacent Witch Trials Memorial). Operator-confirmed visual on Lenovo HNY0CY0W after the parseSalemPoi/salemPoiToJson Bundle-serializer footgun was discovered + fixed.
 
 Full session detail: `docs/session-logs/session-219-2026-05-02.md`. Commit: `84ab1e2`.
-
----
-
-## Session 218: 2026-05-01 — Per-POI location validate workflow (TigerLine + Google Places) with map-review UX
-
-S218 shipped a fully-featured per-POI location validation workflow for the admin tool. Top-of-card **Validate via TigerLine** (fuchsia) and **Validate via Google** (sky blue) buttons + Lint-tab per-row equivalents both run server-side geocoding (PostGIS Tiger or Google Places API New), filter to the Salem area (15 km drops wrong-town matches), and route into a unified proposal-review mode: the editor closes, the map flies to the proposal at zoom 20, the fuchsia "?" pin is draggable, and a small floating panel shows current/proposed coords + source pill + drift (with amber/rose warning bands at 1 km / 5 km) + Accept/Cancel/Re-center/"Ask Google ↗"-link. Tiger path includes snap-to-edge (50 m) + street-name-near-POI fallback (KNN on `tiger.edges` for cases like Sea Level Oyster Bar where Tiger's house-number range doesn't include #94 in Salem); Google path uses Places API (New) Text Search with `<name> <address>` query for storefront-level accuracy (resolves Salem Witch Village → 11 m vs Tiger's 113 m parking-lot interpolation). Backend lives in `cache-proxy/lib/admin-pois.js` (three new endpoints: `/validate-location-tiger`, `/geocode-via-google`, `/discard-proposed-location`; existing `/accept-proposed-location` extended to take optional `{lat,lng}` body for committing the dragged-pin position) + new `cache-proxy/lib/tiger-geocode.js` (refactored shared helpers with verbose `[validate-tiger <poi_id>]`/`[geocode-google <poi_id>]` logging across every step). Frontend: new `web/src/admin/ProposalReviewPanel.tsx` floating bottom-right panel + `ProposalPreviewLayer` draggable in `AdminMap.tsx` + `proposalReview` state machine in `AdminLayout.tsx` + Validate buttons in `PoiEditDialog.tsx` header and `LintTab.tsx` per-row. Wrote `docs/TIGERLINE.md` (~370 lines) as operator reference covering both pipelines, drift bands, log recipes, MassGIS L3 integration plan for future work. No DB schema changes (S162 columns carried the entire workflow); no Android impact.
-
-Full session detail: `docs/session-logs/session-218-2026-05-01.md`. Commit: `c3fb781`.
 
 ---
 

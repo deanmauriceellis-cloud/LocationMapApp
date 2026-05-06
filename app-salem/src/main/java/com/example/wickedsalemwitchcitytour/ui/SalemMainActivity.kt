@@ -61,6 +61,7 @@ import com.example.wickedsalemwitchcitytour.util.DebugHttpServer
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.userdata.GpsTrackRecorder
 import com.example.wickedsalemwitchcitytour.userdata.KatrinaCameraManager
+import com.example.wickedsalemwitchcitytour.userdata.GpsBurstCameraManager
 import com.example.wickedsalemwitchcitytour.wickedmap.AnimatedWaterOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.FireflyOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.SpriteOverlay
@@ -621,6 +622,27 @@ class SalemMainActivity : AppCompatActivity() {
         katrinaCameraManager.onCameraPermissionResult(granted)
     }
 
+    /**
+     * S228 — needed by [GpsBurstCameraManager] to subscribe to its own 1 Hz
+     * FusedLocationProvider stream while the burst toggle is ON. Distinct from
+     * [MainViewModel]'s subscription so we get raw, unclamped fixes for the
+     * EXIF GPS tags.
+     */
+    @Inject
+    internal lateinit var burstLocationManager: com.example.locationmapapp.data.location.LocationManager
+
+    // ── S228: Second top-bar camera — GPS-burst (debug-only) ─────────────
+    internal val gpsBurstCameraManager: GpsBurstCameraManager by lazy {
+        GpsBurstCameraManager(this, burstLocationManager)
+    }
+
+    internal val gpsBurstPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        DebugLogger.i("SalemMainActivity", "GPS-burst camera permission result: granted=$granted")
+        gpsBurstCameraManager.onCameraPermissionResult(granted)
+    }
+
     // =========================================================================
     // LIFECYCLE
     // =========================================================================
@@ -682,9 +704,18 @@ class SalemMainActivity : AppCompatActivity() {
             homeIcon       = binding.root.findViewById(R.id.toolbarHomeIcon),
             aboutIcon      = binding.root.findViewById(R.id.toolbarAboutIcon),
             cameraIcon     = binding.root.findViewById(R.id.toolbarCameraIcon),
+            gpsBurstIcon   = binding.root.findViewById(R.id.toolbarGpsBurstIcon),
             alertsBadge    = binding.root.findViewById(R.id.alertsBadge),
             layersBadge    = binding.root.findViewById(R.id.layersBadge)
         )
+
+        // S228 — register burst-camera permission launcher; instantiate lazy
+        // val so the sensor listener exists before onResume registers it. No-op
+        // when BuildDefaults.GPS_BURST_ENABLED is false (R8 strips the toolbar
+        // wiring upstream, so the manager is never asked to do anything).
+        if (BuildDefaults.GPS_BURST_ENABLED) {
+            gpsBurstCameraManager.registerPermissionLauncher(gpsBurstPermissionLauncher)
+        }
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
         alertsBadgeView = toolbarRefs.alertsBadge
@@ -936,6 +967,7 @@ class SalemMainActivity : AppCompatActivity() {
         // sensor so it costs nothing until an event actually fires.
         motionTracker?.start()
         katrinaCameraManager.onResume()
+        if (BuildDefaults.GPS_BURST_ENABLED) gpsBurstCameraManager.onResume()
         DebugLogger.i("SalemMainActivity","onResume()")
     }
     override fun onPause() {
@@ -951,6 +983,7 @@ class SalemMainActivity : AppCompatActivity() {
         deviceOrientationTracker?.stop()
         motionTracker?.stop()
         katrinaCameraManager.onPause()
+        if (BuildDefaults.GPS_BURST_ENABLED) gpsBurstCameraManager.onPause()
         DebugLogger.i("SalemMainActivity","onPause()")
     }
     override fun onDestroy() {
@@ -4438,6 +4471,14 @@ class SalemMainActivity : AppCompatActivity() {
             resetIdleTimer()
             DebugLogger.i("SalemMainActivity", "onCameraReconRequested")
             katrinaCameraManager.requestCapture()
+        }
+
+        override fun onGpsBurstToggled(enabled: Boolean) {
+            resetIdleTimer()
+            DebugLogger.i("SalemMainActivity", "onGpsBurstToggled enabled=$enabled")
+            if (BuildDefaults.GPS_BURST_ENABLED) {
+                gpsBurstCameraManager.setEnabled(enabled)
+            }
         }
 
         // ── Tours ─────────────────────────────────────────────────────────────

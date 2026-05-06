@@ -291,6 +291,18 @@ interface MenuEventListener {
      */
     fun onCameraReconRequested() { onStubAction("camera_recon") }
 
+    /**
+     * S228 — second top-bar Camera button: GPS-burst toggle. While ON, the
+     * rear camera auto-fires once every 3s on each new GPS fix and writes the
+     * photo to Pictures/WickedSalemRecon/ with EXIF GPS + heading baked in.
+     * For post-walk POI/path-alignment QC. Debug-only (gated by
+     * BuildDefaults.GPS_BURST_ENABLED, R8-stripped from retail). Default
+     * routes through [onStubAction] so non-Salem hosts can compile.
+     *
+     * @param enabled new toggle state (true = burst ON, false = burst OFF).
+     */
+    fun onGpsBurstToggled(enabled: Boolean) { onStubAction("gps_burst:$enabled") }
+
     // =========================================================================
     // SAFETY NET
     // =========================================================================
