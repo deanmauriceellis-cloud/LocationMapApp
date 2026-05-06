@@ -8,7 +8,7 @@
 
 Seven-iteration refinement of S226's per-POI Haunt. Net schema change: Room v18 → v19 (identity `745afa3eb4ce04bd7873671ea297b6e0`) with one new column `haunt_duration_s` REAL; admin form now in minutes (wire stays seconds via `buildDefaults`/`buildPayload` ×60). SpriteOverlay rewritten end-to-end: alpha envelope decoupled from scale (flat-top trapezoid 15/70/15 fade), pseudo-3D depth bob with randomized amplitude/cycles/phase per fire, frame-11-pinned upright facing per S170 demo calibration, one elliptical orbit per dance (random radii 70-140 × 50-100 px, random direction), gentle scale clamp 0.7-1.4. Per-sprite rotation hack added during diagnosis then **deleted** when the real cause was found in `WickedAnimationOverlay.kt:22-27` docstring: osmdroid pre-rotates the canvas by `mapOrientation` (heading-up tour mode) so sprites with a clear up-axis inherit the rotation. Fix is 3 lines: pass `mapView.mapOrientation` into `CameraState.mapOrientationDeg`, then in `SpriteOverlay.draw` `canvas.save() / rotate(-mapOrientationDeg, cx, cy) / drawBitmap / restore()` so the sprite stays anchored at the POI but renders upright on screen regardless of map heading. Operator close: "Much better." S170 sprite WebPs split into 112 per-frame WebPs (`assets/sprites/<id>/00.webp`...`15.webp`, ~2.2 MB total). Field-walk validation of the upright screen-aligned skeleton on Lenovo near the bridge POI owed for next session.
 
-Full session detail: `docs/session-logs/session-227-2026-05-05.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-227-2026-05-05.md`. Commit: `874a764`.
 
 ---
 
