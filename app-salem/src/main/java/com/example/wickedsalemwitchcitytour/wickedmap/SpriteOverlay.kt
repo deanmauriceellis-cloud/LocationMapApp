@@ -50,10 +50,16 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
         val innerRangeM: Int,
         val innerIntervalS: Int,
         val enabled: Boolean,
+        /** S227 — per-fire dance length, seconds. NULL = [DEFAULT_DURATION_MS]. */
+        val durationS: Float? = null,
     )
 
     private val assetManager = context.assets
-    private val spriteBitmaps = HashMap<String, Bitmap?>()
+    // Each sprite is 16 frames at 22.5° heading increments (S170 bake split
+    // into per-frame WebPs at S227). Cycling through frames during the dance
+    // makes the character appear to spin/turn while the size bob makes it
+    // look like it's coming closer or moving away.
+    private val spriteFrames = HashMap<String, Array<Bitmap?>?>()
 
     @Volatile private var haunts: List<HauntConfig> = emptyList()
 
@@ -105,16 +111,55 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
                     }
                 val last = lastFireMs[h.poiId] ?: 0L
                 if (last == 0L || frameTimeMs - last >= intervalMs) {
-                    val bitmap = loadSprite(h.spriteId) ?: continue
-                    activeSwoops.add(
-                        ActiveSwoop(
-                            lat = h.lat,
-                            lng = h.lng,
-                            bitmap = bitmap,
-                            startMs = frameTimeMs,
-                        )
+                    val frames = loadSpriteFrames(h.spriteId) ?: continue
+                    val durationMs = ((h.durationS ?: DEFAULT_DURATION_S) * 1000f)
+                        .toLong()
+                        .coerceAtLeast(MIN_DURATION_MS)
+                    // Randomize each fire so the same POI dances differently
+                    // every time. Pseudo-3D bob: depth oscillates between
+                    // (1 - amplitude) "near" and (1 + amplitude) "far"; scale
+                    // is the inverse so closer = bigger. Phase + cycle count
+                    // + horizontal drift offsets all randomized. Bob cycle
+                    // count scales with duration so a 2s dance gets ~2x as
+                    // many bobs as a 1s dance (fixed cycles/sec, not fixed
+                    // cycles/dance).
+                    // Single upright facing — frame 11 is the S170-calibrated
+                    // toward-viewer pose ("frame 15 faces me" w/ frameOffset=11
+                    // in the prior demo). Fall back to first available frame
+                    // if 11 is missing for this sprite.
+                    val firstNonNull = frames.indexOfFirst { it != null }
+                    val frameIdx = if (frames[FRONT_FRAME_INDEX] != null)
+                        FRONT_FRAME_INDEX else firstNonNull
+                    // Path: gentle elliptical drift around the POI over the
+                    // dance — character translates in a slow loop. Radii are
+                    // in screen pixels, so the sprite traces ~80-150 px around
+                    // the POI marker. One full orbit per dance regardless of
+                    // duration, so 3s = slow drift, 30s = much slower drift.
+                    val sw = ActiveSwoop(
+                        lat = h.lat,
+                        lng = h.lng,
+                        frames = frames,
+                        startMs = frameTimeMs,
+                        durationMs = durationMs,
+                        bobAmplitude = randomInRange(0.06f, 0.14f),
+                        bobCycles = randomInRange(1.5f, 2.5f),
+                        phase = randomInRange(0f, (2 * PI).toFloat()),
+                        pathRadiusPxX = randomInRange(70f, 140f),
+                        pathRadiusPxY = randomInRange(50f, 100f),
+                        pathPhase = randomInRange(0f, (2 * PI).toFloat()),
+                        pathDirection = if (Math.random() < 0.5) 1 else -1,
+                        frameIdx = frameIdx,
                     )
+                    activeSwoops.add(sw)
                     lastFireMs[h.poiId] = frameTimeMs
+                    DebugLogger.i(
+                        TAG,
+                        "fire ${h.poiId} sprite=${h.spriteId} duration=${durationMs}ms " +
+                            "amp=%.2f orbit=(%.0f,%.0f) frame=%d".format(
+                                sw.bobAmplitude, sw.pathRadiusPxX, sw.pathRadiusPxY,
+                                sw.frameIdx
+                            )
+                    )
                 }
             }
         }
@@ -123,7 +168,7 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
             val it = activeSwoops.iterator()
             while (it.hasNext()) {
                 val sw = it.next()
-                if (frameTimeMs - sw.startMs > SWOOP_DURATION_MS) it.remove()
+                if (frameTimeMs - sw.startMs > sw.durationMs) it.remove()
             }
         }
     }
@@ -133,69 +178,140 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
 
         for (sw in activeSwoops) {
             val elapsed = nowMs - sw.startMs
-            val t = (elapsed.toFloat() / SWOOP_DURATION_MS).coerceIn(0f, 1f)
-            // Bell-curve alpha: 0 → 1 → 0 over the second.
-            val bell = sin(PI * t).toFloat()
-            val alpha = (bell * 255f).toInt().coerceIn(0, 255)
+            val t = (elapsed.toFloat() / sw.durationMs).coerceIn(0f, 1f)
+
+            // Alpha envelope: short fade-in / fade-out at the edges of the
+            // dance, full opacity through the middle. With a flat-top
+            // trapezoid most of the dance plays at full alpha — operator
+            // said the previous bell-curve made it feel like a 300ms flash.
+            val fadeFraction = ALPHA_FADE_FRACTION
+            val alphaF = when {
+                t < fadeFraction -> t / fadeFraction
+                t > 1f - fadeFraction -> (1f - t) / fadeFraction
+                else -> 1f
+            }
+            val alpha = (alphaF * 255f).toInt().coerceIn(0, 255)
             if (alpha <= 0) continue
-            val scale = 0.6f + 0.4f * bell
 
+            // Gentle pseudo-3D depth: small near/far oscillation so the
+            // character looks like it's drifting closer and farther. Lower
+            // amplitude than before — operator wanted gentle, not pulsating.
+            val depth = 1f + sw.bobAmplitude * sin(
+                2.0 * PI * sw.bobCycles * t + sw.phase
+            ).toFloat()
+            val scale = (1f / depth).coerceIn(MIN_SCALE, MAX_SCALE)
+
+            // Path: one elliptical orbit around the POI over the dance.
+            // pathDirection (±1) flips clockwise/counter-clockwise so each
+            // fire orbits a different way.
+            val pathArg = (2.0 * PI * t * sw.pathDirection + sw.pathPhase).toFloat()
             val proj = camera.project(sw.lat, sw.lng)
-            // Float upward + small rightward drift so the sprite "moves" a bit
-            // during its 1s peek instead of sitting still on top of the POI.
-            val cx = proj[0] + 30f * t
-            val cy = proj[1] - 80f - 40f * t
+            val cx = proj[0] + sw.pathRadiusPxX * cos(pathArg) * alphaF
+            // Negative Y so the orbit floats above the POI marker rather
+            // than dropping below it. Sit ~50 px above the POI center.
+            val cy = proj[1] - 50f + sw.pathRadiusPxY * sin(pathArg) * alphaF
 
-            val bw = sw.bitmap.width.toFloat()
-            val bh = sw.bitmap.height.toFloat()
-            // 16-frame WebP first-frame decode comes back at native sprite size
-            // (~512x512). Scale to a fixed visible target then apply scale curve.
-            val targetMax = TARGET_SIZE_PX
+            val bm = sw.frames.getOrNull(sw.frameIdx) ?: continue
+
+            val bw = bm.width.toFloat()
+            val bh = bm.height.toFloat()
             val srcAspect = bh / bw
-            val drawW = targetMax * scale
+            val drawW = TARGET_SIZE_PX * scale
             val drawH = drawW * srcAspect
 
             val left = cx - drawW / 2f
             val top = cy - drawH / 2f
             val srcRect = SRC_RECT_REUSABLE.apply {
-                set(0, 0, sw.bitmap.width, sw.bitmap.height)
+                set(0, 0, bm.width, bm.height)
             }
             val dstRect = DST_RECT_REUSABLE.apply {
                 set(left, top, left + drawW, top + drawH)
             }
             paint.alpha = alpha
-            canvas.drawBitmap(sw.bitmap, srcRect, dstRect, paint)
+            // Always draw the sprite upright on screen, regardless of map
+            // rotation. Osmdroid pre-rotates the canvas by mapOrientation in
+            // heading-up mode; we cancel that rotation around this sprite's
+            // screen anchor so the bitmap stays screen-aligned. Sprite is a
+            // dumb dancing graphic — it has no concept of north.
+            if (camera.mapOrientationDeg != 0f) {
+                canvas.save()
+                canvas.rotate(-camera.mapOrientationDeg, cx, cy)
+                canvas.drawBitmap(bm, srcRect, dstRect, paint)
+                canvas.restore()
+            } else {
+                canvas.drawBitmap(bm, srcRect, dstRect, paint)
+            }
         }
     }
 
-    private fun loadSprite(id: String): Bitmap? {
-        if (spriteBitmaps.containsKey(id)) return spriteBitmaps[id]
-        val bm = try {
-            assetManager.open("sprites/$id.webp").use { input ->
-                BitmapFactory.decodeStream(input)
-            }
-        } catch (e: Exception) {
-            DebugLogger.w(TAG, "failed to load sprite '$id': ${e.message}")
-            null
+    private fun randomInRange(min: Float, max: Float): Float =
+        min + (Math.random().toFloat() * (max - min))
+
+    /**
+     * Lazy-load all 16 heading frames for one sprite. Frames live at
+     * `assets/sprites/<id>/00.webp` … `15.webp`. Missing frames are tolerated
+     * (returns null cells) but at least one frame must load or we treat the
+     * sprite as broken and refuse to spawn a swoop.
+     */
+    private fun loadSpriteFrames(id: String): Array<Bitmap?>? {
+        spriteFrames[id]?.let { return it }
+        if (spriteFrames.containsKey(id)) return null
+        val frames = arrayOfNulls<Bitmap>(FRAME_COUNT)
+        var loaded = 0
+        for (i in 0 until FRAME_COUNT) {
+            val path = "sprites/$id/%02d.webp".format(i)
+            try {
+                assetManager.open(path).use { input ->
+                    val bm = BitmapFactory.decodeStream(input)
+                    if (bm != null) {
+                        frames[i] = bm
+                        loaded++
+                    }
+                }
+            } catch (_: Exception) { /* missing frame; tolerated */ }
         }
-        spriteBitmaps[id] = bm
-        if (bm != null) {
-            DebugLogger.i(TAG, "loaded sprite '$id' = ${bm.width}x${bm.height}")
-        }
-        return bm
+        val result = if (loaded > 0) frames else null
+        spriteFrames[id] = result
+        DebugLogger.i(TAG, "loaded sprite '$id' frames=$loaded/$FRAME_COUNT")
+        return result
     }
 
     private data class ActiveSwoop(
         val lat: Double,
         val lng: Double,
-        val bitmap: Bitmap,
+        val frames: Array<Bitmap?>,
         val startMs: Long,
+        val durationMs: Long,
+        val bobAmplitude: Float,
+        val bobCycles: Float,
+        val phase: Float,
+        /** Elliptical orbit radii around the POI, in screen pixels. */
+        val pathRadiusPxX: Float,
+        val pathRadiusPxY: Float,
+        val pathPhase: Float,
+        val pathDirection: Int,
+        /** Fixed heading frame chosen at fire time — no per-frame spinning. */
+        val frameIdx: Int,
     )
 
     companion object {
         private const val TAG = "SpriteOverlay"
-        private const val SWOOP_DURATION_MS = 1000L
+        private const val DEFAULT_DURATION_S = 1.0f
+        private const val MIN_DURATION_MS = 200L
         private const val TARGET_SIZE_PX = 220f
+        private const val MIN_SCALE = 0.7f
+        private const val MAX_SCALE = 1.4f
+        private const val FRAME_COUNT = 16
+        // S170 calibration (~/AI-Studio/map-sprites/demo.html, line 56):
+        // `frameOffset = 11` was the calibrated value where the source frame
+        // is the upright toward-viewer pose. We use that frame fixed across
+        // all fires per operator: orientation stays put, size + path move.
+        private const val FRONT_FRAME_INDEX = 11
+
+        // Fraction of duration spent fading in (and again fading out). With
+        // 0.15, a 2s dance fades for 0.3s on each end and plays full-alpha
+        // for the middle 1.4s.
+        private const val ALPHA_FADE_FRACTION = 0.15f
 
         private val SRC_RECT_REUSABLE = Rect()
         private val DST_RECT_REUSABLE = RectF()

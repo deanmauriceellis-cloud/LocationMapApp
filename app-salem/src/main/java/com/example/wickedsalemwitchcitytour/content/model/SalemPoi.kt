@@ -140,5 +140,8 @@ data class SalemPoi(
     @ColumnInfo(name = "haunt_outer_interval_s") val hauntOuterIntervalS: Int? = null,
     @ColumnInfo(name = "haunt_inner_range_m") val hauntInnerRangeM: Int? = null,
     @ColumnInfo(name = "haunt_inner_interval_s") val hauntInnerIntervalS: Int? = null,
-    @ColumnInfo(name = "haunt_enabled", defaultValue = "1") val hauntEnabled: Boolean = true
+    @ColumnInfo(name = "haunt_enabled", defaultValue = "1") val hauntEnabled: Boolean = true,
+
+    // S227 — per-fire dance duration in seconds. NULL = SpriteOverlay default (1.0s).
+    @ColumnInfo(name = "haunt_duration_s") val hauntDurationS: Float? = null
 )

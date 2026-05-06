@@ -45,6 +45,7 @@ class WickedAnimationOverlay(
             zoom = mapView.zoomLevelDouble,
             viewportW = mapView.width,
             viewportH = mapView.height,
+            mapOrientationDeg = mapView.mapOrientation,
         )
         if (camera.viewportW <= 0 || camera.viewportH <= 0) return
 

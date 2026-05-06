@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 217-226 (S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 218-227 (S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 227: 2026-05-05 → 2026-05-06 — Haunt refinement (duration knob + screen-aligned upright fix)
+
+Seven-iteration refinement of S226's per-POI Haunt. Net schema change: Room v18 → v19 (identity `745afa3eb4ce04bd7873671ea297b6e0`) with one new column `haunt_duration_s` REAL; admin form now in minutes (wire stays seconds via `buildDefaults`/`buildPayload` ×60). SpriteOverlay rewritten end-to-end: alpha envelope decoupled from scale (flat-top trapezoid 15/70/15 fade), pseudo-3D depth bob with randomized amplitude/cycles/phase per fire, frame-11-pinned upright facing per S170 demo calibration, one elliptical orbit per dance (random radii 70-140 × 50-100 px, random direction), gentle scale clamp 0.7-1.4. Per-sprite rotation hack added during diagnosis then **deleted** when the real cause was found in `WickedAnimationOverlay.kt:22-27` docstring: osmdroid pre-rotates the canvas by `mapOrientation` (heading-up tour mode) so sprites with a clear up-axis inherit the rotation. Fix is 3 lines: pass `mapView.mapOrientation` into `CameraState.mapOrientationDeg`, then in `SpriteOverlay.draw` `canvas.save() / rotate(-mapOrientationDeg, cx, cy) / drawBitmap / restore()` so the sprite stays anchored at the POI but renders upright on screen regardless of map heading. Operator close: "Much better." S170 sprite WebPs split into 112 per-frame WebPs (`assets/sprites/<id>/00.webp`...`15.webp`, ~2.2 MB total). Field-walk validation of the upright screen-aligned skeleton on Lenovo near the bridge POI owed for next session.
+
+Full session detail: `docs/session-logs/session-227-2026-05-05.md`. Commit: `<sha>`.
+
+---
 
 ## Session 226: 2026-05-05 — Per-POI Haunt Effect (admin-driven sprite peek)
 
@@ -75,13 +83,4 @@ S218 shipped a fully-featured per-POI location validation workflow for the admin
 Full session detail: `docs/session-logs/session-218-2026-05-01.md`. Commit: `c3fb781`.
 
 ---
-
-## Session 217: 2026-05-01 — Category-aware FAB POI narration + Show-All-POIs FAB overrides every gate
-
-Two operator-driven UX changes. (1) New `BusinessLabel.kt` builds a curated `(category, subcategory) → singular noun-phrase` map (16 BUSINESSES-group categories + ~55 subcategories). `PoiContentPolicy.strippedAnnouncement` and `TourEngine.checkAmbientProximity` both emit `"You are near [the ]<name>, a <phrase>."` Subcategory absorbs category when redundant ("walking tour company", not "walking tour tour company"); `the` skipped for `The …` and possessive `'s` names; defensive leaf-humanization for any new enum added later. (2) Operator rule locked: when the "Show All POIs" FAB is on, ALL POIs narrate, period — bypasses tour gate, Layers checkboxes, Audio Control group toggles (Meaningful/Ambient/Businesses), and the no-narration-text early skip. New in-memory `AudioControl.showAllOverride` flag (resets to OFF every cold launch); `NarrationGeofenceManager.isHistoricalQualified` and `AudioControl.isPoiSpeechEnabled` both short-circuit to true when set; `SalemMainActivity.refreshHistoricalModeForActiveTour` pushes the flag on every FAB tap / tour-state transition / Layers-toggle / walk-sim start. Removed `TourEngine.startTour`'s direct `setTourMode(true,…)` call (and the `MenuPrefs` import) — that line was racing with the Activity observer and overriding the FAB-on intent at tour start, which is why operator's reproducer "toggle the FAB off then on" was a workaround. NARR-GATE diagnostic log now includes `override=` for field debugging. No Room schema impact (Kotlin-only). APK on Lenovo HNY0CY0W via auto-bake `assembleDebug` + `adb uninstall && install`.
-
-Full session detail: `docs/session-logs/session-217-2026-05-01.md`. Commit: `0c259fa`.
-
----
-
 

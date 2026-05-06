@@ -4500,6 +4500,7 @@ class SalemMainActivity : AppCompatActivity() {
                         innerRangeM = p.hauntInnerRangeM ?: 50,
                         innerIntervalS = p.hauntInnerIntervalS ?: 15,
                         enabled = p.hauntEnabled,
+                        durationS = p.hauntDurationS,
                     )
                 }
                 withContext(Dispatchers.Main) {

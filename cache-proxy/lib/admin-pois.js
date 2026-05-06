@@ -122,6 +122,8 @@ const UPDATABLE_FIELDS = [
   'haunt_outer_range_m', 'haunt_outer_interval_s',
   'haunt_inner_range_m', 'haunt_inner_interval_s',
   'haunt_enabled',
+  // S227 — per-fire dance duration (seconds, REAL). NULL = SpriteOverlay default.
+  'haunt_duration_s',
 ];
 
 // Columns that hold JSONB and must be JSON.stringify'd before binding.

@@ -60,6 +60,8 @@ export const UPDATABLE_FIELDS = [
   'haunt_outer_range_m', 'haunt_outer_interval_s',
   'haunt_inner_range_m', 'haunt_inner_interval_s',
   'haunt_enabled',
+  // S227 — per-fire dance length (seconds, REAL). Blank = SpriteOverlay default.
+  'haunt_duration_s',
 ] as const
 
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
@@ -87,6 +89,7 @@ export const NUMERIC_FIELDS: ReadonlySet<string> = new Set([
   'mhc_year_built',
   'haunt_outer_range_m', 'haunt_outer_interval_s',
   'haunt_inner_range_m', 'haunt_inner_interval_s',
+  'haunt_duration_s',
 ])
 
 // S226 — sprite ids available to the haunt effect dropdown. Mirror of the

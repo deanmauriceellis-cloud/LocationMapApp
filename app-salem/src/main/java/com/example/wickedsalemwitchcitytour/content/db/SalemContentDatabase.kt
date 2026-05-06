@@ -29,7 +29,7 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         WitchTrialsNpcBio::class,
         WitchTrialsNewspaper::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = true
 )
 abstract class SalemContentDatabase : RoomDatabase() {

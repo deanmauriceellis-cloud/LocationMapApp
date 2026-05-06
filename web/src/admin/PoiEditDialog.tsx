@@ -216,7 +216,13 @@ function buildDefaults(poi: PoiRow): Record<string, unknown> {
     } else if (NUMERIC_FIELDS.has(field)) {
       // Keep as number when present, '' when null. react-hook-form's number
       // inputs work either way as long as we coerce on submit.
-      out[field] = notNullish(raw) ? raw : ''
+      // S227: haunt_duration is stored in seconds on the wire but displayed
+      // in minutes in the admin form (operator works in minutes).
+      if (field === 'haunt_duration_s' && notNullish(raw) && typeof raw === 'number') {
+        out[field] = raw / 60
+      } else {
+        out[field] = notNullish(raw) ? raw : ''
+      }
     } else {
       out[field] = notNullish(raw) ? String(raw) : ''
     }
@@ -256,7 +262,9 @@ function buildPayload(
       } else {
         const n = typeof raw === 'number' ? raw : parseFloat(raw)
         if (Number.isFinite(n)) {
-          payload[field] = n
+          // S227: haunt_duration form is in minutes; convert back to seconds
+          // for the wire format (column is haunt_duration_s).
+          payload[field] = field === 'haunt_duration_s' ? n * 60 : n
         } else {
           return { error: `"${field}" must be a number` }
         }
@@ -1841,6 +1849,22 @@ export function PoiEditDialog({
                             />
                           </FieldRow>
                         </div>
+
+                        <FieldRow
+                          label="Dance duration (min)"
+                          htmlFor="haunt_duration_s"
+                          hint="How long each peek dances on screen, in minutes. Blank = 1 second default. Try 0.05 for a quick flash, 0.5 for 30s, 3 for 3min."
+                        >
+                          <input
+                            id="haunt_duration_s"
+                            type="number"
+                            step="0.05"
+                            min="0.01"
+                            placeholder="1"
+                            {...reg('haunt_duration_s')}
+                            className="w-32 px-2 py-1 text-sm border border-slate-300 rounded"
+                          />
+                        </FieldRow>
 
                         <label className="flex items-start gap-3 cursor-pointer group pt-2">
                           <div className="relative mt-0.5 flex-shrink-0">

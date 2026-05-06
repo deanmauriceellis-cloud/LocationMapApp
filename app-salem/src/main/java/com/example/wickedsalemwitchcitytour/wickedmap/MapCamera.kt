@@ -104,6 +104,15 @@ data class CameraState(
     val zoom: Double,
     val viewportW: Int,
     val viewportH: Int,
+    /**
+     * S227: clockwise map rotation in degrees (mirrors osmdroid's
+     * MapView.getMapOrientation). Non-zero in heading-up tour mode.
+     * Overlays that draw screen-aligned graphics (sprite characters,
+     * signs, anything with an obvious up-axis) should counter-rotate
+     * around the projected center so they stay upright on screen
+     * regardless of map orientation.
+     */
+    val mapOrientationDeg: Float = 0f,
 ) {
     val intZoom: Int get() = zoom.toInt().coerceIn(0, 22)
     val pxPerTile: Double get() = MercatorMath.TILE_SIZE * Math.pow(2.0, zoom - intZoom)
