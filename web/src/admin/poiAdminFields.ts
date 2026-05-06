@@ -55,6 +55,11 @@ export const UPDATABLE_FIELDS = [
   // POST /admin/salem/pois/:id/accept-proposed-location endpoint to commit
   // a proposal — it's not a PUT.
   'location_truth_of_record', 'location_status',
+  // S226 — Haunt effect (admin-driven sprite peek)
+  'haunt_sprite_id',
+  'haunt_outer_range_m', 'haunt_outer_interval_s',
+  'haunt_inner_range_m', 'haunt_inner_interval_s',
+  'haunt_enabled',
 ] as const
 
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
@@ -72,6 +77,7 @@ export const BOOLEAN_FIELDS: ReadonlySet<string> = new Set([
   'requires_transportation', 'wheelchair_accessible', 'seasonal',
   'is_tour_poi', 'is_civic_poi', 'is_narrated', 'default_visible',
   'location_truth_of_record',
+  'haunt_enabled',
 ])
 
 // Numeric columns (rendered as <input type="number">).
@@ -79,7 +85,17 @@ export const NUMERIC_FIELDS: ReadonlySet<string> = new Set([
   'lat', 'lng', 'geofence_radius_m', 'priority', 'wave', 'rating',
   'confidence', 'ad_priority', 'merchant_tier', 'year_established',
   'mhc_year_built',
+  'haunt_outer_range_m', 'haunt_outer_interval_s',
+  'haunt_inner_range_m', 'haunt_inner_interval_s',
 ])
+
+// S226 — sprite ids available to the haunt effect dropdown. Mirror of the
+// 7 webp assets in app-salem/src/main/assets/sprites/. Append new sprites
+// here as they're baked. Display label is the slug capitalized; the value
+// stored on the POI row is the slug.
+export const HAUNT_SPRITE_IDS: readonly string[] = [
+  'witch', 'owl', 'black-cat', 'katrina-kitty', 'skeleton', 'mouse', 'rat',
+]
 
 // Date columns (rendered as <input type="date">). PG returns ISO strings;
 // the date input wants YYYY-MM-DD which is the leading 10 chars of the ISO.

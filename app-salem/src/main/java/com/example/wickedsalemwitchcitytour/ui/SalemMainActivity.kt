@@ -40,7 +40,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -61,6 +63,7 @@ import com.example.wickedsalemwitchcitytour.userdata.GpsTrackRecorder
 import com.example.wickedsalemwitchcitytour.userdata.KatrinaCameraManager
 import com.example.wickedsalemwitchcitytour.wickedmap.AnimatedWaterOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.FireflyOverlay
+import com.example.wickedsalemwitchcitytour.wickedmap.SpriteOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.PolygonLibrary
 import com.example.wickedsalemwitchcitytour.wickedmap.RollingGrassOverlay
 import com.example.wickedsalemwitchcitytour.wickedmap.WickedAnimationOverlay
@@ -204,6 +207,20 @@ class SalemMainActivity : AppCompatActivity() {
      * [WickedAnimationOverlay] until the full WickedMapView migration lands.
      */
     private var wickedAnimationOverlay: WickedAnimationOverlay? = null
+
+    /**
+     * S226: per-POI haunt-effect sprite overlay. Lives inside the same
+     * [WickedAnimationOverlay] bridge as the water/firefly/grass overlays.
+     * Driven by the haunt_* columns on [salem_pois]; admin opt-in only.
+     */
+    private var spriteOverlay: SpriteOverlay? = null
+
+    /**
+     * S226: DAO direct-injection so we can pull the haunt-configured POI list
+     * once at setup without touching SalemContentRepository / a new ViewModel.
+     */
+    @Inject
+    internal lateinit var salemPoiDao: com.example.wickedsalemwitchcitytour.content.dao.SalemPoiDao
 
     // Phase 9T: Narration system
     /**
@@ -1228,12 +1245,21 @@ class SalemMainActivity : AppCompatActivity() {
             if (water.isNotEmpty()) animations += AnimatedWaterOverlay(water)
             if (cemeteries.isNotEmpty()) animations += FireflyOverlay(cemeteries)
             if (parks.isNotEmpty()) animations += RollingGrassOverlay(parks)
+
+            // S226: per-POI haunt overlay. Always added even if no haunt POIs
+            // are configured today — operator can flip a row in the admin tool
+            // and the next publish-chain bake will populate it.
+            val sprites = SpriteOverlay(this)
+            spriteOverlay = sprites
+            animations += sprites
+            loadHauntConfigsAsync()
+
             if (animations.isNotEmpty()) {
                 wickedAnimationOverlay = WickedAnimationOverlay(animations)
                 binding.mapView.overlays.add(0, wickedAnimationOverlay)
                 DebugLogger.i(
                     "SalemMainActivity",
-                    "WickedAnimationOverlay wired — water=${water.size} cemeteries=${cemeteries.size} parks=${parks.size}",
+                    "WickedAnimationOverlay wired — water=${water.size} cemeteries=${cemeteries.size} parks=${parks.size} sprites=on",
                 )
             } else {
                 DebugLogger.w("SalemMainActivity", "WickedAnimationOverlay skipped — PolygonLibrary returned no water/cemetery/park polygons")
@@ -2867,6 +2893,10 @@ class SalemMainActivity : AppCompatActivity() {
             val speedMph = update.speedMps?.let { it * 2.23694 }
             lastGpsSpeedMph = speedMph
 
+            // S226: feed the haunt-effect overlay so it can compute distance
+            // bands against the latest fix on every tick.
+            spriteOverlay?.setUserLocation(point.latitude, point.longitude)
+
             // ── 0a. GPS staleness tracking (S110) ──
             //    Stamp wall-clock timestamp on EVERY fix BEFORE any other logic.
             //    The narration reach-out gate uses this to suppress reach-out
@@ -4446,6 +4476,40 @@ class SalemMainActivity : AppCompatActivity() {
         }
     }
 
+    // ── S226: haunt-effect config loader ──────────────────────────────────────
 
+    /**
+     * Pull every POI with a non-null haunt_sprite_id from Room and seed the
+     * [SpriteOverlay] with its config list. POIs without a haunt are filtered
+     * client-side (the row count is small — operator-curated subset). Defaults
+     * fill in for any tuning column the operator left blank.
+     */
+    private fun loadHauntConfigsAsync() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val rows = salemPoiDao.findAll()
+                val configs = rows.mapNotNull { p ->
+                    val sprite = p.hauntSpriteId?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    SpriteOverlay.HauntConfig(
+                        poiId = p.id,
+                        lat = p.lat,
+                        lng = p.lng,
+                        spriteId = sprite,
+                        outerRangeM = p.hauntOuterRangeM ?: 200,
+                        outerIntervalS = p.hauntOuterIntervalS ?: 60,
+                        innerRangeM = p.hauntInnerRangeM ?: 50,
+                        innerIntervalS = p.hauntInnerIntervalS ?: 15,
+                        enabled = p.hauntEnabled,
+                    )
+                }
+                withContext(Dispatchers.Main) {
+                    spriteOverlay?.setHaunts(configs)
+                    DebugLogger.i("SalemMainActivity", "SpriteOverlay haunt configs loaded — ${configs.size} POIs")
+                }
+            } catch (e: Exception) {
+                DebugLogger.w("SalemMainActivity", "loadHauntConfigsAsync failed: ${e.message}")
+            }
+        }
+    }
 
 }

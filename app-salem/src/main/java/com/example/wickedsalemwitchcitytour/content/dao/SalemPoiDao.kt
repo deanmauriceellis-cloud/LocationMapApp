@@ -46,7 +46,10 @@ interface SalemPoiDao {
     // override class (is_historical_property=1 / is_civic_poi=1). The Layers
     // toggles in NarrationGeofenceManager then decide per-event whether the
     // POI actually narrates — pool-widening here, eligibility there. S195.
-    @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1) ORDER BY priority ASC, name ASC")
+    // S226: also surface POIs with a haunt configured even if they don't carry
+    // narration text. Otherwise an admin-created POI tagged with a haunt sprite
+    // never renders on the map (and the operator can't see what they configured).
+    @Query("SELECT * FROM salem_pois WHERE (is_narrated = 1 OR (haunt_sprite_id IS NOT NULL AND haunt_enabled = 1)) AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1) ORDER BY priority ASC, name ASC")
     suspend fun findNarrated(): List<SalemPoi>
 
     @Query("SELECT * FROM salem_pois WHERE is_narrated = 1 AND (default_visible = 1 OR is_tour_poi = 1 OR is_historical_property = 1 OR is_civic_poi = 1) AND wave = :wave ORDER BY priority ASC, name ASC")

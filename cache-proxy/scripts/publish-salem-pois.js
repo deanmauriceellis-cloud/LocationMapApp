@@ -146,7 +146,13 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   mhc_narrative TEXT,
   canonical_address_point_id TEXT,
   local_historic_district TEXT,
-  parcel_owner_class TEXT
+  parcel_owner_class TEXT,
+  haunt_sprite_id TEXT,
+  haunt_outer_range_m INTEGER,
+  haunt_outer_interval_s INTEGER,
+  haunt_inner_range_m INTEGER,
+  haunt_inner_interval_s INTEGER,
+  haunt_enabled INTEGER NOT NULL DEFAULT 1
 )`;
 
 // Update Room version hash table
@@ -188,7 +194,9 @@ async function main() {
         has_announce_narration,
         building_footprint_geojson, mhc_id, mhc_year_built,
         mhc_style, mhc_nr_status, mhc_narrative,
-        canonical_address_point_id, local_historic_district, parcel_owner_class
+        canonical_address_point_id, local_historic_district, parcel_owner_class,
+        haunt_sprite_id, haunt_outer_range_m, haunt_outer_interval_s,
+        haunt_inner_range_m, haunt_inner_interval_s, haunt_enabled
       FROM salem_pois
       WHERE deleted_at IS NULL
       ORDER BY category, priority, name
@@ -250,7 +258,9 @@ async function main() {
       has_announce_narration,
       building_footprint_geojson, mhc_id, mhc_year_built,
       mhc_style, mhc_nr_status, mhc_narrative,
-      canonical_address_point_id, local_historic_district, parcel_owner_class
+      canonical_address_point_id, local_historic_district, parcel_owner_class,
+      haunt_sprite_id, haunt_outer_range_m, haunt_outer_interval_s,
+      haunt_inner_range_m, haunt_inner_interval_s, haunt_enabled
     ) VALUES (
       @id, @name, @lat, @lng, @address, @status, @category, @subcategory,
       @short_narration, @long_narration, @historical_narration, @narration_subtopics,
@@ -272,7 +282,9 @@ async function main() {
       @has_announce_narration,
       @building_footprint_geojson, @mhc_id, @mhc_year_built,
       @mhc_style, @mhc_nr_status, @mhc_narrative,
-      @canonical_address_point_id, @local_historic_district, @parcel_owner_class
+      @canonical_address_point_id, @local_historic_district, @parcel_owner_class,
+      @haunt_sprite_id, @haunt_outer_range_m, @haunt_outer_interval_s,
+      @haunt_inner_range_m, @haunt_inner_interval_s, @haunt_enabled
     )
   `);
 
@@ -350,6 +362,12 @@ async function main() {
         canonical_address_point_id: r.canonical_address_point_id || null,
         local_historic_district: r.local_historic_district || null,
         parcel_owner_class: r.parcel_owner_class || null,
+        haunt_sprite_id: r.haunt_sprite_id || null,
+        haunt_outer_range_m: r.haunt_outer_range_m != null ? r.haunt_outer_range_m : null,
+        haunt_outer_interval_s: r.haunt_outer_interval_s != null ? r.haunt_outer_interval_s : null,
+        haunt_inner_range_m: r.haunt_inner_range_m != null ? r.haunt_inner_range_m : null,
+        haunt_inner_interval_s: r.haunt_inner_interval_s != null ? r.haunt_inner_interval_s : null,
+        haunt_enabled: r.haunt_enabled === false ? 0 : 1,
       });
     }
   });

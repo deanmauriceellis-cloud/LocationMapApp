@@ -115,6 +115,13 @@ const UPDATABLE_FIELDS = [
   // are verifier-owned and intentionally NOT in the whitelist — use the
   // /accept-proposed-location endpoint to commit a proposal.
   'location_truth_of_record', 'location_status',
+  // S226 — Per-POI haunt effect. NULL haunt_sprite_id = no haunt. When set,
+  // SpriteOverlay fires a 1-second sprite peek near the POI on the band
+  // schedule defined by outer_range/outer_interval and inner_range/inner_interval.
+  'haunt_sprite_id',
+  'haunt_outer_range_m', 'haunt_outer_interval_s',
+  'haunt_inner_range_m', 'haunt_inner_interval_s',
+  'haunt_enabled',
 ];
 
 // Columns that hold JSONB and must be JSON.stringify'd before binding.

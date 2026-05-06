@@ -128,5 +128,17 @@ data class SalemPoi(
     @ColumnInfo(name = "mhc_narrative") val mhcNarrative: String? = null,
     @ColumnInfo(name = "canonical_address_point_id") val canonicalAddressPointId: String? = null,
     @ColumnInfo(name = "local_historic_district") val localHistoricDistrict: String? = null,
-    @ColumnInfo(name = "parcel_owner_class") val parcelOwnerClass: String? = null
+    @ColumnInfo(name = "parcel_owner_class") val parcelOwnerClass: String? = null,
+
+    // ── S226 — Haunt effect (admin-driven sprite peek) ──
+    // NULL haunt_sprite_id = no haunt configured. When set, SpriteOverlay
+    // fires a 1-second sprite swoop near the POI when the user is inside
+    // outer range; firing cadence ramps from outer_interval_s down to
+    // inner_interval_s as the user crosses inner_range_m.
+    @ColumnInfo(name = "haunt_sprite_id") val hauntSpriteId: String? = null,
+    @ColumnInfo(name = "haunt_outer_range_m") val hauntOuterRangeM: Int? = null,
+    @ColumnInfo(name = "haunt_outer_interval_s") val hauntOuterIntervalS: Int? = null,
+    @ColumnInfo(name = "haunt_inner_range_m") val hauntInnerRangeM: Int? = null,
+    @ColumnInfo(name = "haunt_inner_interval_s") val hauntInnerIntervalS: Int? = null,
+    @ColumnInfo(name = "haunt_enabled", defaultValue = "1") val hauntEnabled: Boolean = true
 )

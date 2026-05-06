@@ -32,7 +32,8 @@ const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 //   v15 (S198) — dropped body_points from WitchTrialsNewspaper (Oracle Newspaper page now renders tts_full_text, matching the audio)
 //   v16 (S216) — dropped historical_note from SalemPoi (column consolidated into description; historical_narration is now the canonical pre-1860 narration field)
 //   v17 (S219) — added narration_subtopics JSONB to SalemPoi (scrollable storytelling subtopic cards on POI detail sheet)
-const ROOM_IDENTITY_HASH_V17 = 'd44caaec8754fbf94080c82e0abd1ebe';
+//   v18 (S226) — added haunt_sprite_id + 5 haunt_* tuning columns to SalemPoi (admin-driven sprite peek)
+const ROOM_IDENTITY_HASH_V18 = 'e6c5a128efdd9949f7297c88ada7d698';
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -110,10 +111,10 @@ if (!fs.existsSync(CONTENT_DB)) {
     const master = db.prepare('SELECT identity_hash FROM room_master_table WHERE id=42').get();
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
-    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V17) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V17} (v17)`);
+    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V18) {
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V18} (v18)`);
     } else {
-      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v17)`);
+      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v18)`);
     }
   } catch (e) {
     fail(`salem_content.db: open/query failed: ${e.message}`);

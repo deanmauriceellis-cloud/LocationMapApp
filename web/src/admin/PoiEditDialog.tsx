@@ -64,6 +64,7 @@ import {
   BOOLEAN_FIELDS,
   NUMERIC_FIELDS,
   DATE_FIELDS,
+  HAUNT_SPRITE_IDS,
 } from './poiAdminFields'
 // S190 — taxonomy is sourced from the live admin endpoints, not the
 // hardcoded POI_CATEGORIES file. The TS file is still authoritative for
@@ -1158,7 +1159,7 @@ export function PoiEditDialog({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <DialogPanel className="w-[800px] max-w-[95vw] max-h-[90vh] flex flex-col bg-white rounded-lg shadow-xl text-slate-800">
+            <DialogPanel className="w-[1100px] max-w-[98vw] h-[95vh] max-h-[95vh] flex flex-col bg-white rounded-lg shadow-xl text-slate-800">
               {/* Header */}
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200">
                 <div className="min-w-0 flex-1">
@@ -1245,7 +1246,7 @@ export function PoiEditDialog({
                       {lintFlags.length} active
                     </span>
                   </div>
-                  <ul className="divide-y divide-amber-200 max-h-48 overflow-y-auto">
+                  <ul className="divide-y divide-amber-200 max-h-32 overflow-y-auto">
                     {lintFlags.map((flag) => {
                       const sevClass =
                         flag.severity === 'error'
@@ -1306,6 +1307,7 @@ export function PoiEditDialog({
                   <TabList className="px-4 pt-2 border-b border-slate-200 flex flex-wrap gap-1">
                     <Tab className={tabClass}>General</Tab>
                     <Tab className={tabClass}>Flags</Tab>
+                    <Tab className={tabClass}>Haunt</Tab>
                     <Tab className={tabClass}>Location</Tab>
                     <Tab className={tabClass}>Hours &amp; Contact</Tab>
                     <Tab className={tabClass}>Narration</Tab>
@@ -1744,6 +1746,121 @@ export function PoiEditDialog({
                             </label>
                           ))}
                         </div>
+                      </div>
+                    </TabPanel>
+
+                    {/* ─── Haunt (S226) ────────────────────────────────────── */}
+                    <TabPanel className="space-y-4">
+                      <div className="rounded-lg border border-purple-200 bg-purple-50/40 p-4 space-y-4">
+                        <div>
+                          <div className="text-sm font-semibold text-purple-900">
+                            Haunt Effect
+                          </div>
+                          <p className="text-xs text-purple-700/80 mt-1">
+                            Pick a sprite and the app will briefly flash it
+                            near this POI as the user approaches — to hint at
+                            something dangerous, haunted, or nonsensical
+                            close by. Leave the sprite on{' '}
+                            <em>None</em> for no haunt. Defaults: outer 200&nbsp;m / 60&nbsp;s, inner 50&nbsp;m / 15&nbsp;s.
+                          </p>
+                        </div>
+
+                        <FieldRow label="Sprite" htmlFor="haunt_sprite_id">
+                          <select
+                            id="haunt_sprite_id"
+                            {...reg('haunt_sprite_id')}
+                            className="w-56 px-2 py-1 text-sm border border-slate-300 rounded bg-white"
+                          >
+                            <option value="">— None —</option>
+                            {HAUNT_SPRITE_IDS.map((s) => (
+                              <option key={s} value={s}>
+                                {s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                              </option>
+                            ))}
+                          </select>
+                        </FieldRow>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FieldRow
+                            label="Outer range (m)"
+                            htmlFor="haunt_outer_range_m"
+                            hint="User must be within this distance to trigger any haunt"
+                          >
+                            <input
+                              id="haunt_outer_range_m"
+                              type="number"
+                              step="1"
+                              placeholder="200"
+                              {...reg('haunt_outer_range_m')}
+                              className="w-32 px-2 py-1 text-sm border border-slate-300 rounded"
+                            />
+                          </FieldRow>
+                          <FieldRow
+                            label="Outer interval (s)"
+                            htmlFor="haunt_outer_interval_s"
+                            hint="Fire cadence at outer range"
+                          >
+                            <input
+                              id="haunt_outer_interval_s"
+                              type="number"
+                              step="1"
+                              placeholder="60"
+                              {...reg('haunt_outer_interval_s')}
+                              className="w-32 px-2 py-1 text-sm border border-slate-300 rounded"
+                            />
+                          </FieldRow>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FieldRow
+                            label="Inner range (m)"
+                            htmlFor="haunt_inner_range_m"
+                            hint="Inside this distance, fires at the inner cadence"
+                          >
+                            <input
+                              id="haunt_inner_range_m"
+                              type="number"
+                              step="1"
+                              placeholder="50"
+                              {...reg('haunt_inner_range_m')}
+                              className="w-32 px-2 py-1 text-sm border border-slate-300 rounded"
+                            />
+                          </FieldRow>
+                          <FieldRow
+                            label="Inner interval (s)"
+                            htmlFor="haunt_inner_interval_s"
+                            hint="Faster cadence when user is close"
+                          >
+                            <input
+                              id="haunt_inner_interval_s"
+                              type="number"
+                              step="1"
+                              placeholder="15"
+                              {...reg('haunt_inner_interval_s')}
+                              className="w-32 px-2 py-1 text-sm border border-slate-300 rounded"
+                            />
+                          </FieldRow>
+                        </div>
+
+                        <label className="flex items-start gap-3 cursor-pointer group pt-2">
+                          <div className="relative mt-0.5 flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              {...reg('haunt_enabled')}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 rounded-full border border-slate-300 bg-slate-100 peer-checked:bg-purple-500 peer-checked:border-purple-500 transition-colors" />
+                            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-slate-700 group-hover:text-slate-900">
+                              Enabled
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              Turn off to keep the configuration but stop firing without clearing the sprite.
+                            </div>
+                          </div>
+                        </label>
                       </div>
                     </TabPanel>
 
