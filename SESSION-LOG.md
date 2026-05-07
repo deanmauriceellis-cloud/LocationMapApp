@@ -8,7 +8,7 @@
 
 Closed the S229 carry-forward "create new POI here" entry kind end-to-end through the same A→C flow. **Trigger:** long-press on empty map (when field-edit toolbar ON) opens a slimmed AlertDialog "Create new POI" sheet pre-pinned at the long-press lat/lng — required: name only; optional: re-pin, recon photo, note. **JSONL schema bumped 1 → 2** with a new `kind: "update" | "create"` discriminator on every line; create rows omit `poi_id` / `poi_name` / `current_*` and carry `proposed_name` instead. **Web admin gate:** `cache-proxy/lib/admin-field-edits.js` apply branches on `e.kind === 'create'`, requires operator-supplied `category` (subcategory optional id) in the request body, generates id via slug+6-hex (one retry on collision), INSERTs with `data_source='admin_create_field'` + `admin_dirty=TRUE`. **UI:** new `<CreateCard />` in `web/src/admin/FieldEditsTab.tsx` (teal-bordered, "Pending Create" badge) renders proposed name + location plus a strict Category `<select>` (required) + Subcategory `<select>` (optional, gated on category pick); Apply button disabled until category chosen. Server-side validated end-to-end with a synthetic create-kind JSONL line: list → apply-without-category 400 → apply-with-`{category:"SHOPPING"}` INSERTs row → PG SELECT confirmed. APK installed on Lenovo HNY0CY0W; `tsc --noEmit` clean. Operator field-test of the actual long-press → save → pull → web-admin-create flow owed for next session (parallel to the still-owed S229 update-flow field validation).
 
-Full session detail: `docs/session-logs/session-230-2026-05-06.md`. Commit: `<SHA>`.
+Full session detail: `docs/session-logs/session-230-2026-05-06.md`. Commit: `3669bc2`.
 
 ---
 
