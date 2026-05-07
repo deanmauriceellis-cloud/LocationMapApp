@@ -79,12 +79,28 @@ class KatrinaCameraManager(
     private var captureLauncher: ActivityResultLauncher<Intent>? = null
     private var permissionLauncher: ActivityResultLauncher<String>? = null
 
+    /**
+     * S229 — one-shot listener fired with the published filename right after
+     * a successful gallery write. Field-edit mode wires this to attach the
+     * recon photo to the active edit. Cleared after firing so it can't leak
+     * into a subsequent unrelated capture.
+     */
+    @Volatile private var oneShotPostCapture: ((String) -> Unit)? = null
+
     fun registerLaunchers(
         captureLauncher: ActivityResultLauncher<Intent>,
         permissionLauncher: ActivityResultLauncher<String>
     ) {
         this.captureLauncher = captureLauncher
         this.permissionLauncher = permissionLauncher
+    }
+
+    /**
+     * S229 — schedule a one-time callback to receive the next captured photo's
+     * filename. Used by the field-edit sheet's "Attach photo" button.
+     */
+    fun setOneShotPostCapture(listener: (String) -> Unit) {
+        oneShotPostCapture = listener
     }
 
     fun onResume() {
@@ -221,6 +237,17 @@ class KatrinaCameraManager(
         }
         Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
         DebugLogger.i(TAG, msg)
+
+        // S229 — fire the one-shot field-edit listener (if any) before clearing
+        // pending state, so the caller gets exactly the filename we just published.
+        if (publishedUri != null) {
+            val listener = oneShotPostCapture
+            oneShotPostCapture = null
+            listener?.invoke(outName)
+        } else {
+            // Publish failed — drop the listener silently so it doesn't fire later.
+            oneShotPostCapture = null
+        }
 
         pendingLocation = null
         pendingAzimuthAtCapture = null

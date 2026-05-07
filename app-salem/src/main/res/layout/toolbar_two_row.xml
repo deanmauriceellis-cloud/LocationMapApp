@@ -73,6 +73,38 @@
             android:contentDescription="GPS-burst camera (auto-shoot every 3s while ON)"
             android:tooltipText="GPS-burst camera (toggle)" />
 
+        <!-- S229 — field-edit mode. Visible only when BuildDefaults.FIELD_EDIT_ENABLED
+             (debug builds). Toggle ON = long-press a POI marker to capture a field edit. -->
+        <FrameLayout
+            android:id="@+id/toolbarFieldEditWrap"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/toolbarFieldEditIcon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_about"
+                android:scaleType="centerInside"
+                android:padding="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Field-edit mode (long-press POIs to capture edits)"
+                android:tooltipText="Field-edit mode (toggle)" />
+            <TextView
+                android:id="@+id/fieldEditBadge"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="top|end"
+                android:gravity="center"
+                android:textSize="9sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/badge_red"
+                android:visibility="gone" />
+        </FrameLayout>
+
         <ImageView
             android:id="@+id/toolbarWeatherIcon"
             android:layout_width="36dp"

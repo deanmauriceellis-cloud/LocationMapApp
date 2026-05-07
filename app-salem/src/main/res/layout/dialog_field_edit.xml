@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S229 — Field-edit bottom sheet content (used as the body of an AlertDialog).
+  Triggered by tapping a POI marker while field-edit toolbar mode is ON.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#FAFAFA">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/fieldEditPoiName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#212121"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditPoiId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="#757575"
+            android:paddingBottom="10dp" />
+
+        <!-- Location row -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Location"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="6dp"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditCurrentLatLng"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#424242" />
+
+        <TextView
+            android:id="@+id/fieldEditProposedLatLng"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#1976D2" />
+
+        <Button
+            android:id="@+id/fieldEditMoveHereBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Move here (tap on map)"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp" />
+
+        <!-- Category row -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Category"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditCurrentCategory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#424242" />
+
+        <TextView
+            android:id="@+id/fieldEditProposedCategory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#1976D2" />
+
+        <Button
+            android:id="@+id/fieldEditPickCategoryBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Change category"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp" />
+
+        <!-- Subcategory row -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Subcategory"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditProposedSubcategory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#1976D2" />
+
+        <Button
+            android:id="@+id/fieldEditPickSubcategoryBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Change subcategory"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp" />
+
+        <!-- Note row -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Note"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <EditText
+            android:id="@+id/fieldEditNoteEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Free text — observations, corrections, anything"
+            android:inputType="textMultiLine|textCapSentences"
+            android:minLines="2"
+            android:maxLines="4"
+            android:textSize="13sp"
+            android:background="@android:drawable/edit_text" />
+
+        <!-- Photos row -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Photos"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditPhotosSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#424242"
+            android:text="No photos attached" />
+
+        <Button
+            android:id="@+id/fieldEditAttachPhotoBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Attach photo (recon camera)"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Action row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/fieldEditCancelBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Cancel"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/fieldEditSaveBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Save"
+                android:backgroundTint="#1976D2"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

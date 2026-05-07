@@ -35,6 +35,12 @@ object BuildDefaults {
     // Const so R8 strips the toolbar wiring + controller refs in retail.
     const val GPS_BURST_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
 
+    // S229 — third toolbar button: field-edit mode. Long-press a POI to open
+    // a bottom sheet that captures move/category/subcategory/note/photo into
+    // an append-only JSONL at /sdcard/Documents/WickedSalemFieldEdits/. Pulled
+    // home post-walk and triaged in the web admin's Field Edits inbox.
+    const val FIELD_EDIT_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
+
     val DEFAULT_ZOOM:   Double = if (BuildConfig.RECON_DEFAULTS) 19.0 else 18.0
     val FAB_ZOOM_STEP:  Double = if (BuildConfig.RECON_DEFAULTS) 2.0 else 1.0
     val MAGNIFY_LEVEL:  Int    = if (BuildConfig.RECON_DEFAULTS) 1   else 0

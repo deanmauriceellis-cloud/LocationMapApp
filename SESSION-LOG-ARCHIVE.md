@@ -1,7 +1,15 @@
 # LocationMapApp — Session Log (Archive: v1.5.0 through Session 203, April–May 2026)
 
 > Archived from SESSION-LOG.md. Contains all sessions through Session 203, plus the original v1.5.0–v1.5.50 archive at the bottom.
-> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close, S211 archived 2026-05-03 at S222 close, S213 archived 2026-05-03 at S223 close, S214 archived 2026-05-04 at S224 close, S215 archived 2026-05-05 at S225 close, S216 archived 2026-05-05 at S226 close, S217 archived 2026-05-06 at S227 close, S218 archived 2026-05-06 at S228 close (note S212 was skipped by the operator) (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+> Then S204 archived 2026-05-01 at S215 close, S205 archived 2026-05-01 at S216 close, S206 archived 2026-05-01 at S217 close, S207 archived 2026-05-02 at S218 close, S208 archived 2026-05-02 at S219 close, S209 archived 2026-05-02 at S220 close, S210 archived 2026-05-02 at S221 close, S211 archived 2026-05-03 at S222 close, S213 archived 2026-05-03 at S223 close, S214 archived 2026-05-04 at S224 close, S215 archived 2026-05-05 at S225 close, S216 archived 2026-05-05 at S226 close, S217 archived 2026-05-06 at S227 close, S218 archived 2026-05-06 at S228 close, S219 archived 2026-05-06 at S229 close (note S212 was skipped by the operator) (kept the 10 most recent in SESSION-LOG.md after adding each new entry).
+
+## Session 219: 2026-05-02 — Storytelling-with-subtopics framework + Old Burying Point worked example
+
+Baked the new HARD RULE end-to-end: warm narrations with overflow facts as scrollable subtopic cards. Added `salem_pois.narration_subtopics` JSONB, extended the publish chain, bumped Room v16→v17, built a structured `SubtopicEditor` in the admin (header/body cards with word-count + source_kind/source_ref + reorder), and rendered the full chip-strip + collapsible body cards on the POI Detail Sheet (all chips visible, no pagination, no "More" overflow). Authored 5 worked-example subtopics on Old Burying Point (Hathorne / Bradstreet / Richard More / Death's Heads & Willows / adjacent Witch Trials Memorial). Operator-confirmed visual on Lenovo HNY0CY0W after the parseSalemPoi/salemPoiToJson Bundle-serializer footgun was discovered + fixed.
+
+Full session detail: `docs/session-logs/session-219-2026-05-02.md`. Commit: `84ab1e2`.
+
+---
 
 ## Session 218: 2026-05-01 — Per-POI location validate workflow (TigerLine + Google Places) with map-review UX
 

@@ -643,6 +643,18 @@ class SalemMainActivity : AppCompatActivity() {
         gpsBurstCameraManager.onCameraPermissionResult(granted)
     }
 
+    // ── S229: Third top-bar button — field-edit mode (debug-only) ────────
+    // R8 strips the manager + toolbar wiring + sheet code in retail because
+    // every call site is gated by [BuildDefaults.FIELD_EDIT_ENABLED].
+    internal val fieldEditManager: com.example.wickedsalemwitchcitytour.userdata.FieldEditManager by lazy {
+        com.example.wickedsalemwitchcitytour.userdata.FieldEditManager(this)
+    }
+
+    /** Set true after the operator clicks "Move here" inside the field-edit
+     *  sheet; the next single-tap on the map is consumed and routes to the
+     *  field-edit "set proposed location" path. */
+    @Volatile internal var awaitingFieldEditMapTap: Boolean = false
+
     // =========================================================================
     // LIFECYCLE
     // =========================================================================
@@ -715,6 +727,11 @@ class SalemMainActivity : AppCompatActivity() {
         // wiring upstream, so the manager is never asked to do anything).
         if (BuildDefaults.GPS_BURST_ENABLED) {
             gpsBurstCameraManager.registerPermissionLauncher(gpsBurstPermissionLauncher)
+        }
+
+        // S229 — wire the third toolbar button (field-edit toggle) when enabled.
+        if (BuildDefaults.FIELD_EDIT_ENABLED) {
+            wireFieldEditToolbar()
         }
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
@@ -1304,6 +1321,12 @@ class SalemMainActivity : AppCompatActivity() {
         setupShowAllPoisButton()
         val eventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                // S229 — field-edit "Move here" mode consumes the tap before
+                // anything else (otherwise the walk-sim/follow stops below
+                // would steal it from the operator's intended placement).
+                if (BuildDefaults.FIELD_EDIT_ENABLED && consumeMapTapForFieldEdit(p)) {
+                    return true
+                }
                 var consumed = false
                 // Stop walk simulator if running — user tapped the map
                 if (walkSimRunning) {
@@ -2392,6 +2415,15 @@ class SalemMainActivity : AppCompatActivity() {
                     marker.icon = icon
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     marker.setOnMarkerClickListener { _, _ ->
+                        // S229 — field-edit mode intercepts when the toolbar
+                        // toggle is ON; otherwise falls through to PoiDetailSheet.
+                        if (BuildDefaults.FIELD_EDIT_ENABLED && consumeSalemPoiTapForFieldEdit(p)) {
+                            DebugLogger.i(
+                                "SalemMainActivity",
+                                "MARKER TAP id=${p.id} name=${p.name} → field-edit sheet"
+                            )
+                            return@setOnMarkerClickListener true
+                        }
                         DebugLogger.i(
                             "SalemMainActivity",
                             "MARKER TAP id=${p.id} name=${p.name} category=${p.category} → showing PoiDetailSheet"
@@ -3577,6 +3609,11 @@ class SalemMainActivity : AppCompatActivity() {
             snippet  = buildPlaceSnippet(place)
             relatedObject = place  // retained for icon refresh on zoom threshold
             setOnMarkerClickListener { _, _ ->
+                // S229 — field-edit mode intercepts POI taps when the
+                // toolbar toggle is ON; otherwise normal POI detail flow.
+                if (BuildDefaults.FIELD_EDIT_ENABLED && consumePoiTapForFieldEdit(place)) {
+                    return@setOnMarkerClickListener true
+                }
                 openPoiDetailFromPlace(place)
                 true
             }

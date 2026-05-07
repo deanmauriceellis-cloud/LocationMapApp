@@ -234,6 +234,17 @@ require('./lib/admin-categories')(app, deps);
 // phone app sees. Gated by /admin Basic Auth.
 require('./lib/admin-tiles')(app, deps);
 
+// Admin burst-photos endpoint (S229) — surfaces the GPS-burst camera album
+// at /mnt/sdb-images/LMASalemPictures/ to the web admin so the operator can
+// pin every shot on the map and spot-check POI / path alignment.
+require('./lib/admin-burst-photos')(app, deps);
+
+// Admin field-edits inbox (S229 Part C) — reads JSONL files written by the
+// Android FieldEditManager, presents an Accept/Reject inbox, applies via the
+// existing /admin/salem/pois/:id endpoints. The web admin is the gate — no
+// edit hits the DB until the operator accepts it.
+require('./lib/admin-field-edits')(app, deps);
+
 // ── Start ───────────────────────────────────────────────────────────────────
 
 server.listen(PORT, '0.0.0.0', () => {

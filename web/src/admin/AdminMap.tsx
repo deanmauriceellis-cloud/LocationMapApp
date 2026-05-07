@@ -18,6 +18,7 @@ import {
   HIST_LANDMARK_FILTER,
 } from './PoiTree'
 import type { TourLeg, TourStop, TourSummary } from './tourTypes'
+import { BurstPhotosOverlay } from './BurstPhotosOverlay'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -311,6 +312,10 @@ interface AdminMapProps {
     flyNonce: number
   } | null
   onProposalDrag?: (lat: number, lng: number) => void
+  /** S229 — overlay every GPS-burst photo from
+   *  /mnt/sdb-images/LMASalemPictures/ on the map as red pins. Click a pin →
+   *  modal with image + EXIF + Delete. Toolbar toggle in AdminLayout. */
+  showBurstPhotos?: boolean
 }
 
 export interface PendingStopMove {
@@ -2102,6 +2107,7 @@ export function AdminMap({
   onGeocodePreviewEditAddress,
   proposalReview,
   onProposalDrag,
+  showBurstPhotos = false,
 }: AdminMapProps) {
   // S188 — geocode-preview view mode. `focusMap` hides every POI marker
   // outside the cluster; `showAll` renders every Tiger candidate at once.
@@ -2556,6 +2562,7 @@ export function AdminMap({
           && selectedPoi.poi.lng_proposed != null && (
             <ProposalPreviewLayer poi={selectedPoi.poi} />
           )}
+        {showBurstPhotos && <BurstPhotosOverlay />}
       </MapContainer>
       {TILE_PROVIDERS.length > 1 && (
         <TileProviderPicker

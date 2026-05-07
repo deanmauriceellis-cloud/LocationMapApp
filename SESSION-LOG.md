@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 219-228 (S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 220-229 (S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 229: 2026-05-06 — Burst-photo admin overlay + Android field-edit feature (A→C, end-to-end)
+
+Three operator-driven shippings stacked. **Burst-photo admin overlay**: pulled S228 round-2 burst photos (278 photos / 30 min, 2 s throttle floor reached 120 times — round-2 tuning confirmed); built a `/admin/burst-photos` cache-proxy endpoint over `/mnt/sdb-images/LMASalemPictures/` (list/image/EXIF/delete) and a Photos toggle on the existing AdminMap that overlays every shot as a red `<CircleMarker>` for POI/path-alignment QC, click → modal with image + EXIF + Delete-with-confirm. **POI-tree cleanup**: dropped the two `SOURCE:*` virtual nodes (Destination Salem, Haunted Happenings) end-to-end. **Android field-edit feature, full A+B+C in one session**: third toolbar icon (R8-stripped via `BuildDefaults.FIELD_EDIT_ENABLED`); tap a POI in field-edit mode opens an AlertDialog sheet with Move-here (tap-to-place)/Category/Subcategory/Note/Photos rows; Save appends a JSON line to `/sdcard/Documents/WickedSalemFieldEdits/edits-<bootTs>.jsonl`. New `tools/pull-field-edits.py` adb-pulls the JSONL + referenced recon photos. New `cache-proxy/lib/admin-field-edits.js` + `web/src/admin/FieldEditsTab.tsx` form the inbox: Sync from device button (spawns the python pull tool) + filter chips + per-edit cards with current-vs-proposed diff grid (Δ-meters for moves, label→canonical-id resolution for subcategory via `salem_poi_subcategories`) + Apply (writes to `salem_pois` with admin_dirty stamp) / Reject (sidecar `state.json`). Fixed two field bugs mid-session: bundled-Salem-POI marker layer (`narrationMarkers`) wasn't being intercepted; subcategory picker was case-sensitive (SalemPoi.category UPPERCASE vs PoiLayerId lowercase). Operator field-tested through Starbird Cannabis Dispensary edit cycle — pulled, surfaced in the new inbox, ready to Apply. Operator: "that is great!"
+
+Full session detail: `docs/session-logs/session-229-2026-05-06.md`. Commit: `<sha>`.
+
+---
 
 ## Session 228: 2026-05-06 — GPS-burst camera (debug-only second toolbar button) + organizer tooling
 
@@ -73,14 +81,4 @@ Full session detail: `docs/session-logs/session-221-2026-05-02.md`. Commit: `a0c
 Finished the storytelling-with-subtopics surface coverage on the runtime side: extracted `SubtopicRenderer.kt` shared util and wired it into the ambient/tour-stop narration banner (`narration_bottom_sheet.xml` + `showNarrationSheet()`); newspaper headline mode explicitly hides the block. Built `cache-proxy/scripts/auto-gen-narration-subtopics.js` — a fenced auto-generator that synthesizes subtopic candidates from local sources only (provenance-pause-respecting): figure detection across the 49 NPC bios + adjacency to the nearest eligible POI ≤200 m. Eligibility fence baked from operator's mid-session refinement: only `category IN (HISTORICAL_LANDMARKS, HISTORICAL_BUILDINGS, CIVIC, WORSHIP)` OR `is_historical_property/is_civic_poi/is_witch_trial_site=true` (commercial categories excluded; `is_tour_poi` excluded due to data-quality pollution). Live run: 497 / 652 eligible POIs got cards (12 with figure detection + 485 adjacency-only). Operator visual sign-off on Lenovo HNY0CY0W: "works well — needs to be refined a lot more but very useful." Carry-forward: `is_tour_poi` Lint-tab cleanup needed (Young World Academy etc. spurious-flagged).
 
 Full session detail: `docs/session-logs/session-220-2026-05-02.md`. Commit: `9112992`.
-
----
-
-## Session 219: 2026-05-02 — Storytelling-with-subtopics framework + Old Burying Point worked example
-
-Baked the new HARD RULE end-to-end: warm narrations with overflow facts as scrollable subtopic cards. Added `salem_pois.narration_subtopics` JSONB, extended the publish chain, bumped Room v16→v17, built a structured `SubtopicEditor` in the admin (header/body cards with word-count + source_kind/source_ref + reorder), and rendered the full chip-strip + collapsible body cards on the POI Detail Sheet (all chips visible, no pagination, no "More" overflow). Authored 5 worked-example subtopics on Old Burying Point (Hathorne / Bradstreet / Richard More / Death's Heads & Willows / adjacent Witch Trials Memorial). Operator-confirmed visual on Lenovo HNY0CY0W after the parseSalemPoi/salemPoiToJson Bundle-serializer footgun was discovered + fixed.
-
-Full session detail: `docs/session-logs/session-219-2026-05-02.md`. Commit: `84ab1e2`.
-
----
 

@@ -30,8 +30,9 @@ import { GeocodesTab } from './GeocodesTab'
 import { GeocodeCandidatesModal } from './GeocodeCandidatesModal'
 import { AuditTab } from './AuditTab'
 import { ProposalReviewPanel } from './ProposalReviewPanel'
+import { FieldEditsTab } from './FieldEditsTab'
 
-type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes' | 'audit'
+type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes' | 'audit' | 'field-edits'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -74,6 +75,12 @@ export function AdminLayout() {
     setLintIdFilter(null)
     setLintIdFilterLabel(null)
   }, [])
+  // S229 — Burst-photos overlay toggle. Pins every photo from
+  // /mnt/sdb-images/LMASalemPictures/ on the AdminMap so the operator can
+  // spot-check POI / path alignment. Default OFF — overlay only appears when
+  // toggled ON via the POI/Tour toolbar.
+  const [showBurstPhotos, setShowBurstPhotos] = useState(false)
+
   // S187 — Geocodes modal state.
   const [geocodeModalPoiId, setGeocodeModalPoiId] = useState<string | null>(null)
   const handleLintOpenGeocodes = useCallback((poiId: string) => {
@@ -868,6 +875,16 @@ export function AdminLayout() {
           >
             Audit
           </button>
+          <button
+            type="button"
+            onClick={() => setView('field-edits')}
+            className={`px-3 py-1 text-sm transition-colors ${
+              view === 'field-edits' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+            title="Field-edit inbox — atomic POI changes captured on the Lenovo, awaiting accept/reject"
+          >
+            Field Edits
+          </button>
         </div>
 
         {view === 'pois' && (
@@ -894,6 +911,18 @@ export function AdminLayout() {
               className="px-3 py-1 text-sm rounded bg-emerald-700 hover:bg-emerald-600 transition-colors"
             >
               Publish
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBurstPhotos(v => !v)}
+              title="Overlay GPS-burst photo pins on the map (POI/path alignment QC)"
+              className={`px-3 py-1 text-sm rounded transition-colors ${
+                showBurstPhotos
+                  ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+              }`}
+            >
+              Photos: {showBurstPhotos ? 'ON' : 'OFF'}
             </button>
           </>
         )}
@@ -938,6 +967,10 @@ export function AdminLayout() {
       ) : view === 'audit' ? (
         <div className="flex-1 min-h-0">
           <AuditTab />
+        </div>
+      ) : view === 'field-edits' ? (
+        <div className="flex-1 min-h-0">
+          <FieldEditsTab />
         </div>
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">
@@ -1040,6 +1073,7 @@ export function AdminLayout() {
                 addPoiMode={addPoiMode}
                 onCancelAddPoiMode={handleCancelAddPoiMode}
                 onMapClickAddPoi={handleMapClickAddPoi}
+                showBurstPhotos={showBurstPhotos}
               />
               {proposalReview && (
                 <ProposalReviewPanel
