@@ -107,12 +107,28 @@ internal fun SalemMainActivity.consumeMapTapForFieldEdit(p: GeoPoint): Boolean {
     awaitingFieldEditMapTap = false
     fieldEditManager.setProposedLocation(p.latitude, p.longitude)
     DebugLogger.i("FieldEditUI", "consumeMapTapForFieldEdit ${p.latitude},${p.longitude}")
-    // Re-open the sheet for the operator's currently active edit so they see
-    // the proposed location filled in.
+    // Re-open the appropriate sheet for the currently active edit so the
+    // operator sees the proposed location filled in.
     val edit = fieldEditManager.activeEdit
     if (edit != null) {
-        showFieldEditSheetForActive(edit)
+        when (edit.kind) {
+            FieldEditManager.Kind.CREATE -> showFieldEditCreateSheetForActive(edit)
+            FieldEditManager.Kind.UPDATE -> showFieldEditSheetForActive(edit)
+        }
     }
+    return true
+}
+
+/**
+ * S230 — long-press on an empty spot in field-edit mode opens the CREATE
+ * sheet seeded at that lat/lng. Returns true if consumed (caller skips the
+ * normal manual-mode teleport).
+ */
+internal fun SalemMainActivity.consumeMapLongPressForFieldEdit(p: GeoPoint): Boolean {
+    if (!com.example.wickedsalemwitchcitytour.ui.BuildDefaults.FIELD_EDIT_ENABLED) return false
+    if (!fieldEditManager.isEnabled()) return false
+    DebugLogger.i("FieldEditUI", "consumeMapLongPressForFieldEdit ${p.latitude},${p.longitude}")
+    showFieldEditCreateSheet(p.latitude, p.longitude)
     return true
 }
 
@@ -295,6 +311,87 @@ private fun SalemMainActivity.showCategoryPicker(
         }
         .setNegativeButton("Cancel", null)
         .show()
+}
+
+// ─── CREATE sheet (long-press → seed new POI) ───────────────────────────────
+
+internal fun SalemMainActivity.showFieldEditCreateSheet(lat: Double, lng: Double) {
+    val edit = fieldEditManager.openCreateAt(lat, lng)
+    showFieldEditCreateSheetForActive(edit)
+}
+
+private fun SalemMainActivity.showFieldEditCreateSheetForActive(edit: FieldEditManager.ActiveEdit) {
+    val view = LayoutInflater.from(this).inflate(R.layout.dialog_field_edit_create, null, false)
+
+    val nameEdit  = view.findViewById<EditText>(R.id.fieldEditCreateNameEdit)
+    val latLngTv  = view.findViewById<TextView>(R.id.fieldEditCreateLatLng)
+    val moveBtn   = view.findViewById<Button>(R.id.fieldEditCreateMoveHereBtn)
+    val noteEdit  = view.findViewById<EditText>(R.id.fieldEditCreateNoteEdit)
+    val photosTv  = view.findViewById<TextView>(R.id.fieldEditCreatePhotosSummary)
+    val attachBtn = view.findViewById<Button>(R.id.fieldEditCreateAttachPhotoBtn)
+    val cancelBtn = view.findViewById<Button>(R.id.fieldEditCreateCancelBtn)
+    val saveBtn   = view.findViewById<Button>(R.id.fieldEditCreateSaveBtn)
+
+    fun renderState() {
+        latLngTv.text = formatLatLng("Pin", edit.proposedLat, edit.proposedLng)
+        val n = edit.photoFilenames.size
+        photosTv.text = when (n) {
+            0 -> "No photos attached"
+            1 -> "1 photo: ${edit.photoFilenames[0]}"
+            else -> "$n photos:\n  • " + edit.photoFilenames.joinToString("\n  • ")
+        }
+    }
+    renderState()
+    nameEdit.setText(edit.proposedName ?: "")
+    noteEdit.setText(edit.note ?: "")
+
+    val dialog = AlertDialog.Builder(this)
+        .setView(view)
+        .setCancelable(false)
+        .create()
+
+    moveBtn.setOnClickListener {
+        // Capture name + note before dismissing so the next sheet re-render shows them.
+        fieldEditManager.setProposedName(nameEdit.text?.toString())
+        fieldEditManager.setNote(noteEdit.text?.toString())
+        awaitingFieldEditMapTap = true
+        Toast.makeText(this, "Tap on the map to re-pin the new POI", Toast.LENGTH_LONG).show()
+        dialog.dismiss()
+    }
+
+    attachBtn.setOnClickListener {
+        fieldEditManager.setProposedName(nameEdit.text?.toString())
+        fieldEditManager.setNote(noteEdit.text?.toString())
+        katrinaCameraManager.setOneShotPostCapture { filename ->
+            fieldEditManager.addPhoto(filename)
+            val current = fieldEditManager.activeEdit ?: return@setOneShotPostCapture
+            runOnUiThread { showFieldEditCreateSheetForActive(current) }
+        }
+        dialog.dismiss()
+        katrinaCameraManager.requestCapture()
+    }
+
+    cancelBtn.setOnClickListener {
+        fieldEditManager.cancelActiveEdit()
+        dialog.dismiss()
+    }
+
+    saveBtn.setOnClickListener {
+        fieldEditManager.setProposedName(nameEdit.text?.toString())
+        fieldEditManager.setNote(noteEdit.text?.toString())
+        if (!edit.hasAnyChange()) {
+            Toast.makeText(
+                this,
+                "Type a name (and confirm the pin location) before saving",
+                Toast.LENGTH_SHORT
+            ).show()
+            return@setOnClickListener
+        }
+        fieldEditManager.saveActiveEdit()
+        dialog.dismiss()
+    }
+
+    dialog.show()
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

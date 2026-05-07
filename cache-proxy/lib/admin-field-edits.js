@@ -165,6 +165,10 @@ module.exports = function(app, deps) {
   // salem_pois via the existing admin paths (shares the audit log, admin_dirty
   // stamp, etc.). Marks the edit applied in the session sidecar so it stops
   // surfacing as pending.
+  //
+  // For kind=create the operator must supply { category, subcategory? } in
+  // the request body — the device only captures name+location+note+photos,
+  // category triage happens at the gate.
   app.post('/admin/field-edits/:editKey/apply', requirePg, async (req, res) => {
     const decoded = decodeEditKey(req.params.editKey);
     if (!decoded) return res.status(400).json({ error: 'bad editKey' });
@@ -173,6 +177,88 @@ module.exports = function(app, deps) {
     if (!found) return res.status(404).json({ error: 'edit not found' });
     const e = found.edit;
 
+    // ── CREATE branch: INSERT a fresh salem_pois row ────────────────────
+    if (e.kind === 'create') {
+      try {
+        const proposedName = typeof e.proposed_name === 'string' ? e.proposed_name.trim() : '';
+        if (!proposedName) {
+          return res.status(400).json({ error: 'create edit has no proposed_name' });
+        }
+        const lat = Number(e.proposed_lat);
+        const lng = Number(e.proposed_lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return res.status(400).json({ error: 'create edit has no proposed_lat/lng' });
+        }
+        const category = (req.body && typeof req.body.category === 'string')
+          ? req.body.category.trim().toUpperCase() : '';
+        if (!category) {
+          return res.status(400).json({ error: 'category is required to apply a create edit (pick one in the inbox)' });
+        }
+        const subcategory = (req.body && typeof req.body.subcategory === 'string' && req.body.subcategory.trim())
+          ? req.body.subcategory.trim() : null;
+
+        // Generate id (slug + 6-hex suffix), retrying once on collision.
+        function makeId() {
+          const slug = proposedName.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 40) || 'poi';
+          const suffix = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+          return `${slug}_${suffix}`;
+        }
+        let newId = makeId();
+        let collisionCheck = await pgPool.query(`SELECT 1 FROM salem_pois WHERE id = $1`, [newId]);
+        if (collisionCheck.rows.length) {
+          newId = makeId();
+          collisionCheck = await pgPool.query(`SELECT 1 FROM salem_pois WHERE id = $1`, [newId]);
+          if (collisionCheck.rows.length) {
+            return res.status(500).json({ error: 'id collision (twice) — try Apply again' });
+          }
+        }
+
+        const insertCols = ['id', 'name', 'lat', 'lng', 'category', 'data_source', 'admin_dirty', 'admin_dirty_at'];
+        const insertPh = ['$1', '$2', '$3', '$4', '$5', '$6', 'TRUE', 'NOW()'];
+        const insertVals = [newId, proposedName, lat, lng, category, 'admin_create_field'];
+        if (subcategory) {
+          insertCols.push('subcategory');
+          insertPh.push('$7');
+          insertVals.push(subcategory);
+        }
+
+        const sql = `INSERT INTO salem_pois (${insertCols.join(', ')})
+                     VALUES (${insertPh.join(', ')})
+                     RETURNING id, name, lat, lng, category, subcategory`;
+        const inserted = await pgPool.query(sql, insertVals);
+
+        const result = [{
+          field: 'create',
+          new_id: inserted.rows[0].id,
+          name: inserted.rows[0].name,
+          lat: inserted.rows[0].lat,
+          lng: inserted.rows[0].lng,
+          category: inserted.rows[0].category,
+          subcategory: inserted.rows[0].subcategory,
+          note: e.note || null,
+        }];
+
+        const state = readSessionState(decoded.sessionDir);
+        state.applied[String(decoded.lineIndex)] = {
+          ts: new Date().toISOString(),
+          result,
+        };
+        writeSessionState(decoded.sessionDir, state);
+
+        return res.json({ ok: true, applied: result });
+      } catch (err) {
+        if (err && err.code === '23503') {
+          return res.status(400).json({ error: `unknown category or subcategory: ${err.detail || err.message}` });
+        }
+        console.error('[admin-field-edits] create-apply failed:', err);
+        return res.status(500).json({ error: String(err.message || err) });
+      }
+    }
+
+    // ── UPDATE branch (existing path) ────────────────────────────────────
     const poiId = String(e.poi_id || '');
     if (!poiId) return res.status(400).json({ error: 'edit has no poi_id' });
 

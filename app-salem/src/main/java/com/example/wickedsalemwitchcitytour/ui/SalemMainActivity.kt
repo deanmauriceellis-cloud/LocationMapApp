@@ -1358,6 +1358,11 @@ class SalemMainActivity : AppCompatActivity() {
                 return consumed
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
+                // S230 — field-edit ON: long-press creates a new POI here
+                // instead of teleport-to-manual-mode. Consume + return.
+                if (BuildDefaults.FIELD_EDIT_ENABLED && consumeMapLongPressForFieldEdit(p)) {
+                    return true
+                }
                 DebugLogger.i("SalemMainActivity", "Long-press → manual mode at ${p.latitude},${p.longitude}")
                 // Stop walk simulator if running — user wants to teleport somewhere else
                 if (walkSimRunning) stopWalkSim()

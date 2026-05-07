@@ -97,6 +97,7 @@ class FieldEditManager(
         currentSubcategory: String?,
     ): ActiveEdit {
         val edit = ActiveEdit(
+            kind = Kind.UPDATE,
             poiId = poiId,
             poiName = poiName,
             currentLat = currentLat,
@@ -107,6 +108,32 @@ class FieldEditManager(
         activeEdit = edit
         DebugLogger.i(TAG, "openEditFor id=$poiId name=$poiName")
         return edit
+    }
+
+    /**
+     * S230 — operator long-pressed an empty spot on the map in field-edit mode.
+     * Open a fresh CREATE edit pre-filled with that lat/lng. The operator must
+     * still type a name before [saveActiveEdit] will accept it.
+     */
+    fun openCreateAt(lat: Double, lng: Double): ActiveEdit {
+        val edit = ActiveEdit(
+            kind = Kind.CREATE,
+            poiId = null,
+            poiName = "",
+            currentLat = null,
+            currentLng = null,
+            currentCategory = null,
+            currentSubcategory = null,
+        )
+        edit.proposedLat = lat
+        edit.proposedLng = lng
+        activeEdit = edit
+        DebugLogger.i(TAG, "openCreateAt $lat,$lng")
+        return edit
+    }
+
+    fun setProposedName(name: String?) {
+        activeEdit?.proposedName = name?.takeIf { it.isNotBlank() }
     }
 
     /** Operator finished a tap-to-place pass — capture the new lat/lng. */
@@ -151,15 +178,17 @@ class FieldEditManager(
         }
         val obj = JSONObject().apply {
             put("schema", SCHEMA_VERSION)
+            put("kind", edit.kind.name.lowercase())
             put("ts", System.currentTimeMillis())
             put("session_ts", sessionTs)
             put("device_model", "${Build.MANUFACTURER ?: ""} ${Build.MODEL ?: ""}".trim())
-            put("poi_id", edit.poiId)
-            put("poi_name", edit.poiName)
+            edit.poiId?.let { put("poi_id", it) }
+            if (edit.poiName.isNotEmpty()) put("poi_name", edit.poiName)
             edit.currentLat?.let { put("current_lat", it) }
             edit.currentLng?.let { put("current_lng", it) }
             edit.currentCategory?.let { put("current_category", it) }
             edit.currentSubcategory?.let { put("current_subcategory", it) }
+            edit.proposedName?.let { put("proposed_name", it) }
             edit.proposedLat?.let { put("proposed_lat", it) }
             edit.proposedLng?.let { put("proposed_lng", it) }
             edit.proposedCategory?.let { put("proposed_category", it) }
@@ -194,16 +223,23 @@ class FieldEditManager(
         return File(dir, "edits-$sessionTs.jsonl")
     }
 
+    /** Update = mutate an existing POI (poiId set, currents populated).
+     *  Create = brand-new POI seeded by a long-press; poiId/currents null,
+     *  proposedName + proposedLat + proposedLng required to save. */
+    enum class Kind { UPDATE, CREATE }
+
     /** A single in-flight field edit. Captured incrementally as the operator
      *  fills out the bottom sheet. Discarded on Cancel; serialized to JSONL on Save. */
     class ActiveEdit(
-        val poiId: String,
+        val kind: Kind,
+        val poiId: String?,
         val poiName: String,
         val currentLat: Double?,
         val currentLng: Double?,
         val currentCategory: String?,
         val currentSubcategory: String?,
     ) {
+        @Volatile var proposedName: String? = null
         @Volatile var proposedLat: Double? = null
         @Volatile var proposedLng: Double? = null
         @Volatile var proposedCategory: String? = null
@@ -211,15 +247,19 @@ class FieldEditManager(
         @Volatile var note: String? = null
         val photoFilenames: MutableList<String> = mutableListOf()
 
-        fun hasAnyChange(): Boolean =
-            proposedLat != null || proposedLng != null ||
-            proposedCategory != null || proposedSubcategory != null ||
-            !note.isNullOrBlank() || photoFilenames.isNotEmpty()
+        fun hasAnyChange(): Boolean = when (kind) {
+            Kind.CREATE ->
+                !proposedName.isNullOrBlank() && proposedLat != null && proposedLng != null
+            Kind.UPDATE ->
+                proposedLat != null || proposedLng != null ||
+                proposedCategory != null || proposedSubcategory != null ||
+                !note.isNullOrBlank() || photoFilenames.isNotEmpty()
+        }
     }
 
     companion object {
         private const val TAG = "FieldEditManager"
-        private const val SCHEMA_VERSION = 1
+        private const val SCHEMA_VERSION = 2
         private const val FIELD_EDITS_FOLDER = "WickedSalemFieldEdits"
     }
 }

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S230 — Field-edit CREATE bottom sheet content (used as the body of an
+  AlertDialog). Triggered by long-pressing an empty spot on the map while
+  field-edit toolbar mode is ON. Required: name. Optional: note, photos.
+  Category/subcategory + everything else gets filled in by the operator
+  in the web admin Field Edits inbox before Apply hits salem_pois.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#FAFAFA">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Create new POI"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#0F766E"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pinned at long-press location. Triage in web admin."
+            android:textSize="11sp"
+            android:textColor="#757575"
+            android:paddingBottom="10dp" />
+
+        <!-- Name (required) -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Name *"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="6dp"
+            android:paddingBottom="2dp" />
+
+        <EditText
+            android:id="@+id/fieldEditCreateNameEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="POI name (required)"
+            android:inputType="textCapWords"
+            android:singleLine="true"
+            android:textSize="14sp"
+            android:background="@android:drawable/edit_text" />
+
+        <!-- Location -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Location"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditCreateLatLng"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#1976D2" />
+
+        <Button
+            android:id="@+id/fieldEditCreateMoveHereBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Re-pin location (tap on map)"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp" />
+
+        <!-- Note -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Note"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <EditText
+            android:id="@+id/fieldEditCreateNoteEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Optional — observations, hints for category, etc."
+            android:inputType="textMultiLine|textCapSentences"
+            android:minLines="2"
+            android:maxLines="4"
+            android:textSize="13sp"
+            android:background="@android:drawable/edit_text" />
+
+        <!-- Photos -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Photos"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#616161"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp" />
+
+        <TextView
+            android:id="@+id/fieldEditCreatePhotosSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#424242"
+            android:text="No photos attached" />
+
+        <Button
+            android:id="@+id/fieldEditCreateAttachPhotoBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Attach photo (recon camera)"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Action row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/fieldEditCreateCancelBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Cancel"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/fieldEditCreateSaveBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Save"
+                android:backgroundTint="#0F766E"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

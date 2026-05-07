@@ -13,21 +13,34 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface FieldEdit {
   schema: number
+  kind?: 'update' | 'create'
   ts: number
   session_ts: string
   device_model?: string
-  poi_id: string
-  poi_name: string
+  poi_id?: string
+  poi_name?: string
   current_lat?: number
   current_lng?: number
   current_category?: string
   current_subcategory?: string
+  proposed_name?: string
   proposed_lat?: number
   proposed_lng?: number
   proposed_category?: string
   proposed_subcategory?: string
   note?: string
   photo_filenames?: string[]
+}
+
+interface Category {
+  id: string
+  label: string
+}
+
+interface Subcategory {
+  id: string
+  category_id: string
+  label: string
 }
 
 interface InboxItem {
@@ -86,6 +99,8 @@ export function FieldEditsTab() {
   const [syncing, setSyncing] = useState(false)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [filter, setFilter] = useState<StatusFilter>('pending')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([])
 
   const refetch = useCallback(() => {
     setLoading(true)
@@ -100,6 +115,19 @@ export function FieldEditsTab() {
   }, [])
 
   useEffect(() => { refetch() }, [refetch])
+
+  // Fetch the canonical taxonomy once for the create-card category pickers.
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/admin/salem/categories', { credentials: 'same-origin' }).then(r => r.json()),
+      fetch('/api/admin/salem/subcategories', { credentials: 'same-origin' }).then(r => r.json()),
+    ])
+      .then(([cats, subs]) => {
+        setCategories(cats.categories || [])
+        setSubcategories(subs.subcategories || [])
+      })
+      .catch(() => { /* best-effort; create-card dropdowns just stay empty */ })
+  }, [])
 
   const handleSync = useCallback(() => {
     setSyncing(true)
@@ -118,18 +146,18 @@ export function FieldEditsTab() {
       .finally(() => setSyncing(false))
   }, [refetch])
 
-  const handleApply = useCallback((editKey: string) => {
+  const handleApply = useCallback((editKey: string, body: Record<string, unknown> = {}) => {
     setBusyKey(editKey)
     fetch(`/api/admin/field-edits/${editKey}/apply`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify(body),
     })
       .then(async r => {
-        const body = await r.json()
-        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-        return body
+        const respBody = await r.json()
+        if (!r.ok) throw new Error(respBody.error || `HTTP ${r.status}`)
+        return respBody
       })
       .then(() => refetch())
       .catch((e: unknown) => alert(`Apply failed: ${(e as Error).message ?? e}`))
@@ -231,13 +259,25 @@ export function FieldEditsTab() {
           </div>
         )}
         {flatItems.map(item => (
-          <EditCard
-            key={item.editKey}
-            item={item}
-            busy={busyKey === item.editKey}
-            onApply={() => handleApply(item.editKey)}
-            onReject={() => handleReject(item.editKey)}
-          />
+          item.edit.kind === 'create' ? (
+            <CreateCard
+              key={item.editKey}
+              item={item}
+              busy={busyKey === item.editKey}
+              categories={categories}
+              subcategories={subcategories}
+              onApply={(body) => handleApply(item.editKey, body)}
+              onReject={() => handleReject(item.editKey)}
+            />
+          ) : (
+            <EditCard
+              key={item.editKey}
+              item={item}
+              busy={busyKey === item.editKey}
+              onApply={() => handleApply(item.editKey)}
+              onReject={() => handleReject(item.editKey)}
+            />
+          )
         ))}
       </div>
     </div>
@@ -367,6 +407,178 @@ function EditCard({ item, busy, onApply, onReject }: EditCardProps) {
       {item.status === 'applied' && item.applied && (
         <div className="mt-3 text-[11px] text-emerald-800 bg-emerald-50 rounded p-2">
           Applied {new Date(item.applied.ts).toLocaleString()}.
+          <pre className="mt-1 whitespace-pre-wrap text-[10px] text-emerald-900">
+            {JSON.stringify(item.applied.result, null, 2)}
+          </pre>
+        </div>
+      )}
+      {item.status === 'dismissed' && item.dismissed && (
+        <div className="mt-3 text-[11px] text-slate-700 bg-slate-50 rounded p-2">
+          Dismissed {new Date(item.dismissed.ts).toLocaleString()}
+          {item.dismissed.reason ? ` — ${item.dismissed.reason}` : ''}.
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Create-card (S230) ─────────────────────────────────────────────────────
+// Renders a kind=create field-edit row. The device captures only name +
+// location + note + photos; category/subcategory triage happens here at the
+// gate before the row gets INSERTed into salem_pois.
+
+interface CreateCardProps {
+  item: InboxItem
+  busy: boolean
+  categories: Category[]
+  subcategories: Subcategory[]
+  onApply: (body: { category: string; subcategory?: string }) => void
+  onReject: () => void
+}
+
+function CreateCard({ item, busy, categories, subcategories, onApply, onReject }: CreateCardProps) {
+  const e = item.edit
+  const [category, setCategory] = useState<string>('')
+  const [subcategory, setSubcategory] = useState<string>('')
+
+  const subOptions = useMemo(() =>
+    subcategories.filter(s => s.category_id === category),
+    [subcategories, category]
+  )
+
+  // Reset subcategory when the parent category changes (otherwise it dangles
+  // pointing to a row from the previous parent).
+  useEffect(() => { setSubcategory('') }, [category])
+
+  const statusBadge = item.status === 'pending'
+    ? <span className="px-2 py-0.5 text-[10px] rounded bg-teal-100 text-teal-900 uppercase tracking-wide">Pending Create</span>
+    : item.status === 'applied'
+      ? <span className="px-2 py-0.5 text-[10px] rounded bg-emerald-100 text-emerald-900 uppercase tracking-wide">Created</span>
+      : <span className="px-2 py-0.5 text-[10px] rounded bg-slate-200 text-slate-700 uppercase tracking-wide">Dismissed</span>
+
+  const canApply = item.status === 'pending' && category.length > 0 && !busy
+
+  return (
+    <div className="bg-white rounded shadow-sm border-l-4 border-l-teal-500 border border-slate-200 p-3">
+      <div className="flex items-start gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-semibold text-slate-900 truncate">
+              {e.proposed_name || '(no name)'}
+            </div>
+            {statusBadge}
+          </div>
+          <div className="text-xs text-slate-500 truncate">
+            new POI · {fmtSession(e.session_ts)}
+            {e.device_model ? ` · ${e.device_model}` : ''}
+          </div>
+        </div>
+        {item.status === 'pending' && (
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onApply({ category, subcategory: subcategory || undefined })}
+              disabled={!canApply}
+              title={!canApply && !busy ? 'Pick a category first' : ''}
+              className="px-3 py-1 text-xs rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={onReject}
+              disabled={busy}
+              className="px-3 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-800 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-[88px_1fr] gap-x-2 gap-y-1 text-xs">
+        <div className="text-slate-700">Name</div>
+        <div className="text-teal-700 font-medium">{e.proposed_name || '—'}</div>
+
+        <div className="text-slate-700">Location</div>
+        <div className="text-teal-700 font-mono">
+          {fmtCoord(e.proposed_lat)}, {fmtCoord(e.proposed_lng)}
+        </div>
+
+        <div className="text-slate-700 self-center">Category *</div>
+        <div>
+          {item.status === 'pending' ? (
+            <select
+              value={category}
+              onChange={ev => setCategory(ev.target.value)}
+              className="text-xs border border-slate-300 rounded px-1 py-0.5 bg-white w-full max-w-xs"
+            >
+              <option value="">— pick a category —</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.label} ({c.id})</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-slate-700">{category || '—'}</span>
+          )}
+        </div>
+
+        <div className="text-slate-700 self-center">Subcategory</div>
+        <div>
+          {item.status === 'pending' ? (
+            <select
+              value={subcategory}
+              onChange={ev => setSubcategory(ev.target.value)}
+              disabled={!category}
+              className="text-xs border border-slate-300 rounded px-1 py-0.5 bg-white w-full max-w-xs disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              <option value="">— optional —</option>
+              {subOptions.map(s => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-slate-700">{subcategory || '—'}</span>
+          )}
+        </div>
+      </div>
+
+      {e.note && (
+        <div className="mt-3 p-2 rounded bg-amber-50 border border-amber-200">
+          <div className="text-[10px] uppercase tracking-wide text-amber-900 font-semibold mb-0.5">Note</div>
+          <div className="text-xs text-amber-950 whitespace-pre-wrap">{e.note}</div>
+        </div>
+      )}
+
+      {e.photo_filenames && e.photo_filenames.length > 0 && (
+        <div className="mt-3">
+          <div className="text-[10px] uppercase tracking-wide text-slate-600 font-semibold mb-1">
+            Photos ({e.photo_filenames.length})
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {e.photo_filenames.map(fn => (
+              <a
+                key={fn}
+                href={`/api/admin/field-edits/photo/${item.sessionDir}/${fn}`}
+                target="_blank"
+                rel="noreferrer"
+                title={fn}
+                className="block"
+              >
+                <img
+                  src={`/api/admin/field-edits/photo/${item.sessionDir}/${fn}`}
+                  alt={fn}
+                  className="w-24 h-24 object-cover rounded border border-slate-300 hover:border-indigo-500 transition-colors"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {item.status === 'applied' && item.applied && (
+        <div className="mt-3 text-[11px] text-emerald-800 bg-emerald-50 rounded p-2">
+          Created {new Date(item.applied.ts).toLocaleString()}.
           <pre className="mt-1 whitespace-pre-wrap text-[10px] text-emerald-900">
             {JSON.stringify(item.applied.result, null, 2)}
           </pre>
