@@ -31,8 +31,8 @@ import { GeocodeCandidatesModal } from './GeocodeCandidatesModal'
 import { AuditTab } from './AuditTab'
 import { ProposalReviewPanel } from './ProposalReviewPanel'
 import { FieldEditsTab } from './FieldEditsTab'
-
-type AdminView = 'pois' | 'tours' | 'witch-trials' | 'lint' | 'geocodes' | 'audit' | 'field-edits'
+import { AdminSidebar, type AdminView } from './AdminSidebar'
+import { SplashTreeTab } from './SplashTreeTab'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -816,76 +816,7 @@ export function AdminLayout() {
           LocationMapApp Admin
         </h1>
 
-        {/* View toggle */}
-        <div className="flex rounded overflow-hidden border border-slate-600 mr-3">
-          <button
-            type="button"
-            onClick={() => setView('pois')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'pois' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            POIs
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('tours')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'tours' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            Tours
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('witch-trials')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'witch-trials' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            Witch Trials
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('lint')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'lint' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-            title="Data-quality lint scan"
-          >
-            Lint
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('geocodes')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'geocodes' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-            title="Address ↔ stored coords deep verification"
-          >
-            Geocodes
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('audit')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'audit' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-            title="Change audit log — every admin/automation edit, with revert"
-          >
-            Audit
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('field-edits')}
-            className={`px-3 py-1 text-sm transition-colors ${
-              view === 'field-edits' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-            title="Field-edit inbox — atomic POI changes captured on the Lenovo, awaiting accept/reject"
-          >
-            Field Edits
-          </button>
-        </div>
+        {/* View navigation now lives in the left sidebar (AdminSidebar). */}
 
         {view === 'pois' && (
           <>
@@ -940,8 +871,10 @@ export function AdminLayout() {
         </button>
       </header>
 
-      {/* Body */}
-      {view === 'witch-trials' ? (
+      {/* Body — sidebar (left) + view content (right) */}
+      <div className="flex-1 flex min-h-0">
+        <AdminSidebar view={view} onViewChange={setView} />
+        {view === 'witch-trials' ? (
         <div className="flex-1 min-h-0">
           <WitchTrialsPanel />
         </div>
@@ -972,6 +905,8 @@ export function AdminLayout() {
         <div className="flex-1 min-h-0">
           <FieldEditsTab />
         </div>
+      ) : view === 'splash-tree' ? (
+        <SplashTreeTab />
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">
           <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
@@ -1092,6 +1027,7 @@ export function AdminLayout() {
           </div>
         </>
       )}
+      </div>
 
       {/* Geocodes modal (Lint tab) */}
       <GeocodeCandidatesModal

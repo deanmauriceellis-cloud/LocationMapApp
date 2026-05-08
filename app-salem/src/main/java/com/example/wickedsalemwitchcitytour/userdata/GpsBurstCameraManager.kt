@@ -13,6 +13,7 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -34,7 +35,9 @@ import androidx.lifecycle.lifecycleScope
 import com.example.locationmapapp.data.location.LocationManager as AppLocationManager
 import com.example.locationmapapp.util.DebugLogger
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -95,7 +98,8 @@ class GpsBurstCameraManager(
     private val mainExecutor: Executor by lazy { ContextCompat.getMainExecutor(context) }
 
     private var locationJob: Job? = null
-    @Volatile private var lastShotAtMs: Long = 0L
+    private var tickerJob: Job? = null
+    @Volatile private var lastLoc: Location? = null
     @Volatile private var shotsThisSession: Int = 0
     @Volatile private var enabled: Boolean = false
 
@@ -133,19 +137,22 @@ class GpsBurstCameraManager(
 
         enabled = true
         shotsThisSession = 0
-        lastShotAtMs = 0L
-        DebugLogger.i(TAG, "start — burst ON, throttle=${THROTTLE_MS}ms, gallery=Pictures/$GALLERY_FOLDER")
+        lastLoc = null
+        DebugLogger.i(TAG, "start — burst ON, tick=${TICK_MS}ms (time-driven, GPS-independent), gallery=Pictures/$GALLERY_FOLDER")
         bindCamera()
         startLocationCollection()
+        startShotTicker()
         Toast.makeText(
             activity,
-            "GPS-burst ON — auto-shoot every ${THROTTLE_MS / 1000}s",
+            "Rapid Recon ON — auto-shoot every ${TICK_MS / 1000}s",
             Toast.LENGTH_SHORT
         ).show()
     }
 
     private fun stop() {
         enabled = false
+        tickerJob?.cancel()
+        tickerJob = null
         locationJob?.cancel()
         locationJob = null
         try { cameraProvider?.unbindAll() } catch (t: Throwable) {
@@ -155,7 +162,7 @@ class GpsBurstCameraManager(
         DebugLogger.i(TAG, "stop — burst OFF, $shotsThisSession photos this session")
         Toast.makeText(
             activity,
-            "GPS-burst OFF — $shotsThisSession photos saved",
+            "Rapid Recon OFF — $shotsThisSession photos saved",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -202,25 +209,26 @@ class GpsBurstCameraManager(
 
     @Suppress("MissingPermission") // Checked in start()
     private fun startLocationCollection() {
-        // 500 ms poll so the throttle floor (THROTTLE_MS) has finer-grained
-        // moments to fire on. With 1 Hz polling the Lenovo was landing most
-        // shots ~one fix past the floor (median 4s on a 3s throttle); 2 Hz
-        // closes that gap. Negligible battery cost on a plugged-in tablet.
+        // S231: location flow is now a passive cache feeder for EXIF stamping.
+        // Shot cadence is driven by [startShotTicker] at TICK_MS, so flaky GPS
+        // (Doze, indoors, stationary-coalescing) cannot starve the camera.
+        // Each fix updates [lastLoc]; the ticker reads whatever's most recent.
         locationJob = activity.lifecycleScope.launch {
             locationManager.getLocationUpdates(intervalMs = 500L, minIntervalMs = 500L)
-                .collect { loc -> onFix(loc) }
+                .collect { loc -> lastLoc = loc }
         }
     }
 
-    private fun onFix(loc: Location) {
-        if (!enabled) return
-        val nowMs = System.currentTimeMillis()
-        if (nowMs - lastShotAtMs < THROTTLE_MS) return
-        lastShotAtMs = nowMs
-        fireShot(loc)
+    private fun startShotTicker() {
+        tickerJob = activity.lifecycleScope.launch {
+            while (isActive && enabled) {
+                fireShot(lastLoc)
+                delay(TICK_MS)
+            }
+        }
     }
 
-    private fun fireShot(loc: Location) {
+    private fun fireShot(loc: Location?) {
         val capture = imageCapture
         if (capture == null) {
             DebugLogger.w(TAG, "fireShot: imageCapture not yet bound, skipping")
@@ -233,9 +241,14 @@ class GpsBurstCameraManager(
         val ts = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         // MediaStore display names tolerate '-' but several file managers misparse
         // a leading '-' on a token; swap negatives to 'n' to keep filenames clean.
-        val latStr = "%.5f".format(loc.latitude).replace("-", "n")
-        val lonStr = "%.5f".format(loc.longitude).replace("-", "n")
-        val displayName = "burst_${ts}_${latStr}_${lonStr}.jpg"
+        // When GPS hasn't delivered a fix yet (or has stalled), filename uses
+        // "noGPS" so the gap is obvious in the gallery thumbnail strip.
+        val coordSuffix = if (loc != null) {
+            val latStr = "%.5f".format(loc.latitude).replace("-", "n")
+            val lonStr = "%.5f".format(loc.longitude).replace("-", "n")
+            "${latStr}_${lonStr}"
+        } else "noGPS"
+        val displayName = "burst_${ts}_${coordSuffix}.jpg"
         val tmpFile = File(tmpDir, displayName)
         val azimuthAtCapture = latestAzimuthDeg
 
@@ -260,9 +273,10 @@ class GpsBurstCameraManager(
                         ).show()
                     }
                 }
+                val accStr = loc?.let { "  acc=${"%.1f".format(it.accuracy)}m" } ?: "  acc=--"
                 DebugLogger.i(
                     TAG,
-                    "burst #$shotsThisSession  $displayName  acc=${"%.1f".format(loc.accuracy)}m" +
+                    "burst #$shotsThisSession  $displayName$accStr" +
                         (azimuthAtCapture?.let { "  hdg=${"%.0f".format(it)}°" } ?: "")
                 )
             }
@@ -306,14 +320,14 @@ class GpsBurstCameraManager(
     // code untouched for this iteration).
     // ─────────────────────────────────────────────────────────────────────
 
-    private fun writeExif(file: File, loc: Location, azimuthDeg: Float?) {
+    private fun writeExif(file: File, loc: Location?, azimuthDeg: Float?) {
         val exif = ExifInterface(file.absolutePath)
 
         exif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER ?: "")
         exif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL ?: "")
         exif.setAttribute(
             ExifInterface.TAG_SOFTWARE,
-            "WickedSalem GPS-burst (Android ${Build.VERSION.RELEASE})"
+            "WickedSalem Rapid-Recon (Android ${Build.VERSION.RELEASE})"
         )
 
         val nowFmt = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
@@ -321,41 +335,67 @@ class GpsBurstCameraManager(
         exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, nowStr)
         exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, nowStr)
 
-        exif.setLatLong(loc.latitude, loc.longitude)
-        if (loc.hasAltitude()) exif.setAltitude(loc.altitude)
-        if (loc.hasSpeed()) {
-            val kmh = (loc.speed * 3.6).toString()
-            exif.setAttribute(ExifInterface.TAG_GPS_SPEED, "$kmh/1")
-            exif.setAttribute(ExifInterface.TAG_GPS_SPEED_REF, "K")
-        }
-        if (loc.hasBearing()) {
-            exif.setAttribute(ExifInterface.TAG_GPS_TRACK, "${loc.bearing}/1")
-            exif.setAttribute(ExifInterface.TAG_GPS_TRACK_REF, "T")
-        }
-        val procMethod = if (loc.hasAccuracy()) {
-            "GPS (accuracy=${"%.1f".format(loc.accuracy)}m)"
-        } else "GPS"
-        exif.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, procMethod)
+        if (loc != null) {
+            exif.setLatLong(loc.latitude, loc.longitude)
+            if (loc.hasAltitude()) exif.setAltitude(loc.altitude)
+            if (loc.hasSpeed()) {
+                val kmh = (loc.speed * 3.6).toString()
+                exif.setAttribute(ExifInterface.TAG_GPS_SPEED, "$kmh/1")
+                exif.setAttribute(ExifInterface.TAG_GPS_SPEED_REF, "K")
+            }
+            if (loc.hasBearing()) {
+                exif.setAttribute(ExifInterface.TAG_GPS_TRACK, "${loc.bearing}/1")
+                exif.setAttribute(ExifInterface.TAG_GPS_TRACK_REF, "T")
+            }
+            val procMethod = if (loc.hasAccuracy()) {
+                "GPS (accuracy=${"%.1f".format(loc.accuracy)}m)"
+            } else "GPS"
+            exif.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, procMethod)
 
-        val fixTime = if (loc.time > 0) loc.time else System.currentTimeMillis()
-        val gpsTimeFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
-        val gpsDateFmt = SimpleDateFormat("yyyy:MM:dd", Locale.US)
-        exif.setAttribute(ExifInterface.TAG_GPS_TIMESTAMP, gpsTimeFmt.format(Date(fixTime)))
-        exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, gpsDateFmt.format(Date(fixTime)))
+            val fixTime = if (loc.time > 0) loc.time else System.currentTimeMillis()
+            val gpsTimeFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
+            val gpsDateFmt = SimpleDateFormat("yyyy:MM:dd", Locale.US)
+            exif.setAttribute(ExifInterface.TAG_GPS_TIMESTAMP, gpsTimeFmt.format(Date(fixTime)))
+            exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, gpsDateFmt.format(Date(fixTime)))
+        } else {
+            exif.setAttribute(ExifInterface.TAG_GPS_PROCESSING_METHOD, "NO_FIX")
+        }
 
         if (azimuthDeg != null) {
-            val az = ((azimuthDeg % 360f) + 360f) % 360f
-            exif.setAttribute(
-                ExifInterface.TAG_GPS_IMG_DIRECTION,
-                "${(az * 100).toInt()}/100"
-            )
-            exif.setAttribute(ExifInterface.TAG_GPS_IMG_DIRECTION_REF, "M")
+            // azimuthDeg from TYPE_ROTATION_VECTOR is relative to MAGNETIC north.
+            // If we have a GPS fix, convert to TRUE north via local declination
+            // (GeomagneticField — WMM model). Without a fix, fall back to magnetic.
+            val magAz = ((azimuthDeg % 360f) + 360f) % 360f
+            if (loc != null) {
+                val geo = GeomagneticField(
+                    loc.latitude.toFloat(),
+                    loc.longitude.toFloat(),
+                    if (loc.hasAltitude()) loc.altitude.toFloat() else 0f,
+                    if (loc.time > 0) loc.time else System.currentTimeMillis()
+                )
+                val trueAz = ((magAz + geo.declination) % 360f + 360f) % 360f
+                exif.setAttribute(
+                    ExifInterface.TAG_GPS_IMG_DIRECTION,
+                    "${(trueAz * 100).toInt()}/100"
+                )
+                exif.setAttribute(ExifInterface.TAG_GPS_IMG_DIRECTION_REF, "T")
+            } else {
+                exif.setAttribute(
+                    ExifInterface.TAG_GPS_IMG_DIRECTION,
+                    "${(magAz * 100).toInt()}/100"
+                )
+                exif.setAttribute(ExifInterface.TAG_GPS_IMG_DIRECTION_REF, "M")
+            }
         }
 
-        val note = StringBuilder("WickedSalem GPS-burst v1")
-        note.append(" | acc=").append("%.1f".format(loc.accuracy)).append("m")
-        if (loc.hasSpeed()) note.append(" spd=").append("%.2f".format(loc.speed)).append("m/s")
-        if (loc.hasAltitude()) note.append(" alt=").append("%.1f".format(loc.altitude)).append("m")
+        val note = StringBuilder("WickedSalem Rapid-Recon v2")
+        if (loc != null) {
+            note.append(" | acc=").append("%.1f".format(loc.accuracy)).append("m")
+            if (loc.hasSpeed()) note.append(" spd=").append("%.2f".format(loc.speed)).append("m/s")
+            if (loc.hasAltitude()) note.append(" alt=").append("%.1f".format(loc.altitude)).append("m")
+        } else {
+            note.append(" | gps=NO_FIX")
+        }
         azimuthDeg?.let { note.append(" hdg=").append("%.0f".format(it)).append("°") }
         exif.setAttribute(ExifInterface.TAG_USER_COMMENT, note.toString())
 
@@ -395,9 +435,9 @@ class GpsBurstCameraManager(
 
     companion object {
         private const val TAG = "GpsBurstCameraManager"
-        // S228 round 2 — dropped 3000 → 2000 to converge on actual ~2s cadence
-        // (Lenovo FusedLocationProvider serves fixes ~every 2s in practice).
-        private const val THROTTLE_MS = 2_000L
+        // S231 — switched from GPS-fix-driven (THROTTLE_MS) to time-driven
+        // (TICK_MS) so flaky/coalesced GPS can't starve the camera. 1 s tick.
+        private const val TICK_MS = 1_000L
         private const val GALLERY_FOLDER = "WickedSalemRecon"
     }
 }

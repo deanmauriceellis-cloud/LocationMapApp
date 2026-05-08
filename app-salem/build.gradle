@@ -166,10 +166,20 @@ tasks.register('alignSalemAssetSchema', Exec) {
     enabled = !skipChain
     mustRunAfter 'publishSalemTourLegs'
 }
+tasks.register('publishSplashTree', Exec) {
+    group = 'salem-content'
+    description = 'S231: bake cache-proxy/data/splash-tree-v1.json → app-salem/src/main/assets/splash_tree_v1.json (validates first).'
+    workingDir = rootProject.projectDir
+    commandLine 'node', 'cache-proxy/scripts/publish-splash-tree.js'
+    enabled = !skipChain
+    // Independent of the salem_content.db chain; can run in parallel but ordered
+    // for deterministic logs.
+    mustRunAfter 'alignSalemAssetSchema'
+}
 tasks.register('publishSalemContent') {
     group = 'salem-content'
     description = 'Run the full PG → asset publish chain in order.'
-    dependsOn 'publishSalemPois', 'publishSalemTours', 'publishSalemTourLegs', 'alignSalemAssetSchema'
+    dependsOn 'publishSalemPois', 'publishSalemTours', 'publishSalemTourLegs', 'alignSalemAssetSchema', 'publishSplashTree'
 }
 
 // S180 — verify-bundled-assets.js gate.

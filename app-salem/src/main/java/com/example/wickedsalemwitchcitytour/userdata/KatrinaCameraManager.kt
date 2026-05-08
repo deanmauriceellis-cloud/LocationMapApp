@@ -169,6 +169,10 @@ class KatrinaCameraManager(
 
         val intent = Intent(activity, ReconCaptureActivity::class.java).apply {
             putExtra(ReconCaptureActivity.EXTRA_OUT_FILE_PATH, tmpFile.absolutePath)
+            // S232 — auto-fire: skip the preview-and-shutter UI on the toolbar
+            // recon button. Operator wants a single tap to produce a photo
+            // without a second interaction.
+            putExtra(ReconCaptureActivity.EXTRA_AUTO_FIRE, true)
         }
 
         val launcher = captureLauncher

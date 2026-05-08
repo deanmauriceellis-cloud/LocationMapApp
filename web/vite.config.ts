@@ -33,8 +33,11 @@ export default defineConfig({
         changeOrigin: true,
       },
       // cache-proxy — LMA POI R/W + aux data services.
+      // localhost:4300 (S231): Vite and cache-proxy live on the same box, so
+      // this stays correct across LAN IP changes. The browser still hits Vite
+      // over LAN; only the Vite→cache-proxy hop uses localhost.
       '/api': {
-        target: 'http://10.0.0.229:4300',
+        target: 'http://localhost:4300',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

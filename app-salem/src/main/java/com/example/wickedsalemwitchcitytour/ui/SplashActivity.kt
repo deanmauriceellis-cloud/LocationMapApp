@@ -9,18 +9,30 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.splash.LocationContext
+import com.example.wickedsalemwitchcitytour.splash.LocationContextBuilder
+import com.example.wickedsalemwitchcitytour.splash.PlaceKind
+import com.example.wickedsalemwitchcitytour.splash.PlaceResolver
+import com.example.wickedsalemwitchcitytour.splash.SplashEngine
+import com.example.wickedsalemwitchcitytour.splash.SplashTree
 import com.example.wickedsalemwitchcitytour.util.SplashVoice
+import com.google.android.gms.location.LocationServices
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Suppress("unused")
@@ -47,8 +59,22 @@ class SplashActivity : AppCompatActivity() {
         // TTS engine never reports onDone (engine crash, missing voice data, etc).
         private const val SPLASH_SAFETY_CAP_MS = 15_000L
         private const val SPLASH_UTTERANCE_ID = "splash_welcome"
-        private const val SPLASH_WELCOME =
-            "Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App."
+
+        // S231 — splash line is now picked from the bundled splash_tree_v1.json
+        // decision tree (authored in the web admin Splash Tree tab). This list
+        // is the LAST-RESORT fallback used only if the tree asset fails to
+        // load entirely. Keep the legacy line as the catch-all default.
+        private val SPLASH_LEGACY_FALLBACK = arrayOf(
+            "Welcome to Katrina's Mystic Visitors Guide, Historic Salem Tour App.",
+        )
+
+        // Hard cap on how long we wait for FusedLocationProvider's last-known
+        // fix before giving up and rendering UNKNOWN. The first-fix path on
+        // a cold start has to bind the GMS client and round-trip — observed
+        // ~200–400 ms in practice on the Lenovo. 800 ms keeps comfortable
+        // headroom; the splash budget waits for TTS onDone (multiple seconds)
+        // so this never delays the visible flow.
+        private const val LAST_LOCATION_TIMEOUT_MS = 800L
 
         // Twelve Katrina mood variants — one is picked at random on every
         // launch so the app feels alive across sessions. Add to this list
@@ -96,11 +122,10 @@ class SplashActivity : AppCompatActivity() {
         // a fixed timer — it waits for the TTS utterance to complete, so the
         // user always hears the full welcome. Safety cap below guarantees the
         // splash never hangs if the engine never reports onDone.
-        DebugLogger.i("SplashActivity", "requesting splash TTS: $SPLASH_WELCOME")
-        SplashVoice.speak(SPLASH_WELCOME, SPLASH_UTTERANCE_ID) {
-            DebugLogger.i("SplashActivity", "splash TTS finished → transitioning")
-            launchMainActivity()
-        }
+        // S231 — pick from the splash decision tree. Async because we want to
+        // grab the last-known GPS fix first (cached, near-instant). Falls back
+        // to the legacy line if the tree asset fails to load.
+        pickAndSpeak()
 
         // Slow zoom-in on the Katrina image (Ken Burns-style).
         splashImage.scaleX = 1.0f
@@ -126,6 +151,112 @@ class SplashActivity : AppCompatActivity() {
                 launchMainActivity()
             }
         }, SPLASH_SAFETY_CAP_MS)
+    }
+
+    /**
+     * S231 — splash line picker. Loads the decision tree, fetches the
+     * last-known GPS fix (with a tight timeout), resolves the polygon
+     * context, picks a bucket + variant, and hands off to SplashVoice.
+     *
+     * Failure modes — all fall through to the legacy fallback line so the
+     * splash still speaks something:
+     *   - tree asset missing / corrupt
+     *   - location permission not yet granted (fresh install)
+     *   - getLastLocation returns null (device just booted)
+     *   - SecurityException from gated APIs
+     */
+    private fun pickAndSpeak() {
+        val tree = SplashTree.fromAssets(this)
+        if (tree == null) {
+            val fallback = SPLASH_LEGACY_FALLBACK.random()
+            DebugLogger.w("SplashActivity", "splash tree unavailable → legacy fallback: $fallback")
+            speakAndLaunch(fallback)
+            return
+        }
+
+        val handler = Handler(Looper.getMainLooper())
+        val consumed = AtomicBoolean(false)
+
+        val onContextResolved: (LocationContext?) -> Unit = { ctx ->
+            if (consumed.compareAndSet(false, true)) {
+                val pick = SplashEngine.pick(tree, ctx)
+                DebugLogger.i(
+                    "SplashActivity",
+                    "splash pick: bucket=${pick.bucket?.id ?: "—"} " +
+                        "variant=${pick.variant?.id ?: "—"} " +
+                        "ctx=${ctx?.let { "place=${it.place} miles=${it.miles} mvmt=${it.movement}" } ?: "null"} " +
+                        "→ ${pick.text}"
+                )
+                speakAndLaunch(pick.text)
+            }
+        }
+
+        // Timeout: if FusedLocationProvider doesn't return a cached fix in
+        // LAST_LOCATION_TIMEOUT_MS, proceed with no context (UNKNOWN bucket).
+        val timeoutRunnable = Runnable {
+            DebugLogger.w("SplashActivity", "last-location timeout → UNKNOWN bucket")
+            onContextResolved(null)
+        }
+        handler.postDelayed(timeoutRunnable, LAST_LOCATION_TIMEOUT_MS)
+
+        val hasLocationPermission =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        if (!hasLocationPermission) {
+            // Fresh install — permission not yet granted. The first launch
+            // legitimately has no GPS context; UNKNOWN bucket is the right
+            // answer. Skip the timeout race and resolve immediately.
+            handler.removeCallbacks(timeoutRunnable)
+            onContextResolved(null)
+            return
+        }
+
+        try {
+            val client = LocationServices.getFusedLocationProviderClient(this)
+            client.lastLocation
+                .addOnSuccessListener { loc ->
+                    handler.removeCallbacks(timeoutRunnable)
+                    // If timeout already fired the pick, skip the (now wasted)
+                    // PlaceResolver call — splash already picked + spoke.
+                    if (consumed.get()) return@addOnSuccessListener
+                    if (loc == null) {
+                        onContextResolved(null)
+                        return@addOnSuccessListener
+                    }
+                    val place = try {
+                        PlaceResolver.resolve(this, loc.latitude, loc.longitude)
+                    } catch (t: Throwable) {
+                        DebugLogger.e("SplashActivity", "PlaceResolver failed: ${t.message}")
+                        null
+                    }
+                    val ctx = LocationContextBuilder.build(
+                        loc,
+                        place?.takeIf { it.kind != PlaceKind.OFFGRID },
+                    )
+                    onContextResolved(ctx)
+                }
+                .addOnFailureListener { e ->
+                    handler.removeCallbacks(timeoutRunnable)
+                    DebugLogger.w("SplashActivity", "lastLocation failed: ${e.message}")
+                    onContextResolved(null)
+                }
+        } catch (se: SecurityException) {
+            // Race: permission may have been revoked between the check and
+            // the call. Fall back to UNKNOWN.
+            handler.removeCallbacks(timeoutRunnable)
+            DebugLogger.w("SplashActivity", "SecurityException on lastLocation: ${se.message}")
+            onContextResolved(null)
+        }
+    }
+
+    private fun speakAndLaunch(line: String) {
+        SplashVoice.speak(line, SPLASH_UTTERANCE_ID) {
+            DebugLogger.i("SplashActivity", "splash TTS finished → transitioning")
+            launchMainActivity()
+        }
     }
 
     private fun launchMainActivity() {

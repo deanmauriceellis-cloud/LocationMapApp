@@ -46,6 +46,7 @@ class ReconCaptureActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private var outFile: File? = null
     private var capturing: Boolean = false
+    private var autoFire: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,11 +69,20 @@ class ReconCaptureActivity : AppCompatActivity() {
             return
         }
         outFile = File(path)
+        autoFire = intent.getBooleanExtra(EXTRA_AUTO_FIRE, false)
 
         closeBtn.setOnClickListener { cancelAndFinish() }
         shutterBtn.setOnClickListener { capture() }
 
-        hud.text = "Recon  •  tap shutter to capture"
+        if (autoFire) {
+            // Hide the framing UI — operator just wants the photo.
+            hud.text = "Capturing…"
+            shutterBtn.visibility = android.view.View.GONE
+            closeBtn.visibility = android.view.View.GONE
+            previewView.visibility = android.view.View.INVISIBLE
+        } else {
+            hud.text = "Recon  •  tap shutter to capture"
+        }
         startCamera()
     }
 
@@ -81,18 +91,30 @@ class ReconCaptureActivity : AppCompatActivity() {
         providerFuture.addListener({
             try {
                 val provider = providerFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                     .build()
                 val selector = CameraSelector.DEFAULT_BACK_CAMERA
 
                 provider.unbindAll()
-                provider.bindToLifecycle(this, selector, preview, capture)
+                if (autoFire) {
+                    // Headless — no preview surface bound. The activity
+                    // window stays present (so onCreate's keep-screen-on
+                    // and lifecycle-bound CameraX still work) but the
+                    // operator never sees a viewfinder.
+                    provider.bindToLifecycle(this, selector, capture)
+                } else {
+                    val preview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+                    provider.bindToLifecycle(this, selector, preview, capture)
+                }
                 imageCapture = capture
-                DebugLogger.i(TAG, "CameraX bound to back camera")
+                DebugLogger.i(TAG, "CameraX bound (autoFire=$autoFire)")
+
+                if (autoFire) {
+                    previewView.postDelayed({ capture() }, AUTO_FIRE_SETTLE_MS)
+                }
             } catch (t: Throwable) {
                 DebugLogger.e(TAG, "CameraX bind failed: ${t.message}")
                 Toast.makeText(this, "Camera failed: ${t.message}", Toast.LENGTH_LONG).show()
@@ -151,5 +173,14 @@ class ReconCaptureActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "ReconCaptureActivity"
         const val EXTRA_OUT_FILE_PATH = "extra_out_file_path"
+        // S232 — when true, skip the preview-and-shutter UI: bind the camera
+        // headlessly, fire the shutter once autofocus settles, then finish.
+        // Used by the always-visible toolbar camera icon so a single tap
+        // produces a photo without operator interaction.
+        const val EXTRA_AUTO_FIRE = "extra_auto_fire"
+        // Brief settle window before firing the shutter in auto-fire mode.
+        // ~250 ms gives autofocus enough time on the Lenovo without a visible
+        // UI flicker.
+        private const val AUTO_FIRE_SETTLE_MS = 300L
     }
 }

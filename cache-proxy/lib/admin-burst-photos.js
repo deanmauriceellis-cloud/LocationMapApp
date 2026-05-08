@@ -11,9 +11,10 @@
  *
  * Routes (all gated by /admin Basic Auth):
  *   GET    /admin/burst-photos             — list { id, lat, lon, ts, session, name }
- *   GET    /admin/burst-photos/:id/image   — stream the JPEG
+ *   GET    /admin/burst-photos/:id/image   — stream the full JPEG
+ *   GET    /admin/burst-photos/:id/thumb   — sharp-resized 256-wide JPEG (disk-cached)
  *   GET    /admin/burst-photos/:id/exif    — parsed EXIF as JSON
- *   DELETE /admin/burst-photos/:id         — remove the file from disk
+ *   DELETE /admin/burst-photos/:id         — move to <session>/.deleted/ (recoverable)
  *
  * Identifier scheme: base64url(`<session>/<filename>`). Path traversal is
  * blocked by validating that the resolved file path stays under ROOT_DIR.
@@ -26,8 +27,11 @@ const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-burst-photos.js';
 const fs = require('fs');
 const path = require('path');
 const exifr = require('exifr');
+const sharp = require('sharp');
 
 const ROOT_DIR = process.env.LMA_BURST_PHOTOS_ROOT || '/mnt/sdb-images/LMASalemPictures';
+const THUMB_WIDTH_PX = 320;
+const THUMB_QUALITY  = 70;
 
 const FNAME_RE = /^burst_(\d{8})-(\d{6})_([n\d.]+)_([n\d.]+)\.jpg$/;
 
@@ -92,6 +96,7 @@ function buildList() {
     let firstTs = null, lastTs = null;
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.jpg')) continue;
+      if (name.startsWith('.')) continue; // skip dotfiles / .thumbs/
       const meta = parseFilename(name);
       if (!meta) continue;
       photos.push({
@@ -149,6 +154,30 @@ module.exports = function(app, _deps) {
     fs.createReadStream(decoded.full).pipe(res);
   });
 
+  app.get('/admin/burst-photos/:id/thumb', async (req, res) => {
+    const decoded = decodeId(req.params.id);
+    if (!decoded) return res.status(400).json({ error: 'bad id' });
+    if (!fs.existsSync(decoded.full)) return res.status(404).json({ error: 'not found' });
+    const thumbDir = path.join(ROOT_DIR, decoded.session, '.thumbs');
+    const thumbPath = path.join(thumbDir, decoded.name);
+    try {
+      if (!fs.existsSync(thumbPath)) {
+        if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+        await sharp(decoded.full)
+          .rotate()
+          .resize({ width: THUMB_WIDTH_PX, withoutEnlargement: true })
+          .jpeg({ quality: THUMB_QUALITY, mozjpeg: true })
+          .toFile(thumbPath);
+      }
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      fs.createReadStream(thumbPath).pipe(res);
+    } catch (err) {
+      console.error('[admin-burst-photos] thumb failed:', err);
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
   app.get('/admin/burst-photos/:id/exif', async (req, res) => {
     const decoded = decodeId(req.params.id);
     if (!decoded) return res.status(400).json({ error: 'bad id' });
@@ -180,9 +209,31 @@ module.exports = function(app, _deps) {
     if (!decoded) return res.status(400).json({ error: 'bad id' });
     if (!fs.existsSync(decoded.full)) return res.status(404).json({ error: 'not found' });
     try {
-      fs.unlinkSync(decoded.full);
+      // Soft-delete: move source + thumb into <session>/.deleted/ (and
+      // .deleted/.thumbs/) so the operator can recover. Permanent cleanup is
+      // a separate `rm -rf <session>/.deleted` step performed manually when
+      // they're confident. The list scanner skips dotfiles, so .deleted/
+      // never reappears in the admin overlay.
+      const trashDir   = path.join(ROOT_DIR, decoded.session, '.deleted');
+      const trashThumb = path.join(trashDir, '.thumbs');
+      if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
+      // Avoid clobber if a same-name file was previously trashed.
+      const uniqName = (target) => {
+        if (!fs.existsSync(target)) return target;
+        const ext = path.extname(target);
+        const base = target.slice(0, -ext.length);
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        return `${base}.${stamp}${ext}`;
+      };
+      fs.renameSync(decoded.full, uniqName(path.join(trashDir, decoded.name)));
+      const thumbPath = path.join(ROOT_DIR, decoded.session, '.thumbs', decoded.name);
+      if (fs.existsSync(thumbPath)) {
+        if (!fs.existsSync(trashThumb)) fs.mkdirSync(trashThumb, { recursive: true });
+        try { fs.renameSync(thumbPath, uniqName(path.join(trashThumb, decoded.name))); }
+        catch (_e) { /* best-effort */ }
+      }
       invalidateCache();
-      res.json({ ok: true, deleted: { session: decoded.session, name: decoded.name } });
+      res.json({ ok: true, deleted: { session: decoded.session, name: decoded.name, trashedTo: '.deleted/' } });
     } catch (err) {
       console.error('[admin-burst-photos] delete failed:', err);
       res.status(500).json({ error: String(err.message || err) });

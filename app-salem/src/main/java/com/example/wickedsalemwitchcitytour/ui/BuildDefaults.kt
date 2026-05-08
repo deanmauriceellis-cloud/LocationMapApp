@@ -19,7 +19,7 @@ import com.example.wickedsalemwitchcitytour.BuildConfig
  *
  * Three are numeric flips:
  *   - [DEFAULT_ZOOM]       — recon 19.0; retail 18.0
- *   - [FAB_ZOOM_STEP]      — recon 2.0; retail 1.0
+ *   - [FAB_ZOOM_STEP]      — 1.0 in both (S231: was recon 2.0, skipped z18)
  *   - [MAGNIFY_LEVEL]      — recon 1 (x2); retail 0 (x1)
  *
  * The values are `const`/`val` so R8 strips the dead branch in release builds.
@@ -42,6 +42,6 @@ object BuildDefaults {
     const val FIELD_EDIT_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
 
     val DEFAULT_ZOOM:   Double = if (BuildConfig.RECON_DEFAULTS) 19.0 else 18.0
-    val FAB_ZOOM_STEP:  Double = if (BuildConfig.RECON_DEFAULTS) 2.0 else 1.0
+    val FAB_ZOOM_STEP:  Double = 1.0
     val MAGNIFY_LEVEL:  Int    = if (BuildConfig.RECON_DEFAULTS) 1   else 0
 }

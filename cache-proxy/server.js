@@ -245,6 +245,10 @@ require('./lib/admin-burst-photos')(app, deps);
 // edit hits the DB until the operator accepts it.
 require('./lib/admin-field-edits')(app, deps);
 
+// Admin splash-tree authoring (S231) — GET/PUT/POST /admin/splash/* for the
+// decision-tree editor. Storage at cache-proxy/data/splash-tree-v1.json.
+require('./lib/admin-splash-tree')(app, deps);
+
 // ── Start ───────────────────────────────────────────────────────────────────
 
 server.listen(PORT, '0.0.0.0', () => {
