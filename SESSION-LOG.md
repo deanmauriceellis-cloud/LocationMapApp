@@ -8,7 +8,7 @@
 
 Curiosity-driven exploration of a faux-3D forward-tilt look on top of osmdroid without leaving osmdroid. Net shipped: `TiltContainer` (FrameLayout subclass that wraps the MapView, concats a `setPolyToPoly` perspective matrix in `dispatchDraw`, and inverse-transforms touch events) gated behind `BuildDefaults.TILT_3D_ENABLED = BuildConfig.DEBUG`. Long-press the **+** zoom button to cycle 0° → 30° → 45° → 60° → 0°; angle persists via new `MenuPrefs.PREF_TILT_3D_DEG`. Top-pinched trapezoid with `topY = 1.0*h*t` lands the operator marker at ~75% screen height at max tilt; dark-purple TC background blends the upper-corner wedges. Narration bar + tour-HUD suppressed during tilt because they were getting added as TiltContainer children and warping with the perspective. ~18 `Marker(binding.mapView)` constructions across 8 files were sed-replaced with `BillboardMarker(binding.mapView)` (now a one-line pass-through subclass — the canvas-matrix billboard trick failed on the Lenovo's hardware-accelerated canvas). Wider-MapView two-pass attempt to fill wedges with real tiles was reverted because the seam where the two perspective transforms met read as a "strange division at horizon." Field-edit field validation (S229+S230 carry-forward) was punted to next session — operator unavailable for the walk; pre-flight verified clean. Side conversation: Pixel 7a recommended as the budget rooted Android target (easy bootloader unlock, dual-frequency L5 GNSS, ~$200-250 used).
 
-Full session detail: `docs/session-logs/session-232-2026-05-08.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-232-2026-05-08.md`. Commit: `db667b3`.
 
 ---
 
