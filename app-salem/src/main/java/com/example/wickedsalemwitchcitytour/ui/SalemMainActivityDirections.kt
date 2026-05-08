@@ -112,7 +112,7 @@ internal fun SalemMainActivity.drawWalkingRoute(route: WalkingRoute) {
         // Only show significant turns (skip "continue" instructions)
         if (instruction.text.lowercase().contains("continue")) continue
 
-        val marker = Marker(binding.mapView).apply {
+        val marker = BillboardMarker(binding.mapView).apply {
             position = instruction.location
             title = instruction.text
             snippet = "%.0f m".format(instruction.distanceM)

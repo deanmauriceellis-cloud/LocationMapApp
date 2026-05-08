@@ -40,7 +40,7 @@ internal fun SalemMainActivity.addTrainMarker(vehicle: com.example.locationmapap
     val tint = vehicleRouteColor(vehicle)
     val labeled = binding.mapView.zoomLevelDouble >= 16.0
     val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = vehicle.toGeoPoint()
         if (labeled) {
             val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
@@ -132,7 +132,7 @@ internal fun SalemMainActivity.addSubwayMarker(vehicle: com.example.locationmapa
     val tint = vehicleRouteColor(vehicle)
     val labeled = binding.mapView.zoomLevelDouble >= 16.0
     val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = vehicle.toGeoPoint()
         if (labeled) {
             val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
@@ -190,7 +190,7 @@ internal fun SalemMainActivity.addBusMarker(vehicle: com.example.locationmapapp.
     val tint = vehicleRouteColor(vehicle)
     val labeled = binding.mapView.zoomLevelDouble >= 16.0
     val isStale = vehicleStalenessTag(vehicle.updatedAt).isNotEmpty()
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = vehicle.toGeoPoint()
         if (labeled) {
             val (icon, anchorY) = MarkerIconHelper.labeledVehicle(
@@ -273,7 +273,7 @@ internal fun SalemMainActivity.addStationMarker(stop: com.example.locationmapapp
     } else {
         routeColor(stop.routeIds.firstOrNull() ?: "")
     }
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = stop.toGeoPoint()
         icon     = MarkerIconHelper.stationIcon(this@addStationMarker, tint)
         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -304,7 +304,7 @@ internal fun SalemMainActivity.addStationMarkersBatched(stations: List<com.examp
             }
         }
         for ((stop, icon) in iconData) {
-            val m = org.osmdroid.views.overlay.Marker(binding.mapView).apply {
+            val m = BillboardMarker(binding.mapView).apply {
                 position = stop.toGeoPoint()
                 this.icon = icon
                 setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
@@ -360,7 +360,7 @@ internal fun SalemMainActivity.refreshBusStopMarkersForViewport() {
 
 internal fun SalemMainActivity.addBusStopMarker(stop: com.example.locationmapapp.data.model.MbtaStop) {
     val tint = Color.parseColor("#00695C")  // Teal
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = stop.toGeoPoint()
         icon     = MarkerIconHelper.busStopIcon(this@addBusStopMarker, tint)
         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)

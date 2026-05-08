@@ -34,7 +34,7 @@ internal fun SalemMainActivity.addMetarMarker(station: com.example.locationmapap
         else   -> Color.parseColor("#546E7A")
     }
     val showLabels = binding.mapView.zoomLevelDouble >= METAR_LABEL_ZOOM
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = GeoPoint(station.lat, station.lon)
         icon     = if (showLabels) buildMetarStationIcon(station, fltCatColor)
                    else MarkerIconHelper.dot(this@addMetarMarker, fltCatColor)

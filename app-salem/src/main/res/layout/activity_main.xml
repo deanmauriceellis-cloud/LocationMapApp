@@ -44,12 +44,23 @@
          S171: WickedMapView prototype is live at the WickedMap FAB and the
          standalone "WickedMap Proto" launcher icon. Migration from osmdroid
          to WickedMapView in this layout is planned for the next 2-3 sessions
-         (338 osmdroid call sites across SalemMainActivity*.kt). -->
-    <org.osmdroid.views.MapView
-        android:id="@+id/mapView"
+         (338 osmdroid call sites across SalemMainActivity*.kt).
+         S232: MapView wrapped in TiltContainer for the debug-only matrix-tilt
+         3D prototype. Long-press zoom-OUT cycles 0/30/45/60 degrees in debug
+         builds; container is a passthrough at 0 degrees. -->
+    <com.example.wickedsalemwitchcitytour.ui.TiltContainer
+        android:id="@+id/tiltContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        android:background="#2D1B4E"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <org.osmdroid.views.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </com.example.wickedsalemwitchcitytour.ui.TiltContainer>
 
     <!-- Custom zoom slider (right edge, vertically centered) -->
     <LinearLayout

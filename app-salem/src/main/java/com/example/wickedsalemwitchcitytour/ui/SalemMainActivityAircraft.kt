@@ -61,7 +61,7 @@ internal fun SalemMainActivity.altitudeColor(altitudeMeters: Double?, onGround: 
 internal fun SalemMainActivity.addAircraftMarker(state: com.example.locationmapapp.data.model.AircraftState) {
     val tint = altitudeColor(state.baroAltitude, state.onGround)
     val heading = state.track?.toInt() ?: 0
-    val m = Marker(binding.mapView).apply {
+    val m = BillboardMarker(binding.mapView).apply {
         position = state.toGeoPoint()
         icon     = MarkerIconHelper.aircraftMarker(
             this@addAircraftMarker, heading, tint,

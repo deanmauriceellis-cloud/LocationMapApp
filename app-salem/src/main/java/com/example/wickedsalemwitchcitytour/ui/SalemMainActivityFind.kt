@@ -1628,7 +1628,7 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
     // Convert results → PlaceResult and add as labeled markers under "filter-map" layer
     val places = results.map { it.toPlaceResult() }
     for (place in places) {
-        val m = Marker(binding.mapView).apply {
+        val m = BillboardMarker(binding.mapView).apply {
             position = GeoPoint(place.lat, place.lon)
             icon = MarkerIconHelper.labeledDot(this@enterFilterAndMapMode, place.category, place.name)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)

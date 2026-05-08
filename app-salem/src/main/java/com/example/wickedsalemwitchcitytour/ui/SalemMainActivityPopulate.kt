@@ -772,7 +772,7 @@ internal fun SalemMainActivity.generateRingPoints(
 internal fun SalemMainActivity.placeScanningMarker(point: GeoPoint, panMap: Boolean = true, panOnly: Boolean = false) {
     runOnUiThread {
         if (scanningMarker == null) {
-            scanningMarker = Marker(binding.mapView).apply {
+            scanningMarker = BillboardMarker(binding.mapView).apply {
                 icon = MarkerIconHelper.forCategory(this@placeScanningMarker, "crosshair", 32)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 title = "Scanning…"

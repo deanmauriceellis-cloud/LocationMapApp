@@ -135,6 +135,13 @@ object MenuPrefs {
     /** When true, detail screens (history tile, newspaper, NPC bio) auto-speak the body 1s after open. */
     const val PREF_NARRATOR_MODE_ENABLED = "narrator_mode_enabled"
 
+    // ── S232 matrix-tilt 3D prototype (debug only) ────────────────────────
+    /** Persisted tilt angle in degrees for the TiltContainer matrix-tilt prototype.
+     *  Long-press zoom-OUT cycles 0/30/45/60. Read & written only when
+     *  BuildDefaults.TILT_3D_ENABLED (= BuildConfig.DEBUG) is true; key is
+     *  inert in retail builds because no code path touches it. */
+    const val PREF_TILT_3D_DEG = "tilt_3d_deg"
+
     // ── S186 helpers: pick the correct Layers pref for the active mode ────────
     fun histLandmarkPrefKey(tourActive: Boolean): String =
         if (tourActive) PREF_POI_HIST_LANDMARK_TOUR else PREF_POI_HIST_LANDMARK

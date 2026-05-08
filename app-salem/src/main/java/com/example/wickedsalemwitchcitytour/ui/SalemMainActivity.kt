@@ -1457,6 +1457,35 @@ class SalemMainActivity : AppCompatActivity() {
             updateZoomBubble()
         }
 
+        // S232 — debug-only matrix-tilt 3D prototype. Long-press zoom-IN cycles
+        // 0° → 30° → 45° → 60° → 0° on the TiltContainer wrapping the MapView.
+        // (Bound to + instead of − because the POI peek sheet covers the bottom
+        // of the right-edge zoom slider and would block the − long-press.)
+        // R8 strips this whole branch in retail because TILT_3D_ENABLED is
+        // false there.
+        if (BuildDefaults.TILT_3D_ENABLED) {
+            val tiltSteps = floatArrayOf(0f, 30f, 45f, 60f)
+            val tiltPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+            val savedTilt = tiltPrefs.getFloat(MenuPrefs.PREF_TILT_3D_DEG, 0f)
+            binding.tiltContainer.setTiltDegrees(savedTilt)
+            binding.btnZoomIn.setOnLongClickListener {
+                val cur = binding.tiltContainer.getTiltDegrees()
+                val curIdx = tiltSteps.indexOfFirst { kotlin.math.abs(it - cur) < 0.5f }
+                    .let { if (it < 0) 0 else it }
+                val next = tiltSteps[(curIdx + 1) % tiltSteps.size]
+                binding.tiltContainer.setTiltDegrees(next)
+                tiltPrefs.edit().putFloat(MenuPrefs.PREF_TILT_3D_DEG, next).apply()
+                // Yank any narration / tour-HUD bars sitting inside the
+                // TiltContainer so they don't sit warped on the perspective plane.
+                if (next > 0f) {
+                    removeNarrationBar()
+                    removeTourHud()
+                }
+                Toast.makeText(this, "3D tilt: ${next.toInt()}°", Toast.LENGTH_SHORT).show()
+                true
+            }
+        }
+
         // Drag the track area to scrub zoom level
         binding.zoomTrackArea.setOnTouchListener { v, event ->
             when (event.actionMasked) {
@@ -2412,7 +2441,7 @@ class SalemMainActivity : AppCompatActivity() {
 
                 // Now on main thread — fast marker creation
                 for ((p, icon) in iconData) {
-                    val marker = Marker(binding.mapView)
+                    val marker = BillboardMarker(binding.mapView)
                     marker.position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
                     marker.title = p.name
                     marker.snippet = p.category.replace('_', ' ').lowercase()
@@ -3582,7 +3611,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     internal fun updateGpsMarker(point: GeoPoint) {
         gpsMarker?.let { binding.mapView.overlays.remove(it) }
-        gpsMarker = Marker(binding.mapView).apply {
+        gpsMarker = BillboardMarker(binding.mapView).apply {
             position = point
             icon     = MarkerIconHelper.forCategory(this@SalemMainActivity, "gps", 32)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
@@ -3602,7 +3631,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     internal fun addPoiMarker(layerId: String, place: com.example.locationmapapp.data.model.PlaceResult) {
         val labeled = binding.mapView.zoomLevelDouble >= 16.0
-        val m = Marker(binding.mapView).apply {
+        val m = BillboardMarker(binding.mapView).apply {
             position = GeoPoint(place.lat, place.lon)
             icon = if (labeled) {
                 MarkerIconHelper.labeledDot(this@SalemMainActivity, place.category, place.name)
@@ -3793,7 +3822,7 @@ class SalemMainActivity : AppCompatActivity() {
             }
             // Now on main thread — fast marker creation
             for ((place, icon) in iconData) {
-                val m = Marker(binding.mapView).apply {
+                val m = BillboardMarker(binding.mapView).apply {
                     position = GeoPoint(place.lat, place.lon)
                     this.icon = icon
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -3833,7 +3862,7 @@ class SalemMainActivity : AppCompatActivity() {
             }
             // Now on main thread — fast marker creation + overlay add
             for ((cluster, _, icon) in iconData) {
-                val m = org.osmdroid.views.overlay.Marker(binding.mapView).apply {
+                val m = BillboardMarker(binding.mapView).apply {
                     position = cluster.toGeoPoint()
                     this.icon = icon
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -3865,7 +3894,7 @@ class SalemMainActivity : AppCompatActivity() {
     // =========================================================================
 
     internal fun addWebcamMarker(webcam: com.example.locationmapapp.data.model.Webcam) {
-        val m = Marker(binding.mapView).apply {
+        val m = BillboardMarker(binding.mapView).apply {
             position = webcam.toGeoPoint()
             icon     = MarkerIconHelper.forCategory(this@SalemMainActivity, "camera", 20)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -3889,7 +3918,7 @@ class SalemMainActivity : AppCompatActivity() {
                 MarkerIconHelper.forCategory(this@SalemMainActivity, "camera", 20)
             }
             for (webcam in webcams) {
-                val m = Marker(binding.mapView).apply {
+                val m = BillboardMarker(binding.mapView).apply {
                     position = webcam.toGeoPoint()
                     this.icon = icon
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)

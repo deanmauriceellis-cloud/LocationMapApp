@@ -926,6 +926,12 @@ internal fun SalemMainActivity.observeNarrationState() {
 private fun SalemMainActivity.showNarrationBar(state: NarrationState) {
     removeNarrationBar()
 
+    // S232 — the narration bar gets added as a child of binding.mapView.parent,
+    // which is now the TiltContainer. While tilt is on the bar would be drawn
+    // into the perspective plane and become unreadable, so suppress it. Cycling
+    // tilt back to 0° lets it appear normally on the next narration event.
+    if (BuildDefaults.TILT_3D_ENABLED && binding.tiltContainer.getTiltDegrees() > 0f) return
+
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
 
@@ -1083,7 +1089,7 @@ internal suspend fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
             for (instruction in route.instructions) {
                 if (instruction.text.isBlank()) continue
                 if (instruction.text.lowercase().contains("continue")) continue
-                val marker = Marker(binding.mapView).apply {
+                val marker = BillboardMarker(binding.mapView).apply {
                     position = instruction.location
                     title = instruction.text
                     snippet = "%.0f m".format(instruction.distanceM)
@@ -1116,7 +1122,7 @@ internal suspend fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
             else -> Color.parseColor(COLOR_UPCOMING)
         }
 
-        val marker = Marker(binding.mapView).apply {
+        val marker = BillboardMarker(binding.mapView).apply {
             position = GeoPoint(poi.lat, poi.lng)
             title = "${i + 1}. ${poi.name}"
             snippet = when {
@@ -1293,6 +1299,10 @@ internal fun SalemMainActivity.applyTourLegHighlightFor(point: GeoPoint) {
 @SuppressLint("SetTextI18n")
 internal fun SalemMainActivity.updateTourHud(activeTour: ActiveTour) {
     removeTourHud()
+
+    // S232 — same suppression as showNarrationBar: TourHud is a child of the
+    // TiltContainer (binding.mapView.parent) and would get warped under tilt.
+    if (BuildDefaults.TILT_3D_ENABLED && binding.tiltContainer.getTiltDegrees() > 0f) return
 
     val density = resources.displayMetrics.density
     val dp = { v: Int -> (v * density).toInt() }
