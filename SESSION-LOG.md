@@ -8,7 +8,7 @@
 
 Reran the parallel raster bake against S235's vector sources, producing a fresh `salem-custom.mbtiles` (832.5 MB, 715,841 tiles in 12 min) with OMT + building footprints rasterized in for the matrix-tilt 3D wedges. Merged + rebuilt `:app-salem:assembleDebug`, installed to Lenovo HNY0CY0W: app launched into SalemMainActivity onCreate, fired cinematic zoom-in, then UI thread wedged within seconds and Android's RescueParty watchdog killed the process — no FATAL/AndroidRuntime stacktrace. Initial diagnosis (4 GB device, ~600 visible WebP tiles × 262 KB ARGB_8888 bitmap = ~470 MB heap > 460 MB watcher trigger) is uncertain because the crashing APK accidentally packaged both live `salem_tiles.sqlite` (848 MB) AND `salem_tiles.sqlite.preS236.bak` (262 MB) — backup left in `app-salem/src/main/assets/` after the merge step. Operator chose rollback path: restored S234's 274 MB `salem_tiles.sqlite`, moved the backup out of assets/ to `tools/tile-bake/dist/`, rebuilt clean (374 MB APK with single sqlite confirmed via unzip -l), reinstalled — operator confirmed working. New bake/merge artifacts preserved on disk (gitignored) for S237 clean-reproduction test before deciding whether to ship +10mi-with-buildings (and if so, whether tilt needs a default-off flag, q needs to drop to 40, or building rasterization needs to drop at z14-z15).
 
-Full session detail: `docs/session-logs/session-236-2026-05-09.md`. Commit: `<pending>`.
+Full session detail: `docs/session-logs/session-236-2026-05-09.md`. Commit: `0ebe4be`.
 
 ---
 
