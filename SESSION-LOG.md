@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 223-232 (S222 archived 2026-05-08 at S232 close; S221 archived 2026-05-08 at S231 close; S220 archived 2026-05-06 at S230 close; S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 224-233 (S223 archived 2026-05-08 at S233 close; S222 archived 2026-05-08 at S232 close; S221 archived 2026-05-08 at S231 close; S220 archived 2026-05-06 at S230 close; S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 233: 2026-05-08 — Matrix-tilt 3D promoted to V1: wedge fill + dedicated 3D FAB + perspective touch fix
+
+S232's debug-only tilt prototype hardened and shipped to V1. **Symmetric upward MapView extension** (height += `5.0 × containerH`, `topMargin = -extra/2`, `clipChildren=false`) fills the upper-corner wedges with real distant Salem tiles through the SAME single perspective transform — no seams, no `setMapCenterOffset` (which broke osmdroid's tile-fetch viewport, leaving overlays rendering through dark gaps). **Touch events are manually perspective-transformed** via `Matrix.mapPoints` + multi-pointer `MotionEvent.obtain(...)` — Android's `MotionEvent.transform(Matrix)` mangles perspective matrices (silently drops/mis-applies the bottom row, inverting y direction). **FAB x1..x5 magnify** pivots correctly on the operator marker because the symmetric layout puts MapView's geometric center at TiltContainer center = operator's GPS-rendered position; default View pivot lines up naturally. **New "3D" FAB** above the GPS button (`btnTilt3d` in `activity_main.xml`) replaces the S232 long-press on the "+" zoom button; cycles **0° → 30° → 36° → 42° → 48° → 0°** (operator-tuned ladder, persisted via `MenuPrefs.PREF_TILT_3D_DEG`). **`BuildDefaults.TILT_3D_ENABLED` flipped from `BuildConfig.DEBUG` to `true`** — ships in release/AAB. **Verbose logging** added across `TiltContainer` + zoom buttons + FAB + slider for the next reproducer of an ANR operator hit during FAB x5 cycling at high zoom (working hypothesis: 5.0× extension × 5× FAB scale = ~30× normal screen render area at high zoom, blowing UI thread). **Carry-forward to S234**: tile-bake bbox expansion 10 miles outside Salem's bbox for ALL zoom layers — the residual darkness at higher tilt + zoom is a real bundled-coverage gap, not a tilt-engine bug.
+
+Full session detail: `docs/session-logs/session-233-2026-05-08.md`. Commit: `<sha>`.
+
+---
 
 ## Session 232: 2026-05-08 — Matrix-tilt 3D prototype (debug-only)
 
@@ -75,10 +83,4 @@ Refinement session while waiting for the SalemIntelligence provenance reformulat
 Full session detail: `docs/session-logs/session-224-2026-05-04.md`. Commit: `479dd29`.
 
 ---
-
-## Session 223: 2026-05-03 — Backlog junk: dotenv autoload + stale CLAUDE.md item
-
-Two cheap chores cleared. (1) **dotenv autoload** for cache-proxy: `cache-proxy/server.js` now calls `require('dotenv').config()` at the top, with `dotenv@^16.6.1` added to `cache-proxy/package.json`. Plain `npm start` survives a reboot — no need for the spawning shell to `set -a; source .env; set +a` first. Verified: killed S222 PID 19753, restarted via plain `npm start`, new PID 501902 came up clean with PostgreSQL connected, smoke-tested `/db/pois/stats` (200, 3558 POIs) and `/db/pois/categories` (200 in 3.7 ms). (2) **Stale priority-block item retired** — verified at `cache-proxy/scripts/publish-tour-legs.js:50–70` that S193 already implemented the dynamic Room schema-JSON read via `readLatestRoomIdentity()`; CLAUDE.md item #6 ("de-hardcode Room identity_hash, currently stamps v10") was wrong. Removed bullet, renumbered engineering items 7-13 → 6-12, refreshed the S188-close cache-proxy state line to reflect the new dotenv autoload posture and current runtime deps over baseline (`sharp@0.34+` from S188, `dotenv@16+` from S223). Removed bullet archived to `docs/archive/CLAUDE.md_priority_item_6_removed_2026-05-03.md`. No Android build, no Room bump, no publish chain re-run. Services left running: cache-proxy PID 501902 (4300, S223 dotenv autoload live), web/Vite PID 19377 (4302).
-
-Full session detail: `docs/session-logs/session-223-2026-05-03.md`. Commit: `3ab7566`.
 

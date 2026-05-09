@@ -41,11 +41,13 @@ object BuildDefaults {
     // home post-walk and triaged in the web admin's Field Edits inbox.
     const val FIELD_EDIT_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
 
-    // S232 — debug-only matrix-tilt 3D prototype. TiltContainer wraps the
-    // MapView and skews its canvas via setPolyToPoly. Long-press zoom-IN (+)
-    // cycles 0° → 30° → 45° → 60° → 0°. Gated on BuildConfig.DEBUG so retail
-    // never gets the long-press wiring (R8 strips the dead branch).
-    @JvmField val TILT_3D_ENABLED: Boolean = BuildConfig.DEBUG
+    // S232 / S233 — matrix-tilt 3D. TiltContainer wraps the MapView and skews
+    // its canvas via setPolyToPoly + grows the MapView upward in tilt mode so
+    // the wedges fill with real distant tiles. Touch events are manually
+    // perspective-transformed via Matrix.mapPoints. S233 promoted to V1
+    // approved (operator sign-off) — flipped from BuildConfig.DEBUG to true
+    // so the dedicated 3D FAB ships in release/AAB builds.
+    const val TILT_3D_ENABLED: Boolean = true
 
     val DEFAULT_ZOOM:   Double = if (BuildConfig.RECON_DEFAULTS) 19.0 else 18.0
     val FAB_ZOOM_STEP:  Double = 1.0

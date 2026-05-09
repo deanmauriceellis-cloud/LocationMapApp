@@ -1317,6 +1317,7 @@ class SalemMainActivity : AppCompatActivity() {
         }
         setupZoomSlider()
         setupZoomToggle()
+        setupTilt3dButton()
         setupWalkSimButton()
         setupShowAllPoisButton()
         val eventsReceiver = object : MapEventsReceiver {
@@ -1445,46 +1446,30 @@ class SalemMainActivity : AppCompatActivity() {
 
         // + button: zoom in by BuildDefaults.FAB_ZOOM_STEP per tap (recon: 2, retail: 1)
         binding.btnZoomIn.setOnClickListener {
-            val newZoom = (map.zoomLevelDouble + BuildDefaults.FAB_ZOOM_STEP).coerceAtMost(map.maxZoomLevel)
+            val cur = map.zoomLevelDouble
+            val newZoom = (cur + BuildDefaults.FAB_ZOOM_STEP).coerceAtMost(map.maxZoomLevel)
+            DebugLogger.i("SalemMainActivity",
+                "btnZoomIn TAP: zoom $cur → $newZoom (tilt=${binding.tiltContainer.getTiltDegrees().toInt()}°, " +
+                "fabScale=${binding.mapView.scaleX}, mapView=${binding.mapView.width}x${binding.mapView.height})")
             map.controller.setZoom(newZoom)
             updateZoomBubble()
         }
 
         // − button: zoom out by BuildDefaults.FAB_ZOOM_STEP per tap
         binding.btnZoomOut.setOnClickListener {
-            val newZoom = (map.zoomLevelDouble - BuildDefaults.FAB_ZOOM_STEP).coerceAtLeast(map.minZoomLevel)
+            val cur = map.zoomLevelDouble
+            val newZoom = (cur - BuildDefaults.FAB_ZOOM_STEP).coerceAtLeast(map.minZoomLevel)
+            DebugLogger.i("SalemMainActivity",
+                "btnZoomOut TAP: zoom $cur → $newZoom (tilt=${binding.tiltContainer.getTiltDegrees().toInt()}°, " +
+                "fabScale=${binding.mapView.scaleX}, mapView=${binding.mapView.width}x${binding.mapView.height})")
             map.controller.setZoom(newZoom)
             updateZoomBubble()
         }
 
-        // S232 — debug-only matrix-tilt 3D prototype. Long-press zoom-IN cycles
-        // 0° → 30° → 45° → 60° → 0° on the TiltContainer wrapping the MapView.
-        // (Bound to + instead of − because the POI peek sheet covers the bottom
-        // of the right-edge zoom slider and would block the − long-press.)
-        // R8 strips this whole branch in retail because TILT_3D_ENABLED is
-        // false there.
-        if (BuildDefaults.TILT_3D_ENABLED) {
-            val tiltSteps = floatArrayOf(0f, 30f, 45f, 60f)
-            val tiltPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
-            val savedTilt = tiltPrefs.getFloat(MenuPrefs.PREF_TILT_3D_DEG, 0f)
-            binding.tiltContainer.setTiltDegrees(savedTilt)
-            binding.btnZoomIn.setOnLongClickListener {
-                val cur = binding.tiltContainer.getTiltDegrees()
-                val curIdx = tiltSteps.indexOfFirst { kotlin.math.abs(it - cur) < 0.5f }
-                    .let { if (it < 0) 0 else it }
-                val next = tiltSteps[(curIdx + 1) % tiltSteps.size]
-                binding.tiltContainer.setTiltDegrees(next)
-                tiltPrefs.edit().putFloat(MenuPrefs.PREF_TILT_3D_DEG, next).apply()
-                // Yank any narration / tour-HUD bars sitting inside the
-                // TiltContainer so they don't sit warped on the perspective plane.
-                if (next > 0f) {
-                    removeNarrationBar()
-                    removeTourHud()
-                }
-                Toast.makeText(this, "3D tilt: ${next.toInt()}°", Toast.LENGTH_SHORT).show()
-                true
-            }
-        }
+        // S233 — matrix-tilt 3D toggle wiring moved to dedicated `btnTilt3d`
+        // FAB (above GPS) per operator sign-off. The "+" zoom button no
+        // longer carries a long-press; tilt is its own first-class control.
+        // See `setupTilt3dButton` below.
 
         // Drag the track area to scrub zoom level
         binding.zoomTrackArea.setOnTouchListener { v, event ->
@@ -1494,6 +1479,11 @@ class SalemMainActivity : AppCompatActivity() {
                     val fraction = (event.y / v.height.toFloat()).coerceIn(0f, 1f)
                     // Top = max zoom, bottom = min zoom
                     val zoom = map.maxZoomLevel - fraction * (map.maxZoomLevel - map.minZoomLevel)
+                    if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                        DebugLogger.i("SalemMainActivity",
+                            "zoomTrackArea DRAG-START: zoom ${map.zoomLevelDouble} → $zoom " +
+                            "(tilt=${binding.tiltContainer.getTiltDegrees().toInt()}°, fabScale=${binding.mapView.scaleX})")
+                    }
                     map.controller.setZoom(zoom)
                     updateZoomBubble()
                     true
@@ -1642,7 +1632,48 @@ class SalemMainActivity : AppCompatActivity() {
                 .setDuration(200L)
                 .start()
             binding.zoomToggleLabel.text = labels[zoomToggleLevel]
-            DebugLogger.i("SalemMainActivity", "Map magnify → ${labels[zoomToggleLevel]} (scale $scale)")
+            val mv = binding.mapView
+            val tilt = binding.tiltContainer.getTiltDegrees().toInt()
+            val effectiveAreaPx = (mv.width * scale).toInt() * (mv.height * scale).toInt()
+            DebugLogger.i("SalemMainActivity",
+                "Map magnify → ${labels[zoomToggleLevel]} (scale $scale, tilt=$tilt°, " +
+                "mvSize=${mv.width}x${mv.height}, effectiveScreenArea=${effectiveAreaPx}px², " +
+                "zoom=${binding.mapView.zoomLevelDouble})")
+        }
+    }
+
+    /**
+     * S233 — dedicated "3D" FAB above GPS. Each tap cycles
+     * 0° → 30° → 45° → 60° → 0° on the [TiltContainer] wrapping the MapView.
+     * Persisted via [MenuPrefs.PREF_TILT_3D_DEG] so the chosen angle survives
+     * cold start. V1-approved (was a debug-only long-press on the "+" zoom
+     * button in S232; promoted to a first-class control in S233).
+     */
+    internal fun setupTilt3dButton() {
+        if (!BuildDefaults.TILT_3D_ENABLED) return
+        // S233 — operator-tuned tilt ladder: shallower max (48° vs 60°)
+        // keeps wedge fill mostly inside the bundled-tile bbox at high zoom
+        // while still giving a clear sense of perspective. Four steps of 6°
+        // each between 30° and 48° give finer control than the original
+        // 30/45/60 jump.
+        val tiltSteps = floatArrayOf(0f, 30f, 36f, 42f, 48f)
+        val tiltPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
+        val savedTilt = tiltPrefs.getFloat(MenuPrefs.PREF_TILT_3D_DEG, 0f)
+        binding.tiltContainer.setTiltDegrees(savedTilt)
+        binding.btnTilt3d.setOnClickListener {
+            val cur = binding.tiltContainer.getTiltDegrees()
+            val curIdx = tiltSteps.indexOfFirst { kotlin.math.abs(it - cur) < 0.5f }
+                .let { if (it < 0) 0 else it }
+            val next = tiltSteps[(curIdx + 1) % tiltSteps.size]
+            binding.tiltContainer.setTiltDegrees(next)
+            tiltPrefs.edit().putFloat(MenuPrefs.PREF_TILT_3D_DEG, next).apply()
+            // Yank any narration / tour-HUD bars sitting inside the
+            // TiltContainer so they don't sit warped on the perspective plane.
+            if (next > 0f) {
+                removeNarrationBar()
+                removeTourHud()
+            }
+            Toast.makeText(this, "3D tilt: ${next.toInt()}°", Toast.LENGTH_SHORT).show()
         }
     }
 
