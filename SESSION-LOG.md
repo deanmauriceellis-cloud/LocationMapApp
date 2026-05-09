@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 226-235 (S225 archived 2026-05-09 at S235 close; S224 archived 2026-05-09 at S234 close; S223 archived 2026-05-08 at S233 close; S222 archived 2026-05-08 at S232 close; S221 archived 2026-05-08 at S231 close; S220 archived 2026-05-06 at S230 close; S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 227-236 (S226 archived 2026-05-09 at S236 close; S225 archived 2026-05-09 at S235 close; S224 archived 2026-05-09 at S234 close; S223 archived 2026-05-08 at S233 close; S222 archived 2026-05-08 at S232 close; S221 archived 2026-05-08 at S231 close; S220 archived 2026-05-06 at S230 close; S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; S216 archived 2026-05-05 at S226 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 236: 2026-05-09 — +10mi-with-buildings raster bake → Lenovo crash on launch → rollback to S234 tiles
+
+Reran the parallel raster bake against S235's vector sources, producing a fresh `salem-custom.mbtiles` (832.5 MB, 715,841 tiles in 12 min) with OMT + building footprints rasterized in for the matrix-tilt 3D wedges. Merged + rebuilt `:app-salem:assembleDebug`, installed to Lenovo HNY0CY0W: app launched into SalemMainActivity onCreate, fired cinematic zoom-in, then UI thread wedged within seconds and Android's RescueParty watchdog killed the process — no FATAL/AndroidRuntime stacktrace. Initial diagnosis (4 GB device, ~600 visible WebP tiles × 262 KB ARGB_8888 bitmap = ~470 MB heap > 460 MB watcher trigger) is uncertain because the crashing APK accidentally packaged both live `salem_tiles.sqlite` (848 MB) AND `salem_tiles.sqlite.preS236.bak` (262 MB) — backup left in `app-salem/src/main/assets/` after the merge step. Operator chose rollback path: restored S234's 274 MB `salem_tiles.sqlite`, moved the backup out of assets/ to `tools/tile-bake/dist/`, rebuilt clean (374 MB APK with single sqlite confirmed via unzip -l), reinstalled — operator confirmed working. New bake/merge artifacts preserved on disk (gitignored) for S237 clean-reproduction test before deciding whether to ship +10mi-with-buildings (and if so, whether tilt needs a default-off flag, q needs to drop to 40, or building rasterization needs to drop at z14-z15).
+
+Full session detail: `docs/session-logs/session-236-2026-05-09.md`. Commit: `<pending>`.
+
+---
 
 ## Session 235: 2026-05-09 — Crash-recovery + vector tile pipeline +10mi (buildings + OMT) on disk; raster re-bake deferred to S236
 
@@ -75,11 +83,4 @@ Seven-iteration refinement of S226's per-POI Haunt. Net schema change: Room v18 
 Full session detail: `docs/session-logs/session-227-2026-05-05.md`. Commit: `874a764`.
 
 ---
-
-## Session 226: 2026-05-05 — Per-POI Haunt Effect (admin-driven sprite peek)
-
-Wired the S170 sprite figures into the running app as an admin-driven, per-POI haunt effect. Six surfaces touched: (1) Room v17 → v18 with 6 new `haunt_*` columns on `salem_pois` (sprite id + outer/inner range/interval + enabled, identity `e6c5a128efdd9949f7297c88ada7d698`); (2) cache-proxy `admin-pois.js` UPDATABLE_FIELDS extended; (3) new **Haunt** tab in `web/src/admin/PoiEditDialog.tsx` with sprite dropdown + 4 numeric inputs + Enabled toggle, plus a generous dialog resize (1100 × 95 vh) so warnings don't crowd the form; (4) 7 sprite WebPs (~992 KB) bundled into `app-salem/src/main/assets/sprites/`; (5) new `SpriteOverlay.kt` (~190 LOC) implementing `MapOverlay` with two-band cadence + 1-second swoop (bell-curve alpha + float-up + scale curve) + lazy bitmap cache; (6) `SalemMainActivity.setupMap` wires SpriteOverlay alongside water/firefly/grass + injects `SalemPoiDao` for haunt-config seeding + feeds GPS to overlay every fix. Post-deploy snag — admin-created POI without narration was filtered out of the marker loader (`is_narrated=true` requirement); fix: loosen `findNarrated()` to also surface `haunt_sprite_id IS NOT NULL AND haunt_enabled = 1` rows. Field-walk verification of the actual swoop firing on Lenovo owed.
-
-Full session detail: `docs/session-logs/session-226-2026-05-05.md`. Commit: `7534483`.
-
 

@@ -22,6 +22,12 @@ salem-buildings-plus10mi.geojsonl
 
 # Pre-session backups of mbtiles (regenerable, large)
 *.preS235.bak
+*.preS236.bak
+*.preS236-from-assets.bak
+
+# Per-session bake/merge logs (verbose, regenerable)
+bake-S*.log
+merge-S*.log
 
 # Parallel-bake transient worker outputs (merged into salem-custom.mbtiles)
 worker-output/
