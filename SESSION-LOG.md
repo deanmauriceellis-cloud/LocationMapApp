@@ -8,7 +8,7 @@
 
 Crash-recovery session. Pre-crash work landed cleanly on disk before an OS crash at 01:39: `salem-buildings-plus10mi.geojsonl` (128 MB / 360,662 features) extracted; `buildings.mbtiles` (36.8 MB, 6,482 vector tiles z14-16) baked via tippecanoe; `salem-vector.mbtiles` (75 MB, 11,525 OMT tiles z0-16) baked via Planetiler — these are the vector input layer that S236's raster re-bake will consume to rasterize a fresh +10mi `salem-custom.mbtiles` with building footprints baked in for the matrix-tilt 3D wedges. The 8-worker parallel raster bake that consumes those vector sources crashed mid-run at ~28% of z15 (z14 fully done at 575/575, z15 partial ~599/2,160, z16-19 not started); `salem-custom.mbtiles` is still S234's 266 MB at 00:27. Recovery decision logged before the crash and confirmed at session end: discard `worker-output/`, rerun `bake-parallel.js` (~9 min) — operator opted to defer that to S236 and close. `worker-output/` removed; new bake artifacts gitignored (`salem-buildings-plus10mi.geojsonl`, `*.preS235.bak`, `worker-output/`). Folded long-untracked operator content into the repo: `DrK/` (4 narration drafts as .docx/.odt pairs — JohnWard, LyeTapleyShoeShop, QuakerMeetingHouse, "Welcome to Salem"), `qcis/` (SalemBeverlyView.qgz QGIS project), four `docs/session-logs/session-192-*.odt` review drafts.
 
-Full session detail: `docs/session-logs/session-235-2026-05-09.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-235-2026-05-09.md`. Commit: `cb3ceae`.
 
 ---
 
