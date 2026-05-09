@@ -18,6 +18,13 @@ salem-parcels.geojsonl
 salem-buildings.geojsonl
 salem-historic-buildings.geojson
 osm-buildings-salem.geojsonl
+salem-buildings-plus10mi.geojsonl
+
+# Pre-session backups of mbtiles (regenerable, large)
+*.preS235.bak
+
+# Parallel-bake transient worker outputs (merged into salem-custom.mbtiles)
+worker-output/
 
 # Preview / sample renders
 preview-*.png

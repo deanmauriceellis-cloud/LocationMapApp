@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 225-234 (S224 archived 2026-05-09 at S234 close; S223 archived 2026-05-08 at S233 close; S222 archived 2026-05-08 at S232 close; S221 archived 2026-05-08 at S231 close; S220 archived 2026-05-06 at S230 close; S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 226-235 (S225 archived 2026-05-09 at S235 close; S224 archived 2026-05-09 at S234 close; S223 archived 2026-05-08 at S233 close; S222 archived 2026-05-08 at S232 close; S221 archived 2026-05-08 at S231 close; S220 archived 2026-05-06 at S230 close; S219 archived 2026-05-06 at S229 close; S218 archived 2026-05-06 at S228 close; S217 archived 2026-05-06 at S227 close; S216 archived 2026-05-05 at S226 close; S210 archived 2026-05-02 at S221 close; S211 archived 2026-05-03 at S222 close; S213 archived 2026-05-03 at S223 close; S214 archived 2026-05-04 at S224 close; S215 archived 2026-05-05 at S225 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 235: 2026-05-09 — Crash-recovery + vector tile pipeline +10mi (buildings + OMT) on disk; raster re-bake deferred to S236
+
+Crash-recovery session. Pre-crash work landed cleanly on disk before an OS crash at 01:39: `salem-buildings-plus10mi.geojsonl` (128 MB / 360,662 features) extracted; `buildings.mbtiles` (36.8 MB, 6,482 vector tiles z14-16) baked via tippecanoe; `salem-vector.mbtiles` (75 MB, 11,525 OMT tiles z0-16) baked via Planetiler — these are the vector input layer that S236's raster re-bake will consume to rasterize a fresh +10mi `salem-custom.mbtiles` with building footprints baked in for the matrix-tilt 3D wedges. The 8-worker parallel raster bake that consumes those vector sources crashed mid-run at ~28% of z15 (z14 fully done at 575/575, z15 partial ~599/2,160, z16-19 not started); `salem-custom.mbtiles` is still S234's 266 MB at 00:27. Recovery decision logged before the crash and confirmed at session end: discard `worker-output/`, rerun `bake-parallel.js` (~9 min) — operator opted to defer that to S236 and close. `worker-output/` removed; new bake artifacts gitignored (`salem-buildings-plus10mi.geojsonl`, `*.preS235.bak`, `worker-output/`). Folded long-untracked operator content into the repo: `DrK/` (4 narration drafts as .docx/.odt pairs — JohnWard, LyeTapleyShoeShop, QuakerMeetingHouse, "Welcome to Salem"), `qcis/` (SalemBeverlyView.qgz QGIS project), four `docs/session-logs/session-192-*.odt` review drafts.
+
+Full session detail: `docs/session-logs/session-235-2026-05-09.md`. Commit: `<sha>`.
+
+---
 
 ## Session 234: 2026-05-08 → 2026-05-09 — Tile bake +10mi everywhere q=60 (parallel) + PoiCache singleton + heading-up fast path + V1 call-site gates
 
@@ -74,13 +82,4 @@ Wired the S170 sprite figures into the running app as an admin-driven, per-POI h
 
 Full session detail: `docs/session-logs/session-226-2026-05-05.md`. Commit: `7534483`.
 
----
-
-## Session 225: 2026-05-05 — Web admin can create POIs
-
-Operator-driven sprint while SI provenance reformulation continues. Net new flow: `+ New POI` header button (POIs view, emerald-600) enters place-mode → click the map → small `PoiCreateDialog` (Name + Category w/ inline `+ Add new` + optional Subcategory/Address) → POST `/admin/salem/pois` → full PoiEditDialog opens on the new row for narration/flags/hours/images. Backend ~95 LOC in `cache-proxy/lib/admin-pois.js` (auto-slug id, JSONB whitelist serialization, FK 400, dup-id 409, `data_source='admin_create'` + `admin_dirty=TRUE` stamping); new `web/src/admin/PoiCreateDialog.tsx` (~290 LOC); `AdminMap.tsx` + `AdminLayout.tsx` wired with `addPoiMode` mirroring the existing tour-stop add-mode pattern (reuses `MapClickAddListener`, distinct emerald banner, ParcelHitTest gated off in place-mode, Esc handler extended). All five validation paths smoke-tested via curl (happy / missing name / lat=91 / unknown category / duplicate id) — all return clean error messages, test row cleaned up. `npx tsc --noEmit` clean; Vite HMR clean; cache-proxy restarted via `npm start` (S223 dotenv autoload live). No Android build, no Room schema bump (admin-only feature). Find-menu-refinement docket queued at S224 close deferred — operator pivoted to POI creation; docket carries forward for later sessions when the new categories need Find-menu tiles.
-
-Full session detail: `docs/session-logs/session-225-2026-05-05.md`. Commit: `122f969`.
-
----
 
