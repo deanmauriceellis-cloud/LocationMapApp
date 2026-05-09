@@ -1730,6 +1730,13 @@ private var smoothedHeadingDeg: Double? = null
  *  always lands regardless of delta. */
 private var lastAppliedRotationDeg: Float? = null
 
+/** S234: Last GPS movement bearing observed by applyHeadingUpRotation. When
+ *  stationary the bearing freezes; the orientation sensor still fires at
+ *  ~100 Hz and was running smoothing math + hysteresis check + Log.d on
+ *  every event for nothing. Cache it here and short-circuit when the
+ *  underlying bearing hasn't changed. */
+private var lastProcessedMoveBearing: Double? = null
+
 /** S115: EMA weight on the newest bearing sample. Lower = smoother, slower to react.
  *  This is the "walking" value — GPS bearing updates every few seconds and we
  *  want to filter out individual fix noise without lagging real direction changes. */
@@ -1813,10 +1820,16 @@ internal fun SalemMainActivity.applyHeadingUpRotation() {
     // it fought GPS noise in the field. When the user stops moving the
     // bearing simply freezes (last walking direction) until they move ≥1m
     // again — that's the intended behavior.
-    val targetBearing: Double = moveBearing ?: run {
-        DebugLogger.d("HEADING-UP", "skip — no GPS movement bearing yet")
+    val targetBearing: Double = moveBearing ?: return
+
+    // S234 — fast path: bearing unchanged since the last call. The orientation
+    // sensor fires at ~100 Hz; when stationary, `moveBearing` is frozen and
+    // every event was running smoothing math + delta calc + format + Log.d
+    // for no behavior change. Bail before any allocation.
+    if (lastProcessedMoveBearing == targetBearing && lastAppliedRotationDeg != null) {
         return
     }
+    lastProcessedMoveBearing = targetBearing
 
     val smoothed = blendBearingDeg(smoothedHeadingDeg, targetBearing, HEADING_SMOOTHING_ALPHA)
     smoothedHeadingDeg = smoothed
@@ -1829,12 +1842,8 @@ internal fun SalemMainActivity.applyHeadingUpRotation() {
             targetRotation.toDouble()
         )
         if (delta < HEADING_HYSTERESIS_DEG) {
-            DebugLogger.d(
-                "HEADING-UP",
-                "skip hysteresis — target=${targetRotation.toInt()}° " +
-                    "applied=${previouslyApplied.toInt()}° Δ=${"%.1f".format(delta)}° " +
-                    "(raw=${targetBearing.toInt()}°, smoothed=${smoothed.toInt()}°)"
-            )
+            // S234 — silent skip. Per-event log was ~100/sec of allocation +
+            // GC pressure when stationary; the apply path below still logs.
             return
         }
         DebugLogger.i(
@@ -1890,6 +1899,7 @@ internal fun SalemMainActivity.applyHeadingUpRotationImmediate() {
 internal fun SalemMainActivity.resetHeadingUpRotation() {
     smoothedHeadingDeg = null
     lastAppliedRotationDeg = null
+    lastProcessedMoveBearing = null  // S234 — clear fast-path cache
     binding.mapView.setMapOrientation(0f)
     binding.mapView.invalidate()
 }

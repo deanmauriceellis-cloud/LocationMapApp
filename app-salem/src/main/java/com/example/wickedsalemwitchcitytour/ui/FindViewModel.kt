@@ -19,7 +19,7 @@ import com.example.locationmapapp.data.model.FindResult
 import com.example.locationmapapp.data.model.PoiWebsite
 import com.example.locationmapapp.data.model.SearchResponse
 import com.example.locationmapapp.util.DebugLogger
-import com.example.wickedsalemwitchcitytour.content.dao.SalemPoiDao
+import com.example.wickedsalemwitchcitytour.content.PoiCache
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +50,10 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module FindViewMod
  */
 @HiltViewModel
 class FindViewModel @Inject constructor(
-    private val salemPoiDao: SalemPoiDao
+    // S234 — uses the app-wide PoiCache instead of hitting Room directly.
+    // The previous local `allPoisCache` field is gone; PoiCache subsumes it
+    // (single source of truth, shared with everyone else).
+    private val poiCache: PoiCache,
 ) : ViewModel() {
 
     private val TAG = "FindVM"
@@ -59,15 +62,11 @@ class FindViewModel @Inject constructor(
     private val _findCounts = MutableLiveData<FindCounts?>()
     val findCounts: LiveData<FindCounts?> = _findCounts
 
-    /**
-     * Full POI catalog preloaded at ViewModel init so fuzzy search is instant.
-     * 1,837 POIs ≈ <2 MB in memory; load once, reuse forever.
-     */
-    @Volatile private var allPoisCache: List<SalemPoi> = emptyList()
-
     init {
+        // S234 — kick off the app-wide cache load early so the first Find
+        // dialog open isn't waiting on Room.
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { allPoisCache = salemPoiDao.findAll() }
+            runCatching { poiCache.ensureLoaded() }
                 .onFailure { e -> DebugLogger.e(TAG, "POI preload FAILED: ${e.message}", e as? Exception) }
         }
     }
@@ -145,8 +144,8 @@ class FindViewModel @Inject constructor(
         limit: Int = 60
     ): SearchResponse? = withContext(Dispatchers.IO) {
         try {
-            val corpus = if (allPoisCache.isNotEmpty()) allPoisCache
-                         else salemPoiDao.findAll().also { allPoisCache = it }
+            poiCache.ensureLoaded()
+            val corpus = poiCache.findAll()
             val scored = FuzzySearchEngine.search(query, corpus, lat, lon, limit)
             val results = scored.map { it.poi.toFindResult(lat, lon).also { fr -> idToPoi[fr.id] = it.poi } }
             SearchResponse(
@@ -178,9 +177,12 @@ class FindViewModel @Inject constructor(
             // Primary lookup: cache populated by prior queries.
             val poi = idToPoi[osmId]
                 // Fallback: rare cold-cache case. Scan by name + coords.
-                ?: salemPoiDao.findAll().firstOrNull {
-                    it.name == name && kotlin.math.abs(it.lat - lat) < 0.0001 &&
-                        kotlin.math.abs(it.lng - lon) < 0.0001
+                ?: run {
+                    poiCache.ensureLoaded()
+                    poiCache.findAll().firstOrNull {
+                        it.name == name && kotlin.math.abs(it.lat - lat) < 0.0001 &&
+                            kotlin.math.abs(it.lng - lon) < 0.0001
+                    }
                 }
 
             if (poi == null) {
@@ -220,8 +222,9 @@ class FindViewModel @Inject constructor(
      * conversion (1° lat ≈ 111 km; 1° lng ≈ 111 km × cos(lat)).
      */
     private suspend fun queryNearby(lat: Double, lon: Double, radiusM: Int): List<SalemPoi> {
+        poiCache.ensureLoaded()
         val radiusDeg = radiusM / 111_000.0
-        val candidates = salemPoiDao.findNearby(lat, lon, radiusDeg)
+        val candidates = poiCache.findNearby(lat, lon, radiusDeg)
         return candidates
             .filter { distanceM(lat, lon, it.lat, it.lng) <= radiusM }
             .sortedBy { distanceM(lat, lon, it.lat, it.lng) }

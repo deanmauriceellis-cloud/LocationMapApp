@@ -29,7 +29,12 @@ class SalemContentRepository @Inject constructor(
     private val tourStopDao: TourStopDao,
     private val tourLegDao: TourLegDao,
     private val eventsCalendarDao: EventsCalendarDao,
-    private val salemPoiDao: SalemPoiDao
+    private val salemPoiDao: SalemPoiDao,
+    // S234 — every salem_pois read goes through the in-memory cache. The
+    // first read triggers a one-time Room load; subsequent reads are pure
+    // memory lookups against pre-built indexes. POI data in V1 is bundled
+    // into the APK and never changes at runtime, so this is safe.
+    private val poiCache: PoiCache,
 ) {
 
     // ── Tours ────────────────────────────────────────────────────────────
@@ -114,55 +119,88 @@ class SalemContentRepository @Inject constructor(
         eventsCalendarDao.findStale(System.currentTimeMillis())
 
     // ── Unified POIs (Phase 9U — salem_pois table) ───────────────────────
+    // S234 — All reads go through PoiCache. First call to any read triggers
+    // a one-time Room load + index build (~few ms for 2k rows); every read
+    // afterwards is pure in-memory. `insertPois` (write path) still hits
+    // the DAO and invalidates the cache so the next read reloads.
 
-    suspend fun getAllPois(): List<SalemPoi> = salemPoiDao.findAll()
+    suspend fun getAllPois(): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findAll()
+    }
 
-    suspend fun getVisiblePois(): List<SalemPoi> = salemPoiDao.findAllVisible()
+    suspend fun getVisiblePois(): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findAllVisible()
+    }
 
-    suspend fun getPoiById(id: String): SalemPoi? = salemPoiDao.findById(id)
+    suspend fun getPoiById(id: String): SalemPoi? {
+        poiCache.ensureLoaded(); return poiCache.findById(id)
+    }
 
-    suspend fun getPoisByCategory(category: String): List<SalemPoi> =
-        salemPoiDao.findByCategory(category)
+    suspend fun getPoisByCategory(category: String): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findByCategory(category)
+    }
 
-    suspend fun getPoisBySubcategory(subcategory: String): List<SalemPoi> =
-        salemPoiDao.findBySubcategory(subcategory)
+    suspend fun getPoisBySubcategory(subcategory: String): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findBySubcategory(subcategory)
+    }
 
-    suspend fun getNarratedPois(): List<SalemPoi> = salemPoiDao.findNarrated()
+    suspend fun getNarratedPois(): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findNarrated()
+    }
 
-    suspend fun getNarratedPoisByWave(wave: Int): List<SalemPoi> =
-        salemPoiDao.findNarratedByWave(wave)
+    suspend fun getNarratedPoisByWave(wave: Int): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findNarratedByWave(wave)
+    }
 
     suspend fun getNarratedPoisInBbox(
         latMin: Double, latMax: Double, lngMin: Double, lngMax: Double
-    ): List<SalemPoi> = salemPoiDao.findNarratedInBbox(latMin, latMax, lngMin, lngMax)
+    ): List<SalemPoi> {
+        poiCache.ensureLoaded()
+        return poiCache.findNarratedInBbox(latMin, latMax, lngMin, lngMax)
+    }
 
     suspend fun getPoisNearby(lat: Double, lng: Double, radiusM: Double): List<SalemPoi> {
+        poiCache.ensureLoaded()
         val radiusDeg = radiusM / 111_000.0
-        return salemPoiDao.findNearby(lat, lng, radiusDeg)
+        return poiCache.findNearby(lat, lng, radiusDeg)
     }
 
     suspend fun getNarratedPoisNearby(lat: Double, lng: Double, radiusM: Double): List<SalemPoi> {
+        poiCache.ensureLoaded()
         val radiusDeg = radiusM / 111_000.0
-        return salemPoiDao.findNarratedNearby(lat, lng, radiusDeg)
+        return poiCache.findNarratedNearby(lat, lng, radiusDeg)
     }
 
     suspend fun getVisiblePoisNearby(lat: Double, lng: Double, radiusM: Double): List<SalemPoi> {
+        poiCache.ensureLoaded()
         val radiusDeg = radiusM / 111_000.0
-        return salemPoiDao.findVisibleNearby(lat, lng, radiusDeg)
+        return poiCache.findVisibleNearby(lat, lng, radiusDeg)
     }
 
-    suspend fun searchPois(query: String): List<SalemPoi> = salemPoiDao.search(query)
+    suspend fun searchPois(query: String): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.search(query)
+    }
 
-    suspend fun getPoisByDistrict(district: String): List<SalemPoi> =
-        salemPoiDao.findByDistrict(district)
+    suspend fun getPoisByDistrict(district: String): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findByDistrict(district)
+    }
 
-    suspend fun getDistricts(): List<String> = salemPoiDao.getDistricts()
+    suspend fun getDistricts(): List<String> {
+        poiCache.ensureLoaded(); return poiCache.getDistricts()
+    }
 
-    suspend fun getPoiCount(): Int = salemPoiDao.count()
+    suspend fun getPoiCount(): Int {
+        poiCache.ensureLoaded(); return poiCache.count()
+    }
 
-    suspend fun getVisiblePoiCount(): Int = salemPoiDao.countVisible()
+    suspend fun getVisiblePoiCount(): Int {
+        poiCache.ensureLoaded(); return poiCache.countVisible()
+    }
 
-    suspend fun insertPois(pois: List<SalemPoi>) = salemPoiDao.insertAll(pois)
+    suspend fun insertPois(pois: List<SalemPoi>) {
+        salemPoiDao.insertAll(pois)
+        poiCache.invalidate()  // force next read to reload
+    }
 
     // ── Bulk Insert (for content pipeline) ───────────────────────────────
 

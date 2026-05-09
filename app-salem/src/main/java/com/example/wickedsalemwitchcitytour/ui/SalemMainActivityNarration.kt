@@ -281,8 +281,9 @@ internal fun SalemMainActivity.initNarrationSystem() {
                 narrationGeofenceManager.loadPoints(points)
                 // Show proximity dock immediately
                 proximityDock?.show()
-                // Also load narration point markers on the map
-                loadNarrationPointMarkers()
+                // S234 — share the just-loaded list with the marker loader
+                // instead of running the same Room query a second time.
+                loadNarrationPointMarkers(points)
                 // S168 — banner removed; keep the POI-id index for other lookups.
                 activityRef.salemPoiIndex = points.associateBy { it.id }
                 DebugLogger.i("SalemMainActivity", "Ambient narration ACTIVE: ${points.size} points, ${SalemCorridors.all().size} corridors — no tour selection required")

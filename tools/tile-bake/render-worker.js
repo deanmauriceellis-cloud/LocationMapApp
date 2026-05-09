@@ -1,14 +1,24 @@
 #!/usr/bin/env node
 /*
- * Block-render raster PNG tiles from the Salem vector MBTiles + custom style.
+ * S234 — parallel-bake worker. Variant of render-tiles.js that renders only
+ * the (zoom, blockX, blockY) blocks where
  *
- * Renders BLOCK_TILES x BLOCK_TILES tile regions in a single MapLibre viewport,
- * then slices the output into individual tiles. This guarantees pixel-identical
- * seams: every tile within a block shares the same renderer context, so labels
- * are placed once and road/feature rendering is deterministic across tile
- * boundaries.
+ *     (bx * 100003 + by) % NUM_WORKERS === WORKER_ID
  *
- * Outputs salem-custom.mbtiles (z14-z18 full Salem + z19 downtown).
+ * (100003 is prime, so the hash spreads adjacent blocks across workers
+ * for an even tile-count split.)
+ *
+ * Each worker writes to its own mbtiles file at WORKER_OUTPUT. The parent
+ * coordinator (bake-parallel.js) merges them at the end.
+ *
+ * Configurable via env:
+ *   WORKER_ID           required, integer 0..NUM_WORKERS-1
+ *   NUM_WORKERS         required, integer
+ *   WORKER_OUTPUT       required, path to write mbtiles
+ *   WORKER_QUALITY      optional, WebP quality (default 60). Use 'lossless'
+ *                       for lossless mode (matches calibration script).
+ *
+ * The bbox + zoom range mirror render-tiles.js (full +10 mi at every zoom).
  */
 
 const fs = require('fs');
@@ -18,30 +28,32 @@ const Database = require('better-sqlite3');
 const sharp = require('sharp');
 const mbgl = require('@maplibre/maplibre-gl-native');
 
-// ── Config ──────────────────────────────────────────────────────────────
+// ── Worker config from env ──────────────────────────────────────────────
+const WORKER_ID = parseInt(process.env.WORKER_ID, 10);
+const NUM_WORKERS = parseInt(process.env.NUM_WORKERS, 10);
+const WORKER_OUTPUT = process.env.WORKER_OUTPUT;
+const QUALITY_RAW = process.env.WORKER_QUALITY || '60';
+const IS_LOSSLESS = QUALITY_RAW === 'lossless';
+const QUALITY = IS_LOSSLESS ? 'lossless' : parseInt(QUALITY_RAW, 10);
+
+if (!Number.isInteger(WORKER_ID) || !Number.isInteger(NUM_WORKERS) || !WORKER_OUTPUT) {
+  console.error(`[worker] Missing env: WORKER_ID=${WORKER_ID} NUM_WORKERS=${NUM_WORKERS} WORKER_OUTPUT=${WORKER_OUTPUT}`);
+  process.exit(1);
+}
+
+const TAG = `[w${WORKER_ID}/${NUM_WORKERS}]`;
+
+// ── Bake config (mirrors render-tiles.js) ───────────────────────────────
 const VECTOR_MBTILES = path.join(__dirname, 'salem-vector.mbtiles');
 const STYLE_PATH = path.join(__dirname, 'style-salem.json');
 const FONTS_DIR = path.join(__dirname, 'fonts');
-const OUTPUT_MBTILES = path.join(__dirname, 'salem-custom.mbtiles');
 const TILE_SIZE = 256;
-const BLOCK_TILES = 4;                 // slice 4x4 tiles from each block
-const BUFFER_TILES = 1;                // 1-tile buffer on each side for label context
-const TOTAL_TILES = BLOCK_TILES + 2 * BUFFER_TILES; // render 6x6 = 1536px
+const BLOCK_TILES = 4;
+const BUFFER_TILES = 1;
+const TOTAL_TILES = BLOCK_TILES + 2 * BUFFER_TILES;
 const BLOCK_PX = TILE_SIZE * TOTAL_TILES;
 
-// Original Salem-proper bbox (~5 mi × 6 mi). Kept for reference / metadata.
-const BBOX_FULL_SALEM = { north: 42.545, south: 42.475, west: -70.958, east: -70.835 };
-const BBOX_DOWNTOWN = { north: 42.530, south: 42.508, west: -70.905, east: -70.876 };
-
-// S234 — full +10 mi ring at every zoom. Operator: "I want everything 10
-// miles out of the BBOX to have full map coverage." Replaces the prior
-// tiered (z14-z16 +10mi, z17-z18 +3mi, z19 downtown-only) shape because
-// zoom-out from z19 → z18 → z17 was hitting the +3mi limit and the +3mi
-// boundary was visible in 3D tilt at z17/z18.
-//
-// 10 mi at lat 42.5°N: 0.1449° lat / 0.1967° lon
 const BBOX_PLUS_10MI = { north: 42.6899, south: 42.3301, west: -71.1547, east: -70.6383 };
-
 const ZOOM_BBOXES = [
   { zoom: 14, bbox: BBOX_PLUS_10MI },
   { zoom: 15, bbox: BBOX_PLUS_10MI },
@@ -73,30 +85,11 @@ if (fs.existsSync(BUILDINGS_MBTILES)) {
   );
 }
 
-// ── Maplibre request handler ────────────────────────────────────────────
+// ── Maplibre style + request handler ────────────────────────────────────
 const style = JSON.parse(fs.readFileSync(STYLE_PATH, 'utf-8'));
-style.sources.salem = {
-  type: 'vector',
-  tiles: ['asset://tile/{z}/{x}/{y}.pbf'],
-  minzoom: 0,
-  maxzoom: 16,
-};
-if (getParcelTile) {
-  style.sources.parcels = {
-    type: 'vector',
-    tiles: ['asset://parcel/{z}/{x}/{y}.pbf'],
-    minzoom: 0,
-    maxzoom: 16,
-  };
-}
-if (getBuildingTile) {
-  style.sources.buildings = {
-    type: 'vector',
-    tiles: ['asset://building/{z}/{x}/{y}.pbf'],
-    minzoom: 0,
-    maxzoom: 16,
-  };
-}
+style.sources.salem = { type: 'vector', tiles: ['asset://tile/{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: 16 };
+if (getParcelTile) style.sources.parcels = { type: 'vector', tiles: ['asset://parcel/{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: 16 };
+if (getBuildingTile) style.sources.buildings = { type: 'vector', tiles: ['asset://building/{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: 16 };
 style.glyphs = 'asset://fonts/{fontstack}/{range}.pbf';
 
 const map = new mbgl.Map({
@@ -138,14 +131,13 @@ const map = new mbgl.Map({
 });
 map.load(style);
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+// ── Helpers (identical to render-tiles.js) ──────────────────────────────
 function tileToLonLat(z, x, y) {
   const n = 2 ** z;
   const lon = (x / n) * 360 - 180;
   const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI;
   return [lon, lat];
 }
-
 function lonLatToTile(lon, lat, z) {
   const n = 2 ** z;
   const x = Math.floor(((lon + 180) / 360) * n);
@@ -153,17 +145,11 @@ function lonLatToTile(lon, lat, z) {
   const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
   return [x, y];
 }
-
 function getTileRange(bbox, z) {
   const [xMin, yMin] = lonLatToTile(bbox.west, bbox.north, z);
   const [xMax, yMax] = lonLatToTile(bbox.east, bbox.south, z);
   return { xMin: Math.min(xMin, xMax), xMax: Math.max(xMin, xMax), yMin: Math.min(yMin, yMax), yMax: Math.max(yMin, yMax) };
 }
-
-// Buffered block center = geographic midpoint of the BUFFERED region
-// (i.e. the block PLUS the 1-tile buffer on each side).
-// Block (bx, by) slices tiles x=[bx*N ... bx*N+N-1], y=[by*N ... by*N+N-1],
-// but the render viewport covers [bx*N - B ... bx*N + N + B - 1] on each axis.
 function blockCenter(z, blockX, blockY) {
   const xStart = blockX * BLOCK_TILES - BUFFER_TILES;
   const yStart = blockY * BLOCK_TILES - BUFFER_TILES;
@@ -173,72 +159,19 @@ function blockCenter(z, blockX, blockY) {
   const [, lat2] = tileToLonLat(z, xStart, yStart + TOTAL_TILES);
   return [(lon1 + lon2) / 2, (lat1 + lat2) / 2];
 }
-
-// MapLibre's zoom <-> pixels relationship:
-// at zoom z, a single OSM tile is 512 CSS pixels wide (MapLibre tile size),
-// meaning a 512 viewport = 1 MapLibre tile = 1 OSM tile at z.
-// Our osmdroid tiles are 256 pixels. At ratio=1, we render at MapLibre's 512
-// logical size then downsample, BUT a simpler approach: render at zoom=(z-1)
-// with 512*(BLOCK_TILES/2) pixels, because at zoom (z-1) a 256 OSM tile
-// covers 128 logical pixels. Actually the cleanest: MapLibre's `size=N` at
-// `zoom=z` fits `N/512` MapLibre-tiles. Since 1 MapLibre-tile = 1 OSM-tile at
-// MapLibre's `tileSize`, and default tileSize=512, a BLOCK_PX wide viewport at
-// zoom z fits BLOCK_PX/512 = BLOCK_TILES/2 OSM-tiles horizontally.
-//
-// The proven pattern for rendering OSM-style 256 tiles is:
-//   renderZoom = z - 1   (because MapLibre internal tile=512 = 4x area of OSM 256)
-//   viewportPx = BLOCK_PX   (to cover BLOCK_TILES OSM tiles)
-// Then slice the output into 256-pixel squares.
-
 function renderBlock(z, blockX, blockY) {
   return new Promise((resolve, reject) => {
     const [lon, lat] = blockCenter(z, blockX, blockY);
-    // MapLibre tiles are 512 logical px, OSM tiles are 256 logical px, so
-    // render at zoom (z-1): at that zoom, a 256-osm-tile covers 128 ml-px.
-    // Correct approach: use MapLibre's zoom offset -- render at zoom - 1 with
-    // size = (256 * BLOCK_TILES) pixels.
     map.render(
-      {
-        zoom: z - 1,
-        center: [lon, lat],
-        width: BLOCK_PX,
-        height: BLOCK_PX,
-      },
-      (err, rgba) => {
-        if (err) return reject(err);
-        resolve(rgba);
-      }
+      { zoom: z - 1, center: [lon, lat], width: BLOCK_PX, height: BLOCK_PX },
+      (err, rgba) => { if (err) return reject(err); resolve(rgba); }
     );
   });
 }
 
-async function sliceBlock(rgba, z, blockX, blockY, insertTile) {
-  const img = sharp(rgba, { raw: { width: BLOCK_PX, height: BLOCK_PX, channels: 4 } });
-  const xStart = blockX * BLOCK_TILES;
-  const yStart = blockY * BLOCK_TILES;
-  let totalBytes = 0;
-  let n = 0;
-  for (let dy = 0; dy < BLOCK_TILES; dy++) {
-    for (let dx = 0; dx < BLOCK_TILES; dx++) {
-      const x = xStart + dx;
-      const y = yStart + dy;
-      const png = await sharp(rgba, { raw: { width: BLOCK_PX, height: BLOCK_PX, channels: 4 } })
-        .extract({ left: dx * TILE_SIZE, top: dy * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE })
-        .removeAlpha()
-        .png({ compressionLevel: 9 })
-        .toBuffer();
-      const tmsY = (1 << z) - 1 - y;
-      insertTile.run(z, x, tmsY, png);
-      totalBytes += png.length;
-      n++;
-    }
-  }
-  return { n, bytes: totalBytes };
-}
-
 // ── Output MBTiles ──────────────────────────────────────────────────────
-if (fs.existsSync(OUTPUT_MBTILES)) fs.unlinkSync(OUTPUT_MBTILES);
-const outDb = new Database(OUTPUT_MBTILES);
+if (fs.existsSync(WORKER_OUTPUT)) fs.unlinkSync(WORKER_OUTPUT);
+const outDb = new Database(WORKER_OUTPUT);
 outDb.pragma('journal_mode = WAL');
 outDb.exec(`
   CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT);
@@ -248,44 +181,59 @@ outDb.exec(`
   );
 `);
 const insertMeta = outDb.prepare('INSERT OR REPLACE INTO metadata (name, value) VALUES (?, ?)');
-insertMeta.run('name', 'Salem Custom');
+insertMeta.run('name', `Salem Custom (worker ${WORKER_ID}/${NUM_WORKERS})`);
 insertMeta.run('format', 'webp');
 insertMeta.run('type', 'baselayer');
-insertMeta.run('version', '4');
-insertMeta.run('description', 'Salem curated basemap (block-rendered, S234 full +10mi every zoom, WebP q=60).');
-insertMeta.run('attribution', '© OpenMapTiles © OpenStreetMap contributors');
-insertMeta.run('bounds', `${BBOX_PLUS_10MI.west},${BBOX_PLUS_10MI.south},${BBOX_PLUS_10MI.east},${BBOX_PLUS_10MI.north}`);
-insertMeta.run('minzoom', '14');
-insertMeta.run('maxzoom', '19');
+insertMeta.run('version', '1');
 const insertTile = outDb.prepare('INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)');
 
 // ── Render loop ─────────────────────────────────────────────────────────
+const webpOpts = IS_LOSSLESS ? { lossless: true, effort: 6 } : { quality: QUALITY, effort: 6 };
+
 (async () => {
-  let totalTiles = 0;
+  // First pass: count this worker's assigned tiles for progress reporting.
+  let myTileTarget = 0;
   for (const { zoom, bbox } of ZOOM_BBOXES) {
     const r = getTileRange(bbox, zoom);
-    totalTiles += (r.xMax - r.xMin + 1) * (r.yMax - r.yMin + 1);
-  }
-  console.log(`Total tiles target: ${totalTiles}. Block size: ${BLOCK_TILES}x${BLOCK_TILES} = ${BLOCK_PX}x${BLOCK_PX}px.`);
-
-  let done = 0;
-  let bytes = 0;
-  const t0 = Date.now();
-
-  for (const { zoom, bbox } of ZOOM_BBOXES) {
-    const r = getTileRange(bbox, zoom);
-    // Block grid: round out to cover the full bbox, render excess, discard tiles outside range
     const bxMin = Math.floor(r.xMin / BLOCK_TILES);
     const bxMax = Math.floor(r.xMax / BLOCK_TILES);
     const byMin = Math.floor(r.yMin / BLOCK_TILES);
     const byMax = Math.floor(r.yMax / BLOCK_TILES);
-    const blockCount = (bxMax - bxMin + 1) * (byMax - byMin + 1);
-    console.log(`\nZoom ${zoom}: ${r.xMax - r.xMin + 1}x${r.yMax - r.yMin + 1} tiles, ${blockCount} blocks`);
-
     for (let bx = bxMin; bx <= bxMax; bx++) {
       for (let by = byMin; by <= byMax; by++) {
+        if (((bx * 100003 + by) % NUM_WORKERS + NUM_WORKERS) % NUM_WORKERS !== WORKER_ID) continue;
+        const xStart = bx * BLOCK_TILES;
+        const yStart = by * BLOCK_TILES;
+        for (let dy = 0; dy < BLOCK_TILES; dy++) {
+          for (let dx = 0; dx < BLOCK_TILES; dx++) {
+            const x = xStart + dx;
+            const y = yStart + dy;
+            if (x < r.xMin || x > r.xMax || y < r.yMin || y > r.yMax) continue;
+            myTileTarget += 1;
+          }
+        }
+      }
+    }
+  }
+  console.log(`${TAG} START — assigned ${myTileTarget} tiles, output=${WORKER_OUTPUT}`);
+
+  let done = 0;
+  let bytes = 0;
+  const t0 = Date.now();
+  let lastProgressMs = t0;
+
+  for (const { zoom, bbox } of ZOOM_BBOXES) {
+    const r = getTileRange(bbox, zoom);
+    const bxMin = Math.floor(r.xMin / BLOCK_TILES);
+    const bxMax = Math.floor(r.xMax / BLOCK_TILES);
+    const byMin = Math.floor(r.yMin / BLOCK_TILES);
+    const byMax = Math.floor(r.yMax / BLOCK_TILES);
+
+    let myZoomTiles = 0;
+    for (let bx = bxMin; bx <= bxMax; bx++) {
+      for (let by = byMin; by <= byMax; by++) {
+        if (((bx * 100003 + by) % NUM_WORKERS + NUM_WORKERS) % NUM_WORKERS !== WORKER_ID) continue;
         const rgba = await renderBlock(zoom, bx, by);
-        // Slice the inner BLOCK_TILES x BLOCK_TILES region (skip the buffer).
         const xStart = bx * BLOCK_TILES;
         const yStart = by * BLOCK_TILES;
         for (let dy = 0; dy < BLOCK_TILES; dy++) {
@@ -295,35 +243,38 @@ const insertTile = outDb.prepare('INSERT INTO tiles (zoom_level, tile_column, ti
             if (x < r.xMin || x > r.xMax || y < r.yMin || y > r.yMax) continue;
             const pxLeft = (dx + BUFFER_TILES) * TILE_SIZE;
             const pxTop = (dy + BUFFER_TILES) * TILE_SIZE;
-            const png = await sharp(rgba, { raw: { width: BLOCK_PX, height: BLOCK_PX, channels: 4 } })
+            const tile = await sharp(rgba, { raw: { width: BLOCK_PX, height: BLOCK_PX, channels: 4 } })
               .extract({ left: pxLeft, top: pxTop, width: TILE_SIZE, height: TILE_SIZE })
               .removeAlpha()
-              .webp({ quality: 60, effort: 6 })
+              .webp(webpOpts)
               .toBuffer();
             const tmsY = (1 << zoom) - 1 - y;
-            insertTile.run(zoom, x, tmsY, png);
-            bytes += png.length;
-            done++;
+            insertTile.run(zoom, x, tmsY, tile);
+            bytes += tile.length;
+            done += 1;
+            myZoomTiles += 1;
           }
         }
-        if (done % 200 === 0 || done === totalTiles) {
-          const elapsed = (Date.now() - t0) / 1000;
+        // Progress line every ~10 seconds, or on each zoom transition.
+        const now = Date.now();
+        if (now - lastProgressMs >= 10_000) {
+          const elapsed = (now - t0) / 1000;
           const rate = done / elapsed;
-          const eta = (totalTiles - done) / rate;
-          process.stdout.write(
-            `\r  ${done}/${totalTiles}  ${(bytes / 1024 / 1024).toFixed(1)} MB  ${rate.toFixed(1)} tiles/s  ETA ${eta.toFixed(0)}s    `
-          );
+          const eta = (myTileTarget - done) / Math.max(rate, 1e-9);
+          console.log(`${TAG} ${done}/${myTileTarget}  ${(bytes / 1024 / 1024).toFixed(1)} MB  ${rate.toFixed(1)} t/s  ETA ${eta.toFixed(0)}s`);
+          lastProgressMs = now;
         }
       }
     }
+    console.log(`${TAG} z${zoom} done: ${myZoomTiles} tiles`);
   }
 
-  console.log('\n\nFinalizing...');
   outDb.pragma('journal_mode = DELETE');
   outDb.exec('VACUUM');
   outDb.close();
 
-  const stat = fs.statSync(OUTPUT_MBTILES);
-  console.log(`Done. ${OUTPUT_MBTILES}  ${(stat.size / 1024 / 1024).toFixed(1)} MB  (${done} tiles)`);
+  const stat = fs.statSync(WORKER_OUTPUT);
+  const elapsed = (Date.now() - t0) / 1000;
+  console.log(`${TAG} DONE — ${done} tiles, ${(stat.size / 1024 / 1024).toFixed(1)} MB, ${elapsed.toFixed(1)}s`);
   process.exit(0);
-})().catch(err => { console.error('\nRender error:', err); process.exit(1); });
+})().catch(err => { console.error(`${TAG} ERROR:`, err); process.exit(1); });

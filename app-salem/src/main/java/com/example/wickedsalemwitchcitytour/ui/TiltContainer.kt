@@ -12,6 +12,7 @@ package com.example.wickedsalemwitchcitytour.ui
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -79,15 +80,49 @@ class TiltContainer @JvmOverloads constructor(
     private var savedMapTopMargin: Int = 0
     private var savedClipChildren: Boolean = true
 
+    // S234 latency-debug: countdown of remaining dispatchDraw frames to log
+    // timing for. Reset to FRAMES_TO_TIME on every setTiltDegrees so we
+    // capture the heavy first frames after each tilt transition without
+    // spamming logs every steady-state frame.
+    private var framesToLog: Int = 0
+
+    // S234 — steady-state sampling. Counts every dispatchDraw frame (tilt mode)
+    // and emits a timing line every STEADY_STATE_LOG_EVERY frames so we can
+    // see drag-time render cost without flooding logcat. Resets to 0 on
+    // every setTiltDegrees so the post-transition burst (framesToLog) and
+    // the steady-state stream don't overlap.
+    private var steadyFrameCounter: Int = 0
+    // Ditto for ACTION_MOVE touch events — sampled every TOUCH_LOG_EVERY.
+    private var moveEventCounter: Int = 0
+
+    // S234 latency-debug A/B: when true, the next dispatchDraw will detach
+    // ALL MapView overlays before super.dispatchDraw and restore them after.
+    // Used to isolate "tile-only render cost" vs "tile + all overlays" cost
+    // when tilted. Toggled via long-press on the 3D FAB. Resetting also
+    // re-arms framesToLog so we capture timing for both before and after.
+    private var debugSuppressOverlays: Boolean = false
+
+    fun toggleDebugSuppressOverlays(): Boolean {
+        debugSuppressOverlays = !debugSuppressOverlays
+        framesToLog = FRAMES_TO_TIME
+        invalidate()
+        Log.i(TAG, "toggleDebugSuppressOverlays → $debugSuppressOverlays (re-armed framesToLog=$FRAMES_TO_TIME)")
+        return debugSuppressOverlays
+    }
+
     fun setTiltDegrees(deg: Float) {
         val clamped = deg.coerceIn(0f, 75f)
         if (clamped == tiltDeg) return
-        Log.i(TAG, "setTiltDegrees: ${tiltDeg.toInt()}° → ${clamped.toInt()}° " +
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        Log.i(TAG, "setTiltDegrees ENTRY: ${tiltDeg.toInt()}° → ${clamped.toInt()}° " +
             "(container=${width}x$height, extraTopPx=$extraTopPx)")
         tiltDeg = clamped
         dirty = true
         applyMapExtension()
         invalidate()
+        framesToLog = FRAMES_TO_TIME
+        val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+        Log.i(TAG, "setTiltDegrees EXIT: ${ms}ms total")
     }
 
     fun getTiltDegrees(): Float = tiltDeg
@@ -154,6 +189,7 @@ class TiltContainer @JvmOverloads constructor(
     }
 
     private fun applyMapExtension() {
+        val t0 = SystemClock.elapsedRealtimeNanos()
         val mv = findMapView()
         if (mv == null) {
             Log.w(TAG, "applyMapExtension: no MapView child found, abort")
@@ -172,21 +208,25 @@ class TiltContainer @JvmOverloads constructor(
 
         if (tiltDeg <= 0f) {
             if (extraTopPx != 0) {
-                Log.i(TAG, "applyMapExtension RESTORE: lp.h=${lp.height}→$savedMapHeight, lp.top=${lp.topMargin}→$savedMapTopMargin, extraTopPx=$extraTopPx→0")
                 lp.height = savedMapHeight
                 lp.topMargin = savedMapTopMargin
                 mv.layoutParams = lp
                 clipChildren = savedClipChildren
+                val oldExtra = extraTopPx
                 extraTopPx = 0
+                val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+                Log.i(TAG, "applyMapExtension RESTORE: lp.h→$savedMapHeight, lp.top→$savedMapTopMargin, extraTopPx=$oldExtra→0 (${ms}ms)")
             } else {
-                Log.i(TAG, "applyMapExtension RESTORE: already flat (extraTopPx=0), no-op")
+                val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+                Log.i(TAG, "applyMapExtension RESTORE: already flat (extraTopPx=0), no-op (${ms}ms)")
             }
             return
         }
 
         val targetExtra = (containerH * EXTRA_TOP_FRACTION).toInt()
         if (targetExtra == extraTopPx) {
-            Log.i(TAG, "applyMapExtension EXTEND: already applied (targetExtra=$targetExtra), no-op")
+            val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            Log.i(TAG, "applyMapExtension EXTEND: already applied (targetExtra=$targetExtra), no-op (${ms}ms)")
             return
         }
 
@@ -205,8 +245,11 @@ class TiltContainer @JvmOverloads constructor(
         lp.height = containerH + targetExtra
         lp.topMargin = -targetExtra / 2
         mv.layoutParams = lp
+        val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+        val zoom = mv.zoomLevelDouble
         Log.i(TAG, "applyMapExtension EXTEND: containerH=$containerH, targetExtra=$targetExtra, " +
-            "lp.h→${lp.height}, lp.top→${lp.topMargin} (memory cost: MapView area = ${lp.height * width} px²)")
+            "lp.h→${lp.height}, lp.top→${lp.topMargin} (memory cost: MapView area = ${lp.height * width} px², " +
+            "zoom=$zoom, ${ms}ms)")
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -215,15 +258,65 @@ class TiltContainer @JvmOverloads constructor(
             super.dispatchDraw(canvas)
             return
         }
+        // S234 latency-debug: time the first FRAMES_TO_TIME draws after a
+        // tilt transition (post-transition burst), AND every Nth frame
+        // thereafter (steady-state sampling). Both drive a single timing log.
+        steadyFrameCounter += 1
+        val burstLog = framesToLog > 0
+        val steadyLog = !burstLog && steadyFrameCounter % STEADY_STATE_LOG_EVERY == 0
+        val log = burstLog || steadyLog
+        val t0 = if (log) SystemClock.elapsedRealtimeNanos() else 0L
+
+        // S234 latency-debug A/B: optionally drain overlays for this frame
+        // so super.dispatchDraw renders tiles only. Restored immediately
+        // after so steady-state behavior is preserved across frames (each
+        // suppressed frame is one-shot; re-suppression happens next frame
+        // if debugSuppressOverlays is still true).
+        val mv = findMapView()
+        val savedOverlays = if (debugSuppressOverlays && mv != null && mv.overlays.isNotEmpty()) {
+            ArrayList(mv.overlays).also { mv.overlays.clear() }
+        } else null
+        val savedOverlayCount = savedOverlays?.size ?: 0
+
         val saved = canvas.save()
         canvas.concat(tiltMatrix)
         super.dispatchDraw(canvas)
         canvas.restoreToCount(saved)
+
+        if (savedOverlays != null && mv != null) {
+            mv.overlays.addAll(savedOverlays)
+        }
+
+        if (log) {
+            val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            val activeOverlays = if (debugSuppressOverlays) 0 else (mv?.overlays?.size ?: 0)
+            val suppressed = if (debugSuppressOverlays) " SUPPRESSED($savedOverlayCount)" else ""
+            val phase = if (burstLog) {
+                val frameNum = FRAMES_TO_TIME - framesToLog + 1
+                "frame #$frameNum/$FRAMES_TO_TIME"
+            } else {
+                "frame STEADY #$steadyFrameCounter (1/$STEADY_STATE_LOG_EVERY)"
+            }
+            Log.i(TAG, "dispatchDraw $phase: ${ms}ms " +
+                "(tilt=${tiltDeg.toInt()}°, mapH=${mv?.height}, zoom=${mv?.zoomLevelDouble}, " +
+                "overlays=$activeOverlays$suppressed)")
+            if (burstLog) framesToLog -= 1
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (dirty) rebuildMatrix()
         if (tiltDeg <= 0f) return super.dispatchTouchEvent(ev)
+
+        // S234 latency-debug: time DOWN/UP always; sample MOVE every Nth so
+        // we can see drag-time touch dispatch cost without flooding logcat.
+        val action = ev.actionMasked
+        val isMove = action == MotionEvent.ACTION_MOVE
+        if (isMove) moveEventCounter += 1
+        val log = action == MotionEvent.ACTION_DOWN ||
+            action == MotionEvent.ACTION_UP ||
+            (isMove && moveEventCounter % TOUCH_LOG_EVERY == 0)
+        val t0 = if (log) SystemClock.elapsedRealtimeNanos() else 0L
 
         // S233 — `MotionEvent.transform(Matrix)` mangles perspective matrices
         // (silently drops or mis-applies the bottom row), which inverted the
@@ -263,12 +356,38 @@ class TiltContainer @JvmOverloads constructor(
         )
         val handled = super.dispatchTouchEvent(transformed)
         transformed.recycle()
+        if (log) {
+            val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            val name = when (action) {
+                MotionEvent.ACTION_DOWN -> "DOWN"
+                MotionEvent.ACTION_UP -> "UP"
+                MotionEvent.ACTION_MOVE -> "MOVE #$moveEventCounter (1/$TOUCH_LOG_EVERY)"
+                else -> "ACTION_$action"
+            }
+            Log.i(TAG, "dispatchTouchEvent $name: ${ms}ms (handled=$handled, tilt=${tiltDeg.toInt()}°)")
+        }
         return handled
     }
 
     companion object {
         private const val TAG = "TiltContainer"
 
+        // S234 latency-debug: number of dispatchDraw frames after a tilt
+        // transition for which timing is logged. After this countdown the
+        // logger goes silent until the next setTiltDegrees.
+        private const val FRAMES_TO_TIME = 5
+
+        // S234 latency-debug: steady-state frame log sampling. Tightened to
+        // 10 (was 60) so short drags show timing too — at 60fps this is
+        // 6 lines/sec, at 23fps it's 2-3/sec. Still narrow enough not to
+        // flood logcat under continuous interaction.
+        private const val STEADY_STATE_LOG_EVERY = 10
+
+        // S234 latency-debug: ACTION_MOVE log sampling. Drags fire ~50-100
+        // events/sec; sampling every 10th gives 5-10 lines/sec — enough to
+        // see whether per-MOVE dispatch time changes (tile decode under the
+        // finger, GC pause, etc.) without flooding.
+        private const val TOUCH_LOG_EVERY = 10
 
         // How much extra height MapView gets while tilted, as a fraction of
         // the TiltContainer's height. SYMMETRIC distribution: half above the

@@ -34,7 +34,11 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module MarkerIconH
 object MarkerIconHelper {
 
     private const val TAG = "MarkerIconHelper"
-    private const val MAX_CACHE_SIZE = 2000
+    // S234 — bumped 2000 → 4096. Working set across narration markers (~720
+    // unique keys at full coverage) + cluster icons + vehicles + others can
+    // brush against 2000; 4096 is cheap insurance against eviction-thrashing
+    // when filter toggles re-walk the marker list.
+    private const val MAX_CACHE_SIZE = 4096
 
     // LRU cache: access-order LinkedHashMap evicts oldest entries beyond MAX_CACHE_SIZE
     private val cache = object : LinkedHashMap<String, BitmapDrawable>(128, 0.75f, true) {

@@ -7,7 +7,6 @@ package com.example.wickedsalemwitchcitytour.ui.witchtrials
 
 import android.content.Context
 import com.example.locationmapapp.util.DebugLogger
-import com.example.wickedsalemwitchcitytour.content.dao.SalemPoiDao
 import com.example.wickedsalemwitchcitytour.content.dao.WitchTrialsArticleDao
 import com.example.wickedsalemwitchcitytour.content.dao.WitchTrialsNewspaperDao
 import com.example.wickedsalemwitchcitytour.content.dao.WitchTrialsNpcBioDao
@@ -37,7 +36,9 @@ class WitchTrialsRepository @Inject constructor(
     private val articleDao: WitchTrialsArticleDao,
     private val npcBioDao: WitchTrialsNpcBioDao,
     private val newspaperDao: WitchTrialsNewspaperDao,
-    private val salemPoiDao: SalemPoiDao
+    // S234 — Historic Sites lookups go through PoiCache (in-memory) instead
+    // of re-hitting Room every time the user opens the Historic Sites tab.
+    private val poiCache: com.example.wickedsalemwitchcitytour.content.PoiCache,
 ) {
 
     companion object {
@@ -82,10 +83,14 @@ class WitchTrialsRepository @Inject constructor(
     suspend fun getNewspaperCount(): Int = newspaperDao.count()
 
     // ── Historic Sites (S134 — "Historic Sites of Salem" feature) ─────
-    suspend fun getHistoricSites(): List<SalemPoi> =
-        salemPoiDao.findByCategory("HISTORICAL_BUILDINGS")
-    suspend fun getHistoricSiteById(id: String): SalemPoi? =
-        salemPoiDao.findById(id)
+    suspend fun getHistoricSites(): List<SalemPoi> {
+        poiCache.ensureLoaded()
+        return poiCache.findByCategory("HISTORICAL_BUILDINGS")
+    }
+    suspend fun getHistoricSiteById(id: String): SalemPoi? {
+        poiCache.ensureLoaded()
+        return poiCache.findById(id)
+    }
 
     // ── Hydration ──────────────────────────────────────────────────────
 

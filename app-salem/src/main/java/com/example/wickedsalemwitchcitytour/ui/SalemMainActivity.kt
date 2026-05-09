@@ -217,11 +217,12 @@ class SalemMainActivity : AppCompatActivity() {
     private var spriteOverlay: SpriteOverlay? = null
 
     /**
-     * S226: DAO direct-injection so we can pull the haunt-configured POI list
-     * once at setup without touching SalemContentRepository / a new ViewModel.
+     * S226 — direct DAO injection used by `loadHauntConfigsAsync` to pull
+     * the haunt-configured POI list once at setup. S234 — repointed at
+     * PoiCache so we don't run a parallel Room query just for haunt configs.
      */
     @Inject
-    internal lateinit var salemPoiDao: com.example.wickedsalemwitchcitytour.content.dao.SalemPoiDao
+    internal lateinit var poiCache: com.example.wickedsalemwitchcitytour.content.PoiCache
 
     // Phase 9T: Narration system
     /**
@@ -1495,7 +1496,12 @@ class SalemMainActivity : AppCompatActivity() {
         // Listen for zoom/scroll changes from pinch-to-zoom, programmatic changes, or panning
         map.addMapListener(object : org.osmdroid.events.MapListener {
             override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
-                if (!filterAndMapActive) {
+                // S234 — gate the V1-disabled subsystems at the call site so
+                // every drag tick doesn't pay the method-dispatch + arg-eval +
+                // internal early-return cost. The functions also guard inside
+                // (defense-in-depth) but the hot path shouldn't even invoke
+                // them in V1.
+                if (!filterAndMapActive && !com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) {
                     scheduleAircraftReload()
                     scheduleBusStopReload()
                     // Suppress webcam reloads while populate scanner is running
@@ -1519,7 +1525,8 @@ class SalemMainActivity : AppCompatActivity() {
                 updateZoomBubble()
                 refreshNarrationIcons()
                 val zoom = binding.mapView.zoomLevelDouble
-                if (!filterAndMapActive) {
+                // S234 — same V1 call-site gate as the scroll handler above.
+                if (!filterAndMapActive && !com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) {
                     scheduleAircraftReload()
                     scheduleBusStopReload()
                     if (populateJob == null) scheduleWebcamReload()
@@ -1674,6 +1681,18 @@ class SalemMainActivity : AppCompatActivity() {
                 removeTourHud()
             }
             Toast.makeText(this, "3D tilt: ${next.toInt()}°", Toast.LENGTH_SHORT).show()
+        }
+        // S234 latency-debug A/B: long-press 3D FAB toggles overlay
+        // suppression while tilted. Used to isolate whether tilt-mode
+        // freezes are tile-render cost or per-frame overlay draw cost.
+        binding.btnTilt3d.setOnLongClickListener {
+            val now = binding.tiltContainer.toggleDebugSuppressOverlays()
+            Toast.makeText(
+                this,
+                if (now) "DEBUG: overlays suppressed in tilt" else "DEBUG: overlays restored",
+                Toast.LENGTH_SHORT,
+            ).show()
+            true
         }
     }
 
@@ -2359,9 +2378,32 @@ class SalemMainActivity : AppCompatActivity() {
         loadNarrationPointMarkers()
     }
 
-    /** Narration point markers — stored for zoom-based icon refresh */
+    /** Narration point markers currently attached to the map — kept in sync
+     *  with `mapView.overlays` for the visible filter set. Used by
+     *  `refreshNarrationIcons` to walk only attached markers when zoom-bucket
+     *  changes. */
     internal val narrationMarkers = mutableListOf<Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.SalemPoi>>()
     private var lastNarrationIconZoom = -1
+
+    /** S234 — persistent marker cache keyed by POI id. Markers are created
+     *  lazily on first appearance and reused across filter toggles. Avoids
+     *  the 600+ BillboardMarker allocations + listener attachments that the
+     *  S233-era full-rebuild path did on every Layers checkbox / show-all
+     *  toggle / tour-mode transition. */
+    private val narrationMarkerCache = mutableMapOf<String, Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.SalemPoi>>()
+    private val narrationMarkersOnOverlay = mutableSetOf<String>()
+    /** Cached result of the last `tourViewModel.loadNarrationPoints()` call so
+     *  filter-only updates don't re-hit Room. Invalidated on next startup
+     *  load or when caller explicitly passes fresh points. */
+    private var narrationPointsCache: List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi>? = null
+    /** S234 — serialize loadNarrationPointMarkers across concurrent callers.
+     *  Cold-start fires it twice (once from narration init, once from
+     *  refreshHistoricalModeForActiveTour) and the original cancel-and-restart
+     *  pattern raced against the marker-cache writes, leaving the cache empty
+     *  and the second call double-attaching the same 600+ markers. The mutex
+     *  serializes them: second call waits, sees the warm cache, and falls
+     *  through as a near no-op. */
+    private val narrationMarkerMutex = kotlinx.coroutines.sync.Mutex()
 
     /**
      * Load narration points as markers on the map.
@@ -2383,17 +2425,22 @@ class SalemMainActivity : AppCompatActivity() {
      * Always removes any previously-loaded narration markers from the map
      * before loading the new set, so toggling the button is fully reversible.
      */
-    internal fun loadNarrationPointMarkers() {
-        narrationMarkerJob?.cancel()
+    internal fun loadNarrationPointMarkers(preloadedPoints: List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi>? = null) {
+        // S234 — Do NOT cancel previous job; the mutex serializes them so
+        // concurrent callers see consistent cache state. The cancel-and-
+        // restart pattern raced against the cache writes and double-attached
+        // markers when two calls fired during cold start.
         narrationMarkerJob = lifecycleScope.launch {
-            try {
-                // Remove any previously loaded narration markers
-                for ((marker, _) in narrationMarkers) {
-                    binding.mapView.overlays.remove(marker)
-                }
-                narrationMarkers.clear()
+            narrationMarkerMutex.withLock { try {
+                // S234 — Source of `allPoints`, in priority order:
+                //   1. caller-supplied preloadedPoints (e.g. startup share)
+                //   2. cached result of a prior load (Room hit avoided)
+                //   3. fresh Room query
+                val allPoints = preloadedPoints
+                    ?: narrationPointsCache
+                    ?: tourViewModel.loadNarrationPoints().also { narrationPointsCache = it }
+                if (preloadedPoints != null) narrationPointsCache = preloadedPoints
 
-                val allPoints = tourViewModel.loadNarrationPoints()
                 val tierFiltered = if (showAllPoisActive) {
                     allPoints
                 } else {
@@ -2459,46 +2506,87 @@ class SalemMainActivity : AppCompatActivity() {
                         }
                     }
                 }
-                DebugLogger.i("SalemMainActivity",
-                    "Loading ${points.size} narration markers (showAll=$showAllPoisActive, " +
-                    "total=${allPoints.size}, histMode=${narrationGeofenceManager.isHistoricalMode()}, " +
-                    "histLandmark=$histLandmarkOn, civic=$civicOn)")
+                // S234 — Diff against persistent marker cache instead of
+                // tearing down and re-allocating every BillboardMarker.
+                //   visibleIds = filter pass result (the POIs that should
+                //                be on the map right now)
+                //   toRemove   = currently attached markers no longer visible
+                //   toAdd      = newly visible POIs (may be cache hits or
+                //                first-time creations)
+                val visibleIds = points.mapTo(HashSet(points.size)) { it.id }
+                val toRemove = narrationMarkersOnOverlay.filter { it !in visibleIds }
+                val toAdd = points.filter { it.id !in narrationMarkersOnOverlay }
+                val firstTimeCount = toAdd.count { it.id !in narrationMarkerCache }
 
-                // S118: Pre-generate icons on background thread to avoid ANR
+                DebugLogger.i("SalemMainActivity",
+                    "Narration markers diff: visible=${points.size} (showAll=$showAllPoisActive, " +
+                    "total=${allPoints.size}, histMode=${narrationGeofenceManager.isHistoricalMode()}, " +
+                    "histLandmark=$histLandmarkOn, civic=$civicOn) — " +
+                    "+${toAdd.size} (first-time=$firstTimeCount), -${toRemove.size}, " +
+                    "cache=${narrationMarkerCache.size}, onMap was ${narrationMarkersOnOverlay.size}")
+
+                // S118: Pre-generate icons for the additions only on a
+                // background thread. Cache hits return the same BitmapDrawable
+                // instance — cheap.
                 val zoom = binding.mapView.zoomLevelDouble
-                val iconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    points.map { p -> p to narrationIconForZoom(p.category.lowercase(), p.name, zoom) }
+                val addIconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    toAdd.map { p -> p to narrationIconForZoom(p.category.lowercase(), p.name, zoom) }
                 }
 
-                // Now on main thread — fast marker creation
-                for ((p, icon) in iconData) {
-                    val marker = BillboardMarker(binding.mapView)
-                    marker.position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
-                    marker.title = p.name
-                    marker.snippet = p.category.replace('_', ' ').lowercase()
-                        .split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
-                    marker.icon = icon
-                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    marker.setOnMarkerClickListener { _, _ ->
-                        // S229 — field-edit mode intercepts when the toolbar
-                        // toggle is ON; otherwise falls through to PoiDetailSheet.
-                        if (BuildDefaults.FIELD_EDIT_ENABLED && consumeSalemPoiTapForFieldEdit(p)) {
-                            DebugLogger.i(
-                                "SalemMainActivity",
-                                "MARKER TAP id=${p.id} name=${p.name} → field-edit sheet"
-                            )
-                            return@setOnMarkerClickListener true
-                        }
-                        DebugLogger.i(
-                            "SalemMainActivity",
-                            "MARKER TAP id=${p.id} name=${p.name} category=${p.category} → showing PoiDetailSheet"
-                        )
-                        PoiDetailSheet.show(p, supportFragmentManager)
-                        true
+                // Apply removals on main thread (cheap — markers stay in
+                // narrationMarkerCache so a future filter that re-adds them
+                // is a pure overlays.add, no allocation).
+                for (id in toRemove) {
+                    val pair = narrationMarkerCache[id] ?: continue
+                    binding.mapView.overlays.remove(pair.first)
+                    narrationMarkersOnOverlay.remove(id)
+                }
+
+                // Apply additions: cache hit → reuse marker (refresh icon for
+                // current zoom); cache miss → create new BillboardMarker.
+                for ((p, icon) in addIconData) {
+                    val cached = narrationMarkerCache[p.id]
+                    val marker = if (cached != null) {
+                        cached.first.also { it.icon = icon }
+                    } else {
+                        BillboardMarker(binding.mapView).apply {
+                            position = org.osmdroid.util.GeoPoint(p.lat, p.lng)
+                            title = p.name
+                            snippet = p.category.replace('_', ' ').lowercase()
+                                .split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                            this.icon = icon
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                            setOnMarkerClickListener { _, _ ->
+                                // S229 — field-edit mode intercepts when the toolbar
+                                // toggle is ON; otherwise falls through to PoiDetailSheet.
+                                if (BuildDefaults.FIELD_EDIT_ENABLED && consumeSalemPoiTapForFieldEdit(p)) {
+                                    DebugLogger.i(
+                                        "SalemMainActivity",
+                                        "MARKER TAP id=${p.id} name=${p.name} → field-edit sheet"
+                                    )
+                                    return@setOnMarkerClickListener true
+                                }
+                                DebugLogger.i(
+                                    "SalemMainActivity",
+                                    "MARKER TAP id=${p.id} name=${p.name} category=${p.category} → showing PoiDetailSheet"
+                                )
+                                PoiDetailSheet.show(p, supportFragmentManager)
+                                true
+                            }
+                        }.also { narrationMarkerCache[p.id] = it to p }
                     }
                     binding.mapView.overlays.add(marker)
-                    narrationMarkers.add(marker to p)
+                    narrationMarkersOnOverlay.add(p.id)
                 }
+
+                // Sync the legacy `narrationMarkers` list (still consumed by
+                // refreshNarrationIcons + several diagnostics) with the
+                // current overlay set.
+                narrationMarkers.clear()
+                for (id in narrationMarkersOnOverlay) {
+                    narrationMarkerCache[id]?.let { narrationMarkers.add(it) }
+                }
+
                 lastNarrationIconZoom = zoomBucket(zoom)
                 bringStationMarkersToFront()
                 binding.mapView.invalidate()
@@ -2506,7 +2594,7 @@ class SalemMainActivity : AppCompatActivity() {
                 // Normal: cancelled by a newer load
             } catch (e: Exception) {
                 DebugLogger.e("SalemMainActivity", "Failed to load narration markers", e)
-            }
+            } }
         }
     }
 
@@ -4630,7 +4718,8 @@ class SalemMainActivity : AppCompatActivity() {
     private fun loadHauntConfigsAsync() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val rows = salemPoiDao.findAll()
+                poiCache.ensureLoaded()
+                val rows = poiCache.findAll()
                 val configs = rows.mapNotNull { p ->
                     val sprite = p.hauntSpriteId?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                     SpriteOverlay.HauntConfig(
