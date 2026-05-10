@@ -25,6 +25,11 @@ salem-buildings-plus10mi.geojsonl
 *.preS236.bak
 *.preS236-from-assets.bak
 
+# S237 — temporary stash files used during bake source swaps
+*.s234
+*.s236bak
+*.s235stash
+
 # Per-session bake/merge logs (verbose, regenerable)
 bake-S*.log
 merge-S*.log

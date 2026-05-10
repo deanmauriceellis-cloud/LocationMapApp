@@ -72,6 +72,14 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
 
     private val paint = Paint().apply { isFilterBitmap = true; isAntiAlias = true }
 
+    /**
+     * S237 — when set, the normal [draw] is a no-op and [TiltContainer] drives
+     * the upright billboard pass via [drawBillboarded]. Lets the sprite ride
+     * the perspective scene at the right pixel without getting sheared by the
+     * tilt matrix.
+     */
+    @Volatile var tiltActiveSupplier: (() -> Boolean)? = null
+
     /** Update the user's GPS position. Called from the location observer. */
     fun setUserLocation(lat: Double, lng: Double) {
         userLat = lat
@@ -174,6 +182,11 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
     }
 
     override fun draw(canvas: Canvas, camera: CameraState) {
+        // When tilt is active, the parent TiltContainer renders sprites
+        // upright via drawBillboarded() in its pass-2 (post-restore) draw.
+        // Suppressing the normal pass here keeps them from rendering twice
+        // (once sheared under tilt, once upright on top).
+        if (tiltActiveSupplier?.invoke() == true) return
         if (activeSwoops.isEmpty()) return
 
         for (sw in activeSwoops) {
@@ -241,6 +254,103 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
             } else {
                 canvas.drawBitmap(bm, srcRect, dstRect, paint)
             }
+        }
+    }
+
+    /**
+     * S237 pass-2 billboard renderer. Called from [TiltContainer.dispatchDraw]
+     * after the tilted super-draw has restored the canvas matrix to identity.
+     *
+     * Each active swoop is positioned by:
+     *   1. osmdroid's rotation-aware projection → mapView-local px
+     *   2. add mapView (left, top) → TiltContainer-local px (matches the matrix
+     *      input space)
+     *   3. apply tilt matrix → screen px
+     * then the bitmap is stamped UPRIGHT (no perspective shear) at that screen
+     * px with depth-based scaling. Orbit + bob + alpha envelope from [tick]'s
+     * swoop state are applied in screen-aligned space (same as before tilt
+     * existed), so the sprite reads as floating in the perspective scene
+     * rather than lying on the ground plane.
+     */
+    fun drawBillboarded(
+        canvas: Canvas,
+        mapView: org.osmdroid.views.MapView,
+        mvLeftPx: Int,
+        mvTopPx: Int,
+        tiltMapPoint: (FloatArray) -> Unit,
+        depthScale: (Float) -> Float,
+    ) {
+        if (activeSwoops.isEmpty()) return
+        val pt = android.graphics.Point()
+        val xy = FloatArray(2)
+        // Same rotation correction as TiltContainer.drawBillboardedMarkers —
+        // toPixels returns un-rotated mvLocal; we must apply mapOrientation
+        // rotation around mv geometric center to match what pass-1 would have
+        // drawn under the rotated MapView canvas.
+        val mvCx = mapView.width / 2f
+        val mvCy = mapView.height / 2f
+        val orientRad = Math.toRadians(mapView.mapOrientation.toDouble())
+        val cosO = kotlin.math.cos(orientRad).toFloat()
+        val sinO = kotlin.math.sin(orientRad).toFloat()
+        // S237 — match the FAB-zoom scale-around-mvCenter behaviour of
+        // TiltContainer.drawBillboardedMarkers; sprites otherwise stay at base
+        // size while the underlying map magnifies.
+        val fabScale = mapView.scaleX
+        val ctnW = mapView.width.toFloat()
+        val ctnH = mapView.height.toFloat()
+        for (sw in activeSwoops) {
+            val elapsed = nowMs - sw.startMs
+            val t = (elapsed.toFloat() / sw.durationMs).coerceIn(0f, 1f)
+            val fadeFraction = ALPHA_FADE_FRACTION
+            val alphaF = when {
+                t < fadeFraction -> t / fadeFraction
+                t > 1f - fadeFraction -> (1f - t) / fadeFraction
+                else -> 1f
+            }
+            val alpha = (alphaF * 255f).toInt().coerceIn(0, 255)
+            if (alpha <= 0) continue
+
+            val depth = 1f + sw.bobAmplitude * sin(
+                2.0 * PI * sw.bobCycles * t + sw.phase
+            ).toFloat()
+            val bobScale = (1f / depth).coerceIn(MIN_SCALE, MAX_SCALE)
+
+            mapView.projection.toPixels(
+                org.osmdroid.util.GeoPoint(sw.lat, sw.lng), pt,
+            )
+            val relX = pt.x - mvCx
+            val relY = pt.y - mvCy
+            val rotX = (relX * cosO - relY * sinO) * fabScale
+            val rotY = (relX * sinO + relY * cosO) * fabScale
+            xy[0] = rotX + mvCx + mvLeftPx
+            xy[1] = rotY + mvCy + mvTopPx
+            // S237 cull — drop sprites whose pre-tilt container position lies
+            // outside the natural map rect, matching the marker cull. Avoids
+            // upright sprites floating over the dark wedge background.
+            val ctnX = xy[0]
+            val ctnY = xy[1]
+            if (ctnY < 0f || ctnY > ctnH || ctnX < 0f || ctnX > ctnW) continue
+            tiltMapPoint(xy)
+
+            val pathArg = (2.0 * PI * t * sw.pathDirection + sw.pathPhase).toFloat()
+            val cx = xy[0] + sw.pathRadiusPxX * cos(pathArg) * alphaF
+            val cy = xy[1] - 50f + sw.pathRadiusPxY * sin(pathArg) * alphaF
+
+            val depthFactor = depthScale(cy)
+            val totalScale = bobScale * depthFactor * fabScale
+
+            val bm = sw.frames.getOrNull(sw.frameIdx) ?: continue
+            val bw = bm.width.toFloat()
+            val bh = bm.height.toFloat()
+            val srcAspect = bh / bw
+            val drawW = TARGET_SIZE_PX * totalScale
+            val drawH = drawW * srcAspect
+            val left = cx - drawW / 2f
+            val top = cy - drawH / 2f
+            SRC_RECT_REUSABLE.set(0, 0, bm.width, bm.height)
+            DST_RECT_REUSABLE.set(left, top, left + drawW, top + drawH)
+            paint.alpha = alpha
+            canvas.drawBitmap(bm, SRC_RECT_REUSABLE, DST_RECT_REUSABLE, paint)
         }
     }
 

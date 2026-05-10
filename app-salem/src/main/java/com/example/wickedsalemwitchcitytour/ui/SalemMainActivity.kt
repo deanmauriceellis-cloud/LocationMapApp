@@ -1303,6 +1303,13 @@ class SalemMainActivity : AppCompatActivity() {
             val sprites = SpriteOverlay(this)
             spriteOverlay = sprites
             animations += sprites
+            // S237 — sprites billboard upright in the tilted scene via the
+            // TiltContainer pass-2 path. Tilt-aware short-circuit + back-ref
+            // so the parent can drive the upright draw at the right pixel.
+            sprites.tiltActiveSupplier = {
+                binding.tiltContainer.getTiltDegrees() > 0f
+            }
+            binding.tiltContainer.spriteOverlayRef = sprites
             loadHauntConfigsAsync()
 
             if (animations.isNotEmpty()) {
@@ -1686,10 +1693,14 @@ class SalemMainActivity : AppCompatActivity() {
         // suppression while tilted. Used to isolate whether tilt-mode
         // freezes are tile-render cost or per-frame overlay draw cost.
         binding.btnTilt3d.setOnLongClickListener {
-            val now = binding.tiltContainer.toggleDebugSuppressOverlays()
+            // S237 diagnostic — cycle billboard mode 0 → 1 → 0 to A/B compare
+            // upright billboarded markers vs sheared-by-tilt markers.
+            val nextMode = (binding.tiltContainer.billboardMode + 1) % 2
+            binding.tiltContainer.billboardMode = nextMode
+            binding.tiltContainer.invalidate()
             Toast.makeText(
                 this,
-                if (now) "DEBUG: overlays suppressed in tilt" else "DEBUG: overlays restored",
+                if (nextMode == 0) "Billboard ON (upright POIs)" else "Billboard OFF (POIs ride tilt)",
                 Toast.LENGTH_SHORT,
             ).show()
             true
