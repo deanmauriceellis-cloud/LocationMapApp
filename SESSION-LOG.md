@@ -8,7 +8,7 @@
 
 Diagnosed three tilt-mode rendering bugs as the same root cause: hardware-accelerated display list staleness. The S237 strip-then-pass-2 design relied on `mv.overlays.removeAll(markers)` taking effect during `MapView.onDraw`, but MapView's RenderNode wasn't being re-recorded each frame, so the renderer replayed cached marker draw commands → flat ghost markers. The same caching caused upright drift after FAB +/- zoom and made the magnify FAB (x1→x5) fail to scale upright icons. Replaced strip/restore with a per-Marker tilt-suppression flag (`BillboardMarker.tiltActive` companion, `draw()` early-return when set), flipped on tilt 0↔>0 transitions with one-shot `mv.invalidate()`. Added a `MapListener` registered on the MapView while `tiltDeg > 0` (auto-unregisters at tilt=0) that calls `TiltContainer.invalidate()` on every osmdroid scroll/zoom event, plus a `setUpdateListener` on the magnify animator chain in `setupZoomToggle` that invalidates per-frame during the scaleX ramp. One ANR rabbit-hole on Option 1 (`mv.invalidate()` before `super.dispatchDraw`) was reverted within minutes — `View.invalidate()` schedules next-frame, so it created an infinite re-record loop instead of forcing same-frame re-record. Also did a side-quest hero-asset reachability audit: 385 of 386 `hero/<uuid>.webp` files are dead at runtime (94 shadowed by `heroes/<slug>.webp` priority-0, 291 orphan); ~12 MB AAB pre-ship reclaim noted. Operator: "much better, no more drift." Carry to S240: operator-mentioned other odds and ends in tilt mode, plus all S238/S237/S236 carry-forwards still apply.
 
-Full session detail: `docs/session-logs/session-239-2026-05-10.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-239-2026-05-10.md`. Commit: `e5f4843`.
 
 ---
 
