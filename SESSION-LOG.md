@@ -8,7 +8,7 @@
 
 Diagnosed the S237-carry "z19 dark wedge" via canvas-clip + MapView geometry instrumentation: geometry was already correct (mv extended 6× container, symmetric placement, full canvas clip) — the operator's complaint was perceptual, not a layout bug. At the previous `topY = h * 1.0 * t`, the perspective matrix's vanishing point sat inside the visible screen and z19 detail crushed to illegible gray in the band between vanishing and trapezoid top. Fix: `topY = h * 0.6f * t` (one-constant change, with a new `TOPY_FACTOR` companion shared between `rebuildMatrix` and `depthScale`). At max tilt the trapezoid now covers ~68% of screen, vanishing point is off-screen, and z19 street/building detail stays legible — operator's "fills the screen" requirement met (verified via adb-driven walk-sim teleport + screenshot). Marker + sprite culls loosened to allow the previously-rejected upper-extension area now that wedge is filled. S234/S237/S238 diagnostic scaffolding stripped (BILLBOARD-DIAG, WEDGE-DIAG, OVERLAY-TYPES, per-frame timing logs, billboardMode toggle, debugSuppressOverlays + companions): `TiltContainer.kt` 614 → 463 lines (-25%); logcat clean to a single `setTiltDegrees: X° → Y°` line per user input. Carry to S239: field-walk validation in motion + a `mv.requestLayout()` close to the first-frame layout race surfaced by the diagnostic.
 
-Full session detail: `docs/session-logs/session-238-2026-05-09.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-238-2026-05-09.md`. Commit: `d9362c7`.
 
 ---
 
