@@ -1644,6 +1644,12 @@ class SalemMainActivity : AppCompatActivity() {
             binding.mapView.animate()
                 .scaleX(scale).scaleY(scale)
                 .setDuration(200L)
+                // S239 — invalidate TiltContainer on every frame of the magnify
+                // animation so pass-2 picks up the in-flight scaleX. Without
+                // this, View framework updates mv's RenderNode scaleX without
+                // re-recording TiltContainer's display list → pass-2 replays
+                // with stale fabScale → icons don't grow.
+                .setUpdateListener { binding.tiltContainer.invalidate() }
                 .start()
             binding.zoomToggleLabel.text = labels[zoomToggleLevel]
             val mv = binding.mapView

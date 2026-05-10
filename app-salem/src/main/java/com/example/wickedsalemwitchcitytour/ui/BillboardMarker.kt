@@ -9,7 +9,9 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import android.graphics.Canvas
 import org.osmdroid.views.MapView
+import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Marker
 
 @Suppress("unused")
@@ -21,9 +23,9 @@ private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module BillboardMa
  * tilt-mapped screen position with the same visual centering it would have had
  * in flat mode.
  *
- * Behaves identically to plain [Marker] for normal (untilted) draw — the
- * billboard path lives in [TiltContainer.dispatchDraw] and only kicks in when
- * tilt > 0°.
+ * S239 — early-returns from [draw] when [tiltActive] is set so the base
+ * Marker.draw call doesn't paint the icon flat into MapView's display list at
+ * tilt > 0°. TiltContainer's pass-2 owns the upright rendering instead.
  */
 class BillboardMarker(mv: MapView) : Marker(mv) {
     /** Anchor U (0..1) — fraction of icon width past which the position sits. */
@@ -34,4 +36,13 @@ class BillboardMarker(mv: MapView) : Marker(mv) {
 
     /** Marker alpha (0..1). */
     fun billboardAlpha(): Float = mAlpha
+
+    override fun draw(canvas: Canvas, pj: Projection) {
+        if (tiltActive) return
+        super.draw(canvas, pj)
+    }
+
+    companion object {
+        @Volatile @JvmStatic var tiltActive: Boolean = false
+    }
 }

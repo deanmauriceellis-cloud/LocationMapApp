@@ -92,13 +92,53 @@ class TiltContainer @JvmOverloads constructor(
     private val billboardXY = FloatArray(2)
     private val billboardPt = Point()
 
+    // S239 — MapListener that invalidates the tilt container on every scroll
+    // and zoom event. Without this, View framework updates mv's RenderNode
+    // properties (projection, scaleX from magnify-FAB animator) without
+    // dirtying TiltContainer's display list, so pass-2 replays with stale
+    // `fabScale` + stale `mv.projection` until something else forces a
+    // re-record. Symptom: upright marker drifts after zoom or magnify, snaps
+    // back when the operator nudges the map. Only registered while tilt > 0.
+    private val mapListener = object : org.osmdroid.events.MapListener {
+        override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+            if (tiltDeg > 0f) invalidate()
+            return false
+        }
+        override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+            if (tiltDeg > 0f) invalidate()
+            return false
+        }
+    }
+    private var mapListenerRegistered = false
+
     fun setTiltDegrees(deg: Float) {
         val clamped = deg.coerceIn(0f, 75f)
         if (clamped == tiltDeg) return
         Log.i(TAG, "setTiltDegrees: ${tiltDeg.toInt()}° → ${clamped.toInt()}°")
+        val wasActive = tiltDeg > 0f
+        val nowActive = clamped > 0f
         tiltDeg = clamped
         dirty = true
         applyMapExtension()
+        // S239 — flip the BillboardMarker tilt flag on transition and invalidate
+        // the MapView so its display list re-records with markers no-opping
+        // their own draw (avoids the flat ghost-marker bug from S237/S238).
+        if (wasActive != nowActive) {
+            BillboardMarker.tiltActive = nowActive
+            val mv = findMapView()
+            mv?.invalidate()
+            // S239 — only listen to map events while tilted. Avoids per-event
+            // invalidate overhead at tilt=0 where pass-2 doesn't run anyway.
+            if (mv != null) {
+                if (nowActive && !mapListenerRegistered) {
+                    mv.addMapListener(mapListener)
+                    mapListenerRegistered = true
+                } else if (!nowActive && mapListenerRegistered) {
+                    mv.removeMapListener(mapListener)
+                    mapListenerRegistered = false
+                }
+            }
+        }
         invalidate()
     }
 
@@ -201,30 +241,16 @@ class TiltContainer @JvmOverloads constructor(
         }
         val mv = findMapView()
 
-        // Pass 1 — strip Markers out of mv.overlays so they don't ride the
-        // tilt matrix (which would shear them into the ground plane). Tiles,
-        // polylines, polygons, and the SpriteOverlay (which short-circuits
-        // its own draw when tilt > 0 via tiltActiveSupplier) all stay in
-        // pass 1 and render under the tilt matrix.
-        val strippedMarkers: List<Marker>? = if (mv != null) {
-            val markers = mv.overlays.filterIsInstance<Marker>()
-            if (markers.isNotEmpty()) {
-                mv.overlays.removeAll(markers)
-                markers
-            } else null
-        } else null
-
+        // S239 — markers no-op their own draw via BillboardMarker.tiltActive,
+        // set on tilt-mode transition in setTiltDegrees. No strip/restore here:
+        // markers stay in mv.overlays for hit-testing, but BillboardMarker.draw
+        // early-returns so MapView's display list records no marker commands
+        // under the tilt matrix. SpriteOverlay short-circuits the same way via
+        // its tiltActiveSupplier.
         val saved = canvas.save()
         canvas.concat(tiltMatrix)
         super.dispatchDraw(canvas)
         canvas.restoreToCount(saved)
-
-        // Restore stripped markers before pass 2 so taps still find them via
-        // mv.projection (they live in the overlay list at their flat lat/lng;
-        // billboard rendering only changes pixels, not hit-testing).
-        if (strippedMarkers != null && mv != null) {
-            mv.overlays.addAll(strippedMarkers)
-        }
 
         // Pass 2 (canvas matrix back at TiltContainer identity): paint sprites
         // first (background atmosphere), then markers on top.
@@ -232,8 +258,9 @@ class TiltContainer @JvmOverloads constructor(
             spriteOverlayRef?.let { sprites ->
                 drawBillboardedSprites(canvas, mv, sprites)
             }
-            if (strippedMarkers != null) {
-                drawBillboardedMarkers(canvas, mv, strippedMarkers)
+            val markers = mv.overlays.filterIsInstance<Marker>()
+            if (markers.isNotEmpty()) {
+                drawBillboardedMarkers(canvas, mv, markers)
             }
         }
     }
