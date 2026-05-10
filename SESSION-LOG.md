@@ -8,7 +8,7 @@
 
 Two-pass tilt rendering shipped: `TiltContainer.dispatchDraw` strips `Marker` instances from `mv.overlays` before `super.dispatchDraw` (which renders tiles + non-marker overlays under the perspective `tiltMatrix`), then re-renders the stripped markers UPRIGHT in pass-2 by projecting `lat/lng → mvLocal → rotation around mvCenter → scale-around-mvCenter by mapView.scaleX → +mv.left/+mv.top → tiltMatrix.mapPoints`. `SpriteOverlay` short-circuits its normal draw under tilt and exposes a parallel `drawBillboarded` for the haunt skeletons. Operator walkthrough exposed 8 issues which were triaged into a 4-phase plan written into the live log; Phase 1 (sign + cull + FAB scale) and Phase 2 (POI symbol layers stripped from `tools/tile-bake/style-salem.json`, S234-baseline re-bake of 715,841 tiles → 253.8 MB, merged into a 261.6 MB bundle) shipped. Final tighten of `BILLBOARD_NEAR_SCALE` 2.0→1.4 and `BILLBOARD_FAR_SCALE` 0.6→0.95 deployed unverified before session end. **Phase 3 deferred to S238: wedge tile fill at z19 (mandatory per operator) — at z19+high tilt the upper ~30% of screen still renders dark `#2D1B4E` instead of tile content despite `lp.height += 5×containerH` resize.** Diagnostic infrastructure (`BILLBOARD-DIAG`, `OVERLAY-TYPES`, `billboardMode` long-press toggle on 3D FAB) left in place for next session.
 
-Full session detail: `docs/session-logs/session-237-2026-05-09.md`. Commit: `<sha>`.
+Full session detail: `docs/session-logs/session-237-2026-05-09.md`. Commit: `6500e2b`.
 
 ---
 
