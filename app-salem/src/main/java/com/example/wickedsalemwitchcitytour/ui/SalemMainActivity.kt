@@ -2393,10 +2393,14 @@ class SalemMainActivity : AppCompatActivity() {
      *  toggle / tour-mode transition. */
     private val narrationMarkerCache = mutableMapOf<String, Pair<Marker, com.example.wickedsalemwitchcitytour.content.model.SalemPoi>>()
     private val narrationMarkersOnOverlay = mutableSetOf<String>()
-    /** Cached result of the last `tourViewModel.loadNarrationPoints()` call so
+    /** Cached result of the last `tourViewModel.loadRenderablePoints()` call so
      *  filter-only updates don't re-hit Room. Invalidated on next startup
-     *  load or when caller explicitly passes fresh points. */
-    private var narrationPointsCache: List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi>? = null
+     *  load or when caller explicitly passes fresh points.
+     *
+     *  S240 — Source switched from narrated pool to renderable pool (wider:
+     *  default_visible OR tour/civic/hist-property). Marker overlay decoupled
+     *  from narration audio gating. */
+    private var renderablePointsCache: List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi>? = null
     /** S234 — serialize loadNarrationPointMarkers across concurrent callers.
      *  Cold-start fires it twice (once from narration init, once from
      *  refreshHistoricalModeForActiveTour) and the original cancel-and-restart
@@ -2433,14 +2437,17 @@ class SalemMainActivity : AppCompatActivity() {
         // markers when two calls fired during cold start.
         narrationMarkerJob = lifecycleScope.launch {
             narrationMarkerMutex.withLock { try {
-                // S234 — Source of `allPoints`, in priority order:
+                // S234/S240 — Source of `allPoints`, in priority order:
                 //   1. caller-supplied preloadedPoints (e.g. startup share)
                 //   2. cached result of a prior load (Room hit avoided)
                 //   3. fresh Room query
+                // S240: source is now the renderable pool (default_visible OR
+                // overrides) — wider than the narrated pool so non-narrating
+                // POIs with default_visible=true also get markers.
                 val allPoints = preloadedPoints
-                    ?: narrationPointsCache
-                    ?: tourViewModel.loadNarrationPoints().also { narrationPointsCache = it }
-                if (preloadedPoints != null) narrationPointsCache = preloadedPoints
+                    ?: renderablePointsCache
+                    ?: tourViewModel.loadRenderablePoints().also { renderablePointsCache = it }
+                if (preloadedPoints != null) renderablePointsCache = preloadedPoints
 
                 val tierFiltered = if (showAllPoisActive) {
                     allPoints

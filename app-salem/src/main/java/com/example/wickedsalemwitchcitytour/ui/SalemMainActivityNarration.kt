@@ -276,17 +276,24 @@ internal fun SalemMainActivity.initNarrationSystem() {
     val activityRef = this
     lifecycleScope.launch {
         try {
-            val points = tourViewModel.loadNarrationPoints()
-            if (points.isNotEmpty()) {
-                narrationGeofenceManager.loadPoints(points)
+            // S240 — Split source: narrated pool feeds the geofence audio triggers;
+            // renderable pool (wider — default_visible OR tour/civic/hist-property)
+            // feeds the map marker overlay. A POI with default_visible=true but
+            // is_narrated=false now appears on the map (Bit Bar etc.) without firing
+            // audio in its geofence.
+            val narrated = tourViewModel.loadNarrationPoints()
+            val renderable = tourViewModel.loadRenderablePoints()
+            if (narrated.isNotEmpty() || renderable.isNotEmpty()) {
+                narrationGeofenceManager.loadPoints(narrated)
                 // Show proximity dock immediately
                 proximityDock?.show()
-                // S234 — share the just-loaded list with the marker loader
-                // instead of running the same Room query a second time.
-                loadNarrationPointMarkers(points)
-                // S168 — banner removed; keep the POI-id index for other lookups.
-                activityRef.salemPoiIndex = points.associateBy { it.id }
-                DebugLogger.i("SalemMainActivity", "Ambient narration ACTIVE: ${points.size} points, ${SalemCorridors.all().size} corridors — no tour selection required")
+                // S234/S240 — share the just-loaded renderable list with the marker
+                // loader instead of running the same Room query a second time.
+                loadNarrationPointMarkers(renderable)
+                // S168/S240 — POI-id index covers the full renderable set so tap
+                // lookups work for non-narrated markers too.
+                activityRef.salemPoiIndex = renderable.associateBy { it.id }
+                DebugLogger.i("SalemMainActivity", "Ambient narration ACTIVE: narrated=${narrated.size}, renderable=${renderable.size}, corridors=${SalemCorridors.all().size}")
             } else {
                 DebugLogger.w("SalemMainActivity", "No narration points in database")
             }

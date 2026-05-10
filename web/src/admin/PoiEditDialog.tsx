@@ -2055,7 +2055,7 @@ export function PoiEditDialog({
                           <strong>Tier 0 — template only.</strong> Commercial POIs do not narrate
                           unless the user enables the &ldquo;Show All POIs&rdquo; FAB, in which
                           case a synthesized template plays. Bump <em>Merchant tier</em>
-                          {' '}on the Operational tab to author custom narration + voice asset.
+                          {' '}below (same tab) to author custom narration + voice asset.
                         </div>
                       )}
                       {has('short_narration') && !isCommercialTier0 && (

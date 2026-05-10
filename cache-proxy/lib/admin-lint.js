@@ -405,7 +405,7 @@ async function checkContentNoDescription(pgPool) {
   `, params);
   return rows.map(r => poiItem(r,
     `POI has no description and no short_description.`,
-    `Open the editor → Content tab → write at least a Short Description.`,
+    `Open the editor → General tab → write at least a Short Description.`,
   ));
 }
 
@@ -424,7 +424,7 @@ async function checkContentNoImage(pgPool) {
   `, params);
   return rows.map(r => poiItem(r,
     `Tour POI has no image_asset — POI detail card will show a placeholder.`,
-    `Generate or assign an image, then open the editor → Content tab → set Image Asset.`,
+    `Generate or assign an image, then open the editor → General tab → set Image asset.`,
   ));
 }
 

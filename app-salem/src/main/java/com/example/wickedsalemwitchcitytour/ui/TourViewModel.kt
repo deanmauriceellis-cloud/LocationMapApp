@@ -679,6 +679,14 @@ class TourViewModel @Inject constructor(
         return repository.getNarratedPois()
     }
 
+    /** S240 — Load all map-renderable POIs (default_visible OR tour/civic/hist-property
+     *  overrides). Wider than the narrated pool: includes POIs that should appear on the
+     *  map even when they have no narration audio (e.g. a FOOD_DRINK marker the user can
+     *  tap to see the detail sheet, but which doesn't trigger an audio geofence). */
+    suspend fun loadRenderablePoints(): List<com.example.wickedsalemwitchcitytour.content.model.SalemPoi> {
+        return repository.getRenderablePois()
+    }
+
     /** Look up a single SalemPoi by id (S221 — used by detour overlay). */
     suspend fun getSalemPoiById(id: String): com.example.wickedsalemwitchcitytour.content.model.SalemPoi? {
         return repository.getPoiById(id)

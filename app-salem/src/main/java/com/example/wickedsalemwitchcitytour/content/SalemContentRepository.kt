@@ -144,6 +144,10 @@ class SalemContentRepository @Inject constructor(
         poiCache.ensureLoaded(); return poiCache.findBySubcategory(subcategory)
     }
 
+    suspend fun getRenderablePois(): List<SalemPoi> {
+        poiCache.ensureLoaded(); return poiCache.findRenderable()
+    }
+
     suspend fun getNarratedPois(): List<SalemPoi> {
         poiCache.ensureLoaded(); return poiCache.findNarrated()
     }

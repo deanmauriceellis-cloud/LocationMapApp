@@ -51,6 +51,7 @@ class PoiCache @Inject constructor(
         val bySubcategory: Map<String, List<SalemPoi>>,
         val byDistrict: Map<String, List<SalemPoi>>,
         val visible: List<SalemPoi>,
+        val renderable: List<SalemPoi>,
         val narrated: List<SalemPoi>,
         val tour: List<SalemPoi>,
         val districts: List<String>,
@@ -70,7 +71,8 @@ class PoiCache @Inject constructor(
             val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
             Log.i(TAG, "Loaded ${all.size} POIs in ${ms}ms (categories=${snapshot!!.byCategory.size}, " +
                 "districts=${snapshot!!.districts.size}, visible=${snapshot!!.visible.size}, " +
-                "narrated=${snapshot!!.narrated.size}, tour=${snapshot!!.tour.size})")
+                "renderable=${snapshot!!.renderable.size}, narrated=${snapshot!!.narrated.size}, " +
+                "tour=${snapshot!!.tour.size})")
         }
     }
 
@@ -89,6 +91,14 @@ class PoiCache @Inject constructor(
             .filter { !it.district.isNullOrBlank() }
             .groupBy { it.district!! }
         val visible = all.filter { it.defaultVisible }
+        // S240 — Renderable pool: what shows up on the map. Decoupled from
+        // narration. A POI renders if `default_visible=true` OR it has a flag
+        // override (tour stop, historical property, civic). Whether it
+        // *narrates* in its geofence is a separate concern, gated by the
+        // `narrated` filter below.
+        val renderable = all.filter { p ->
+            p.defaultVisible || p.isTourPoi || p.isHistoricalProperty || p.isCivicPoi
+        }
         // Mirrors SalemPoiDao.findNarrated SQL exactly:
         //   (is_narrated OR (haunt_sprite_id IS NOT NULL AND haunt_enabled))
         //   AND (default_visible OR is_tour_poi OR is_historical_property OR is_civic_poi)
@@ -99,7 +109,7 @@ class PoiCache @Inject constructor(
         }
         val tour = all.filter { it.isTourPoi }
         val districts = byDistrict.keys.sorted()
-        return Snapshot(all, byId, byCategory, bySubcategory, byDistrict, visible, narrated, tour, districts)
+        return Snapshot(all, byId, byCategory, bySubcategory, byDistrict, visible, renderable, narrated, tour, districts)
     }
 
     private fun snap(): Snapshot =
@@ -116,6 +126,8 @@ class PoiCache @Inject constructor(
 
     fun findBySubcategory(subcategory: String): List<SalemPoi> =
         snap().bySubcategory[subcategory] ?: emptyList()
+
+    fun findRenderable(): List<SalemPoi> = snap().renderable
 
     fun findNarrated(): List<SalemPoi> = snap().narrated
 
