@@ -1689,22 +1689,6 @@ class SalemMainActivity : AppCompatActivity() {
             }
             Toast.makeText(this, "3D tilt: ${next.toInt()}°", Toast.LENGTH_SHORT).show()
         }
-        // S234 latency-debug A/B: long-press 3D FAB toggles overlay
-        // suppression while tilted. Used to isolate whether tilt-mode
-        // freezes are tile-render cost or per-frame overlay draw cost.
-        binding.btnTilt3d.setOnLongClickListener {
-            // S237 diagnostic — cycle billboard mode 0 → 1 → 0 to A/B compare
-            // upright billboarded markers vs sheared-by-tilt markers.
-            val nextMode = (binding.tiltContainer.billboardMode + 1) % 2
-            binding.tiltContainer.billboardMode = nextMode
-            binding.tiltContainer.invalidate()
-            Toast.makeText(
-                this,
-                if (nextMode == 0) "Billboard ON (upright POIs)" else "Billboard OFF (POIs ride tilt)",
-                Toast.LENGTH_SHORT,
-            ).show()
-            true
-        }
     }
 
     /** Walk simulator button — starts/stops emulated GPS walk along the witch trials tour. */

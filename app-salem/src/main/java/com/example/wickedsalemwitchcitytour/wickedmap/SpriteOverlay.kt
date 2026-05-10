@@ -297,7 +297,7 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
         // size while the underlying map magnifies.
         val fabScale = mapView.scaleX
         val ctnW = mapView.width.toFloat()
-        val ctnH = mapView.height.toFloat()
+        val mvBottom = mvTopPx + mapView.height.toFloat()
         for (sw in activeSwoops) {
             val elapsed = nowMs - sw.startMs
             val t = (elapsed.toFloat() / sw.durationMs).coerceIn(0f, 1f)
@@ -324,12 +324,14 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
             val rotY = (relX * sinO + relY * cosO) * fabScale
             xy[0] = rotX + mvCx + mvLeftPx
             xy[1] = rotY + mvCy + mvTopPx
-            // S237 cull — drop sprites whose pre-tilt container position lies
-            // outside the natural map rect, matching the marker cull. Avoids
-            // upright sprites floating over the dark wedge background.
+            // S238 cull — match the marker cull: allow sprites anywhere in
+            // MapView's extended drawing rect (so distant haunts can render
+            // upright in the wedge area now that S238's softened perspective
+            // fills it with tile content).
             val ctnX = xy[0]
             val ctnY = xy[1]
-            if (ctnY < 0f || ctnY > ctnH || ctnX < 0f || ctnX > ctnW) continue
+            if (ctnY < mvTopPx - 50f || ctnY > mvBottom + 50f ||
+                ctnX < -50f || ctnX > ctnW + 50f) continue
             tiltMapPoint(xy)
 
             val pathArg = (2.0 * PI * t * sw.pathDirection + sw.pathPhase).toFloat()
