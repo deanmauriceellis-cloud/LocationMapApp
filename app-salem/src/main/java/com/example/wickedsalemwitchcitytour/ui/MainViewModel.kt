@@ -261,7 +261,10 @@ class MainViewModel @Inject constructor(
     // ── Data loads — user-initiated only, never called from init ──────────────
 
     fun searchPoisAt(point: GeoPoint, categories: List<String> = emptyList(), layerId: String = "default") {
-        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.d(TAG, "searchPoisAt() BLOCKED by V1_OFFLINE_ONLY (would have searched lat=${point.latitude} lon=${point.longitude} layerId=$layerId)")
+            return
+        }
         DebugLogger.i(TAG, "searchPoisAt() lat=${point.latitude} lon=${point.longitude} layerId=$layerId categories=$categories")
         viewModelScope.launch {
             runCatching { placesRepository.searchPois(point, categories) }
@@ -280,7 +283,10 @@ class MainViewModel @Inject constructor(
 
     /** Load cached POIs within a bounding box from the proxy's poi-cache. */
     fun loadCachedPoisForBbox(south: Double, west: Double, north: Double, east: Double) {
-        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.d(TAG, "loadCachedPoisForBbox() BLOCKED by V1_OFFLINE_ONLY (would have fetched bbox=$south,$west,$north,$east)")
+            return
+        }
         DebugLogger.i(TAG, "loadCachedPoisForBbox() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { placesRepository.fetchCachedPoisInBbox(south, west, north, east) }
@@ -303,7 +309,10 @@ class MainViewModel @Inject constructor(
     /** Direct suspend call for populate scanner — returns result without LiveData.
      *  @param radiusOverride if non-null, overrides the radius hint (used for cap-retry) */
     suspend fun populateSearchAt(point: GeoPoint, categories: List<String> = emptyList(), radiusOverride: Int? = null): com.example.locationmapapp.data.model.PopulateSearchResult? {
-        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) return null
+        if (com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY) {
+            DebugLogger.d(TAG, "populateSearchAt() BLOCKED by V1_OFFLINE_ONLY (would have populated at lat=${point.latitude} lon=${point.longitude})")
+            return null
+        }
         return try {
             placesRepository.searchPoisForPopulate(point, categories, radiusOverride)
         } catch (e: Exception) {

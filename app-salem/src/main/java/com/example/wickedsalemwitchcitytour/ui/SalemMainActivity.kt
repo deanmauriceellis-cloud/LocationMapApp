@@ -605,6 +605,7 @@ class SalemMainActivity : AppCompatActivity() {
     internal val dbImportLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
+        DebugLogger.i("Import", "dbImportLauncher result: uri=${uri?.toString() ?: "null (cancelled)"}")
         if (uri != null) {
             pendingImportUri = uri
             geofenceViewModel.importGeofenceDatabase(contentResolver, uri)
@@ -614,6 +615,7 @@ class SalemMainActivity : AppCompatActivity() {
     internal val csvImportLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
+        DebugLogger.i("Import", "csvImportLauncher result: uri=${uri?.toString() ?: "null (cancelled)"}")
         if (uri != null) showCsvImportConfigDialog(uri)
     }
 
@@ -673,6 +675,23 @@ class SalemMainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DebugLogger.i("SalemMainActivity", "onCreate() start — device=${android.os.Build.MODEL} SDK=${android.os.Build.VERSION.SDK_INT} savedInstanceState=${savedInstanceState != null}")
+        // S243 — single startup-posture echo. All runtime defaults in one line
+        // so any "we shipped with the wrong defaults" investigation is a single
+        // grep against the first frame of the session.
+        if (BuildConfig.DEBUG) {
+            DebugLogger.i(
+                "Posture",
+                "BuildConfig.DEBUG=${BuildConfig.DEBUG} RECON_DEFAULTS=${BuildConfig.RECON_DEFAULTS} " +
+                    "V1_OFFLINE_ONLY=${com.example.locationmapapp.util.FeatureFlags.V1_OFFLINE_ONLY} " +
+                    "GPS_BBOX_OVERRIDE=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.GPS_BBOX_OVERRIDE} " +
+                    "GPS_TRACK_VISIBLE=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.GPS_TRACK_VISIBLE} " +
+                    "HEADING_UP=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.HEADING_UP} " +
+                    "GPS_BURST_ENABLED=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.GPS_BURST_ENABLED} " +
+                    "FIELD_EDIT_ENABLED=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.FIELD_EDIT_ENABLED} " +
+                    "DEFAULT_ZOOM=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.DEFAULT_ZOOM} " +
+                    "TILT_3D_ENABLED=${com.example.wickedsalemwitchcitytour.ui.BuildDefaults.TILT_3D_ENABLED}",
+            )
+        }
         // S110 — lifecycle observer for diagnostic logging. Helps post-mortems
         // distinguish "process death" (no graceful onPause / onDestroy logs)
         // from "configuration change" (changingConfigurations=true) from
@@ -1128,6 +1147,14 @@ class SalemMainActivity : AppCompatActivity() {
                 }
             } walkSimRunning=$walkSimRunning"
         )
+        if (BuildConfig.DEBUG) {
+            DebugLogger.d(
+                "LIFECYCLE",
+                "pendingRestores: POI=$pendingPoiRestore Webcam=$pendingWebcamRestore " +
+                    "Geofence=$pendingGeofenceRestore METAR=$pendingMetarRestore " +
+                    "Aircraft=$pendingAircraftRestore AutoFollow=$pendingAutoFollowRestore",
+            )
+        }
         binding.mapView.invalidate()
     }
 
