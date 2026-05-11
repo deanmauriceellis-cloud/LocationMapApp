@@ -5,12 +5,12 @@ import java.sql.DriverManager
 
 /**
  * JVM-only loader that mirrors the Android `RoutingBundleLoader` (in `:core`)
- * but uses sqlite-jdbc instead of `SQLiteDatabase`. Used by the
- * `:salem-content` bake pipeline and by `:routing-jvm`'s parity tests.
+ * but uses sqlite-jdbc instead of `SQLiteDatabase`. Used by `:routing-jvm`'s
+ * parity tests.
  *
  * If the Android-side `RoutingBundleLoader` changes its schema expectations
  * or column reads, this loader must be updated to match — otherwise the
- * parity checks become meaningless and the bake will diverge from runtime.
+ * parity checks become meaningless.
  */
 object JdbcRoutingBundleLoader {
 

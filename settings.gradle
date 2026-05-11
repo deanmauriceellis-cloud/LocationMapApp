@@ -17,4 +17,3 @@ rootProject.name = "LocationMapApp_v1.5"
 include ':app-salem'
 include ':core'
 include ':routing-jvm'
-include ':salem-content'

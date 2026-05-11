@@ -136,14 +136,14 @@ ksp {
 def skipChain = project.hasProperty('skipPublishChain')
 
 tasks.register('publishSalemPois', Exec) {
-    group = 'salem-content'
+    group = 'salem publish'
     description = 'PG salem_pois → bundled SQLite (publish-salem-pois.js)'
     workingDir = rootProject.projectDir
     commandLine 'node', 'cache-proxy/scripts/publish-salem-pois.js'
     enabled = !skipChain
 }
 tasks.register('publishSalemTours', Exec) {
-    group = 'salem-content'
+    group = 'salem publish'
     description = 'PG salem_tours/_stops → bundled SQLite (publish-tours.js)'
     workingDir = rootProject.projectDir
     commandLine 'node', 'cache-proxy/scripts/publish-tours.js'
@@ -151,7 +151,7 @@ tasks.register('publishSalemTours', Exec) {
     mustRunAfter 'publishSalemPois'
 }
 tasks.register('publishSalemTourLegs', Exec) {
-    group = 'salem-content'
+    group = 'salem publish'
     description = 'PG salem_tour_legs → bundled SQLite (publish-tour-legs.js)'
     workingDir = rootProject.projectDir
     commandLine 'node', 'cache-proxy/scripts/publish-tour-legs.js'
@@ -159,7 +159,7 @@ tasks.register('publishSalemTourLegs', Exec) {
     mustRunAfter 'publishSalemTours'
 }
 tasks.register('alignSalemAssetSchema', Exec) {
-    group = 'salem-content'
+    group = 'salem publish'
     description = 'Stamp Room identity_hash + user_version on asset (align-asset-schema-to-room.js). MUST run last.'
     workingDir = rootProject.projectDir
     commandLine 'node', 'cache-proxy/scripts/align-asset-schema-to-room.js'
@@ -167,7 +167,7 @@ tasks.register('alignSalemAssetSchema', Exec) {
     mustRunAfter 'publishSalemTourLegs'
 }
 tasks.register('publishSplashTree', Exec) {
-    group = 'salem-content'
+    group = 'salem publish'
     description = 'S231: bake cache-proxy/data/splash-tree-v1.json → app-salem/src/main/assets/splash_tree_v1.json (validates first).'
     workingDir = rootProject.projectDir
     commandLine 'node', 'cache-proxy/scripts/publish-splash-tree.js'
@@ -177,7 +177,7 @@ tasks.register('publishSplashTree', Exec) {
     mustRunAfter 'alignSalemAssetSchema'
 }
 tasks.register('publishSalemContent') {
-    group = 'salem-content'
+    group = 'salem publish'
     description = 'Run the full PG → asset publish chain in order.'
     dependsOn 'publishSalemPois', 'publishSalemTours', 'publishSalemTourLegs', 'alignSalemAssetSchema', 'publishSplashTree'
 }
