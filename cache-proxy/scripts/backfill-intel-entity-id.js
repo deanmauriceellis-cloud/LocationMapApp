@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// [PAUSED S214] Salem Oracle / SalemIntelligence provenance reformulation. Do not run until operator signals pause lifted.
 /*
  * backfill-intel-entity-id.js — Session 192 (2026-04-27)
  *

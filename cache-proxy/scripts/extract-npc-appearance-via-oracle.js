@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// [PAUSED S214] Salem Oracle / SalemIntelligence provenance reformulation. Do not run until operator signals pause lifted.
 /*
  * extract-npc-appearance-via-oracle.js — Phase 9X.6 Pass A
  *

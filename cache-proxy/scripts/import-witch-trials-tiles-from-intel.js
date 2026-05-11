@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// [PAUSED S214] Salem Oracle / SalemIntelligence provenance reformulation. Do not run until operator signals pause lifted.
 /*
  * import-witch-trials-tiles-from-intel.js — Phase 9X Step 3 (S140)
  *

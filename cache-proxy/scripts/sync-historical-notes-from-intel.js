@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// [PAUSED S214] Salem Oracle / SalemIntelligence provenance reformulation. Do not run until operator signals pause lifted.
 /*
  * sync-historical-notes-from-intel.js — Phase 9R.0 Heritage Trail
  *

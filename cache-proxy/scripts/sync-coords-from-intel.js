@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// [PAUSED S214] Salem Oracle / SalemIntelligence provenance reformulation. Do not run until operator signals pause lifted.
 /*
  * sync-coords-from-intel.js — S149 (2026-04-18)
  *

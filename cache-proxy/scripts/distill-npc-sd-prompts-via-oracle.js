@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// [PAUSED S214] Salem Oracle / SalemIntelligence provenance reformulation. Do not run until operator signals pause lifted.
 /*
  * distill-npc-sd-prompts-via-oracle.js — Phase 9X.6 Pass A.2
  *
