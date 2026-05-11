@@ -40,10 +40,13 @@ try {
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const dbIdx = process.argv.indexOf('--db');
+const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+// S242: `:salem-content` module deleted. SQLITE_PATH was the intermediate
+// write target the JVM bake pipeline produced; the asset is now the direct
+// write target. `--db <path>` still overrides for offline testing.
 const SQLITE_PATH = dbIdx !== -1
   ? process.argv[dbIdx + 1]
-  : path.resolve(__dirname, '../../salem-content/salem_content.db');
-const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+  : ASSETS_PATH;
 
 if (!process.env.DATABASE_URL) {
   // Parse .env manually (no dotenv dependency)
@@ -394,9 +397,14 @@ async function main() {
   db.close();
 
   // Copy to assets
-  fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
-  const size = fs.statSync(ASSETS_PATH).size;
-  console.log(`\nCopied to assets: ${ASSETS_PATH} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  if (path.resolve(SQLITE_PATH) !== path.resolve(ASSETS_PATH)) {
+    fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
+    const size = fs.statSync(ASSETS_PATH).size;
+    console.log(`\nCopied to assets: ${ASSETS_PATH} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  } else {
+    const size = fs.statSync(ASSETS_PATH).size;
+    console.log(`\nWrote directly to assets: ${ASSETS_PATH} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  }
 
   console.log('\nPUBLISH COMPLETE');
   await pool.end();

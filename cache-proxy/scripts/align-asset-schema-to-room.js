@@ -32,8 +32,11 @@ const SCHEMAS_DIR = path.resolve(
   __dirname,
   '../../app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase'
 );
-const SQLITE_PATH = path.resolve(__dirname, '../../salem-content/salem_content.db');
+// S242: `:salem-content` module deleted. SQLITE_PATH retained as an alias
+// pointing at the asset, so older code paths that iterate [SQLITE_PATH, ASSETS_PATH]
+// dedupe on the resolved path (see line ~115).
 const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+const SQLITE_PATH = ASSETS_PATH;
 
 function latestSchema() {
   const files = fs.readdirSync(SCHEMAS_DIR).filter((f) => /^\d+\.json$/.test(f));
@@ -110,7 +113,9 @@ function main() {
   const entities = data.database.entities;
   console.log(`Entities: ${entities.length}`);
 
-  for (const dbPath of [SQLITE_PATH, ASSETS_PATH]) {
+  // S242: SQLITE_PATH and ASSETS_PATH are the same file now. Dedupe.
+  const targets = Array.from(new Set([path.resolve(SQLITE_PATH), path.resolve(ASSETS_PATH)]));
+  for (const dbPath of targets) {
     if (!fs.existsSync(dbPath)) {
       console.warn(`Skipping (not present): ${dbPath}`);
       continue;

@@ -32,11 +32,11 @@ if (!process.env.DATABASE_URL) {
   } catch (_) {}
 }
 
-// S153 fix: bake into the CANONICAL source DB, then mirror to assets. Previously
-// this script wrote only to assets, which `publish-salem-pois.js` silently
-// clobbers on its next run. Same bug/fix pattern as the S150 newspaper fix.
-const SRC_DB = path.resolve(__dirname, '../../salem-content/salem_content.db');
+// S242: `:salem-content` module deleted. SRC_DB now points at the bundled
+// asset directly (was an intermediate copy under salem-content/). The copy
+// step below becomes a no-op (guarded).
 const ASSETS_DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+const SRC_DB = ASSETS_DB;
 const DB = SRC_DB;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -114,9 +114,11 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const count = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_articles').get().c;
   db.exec('VACUUM');
   db.close();
-  // S153: mirror source → assets so the APK build picks up the table.
-  fs.copyFileSync(SRC_DB, ASSETS_DB);
+  // S242: SRC_DB === ASSETS_DB now (no intermediate); only copy if they differ (e.g. override).
+  if (path.resolve(SRC_DB) !== path.resolve(ASSETS_DB)) {
+    fs.copyFileSync(SRC_DB, ASSETS_DB);
+    console.log(`Mirrored → ${ASSETS_DB}`);
+  }
   console.log(`Cleared ${preBundle} pre-existing rows. Bundled ${rows.length} articles into ${SRC_DB}. Post-insert COUNT=${count}.`);
-  console.log(`Mirrored → ${ASSETS_DB}`);
   await pool.end();
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });

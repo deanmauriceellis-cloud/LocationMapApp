@@ -26,8 +26,9 @@ try {
 }
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const SQLITE_PATH = path.resolve(__dirname, '../../salem-content/salem_content.db');
 const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+// S242: write directly to bundled asset (was via the now-deleted `:salem-content` intermediate).
+const SQLITE_PATH = ASSETS_PATH;
 
 if (!process.env.DATABASE_URL) {
   try {
@@ -178,9 +179,11 @@ async function main() {
 
   db.close();
 
-  fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
+  if (path.resolve(SQLITE_PATH) !== path.resolve(ASSETS_PATH)) {
+    fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
+  }
   const size = fs.statSync(ASSETS_PATH).size;
-  console.log(`Copied to assets (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  console.log(`Assets written (${(size / 1024 / 1024).toFixed(1)} MB)`);
   console.log('\nPUBLISH TOURS COMPLETE');
 
   await pool.end();

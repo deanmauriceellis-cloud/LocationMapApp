@@ -39,8 +39,10 @@ if (!process.env.DATABASE_URL) {
 // silently clobber on its next run — the exact failure mode seen in the S149
 // field-test log where `salem_witch_trials_newspapers` was missing from the
 // shipped APK.
-const SRC_DB = path.resolve(__dirname, '../../salem-content/salem_content.db');
+// S242: `:salem-content` module deleted. SRC_DB now points at the bundled
+// asset directly (was an intermediate copy under salem-content/).
 const ASSETS_DB = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+const SRC_DB = ASSETS_DB;
 const DB = SRC_DB;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -155,10 +157,11 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const count = db.prepare('SELECT COUNT(*) AS c FROM salem_witch_trials_newspapers').get().c;
   db.exec('VACUUM');
   db.close();
-  // S150: mirror the source DB to the APK assets so the next build picks up
-  // the newspaper table without requiring a separate publish-salem-pois run.
-  fs.copyFileSync(SRC_DB, ASSETS_DB);
+  // S242: SRC_DB === ASSETS_DB now (no intermediate); only copy if they differ.
+  if (path.resolve(SRC_DB) !== path.resolve(ASSETS_DB)) {
+    fs.copyFileSync(SRC_DB, ASSETS_DB);
+    console.log(`Mirrored → ${ASSETS_DB}`);
+  }
   console.log(`Bundled ${rows.length} newspapers into ${SRC_DB}. Post-insert COUNT=${count}.`);
-  console.log(`Mirrored → ${ASSETS_DB}`);
   await pool.end();
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });

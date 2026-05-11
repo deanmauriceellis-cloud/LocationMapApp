@@ -44,8 +44,9 @@ try {
 }
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const SQLITE_PATH = path.resolve(__dirname, '../../salem-content/salem_content.db');
 const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/salem_content.db');
+// S242: write directly to bundled asset (was via the now-deleted `:salem-content` intermediate).
+const SQLITE_PATH = ASSETS_PATH;
 
 // S193: read the current Room identity_hash + version from the latest schema
 // JSON instead of hardcoding. The hardcoded v10 value caused S192/S193 to
@@ -248,9 +249,11 @@ async function main() {
 
   db.close();
 
-  fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
+  if (path.resolve(SQLITE_PATH) !== path.resolve(ASSETS_PATH)) {
+    fs.copyFileSync(SQLITE_PATH, ASSETS_PATH);
+  }
   const size = fs.statSync(ASSETS_PATH).size;
-  console.log(`Copied to assets (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  console.log(`Assets written (${(size / 1024 / 1024).toFixed(1)} MB)`);
   console.log('\nPUBLISH TOUR LEGS COMPLETE');
 
   await pool.end();
