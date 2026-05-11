@@ -155,7 +155,7 @@ If a marker says "abandoned", do not retry the same approach without first readi
 ## Cross-project dependencies (off-repo)
 
 - **SalemIntelligence** — Phase 1 KB live at `:8089`. 1,724 BCS POIs, 116K entities, 238 buildings, 5.67M relations. Memory: `project_salem_intelligence.md`.
-- **Salem JSON data** — `salem-content/` pipeline reads from `~/Development/Salem/data/json/` (49 figures, 500 facts, 80 events, 200 sources).
+- **Salem JSON data** — `~/Development/Salem/data/json/` (49 figures, 500 facts, 80 events, 200 sources) is the historical-content authoring source pulled into PG via the cache-proxy admin tooling. (S242: pre-pivot `:salem-content` JVM consumer deleted as dead code.)
 - **GeoInbox** — future photo source for POI imagery; `omenpicturefeed@gmail.com`. Memory: `reference_geoinbox.md`.
 - **RadioIntelligence** — LMA Salem is a hashed-observation contributor only, NOT a peer of WWWatcher/RadioLogger threat tools. Memory: `project_radiointelligence_collector_role.md`.
 - **OMEN** — `~/Development/OMEN/notes/locationmapapp.md` for actionable items, `~/Development/OMEN/directives/ACTIVE.md` for active directives, `~/Development/OMEN/reports/locationmapapp/` for session-end reports.

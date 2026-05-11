@@ -28,7 +28,7 @@ Required tables (must all exist, with `CREATE TABLE` matching the `@Entity` decl
 | `tour_stops` | 80 | same | `TourStop.kt` |
 | `tour_pois` | 40 | same | `TourPoi.kt` |
 | `events_calendar` | 20 | `publish-events-to-sqlite.js` | `EventsCalendar.kt` |
-| `historical_facts` | 500 | `publish-salem-content.js` | `HistoricalFact.kt` |
+| `historical_facts` | 500 | (legacy; bundled at last `:salem-content` run pre-S242, table preserved by Room schema) | `HistoricalFact.kt` |
 | `historical_figures` | 49 | same | `HistoricalFigure.kt` |
 | `primary_sources` | 200 | same | `PrimarySource.kt` |
 | `timeline_events` | 40 | same | `TimelineEvent.kt` |

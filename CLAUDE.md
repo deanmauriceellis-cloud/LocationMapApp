@@ -237,7 +237,7 @@ If OMEN needs any of that, it can read the live log directly — the path is in 
 - **Web app** — React 19, TypeScript, Vite, Leaflet, Tailwind CSS (`web/`)
 - **Cache proxy** — Node.js/Express on port 4300 (`cache-proxy/`)
 - **PostgreSQL** — `locationmapapp` DB, 9 `salem_*` tables
-- **Multi-module monorepo** — `:core` (shared), `:app` (generic), `:app-salem` (WickedSalemWitchCityTour), `:salem-content` (JVM content pipeline)
+- **Multi-module monorepo** — `:core` (shared), `:app-salem` (WickedSalemWitchCityTour), `:routing-jvm` (shared Dijkstra + parity tests). (S242: pre-pivot `:app` and `:salem-content` modules deleted as dead code.)
 
 ---
 
@@ -245,12 +245,11 @@ If OMEN needs any of that, it can read the live log directly — the path is in 
 
 ```
 LocationMapApp_v1.5/
-├── app/                   — Generic LocationMapApp module
-├── app-salem/             — WickedSalemWitchCityTour module
+├── app-salem/             — WickedSalemWitchCityTour module (the V1 product)
 ├── core/                  — Shared library module
-├── salem-content/         — JVM content pipeline (imports from ~/Development/Salem/data/json/)
-├── cache-proxy/           — Node.js caching proxy
-├── web/                   — React web app
+├── routing-jvm/           — Shared Dijkstra walking router + parity tests
+├── cache-proxy/           — Node.js caching proxy (port 4300)
+├── web/                   — React 19 + TS admin tool (operator-only)
 ├── docs/session-logs/     — Live conversation logs (crash-recovery)
 ├── docs/                  — Archive, other docs
 ├── STATE.md               — Current project state
@@ -265,7 +264,7 @@ LocationMapApp_v1.5/
 
 ## Cross-Project Dependencies
 
-- **Salem JSON data** — `salem-content/` pipeline reads from `~/Development/Salem/data/json/` (49 figures, 500 facts, 80 events, 200 sources). Salem's JSON schema is a shared engine dependency tracked in OMEN.
+- **Salem JSON data** — historical-content source for narrations and POI authoring lives at `~/Development/Salem/data/json/` (49 figures, 500 facts, 80 events, 200 sources). Pulled into PG via cache-proxy admin tooling; the pre-pivot `:salem-content` JVM pipeline that used to consume this directly was deleted S242 — PG + cache-proxy scripts are now the only consumer.
 - **GeoInbox** — Future photo source for POI imagery (see `~/Development/OMEN/architecture/geoinbox-concept.md`)
 - **Phase 19 (LLM Integration)** — Blocked by OMEN-005 (Unified Server Engine Assessment). Must use shared conversation engine, not build parallel.
 
