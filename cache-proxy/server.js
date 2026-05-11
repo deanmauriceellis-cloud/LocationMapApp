@@ -162,9 +162,20 @@ deps.markScanned = scanCellsModule.markScanned;
 deps.collectPoisInRadius = scanCellsModule.collectPoisInRadius;
 deps.SCAN_CELLS_FILE = scanCellsModule.SCAN_CELLS_FILE;
 
-// Overpass (needs cache + POI cache + scan cells; returns queue length accessor)
-const overpassModule = require('./lib/overpass')(app, deps);
-deps.getOverpassQueueLength = overpassModule.getOverpassQueueLength;
+// Overpass (needs cache + POI cache + scan cells; returns queue length accessor).
+// S242: per `feedback_no_osm_use_local_geo.md`, OSM is build-time only. Android
+// has zero runtime callers (verified S242 code audit). Gated behind
+// ENABLE_OVERPASS=true so the route can't accidentally be re-introduced into a
+// runtime path. Flip the env var to revive admin-side OSM probing.
+let overpassModule = null;
+const OVERPASS_ENABLED = String(process.env.ENABLE_OVERPASS || '').toLowerCase() === 'true';
+if (OVERPASS_ENABLED) {
+  overpassModule = require('./lib/overpass')(app, deps);
+  deps.getOverpassQueueLength = overpassModule.getOverpassQueueLength;
+} else {
+  // Stub queue-length accessor so admin code that reads it doesn't crash.
+  deps.getOverpassQueueLength = () => 0;
+}
 
 // Complex routes
 require('./lib/tfr')(app, deps);
@@ -260,7 +271,12 @@ require('./lib/admin-splash-tree')(app, deps);
 server.listen(PORT, '0.0.0.0', () => {
   if (chatModule) chatModule.ensureGlobalRoom();
   console.log(`Cache proxy listening on http://0.0.0.0:${PORT}`);
-  console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft, GET /webcams, GET /weather, GET /tfrs');
+  if (overpassModule) {
+    console.log('Routes: POST /overpass, GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft, GET /webcams, GET /weather, GET /tfrs');
+  } else {
+    console.log('Routes: GET /earthquakes, GET /nws-alerts, GET /metar, GET /aircraft, GET /webcams, GET /weather, GET /tfrs');
+    console.log('        /overpass disabled (S242 contract — set ENABLE_OVERPASS=true to opt in)');
+  }
   console.log('Zones:  GET /cameras, GET /schools, GET /flood-zones, GET /crossings');
   console.log('GeoDb:  GET /geofences/catalog, GET /geofences/database/:id/download');
   console.log('Radius: GET /radius-hint, POST /radius-hint, GET /radius-hints');
