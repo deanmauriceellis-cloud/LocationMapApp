@@ -304,6 +304,9 @@ class TourViewModel @Inject constructor(
 
     fun isNarrating(): Boolean = narrationManager.isSpeaking()
 
+    /** S244: walk-sim gates TTS-dwell on engine availability. */
+    fun isTtsReady(): Boolean = narrationManager.isTtsReady
+
     var autoNarrationEnabled: Boolean
         get() = narrationManager.autoNarrationEnabled
         set(value) { narrationManager.autoNarrationEnabled = value }

@@ -53,6 +53,15 @@ class NarrationManager @Inject constructor(
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
+    /**
+     * S244: public read-only view of [ttsReady] for callers that need to gate
+     * on engine availability. Walk-sim uses this to skip the TTS-dwell pin
+     * when no TTS engine is installed (Bluestacks pattern); without it the
+     * walker stalls for the 180s safety cap because deferred queue entries
+     * never drain.
+     */
+    val isTtsReady: Boolean get() = ttsReady
+
     /** Cached Voice objects by ID for fast switching */
     private val voiceCache = mutableMapOf<String, android.speech.tts.Voice>()
 

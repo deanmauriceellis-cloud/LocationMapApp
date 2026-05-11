@@ -2154,12 +2154,28 @@ class SalemMainActivity : AppCompatActivity() {
                 // narration queue has any item, freeze the walker until
                 // both drain. Newspaper (Oracle 1692) dispatches are
                 // ambient and do not pin the walker.
+                //
+                // S244: skip the dwell entirely when no TTS engine is
+                // available. NarrationManager defers enqueues while
+                // ttsReady=false, which leaves the queue non-empty and the
+                // state Speaking even though nothing will ever play — the
+                // dwell loop would then sit until WALK_SIM_DWELL_MAX_MS
+                // (180s) and exit via the safety cap. Bluestacks ships
+                // without Google TTS; same defence covers any device with a
+                // failed TTS init.
+                val ttsReady = tourViewModel.isTtsReady()
                 val initialState = tourViewModel.narrationState.value
                 val initialSeg = (initialState as? com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking)?.segment
                 val initialNewspaper = initialSeg?.id?.startsWith("newspaper_1692_") == true
                 val initialPoiSpeaking = initialState is com.example.wickedsalemwitchcitytour.tour.NarrationState.Speaking && !initialNewspaper
                 val initialQueueNonEmpty = narrationQueue.isNotEmpty()
-                if (initialPoiSpeaking || initialQueueNonEmpty) {
+                if (!ttsReady && (initialPoiSpeaking || initialQueueNonEmpty)) {
+                    DebugLogger.w("WALK-SIM",
+                        "DWELL skipped at step $stepIdx — TTS engine not ready " +
+                        "(state=$initialState queueSize=${narrationQueue.size}); " +
+                        "walker would deadlock until safety cap")
+                }
+                if (ttsReady && (initialPoiSpeaking || initialQueueNonEmpty)) {
                     ttsDwellCount++
                     val dwellStart = System.currentTimeMillis()
                     val narratingAtStart = currentNarration?.name ?: "none"
