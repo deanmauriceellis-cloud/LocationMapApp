@@ -98,6 +98,7 @@ class NarrationManager @Inject constructor(
             val result = tts?.setLanguage(Locale.US)
             ttsReady = result != TextToSpeech.LANG_MISSING_DATA &&
                        result != TextToSpeech.LANG_NOT_SUPPORTED
+            DebugLogger.i(TAG, "ttsReady ← $ttsReady (onInit SUCCESS, setLanguage result=$result)")
             tts?.setSpeechRate(speechRate)
 
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -176,7 +177,7 @@ class NarrationManager @Inject constructor(
             }
         } else {
             ttsReady = false
-            DebugLogger.e(TAG, "TTS init failed: status=$status")
+            DebugLogger.e(TAG, "TTS init failed: status=$status — ttsReady ← false")
         }
     }
 
@@ -185,6 +186,7 @@ class NarrationManager @Inject constructor(
         tts?.shutdown()
         tts = null
         ttsReady = false
+        DebugLogger.i(TAG, "ttsReady ← false (shutdown)")
         DebugLogger.i(TAG, "TTS shutdown")
     }
 
@@ -347,11 +349,14 @@ class NarrationManager @Inject constructor(
     // ── Playback Controls ───────────────────────────────────────────────
 
     fun pause() {
-        if (_state.value is NarrationState.Speaking) {
+        val s = _state.value
+        if (s is NarrationState.Speaking) {
             intentionallyStopping = true
             tts?.stop()
             _state.value = NarrationState.Paused(currentSegment)
-            DebugLogger.i(TAG, "Paused")
+            DebugLogger.i(TAG, "Paused — segment=${currentSegment?.id}")
+        } else {
+            DebugLogger.d(TAG, "pause() refused — state=${s::class.simpleName} (not Speaking)")
         }
     }
 
@@ -360,10 +365,14 @@ class NarrationManager @Inject constructor(
         if (state is NarrationState.Paused) {
             val segment = state.segment
             if (segment != null) {
+                DebugLogger.i(TAG, "resume() — speaking paused segment=${segment.id}")
                 speak(segment)
             } else {
+                DebugLogger.i(TAG, "resume() — paused segment was null, draining queue")
                 playNext()
             }
+        } else {
+            DebugLogger.d(TAG, "resume() refused — state=${state::class.simpleName} (not Paused)")
         }
     }
 
@@ -475,8 +484,12 @@ class NarrationManager @Inject constructor(
         }
 
         // If nothing is playing, start immediately
-        if (_state.value is NarrationState.Idle) {
+        val stateNow = _state.value
+        if (stateNow is NarrationState.Idle) {
+            DebugLogger.d(TAG, "enqueue → playNext (state=Idle, segment=${segment.id})")
             playNext()
+        } else {
+            DebugLogger.d(TAG, "enqueue queued behind current (state=${stateNow::class.simpleName}, queue=${queue.size}, current=${currentSegment?.id})")
         }
     }
 

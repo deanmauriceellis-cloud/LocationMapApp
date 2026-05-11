@@ -259,16 +259,28 @@ class NarrationGeofenceManager @Inject constructor(
     private fun isHistoricalQualified(point: SalemPoi): Boolean {
         // S217 — "Show All POIs" FAB override. When the operator turns the
         // FAB on, ALL POIs narrate regardless of tour/layers/historical gates.
-        if (com.example.wickedsalemwitchcitytour.audio.AudioControl.isShowAllOverride()) return true
-        if (point.isTourPoi) return true
-        if (tourMode) return isTourEligible(point)
+        if (com.example.wickedsalemwitchcitytour.audio.AudioControl.isShowAllOverride()) {
+            logQualified(point, true, "showAllOverride"); return true
+        }
+        if (point.isTourPoi) {
+            logQualified(point, true, "isTourPoi"); return true
+        }
+        if (tourMode) {
+            val eligible = isTourEligible(point)
+            logQualified(point, eligible, "tourMode→isTourEligible"); return eligible
+        }
         if (historicalMode) {
-            if (point.id in historicalAllowedIds) return true
+            if (point.id in historicalAllowedIds) {
+                logQualified(point, true, "historicalMode→allowedId"); return true
+            }
             // S216: historical_note dropped — gate on historical_narration
             // (the strict pre-1860 audio script) instead. POIs with no pre-1860
             // narration authored fall through to the categorical check.
-            if (point.historicalNarration.isNullOrBlank()) return false
-            return isCategoricallyHistorical(point)
+            if (point.historicalNarration.isNullOrBlank()) {
+                logQualified(point, false, "historicalMode→no historical_narration"); return false
+            }
+            val cat = isCategoricallyHistorical(point)
+            logQualified(point, cat, "historicalMode→categoricallyHistorical=$cat"); return cat
         }
         // Pure explore mode — Layers checkboxes gate the hist-landmark and
         // civic classes. S216 split: HISTORICAL_LANDMARKS (MASSGIS-only,
@@ -277,10 +289,32 @@ class NarrationGeofenceManager @Inject constructor(
         // is_historical_property flag is no longer the explore-mode gate
         // criterion — it's still useful as metadata but spans both
         // categories now.
-        if (point.category == "HISTORICAL_LANDMARKS") return exploreAllowHistLandmarks
-        if (point.isCivicPoi) return exploreAllowCivic
-        return true
+        if (point.category == "HISTORICAL_LANDMARKS") {
+            logQualified(point, exploreAllowHistLandmarks, "explore→HIST_LANDMARK layer=$exploreAllowHistLandmarks"); return exploreAllowHistLandmarks
+        }
+        if (point.isCivicPoi) {
+            logQualified(point, exploreAllowCivic, "explore→civic layer=$exploreAllowCivic"); return exploreAllowCivic
+        }
+        logQualified(point, true, "explore→default-allow"); return true
     }
+
+    private fun logQualified(point: SalemPoi, allowed: Boolean, path: String) {
+        if (!com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) return
+        // Throttle: per-POI per-state, one log per 30s. Tight loops over the
+        // entire POI table would otherwise produce ~2000 lines per checkPosition.
+        val now = android.os.SystemClock.uptimeMillis()
+        val key = point.id + (if (allowed) ":Y" else ":N")
+        val last = qualifiedLogAt[key] ?: 0L
+        if (now - last < 30_000L) return
+        qualifiedLogAt[key] = now
+        com.example.locationmapapp.util.DebugLogger.d(
+            "NARR-GATE",
+            "${point.name} (${point.id}) allowed=$allowed via $path " +
+                "[tourMode=$tourMode histMode=$historicalMode]",
+        )
+    }
+
+    private val qualifiedLogAt = mutableMapOf<String, Long>()
 
     /**
      * Does this POI qualify for MAP VISIBILITY under historical mode?
@@ -612,6 +646,15 @@ class NarrationGeofenceManager @Inject constructor(
                         ))
                     } else {
                         skippedCooldown++
+                        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                            val cdElapsed = now - (cooldowns[point.id] ?: 0L)
+                            val cdRemaining = (COOLDOWN_MS - cdElapsed).coerceAtLeast(0L)
+                            com.example.locationmapapp.util.DebugLogger.d(
+                                "NARR-GEO",
+                                "cooldown skip: ${point.name} dist=${distanceM.toInt()}m " +
+                                    "cooldownRemaining=${cdRemaining}ms (of ${COOLDOWN_MS}ms)",
+                            )
+                        }
                     }
                 }
                 // APPROACH: within 2x geofence radius
@@ -673,19 +716,41 @@ class NarrationGeofenceManager @Inject constructor(
      * 15m/25m behavior applies.
      */
     fun findNearestUnnarrated(overrideRadiusM: Double? = null): NearbyPoint? {
-        if (lastLat == 0.0 && lastLng == 0.0) return null
+        if (lastLat == 0.0 && lastLng == 0.0) {
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                com.example.locationmapapp.util.DebugLogger.d(
+                    "NARR-REACH",
+                    "findNearestUnnarrated: no lastLat/lng yet → null",
+                )
+            }
+            return null
+        }
 
         val radius = overrideRadiusM ?: if (walkSimMode) REACH_RADIUS_WALKSIM_M else REACH_RADIUS_M
         val now = System.currentTimeMillis()
 
+        var totalConsidered = 0
+        var filteredNarrated = 0
+        var filteredHistGate = 0
+        var filteredRadius = 0
+
         val candidates = mutableListOf<NearbyPoint>()
         for (point in points) {
-            if (isNarrated(point.id, now)) continue
-            if (!isHistoricalQualified(point)) continue // 9R.0: silence modern POIs in reach-out too
+            totalConsidered++
+            if (isNarrated(point.id, now)) { filteredNarrated++; continue }
+            if (!isHistoricalQualified(point)) { filteredHistGate++; continue } // 9R.0: silence modern POIs in reach-out too
             val dist = haversine(lastLat, lastLng, point.lat, point.lng)
-            if (dist <= radius) {
-                candidates.add(NearbyPoint(point, dist))
-            }
+            if (dist > radius) { filteredRadius++; continue }
+            candidates.add(NearbyPoint(point, dist))
+        }
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.d(
+                "NARR-REACH",
+                "findNearestUnnarrated radius=${radius.toInt()}m " +
+                    "considered=$totalConsidered alreadyNarrated=$filteredNarrated " +
+                    "gateRejected=$filteredHistGate outOfRadius=$filteredRadius " +
+                    "candidates=${candidates.size}",
+            )
         }
         if (candidates.isEmpty()) return null
 
