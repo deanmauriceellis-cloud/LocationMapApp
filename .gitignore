@@ -43,6 +43,9 @@ tools/hero-image-gen/__pycache__/
 # Cache-proxy intermediate outputs (S157 L3 ingest NDJSON ~920 MB, logs, checkpoints)
 cache-proxy/out/
 
+# S241: mass-edit spreadsheet upload tmp dir (multer dest). Files deleted post-parse.
+cache-proxy/tmp/
+
 # Bake test logs — large, regenerable
 docs/bake-tests/
 

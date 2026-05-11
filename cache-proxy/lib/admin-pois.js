@@ -1209,6 +1209,8 @@ module.exports = function(app, deps) {
   });
 };
 
-// Exposed for unit tests / introspection
+// Exposed for unit tests / introspection / cross-module reuse (S241 mass-edit)
 module.exports.UPDATABLE_FIELDS = UPDATABLE_FIELDS;
+module.exports.JSONB_FIELDS = JSONB_FIELDS;
+module.exports.buildUpdateClause = buildUpdateClause;
 module.exports.JSONB_FIELDS = JSONB_FIELDS;

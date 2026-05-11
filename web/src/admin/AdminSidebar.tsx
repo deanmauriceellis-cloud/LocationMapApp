@@ -23,6 +23,7 @@ export type AdminView =
   | 'geocodes'
   | 'audit'
   | 'field-edits'
+  | 'mass-edit'
   | 'splash-tree'
 
 interface SidebarItem {
@@ -59,6 +60,7 @@ const GROUPS: SidebarGroup[] = [
     name: 'Tooling',
     items: [
       { id: 'splash-tree',  label: 'Splash Tree',  icon: '🌳', title: 'Splash announcement decision tree authoring' },
+      { id: 'mass-edit',    label: 'Mass Edit',    icon: '📊', title: 'Bulk POI edits via .xlsx round-trip with per-cell review' },
     ],
   },
 ]

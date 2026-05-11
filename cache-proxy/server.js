@@ -207,6 +207,12 @@ deps.salemRouteEx = salemRouterModule._routeEx;
 // Admin (depends on import + overpass state)
 require('./lib/admin')(app, deps);
 
+// Admin Mass-Edit endpoints (S241) — registered BEFORE admin-pois.js so the
+// exact-match /admin/salem/pois/export-spreadsheet route wins over admin-pois's
+// generic GET /admin/salem/pois/:id pattern (Express tries handlers in
+// registration order).
+require('./lib/admin-mass-edit')(app, deps);
+
 // Admin POI write endpoints (Phase 9P.4) — gated by /admin Basic Auth
 require('./lib/admin-pois')(app, deps);
 
