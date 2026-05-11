@@ -144,6 +144,10 @@ class FireflyOverlay(
         phase = (phase + dt / cycleMs) % 1.0
     }
 
+    // S243 — verbose per-frame stats. 1Hz summary emit only.
+    private var drawFrameCount = 0L
+    private var lastSummaryAtMs = 0L
+
     override fun draw(canvas: Canvas, camera: CameraState) {
         if (flies.isEmpty()) return
 
@@ -162,14 +166,27 @@ class FireflyOverlay(
         // cemetery has its OWN independent pulse phase — no polygon-wide
         // burst gating. Many small isolated fireflies, each on its own
         // rhythm, is the right read for a haunted graveyard.
+        var visiblePolys = 0
         var anyVisible = false
         for (i in polygons.indices) {
             val visible = polyMaxLat[i] >= vMinLat && polyMinLat[i] <= vMaxLat &&
                 polyMaxLon[i] >= vMinLon && polyMinLon[i] <= vMaxLon
             polyVisible[i] = visible
-            if (visible) anyVisible = true
+            if (visible) { anyVisible = true; visiblePolys++ }
         }
-        if (!anyVisible) return
+        if (!anyVisible) {
+            drawFrameCount++
+            val now = android.os.SystemClock.uptimeMillis()
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG &&
+                now - lastSummaryAtMs >= 1_000L) {
+                lastSummaryAtMs = now
+                com.example.locationmapapp.util.DebugLogger.d(
+                    "Firefly",
+                    "frame=$drawFrameCount flies=${flies.size} visiblePolys=0/${polygons.size} (no cemetery in view)",
+                )
+            }
+            return
+        }
 
         clipPath.rewind()
         for (i in polygons.indices) {
@@ -192,8 +209,13 @@ class FireflyOverlay(
         canvas.save()
         canvas.clipPath(clipPath)
 
+        var polyHiddenCulled = 0
+        var intensityCulled = 0
+        var viewportCulled = 0
+        var drawn = 0
+
         for (k in flies.indices) {
-            if (!polyVisible[flyPolyIdx[k]]) continue
+            if (!polyVisible[flyPolyIdx[k]]) { polyHiddenCulled++; continue }
             val f = flies[k]
             val local = (phase * f.speed + f.phaseOffset) % 1.0
 
@@ -203,7 +225,7 @@ class FireflyOverlay(
             // off-phase comes from the < 0.05 cull below.
             val s = sin(local * Math.PI * 2) * 0.5 + 0.5
             val intensity = s
-            if (intensity < 0.05) continue
+            if (intensity < 0.05) { intensityCulled++; continue }
 
             val proj = camera.project(f.lat, f.lon)
             // Drift: small smooth motion, constant speed across cycle.
@@ -211,7 +233,7 @@ class FireflyOverlay(
             val cx = proj[0] + cos(f.driftAngleRad).toFloat() * driftFrac * f.driftPx
             val cy = proj[1] + sin(f.driftAngleRad).toFloat() * driftFrac * f.driftPx
             if (cx < -10f || cx > camera.viewportW + 10f ||
-                cy < -10f || cy > camera.viewportH + 10f) continue
+                cy < -10f || cy > camera.viewportH + 10f) { viewportCulled++; continue }
 
             // Halo (yellow-green) at moderate alpha, bright white-yellow core
             // at high alpha for the "spark" look.
@@ -219,9 +241,23 @@ class FireflyOverlay(
             canvas.drawCircle(cx, cy, f.haloRadiusPx, haloPaint)
             corePaint.alpha = (intensity * 255).toInt().coerceIn(0, 255)
             canvas.drawCircle(cx, cy, f.coreRadiusPx, corePaint)
+            drawn++
         }
 
         canvas.restore()
+        drawFrameCount++
+
+        val nowMs = android.os.SystemClock.uptimeMillis()
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG &&
+            nowMs - lastSummaryAtMs >= 1_000L) {
+            lastSummaryAtMs = nowMs
+            com.example.locationmapapp.util.DebugLogger.d(
+                "Firefly",
+                "frame=$drawFrameCount flies=${flies.size} drawn=$drawn polyHidden=$polyHiddenCulled " +
+                    "intensityCulled=$intensityCulled viewportCulled=$viewportCulled " +
+                    "visiblePolys=$visiblePolys/${polygons.size}",
+            )
+        }
     }
 
     private fun pointInRing(

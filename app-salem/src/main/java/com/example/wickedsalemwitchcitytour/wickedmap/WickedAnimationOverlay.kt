@@ -6,6 +6,7 @@
 package com.example.wickedsalemwitchcitytour.wickedmap
 
 import android.graphics.Canvas
+import com.example.locationmapapp.util.DebugLogger
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 
@@ -34,6 +35,23 @@ class WickedAnimationOverlay(
 
     private var nextFrameAtMs = 0L
 
+    /** Exposed for MapDebugDumper. Read-only view of the wrapped overlays. */
+    fun innerOverlays(): List<MapOverlay> = overlays
+
+    /**
+     * Per-inner-overlay error suppression. Each inner overlay logs its first
+     * draw exception once, then is skipped silently on subsequent frames so a
+     * broken overlay doesn't bury the TCP collector under 30 fps of identical
+     * stack traces. Cleared only on app restart.
+     */
+    private val failedOverlays = HashSet<Class<*>>()
+
+    // S243 — extreme-verbose 1 Hz frame summary so the operator can see the
+    // bridge is alive + which inner overlays drew + suppressed-error count.
+    private var frameCounter = 0L
+    private var lastSummaryAtMs = 0L
+    private val summaryIntervalMs = 1_000L
+
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
         if (overlays.isEmpty()) return
@@ -50,9 +68,36 @@ class WickedAnimationOverlay(
         if (camera.viewportW <= 0 || camera.viewportH <= 0) return
 
         val now = android.os.SystemClock.uptimeMillis()
+        val drewThisFrame = ArrayList<String>(overlays.size)
         for (overlay in overlays) {
-            overlay.tick(now)
-            overlay.draw(canvas, camera)
+            val cls = overlay.javaClass
+            if (cls in failedOverlays) continue
+            try {
+                overlay.tick(now)
+                overlay.draw(canvas, camera)
+                drewThisFrame.add(cls.simpleName)
+            } catch (t: Throwable) {
+                failedOverlays.add(cls)
+                DebugLogger.e(
+                    "WickedAnimationOverlay",
+                    "draw() failed for ${cls.simpleName} — suppressing future frames: ${t.message}",
+                    t,
+                )
+            }
+        }
+        frameCounter++
+
+        // 1 Hz summary — bridge heartbeat with inner-overlay roster + error count.
+        if (now - lastSummaryAtMs >= summaryIntervalMs) {
+            lastSummaryAtMs = now
+            DebugLogger.d(
+                "WickedAnimSummary",
+                "frame=$frameCounter drew=$drewThisFrame failed=${failedOverlays.size} " +
+                    "zoom=${"%.2f".format(camera.zoom)} " +
+                    "center=${"%.5f".format(camera.centerLat)},${"%.5f".format(camera.centerLon)} " +
+                    "orient=${"%.1f".format(camera.mapOrientationDeg)}° " +
+                    "viewport=${camera.viewportW}x${camera.viewportH}",
+            )
         }
 
         // Throttle: only schedule the next invalidate after frameIntervalMs.

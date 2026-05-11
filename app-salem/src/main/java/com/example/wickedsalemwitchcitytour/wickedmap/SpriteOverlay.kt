@@ -395,7 +395,13 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
         }
         val result = if (loaded > 0) frames else null
         spriteFrames[id] = result
-        DebugLogger.i(TAG, "loaded sprite '$id' frames=$loaded/$FRAME_COUNT")
+        val totalBytes = frames.sumOf { it?.allocationByteCount ?: 0 }
+        val firstFrame = frames.firstOrNull { it != null }
+        val dim = if (firstFrame != null) "${firstFrame.width}x${firstFrame.height}" else "n/a"
+        DebugLogger.i(
+            TAG,
+            "loaded sprite '$id' frames=$loaded/$FRAME_COUNT total_bytes=$totalBytes first_size_px=$dim",
+        )
         return result
     }
 

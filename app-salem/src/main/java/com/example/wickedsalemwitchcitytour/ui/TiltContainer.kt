@@ -224,6 +224,12 @@ class TiltContainer @JvmOverloads constructor(
                 mv.layoutParams = lp
                 clipChildren = savedClipChildren
                 extraTopPx = 0
+                if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                    com.example.locationmapapp.util.DebugLogger.d(
+                        TAG,
+                        "applyMapExtension RESTORE: tilt=0° lp.height=${lp.height} topMargin=${lp.topMargin} extraTopPx=0",
+                    )
+                }
             }
             return
         }
@@ -231,6 +237,7 @@ class TiltContainer @JvmOverloads constructor(
         val targetExtra = (containerH * EXTRA_TOP_FRACTION).toInt()
         if (targetExtra == extraTopPx) return
 
+        val mvHBefore = mv.height
         if (extraTopPx == 0) {
             // First entry into tilted state — capture flat-mode params for restore.
             savedMapHeight = lp.height
@@ -251,6 +258,14 @@ class TiltContainer @JvmOverloads constructor(
         // unextended mv.height (=684 in the S238 debug strip) and pass-1
         // tile-fetch under-reaches. requestLayout() collapses the race.
         mv.requestLayout()
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.d(
+                TAG,
+                "applyMapExtension EXTEND: tilt=${tiltDeg.toInt()}° containerH=$containerH " +
+                    "targetExtra=${targetExtra}px lp.height=${lp.height} topMargin=${lp.topMargin} " +
+                    "mv.height_before=$mvHBefore (post-requestLayout pending next measure)",
+            )
+        }
     }
 
     override fun dispatchDraw(canvas: Canvas) {

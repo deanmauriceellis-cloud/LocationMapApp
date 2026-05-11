@@ -60,6 +60,21 @@
         android:title="Debug Log Viewer"
         app:showAsAction="never" />
 
+    <!-- S243: dump every map overlay's state to DebugLogger / TCP stream.
+         Operator-driven, used when a visual glitch needs remote diagnosis. -->
+    <item
+        android:id="@+id/menu_util_debug_dump_map"
+        android:title="Dump Map Overlays (Debug)"
+        app:showAsAction="never" />
+
+    <!-- S243: jump straight into the Android TTS settings screen.
+         Bluestacks's stripped system UI doesn't surface Accessibility/TTS,
+         so we fire the Intent directly. -->
+    <item
+        android:id="@+id/menu_util_debug_open_tts"
+        android:title="Open TTS Settings (Debug)"
+        app:showAsAction="never" />
+
     <!-- GPS mode toggle (existing feature) -->
     <item
         android:id="@+id/menu_util_gps_mode"

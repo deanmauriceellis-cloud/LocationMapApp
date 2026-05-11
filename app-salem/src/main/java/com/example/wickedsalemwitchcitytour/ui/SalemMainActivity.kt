@@ -36,6 +36,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.wickedsalemwitchcitytour.BuildConfig
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -317,6 +319,9 @@ class SalemMainActivity : AppCompatActivity() {
      *  explicitly. lifecycleScope cancels on its own; this just makes the
      *  while(true) loop's lifecycle ownership readable. */
     private var gpsObsHeartbeatJob: kotlinx.coroutines.Job? = null
+
+    /** S243: auto-dump every 10s while resumed. Debug-only. */
+    private var autoDumpJob: kotlinx.coroutines.Job? = null
 
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
@@ -991,6 +996,8 @@ class SalemMainActivity : AppCompatActivity() {
         motionTracker?.start()
         katrinaCameraManager.onResume()
         if (BuildDefaults.GPS_BURST_ENABLED) gpsBurstCameraManager.onResume()
+        // S243 — extreme-verbose: auto-dump every 10s while resumed. Debug-only.
+        if (BuildConfig.DEBUG) startAutoMapDump()
         DebugLogger.i("SalemMainActivity","onResume()")
     }
     override fun onPause() {
@@ -1007,6 +1014,8 @@ class SalemMainActivity : AppCompatActivity() {
         motionTracker?.stop()
         katrinaCameraManager.onPause()
         if (BuildDefaults.GPS_BURST_ENABLED) gpsBurstCameraManager.onPause()
+        // S243 — stop the verbose auto-dump while paused.
+        stopAutoMapDump()
         DebugLogger.i("SalemMainActivity","onPause()")
     }
     override fun onDestroy() {
@@ -1457,6 +1466,31 @@ class SalemMainActivity : AppCompatActivity() {
         map.postDelayed({
             showWelcomeDialog()
         }, 2300L)
+    }
+
+    /**
+     * S243 — periodic map-state dump while the activity is in onResume.
+     * Debug-only; gated at the call site in onResume(). 10s interval keeps
+     * the TCP collector stream rich without flooding it.
+     */
+    private fun startAutoMapDump() {
+        if (autoDumpJob?.isActive == true) return
+        autoDumpJob = lifecycleScope.launch {
+            DebugLogger.i("MapDump", "auto-dump scheduler started (10s interval)")
+            while (isActive) {
+                kotlinx.coroutines.delay(10_000L)
+                try {
+                    com.example.wickedsalemwitchcitytour.wickedmap.MapDebugDumper.dumpAll(binding.mapView)
+                } catch (t: Throwable) {
+                    DebugLogger.w("MapDump", "auto-dump tick failed: ${t.message}")
+                }
+            }
+        }
+    }
+
+    private fun stopAutoMapDump() {
+        autoDumpJob?.cancel()
+        autoDumpJob = null
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1934,6 +1968,9 @@ class SalemMainActivity : AppCompatActivity() {
         binding.btnWalkSim.text = "Stop"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_button_active_bg)
         DebugLogger.i("SalemMainActivity", "Walk sim started: '$routeLabel' — ${routePoints.size} route points (narration history preserved)")
+        if (BuildConfig.DEBUG) {
+            com.example.wickedsalemwitchcitytour.wickedmap.MapDebugDumper.dumpNow(binding.mapView, "walk-sim-start:$routeLabel")
+        }
 
         walkSimJob = lifecycleScope.launch {
             // S125: hold a PARTIAL wake lock for the whole walk so the CPU
@@ -2160,6 +2197,9 @@ class SalemMainActivity : AppCompatActivity() {
         binding.btnWalkSim.text = "Walk"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
         DebugLogger.i("SalemMainActivity", "Walk sim stopped")
+        if (BuildConfig.DEBUG) {
+            com.example.wickedsalemwitchcitytour.wickedmap.MapDebugDumper.dumpNow(binding.mapView, "walk-sim-stop")
+        }
         toast("Walk stopped")
     }
 
@@ -4437,6 +4477,35 @@ class SalemMainActivity : AppCompatActivity() {
         override fun onDebugLogRequested() {
             DebugLogger.i("SalemMainActivity", "onDebugLogRequested")
             startActivity(Intent(this@SalemMainActivity, DebugLogActivity::class.java))
+        }
+
+        override fun onDebugDumpMapRequested() {
+            DebugLogger.i("SalemMainActivity", "onDebugDumpMapRequested — snapshotting overlay state")
+            com.example.wickedsalemwitchcitytour.wickedmap.MapDebugDumper.dumpAll(binding.mapView)
+        }
+
+        override fun onDebugOpenTtsSettingsRequested() {
+            DebugLogger.i("SalemMainActivity", "onDebugOpenTtsSettingsRequested — launching system TTS settings")
+            // Try the explicit TTS settings activity first; fall back to the
+            // generic accessibility screen; if even that fails, log it.
+            val attempts = listOf(
+                Intent("com.android.settings.TTS_SETTINGS").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+                Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
+            for (intent in attempts) {
+                try {
+                    startActivity(intent)
+                    DebugLogger.i("SalemMainActivity", "TTS settings opened via ${intent.action}")
+                    return
+                } catch (e: Exception) {
+                    DebugLogger.w("SalemMainActivity", "TTS-settings intent ${intent.action} failed: ${e.message}")
+                }
+            }
+            DebugLogger.e("SalemMainActivity", "All TTS-settings intents failed — Bluestacks may have stripped the Settings activity entirely")
         }
 
         override fun onAutoFollowAircraftToggled(enabled: Boolean) {

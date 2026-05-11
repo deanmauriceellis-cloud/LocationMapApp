@@ -30,9 +30,17 @@ object PolygonLibrary {
     private val byKind: MutableMap<String, MutableList<WickedPolygon>> = HashMap()
     private var loaded = false
 
+    // S243 — verbose parse diagnostics. Sums across the entire load() pass so
+    // the final summary tells the operator about silent ring drops + unknown
+    // geometry types. Surfaced via DebugLogger (hits TCP stream).
+    private var ringsSkippedTooShort = 0
+    private var unknownGeometryTypes = 0
+
     fun load(context: Context) {
         if (loaded) return
         val started = System.currentTimeMillis()
+        ringsSkippedTooShort = 0
+        unknownGeometryTypes = 0
 
         val raw = try {
             context.assets.open(ASSET_PATH).bufferedReader().use { it.readText() }
@@ -81,7 +89,12 @@ object PolygonLibrary {
         loaded = true
         val elapsed = System.currentTimeMillis() - started
         val summary = byKind.entries.joinToString(", ") { "${it.key}=${it.value.size}" }
-        Log.i(TAG, "loaded $added polygons in ${elapsed}ms ($summary), skipped=$skipped")
+        val msg = "loaded $added polygons in ${elapsed}ms ($summary), skipped=$skipped " +
+            "ringsSkippedTooShort=$ringsSkippedTooShort unknownGeometryTypes=$unknownGeometryTypes"
+        Log.i(TAG, msg)
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.i("PolygonLibrary", msg)
+        }
     }
 
     fun byKind(kind: String): List<WickedPolygon> = byKind[kind].orEmpty()
@@ -121,7 +134,16 @@ object PolygonLibrary {
                 }
                 out
             }
-            else -> emptyList()
+            else -> {
+                unknownGeometryTypes++
+                if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                    com.example.locationmapapp.util.DebugLogger.w(
+                        "PolygonLibrary",
+                        "unknown geometry type='$type' coords.length=${coords.length()}",
+                    )
+                }
+                emptyList()
+            }
         }
     }
 
@@ -139,7 +161,11 @@ object PolygonLibrary {
                     pts.add(lat to lon)
                 }
             }
-            if (pts.size >= 3) out.add(pts)
+            if (pts.size >= 3) {
+                out.add(pts)
+            } else if (pts.isNotEmpty()) {
+                ringsSkippedTooShort++
+            }
         }
         return out
     }

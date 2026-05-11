@@ -124,6 +124,10 @@ class RollingGrassOverlay(
 
     private var lastTimeMs = 0L
 
+    // S243 — verbose per-frame stats. 1Hz summary emit only.
+    private var frameCount = 0L
+    private var lastSummaryAtMs = 0L
+
     override fun tick(frameTimeMs: Long) {
         lastTimeMs = frameTimeMs
     }
@@ -137,6 +141,11 @@ class RollingGrassOverlay(
         val h = camera.viewportH.toFloat()
         val margin = 16f
 
+        var dutyCulled = 0
+        var intensityCulled = 0
+        var viewportCulled = 0
+        var drawn = 0
+
         var i = 0
         while (i < anchors.size) {
             val lat = anchors[i].toDouble()
@@ -146,16 +155,16 @@ class RollingGrassOverlay(
 
             val phaseOffsetMs = (phase * cycleMs.toFloat()).toLong()
             val cycleTime = (now + phaseOffsetMs) % cycleMs
-            if (cycleTime >= activeMs) continue
+            if (cycleTime >= activeMs) { dutyCulled++; continue }
             val activePhase = cycleTime / activeMs.toDouble()
             val s = sin(activePhase * piConst)
             val intensity = (s * s).toFloat()
-            if (intensity < 0.05f) continue
+            if (intensity < 0.05f) { intensityCulled++; continue }
 
             val proj = camera.project(lat, lon)
             val cx = proj[0]
             val cy = proj[1]
-            if (cx < -margin || cx > w + margin || cy < -margin || cy > h + margin) continue
+            if (cx < -margin || cx > w + margin || cy < -margin || cy > h + margin) { viewportCulled++; continue }
 
             bladePaint.alpha = (intensity * 230).toInt().coerceIn(0, 255)
 
@@ -164,6 +173,19 @@ class RollingGrassOverlay(
             val height = 6f + intensity * 4f
             val bend = (intensity - 0.5f) * 5f  // -2.5 → +2.5 across cycle
             canvas.drawLine(cx, cy, cx + bend, cy - height, bladePaint)
+            drawn++
+        }
+        frameCount++
+
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG &&
+            now - lastSummaryAtMs >= 1_000L) {
+            lastSummaryAtMs = now
+            com.example.locationmapapp.util.DebugLogger.d(
+                "RollingGrass",
+                "frame=$frameCount anchors=$anchorCount drawn=$drawn dutyCulled=$dutyCulled " +
+                    "intensityCulled=$intensityCulled viewportCulled=$viewportCulled " +
+                    "viewport=${w.toInt()}x${h.toInt()}",
+            )
         }
     }
 

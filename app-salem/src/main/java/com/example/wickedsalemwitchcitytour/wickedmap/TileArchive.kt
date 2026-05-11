@@ -32,10 +32,30 @@ class TileArchive(archiveFile: File, private val provider: String = "Salem-Custo
 
     private val missing = HashSet<Long>()
 
+    // S243 — periodic-summary verbose stats. Per-call logging would flood the
+    // collector (30+ tile lookups per frame); we aggregate and emit once per
+    // 5s instead. Debug-gated.
+    private var hits = 0L
+    private var decoded = 0L
+    private var decodedBytes = 0L
+    private var nullDecodes = 0L
+    private var missingHits = 0L
+    private var lastSummaryAtMs = 0L
+
     fun tile(z: Int, x: Int, y: Int): Bitmap? {
         val key = MercatorMath.osmdroidKey(z, x, y)
-        cache.get(key)?.let { return it }
-        synchronized(missing) { if (missing.contains(key)) return null }
+        cache.get(key)?.let {
+            hits++
+            maybeLogSummary()
+            return it
+        }
+        synchronized(missing) {
+            if (missing.contains(key)) {
+                missingHits++
+                maybeLogSummary()
+                return null
+            }
+        }
 
         val cursor = db.rawQuery(
             "SELECT tile FROM tiles WHERE key = ? AND provider = ? LIMIT 1",
@@ -47,14 +67,39 @@ class TileArchive(archiveFile: File, private val provider: String = "Salem-Custo
                 val bmp = BitmapFactory.decodeByteArray(blob, 0, blob.size)
                 if (bmp != null) {
                     cache.put(key, bmp)
+                    decoded++
+                    decodedBytes += bmp.allocationByteCount.toLong()
+                    maybeLogSummary()
                     return bmp
+                } else {
+                    nullDecodes++
+                    if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                        com.example.locationmapapp.util.DebugLogger.w(
+                            "TileArchive",
+                            "decode returned null z=$z x=$x y=$y blobSize=${blob.size}",
+                        )
+                    }
                 }
             }
         } finally {
             cursor.close()
         }
         synchronized(missing) { missing.add(key) }
+        maybeLogSummary()
         return null
+    }
+
+    private fun maybeLogSummary() {
+        if (!com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastSummaryAtMs < 5_000L) return
+        lastSummaryAtMs = now
+        com.example.locationmapapp.util.DebugLogger.d(
+            "TileArchive",
+            "cache hits=$hits decoded=$decoded ($decodedBytes B) nullDecodes=$nullDecodes " +
+                "missingHits=$missingHits cacheSize=${cache.size()}/${cache.maxSize()} " +
+                "missingKeys=${synchronized(missing) { missing.size }}",
+        )
     }
 
     fun close() {

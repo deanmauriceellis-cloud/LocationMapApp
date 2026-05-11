@@ -173,6 +173,12 @@ interface MenuEventListener {
     /** Open in-app DebugLogActivity. */
     fun onDebugLogRequested()
 
+    /** Dump every map overlay's state to DebugLogger (TCP stream + daily file). */
+    fun onDebugDumpMapRequested() {}
+
+    /** Launch Android system TTS settings — for Bluestacks where the system UI is stripped. */
+    fun onDebugOpenTtsSettingsRequested() {}
+
     /** Auto-follow random high-altitude aircraft every 20 min for POI cache building. */
     fun onAutoFollowAircraftToggled(enabled: Boolean)
 

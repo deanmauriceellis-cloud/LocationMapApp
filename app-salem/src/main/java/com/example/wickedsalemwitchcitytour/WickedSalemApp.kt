@@ -13,6 +13,7 @@ import android.app.Application
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import com.example.wickedsalemwitchcitytour.util.SplashVoice
+import com.example.wickedsalemwitchcitytour.util.TcpLogStreamer
 import dagger.hilt.android.HiltAndroidApp
 import org.osmdroid.config.Configuration
 import androidx.preference.PreferenceManager
@@ -31,6 +32,13 @@ class WickedSalemApp : Application() {
         //    drive bug investigation. Pull with `adb pull` after a session.
         DebugLogger.initFileSink(applicationContext)
         DebugLogger.i("WickedSalemApp", "onCreate — file sink wired up")
+
+        // 0a. Debug-only TCP log streamer → collector PC running `nc -lk 4301`.
+        //     Debug builds only — release/AAB must stay V1-offline per
+        //     memory feedback_v1_no_external_contact.md.
+        if (BuildConfig.DEBUG) {
+            TcpLogStreamer.start()
+        }
 
         // 1. Set osmdroid base path in prefs BEFORE load() picks it up.
         //    Ensures scoped storage compatibility on Android 10+.

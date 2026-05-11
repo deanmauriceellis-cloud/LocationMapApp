@@ -976,8 +976,16 @@ class AppBarMenuManager(
             popup.menu.removeItem(R.id.menu_util_populate_pois)       // dev
             popup.menu.removeItem(R.id.menu_util_probe_10km)          // dev / online
             popup.menu.removeItem(R.id.menu_util_fill_probe)          // dev stub
-            popup.menu.removeItem(R.id.menu_util_debug_log)           // dev
-            popup.menu.removeItem(R.id.menu_util_silent_fill_debug)   // dev
+            // S243 — debug-only diagnostics kept visible in debug builds even
+            // under V1_OFFLINE_ONLY. Operator needs the dump-map button +
+            // direct TTS-settings shortcut on Bluestacks where the system
+            // Settings UI is stripped.
+            if (!com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                popup.menu.removeItem(R.id.menu_util_debug_log)           // dev
+                popup.menu.removeItem(R.id.menu_util_debug_dump_map)      // dev
+                popup.menu.removeItem(R.id.menu_util_debug_open_tts)      // dev
+                popup.menu.removeItem(R.id.menu_util_silent_fill_debug)   // dev
+            }
             popup.menu.removeItem(R.id.menu_util_divider)
         }
         popup.setOnMenuItemClickListener { item ->
@@ -999,6 +1007,8 @@ class AppBarMenuManager(
                 R.id.menu_util_probe_10km    -> menuEventListener.onProbe10kmRequested()
                 R.id.menu_util_fill_probe    -> menuEventListener.onFillProbeRequested()
                 R.id.menu_util_debug_log     -> menuEventListener.onDebugLogRequested()
+                R.id.menu_util_debug_dump_map -> menuEventListener.onDebugDumpMapRequested()
+                R.id.menu_util_debug_open_tts -> menuEventListener.onDebugOpenTtsSettingsRequested()
 
                 R.id.menu_util_gps_mode ->
                     toggleBinary(item, MenuPrefs.PREF_GPS_MODE) { menuEventListener.onGpsModeToggled(it) }
