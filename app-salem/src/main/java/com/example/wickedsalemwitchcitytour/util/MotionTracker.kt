@@ -150,8 +150,26 @@ class MotionTracker(
         if (!hasSensor()) return false  // fail-safe: unknown state → not stationary
         val now = System.currentTimeMillis()
         if (startedAtMs == 0L || (now - startedAtMs) < warmupMs) return false
+        // S243 — periodic "armed but never fired" diagnostic. Lenovo TB305FU
+        // has a broken TYPE_SIGNIFICANT_MOTION sensor (memory: reference_-
+        // lenovo_motion_sensor_broken.md); the tracker says stationary forever
+        // and downstream consumers freeze. Surface that explicitly every ~2 min.
+        if (armed && lastMotionEventMs == 0L && com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            val runSec = (now - startedAtMs) / 1000
+            // Only log once per 2-min window (and only after 2 min have passed).
+            if (runSec >= 120 && (now - lastBrokenSensorLogAt) >= 120_000L) {
+                lastBrokenSensorLogAt = now
+                com.example.locationmapapp.util.DebugLogger.w(
+                    "MOTION",
+                    "diagnostic — armed=${runSec}s but lastMotionEventMs=0 " +
+                        "(TB305FU-style broken significant-motion sensor? isStationary will stay true forever)",
+                )
+            }
+        }
         return (now - lastMotionEventMs) >= stationaryThresholdMs
     }
+
+    private var lastBrokenSensorLogAt: Long = 0L
 
     /**
      * Human-readable snapshot for log output:

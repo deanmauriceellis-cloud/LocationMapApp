@@ -153,6 +153,10 @@ class DeviceOrientationTracker(
      * 100 Hz spam for the whole 24-min walk. Throttled to ~10 Hz below.
      */
     private var lastOrientRawLogMs: Long = 0L
+
+    // S243 — sustained-static-mode diagnostic timers.
+    private var staticModeEnteredAtMs: Long = 0L
+    private var staticSustainedLoggedAtMs: Long = 0L
     private val ORIENT_RAW_LOG_MIN_GAP_MS: Long = 100L
 
     private var registered: Boolean = false
@@ -331,6 +335,7 @@ class DeviceOrientationTracker(
                 if (!isInStaticMode && consecutiveStaticSamples >= STATIC_SAMPLE_MIN_COUNT) {
                     isInStaticMode = true
                     justEnteredStaticMode = true
+                    staticModeEnteredAtMs = System.currentTimeMillis()
                     DebugLogger.i(
                         "DEVICE-ORIENT",
                         "static mode ON — ${consecutiveStaticSamples} consecutive samples within ${STATIC_SAMPLE_THRESHOLD_DEG}° — " +
@@ -346,6 +351,25 @@ class DeviceOrientationTracker(
                 }
                 consecutiveStaticSamples = 0
                 isInStaticMode = false
+                staticModeEnteredAtMs = 0L
+                staticSustainedLoggedAtMs = 0L
+            }
+        }
+        // S243 — sustained-static diagnostic. Bluestacks (and any device with a
+        // mocked/locked compass) sits in static mode forever at e.g. 300.7°.
+        // Without a warning the operator can't tell from logcat that the
+        // azimuth is dead vs. the user is just holding very still.
+        if (isInStaticMode && staticModeEnteredAtMs > 0L &&
+            com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            val now = System.currentTimeMillis()
+            val sustainedMs = now - staticModeEnteredAtMs
+            if (sustainedMs >= 60_000L && now - staticSustainedLoggedAtMs >= 60_000L) {
+                staticSustainedLoggedAtMs = now
+                DebugLogger.w(
+                    "DEVICE-ORIENT",
+                    "sustained static-mode ${sustainedMs / 1000}s at azimuth=${"%.1f".format(azimuthDeg)}° — " +
+                        "compass locked / sensor mocked? (Bluestacks symptom)",
+                )
             }
         }
         previousRawAzimuthDeg = azimuthDeg

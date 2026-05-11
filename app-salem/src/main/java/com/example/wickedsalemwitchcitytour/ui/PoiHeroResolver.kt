@@ -96,18 +96,36 @@ object PoiHeroResolver {
         if (!forceCategoryFallback) {
             // Priority 0: S147 triptych hero, keyed on slug poi.id
             if (HeroAssetLoader.hasTriptych(context, poi.id)) {
+                if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                    com.example.locationmapapp.util.DebugLogger.d(
+                        "PoiHero", "${poi.id} → tier0 triptych heroes/${poi.id}.webp",
+                    )
+                }
                 return HeroResult.AssetImage("heroes/${poi.id}.webp")
             }
 
             // Priority 1: dedicated hero image from S119 generation pipeline
             poi.imageAsset?.takeIf { it.isNotBlank() }?.let { asset ->
+                if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                    com.example.locationmapapp.util.DebugLogger.d(
+                        "PoiHero", "${poi.id} → tier1 imageAsset='$asset'",
+                    )
+                }
                 return HeroResult.AssetImage(asset)
             }
         }
 
         // Priority 2: category-based fallback from poi-icons
         val folder = categoryToFolder[poi.category]
-            ?: return HeroResult.RedPlaceholder
+        if (folder == null) {
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                com.example.locationmapapp.util.DebugLogger.w(
+                    "PoiHero",
+                    "${poi.id} → RedPlaceholder (no folder mapping for category=${poi.category})",
+                )
+            }
+            return HeroResult.RedPlaceholder
+        }
 
         // S154: prefer subcategory-scoped files when the POI carries a
         // subcategory that matches a file-name prefix in the folder. Keeps a
@@ -118,7 +136,15 @@ object PoiHeroResolver {
         // returns the original string when "__" is not present, so legacy bare
         // tokens still work.
         val all = listingFor(context, folder)
-        if (all.isEmpty()) return HeroResult.RedPlaceholder
+        if (all.isEmpty()) {
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                com.example.locationmapapp.util.DebugLogger.w(
+                    "PoiHero",
+                    "${poi.id} → RedPlaceholder (folder '$folder' empty for category=${poi.category})",
+                )
+            }
+            return HeroResult.RedPlaceholder
+        }
 
         val sub = poi.subcategory
             ?.lowercase()
@@ -132,7 +158,14 @@ object PoiHeroResolver {
         }
 
         val idx = abs(poi.id.hashCode()) % pool.size
-        return HeroResult.AssetImage("poi-icons/$folder/${pool[idx]}")
+        val pick = "poi-icons/$folder/${pool[idx]}"
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.d(
+                "PoiHero",
+                "${poi.id} → tier2 category-folder pick='$pick' (subcat='$sub' poolSize=${pool.size}/${all.size})",
+            )
+        }
+        return HeroResult.AssetImage(pick)
     }
 
     /** Load the resolved hero into an ImageView. Safe on any IO error. */

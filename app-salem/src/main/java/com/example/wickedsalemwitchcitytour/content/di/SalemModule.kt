@@ -11,6 +11,10 @@ package com.example.wickedsalemwitchcitytour.content.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.BuildConfig
 import com.example.wickedsalemwitchcitytour.content.dao.*
 import com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase
 import dagger.Module
@@ -40,6 +44,34 @@ object SalemModule {
             // Contrast: UserDataDatabase has user-generated state and must use
             // real migrations (S180 lockdown — fallback removed there).
             .fallbackToDestructiveMigration()
+            // S243 — verbose: log every open + flag any destructive migration
+            // loud-and-clear. A silent fallback wiped the whole POI table once
+            // (S180 hindsight) — operator never knew until field test.
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    if (!BuildConfig.DEBUG) return
+                    val tables = mutableListOf<String>()
+                    runCatching {
+                        db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'room_%' AND name NOT LIKE 'android_%'").use { c ->
+                            while (c.moveToNext()) tables.add(c.getString(0))
+                        }
+                    }
+                    DebugLogger.i(
+                        "SalemDB",
+                        "SalemContentDatabase opened: schema_v=${db.version} tables=${tables.size} (${tables.joinToString(",")})",
+                    )
+                }
+
+                override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                    DebugLogger.e(
+                        "SalemDB",
+                        "*** DESTRUCTIVE MIGRATION TRIGGERED *** schema_v=${db.version} — " +
+                            "the bundled asset's identity_hash did not match Room's expectation. " +
+                            "All POIs/tours/articles were wiped and reseeded from the new asset. " +
+                            "If this fires unexpectedly, the publish chain (align-asset-schema-to-room.js) is out of sync.",
+                    )
+                }
+            })
             .build()
 
     @Provides fun provideTourPoiDao(db: SalemContentDatabase): TourPoiDao = db.tourPoiDao()

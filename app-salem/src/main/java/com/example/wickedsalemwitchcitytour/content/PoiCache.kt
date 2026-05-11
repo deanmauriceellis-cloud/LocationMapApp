@@ -69,10 +69,28 @@ class PoiCache @Inject constructor(
             val all = salemPoiDao.findAll()
             snapshot = build(all)
             val ms = (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
-            Log.i(TAG, "Loaded ${all.size} POIs in ${ms}ms (categories=${snapshot!!.byCategory.size}, " +
-                "districts=${snapshot!!.districts.size}, visible=${snapshot!!.visible.size}, " +
-                "renderable=${snapshot!!.renderable.size}, narrated=${snapshot!!.narrated.size}, " +
-                "tour=${snapshot!!.tour.size})")
+            val s = snapshot!!
+            val narratedWithText = all.count { it.isNarrated && !it.shortNarration.isNullOrBlank() }
+            val tourFlagged = all.count { it.isTourPoi }
+            val civicFlagged = all.count { it.isCivicPoi }
+            val histProperty = all.count { it.isHistoricalProperty }
+            val withImageAsset = all.count { !it.imageAsset.isNullOrBlank() }
+            val msg = "Loaded ${all.size} POIs in ${ms}ms (categories=${s.byCategory.size}, " +
+                "districts=${s.districts.size}, visible=${s.visible.size}, " +
+                "renderable=${s.renderable.size}, narrated=${s.narrated.size}, " +
+                "tour=${s.tour.size}) — narratedWithText=$narratedWithText " +
+                "tourFlagged=$tourFlagged civicFlagged=$civicFlagged " +
+                "histProperty=$histProperty withImageAsset=$withImageAsset"
+            Log.i(TAG, msg)
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                com.example.locationmapapp.util.DebugLogger.i("PoiCache", msg)
+                // Per-category breakdown — useful when an entire category goes
+                // silent (e.g. "all 484 HISTORICAL_LANDMARKS suddenly empty").
+                val catSummary = s.byCategory.entries
+                    .sortedByDescending { it.value.size }
+                    .joinToString(", ") { "${it.key}=${it.value.size}" }
+                com.example.locationmapapp.util.DebugLogger.d("PoiCache", "byCategory: $catSummary")
+            }
         }
     }
 

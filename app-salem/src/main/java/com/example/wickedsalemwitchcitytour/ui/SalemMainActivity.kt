@@ -3191,9 +3191,16 @@ class SalemMainActivity : AppCompatActivity() {
             val previousFixAt = lastFixAtMs
             lastFixAtMs = System.currentTimeMillis()
             val gapMs = if (previousFixAt == 0L) 0L else (lastFixAtMs - previousFixAt)
+            // S243 — tag the fix source. Walk-sim injects fixes through the
+            // same observer, so without a tag the operator can't tell from
+            // logcat whether the cursor stalled because GPS died or because
+            // walk-sim is paused. accuracy=0 with manual mode = walk-sim.
+            val srcTag = if (walkSimRunning) "(walk-sim)"
+                else if (viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL) "(manual)"
+                else ""
             DebugLogger.i(
                 "GPS-OBS",
-                "fix lat=${"%.5f".format(point.latitude)} lng=${"%.5f".format(point.longitude)} " +
+                "fix $srcTag lat=${"%.5f".format(point.latitude)} lng=${"%.5f".format(point.longitude)} " +
                 "acc=${"%.1f".format(update.accuracy)}m " +
                 "speed=${update.speedMps?.let { "${"%.2f".format(it)}mps" } ?: "?"} " +
                 "bearing=${update.bearing?.let { "${"%.0f".format(it)}°" } ?: "?"} " +
