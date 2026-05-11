@@ -313,6 +313,11 @@ class SalemMainActivity : AppCompatActivity() {
      *  that order of magnitude. */
     internal val GPS_STALE_THRESHOLD_MS = 45_000L
 
+    /** S242: handle on the GPS-OBS heartbeat coroutine so onDestroy can cancel
+     *  explicitly. lifecycleScope cancels on its own; this just makes the
+     *  while(true) loop's lifecycle ownership readable. */
+    private var gpsObsHeartbeatJob: kotlinx.coroutines.Job? = null
+
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
     internal val clusterMarkers    = mutableListOf<Marker>()
@@ -1014,6 +1019,12 @@ class SalemMainActivity : AppCompatActivity() {
         // last-known values; this is just for the diagnostic log so a
         // post-mortem reader can see what was open at destroy time.
         poiEncounterTracker.flushAll()
+        // S242: explicit cancel of the GPS-OBS heartbeat (started in
+        // observeViewModel). lifecycleScope cancellation handles this too, but
+        // an explicit cancel here makes the while(true) loop's lifecycle
+        // visible to readers.
+        gpsObsHeartbeatJob?.cancel()
+        gpsObsHeartbeatJob = null
         DebugLogger.i("SalemMainActivity","onDestroy()")
     }
 
@@ -1649,7 +1660,9 @@ class SalemMainActivity : AppCompatActivity() {
                 // this, View framework updates mv's RenderNode scaleX without
                 // re-recording TiltContainer's display list → pass-2 replays
                 // with stale fabScale → icons don't grow.
-                .setUpdateListener { binding.tiltContainer.invalidate() }
+                // S242 — routed through onMapStateChanged so this animator
+                // shares the MapListener's single entry point.
+                .setUpdateListener { binding.tiltContainer.onMapStateChanged() }
                 .start()
             binding.zoomToggleLabel.text = labels[zoomToggleLevel]
             val mv = binding.mapView
@@ -3047,7 +3060,11 @@ class SalemMainActivity : AppCompatActivity() {
         //   Without case (2), the heartbeat looks dead during normal operation and you can't tell
         //   the difference between "GPS is fine, heartbeat ticking silently" and "heartbeat
         //   coroutine crashed".
-        lifecycleScope.launch {
+        // S242: store Job so onDestroy can cancel explicitly. lifecycleScope cancels
+        // on its own when the Activity is destroyed; explicit cancel makes the
+        // intent visible and silences the "while(true) coroutine with no cancel"
+        // smell flagged by the S242 code audit.
+        gpsObsHeartbeatJob = lifecycleScope.launch {
             DebugLogger.i("GPS-OBS", "HEARTBEAT START — tick=10s, stale-threshold=${GPS_STALE_THRESHOLD_MS / 1000}s, ok-log=60s, stale-backoff=5m→5m cadence, 30m→15m cadence")
             var lastOkLogAt = 0L
             var lastStaleLogAt = 0L
@@ -4394,11 +4411,8 @@ class SalemMainActivity : AppCompatActivity() {
 
         // ── Utility ───────────────────────────────────────────────────────────
 
-        override fun onGpsRecordingToggled(enabled: Boolean) {
-            DebugLogger.i("SalemMainActivity", "onGpsRecordingToggled: $enabled")
-            // STUB: start/stop writing GeoPoints to local Room DB or GPX file
-            stub("record_gps", enabled)
-        }
+        // S242: onGpsRecordingToggled override removed (breadcrumb recording
+        // was stub-only and never shipped; menu entry + listener method gone).
 
         override fun onBuildStoryRequested() {
             DebugLogger.i("SalemMainActivity", "onBuildStoryRequested")
@@ -4418,11 +4432,7 @@ class SalemMainActivity : AppCompatActivity() {
             stub("travel_anomalies")
         }
 
-        override fun onEmailGpxRequested() {
-            DebugLogger.i("SalemMainActivity", "onEmailGpxRequested")
-            // STUB: serialize stored track to GPX, fire ACTION_SEND intent
-            stub("email_gpx")
-        }
+        // S242: onEmailGpxRequested override removed (GPX export stub-only).
 
         override fun onDebugLogRequested() {
             DebugLogger.i("SalemMainActivity", "onDebugLogRequested")

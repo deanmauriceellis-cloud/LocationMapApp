@@ -13,9 +13,9 @@ import com.example.wickedsalemwitchcitytour.BuildConfig
  *
  * Three flips use this directly:
  *   - [GPS_BBOX_OVERRIDE]  — recon: real GPS outside Salem; retail: clamp to Samantha statue
- *   - [RECORD_GPS]         — recon: breadcrumb on; retail: off (privacy/battery)
  *   - [GPS_TRACK_VISIBLE]  — recon: polyline shown; retail: hidden
  *   - [HEADING_UP]         — recon: rotates with bearing; retail: north-up
+ * (S242: RECORD_GPS dropped — breadcrumb recording stub never shipped.)
  *
  * Three are numeric flips:
  *   - [DEFAULT_ZOOM]       — recon 19.0; retail 18.0
@@ -26,7 +26,6 @@ import com.example.wickedsalemwitchcitytour.BuildConfig
  */
 object BuildDefaults {
     const val GPS_BBOX_OVERRIDE: Boolean = BuildConfig.RECON_DEFAULTS
-    const val RECORD_GPS:        Boolean = BuildConfig.RECON_DEFAULTS
     const val GPS_TRACK_VISIBLE: Boolean = BuildConfig.RECON_DEFAULTS
     const val HEADING_UP:        Boolean = BuildConfig.RECON_DEFAULTS
 

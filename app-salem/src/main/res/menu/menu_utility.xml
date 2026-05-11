@@ -12,12 +12,9 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- Binary: record GPS breadcrumb trail -->
-    <item
-        android:id="@+id/menu_util_record_gps"
-        android:title="Record GPS Travel Coordinates"
-        android:checkable="true"
-        app:showAsAction="never" />
+    <!-- S242: record_gps + email_gpx menu items removed. Both were
+         stub-only (no implementation). Build Story / Analyze Today /
+         Travel Anomalies stubs kept — they're parked V1+ features. -->
 
     <!-- Button: launch story-builder website with stored coordinates -->
     <item
@@ -35,12 +32,6 @@
     <item
         android:id="@+id/menu_util_anomalies"
         android:title="Show Travel Anomalies…"
-        app:showAsAction="never" />
-
-    <!-- Button: email GPX file of recorded coordinates -->
-    <item
-        android:id="@+id/menu_util_email_gpx"
-        android:title="Email GPS Coordinates (GPX)…"
         app:showAsAction="never" />
 
     <item android:id="@+id/menu_util_divider" style="@style/Widget.AppCompat.ActionBar.TabBar"/>

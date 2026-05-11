@@ -983,13 +983,11 @@ class AppBarMenuManager(
         popup.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Journey: '${item.title}'")
             when (item.itemId) {
-                R.id.menu_util_record_gps ->
-                    toggleBinary(item, MenuPrefs.PREF_RECORD_GPS) { menuEventListener.onGpsRecordingToggled(it) }
-
+                // S242: menu_util_record_gps + menu_util_email_gpx removed
+                // (stub-only; never shipped). Listener methods removed too.
                 R.id.menu_util_build_story   -> menuEventListener.onBuildStoryRequested()
                 R.id.menu_util_analyze_today -> menuEventListener.onAnalyzeTodayRequested()
                 R.id.menu_util_anomalies     -> menuEventListener.onTravelAnomaliesRequested()
-                R.id.menu_util_email_gpx     -> menuEventListener.onEmailGpxRequested()
                 R.id.menu_util_populate_pois -> {
                     val running = prefs.getBoolean(MenuPrefs.PREF_POPULATE_POIS, false)
                     val newState = !running
@@ -1026,7 +1024,7 @@ class AppBarMenuManager(
         // menu_util_silent_fill_debug is removed above under V1_OFFLINE_ONLY, so
         // only sync its check state when the item is actually present.
         val pairs = buildList {
-            add(R.id.menu_util_record_gps        to MenuPrefs.PREF_RECORD_GPS)
+            // S242: menu_util_record_gps removed; pref pair dropped.
             add(R.id.menu_util_gps_mode          to MenuPrefs.PREF_GPS_MODE)
             add(R.id.menu_util_gps_bbox_override to MenuPrefs.PREF_GPS_BBOX_OVERRIDE)
             if (!FeatureFlags.V1_OFFLINE_ONLY) {
@@ -1141,7 +1139,7 @@ class AppBarMenuManager(
             MenuPrefs.PREF_RADAR_ANIMATE, MenuPrefs.PREF_DARK_MODE -> true
             // S203: build-type switch — recon builds default these ON for testers
             // walking with the debug APK; release / AAB defaults OFF for retail.
-            MenuPrefs.PREF_RECORD_GPS         -> com.example.wickedsalemwitchcitytour.ui.BuildDefaults.RECORD_GPS
+            // S242: PREF_RECORD_GPS removed (menu item + listener gone).
             MenuPrefs.PREF_GPS_BBOX_OVERRIDE  -> com.example.wickedsalemwitchcitytour.ui.BuildDefaults.GPS_BBOX_OVERRIDE
             else -> true
         }

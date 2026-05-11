@@ -26,9 +26,11 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- Email GPX export -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+    <!-- S242: READ_EXTERNAL_STORAGE removed. Was held for the GPX-export
+         feature, which never shipped past the stub. Menu entries +
+         handlers removed in the same phase. Re-add alongside the
+         FeatureFlags flip if/when breadcrumb recording + GPX email
+         actually ship. -->
 
     <!-- S125: Keep CPU running during walk-sim when the screen locks.
          Without this, overnight walks stall intermittently because the

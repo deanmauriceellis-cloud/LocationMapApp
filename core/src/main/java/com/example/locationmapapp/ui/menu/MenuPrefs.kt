@@ -82,7 +82,7 @@ object MenuPrefs {
     const val PREF_HOME_SET  = "home_set"
 
     // ── Utility ───────────────────────────────────────────────────────────
-    const val PREF_RECORD_GPS            = "record_gps_on"
+    // S242: PREF_RECORD_GPS removed (breadcrumb feature was stub-only; never shipped).
     const val PREF_GPS_MODE              = "gps_mode_auto"
     const val PREF_AUTO_FOLLOW_AIRCRAFT  = "auto_follow_aircraft_on"
     const val PREF_POPULATE_POIS         = "populate_pois_on"

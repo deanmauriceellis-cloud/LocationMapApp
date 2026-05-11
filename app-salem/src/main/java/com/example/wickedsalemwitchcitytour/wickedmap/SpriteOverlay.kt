@@ -328,15 +328,26 @@ class SpriteOverlay(private val context: Context) : MapOverlay {
             // MapView's extended drawing rect (so distant haunts can render
             // upright in the wedge area now that S238's softened perspective
             // fills it with tile content).
+            // S242 — pre-cull constants shared with TiltContainer.drawBillboardedMarkers.
             val ctnX = xy[0]
             val ctnY = xy[1]
-            if (ctnY < mvTopPx - 50f || ctnY > mvBottom + 50f ||
-                ctnX < -50f || ctnX > ctnW + 50f) continue
+            if (ctnY < mvTopPx - com.example.wickedsalemwitchcitytour.ui.TiltContainer.SCREEN_CULL_PRE_PX ||
+                ctnY > mvBottom + com.example.wickedsalemwitchcitytour.ui.TiltContainer.SCREEN_CULL_PRE_PX ||
+                ctnX < -com.example.wickedsalemwitchcitytour.ui.TiltContainer.SCREEN_CULL_PRE_PX ||
+                ctnX > ctnW + com.example.wickedsalemwitchcitytour.ui.TiltContainer.SCREEN_CULL_PRE_PX) continue
             tiltMapPoint(xy)
 
             val pathArg = (2.0 * PI * t * sw.pathDirection + sw.pathPhase).toFloat()
             val cx = xy[0] + sw.pathRadiusPxX * cos(pathArg) * alphaF
             val cy = xy[1] - 50f + sw.pathRadiusPxY * sin(pathArg) * alphaF
+
+            // S242 — post-tilt screen-bounds cull mirroring TiltContainer's
+            // marker post-cull. Was relying on canvas clipping; explicit cull
+            // skips the rect-compute + drawBitmap call entirely for off-screen
+            // sprites, and keeps marker and sprite behaviour in lockstep.
+            val cullPost = com.example.wickedsalemwitchcitytour.ui.TiltContainer.SCREEN_CULL_POST_PX
+            if (cx < -cullPost || cx > canvas.width + cullPost ||
+                cy < -cullPost || cy > canvas.height + cullPost) continue
 
             val depthFactor = depthScale(cy)
             val totalScale = bobScale * depthFactor * fabScale

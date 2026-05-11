@@ -99,17 +99,31 @@ class TiltContainer @JvmOverloads constructor(
     // `fabScale` + stale `mv.projection` until something else forces a
     // re-record. Symptom: upright marker drifts after zoom or magnify, snaps
     // back when the operator nudges the map. Only registered while tilt > 0.
+    // S242 — both callbacks route through [onMapStateChanged] so external
+    // code (e.g. FAB-magnify animator) shares one entry point for the same
+    // root cause.
     private val mapListener = object : org.osmdroid.events.MapListener {
         override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
-            if (tiltDeg > 0f) invalidate()
+            onMapStateChanged()
             return false
         }
         override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
-            if (tiltDeg > 0f) invalidate()
+            onMapStateChanged()
             return false
         }
     }
     private var mapListenerRegistered = false
+
+    /**
+     * S242 — single entry point for "MapView state changed under tilt, please
+     * re-record pass-2." Used by the internal MapListener and by external
+     * animators (FAB magnify) that mutate `mv.scaleX` without otherwise
+     * dirtying the container's display list. No-op when tilt is off, since
+     * pass-2 doesn't run at tilt=0 anyway.
+     */
+    fun onMapStateChanged() {
+        if (tiltDeg > 0f) invalidate()
+    }
 
     fun setTiltDegrees(deg: Float) {
         val clamped = deg.coerceIn(0f, 75f)
@@ -231,6 +245,12 @@ class TiltContainer @JvmOverloads constructor(
         lp.height = containerH + targetExtra
         lp.topMargin = -targetExtra / 2
         mv.layoutParams = lp
+        // S242 — force a measure/layout pass after extending. Setting
+        // layoutParams alone leaves the new height pending until the next
+        // layout cycle; if dispatchDraw fires on the same frame it sees the
+        // unextended mv.height (=684 in the S238 debug strip) and pass-1
+        // tile-fetch under-reaches. requestLayout() collapses the race.
+        mv.requestLayout()
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -337,14 +357,15 @@ class TiltContainer @JvmOverloads constructor(
             // visible pixel. Pre-S238 cull rejected ctnY<0 because the wedge
             // was largely unfilled and markers floated on `#2D1B4E`; that
             // condition no longer holds.
-            if (ctnY < mvTop - 50f || ctnY > mvTop + mv.height + 50f ||
-                ctnX < -50f || ctnX > cw + 50f) continue
+            if (ctnY < mvTop - SCREEN_CULL_PRE_PX || ctnY > mvTop + mv.height + SCREEN_CULL_PRE_PX ||
+                ctnX < -SCREEN_CULL_PRE_PX || ctnX > cw + SCREEN_CULL_PRE_PX) continue
             tiltMatrix.mapPoints(billboardXY)
             val dx = billboardXY[0]
             val dy = billboardXY[1]
             // Off-screen cull with a generous slack so half-visible icons
             // near the edge still draw.
-            if (dx < -300f || dx > cw + 300f || dy < -300f || dy > ch + 300f) continue
+            if (dx < -SCREEN_CULL_POST_PX || dx > cw + SCREEN_CULL_POST_PX ||
+                dy < -SCREEN_CULL_POST_PX || dy > ch + SCREEN_CULL_POST_PX) continue
             val scale = depthScale(dy) * fabScale
             val iw = icon.intrinsicWidth
             val ih = icon.intrinsicHeight
@@ -459,5 +480,14 @@ class TiltContainer @JvmOverloads constructor(
         // emphasis while distant markers stay big enough to read as upright.
         private const val BILLBOARD_NEAR_SCALE = 1.4f
         private const val BILLBOARD_FAR_SCALE = 0.95f
+
+        // S242 — cull thresholds. Pre-cull (PRE_PX) rejects markers far outside
+        // the extended MapView rect BEFORE the tilt matrix transform; post-cull
+        // (POST_PX) rejects anything that projects far off the container screen.
+        // Exposed `internal` so SpriteOverlay can mirror exactly the same
+        // thresholds (S238 cull-loosen kept marker + sprite paths in sync by
+        // hand; the constants make that intent explicit).
+        internal const val SCREEN_CULL_PRE_PX  = 50f
+        internal const val SCREEN_CULL_POST_PX = 300f
     }
 }

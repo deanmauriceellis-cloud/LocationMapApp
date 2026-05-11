@@ -157,8 +157,9 @@ interface MenuEventListener {
     // UTILITY
     // =========================================================================
 
-    /** Start / stop recording GPS breadcrumb track to local storage. */
-    fun onGpsRecordingToggled(enabled: Boolean)
+    // S242: onGpsRecordingToggled + onEmailGpxRequested removed.
+    // Breadcrumb recording + GPX export were stub-only; removed alongside
+    // their menu entries and the READ_EXTERNAL_STORAGE manifest permission.
 
     /** Launch external story-builder website with stored GPS coordinate payload. */
     fun onBuildStoryRequested()
@@ -168,9 +169,6 @@ interface MenuEventListener {
 
     /** Launch external analytics site — travel anomaly detection on stored track. */
     fun onTravelAnomaliesRequested()
-
-    /** Share / email recorded track as a standard GPX file attachment. */
-    fun onEmailGpxRequested()
 
     /** Open in-app DebugLogActivity. */
     fun onDebugLogRequested()
