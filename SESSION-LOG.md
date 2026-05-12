@@ -1,8 +1,16 @@
 # LocationMapApp — Session Log
 
-> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 237-246 (S236 archived 2026-05-11 at S246 close; S235 archived 2026-05-11 at S245 close; S234 archived 2026-05-11 at S244 close; S233 archived 2026-05-11 at S243 close; S232 archived 2026-05-11 at S242 close; S231 archived 2026-05-10 at S241 close; S230 archived 2026-05-10 at S240 close; S229 archived 2026-05-10 at S239 close; S228 archived 2026-05-09 at S238 close; S227 archived 2026-05-09 at S237 close; S226 archived 2026-05-09 at S236 close; S225 archived 2026-05-09 at S235 close; S224 archived 2026-05-09 at S234 close; S223 archived 2026-05-08 at S233 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
+> **Rolling window — last 10 sessions only.** On every session end, the oldest session is moved to `SESSION-LOG-ARCHIVE.md`. This file currently holds Sessions 238-247 (S237 archived 2026-05-11 at S247 close; S236 archived 2026-05-11 at S246 close; S235 archived 2026-05-11 at S245 close; S234 archived 2026-05-11 at S244 close; S233 archived 2026-05-11 at S243 close; S232 archived 2026-05-11 at S242 close; S231 archived 2026-05-10 at S241 close; S230 archived 2026-05-10 at S240 close; S229 archived 2026-05-10 at S239 close; S228 archived 2026-05-09 at S238 close; S227 archived 2026-05-09 at S237 close; S226 archived 2026-05-09 at S236 close; S225 archived 2026-05-09 at S235 close; S224 archived 2026-05-09 at S234 close; S223 archived 2026-05-08 at S233 close; note S212 was skipped by the operator). Everything older lives in the archive (which itself ends with the original v1.5.0–v1.5.50 archive at the bottom).
 >
 > **Per-session live conversation logs** (the canonical, append-only record with full reasoning, decisions, file diffs, build results) live in `docs/session-logs/session-NNN-YYYY-MM-DD.md`. The entries in this file are 2-3 sentence summaries — pointers to the live logs, not replacements.
+
+## Session 247: 2026-05-11 — About-dialog product-name fix (WickedSalemApp → Katrina's Mystic Visitors Guide) + S246 LLC About-dialog field-validation PASS
+
+Tight micro-session following S246's entity propagation. Operator field-validated the LLC About dialog on Lenovo HNY0CY0W (copyright line + email confirmed) — closing S246 carry #1. Then caught a separate issue: the About dialog title and version line still said "WickedSalemApp", which is an internal Kotlin class name, not the user-facing product. Fixed both strings in `SalemMainActivityHelpers.kt` to read "Katrina's Mystic Visitors Guide" (matches `strings.xml` `app_name`, AndroidManifest `android:label`, and the splash screen). Explore agent verified the rest of the app + web admin clean — no other user-facing "WickedSalemApp" references; all remaining hits are internal (class names, file headers, MODULE_IDs, log tags). `:app-salem:assembleDebug` clean in 7 s; `adb uninstall && adb install` to Lenovo HNY0CY0W; operator field-validated PASS.
+
+Full session detail: `docs/session-logs/session-247-2026-05-11.md`. Commit: pending session-end commit.
+
+---
 
 ## Session 246: 2026-05-11 — Entity propagation pass (Dean Maurice Ellis → Destructive AI Gurus, LLC) across 340 files
 
@@ -75,14 +83,6 @@ Full session detail: `docs/session-logs/session-239-2026-05-10.md`. Commit: `e5f
 Diagnosed the S237-carry "z19 dark wedge" via canvas-clip + MapView geometry instrumentation: geometry was already correct (mv extended 6× container, symmetric placement, full canvas clip) — the operator's complaint was perceptual, not a layout bug. At the previous `topY = h * 1.0 * t`, the perspective matrix's vanishing point sat inside the visible screen and z19 detail crushed to illegible gray in the band between vanishing and trapezoid top. Fix: `topY = h * 0.6f * t` (one-constant change, with a new `TOPY_FACTOR` companion shared between `rebuildMatrix` and `depthScale`). At max tilt the trapezoid now covers ~68% of screen, vanishing point is off-screen, and z19 street/building detail stays legible — operator's "fills the screen" requirement met (verified via adb-driven walk-sim teleport + screenshot). Marker + sprite culls loosened to allow the previously-rejected upper-extension area now that wedge is filled. S234/S237/S238 diagnostic scaffolding stripped (BILLBOARD-DIAG, WEDGE-DIAG, OVERLAY-TYPES, per-frame timing logs, billboardMode toggle, debugSuppressOverlays + companions): `TiltContainer.kt` 614 → 463 lines (-25%); logcat clean to a single `setTiltDegrees: X° → Y°` line per user input. Carry to S239: field-walk validation in motion + a `mv.requestLayout()` close to the first-frame layout race surfaced by the diagnostic.
 
 Full session detail: `docs/session-logs/session-238-2026-05-09.md`. Commit: `d9362c7`.
-
----
-
-## Session 237: 2026-05-09 — Billboarded POIs + sprites in matrix-tilt; rotation/scale/cull corrections; tile bake stripped of POI symbol layers; carry-forward to S238
-
-Two-pass tilt rendering shipped: `TiltContainer.dispatchDraw` strips `Marker` instances from `mv.overlays` before `super.dispatchDraw` (which renders tiles + non-marker overlays under the perspective `tiltMatrix`), then re-renders the stripped markers UPRIGHT in pass-2 by projecting `lat/lng → mvLocal → rotation around mvCenter → scale-around-mvCenter by mapView.scaleX → +mv.left/+mv.top → tiltMatrix.mapPoints`. `SpriteOverlay` short-circuits its normal draw under tilt and exposes a parallel `drawBillboarded` for the haunt skeletons. Operator walkthrough exposed 8 issues which were triaged into a 4-phase plan written into the live log; Phase 1 (sign + cull + FAB scale) and Phase 2 (POI symbol layers stripped from `tools/tile-bake/style-salem.json`, S234-baseline re-bake of 715,841 tiles → 253.8 MB, merged into a 261.6 MB bundle) shipped. Final tighten of `BILLBOARD_NEAR_SCALE` 2.0→1.4 and `BILLBOARD_FAR_SCALE` 0.6→0.95 deployed unverified before session end. **Phase 3 deferred to S238: wedge tile fill at z19 (mandatory per operator) — at z19+high tilt the upper ~30% of screen still renders dark `#2D1B4E` instead of tile content despite `lp.height += 5×containerH` resize.** Diagnostic infrastructure (`BILLBOARD-DIAG`, `OVERLAY-TYPES`, `billboardMode` long-press toggle on 3D FAB) left in place for next session.
-
-Full session detail: `docs/session-logs/session-237-2026-05-09.md`. Commit: `6500e2b`.
 
 ---
 

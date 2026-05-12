@@ -18,7 +18,7 @@ internal fun SalemMainActivity.toast(msg: String) = Toast.makeText(this, msg, To
 
 internal fun SalemMainActivity.showAboutDialog() {
     val message = """
-        |WickedSalemApp v1.5.55
+        |Katrina's Mystic Visitors Guide v1.5.55
         |Copyright (c) 2026 Destructive AI Gurus, LLC
         |All rights reserved.
         |
@@ -31,7 +31,7 @@ internal fun SalemMainActivity.showAboutDialog() {
     """.trimMargin()
 
     android.app.AlertDialog.Builder(this)
-        .setTitle("About WickedSalemApp")
+        .setTitle("About Katrina's Mystic Visitors Guide")
         .setMessage(message)
         .setPositiveButton("OK", null)
         .show()
