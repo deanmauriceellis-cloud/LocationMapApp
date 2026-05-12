@@ -13,8 +13,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Network -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- S249: INTERNET + ACCESS_NETWORK_STATE removed from this manifest.
+         The S180 V1 zero-network rule strips these from app-salem's main
+         manifest, but :core was silently re-merging them back into both
+         debug AND release APKs. For consuming apps that need network in
+         debug, declare INTERNET in their own src/debug/AndroidManifest.xml
+         (see app-salem/src/debug/AndroidManifest.xml for the V1 pattern). -->
 
 </manifest>

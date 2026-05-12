@@ -10,6 +10,7 @@
 package com.example.locationmapapp.util.network
 
 import com.example.locationmapapp.util.FeatureFlags
+import com.example.locationmapapp.util.SuperAdminMode
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -34,7 +35,7 @@ class OfflineModeInterceptor : Interceptor {
 
     @Throws(IOException::class)
     override fun intercept(chain: Interceptor.Chain): Response {
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             throw OfflineModeException(chain.request().url.host)
         }
         return chain.proceed(chain.request())

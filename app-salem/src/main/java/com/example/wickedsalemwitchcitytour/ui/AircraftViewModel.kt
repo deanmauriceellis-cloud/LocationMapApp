@@ -18,6 +18,7 @@ import com.example.locationmapapp.data.model.FlightPathPoint
 import com.example.locationmapapp.data.repository.AircraftRepository
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.FeatureFlags
+import com.example.locationmapapp.util.SuperAdminMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,7 +40,7 @@ class AircraftViewModel @Inject constructor(
     val followedAircraft: LiveData<AircraftState?> = _followedAircraft
 
     fun loadAircraft(south: Double, west: Double, north: Double, east: Double) {
-        if (FeatureFlags.V1_OFFLINE_ONLY) return
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
         DebugLogger.i(TAG, "loadAircraft() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { aircraftRepository.fetchAircraft(south, west, north, east) }
@@ -49,7 +50,7 @@ class AircraftViewModel @Inject constructor(
     }
 
     fun loadFollowedAircraft(icao24: String) {
-        if (FeatureFlags.V1_OFFLINE_ONLY) return
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
         DebugLogger.i(TAG, "loadFollowedAircraft() icao24=$icao24")
         viewModelScope.launch {
             runCatching { aircraftRepository.fetchAircraftByIcao(icao24) }
@@ -67,7 +68,7 @@ class AircraftViewModel @Inject constructor(
 
     /** Suspend call — returns flight history path points directly for trail drawing. */
     suspend fun fetchFlightHistoryDirectly(icao24: String): List<FlightPathPoint> {
-        if (FeatureFlags.V1_OFFLINE_ONLY) return emptyList()
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return emptyList()
         return try {
             aircraftRepository.fetchFlightHistory(icao24)
         } catch (e: Exception) {

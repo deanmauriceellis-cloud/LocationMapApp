@@ -105,6 +105,31 @@
                 android:visibility="gone" />
         </FrameLayout>
 
+        <!-- S249 — SuperAdmin mode toggle. Visible only when
+             BuildDefaults.SUPER_ADMIN_ENABLED (debug builds). Tap toggles the
+             runtime override (`SuperAdminMode.allowNetwork`) that bypasses
+             V1_OFFLINE_ONLY for the parked external services
+             (weather / MBTA / aircraft / METAR / webcams / radar). -->
+        <FrameLayout
+            android:id="@+id/toolbarSuperAdminWrap"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/toolbarSuperAdminIcon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_debug"
+                android:scaleType="centerInside"
+                android:padding="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="SuperAdmin mode (toggle parked V1+ services)"
+                android:tooltipText="SuperAdmin mode (toggle)" />
+        </FrameLayout>
+
         <ImageView
             android:id="@+id/toolbarWeatherIcon"
             android:layout_width="36dp"

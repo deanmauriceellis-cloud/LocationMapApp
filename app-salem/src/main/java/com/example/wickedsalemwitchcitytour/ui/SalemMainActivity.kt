@@ -763,6 +763,10 @@ class SalemMainActivity : AppCompatActivity() {
         if (BuildDefaults.FIELD_EDIT_ENABLED) {
             wireFieldEditToolbar()
         }
+        // S249 — wire the fourth toolbar button (SuperAdmin toggle) when enabled.
+        if (BuildDefaults.SUPER_ADMIN_ENABLED) {
+            wireSuperAdminToolbar()
+        }
         weatherIconView = toolbarRefs.weatherIcon
         alertsIconView  = toolbarRefs.alertsIcon
         alertsBadgeView = toolbarRefs.alertsBadge

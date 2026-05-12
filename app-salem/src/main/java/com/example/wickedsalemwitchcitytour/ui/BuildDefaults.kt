@@ -40,6 +40,15 @@ object BuildDefaults {
     // home post-walk and triaged in the web admin's Field Edits inbox.
     const val FIELD_EDIT_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
 
+    // S249 — fourth toolbar button: SuperAdmin mode. Toggles the runtime
+    // override (`SuperAdminMode.allowNetwork`) that bypasses V1_OFFLINE_ONLY
+    // for the parked external services (weather / MBTA / aircraft / METAR /
+    // webcams / radar). Debug-only — release/AAB hardcodes false so R8
+    // strips the toolbar wiring, the override path, and never re-adds the
+    // INTERNET permission (which lives in the debug-only manifest at
+    // app-salem/src/debug/AndroidManifest.xml).
+    const val SUPER_ADMIN_ENABLED: Boolean = BuildConfig.RECON_DEFAULTS
+
     // S232 / S233 — matrix-tilt 3D. TiltContainer wraps the MapView and skews
     // its canvas via setPolyToPoly + grows the MapView upward in tilt mode so
     // the wedges fill with real distant tiles. Touch events are manually

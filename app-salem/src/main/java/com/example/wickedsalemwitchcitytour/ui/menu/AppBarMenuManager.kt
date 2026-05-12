@@ -40,6 +40,7 @@ import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.locationmapapp.ui.menu.PoiLayerId
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.FeatureFlags
+import com.example.locationmapapp.util.SuperAdminMode
 import com.google.android.material.slider.Slider
 
 @Suppress("unused")
@@ -94,13 +95,22 @@ class AppBarMenuManager(
 
     fun onMenuInflated(menu: Menu) {
         DebugLogger.i(TAG, "onMenuInflated() — ${menu.size()} top-level items")
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             menu.findItem(R.id.menu_top_weather)?.isVisible = false
             menu.findItem(R.id.menu_top_transit)?.isVisible = false
             menu.findItem(R.id.menu_top_cams)?.isVisible = false
             menu.findItem(R.id.menu_top_aircraft)?.isVisible = false
             menu.findItem(R.id.menu_top_radar)?.isVisible = false
             DebugLogger.i(TAG, "V1_OFFLINE_ONLY — hid weather/transit/cams/aircraft/radar top-bar items")
+        } else if (FeatureFlags.V1_OFFLINE_ONLY) {
+            // SuperAdmin override on — explicitly re-show in case a prior
+            // onMenuInflated hid them when SuperAdmin was off.
+            menu.findItem(R.id.menu_top_weather)?.isVisible = true
+            menu.findItem(R.id.menu_top_transit)?.isVisible = true
+            menu.findItem(R.id.menu_top_cams)?.isVisible = true
+            menu.findItem(R.id.menu_top_aircraft)?.isVisible = true
+            menu.findItem(R.id.menu_top_radar)?.isVisible = true
+            DebugLogger.i(TAG, "SuperAdmin ON — un-hid weather/transit/cams/aircraft/radar top-bar items")
         }
         toolbar.setOnMenuItemClickListener { item ->
             DebugLogger.i(TAG, "Top-bar click: '${item.title}' id=0x${item.itemId.toString(16)}")
