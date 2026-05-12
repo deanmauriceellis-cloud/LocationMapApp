@@ -53,7 +53,7 @@ class WeatherViewModel @Inject constructor(
     val webcams: LiveData<List<Webcam>> = _webcams
 
     fun fetchWeatherAlerts() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchWeatherAlerts")) return
         DebugLogger.i(TAG, "fetchWeatherAlerts()")
         viewModelScope.launch {
             runCatching { weatherRepository.fetchAlerts() }
@@ -63,7 +63,7 @@ class WeatherViewModel @Inject constructor(
     }
 
     fun fetchWeather(lat: Double, lon: Double) {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchWeather($lat,$lon)")) return
         DebugLogger.i(TAG, "fetchWeather() lat=$lat lon=$lon")
         viewModelScope.launch {
             runCatching { weatherRepository.fetchWeather(lat, lon) }
@@ -74,7 +74,7 @@ class WeatherViewModel @Inject constructor(
 
     /** Suspend call — returns weather data directly for dialog. */
     suspend fun fetchWeatherDirectly(lat: Double, lon: Double): WeatherData? {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return null
+        if (SuperAdminMode.networkBlocked(TAG, "fetchWeatherDirectly($lat,$lon)")) return null
         return try {
             weatherRepository.fetchWeather(lat, lon)
         } catch (e: Exception) {
@@ -84,7 +84,7 @@ class WeatherViewModel @Inject constructor(
     }
 
     fun loadMetars(south: Double, west: Double, north: Double, east: Double) {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "loadMetars")) return
         DebugLogger.i(TAG, "loadMetars() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { weatherRepository.fetchMetars(south, west, north, east) }
@@ -94,7 +94,7 @@ class WeatherViewModel @Inject constructor(
     }
 
     fun loadWebcams(south: Double, west: Double, north: Double, east: Double, categories: String) {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "loadWebcams")) return
         DebugLogger.i(TAG, "loadWebcams() bbox=$south,$west,$north,$east categories=$categories")
         viewModelScope.launch {
             runCatching { webcamRepository.fetchWebcams(south, west, north, east, categories) }
@@ -109,7 +109,7 @@ class WeatherViewModel @Inject constructor(
     }
 
     fun refreshRadar() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "refreshRadar")) return
         _radarRefreshTick.value = System.currentTimeMillis()
         DebugLogger.i(TAG, "Radar refresh tick")
     }

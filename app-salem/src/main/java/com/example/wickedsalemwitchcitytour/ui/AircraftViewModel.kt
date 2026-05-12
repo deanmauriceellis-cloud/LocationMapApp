@@ -40,7 +40,7 @@ class AircraftViewModel @Inject constructor(
     val followedAircraft: LiveData<AircraftState?> = _followedAircraft
 
     fun loadAircraft(south: Double, west: Double, north: Double, east: Double) {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "loadAircraft")) return
         DebugLogger.i(TAG, "loadAircraft() bbox=$south,$west,$north,$east")
         viewModelScope.launch {
             runCatching { aircraftRepository.fetchAircraft(south, west, north, east) }
@@ -50,7 +50,7 @@ class AircraftViewModel @Inject constructor(
     }
 
     fun loadFollowedAircraft(icao24: String) {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "loadFollowedAircraft($icao24)")) return
         DebugLogger.i(TAG, "loadFollowedAircraft() icao24=$icao24")
         viewModelScope.launch {
             runCatching { aircraftRepository.fetchAircraftByIcao(icao24) }
@@ -68,7 +68,7 @@ class AircraftViewModel @Inject constructor(
 
     /** Suspend call — returns flight history path points directly for trail drawing. */
     suspend fun fetchFlightHistoryDirectly(icao24: String): List<FlightPathPoint> {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return emptyList()
+        if (SuperAdminMode.networkBlocked(TAG, "fetchFlightHistoryDirectly($icao24)")) return emptyList()
         return try {
             aircraftRepository.fetchFlightHistory(icao24)
         } catch (e: Exception) {

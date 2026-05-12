@@ -53,7 +53,7 @@ class TransitViewModel @Inject constructor(
     val mbtaBusStops: LiveData<List<MbtaStop>> = _mbtaBusStops
 
     fun fetchMbtaTrains() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchMbtaTrains")) return
         DebugLogger.i(TAG, "fetchMbtaTrains() — fetching commuter rail vehicles")
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchCommuterRailVehicles() } }
@@ -73,7 +73,7 @@ class TransitViewModel @Inject constructor(
     }
 
     fun fetchMbtaSubway() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchMbtaSubway")) return
         DebugLogger.i(TAG, "fetchMbtaSubway() — fetching subway vehicles")
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchSubwayVehicles() } }
@@ -93,7 +93,7 @@ class TransitViewModel @Inject constructor(
     }
 
     fun fetchMbtaBuses() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchMbtaBuses")) return
         DebugLogger.i(TAG, "fetchMbtaBuses() — fetching bus vehicles")
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchBusVehicles() } }
@@ -113,7 +113,7 @@ class TransitViewModel @Inject constructor(
     }
 
     fun fetchMbtaStations() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchMbtaStations")) return
         DebugLogger.i(TAG, "fetchMbtaStations() — fetching subway + CR stations")
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchStations() } }
@@ -133,7 +133,7 @@ class TransitViewModel @Inject constructor(
     }
 
     fun fetchMbtaBusStops() {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return
+        if (SuperAdminMode.networkBlocked(TAG, "fetchMbtaBusStops")) return
         DebugLogger.i(TAG, "fetchMbtaBusStops() — fetching all bus stops")
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { mbtaRepository.fetchBusStops() } }
@@ -154,7 +154,7 @@ class TransitViewModel @Inject constructor(
 
     /** Suspend call — returns predictions directly for dialogs. */
     suspend fun fetchPredictionsDirectly(stopId: String): List<MbtaPrediction> {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return emptyList()
+        if (SuperAdminMode.networkBlocked(TAG, "fetchPredictionsDirectly($stopId)")) return emptyList()
         return try {
             mbtaRepository.fetchPredictions(stopId)
         } catch (e: Exception) {
@@ -165,7 +165,7 @@ class TransitViewModel @Inject constructor(
 
     /** Suspend call — returns trip schedule directly for dialogs. */
     suspend fun fetchTripScheduleDirectly(tripId: String): List<MbtaTripScheduleEntry> {
-        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) return emptyList()
+        if (SuperAdminMode.networkBlocked(TAG, "fetchTripScheduleDirectly($tripId)")) return emptyList()
         return try {
             mbtaRepository.fetchTripSchedule(tripId)
         } catch (e: Exception) {

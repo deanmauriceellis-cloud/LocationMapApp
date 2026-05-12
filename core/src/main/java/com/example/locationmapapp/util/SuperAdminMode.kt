@@ -30,6 +30,8 @@ package com.example.locationmapapp.util
 @Suppress("unused")
 private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module SuperAdminMode.kt"
 
+// FeatureFlags + DebugLogger live in the same package — no import needed.
+
 object SuperAdminMode {
 
     @Volatile private var available: Boolean = false
@@ -63,5 +65,24 @@ object SuperAdminMode {
      */
     fun setEnabled(value: Boolean) {
         if (available) enabledFlag = value
+    }
+
+    /**
+     * V1 short-circuit guard for ViewModel network calls. Returns `true` (and
+     * logs at INFO) when the call must be skipped because V1_OFFLINE_ONLY is
+     * compile-true and SuperAdmin isn't unlocking the network. Returns `false`
+     * when the call may proceed.
+     *
+     * Use as: `if (SuperAdminMode.networkBlocked("TAG", "fetchX")) return`.
+     *
+     * S251 — replaces the previously silent `if (V1_OFFLINE_ONLY && !allowNetwork) return`
+     * pattern that hid one-shot fetches called before the operator toggled
+     * SuperAdmin on (race observed at 01:02:32 stations vs 01:02:44 toggle).
+     */
+    fun networkBlocked(tag: String, action: String): Boolean {
+        if (!FeatureFlags.V1_OFFLINE_ONLY) return false
+        if (allowNetwork) return false
+        DebugLogger.i(tag, "$action SUPPRESSED — V1_OFFLINE_ONLY=true allowNetwork=false (available=$available enabledFlag=$enabledFlag)")
+        return true
     }
 }

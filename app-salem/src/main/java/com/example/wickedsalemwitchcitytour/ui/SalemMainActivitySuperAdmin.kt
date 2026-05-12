@@ -22,10 +22,13 @@
 
 package com.example.wickedsalemwitchcitytour.ui
 
+import android.content.Context
 import android.view.View
 import android.widget.Toast
+import androidx.preference.PreferenceManager
 import com.example.locationmapapp.util.DebugLogger
 import com.example.locationmapapp.util.SuperAdminMode
+import com.example.locationmapapp.ui.menu.MenuPrefs
 import com.example.wickedsalemwitchcitytour.R
 
 private const val TAG = "SuperAdminUI"
@@ -58,6 +61,12 @@ internal fun SalemMainActivity.wireSuperAdminToolbar() {
         // state automatically). onCreateOptionsMenu is stubbed so we don't
         // call invalidateOptionsMenu here — would be a no-op.
         appBarMenuManager.reapplySuperAdminVisibility()
+        // S251 — re-kick deferred one-shot fetches that may have silently
+        // bailed in onStart() before the operator turned SuperAdmin on. The
+        // refresh-loop fetches (trains/subway/buses) self-recover on the next
+        // 30s tick, but stations + bus-stops are one-shots and would otherwise
+        // stay empty for the whole session.
+        if (nowOn) kickDeferredSuperAdminFetches()
         val msg = if (nowOn) {
             "SuperAdmin: ON — V1+ services unlocked (weather / MBTA / aircraft / radar / webcams). LAN cache-proxy required."
         } else {
@@ -65,6 +74,31 @@ internal fun SalemMainActivity.wireSuperAdminToolbar() {
         }
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
         DebugLogger.i(TAG, "SuperAdmin toggled → $nowOn")
+    }
+}
+
+/**
+ * S251 — re-fire the one-shot fetches that respect their pref defaults but
+ * bailed silently when called in onStart() before SuperAdmin was on. Logs
+ * exactly what it did so the stream shows the recovery chain.
+ */
+internal fun SalemMainActivity.kickDeferredSuperAdminFetches() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+    val stationsPref = prefs.getBoolean(MenuPrefs.PREF_MBTA_STATIONS, true)
+    val busStopsPref = prefs.getBoolean(MenuPrefs.PREF_MBTA_BUS_STOPS, false)
+    DebugLogger.i(
+        TAG,
+        "kickDeferredSuperAdminFetches — stationsPref=$stationsPref " +
+                "stationsCached=${stationMarkers.size} busStopsPref=$busStopsPref " +
+                "busStopsCached=${allBusStops.size}"
+    )
+    if (stationsPref && stationMarkers.isEmpty()) {
+        DebugLogger.i(TAG, "kicking deferred fetchMbtaStations()")
+        transitViewModel.fetchMbtaStations()
+    }
+    if (busStopsPref && allBusStops.isEmpty()) {
+        DebugLogger.i(TAG, "kicking deferred fetchMbtaBusStops()")
+        transitViewModel.fetchMbtaBusStops()
     }
 }
 
