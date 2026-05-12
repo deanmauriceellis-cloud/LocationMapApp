@@ -26,6 +26,7 @@ export type AdminView =
   | 'mass-edit'
   | 'splash-tree'
   | 'super-admin'
+  | 'tigerbase'
 
 interface SidebarItem {
   id: AdminView
@@ -63,6 +64,7 @@ const GROUPS: SidebarGroup[] = [
       { id: 'splash-tree',  label: 'Splash Tree',  icon: '🌳', title: 'Splash announcement decision tree authoring' },
       { id: 'mass-edit',    label: 'Mass Edit',    icon: '📊', title: 'Bulk POI edits via .xlsx round-trip with per-cell review' },
       { id: 'super-admin',  label: 'Super Admin',  icon: '🛰', title: 'Post-V1 console — exercise parked external services (weather, MBTA, aircraft, METAR, webcams, TFRs)' },
+      { id: 'tigerbase',    label: 'TigerBase',    icon: '🌎', title: 'Post-V1 — preview the CONUS TIGER/Line basemap baked at tools/tigerbase/' },
     ],
   },
 ]

@@ -1,0 +1,59 @@
+{
+  "background": "#f7f5ef",
+  "water": {
+    "water_color": "#bfd8e6",
+    "land_color": "#f7f5ef"
+  },
+  "county": {
+    "min_zoom": 7,
+    "max_zoom": 11,
+    "stroke": "#d9d3c2",
+    "width_px": 0.8
+  },
+  "state": {
+    "min_zoom": 3,
+    "max_zoom": 14,
+    "stroke": "#bfb59e",
+    "width_px": 1.5
+  },
+  "roads_primary": {
+    "min_zoom": 4,
+    "max_zoom": 14,
+    "stroke": "#b89868",
+    "width_px_by_zoom": {
+      "4":  0.4, "5":  0.5,
+      "6":  0.6, "7":  0.7, "8":  0.9, "9":  1.2,
+      "10": 1.5, "11": 1.9, "12": 2.3, "13": 2.7, "14": 3.2
+    }
+  },
+  "roads_secondary": {
+    "min_zoom": 9,
+    "max_zoom": 14,
+    "stroke": "#cfb792",
+    "width_px_by_zoom": {
+      "9":  0.6, "10": 0.8, "11": 1.1, "12": 1.4, "13": 1.7, "14": 2.0
+    }
+  },
+  "place_dot": {
+    "min_zoom": 5,
+    "max_zoom": 14,
+    "fill": "#3a3a3a",
+    "outline": "#ffffff",
+    "radius_by_zoom": {
+      "5":  0.8,
+      "6":  1.2, "7":  1.4, "8":  1.6, "9":  1.8,
+      "10": 2.0, "11": 2.2, "12": 2.4, "13": 2.6, "14": 2.8
+    }
+  },
+  "place_label": {
+    "min_zoom": 6,
+    "max_zoom": 14,
+    "fill": "#1f1f1f",
+    "halo": "#fffdf5",
+    "halo_width": 2,
+    "collision_pad": 2,
+    "size_by_zoom": {
+      "6": 8, "7": 9, "8": 10, "9": 11, "10": 12, "11": 13, "12": 14, "13": 15, "14": 16
+    }
+  }
+}

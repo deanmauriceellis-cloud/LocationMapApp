@@ -251,6 +251,12 @@ require('./lib/admin-categories')(app, deps);
 // phone app sees. Gated by /admin Basic Auth.
 require('./lib/admin-tiles')(app, deps);
 
+// TigerBase tile server (S252, post-V1) — serves CONUS TIGER/Line basemap
+// out of layered PMTiles archives at tools/tigerbase/out/. Not gated by
+// admin auth; consumed by web admin preview + (post-V1) the Android app
+// when outside Salem geofence with internet.
+require('./lib/tigerbase-tiles')(app, deps);
+
 // Admin burst-photos endpoint (S229) — surfaces the GPS-burst camera album
 // at /mnt/sdb-images/LMASalemPictures/ to the web admin so the operator can
 // pin every shot on the map and spot-check POI / path alignment.

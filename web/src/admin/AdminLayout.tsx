@@ -35,6 +35,7 @@ import { AdminSidebar, type AdminView } from './AdminSidebar'
 import { SplashTreeTab } from './SplashTreeTab'
 import { MassEditTab } from './MassEditTab'
 import { SuperAdminTab } from './SuperAdminTab'
+import TigerBaseTab from './TigerBaseTab'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -917,6 +918,8 @@ export function AdminLayout() {
         <div className="flex-1 min-h-0">
           <SuperAdminTab />
         </div>
+      ) : view === 'tigerbase' ? (
+        <TigerBaseTab />
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">
           <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">
