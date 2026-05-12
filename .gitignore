@@ -66,6 +66,11 @@ docs/archive/poi-icons-unused-styles_archived_*/**/*.jpg
 .claude/
 **/__pycache__/
 
+# S245: operator legal records (Certificate of Organization etc.) — local-only,
+# not shipped in the public repo. The entity facts that callers need are in
+# docs/PRIVACY-POLICY-V1.md + the operating-entity memory.
+LegalDocuments/
+
 # S167: pipeline staging copy of salem_tiles.sqlite.
 # The canonical copy that ships lives at app-salem/src/main/assets/salem_tiles.sqlite
 # and IS committed — fresh clones need it to build a working APK. The staging

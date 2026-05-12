@@ -1,16 +1,16 @@
 # Katrina's Mystic Visitors Guide — Privacy Policy (V1)
 
-**Status:** DRAFT — pending counsel review at 2026-04-20 meeting.
-**Draft version:** 1.0 (V1-minimal, Posture A)
-**Drafted:** 2026-04-17 (Session 145)
+**Status:** DRAFT — entity backfill complete; awaiting counsel sign-off on final policy text before public hosting.
+**Draft version:** 1.1 (V1-minimal, Posture A — entity backfill)
+**Drafted:** 2026-04-17 (Session 145). **Entity backfill:** 2026-05-11 (Session 245).
 **App:** Katrina's Mystic Visitors Guide — Historic Salem Tour App
 **Scope:** Covers the V1 commercial release only. V1 is fully offline and collects no data outside your device. This policy is deliberately scoped to what the shipped V1 app actually does; future versions that introduce server-side features will update this policy before those features activate.
 
-**Legal placeholders** — the following will be resolved at the 2026-04-20 counsel meeting and before public hosting:
-- `[OPERATING ENTITY TBD]` — the C-corp being formed at the 2026-04-20 counsel meeting will be the operating entity.
-- `[CONTACT EMAIL TBD]` — privacy-inquiries email address.
-- `[MAILING ADDRESS TBD]` — physical mailing address (likely PO Box or C-corp registered agent).
-- `[JURISDICTION TBD]` — state of incorporation for the operating entity.
+**Operating entity (filed 2026-05-11, MA SOC Filing # 202626416630):**
+- **Name:** Destructive AI Gurus, LLC
+- **Jurisdiction:** The Commonwealth of Massachusetts (a Massachusetts limited liability company organized under General Laws, Chapter 156C)
+- **Mailing address:** 111 Essex Street, Beverly, MA 01915, USA
+- **Contact email:** contact@destructiveaigurus.com
 
 ---
 
@@ -28,7 +28,7 @@ This text appears in the app's in-settings privacy section and on the Google Pla
 
 ### 2.1 Who we are and what this policy covers
 
-Katrina's Mystic Visitors Guide ("the app") is a GPS-guided walking-tour application for Salem, Massachusetts, produced by **[OPERATING ENTITY TBD]** ("we," "us"). This Privacy Policy explains every category of data the app uses, why, where it is stored, and who can see it.
+Katrina's Mystic Visitors Guide ("the app") is a GPS-guided walking-tour application for Salem, Massachusetts, produced by **Destructive AI Gurus, LLC** ("we," "us"). This Privacy Policy explains every category of data the app uses, why, where it is stored, and who can see it.
 
 **This is the V1 commercial release.** The V1 app is fully offline: once installed, it does not require a network connection to function, and it does not transmit your location or any other personal information to any server under our control.
 
@@ -85,10 +85,10 @@ Because V1 does not transmit any data off your device, there is no server, cloud
 
 Questions about this Privacy Policy can be sent to:
 
-- **Email:** [CONTACT EMAIL TBD]
-- **Mailing address:** [MAILING ADDRESS TBD]
+- **Email:** contact@destructiveaigurus.com
+- **Mailing address:** Destructive AI Gurus, LLC, 111 Essex Street, Beverly, MA 01915, USA
 
-The operating entity for this app is **[OPERATING ENTITY TBD]**, incorporated in **[JURISDICTION TBD]**.
+The operating entity for this app is **Destructive AI Gurus, LLC**, a limited liability company organized under the laws of **the Commonwealth of Massachusetts** (MA SOC Filing # 202626416630, filed 2026-05-11).
 
 ### 2.10 Changes to this policy
 
@@ -104,11 +104,11 @@ This section is drafting commentary for the operator + counsel review pass. It w
 
 1. **Posture A — V1-minimal.** This document deliberately covers **only** what the shipped V1 app does. It does not mention Bluetooth/Wi-Fi/cellular observation, hashed-device-ID collection, the operator's security systems, or any of the OMEN-008 Salem-stream material. Those are future-state features and will get their own policy revision when the code is written. The full OMEN-008-compliant draft is preserved at `docs/PRIVACY-POLICY.md` for that future use.
 
-2. **Legal entity — to be decided 2026-04-20.** The C-corp formation meeting on 2026-04-20 drives this decision. The policy references `[OPERATING ENTITY TBD]` in four places: the header, section 2.1, section 2.9, and the "Last updated" footer. Once the entity is registered, collapse all four placeholders to the registered name.
+2. **Legal entity — RESOLVED 2026-05-11.** Operating entity formed as **Destructive AI Gurus, LLC**, a Massachusetts limited liability company (not a C-corp as originally contemplated — the operator elected an MA LLC for simpler single-member structure and home-state alignment). MA SOC Filing # 202626416630, approved by William Francis Galvin, Secretary of the Commonwealth, on 2026-05-11 at 11:21 AM. Manager + Resident Agent: Dean Ellis. Principal office: 111 Essex Street, Beverly, MA 01915. Certificate of Organization PDF kept locally at `LegalDocuments/` (gitignored) — operator-owned legal record, not in the public repo.
 
-3. **Contact email and mailing address — to be decided with counsel.** The policy currently lists both as TBD. Options discussed: `privacy@destructiveaigurus.com` (requires DAG mail alias setup) vs. `Dean.Maurice.Ellis@gmail.com` (works immediately but personal). Mailing options: home address (publishes forever), PO Box (~$50-100/yr at USPS), or C-corp registered-agent address.
+3. **Contact email and mailing address — RESOLVED 2026-05-11.** Email: `contact@destructiveaigurus.com` (operator-assigned). Mailing address: 111 Essex Street, Beverly, MA 01915 — same as the principal office on the Certificate of Organization, and same as the operator's residence. Note: this is now public record on the MA SOC filing system, so listing it in the policy adds no new exposure.
 
-4. **Jurisdiction — ties to entity formation.** The C-corp will be incorporated in a specific state (Delaware is common for C-corps; Massachusetts is the operator's home state). Whichever state is selected goes in section 2.9.
+4. **Jurisdiction — RESOLVED 2026-05-11.** Commonwealth of Massachusetts. The operator elected an MA LLC over a Delaware C-corp; pro is home-state alignment + simpler formation; con is missed Delaware C-corp tax / investor optics if the entity ever raises outside capital. Conversion to Delaware (or a roll-up into a parent corp) is a future option but not a V1 launch blocker.
 
 5. **Hosting URL — DestructiveAIGurus.com subpage.** Operator direction S145: *"This will be all hosted under DestructiveAIGurus.com — the whole website will need to be redeveloped but everything should be part there as subpages for now."* Suggested URL pattern: `destructiveaigurus.com/katrinas-mystic-guide/privacy` (or similar). Final slug: operator decision.
 
@@ -129,15 +129,16 @@ This section is drafting commentary for the operator + counsel review pass. It w
 9. **Future Privacy Policy (OMEN-008 draft).** The 184-line full OMEN-008-compliant policy at `docs/PRIVACY-POLICY.md` is held in reserve. When the RadioIntelligence Salem stream is eventually coded, that policy replaces this one on the next app launch via the §2.10 material-change notice. The two documents intentionally do not overlap: V1 = on-device only; future = Salem radio-environment analytics.
 
 10. **Draft review checklist for counsel:**
-   - [ ] Operating entity name (2026-04-20 C-corp decision)
-   - [ ] Jurisdiction of incorporation
-   - [ ] Contact email
-   - [ ] Mailing address
+   - [x] Operating entity name — Destructive AI Gurus, LLC (MA SOC Filing # 202626416630, 2026-05-11)
+   - [x] Jurisdiction — Commonwealth of Massachusetts (MA LLC, not Delaware C-corp)
+   - [x] Contact email — contact@destructiveaigurus.com
+   - [x] Mailing address — 111 Essex Street, Beverly, MA 01915
    - [ ] Approve plain-English tone (section 2.4 especially — "What we do not collect cannot be lost, leaked, subpoenaed, or sold" is deliberately strong)
    - [ ] Approve age-gate posture (IARC Teen + Google Family Link, no dev-side gate)
    - [ ] Approve hosting URL pattern on DestructiveAIGurus.com
    - [ ] Approve the change-notice mechanism in §2.10 (in-app notice on next launch after material change)
+   - [ ] Confirm LLC's single-member status + lack of written operating agreement does not undermine the publisher representations in §2.1 / §2.9 (separately: counsel may recommend a written OA before AAB upload regardless, for veil-protection)
 
 ---
 
-**Last updated:** 2026-04-17 (V1 draft; operating entity, contact, jurisdiction pending 2026-04-20 counsel meeting).
+**Last updated:** 2026-05-11 (V1 entity backfill — operating entity, jurisdiction, contact, mailing all populated from MA SOC Filing # 202626416630).
