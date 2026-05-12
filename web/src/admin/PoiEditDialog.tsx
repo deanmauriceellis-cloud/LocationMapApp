@@ -879,38 +879,19 @@ export function PoiEditDialog({
         return
       }
       try {
-        // S244 — first attempt without ?force. If the backend refuses with
-        // NO_OVERWRITE_LOCKED, prompt the operator and retry with ?force=true.
-        const doPut = (force: boolean) =>
-          fetch(
-            `/api/admin/salem/pois/${encodeURIComponent(poi.id)}${force ? '?force=true' : ''}`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'same-origin',
-              body: JSON.stringify(built.payload),
-            },
-          )
-        let res = await doPut(false)
-        if (res.status === 409) {
-          // Peek the body; only treat as a no_overwrite lock if the code matches.
-          const cloned = res.clone()
-          let lockBody: { code?: string; locked_fields?: string[]; error?: string } | null = null
-          try { lockBody = await cloned.json() } catch { /* not JSON */ }
-          if (lockBody?.code === 'NO_OVERWRITE_LOCKED') {
-            const fields = (lockBody.locked_fields ?? []).join(', ') || '(unknown)'
-            const ok = window.confirm(
-              `This POI is flagged "Admin Authored — Do Not Overwrite".\n\n` +
-              `Saving will change protected field(s): ${fields}\n\n` +
-              `Override the lock and save anyway?`,
-            )
-            if (!ok) {
-              setSaveError('Save cancelled — POI is admin-authored.')
-              return
-            }
-            res = await doPut(true)
-          }
-        }
+        // S245 — admin dialog is the trusted hand-edit path; always pass
+        // ?force=true so the no_overwrite lock never blocks an interactive
+        // save. The lock is only meant to stop AI / automation / unattended
+        // scripts that don't know to bypass it.
+        const res = await fetch(
+          `/api/admin/salem/pois/${encodeURIComponent(poi.id)}?force=true`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(built.payload),
+          },
+        )
         if (!res.ok) {
           let msg = `${res.status} ${res.statusText}`
           try {
@@ -1710,35 +1691,59 @@ export function PoiEditDialog({
 
                     {/* ─── Flags ───────────────────────────────────────────── */}
                     <TabPanel className="space-y-6">
-                      {/* S244 — Authoring lock. Pinned to the top of the Flags
-                          tab so it's the first toggle the operator sees when
-                          protecting curated content. */}
-                      <div className="rounded-lg border border-amber-300 bg-amber-50/60 p-4">
-                        <div className="text-xs font-semibold text-amber-900 uppercase tracking-wide mb-3">
-                          Authoring Lock
-                        </div>
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                          <div className="relative mt-0.5 flex-shrink-0">
-                            <input
-                              type="checkbox"
-                              {...reg('no_overwrite')}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 rounded-full border border-amber-400 bg-amber-100 peer-checked:bg-amber-500 peer-checked:border-amber-500 transition-colors" />
-                            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-amber-900 group-hover:text-amber-950">
-                              Admin Authored — Do Not Overwrite (NoOverwrite)
+                      {/* S245 — Authoring lock. Red when locked, clear/neutral
+                          when unlocked, so the panel's state is visible at a
+                          glance from across the dialog. */}
+                      {(() => {
+                        const locked = !!watch('no_overwrite')
+                        return (
+                          <div
+                            className={
+                              locked
+                                ? 'rounded-lg border border-red-400 bg-red-50 p-4'
+                                : 'rounded-lg border border-slate-300 bg-white p-4'
+                            }
+                          >
+                            <div
+                              className={
+                                'text-xs font-semibold uppercase tracking-wide mb-3 ' +
+                                (locked ? 'text-red-900' : 'text-slate-600')
+                              }
+                            >
+                              Authoring Lock {locked ? '— Locked' : '— Unlocked'}
                             </div>
-                            <div className="text-xs text-amber-800/80">
-                              Blocks programmatic writes (mass-edit apply, AI backfill scripts) from
-                              changing narration text, description, or year_established. Hand-edits
-                              from this dialog will prompt to confirm. Toggle off to unlock.
-                            </div>
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                              <div className="relative mt-0.5 flex-shrink-0">
+                                <input
+                                  type="checkbox"
+                                  {...reg('no_overwrite')}
+                                  className="sr-only peer"
+                                />
+                                {/* Track: red when on, light slate when off — both clearly readable */}
+                                <div className="w-9 h-5 rounded-full border border-slate-300 bg-slate-200 peer-checked:bg-red-600 peer-checked:border-red-600 transition-colors" />
+                                {/* Knob: white circle that slides; ring helps the OFF state read as a switch */}
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow ring-1 ring-slate-400 peer-checked:ring-red-700 transition-transform peer-checked:translate-x-4" />
+                              </div>
+                              <div>
+                                <div
+                                  className={
+                                    'text-sm font-medium ' +
+                                    (locked ? 'text-red-900 group-hover:text-red-950' : 'text-slate-800 group-hover:text-slate-900')
+                                  }
+                                >
+                                  Admin Authored — Do Not Overwrite (NoOverwrite)
+                                </div>
+                                <div className={'text-xs ' + (locked ? 'text-red-800/80' : 'text-slate-500')}>
+                                  Blocks AI and unattended automation (backfill scripts, batch
+                                  rewriters) from changing narration text, description, or
+                                  year_established. Admin hand-edits from this dialog (and
+                                  approvals from the Mass-Edit tab) always go through.
+                                </div>
+                              </div>
+                            </label>
                           </div>
-                        </label>
-                      </div>
+                        )
+                      })()}
 
                       {/* Operational flags */}
                       <div>

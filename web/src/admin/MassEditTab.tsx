@@ -133,7 +133,10 @@ export function MassEditTab() {
 
     setPhase('applying')
     setError(null)
-    fetch('/api/admin/salem/pois/apply-mass-edit', {
+    // S245 — Mass-Edit Tab is an admin-driven path (operator picks each
+    // approval explicitly), so it always passes ?force=true. The
+    // no_overwrite lock targets AI / unattended automation, not the admin UI.
+    fetch('/api/admin/salem/pois/apply-mass-edit?force=true', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
