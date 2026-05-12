@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S250 — Debug-only network security config.
+
+  Companion to app-salem/src/debug/AndroidManifest.xml + the SuperAdminMode
+  runtime override (S249). Without this file, Android API 28+ blocks
+  cleartext HTTP by default — OkHttp throws UnknownServiceException before
+  ever hitting the wire, so even after INTERNET is granted and the V1 gate
+  is bypassed via SuperAdmin, calls to the LAN cache-proxy at
+  http://10.0.0.x:4300 silently fail.
+
+  Allow-listed in debug only:
+    - 10.0.0.0/8 (operator's LAN) — the cache-proxy + SalemIntelligence
+      typically live on 10.0.0.229
+    - localhost / 127.0.0.1 — for emulator tunneling
+    - 192.168.0.0/16 — common home-router LAN range, just in case
+
+  Public hostnames (api.weather.gov, api-v3.mbta.com, api.windy.com, etc.)
+  are reached via the cache-proxy, never from the device — so they don't
+  need an entry here.
+
+  Release builds do NOT include this overlay (src/debug/ only), so retail
+  V1 keeps Android's default HTTPS-only posture. Belt-and-braces: even if
+  this leaked into release, INTERNET permission isn't granted there
+  either (per src/debug/AndroidManifest.xml + S249 :core manifest cleanup).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.0.229</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

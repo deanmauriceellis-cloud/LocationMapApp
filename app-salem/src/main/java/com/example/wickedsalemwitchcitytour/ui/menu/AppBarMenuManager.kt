@@ -80,12 +80,30 @@ class AppBarMenuManager(
     // on between sessions and burn the gallery.
     private var gpsBurstActive: Boolean = false
 
+    // S250 — saved refs to slim-toolbar icons so SuperAdmin toggle can flip
+    // their visibility without rebuilding the toolbar. Set during setupSlimToolbar.
+    private var slimWeatherIcon: ImageView? = null
+    private var slimAlertsIcon:  ImageView? = null
+
     // ─────────────────────────────────────────────────────────────────────────
     // PHASE 1 — called from onCreate (no menu items exist yet)
     // ─────────────────────────────────────────────────────────────────────────
 
     fun setupToolbarMenus() {
         DebugLogger.i(TAG, "setupToolbarMenus() — deferring click wiring until onMenuInflated()")
+    }
+
+    /**
+     * S250 — call after [SuperAdminMode.setEnabled] to flip the slim-toolbar
+     * Weather + Alerts icon visibility to match the new override state. The
+     * 9-dot grid dropdown rebuilds its rows on every open, so it picks up the
+     * new state without any explicit reapply.
+     */
+    fun reapplySuperAdminVisibility() {
+        val show = SuperAdminMode.allowNetwork || !FeatureFlags.V1_OFFLINE_ONLY
+        slimWeatherIcon?.visibility = if (show) View.VISIBLE else View.GONE
+        slimAlertsIcon?.visibility  = if (show) View.VISIBLE else View.GONE
+        DebugLogger.i(TAG, "reapplySuperAdminVisibility — slim weather/alerts icons ${if (show) "shown" else "hidden"}")
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -105,6 +123,8 @@ class AppBarMenuManager(
         } else if (FeatureFlags.V1_OFFLINE_ONLY) {
             // SuperAdmin override on — explicitly re-show in case a prior
             // onMenuInflated hid them when SuperAdmin was off.
+            // (Note: onCreateOptionsMenu is stubbed in SalemMainActivity,
+            // so this branch is effectively dead code; kept for V2 path.)
             menu.findItem(R.id.menu_top_weather)?.isVisible = true
             menu.findItem(R.id.menu_top_transit)?.isVisible = true
             menu.findItem(R.id.menu_top_cams)?.isVisible = true
@@ -167,13 +187,18 @@ class AppBarMenuManager(
         weatherIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
         alertsIcon.imageTintList = ColorStateList.valueOf(Color.WHITE)
 
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        // S250 — save refs so SuperAdmin runtime toggle can flip visibility later.
+        slimWeatherIcon = weatherIcon
+        slimAlertsIcon  = alertsIcon
+
+        // S250 — always wire click listeners (cheap; no harm if icon hidden).
+        // Visibility is the only thing the V1 gate controls now.
+        weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
+        alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             weatherIcon.visibility = View.GONE
             alertsIcon.visibility = View.GONE
             DebugLogger.i(TAG, "V1_OFFLINE_ONLY — slim-toolbar weather + alerts icons hidden")
-        } else {
-            weatherIcon.setOnClickListener { menuEventListener.onWeatherRequested() }
-            alertsIcon.setOnClickListener { menuEventListener.onAlertsRequested() }
         }
         gridButton.setOnClickListener { showGridDropdown(it) }
 
@@ -573,7 +598,7 @@ class AppBarMenuManager(
             GridBtn(R.drawable.ic_witch_trials, "Witch Trials") { popup.dismiss(); menuEventListener.onWitchTrialsRequested() }
         )
 
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             // S144 V1 grid — two clean rows of four, all functional offline.
             //   Row 1 (Transit/Webcams/Aircraft/Radar): hidden (online-only).
             //   Row 2 (V1 layout): POI | Find | Go To | Journey (was "Utility").
@@ -616,7 +641,7 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showTransitMenu(anchor: View) {
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             DebugLogger.i(TAG, "showTransitMenu suppressed — V1_OFFLINE_ONLY")
             return
         }
@@ -693,7 +718,7 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showCamsMenu(anchor: View) {
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             DebugLogger.i(TAG, "showCamsMenu suppressed — V1_OFFLINE_ONLY")
             return
         }
@@ -766,7 +791,7 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showAircraftMenu(anchor: View) {
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             DebugLogger.i(TAG, "showAircraftMenu suppressed — V1_OFFLINE_ONLY")
             return
         }
@@ -813,7 +838,7 @@ class AppBarMenuManager(
     // =========================================================================
 
     private fun showRadarMenu(anchor: View) {
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             DebugLogger.i(TAG, "showRadarMenu suppressed — V1_OFFLINE_ONLY")
             return
         }
@@ -975,7 +1000,7 @@ class AppBarMenuManager(
 
     private fun showUtilityMenu(anchor: View) {
         val popup = buildPopup(anchor, R.menu.menu_utility)
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             // S144 — Journey menu (V1) is user-facing, not a dev console.
             // Hide every item that needs the network or only makes sense to
             // the operator's dev workflow. What remains is: Record GPS, Build
@@ -1066,7 +1091,7 @@ class AppBarMenuManager(
 
     fun showAlertsMenu(anchor: View) {
         val popup = buildPopup(anchor, R.menu.menu_alerts)
-        if (FeatureFlags.V1_OFFLINE_ONLY) {
+        if (FeatureFlags.V1_OFFLINE_ONLY && !SuperAdminMode.allowNetwork) {
             // TFR data comes from a live aviation feed — remove the toggle in V1
             // so the user doesn't see a switch that would never populate data.
             popup.menu.removeItem(R.id.menu_tfr_overlay)

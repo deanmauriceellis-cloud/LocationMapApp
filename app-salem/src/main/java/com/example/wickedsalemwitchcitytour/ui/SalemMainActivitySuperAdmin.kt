@@ -53,7 +53,11 @@ internal fun SalemMainActivity.wireSuperAdminToolbar() {
         val nowOn = !SuperAdminMode.isEnabled()
         SuperAdminMode.setEnabled(nowOn)
         refreshSuperAdminIconTint()
-        invalidateOptionsMenu()  // re-runs onMenuInflated → re-evaluates V1 hide block
+        // S250 — flip slim-toolbar Weather/Alerts icon visibility (the 9-dot
+        // grid dropdown rebuilds itself on each open, so it picks up the new
+        // state automatically). onCreateOptionsMenu is stubbed so we don't
+        // call invalidateOptionsMenu here — would be a no-op.
+        appBarMenuManager.reapplySuperAdminVisibility()
         val msg = if (nowOn) {
             "SuperAdmin: ON — V1+ services unlocked (weather / MBTA / aircraft / radar / webcams). LAN cache-proxy required."
         } else {
