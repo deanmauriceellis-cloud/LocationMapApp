@@ -1,6 +1,6 @@
 /*
  * WickedSalemApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * S213 — unit tests for NarrationManager.normalizeForTts(). Verifies the
  * markdown-strip pass and the abbreviation-expansion heuristics against

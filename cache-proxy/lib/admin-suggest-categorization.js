@@ -1,6 +1,6 @@
 /**
  * Module: admin-suggest-categorization.js
- * (C) Dean Maurice Ellis, 2026
+ * (C) Destructive AI Gurus, LLC, 2026
  *
  * S205 — Auto-categorize commercial POIs by mapping SalemIntelligence
  * (port 8089) `primary_category` + secondary/specialty/name patterns onto

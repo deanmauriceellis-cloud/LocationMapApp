@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.0
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -29,7 +29,7 @@ import kotlin.math.cos
 import kotlin.math.sqrt
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WalkingDirections.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module WalkingDirections.kt"
 
 /**
  * Walking directions engine using OSRM (Open Source Routing Machine).

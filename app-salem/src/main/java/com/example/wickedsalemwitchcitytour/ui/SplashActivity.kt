@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.0
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -36,7 +36,7 @@ import com.google.android.gms.location.LocationServices
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SplashActivity.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module SplashActivity.kt"
 
 /**
  * SplashActivity — Branded launch screen for Katrina's Mystic Visitors Guide.

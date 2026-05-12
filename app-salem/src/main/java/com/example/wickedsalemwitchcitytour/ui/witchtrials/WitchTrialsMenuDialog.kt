@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.5 — Phase 9X (Session 127; history grid S129)
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * "The Salem Witch Trials" 3-panel sub-menu, opened from the welcome
  * dialog's hero card. The History panel now opens a real 4×4 tile grid
@@ -39,7 +39,7 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module WitchTrialsMenuDialog.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module WitchTrialsMenuDialog.kt"
 
 // Match the existing Salem brand palette from SalemMainActivityTour.kt.
 private const val SALEM_PURPLE = "#2D1B4E"

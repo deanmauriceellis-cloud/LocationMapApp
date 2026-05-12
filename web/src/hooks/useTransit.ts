@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module useTransit.ts
+// (C) Destructive AI Gurus, LLC, 2026 - Module useTransit.ts
 import { useState, useRef, useCallback } from 'react'
 import { apiFetch } from '@/config/api'
 import type { BboxParams, MbtaVehicle, MbtaStop, MbtaPrediction } from '@/lib/types'

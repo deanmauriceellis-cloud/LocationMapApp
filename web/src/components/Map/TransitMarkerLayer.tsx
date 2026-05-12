@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module TransitMarkerLayer.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module TransitMarkerLayer.tsx
 import { useMemo, useState } from 'react'
 import { CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { getRouteColor, vehicleStatusLabel } from '@/config/transit'

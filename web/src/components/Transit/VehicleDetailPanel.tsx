@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module VehicleDetailPanel.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module VehicleDetailPanel.tsx
 import { getRouteColor, routeTypeLabel, vehicleStatusLabel } from '@/config/transit'
 import type { MbtaVehicle, MbtaPrediction } from '@/lib/types'
 

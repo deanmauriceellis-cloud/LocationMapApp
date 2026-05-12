@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin Tour write endpoints (S174 — web admin tour editor).
  *
@@ -18,7 +18,7 @@
  *   GET   /admin/salem/tours/:tour_id                  — tour + ordered stops
  *   PATCH /admin/salem/tours/:tour_id/stops/:stop_id   — move / narration
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-tours.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-tours.js';
 
 function isFiniteNumber(v) {
   return typeof v === 'number' && Number.isFinite(v);

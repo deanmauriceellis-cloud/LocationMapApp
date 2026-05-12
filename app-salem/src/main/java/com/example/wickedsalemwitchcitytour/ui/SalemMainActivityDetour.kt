@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.0
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * S221 — Tour detour UI: persistent floating banner, manage-dialog
  * (Return / Stop / Cancel), and the orange out-route + rejoin polylines.

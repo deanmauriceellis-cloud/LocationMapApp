@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -15,7 +15,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module FavoritesManager.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module FavoritesManager.kt"
 
 class FavoritesManager(context: Context) {
 

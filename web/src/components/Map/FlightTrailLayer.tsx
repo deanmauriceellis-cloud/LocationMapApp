@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module FlightTrailLayer.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module FlightTrailLayer.tsx
 import { Polyline } from 'react-leaflet'
 import { getAltitudeColor } from '@/config/aircraft'
 import type { FlightPathPoint } from '@/lib/types'

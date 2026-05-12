@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5 — Phase 9P.6 (Session 101)
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * ════════════════════════════════════════════════════════════════════════
  * MIRROR OF: app-salem/src/main/java/com/example/wickedsalemwitchcitytour/ui/menu/PoiCategories.kt

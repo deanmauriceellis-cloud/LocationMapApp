@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.5 — Phase 9R.0 / S135
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  */
 
 package com.example.wickedsalemwitchcitytour.tour
@@ -16,7 +16,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module HistoricalHeadlineQueue.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module HistoricalHeadlineQueue.kt"
 
 /**
  * Salem 1692 "newspaper dispatch" filler — read chronologically during

@@ -1,12 +1,12 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
--- MODULE_ID: (C) Dean Maurice Ellis, 2026 - Module schema.sql
+-- MODULE_ID: (C) Destructive AI Gurus, LLC, 2026 - Module schema.sql
 
 -- POI permanent storage schema for LocationMapApp
 -- Usage: psql -U postgres -d locationmapapp -f schema.sql

@@ -1,6 +1,6 @@
 /*
  * WickedSalemApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Phase 9T: Salem Walking Tour Restructure — Narration system wiring
  */

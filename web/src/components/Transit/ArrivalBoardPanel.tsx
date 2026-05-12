@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module ArrivalBoardPanel.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module ArrivalBoardPanel.tsx
 import type { MbtaPrediction } from '@/lib/types'
 
 interface Props {

@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.5 — Phase 9X.7 (Session 133)
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Cross-linking renderer for Witch Trials body text. Scans for known NPC
  * names and explicit [[npc:id]] / [[newspaper:YYYY-MM-DD]] markup, converts

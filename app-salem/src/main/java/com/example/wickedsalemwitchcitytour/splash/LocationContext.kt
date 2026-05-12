@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * S231 — splash decision-tree LocationContext.
  *
@@ -21,7 +21,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-internal const val SPLASH_MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module LocationContext.kt"
+internal const val SPLASH_MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module LocationContext.kt"
 
 /** Salem common — anchor for distance + bearing. */
 const val SALEM_LAT = 42.5224

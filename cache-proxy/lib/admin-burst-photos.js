@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin burst-photos endpoint (S229).
  *
@@ -22,7 +22,7 @@
  * Filename pattern (produced by GpsBurstCameraManager.kt, S228):
  *   burst_YYYYMMDD-HHMMSS_<lat>_<lon>.jpg   (negatives use 'n')
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-burst-photos.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-burst-photos.js';
 
 const fs = require('fs');
 const path = require('path');

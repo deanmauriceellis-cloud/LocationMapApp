@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
  * strictly prohibited.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module import-pois.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module import-pois.js';
 
 // Import POIs from cache proxy into PostgreSQL
 // Usage: DATABASE_URL=postgres://user:pass@localhost/locationmapapp node import-pois.js

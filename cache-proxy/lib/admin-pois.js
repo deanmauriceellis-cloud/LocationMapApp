@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin POI write endpoints (Phase 9U — unified salem_pois table).
  *
@@ -34,7 +34,7 @@
  *
  * All write endpoints set updated_at = NOW() automatically.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-pois.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-pois.js';
 
 const {
   tigerPool,

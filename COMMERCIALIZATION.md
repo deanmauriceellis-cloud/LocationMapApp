@@ -59,10 +59,10 @@ V1 Posture A (per PRIVACY-POLICY-V1.md §3.7):
 
 | Item | Owner | Status |
 |---|---|---|
-| Form TX copyright filing | Counsel | Hard deadline 2026-05-20 (per S201 confirmation: lawyer handling) |
-| Operating entity formation | Counsel | C-corp formation discussed at 2026-04-20 meeting; outcome captured by operator, four privacy-policy [TBD] fields pending operator-relay |
-| Play Console developer account | Operator | Starting this week (multi-week ID-verification clock) |
-| Privacy policy public hosting | Operator + counsel | Planned subpage on DestructiveAIGurus.com once entity + contact resolved |
+| Form TX copyright filing | Counsel | Hard deadline 2026-05-20. **Must name Destructive AI Gurus, LLC as claimant** (entity-owned copyright preferred over personal). |
+| Operating entity formation | DONE (S245, 2026-05-11) | **Destructive AI Gurus, LLC** — MA LLC, Filing # 202626416630, MA ID # 001971098. Principal office 111 Essex Street, Beverly, MA 01915. Manager + Resident Agent: Dean Ellis. Single-member, manager-managed. All four privacy-policy `[TBD]` fields now resolved in `docs/PRIVACY-POLICY-V1.md` v1.1. |
+| Play Console developer account | Operator | Register under **Destructive AI Gurus, LLC**; multi-week ID-verification clock should start immediately. |
+| Privacy policy public hosting | Operator + counsel | Planned subpage on DestructiveAIGurus.com; contact email `contact@destructiveaigurus.com` confirmed. |
 | Upload keystore second-medium backup | Operator | Covered (multiple secure methods per S201 confirmation) |
 | Trademark "Katrina's Mystic Visitors Guide" | Deferred | Post-launch decision |
 

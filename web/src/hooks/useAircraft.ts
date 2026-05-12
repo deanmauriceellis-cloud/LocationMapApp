@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module useAircraft.ts
+// (C) Destructive AI Gurus, LLC, 2026 - Module useAircraft.ts
 import { useState, useRef, useCallback } from 'react'
 import { apiFetch, API_BASE } from '@/config/api'
 import type { AircraftState, AircraftHistory, BboxParams } from '@/lib/types'

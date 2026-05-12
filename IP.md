@@ -1,8 +1,9 @@
 # Katrina's Mystic Visitors Guide — V1 Intellectual Property Register
 
-**Author:** Dean Maurice Ellis
-**Copyright:** (c) 2026 Dean Maurice Ellis. All rights reserved.
-**Last updated:** 2026-04-29 (S201 V1 triage).
+**Author / Developer:** Dean Ellis (natural-person creator)
+**Copyright Holder:** Destructive AI Gurus, LLC (MA LLC, Filing # 202626416630, formed 2026-05-11)
+**Copyright:** (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
+**Last updated:** 2026-05-11 (S246 entity propagation).
 **Status:** Proprietary — not licensed for redistribution.
 
 > **Pre-pivot patent register archived** at `docs/archive/IP_removed_2026-04-29.md` — 14 patentable innovations from the generic LocationMapApp platform (Adaptive Radius Cap-Retry, Probe-Calibrate-Spiral Scanner, Overpass Fair-Queue, JTS R-Tree Geofence Engine for TFR/military/aircraft, etc.). None of those algorithms ship in V1; the register is preserved for historical context. Do not treat it as a V1 spec.
@@ -22,7 +23,7 @@
 
 | Item | Owner | Status |
 |---|---|---|
-| **Form TX copyright registration** | Counsel | **Hard deadline 2026-05-20.** Per S201 operator confirmation: lawyer is handling. Filing as Dean Maurice Ellis individually (or under newly formed C-corp if entity is registered first); preserves statutory damages eligibility for the launch window. $65 + ~10 minutes online at copyright.gov. |
+| **Form TX copyright registration** | Counsel | **Hard deadline 2026-05-20.** Per S201 operator confirmation: lawyer is handling. **Filing must name Destructive AI Gurus, LLC as claimant** (entity formed 2026-05-11, MA SOC Filing # 202626416630) — not Dean Ellis personally. Entity-owned copyright produces a more durable license posture and aligns with the publisher representations in the privacy policy and store listing. Preserves statutory damages eligibility for the launch window. $65 + ~10 minutes online at copyright.gov. |
 | Copyright headers on source files | Done | Originally added in pre-pivot work; retained on V1 source. |
 | GitHub repo private | Done | `github.com/deanmauriceellis-cloud/LocationMapApp_v1.5` is private. |
 | Trademark filing | Deferred | Post-launch. USPTO TEAS Plus / Standard, IC 009 (mobile application software). $250-350 filing fee. |

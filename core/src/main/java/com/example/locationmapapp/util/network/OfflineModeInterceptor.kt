@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -16,7 +16,7 @@ import okhttp3.Response
 import java.io.IOException
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module OfflineModeInterceptor.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module OfflineModeInterceptor.kt"
 
 /**
  * OkHttp interceptor that enforces the V1 offline-only posture at the transport

@@ -14,7 +14,7 @@
  * Hook into Gradle preBuild (publishSalemContent task) so every :app-salem
  * build runs this automatically. Skip with -PskipPublishChain if needed.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module publish-splash-tree.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module publish-splash-tree.js';
 void MODULE_ID;
 
 const fs = require('fs');

@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Shared TigerLine geocoding helpers (S218).
  *
@@ -8,7 +8,7 @@
  * TigerLine) and admin-lint.js (cluster + deep-scan flows) share the same
  * pool, address-normalization rules, and variant ladder.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module tiger-geocode.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module tiger-geocode.js';
 
 const { Pool } = require('pg');
 

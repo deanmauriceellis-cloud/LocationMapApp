@@ -26,7 +26,7 @@
  * candidates per (lat, lon) lookup, then runs point-in-polygon against the
  * simplified WKB. Sub-millisecond warm.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module bake-place-polygons.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module bake-place-polygons.js';
 void MODULE_ID;
 
 const fs = require('fs');

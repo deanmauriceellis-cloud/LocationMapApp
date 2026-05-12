@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin Basic Auth middleware (Phase 9P.3).
  *
@@ -12,7 +12,7 @@
  *
  * Hard-fails at startup if either env var is unset — see ensureConfigured().
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-auth.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-auth.js';
 
 const crypto = require('crypto');
 

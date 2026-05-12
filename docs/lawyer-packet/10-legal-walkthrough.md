@@ -47,9 +47,11 @@ These are the items that require counsel sign-off or operator-with-counsel decis
 
 ## 3. Operating entity
 
+> **S246 UPDATE (2026-05-11) — DECISION SUPERSEDED.** Operator formed **Destructive AI Gurus, LLC** (Massachusetts LLC, MA SOC Filing # 202626416630, MA Identification # 001971098, filed and approved 2026-05-11 11:21 AM by Secretary William Francis Galvin). Principal office 111 Essex Street, Beverly, MA 01915. Single-member, manager-managed; Dean Ellis is Manager and Resident Agent. General character: software development. The remainder of this section (and the C-corp framing throughout the document) is preserved as historical pre-formation counsel material; counsel should now read it as "what was considered, before the LLC was chosen." Roll-up into a Delaware parent C-corp remains a known future move if outside capital is ever raised. **Counsel action items still open as of S246:** (a) confirm Form TX names the LLC as claimant (not Dean Ellis personally) before the 2026-05-20 deadline; (b) advise whether a written single-member operating agreement is warranted before AAB upload for veil protection (MA does not require one for single-member LLCs).
+
 ### 3.1 The decision
 
-Per Session 145 operator direction: **form a C-corp at the 2026-04-20 counsel meeting; the C-corp is the operating entity for the app.**
+Per Session 145 operator direction: **form a C-corp at the 2026-04-20 counsel meeting; the C-corp is the operating entity for the app.** *(See S246 update above — operator instead formed an MA LLC on 2026-05-11.)*
 
 ### 3.2 Counsel-level questions
 

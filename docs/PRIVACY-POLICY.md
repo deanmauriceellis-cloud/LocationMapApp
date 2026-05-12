@@ -24,7 +24,7 @@ The "Read the full Privacy Policy" link opens the text below (either as an in-ap
 
 ### 2.1 Who we are and what this policy covers
 
-WickedSalemWitchCityTour ("the app") is a GPS-guided walking-tour application for Salem, Massachusetts, produced by **[OPERATING ENTITY TBD]** ("we," "us"). This Privacy Policy explains every category of data the app collects, why we collect it, where it is stored, how long it is kept, and who can see it.
+WickedSalemWitchCityTour ("the app") is a GPS-guided walking-tour application for Salem, Massachusetts, produced by **Destructive AI Gurus, LLC** ("we," "us"). This Privacy Policy explains every category of data the app collects, why we collect it, where it is stored, how long it is kept, and who can see it.
 
 This policy covers two distinct collection activities:
 

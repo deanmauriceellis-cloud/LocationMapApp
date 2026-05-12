@@ -1,6 +1,6 @@
 /*
  * WitchTrialsPanel — Phase 9X.7 (Session 133)
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin panel for browsing and editing Witch Trials content: articles (16),
  * NPC bios (49), and newspapers (202). Three-tab layout with list + inline

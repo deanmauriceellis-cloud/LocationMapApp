@@ -3,6 +3,8 @@
   "version": "1.5.15",
   "description": "Caching proxy for LocationMapApp external APIs",
   "main": "server.js",
+  "author": "Destructive AI Gurus, LLC",
+  "license": "UNLICENSED",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"

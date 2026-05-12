@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5 — Salem walking router (web side)
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * JS port of core/.../routing/RoutingBundle.kt + Router.kt. Reads the same
  * `salem-routing-graph.sqlite` bundle the APK ships in app-salem assets, so
@@ -17,7 +17,7 @@
  * Bundle schema is owned by tools/routing-bake/SCHEMA.md. If you change the
  * schema there, update both this loader and core/.../RoutingBundleLoader.kt.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module salem-router.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module salem-router.js';
 
 const path = require('path');
 const fs = require('fs');

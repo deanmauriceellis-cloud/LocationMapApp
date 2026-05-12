@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module AircraftDetailPanel.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module AircraftDetailPanel.tsx
 import {
   getAltitudeColor,
   headingToCompass,

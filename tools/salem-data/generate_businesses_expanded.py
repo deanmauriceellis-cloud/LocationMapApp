@@ -292,7 +292,7 @@ def main():
     kt_lines = []
     kt_lines.append('/*')
     kt_lines.append(' * WickedSalemWitchCityTour v1.0')
-    kt_lines.append(' * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.')
+    kt_lines.append(' * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.')
     kt_lines.append(' *')
     kt_lines.append(' * Auto-generated from merged-salem-pois.json by generate_businesses_expanded.py')
     kt_lines.append(f' * Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')

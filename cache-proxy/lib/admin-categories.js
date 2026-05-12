@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin endpoints for the POI taxonomy tables (S190).
  *
@@ -22,7 +22,7 @@
  * (operator chose inline-create-only). The FK from salem_pois to both
  * tables means delete is non-trivial anyway.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-categories.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-categories.js';
 
 // Default color for operator-created categories. Slate-blue, distinct from
 // the existing palette so newly-added categories are visible at a glance

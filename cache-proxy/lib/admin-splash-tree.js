@@ -16,7 +16,7 @@
  * fires + lists every variant whose template would speak (slot-fill simulated
  * at the polygon-resolver level).
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-splash-tree.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-splash-tree.js';
 void MODULE_ID;
 
 const fs = require('fs');

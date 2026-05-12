@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5 — Phase 9X.7 (Session 133)
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin endpoints for Witch Trials content (articles, NPC bios, newspapers).
  * All routes are mounted under /admin/salem/witch-trials/* and gated by the
@@ -19,7 +19,7 @@
  *   GET    /admin/salem/witch-trials/newspapers/:id      — single newspaper
  *   PUT    /admin/salem/witch-trials/newspapers/:id      — partial update
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-witch-trials.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-witch-trials.js';
 
 // ─── Field whitelists ───────────────────────────────────────────────────────
 

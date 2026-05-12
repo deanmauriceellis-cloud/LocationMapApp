@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module aircraft.ts
+// (C) Destructive AI Gurus, LLC, 2026 - Module aircraft.ts
 
 /** Altitude color mapping — matches Android app */
 export function getAltitudeColor(altMeters: number | null, onGround: boolean): string {

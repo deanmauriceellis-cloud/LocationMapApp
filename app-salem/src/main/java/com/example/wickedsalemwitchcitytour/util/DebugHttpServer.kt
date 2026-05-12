@@ -1,6 +1,6 @@
 /*
  * WickedSalemApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -10,7 +10,7 @@
 package com.example.wickedsalemwitchcitytour.util
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module DebugHttpServer.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module DebugHttpServer.kt"
 
 /**
  * DebugHttpServer — HTTP listener disabled for V1 (S209).

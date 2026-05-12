@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * S231 — runtime polygon resolver against the bundled us_places_v1.sqlite
  * asset. Layered point-in-polygon:

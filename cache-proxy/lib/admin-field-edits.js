@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin field-edits inbox endpoint (S229 Part C).
  *
@@ -24,7 +24,7 @@
  * State sidecar: per-session `state.json` co-located with the JSONL:
  *   { applied: { "<line_index>": { ts, result } }, dismissed: { "<line_index>": { ts, reason } } }
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-field-edits.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-field-edits.js';
 
 const fs = require('fs');
 const path = require('path');

@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour — Salem Content API
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Salem-specific content endpoints. Backward compatible — all routes
  * are under /salem/* prefix and do not affect existing LocationMapApp
@@ -11,7 +11,7 @@
  * non-narrated POIs with business-specific columns) for backward
  * compatibility.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module salem.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module salem.js';
 
 module.exports = function (app, deps) {
   const { pgPool, requirePg } = deps;

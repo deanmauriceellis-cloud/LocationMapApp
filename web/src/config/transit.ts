@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module transit.ts
+// (C) Destructive AI Gurus, LLC, 2026 - Module transit.ts
 
 /** MBTA route colors by route ID prefix / type */
 const ROUTE_COLORS: Record<string, string> = {

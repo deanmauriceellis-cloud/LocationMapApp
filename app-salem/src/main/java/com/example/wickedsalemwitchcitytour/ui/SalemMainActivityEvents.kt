@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.0
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -27,7 +27,7 @@ import com.example.wickedsalemwitchcitytour.content.model.TimelineEvent
 import org.osmdroid.util.GeoPoint
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module SalemMainActivityEvents.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module SalemMainActivityEvents.kt"
 
 private const val EVT_DARK = "#1E1E2A"
 private const val EVT_SURFACE = "#2A2A3C"

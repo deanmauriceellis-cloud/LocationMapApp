@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin tile endpoint (Phase 9Y admin tooling, S160).
  *
@@ -23,7 +23,7 @@
  *     key = (z << (z + z)) | (x << z) | y
  *   using BigInt because at z=19 the shift exceeds JS's safe-integer range.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-tiles.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-tiles.js';
 
 const path = require('path');
 const fs = require('fs');

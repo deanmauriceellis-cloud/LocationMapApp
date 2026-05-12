@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.0
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  */
 
 package com.example.wickedsalemwitchcitytour.tour

@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * S229 — Field-edit mode UI: third top-bar button (debug-only, R8-stripped)
  * that lets the operator capture proposed corrections to POIs while walking.

@@ -1,6 +1,6 @@
 /*
  * WickedSalemWitchCityTour — Salem Content Schema
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Extends the LocationMapApp PostgreSQL database with Salem-specific
  * content tables. Backward compatible — no changes to existing tables.

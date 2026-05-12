@@ -1,6 +1,6 @@
 /*
  * WickedSalemApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * S203 — OMEN-004 phase-1 unit-test seed. First real Kotlin unit test in
  * :app-salem; closes the OMEN-004 deadline (2026-08-30) for "first test

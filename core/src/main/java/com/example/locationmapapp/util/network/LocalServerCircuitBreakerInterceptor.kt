@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * This source code is proprietary and confidential.
  * Unauthorized copying, modification, or distribution is
@@ -18,7 +18,7 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 @Suppress("unused")
-private const val MODULE_ID = "(C) Dean Maurice Ellis, 2026 - Module LocalServerCircuitBreakerInterceptor.kt"
+private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module LocalServerCircuitBreakerInterceptor.kt"
 
 /**
  * OkHttp interceptor that wires every outgoing request through the

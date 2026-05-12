@@ -1,6 +1,6 @@
 /*
  * LocationMapApp v1.5
- * Copyright (c) 2026 Dean Maurice Ellis. All rights reserved.
+ * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
  * Admin Lint endpoints (S187).
  *
@@ -20,7 +20,7 @@
  *        Returns { state, progress, total, items?, generated_at? }.
  *        State machine: idle | running | done | error.
  */
-const MODULE_ID = '(C) Dean Maurice Ellis, 2026 - Module admin-lint.js';
+const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-lint.js';
 
 const { Pool } = require('pg');
 const { validateNarration } = require('./historical-narration-validator');

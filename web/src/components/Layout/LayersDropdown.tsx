@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module LayersDropdown.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module LayersDropdown.tsx
 import { useEffect, useRef } from 'react'
 
 interface LayerToggle {

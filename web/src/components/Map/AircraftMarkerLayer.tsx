@@ -1,4 +1,4 @@
-// (C) Dean Maurice Ellis, 2026 - Module AircraftMarkerLayer.tsx
+// (C) Destructive AI Gurus, LLC, 2026 - Module AircraftMarkerLayer.tsx
 import { useMemo } from 'react'
 import { Marker } from 'react-leaflet'
 import L from 'leaflet'
