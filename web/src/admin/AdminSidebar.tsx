@@ -25,6 +25,7 @@ export type AdminView =
   | 'field-edits'
   | 'mass-edit'
   | 'splash-tree'
+  | 'super-admin'
 
 interface SidebarItem {
   id: AdminView
@@ -61,6 +62,7 @@ const GROUPS: SidebarGroup[] = [
     items: [
       { id: 'splash-tree',  label: 'Splash Tree',  icon: '🌳', title: 'Splash announcement decision tree authoring' },
       { id: 'mass-edit',    label: 'Mass Edit',    icon: '📊', title: 'Bulk POI edits via .xlsx round-trip with per-cell review' },
+      { id: 'super-admin',  label: 'Super Admin',  icon: '🛰', title: 'Post-V1 console — exercise parked external services (weather, MBTA, aircraft, METAR, webcams, TFRs)' },
     ],
   },
 ]

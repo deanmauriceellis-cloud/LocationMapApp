@@ -11,7 +11,10 @@ const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module mbta.js';
 module.exports = function(app, deps) {
   const { cacheGet, cacheSet, stats, log } = deps;
 
-  const MBTA_API_KEY = 'd2dbf0064a5a4e80b9384fea24c43c9b';
+  const MBTA_API_KEY = process.env.MBTA_API_KEY;
+  if (!MBTA_API_KEY) {
+    log('mbta', 'WARN: MBTA_API_KEY not set in .env — MBTA routes will return 503');
+  }
 
   // Helper: build lookup from JSON:API included[] array
   function buildIncludedMap(included) {

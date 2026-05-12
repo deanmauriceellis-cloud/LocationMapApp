@@ -11,7 +11,10 @@ const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module webcams.js';
 module.exports = function(app, deps) {
   const { cacheGet, cacheSet, stats, snapBbox, log } = deps;
 
-  const WINDY_API_KEY = 'VyQEq6OkmnafZMqEqbVrbH4MXQmS1xfw';
+  const WINDY_API_KEY = process.env.WINDY_API_KEY;
+  if (!WINDY_API_KEY) {
+    log('webcams', 'WARN: WINDY_API_KEY not set in .env — /webcams will return 503');
+  }
 
   app.get('/webcams', async (req, res) => {
     const { s, w, n, e, categories } = req.query;

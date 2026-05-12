@@ -34,6 +34,7 @@ import { FieldEditsTab } from './FieldEditsTab'
 import { AdminSidebar, type AdminView } from './AdminSidebar'
 import { SplashTreeTab } from './SplashTreeTab'
 import { MassEditTab } from './MassEditTab'
+import { SuperAdminTab } from './SuperAdminTab'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -911,6 +912,10 @@ export function AdminLayout() {
       ) : view === 'mass-edit' ? (
         <div className="flex-1 min-h-0">
           <MassEditTab />
+        </div>
+      ) : view === 'super-admin' ? (
+        <div className="flex-1 min-h-0">
+          <SuperAdminTab />
         </div>
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">

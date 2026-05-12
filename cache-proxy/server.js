@@ -266,6 +266,12 @@ require('./lib/admin-field-edits')(app, deps);
 // decision-tree editor. Storage at cache-proxy/data/splash-tree-v1.json.
 require('./lib/admin-splash-tree')(app, deps);
 
+// SuperAdmin metadata endpoint (S248) — drives the post-V1 service console
+// in the web admin. Pure metadata; the tab itself calls the existing
+// /weather, /mbta/*, /aircraft, /metar, /webcams, /tfrs routes via the
+// Vite /api proxy. Gated by /admin Basic Auth.
+require('./lib/admin-super')(app, deps);
+
 // ── Start ───────────────────────────────────────────────────────────────────
 
 server.listen(PORT, '0.0.0.0', () => {
