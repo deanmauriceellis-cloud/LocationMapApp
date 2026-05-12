@@ -124,7 +124,23 @@ const UPDATABLE_FIELDS = [
   'haunt_enabled',
   // S227 — per-fire dance duration (seconds, REAL). NULL = SpriteOverlay default.
   'haunt_duration_s',
+  // S244 — admin-authored content lock. When true, programmatic update paths
+  // (PUT, mass-edit apply, future AI backfill scripts) refuse to change any
+  // field in NO_OVERWRITE_PROTECTED_FIELDS unless the caller passes
+  // ?force=true. The flag itself is always toggleable so an operator can
+  // unlock a row.
+  'no_overwrite',
 ];
+
+// S244 — content fields protected by no_overwrite=true. Toggling the flag
+// itself is never blocked; only the prose / metadata most likely to be
+// clobbered by an AI/bake script.
+const NO_OVERWRITE_PROTECTED_FIELDS = new Set([
+  'short_narration', 'long_narration', 'historical_narration',
+  'narration_subtopics',
+  'description', 'short_description', 'custom_description', 'origin_story',
+  'year_established',
+]);
 
 // Columns that hold JSONB and must be JSON.stringify'd before binding.
 const JSONB_FIELDS = new Set([
@@ -235,6 +251,37 @@ function buildUpdateClause(body) {
 
 module.exports = function(app, deps) {
   const { pgPool, requirePg } = deps;
+
+  // S244 — idempotent column bootstrap. `no_overwrite` protects authored
+  // narration / description content from programmatic clobber. PG 9.6+
+  // supports IF NOT EXISTS on ADD COLUMN, so re-deploys are safe.
+  pgPool.query(`
+    ALTER TABLE salem_pois
+      ADD COLUMN IF NOT EXISTS no_overwrite BOOLEAN NOT NULL DEFAULT FALSE;
+  `).catch(err => console.error('[admin-pois] no_overwrite bootstrap failed:', err.message));
+
+  // S244 — given the row stored in PG and the body about to be written,
+  // return the list of protected fields that would actually change. An
+  // empty list means the write is allowed even with the lock on (e.g. only
+  // toggling the flag itself, or only writing non-protected fields like
+  // category / coords). Callers (PUT, mass-edit) use this to decide whether
+  // to refuse with 409.
+  function lockedFieldsThatWouldChange(existingRow, body) {
+    if (!existingRow || existingRow.no_overwrite !== true) return [];
+    if (!body || typeof body !== 'object') return [];
+    const locked = [];
+    for (const field of NO_OVERWRITE_PROTECTED_FIELDS) {
+      if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+      const incoming = body[field];
+      const stored = existingRow[field];
+      // JSONB columns come back from pg as objects/arrays; coerce both sides
+      // to a JSON string for compare so {a:1} === {a:1} works.
+      const a = JSONB_FIELDS.has(field) ? JSON.stringify(incoming ?? null) : (incoming ?? null);
+      const b = JSONB_FIELDS.has(field) ? JSON.stringify(stored ?? null)   : (stored ?? null);
+      if (a !== b) locked.push(field);
+    }
+    return locked;
+  }
 
   // ─── GET /admin/salem/pois — list with filters ─────────────────────────────
   app.get('/admin/salem/pois', requirePg, async (req, res) => {
@@ -551,13 +598,29 @@ module.exports = function(app, deps) {
       const { setSql, values, error } = buildUpdateClause(req.body);
       if (error) return res.status(400).json({ error });
 
+      // S244 — fetch the full row so the no_overwrite check can compare
+      // incoming protected fields against stored values.
       const existing = await pgPool.query(
-        `SELECT id, deleted_at FROM salem_pois WHERE id = $1`,
+        `SELECT * FROM salem_pois WHERE id = $1`,
         [id]
       );
       if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
       if (existing.rows[0].deleted_at) {
         return res.status(409).json({ error: 'POI is soft-deleted; restore it before updating' });
+      }
+
+      // S244 — no_overwrite gate. ?force=true bypasses (operator confirmed
+      // they really do want to overwrite authored content).
+      const force = req.query.force === 'true' || req.query.force === '1';
+      if (!force) {
+        const locked = lockedFieldsThatWouldChange(existing.rows[0], req.body);
+        if (locked.length > 0) {
+          return res.status(409).json({
+            error: 'POI is flagged no_overwrite=true; protected fields would change. Pass ?force=true to override.',
+            code: 'NO_OVERWRITE_LOCKED',
+            locked_fields: locked,
+          });
+        }
       }
 
       values.push(id);
@@ -1214,3 +1277,4 @@ module.exports.UPDATABLE_FIELDS = UPDATABLE_FIELDS;
 module.exports.JSONB_FIELDS = JSONB_FIELDS;
 module.exports.buildUpdateClause = buildUpdateClause;
 module.exports.JSONB_FIELDS = JSONB_FIELDS;
+module.exports.NO_OVERWRITE_PROTECTED_FIELDS = NO_OVERWRITE_PROTECTED_FIELDS;

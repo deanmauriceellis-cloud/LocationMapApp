@@ -879,15 +879,38 @@ export function PoiEditDialog({
         return
       }
       try {
-        const res = await fetch(
-          `/api/admin/salem/pois/${encodeURIComponent(poi.id)}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify(built.payload),
-          },
-        )
+        // S244 — first attempt without ?force. If the backend refuses with
+        // NO_OVERWRITE_LOCKED, prompt the operator and retry with ?force=true.
+        const doPut = (force: boolean) =>
+          fetch(
+            `/api/admin/salem/pois/${encodeURIComponent(poi.id)}${force ? '?force=true' : ''}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify(built.payload),
+            },
+          )
+        let res = await doPut(false)
+        if (res.status === 409) {
+          // Peek the body; only treat as a no_overwrite lock if the code matches.
+          const cloned = res.clone()
+          let lockBody: { code?: string; locked_fields?: string[]; error?: string } | null = null
+          try { lockBody = await cloned.json() } catch { /* not JSON */ }
+          if (lockBody?.code === 'NO_OVERWRITE_LOCKED') {
+            const fields = (lockBody.locked_fields ?? []).join(', ') || '(unknown)'
+            const ok = window.confirm(
+              `This POI is flagged "Admin Authored — Do Not Overwrite".\n\n` +
+              `Saving will change protected field(s): ${fields}\n\n` +
+              `Override the lock and save anyway?`,
+            )
+            if (!ok) {
+              setSaveError('Save cancelled — POI is admin-authored.')
+              return
+            }
+            res = await doPut(true)
+          }
+        }
         if (!res.ok) {
           let msg = `${res.status} ${res.statusText}`
           try {
@@ -1687,6 +1710,36 @@ export function PoiEditDialog({
 
                     {/* ─── Flags ───────────────────────────────────────────── */}
                     <TabPanel className="space-y-6">
+                      {/* S244 — Authoring lock. Pinned to the top of the Flags
+                          tab so it's the first toggle the operator sees when
+                          protecting curated content. */}
+                      <div className="rounded-lg border border-amber-300 bg-amber-50/60 p-4">
+                        <div className="text-xs font-semibold text-amber-900 uppercase tracking-wide mb-3">
+                          Authoring Lock
+                        </div>
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <div className="relative mt-0.5 flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              {...reg('no_overwrite')}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 rounded-full border border-amber-400 bg-amber-100 peer-checked:bg-amber-500 peer-checked:border-amber-500 transition-colors" />
+                            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-amber-900 group-hover:text-amber-950">
+                              Admin Authored — Do Not Overwrite (NoOverwrite)
+                            </div>
+                            <div className="text-xs text-amber-800/80">
+                              Blocks programmatic writes (mass-edit apply, AI backfill scripts) from
+                              changing narration text, description, or year_established. Hand-edits
+                              from this dialog will prompt to confirm. Toggle off to unlock.
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+
                       {/* Operational flags */}
                       <div>
                         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">

@@ -46,6 +46,7 @@ const {
   UPDATABLE_FIELDS,
   JSONB_FIELDS,
   buildUpdateClause,
+  NO_OVERWRITE_PROTECTED_FIELDS,
 } = require('./admin-pois');
 
 // ─── Editable / excluded column sets ─────────────────────────────────────────
@@ -853,6 +854,43 @@ module.exports = function(app, deps) {
 
       if (!grouped.has(poi_id)) grouped.set(poi_id, {});
       grouped.get(poi_id)[column] = coerced;
+    }
+
+    // S244 — no_overwrite gate. Pre-scan flagged rows; any approval batch
+    // that would mutate a protected field on a locked POI is refused
+    // wholesale (transaction never opens) unless ?force=true.
+    const force = req.query.force === 'true' || req.query.force === '1';
+    if (!force && grouped.size > 0) {
+      const poiIds = Array.from(grouped.keys());
+      const lockedRowsRes = await pgPool.query(
+        `SELECT id, name, no_overwrite,
+                short_narration, long_narration, historical_narration,
+                narration_subtopics,
+                description, short_description, custom_description, origin_story,
+                year_established
+           FROM salem_pois
+          WHERE id = ANY($1) AND no_overwrite = TRUE`,
+        [poiIds]
+      );
+      const blocked = [];
+      for (const row of lockedRowsRes.rows) {
+        const fields = grouped.get(row.id) || {};
+        const locked = [];
+        for (const f of NO_OVERWRITE_PROTECTED_FIELDS) {
+          if (!Object.prototype.hasOwnProperty.call(fields, f)) continue;
+          const a = JSONB_FIELDS.has(f) ? JSON.stringify(fields[f] ?? null) : (fields[f] ?? null);
+          const b = JSONB_FIELDS.has(f) ? JSON.stringify(row[f] ?? null)    : (row[f] ?? null);
+          if (a !== b) locked.push(f);
+        }
+        if (locked.length) blocked.push({ poi_id: row.id, poi_name: row.name, locked_fields: locked });
+      }
+      if (blocked.length) {
+        return res.status(409).json({
+          error: `${blocked.length} POI(s) flagged no_overwrite=true; protected fields would change. Pass ?force=true to override.`,
+          code: 'NO_OVERWRITE_LOCKED',
+          blocked,
+        });
+      }
     }
 
     // Apply in a single transaction. Reuse buildUpdateClause for whitelist +

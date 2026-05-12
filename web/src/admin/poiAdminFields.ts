@@ -62,6 +62,8 @@ export const UPDATABLE_FIELDS = [
   'haunt_enabled',
   // S227 — per-fire dance length (seconds, REAL). Blank = SpriteOverlay default.
   'haunt_duration_s',
+  // S244 — admin-authored content lock (mirror of backend column).
+  'no_overwrite',
 ] as const
 
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
@@ -80,6 +82,8 @@ export const BOOLEAN_FIELDS: ReadonlySet<string> = new Set([
   'is_tour_poi', 'is_civic_poi', 'is_narrated', 'default_visible',
   'location_truth_of_record',
   'haunt_enabled',
+  // S244 — authoring lock; rendered as the amber toggle in the Flags tab.
+  'no_overwrite',
 ])
 
 // Numeric columns (rendered as <input type="number">).

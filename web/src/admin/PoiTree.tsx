@@ -48,6 +48,9 @@ export interface PoiRow {
   is_free_admission?: boolean
   is_indoor?: boolean
   is_family_friendly?: boolean
+  // S244 — authoring lock; blocks programmatic writes to narration / description
+  // / year_established unless caller passes ?force=true.
+  no_overwrite?: boolean
   deleted_at?: string | null
   // S162 — POI location verification
   lat_proposed?: number | null
@@ -589,6 +592,15 @@ function PoiNode({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
         <span className="inline-block w-2 h-2 flex-shrink-0" aria-hidden />
       )}
       <span className="truncate flex-1">{data.label}</span>
+      {isLeaf && data.poi?.no_overwrite ? (
+        <span
+          className="text-amber-600 text-xs flex-shrink-0 ml-1"
+          title="Admin Authored — Do Not Overwrite (NoOverwrite)"
+          aria-label="Authoring locked"
+        >
+          🔒
+        </span>
+      ) : null}
       {isContainer && data.count !== undefined && (
         <span className="ml-auto text-xs text-slate-500 tabular-nums pl-2">
           {data.flaggedCount && data.flaggedCount > 0 ? (
