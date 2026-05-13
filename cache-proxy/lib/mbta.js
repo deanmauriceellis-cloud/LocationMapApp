@@ -362,18 +362,26 @@ module.exports = function(app, deps) {
     const tail = req.params[0] || '';
     if (!tail) return res.status(400).json({ error: 'path required after /mbta/upstream/' });
 
-    // Build upstream URL: original path + original query + api_key injection.
-    // Strip any client-sent api_key to avoid double-keying.
-    const params = new URLSearchParams(req.query);
-    params.delete('api_key');
-    params.append('api_key', MBTA_API_KEY);
-    const qs = params.toString();
-    const upstreamUrl = `https://api-v3.mbta.com/${tail}${qs ? `?${qs}` : ''}`;
+    // Pass the raw query string through to MBTA verbatim — DO NOT roundtrip
+    // via req.query / URLSearchParams. Express's default qs parser collapses
+    // `filter[route]=Red` into `{filter: {route: 'Red'}}`, which then renders
+    // back as `filter=[object+Object]` and silently drops the filter. The raw
+    // string from req.originalUrl preserves MBTA's bracket-encoded params
+    // exactly as the Android client built them.
+    const qIdx = req.originalUrl.indexOf('?');
+    const rawQuery = qIdx === -1 ? '' : req.originalUrl.slice(qIdx + 1);
+    // Strip any client-sent api_key=... segment so we can re-append ours and
+    // avoid double-keying. Match the param at start-of-string or after `&`,
+    // through the next `&` or end-of-string.
+    const sanitized = rawQuery.replace(/(^|&)api_key=[^&]*/g, '').replace(/^&/, '');
+    const upstreamQuery = sanitized
+      ? `${sanitized}&api_key=${MBTA_API_KEY}`
+      : `api_key=${MBTA_API_KEY}`;
+    const upstreamUrl = `https://api-v3.mbta.com/${tail}?${upstreamQuery}`;
 
-    // Cache key strips the api_key so cache hits don't depend on the secret.
-    const cacheParams = new URLSearchParams(req.query);
-    cacheParams.delete('api_key');
-    const cacheKey = `mbta:upstream:${tail}?${cacheParams.toString()}`;
+    // Cache key uses the sanitized (key-stripped) query so hits don't depend
+    // on the secret value.
+    const cacheKey = `mbta:upstream:${tail}?${sanitized}`;
     const ttlMs = 15 * 1000;
 
     const cached = cacheGet(cacheKey, ttlMs);
