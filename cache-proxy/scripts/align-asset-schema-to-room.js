@@ -75,30 +75,35 @@ function alignDb(dbPath, entities) {
     }
     const before = rows.length;
 
-    db.exec(`DROP TABLE IF EXISTS ${tableName};`);
-    db.exec(sqlForEntity(entity));
-    for (const idx of entity.indices || []) {
-      db.exec(idx.createSql.replace('${TABLE_NAME}', tableName));
-    }
-
-    if (rows.length) {
-      // Restrict re-inserted columns to those present in the new schema.
-      const newCols = db.prepare(`PRAGMA table_info(${tableName})`).all().map((c) => c.name);
-      const sharedCols = columns.filter((c) => newCols.includes(c));
-      const placeholders = sharedCols.map((c) => `@${c}`).join(', ');
-      const colList = sharedCols.map((c) => `"${c}"`).join(', ');
-      const insert = db.prepare(
-        `INSERT INTO ${tableName} (${colList}) VALUES (${placeholders})`
-      );
-      const tx = db.transaction(() => {
+    // S262: wrap DROP+CREATE+INDEX+INSERT in a single transaction so a
+    // partial failure (e.g. malformed createSql in the schema JSON after a
+    // Room version bump) rolls back to the pre-DROP table state instead of
+    // leaving the asset DB with a missing or empty table that ships in the
+    // AAB. better-sqlite3 does not nest transactions, so the prior inner
+    // re-insert transaction is collapsed into this outer one.
+    const rebuildTable = db.transaction(() => {
+      db.exec(`DROP TABLE IF EXISTS ${tableName};`);
+      db.exec(sqlForEntity(entity));
+      for (const idx of entity.indices || []) {
+        db.exec(idx.createSql.replace('${TABLE_NAME}', tableName));
+      }
+      if (rows.length) {
+        // Restrict re-inserted columns to those present in the new schema.
+        const newCols = db.prepare(`PRAGMA table_info(${tableName})`).all().map((c) => c.name);
+        const sharedCols = columns.filter((c) => newCols.includes(c));
+        const placeholders = sharedCols.map((c) => `@${c}`).join(', ');
+        const colList = sharedCols.map((c) => `"${c}"`).join(', ');
+        const insert = db.prepare(
+          `INSERT INTO ${tableName} (${colList}) VALUES (${placeholders})`
+        );
         for (const r of rows) {
           const slim = {};
           for (const c of sharedCols) slim[c] = r[c];
           insert.run(slim);
         }
-      });
-      tx();
-    }
+      }
+    });
+    rebuildTable();
     const after = db.prepare(`SELECT COUNT(*) AS c FROM ${tableName}`).get().c;
     console.log(`  ${tableName.padEnd(34)} ${before} → ${after} rows`);
   }
