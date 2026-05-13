@@ -95,6 +95,20 @@ android {
         noCompress += ['sqlite']
     }
 
+    // S255: lint baseline + abortOnError on release. The baseline pins
+    // every issue present at S255 close so future commits can't introduce
+    // new lint regressions silently. To clear an issue, fix the code and
+    // remove the matching <issue> block from lint-baseline.xml. To
+    // regenerate from scratch: delete lint-baseline.xml, run
+    // `:app-salem:lintRelease`, commit the new baseline.
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        // Do not gate release builds on noisy warnings — only errors.
+        warningsAsErrors = false
+        checkReleaseBuilds = true
+    }
+
     // S203: pure-JVM unit tests can't link against android.* stubs (Process,
     // Log, etc.) without Robolectric. returnDefaultValues=true lets calls into
     // unmocked Android APIs return 0/null/false instead of throwing. Production

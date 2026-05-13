@@ -44,14 +44,15 @@ const ROOM_IDENTITY_HASH_V19 = '745afa3eb4ce04bd7873671ea297b6e0';
 // a polyline-only walking path. Narration is POI-driven, independent of
 // any tour. The 5 historical Kotlin-curated tours were removed; they'll be
 // re-authored manually in PG when needed.
+// S255: salem_businesses / narration_points / tour_pois removed from the
+// required list — they are not in SalemContentDatabase.@Database(entities=…)
+// and publish-salem-pois.js now DROPs them on every bake. Keeping them in
+// REQUIRED would fail the next clean build.
 const REQUIRED_ROOM_TABLES = [
   { table: 'salem_pois',                    minRows: 1800 },
-  { table: 'salem_businesses',              minRows: 800  },
-  { table: 'narration_points',              minRows: 800  },
   { table: 'tours',                         minRows: 1    },
   { table: 'tour_stops',                    minRows: 0    },
   { table: 'tour_legs',                     minRows: 14   },
-  { table: 'tour_pois',                     minRows: 40   },
   { table: 'events_calendar',               minRows: 20   },
   { table: 'historical_facts',              minRows: 500  },
   { table: 'historical_figures',            minRows: 49   },

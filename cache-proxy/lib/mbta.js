@@ -342,6 +342,69 @@ module.exports = function(app, deps) {
     }
   });
 
+  // ── GET /mbta/upstream/* — pass-through to api-v3.mbta.com with key injection ──
+  //
+  // S255: lets the Android app talk to MBTA via the cache-proxy WITHOUT
+  // shipping the API key inside the APK. The OkHttp client points at
+  // `http://10.0.0.229:4300/mbta/upstream` and builds the rest of the URL
+  // exactly as it would for api-v3.mbta.com. We append `&api_key=...` server
+  // side and proxy the JSON:API response verbatim so the existing Android
+  // JSON:API parsers keep working.
+  //
+  // Cached by full upstream URL with 15s TTL — matches `/mbta/vehicles`
+  // cache cadence. Short cache because positions move; predictions/stops
+  // tolerate the same window without UX impact.
+  app.get('/mbta/upstream/*', async (req, res) => {
+    if (!MBTA_API_KEY) {
+      return res.status(503).json({ error: 'MBTA_API_KEY not configured on cache-proxy' });
+    }
+    // Express captures everything after /mbta/upstream/ in req.params[0].
+    const tail = req.params[0] || '';
+    if (!tail) return res.status(400).json({ error: 'path required after /mbta/upstream/' });
+
+    // Build upstream URL: original path + original query + api_key injection.
+    // Strip any client-sent api_key to avoid double-keying.
+    const params = new URLSearchParams(req.query);
+    params.delete('api_key');
+    params.append('api_key', MBTA_API_KEY);
+    const qs = params.toString();
+    const upstreamUrl = `https://api-v3.mbta.com/${tail}${qs ? `?${qs}` : ''}`;
+
+    // Cache key strips the api_key so cache hits don't depend on the secret.
+    const cacheParams = new URLSearchParams(req.query);
+    cacheParams.delete('api_key');
+    const cacheKey = `mbta:upstream:${tail}?${cacheParams.toString()}`;
+    const ttlMs = 15 * 1000;
+
+    const cached = cacheGet(cacheKey, ttlMs);
+    if (cached) {
+      stats.hits++;
+      log('/mbta/upstream', true);
+      res.set('Content-Type', 'application/vnd.api+json');
+      return res.send(cached.data);
+    }
+
+    stats.misses++;
+    try {
+      const t0 = Date.now();
+      const upstream = await fetch(upstreamUrl);
+      const elapsed = Date.now() - t0;
+      if (!upstream.ok) {
+        const errBody = await upstream.text();
+        console.error(`[MBTA] upstream ${tail} HTTP ${upstream.status}: ${errBody.substring(0, 200)}`);
+        return res.status(upstream.status).json({ error: 'MBTA upstream error', status: upstream.status, path: tail });
+      }
+      const body = await upstream.text();
+      console.log(`[MBTA] upstream ${tail} ${upstream.status} in ${elapsed}ms (${body.length}B)`);
+      log('/mbta/upstream', false, elapsed);
+      cacheSet(cacheKey, body, { 'content-type': 'application/vnd.api+json' });
+      res.set('Content-Type', 'application/vnd.api+json').send(body);
+    } catch (err) {
+      console.error('[MBTA upstream error]', err.message);
+      res.status(502).json({ error: 'Upstream request failed', detail: err.message });
+    }
+  });
+
   // ── GET /mbta/trip-predictions?trip=TRIP_ID — next stops for a vehicle's trip ──
   app.get('/mbta/trip-predictions', async (req, res) => {
     const tripId = req.query.trip;

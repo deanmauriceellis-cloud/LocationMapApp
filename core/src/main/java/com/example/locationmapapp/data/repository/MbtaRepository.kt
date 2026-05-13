@@ -48,8 +48,13 @@ private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module Mbta
 class MbtaRepository @Inject constructor() {
 
     private val TAG = "MbtaRepository"
-    private val API_KEY = "d2dbf0064a5a4e80b9384fea24c43c9b"
-    private val BASE_URL = "https://api-v3.mbta.com"
+    // S255: hardcoded MBTA API key removed. All MBTA traffic now flows
+    // through the cache-proxy passthrough at /mbta/upstream/*, which
+    // appends api_key from cache-proxy/.env server-side. The Android app
+    // never sees the key and never opens a direct connection to
+    // api-v3.mbta.com — see feedback_v1_no_external_contact.md /
+    // STATE.md S251 carry. Closes S251/S252 direct-leak.
+    private val BASE_URL = "http://10.0.0.229:4300/mbta/upstream"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -57,10 +62,12 @@ class MbtaRepository @Inject constructor() {
         .addInterceptor(OfflineModeInterceptor())
         .addInterceptor(LocalServerCircuitBreakerInterceptor())
         .addInterceptor { chain ->
-            // MBTA requires Accept header for JSON:API
+            // JSON:API Accept header preserved — cache-proxy passes the
+            // upstream payload through unchanged. The x-api-key header
+            // injection is gone (the proxy adds api_key as a query param
+            // server-side).
             val req = chain.request().newBuilder()
                 .addHeader("Accept", "application/vnd.api+json")
-                .addHeader("x-api-key", API_KEY)
                 .build()
             chain.proceed(req)
         }
@@ -103,8 +110,7 @@ class MbtaRepository @Inject constructor() {
         for (route in SUBWAY_ROUTES_LIST) {
             val url = "$BASE_URL/stops" +
                     "?filter%5Broute%5D=$route" +
-                    "&filter%5Blocation_type%5D=1" +
-                    "&api_key=$API_KEY"
+                    "&filter%5Blocation_type%5D=1"
             val json = executeGet(url, "stops route=$route")
             parseStopsWithRoute(json, route).forEach { stop ->
                 mergedStops.merge(stop.id, stop) { existing, new ->
@@ -118,8 +124,7 @@ class MbtaRepository @Inject constructor() {
         //    Group by parent_station ID so we get 143 unique stations instead of 227 platforms.
         //    Parent IDs are "place-xxx" format, same as subway — shared stations merge by ID.
         val crUrl = "$BASE_URL/stops" +
-                "?filter%5Broute_type%5D=2" +
-                "&api_key=$API_KEY"
+                "?filter%5Broute_type%5D=2"
         val crJson = executeGet(crUrl, "CR stops")
         parseCrStops(crJson).forEach { stop ->
             mergedStops.merge(stop.id, stop) { existing, new ->
@@ -139,8 +144,7 @@ class MbtaRepository @Inject constructor() {
         val url = "$BASE_URL/predictions" +
                 "?filter%5Bstop%5D=$stopId" +
                 "&include=trip%2Croute" +
-                "&sort=departure_time" +
-                "&api_key=$API_KEY"
+                "&sort=departure_time"
         val json = executeGet(url, "predictions stop=$stopId")
         parsePredictions(json)
     }
@@ -153,8 +157,7 @@ class MbtaRepository @Inject constructor() {
         val url = "$BASE_URL/schedules" +
                 "?filter%5Btrip%5D=$tripId" +
                 "&include=stop" +
-                "&sort=stop_sequence" +
-                "&api_key=$API_KEY"
+                "&sort=stop_sequence"
         val json = executeGet(url, "schedule trip=$tripId")
         parseTripSchedule(json)
     }
@@ -173,8 +176,7 @@ class MbtaRepository @Inject constructor() {
             withContext(Dispatchers.IO) {
                 val tripFilter = tripIds.joinToString(",")
                 val url = "$BASE_URL/predictions" +
-                        "?filter%5Btrip%5D=$tripFilter" +
-                        "&api_key=$API_KEY"
+                        "?filter%5Btrip%5D=$tripFilter"
                 val json = executeGet(url, "predictions ${tripIds.size} trips")
 
                 // Parse: build map of vehicleId → minutes until arrival
@@ -239,8 +241,7 @@ class MbtaRepository @Inject constructor() {
         withContext(Dispatchers.IO) {
             val url = "$BASE_URL/vehicles" +
                     "?filter%5Broute_type%5D=$routeType" +
-                    "&include=stop%2Croute%2Ctrip" +
-                    "&api_key=$API_KEY"
+                    "&include=stop%2Croute%2Ctrip"
 
             val bodyStr = executeGet(url, "vehicles routeType=$routeType")
             parseVehicleResponse(bodyStr, routeType)

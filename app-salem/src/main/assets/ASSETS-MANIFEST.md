@@ -22,11 +22,9 @@ Required tables (must all exist, with `CREATE TABLE` matching the `@Entity` decl
 | Table | Min rows | Source script | Room entity |
 |---|---:|---|---|
 | `salem_pois` | 1800 | `publish-salem-pois.js` | `SalemPoi.kt` |
-| `salem_businesses` | 800 | legacy (still referenced by some queries) | `SalemBusiness.kt` (removed S126) |
-| `narration_points` | 800 | `publish-salem-pois.js` | `NarrationPoint.kt` |
-| `tours` | 5 | `publish-tours-to-sqlite.js` or similar | `Tour.kt` |
-| `tour_stops` | 80 | same | `TourStop.kt` |
-| `tour_pois` | 40 | same | `TourPoi.kt` |
+| `tours` | 4 | `publish-tours.js` | `Tour.kt` |
+| `tour_stops` | 0 | same (Room-declared but unpopulated in current bundle) | `TourStop.kt` |
+| `tour_legs` | 70 | `publish-tour-legs.js` | `TourLeg.kt` |
 | `events_calendar` | 20 | `publish-events-to-sqlite.js` | `EventsCalendar.kt` |
 | `historical_facts` | 500 | (legacy; bundled at last `:salem-content` run pre-S242, table preserved by Room schema) | `HistoricalFact.kt` |
 | `historical_figures` | 49 | same | `HistoricalFigure.kt` |
@@ -37,7 +35,9 @@ Required tables (must all exist, with `CREATE TABLE` matching the `@Entity` decl
 | `salem_witch_trials_articles` | 16 | `bundle-witch-trials-into-db.js` | `WitchTrialsArticle.kt` |
 | `room_master_table` | 1 | identity-hash housekeeping | (Room internal) |
 
-Required Room `identity_hash` at v8: **`458bb11df51a54f5284a03ef1d2913aa`**. Bumping this requires updating the constant in all bundle scripts that write it.
+Required Room `identity_hash` at v19: **`745afa3eb4ce04bd7873671ea297b6e0`**. Bumping this requires regenerating the schema JSON (`./gradlew :app-salem:kspDebugKotlin`) and re-running `align-asset-schema-to-room.js`.
+
+**S255 — dead tables dropped from publish chain:** `salem_businesses` (861 rows), `narration_points` (817), `tour_pois` (45). Not in `@Database(entities=…)` since the pre-S242 module deletion; never read at runtime. `publish-salem-pois.js` now DROPs them on every bake. ~1 MB asset reclaim.
 
 ### `salem_tiles.sqlite` — Offline map tiles (~90 MB)
 
@@ -72,6 +72,10 @@ One file per `historical_figures.id`. Minimum count: **49** (matches `historical
 ### `hero/*.webp` and `heroes/*.webp` — POI hero images
 
 `hero/` = UUID-named assets from the SalemIntelligence KB. `heroes/` = POI-id-named assets (the canonical names used by `HeroAssetLoader`). Both trees must exist and be non-empty.
+
+### `us_places_v1.sqlite` — Splash place resolver (~2.1 MB)
+
+Read-only SQLite consumed by `PlaceResolver.kt:33` (S231 splash polygon resolver) — maps the user's current GPS fix to a US place name (city/town) for the splash-screen "Welcome to <PLACE>" heading when outside Salem. Single bundled file; not a Room database. If absent, the splash falls back to a generic greeting; no crash.
 
 ### `witch_trials/portraits/*` — NPC portraits (currently empty)
 

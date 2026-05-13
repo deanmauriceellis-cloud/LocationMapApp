@@ -71,10 +71,28 @@ object HeroAssetLoader {
         }
     }
 
+    /**
+     * S255: defensive inSampleSize on hero decode. Heroes ship as 800x200
+     * WebP so the normal path uses inSampleSize=1 (no downsample). The
+     * defensive cap kicks in only if a future hero ships oversized (e.g.,
+     * 1600x400 replacement) — without this, ARGB_8888 at 1600x400 = 2.5 MB
+     * each would blow past the 8 MB LRU after 3 entries and OOM under
+     * tilt-mode pressure. Two-pass decode: bounds probe + downsample.
+     */
     private fun decodeAsset(context: Context, path: String): Bitmap? {
         return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             context.assets.open(path).use { stream ->
-                BitmapFactory.decodeStream(stream)
+                BitmapFactory.decodeStream(stream, null, bounds)
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = calcSampleSize(bounds.outWidth, bounds.outHeight)
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            context.assets.open(path).use { stream ->
+                BitmapFactory.decodeStream(stream, null, opts)
             }
         } catch (_: IOException) {
             null
@@ -83,4 +101,21 @@ object HeroAssetLoader {
             null
         }
     }
+
+    /**
+     * Compute a power-of-2 inSampleSize so a decoded bitmap fits within
+     * [TARGET_W_MAX] × [TARGET_H_MAX]. Heroes ship at 800×200, so the
+     * normal return is 1.
+     */
+    private fun calcSampleSize(srcW: Int, srcH: Int): Int {
+        var sample = 1
+        while (srcW / (sample * 2) >= TARGET_W_MAX && srcH / (sample * 2) >= TARGET_H_MAX) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    // Canonical hero dimensions (tools/hero-triptych/generate_full.py output).
+    private const val TARGET_W_MAX = 800
+    private const val TARGET_H_MAX = 200
 }

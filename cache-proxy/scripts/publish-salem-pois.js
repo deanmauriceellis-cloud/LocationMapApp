@@ -240,6 +240,15 @@ async function main() {
   db.exec(CREATE_TABLE_SQL);
   console.log(`Rebuilt salem_pois table with current schema`);
 
+  // S255: drop 3 dead tables left over from pre-S242 modules. None are
+  // in SalemContentDatabase's @Database(entities=…), so Room ignores
+  // them at runtime; they were just costing ~1 MB of asset budget. Run
+  // here so the next bake-then-ship sequence purges them.
+  for (const t of ['tour_pois', 'salem_businesses', 'narration_points']) {
+    db.exec(`DROP TABLE IF EXISTS ${t}`);
+  }
+  console.log(`Dropped 3 dead tables (tour_pois / salem_businesses / narration_points)`);
+
   // Prepare insert
   const insertStmt = db.prepare(`
     INSERT INTO salem_pois (
