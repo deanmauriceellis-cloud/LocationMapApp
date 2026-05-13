@@ -314,3 +314,64 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('AdminPOI: GET /admin/salem/pois?kind=tour|business|narration, GET /admin/salem/pois/duplicates?radius=, GET/PUT/DELETE /admin/salem/pois/:kind/:id, POST .../move, POST .../restore (Basic Auth)');
   console.log(`        Admin auth: ${adminAuthConfigured ? 'configured' : 'NOT CONFIGURED — set ADMIN_USER and ADMIN_PASS'}`);
 });
+
+// ── Global error handlers ───────────────────────────────────────────────────
+// Express 4.x catches sync throws and async-await rejections inside route
+// handlers, but ONLY when there is a 4-arg error middleware mounted. Without
+// this, a route that throws past its try/catch returns no response and ties up
+// the socket until the client times out.
+app.use((err, req, res, _next) => {
+  console.error('[Express] Unhandled route error:', err && err.stack ? err.stack : err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'internal_error' });
+});
+
+// Last-line-of-defense for promise rejections that escape Express (e.g. an
+// async background task that no route owns). We log loudly but do NOT kill the
+// process — the cache-proxy is single-tenant on a dev box and crashing on a
+// single bad rejection leaves the operator with a dead admin tool.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Process] Unhandled promise rejection:', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Process] Uncaught exception:', err && err.stack ? err.stack : err);
+  // Don't exit — same reasoning as above.
+});
+
+// ── Graceful shutdown ───────────────────────────────────────────────────────
+// SIGTERM (systemd / pm2 restart) and SIGINT (Ctrl-C) drain in-flight HTTP,
+// close the PG pool so queued queries finish, then exit cleanly. Without this
+// pgPool.end() never fires and queries can be lost on restart.
+let shuttingDown = false;
+async function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[Server] ${signal} received — graceful shutdown starting`);
+
+  const forceExitTimer = setTimeout(() => {
+    console.error('[Server] Forced exit after 10s — connections did not drain');
+    process.exit(1);
+  }, 10_000);
+  forceExitTimer.unref();
+
+  try {
+    await new Promise((resolve) => server.close(() => resolve()));
+    console.log('[Server] HTTP closed');
+  } catch (err) {
+    console.error('[Server] HTTP close error:', err.message);
+  }
+
+  if (pgPool) {
+    try {
+      await pgPool.end();
+      console.log('[Server] PG pool drained');
+    } catch (err) {
+      console.error('[Server] PG pool drain error:', err.message);
+    }
+  }
+
+  clearTimeout(forceExitTimer);
+  process.exit(0);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

@@ -58,6 +58,7 @@ export function MassEditTab() {
   const [applyResp, setApplyResp] = useState<ApplyResponse | null>(null)
   const [approvals, setApprovals] = useState<Set<string>>(new Set())
   const [expandedPois, setExpandedPois] = useState<Set<string>>(new Set())
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   // ─── Export ─────────────────────────────────────────────────────────────
   const handleExport = useCallback(() => {
@@ -116,12 +117,21 @@ export function MassEditTab() {
   }, [])
 
   // ─── Apply ──────────────────────────────────────────────────────────────
-  const handleApply = useCallback(() => {
+  // Two-step: clicking the Apply button opens a confirm dialog; only the
+  // confirm button in that dialog actually POSTs. Mass-edit can land 500+
+  // edits in a single transaction, so a single click was too easy to misfire.
+  const handleRequestApply = useCallback(() => {
     if (!importResp) return
     if (approvals.size === 0) {
       alert('No cells approved. Tick at least one row before Apply.')
       return
     }
+    setConfirmOpen(true)
+  }, [importResp, approvals])
+
+  const handleConfirmApply = useCallback(() => {
+    if (!importResp) return
+    setConfirmOpen(false)
     const payload: Array<{ poi_id: string; column: string; new: string | null }> = []
     for (const p of importResp.changeset) {
       for (const c of p.changes) {
@@ -359,11 +369,11 @@ export function MassEditTab() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleApply}
+                  onClick={handleRequestApply}
                   disabled={approvedCount === 0}
                   className="px-4 py-1.5 text-sm rounded bg-indigo-700 hover:bg-indigo-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Apply {approvedCount} approved
+                  Apply {approvedCount} approved…
                 </button>
               </div>
               {error && (
@@ -402,6 +412,78 @@ export function MassEditTab() {
             Applying approved cells…
           </section>
         )}
+
+        {/* ── Confirm Apply modal ──────────────────────────────────────── */}
+        {confirmOpen && importResp && (() => {
+          // Build a per-POI tally of approved cells + flag any soft-delete /
+          // restore / warning overrides that landed in the approval set.
+          let affectedPois = 0
+          let softDeletes = 0
+          let restores = 0
+          let warningOverrides = 0
+          for (const p of importResp.changeset) {
+            let approvedHere = 0
+            for (const c of p.changes) {
+              if (!approvals.has(approvalKey(p.poi_id, c.column))) continue
+              approvedHere++
+              if (c.kind === 'soft_delete') softDeletes++
+              else if (c.kind === 'restore') restores++
+              if (c.warning) warningOverrides++
+            }
+            if (approvedHere > 0) affectedPois++
+          }
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-5">
+                <h3 className="text-base font-semibold text-slate-800">Apply mass edit?</h3>
+                <div className="mt-3 text-sm text-slate-700 space-y-1.5">
+                  <div>
+                    <span className="font-semibold">{approvedCount}</span> cell
+                    {approvedCount === 1 ? '' : 's'} across{' '}
+                    <span className="font-semibold">{affectedPois}</span> POI
+                    {affectedPois === 1 ? '' : 's'} will be written to PG in a single transaction.
+                  </div>
+                  {softDeletes > 0 && (
+                    <div className="text-rose-700">
+                      ⚠ {softDeletes} POI{softDeletes === 1 ? '' : 's'} will be soft-deleted.
+                    </div>
+                  )}
+                  {restores > 0 && (
+                    <div className="text-emerald-700">
+                      ↩ {restores} POI{restores === 1 ? '' : 's'} will be restored from soft-delete.
+                    </div>
+                  )}
+                  {warningOverrides > 0 && (
+                    <div className="text-amber-700">
+                      ⚠ {warningOverrides} cell{warningOverrides === 1 ? '' : 's'} ticked despite
+                      validation warnings.
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-500 pt-2">
+                    Changes are reversible via the Audit tab, but a publish-chain run
+                    afterwards will bake them into the Android asset DB.
+                  </div>
+                </div>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmOpen(false)}
+                    className="px-3 py-1.5 text-sm rounded bg-slate-200 hover:bg-slate-300 text-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmApply}
+                    className="px-4 py-1.5 text-sm rounded bg-indigo-700 hover:bg-indigo-600 text-white font-medium"
+                  >
+                    Apply {approvedCount}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {phase === 'done' && applyResp && (
           <section className="bg-emerald-50 border border-emerald-200 rounded p-4">

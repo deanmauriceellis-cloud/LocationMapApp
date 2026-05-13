@@ -32,6 +32,8 @@ app-salem/src/main/assets/salem_content.db.bak
 tools/poi-icons/
 tools/splash-audio/
 tools/.poi-pdf-venv/
+tools/hero-triptych/output-full/
+tools/tile-bake/data/sources/
 docs/poi-inventory*.pdf
 # Hero images — generated assets, too large for git
 app-salem/src/main/assets/hero/
@@ -81,3 +83,18 @@ LegalDocuments/
 # :app-salem:bundleRelease. ASSETS-MANIFEST.md documents the procedure.
 tools/tile-bake/dist/salem_tiles.sqlite
 app-salem-tiles-pack/src/main/assets/salem_tiles.sqlite
+
+# DrK/ — Dr. K's authoritative POI content drafts (.docx / .odt). These ARE
+# tracked: they are the source of truth that hand-promotes into salem_pois via
+# the publish chain. Only block USB-mount detritus that lands here when a
+# Windows / FAT32 stick gets plugged in (FOUND.000 = chkdsk salvage, System
+# Volume Information = Windows shadow-copy dir, plus generic Windows / macOS
+# index files).
+DrK/FOUND.*/
+DrK/System Volume Information/
+DrK/$RECYCLE.BIN/
+DrK/Thumbs.db
+DrK/desktop.ini
+DrK/.fseventsd/
+DrK/.Spotlight-V100/
+DrK/.Trashes/
