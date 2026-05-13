@@ -15,6 +15,7 @@ import com.example.wickedsalemwitchcitytour.userdata.db.GpsTrackPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -127,6 +128,18 @@ class GpsTrackRecorder @Inject constructor(
         val nowMs = System.currentTimeMillis()
         lastPruneMs = nowMs
         scope.launch { runPrune(nowMs) }
+    }
+
+    /**
+     * S255: cancel the recorder's IO scope. Called from
+     * [com.example.wickedsalemwitchcitytour.ui.SalemMainActivity.onDestroy].
+     * The Singleton survives Hilt's container for the process lifetime, so
+     * without an explicit cancel a stray late fix could land an insert
+     * after activity teardown. Process death cleans up anyway, but the
+     * explicit cancel makes the lifecycle visible.
+     */
+    fun shutdown() {
+        scope.cancel()
     }
 
     private suspend fun runPrune(nowMs: Long) {

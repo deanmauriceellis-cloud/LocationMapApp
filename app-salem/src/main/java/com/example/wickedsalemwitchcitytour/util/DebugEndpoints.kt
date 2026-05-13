@@ -710,6 +710,20 @@ class DebugEndpoints(
     }
 
     /**
+     * S255: tear down the walk scope. Called from
+     * [com.example.wickedsalemwitchcitytour.ui.SalemMainActivity.onDestroy]
+     * (alongside `DebugHttpServer.stop()` and `endpoints = null`). Stopping
+     * the HTTP server stops accepting new requests, but pending walk
+     * coroutines spawned via [walkScope] would otherwise keep emitting
+     * `setManualLocation` after the activity is gone.
+     */
+    fun shutdown() {
+        walkJob?.cancel()
+        walkJob = null
+        walkScope.cancel()
+    }
+
+    /**
      * S125: cancel the HTTP-triggered walk AND wait for it to terminate.
      * Kotlin's cancel() is cooperative — without this the old walkJob keeps
      * emitting setManualLocation for up to ~1 s after cancel, which

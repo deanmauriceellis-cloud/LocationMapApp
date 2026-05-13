@@ -16,6 +16,7 @@ import com.example.wickedsalemwitchcitytour.userdata.db.PoiEncounter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -176,18 +177,26 @@ class PoiEncounterTracker @Inject constructor(
      * rows already hold their last-known values. Called from
      * [com.example.wickedsalemwitchcitytour.ui.SalemMainActivity.onDestroy]
      * for diagnostic logging only.
+     *
+     * S255: also cancels the tracker's IO scope. The Singleton survives
+     * Hilt's container for the process lifetime; without an explicit
+     * cancel the launch-after-destroy upserts/prunes would keep running
+     * past onDestroy. Process death cleans up anyway, but the explicit
+     * cancel makes the lifecycle visible to readers.
      */
     fun flushAll() {
-        if (active.isEmpty()) return
-        DebugLogger.i(TAG, "flushAll: ${active.size} active encounter(s) at activity destroy:")
-        for (enc in active.values) {
-            DebugLogger.i(
-                TAG,
-                "  · ${enc.poiName} duration=${enc.durationMs / 1000}s " +
-                "minDist=${enc.minDistanceM.toInt()}m fixes=${enc.fixCount}"
-            )
+        if (active.isNotEmpty()) {
+            DebugLogger.i(TAG, "flushAll: ${active.size} active encounter(s) at activity destroy:")
+            for (enc in active.values) {
+                DebugLogger.i(
+                    TAG,
+                    "  · ${enc.poiName} duration=${enc.durationMs / 1000}s " +
+                    "minDist=${enc.minDistanceM.toInt()}m fixes=${enc.fixCount}"
+                )
+            }
+            active.clear()
         }
-        active.clear()
+        scope.cancel()
     }
 
     /**

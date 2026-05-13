@@ -1043,6 +1043,11 @@ class SalemMainActivity : AppCompatActivity() {
     }
     override fun onDestroy() {
         super.onDestroy()
+        // S255: shutdown DebugEndpoints' walkScope before dropping the
+        // reference. stop() halts new HTTP requests, but walk coroutines
+        // already spawned would otherwise keep emitting setManualLocation
+        // past activity teardown.
+        DebugHttpServer.endpoints?.shutdown()
         DebugHttpServer.endpoints = null
         DebugHttpServer.stop()
         releaseWalkWakeLock()
@@ -1050,7 +1055,12 @@ class SalemMainActivity : AppCompatActivity() {
         // when the activity was destroyed. The DB rows already hold their
         // last-known values; this is just for the diagnostic log so a
         // post-mortem reader can see what was open at destroy time.
+        // S255: flushAll() now also cancels the tracker's IO scope.
         poiEncounterTracker.flushAll()
+        // S255: cancel the GPS recorder's IO scope. Mirror of the tracker
+        // cancel above. Without this a late fix can still land an insert
+        // after activity teardown.
+        gpsTrackRecorder.shutdown()
         // S242: explicit cancel of the GPS-OBS heartbeat (started in
         // observeViewModel). lifecycleScope cancellation handles this too, but
         // an explicit cancel here makes the while(true) loop's lifecycle

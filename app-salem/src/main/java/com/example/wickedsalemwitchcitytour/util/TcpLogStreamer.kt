@@ -53,6 +53,21 @@ object TcpLogStreamer {
         DebugLogger.i(TAG, "TCP log streamer starting → $HOST:$PORT")
     }
 
+    /**
+     * S255: cancel the streamer's IO scope. Provided for symmetry with the
+     * other three S255 scope.cancel() sites; not wired into a lifecycle
+     * because this object is process-lifetime (started from
+     * [WickedSalemApp.onCreate], no Application.onTerminate on a real
+     * device). Useful for test harnesses that need to tear the streamer
+     * down deterministically.
+     */
+    fun stop() {
+        DebugLogger.tcpStreamer = null
+        scope.cancel()
+        writer = null
+        connected = false
+    }
+
     private fun send(line: String) {
         // Always queue — the IO coroutine drains the queue.
         // This avoids NetworkOnMainThreadException when DebugLogger

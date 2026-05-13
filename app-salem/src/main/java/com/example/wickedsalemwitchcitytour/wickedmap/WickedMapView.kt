@@ -63,7 +63,9 @@ class WickedMapView @JvmOverloads constructor(
     private val scaleDetector = ScaleGestureDetector(context, object :
         ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScaleBegin(d: ScaleGestureDetector): Boolean {
-            Log.d(TAG, "scale begin: focus=(${d.focusX},${d.focusY}) zoom=${camera.zoom}")
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                Log.d(TAG, "scale begin: focus=(${d.focusX},${d.focusY}) zoom=${camera.zoom}")
+            }
             return true
         }
 
@@ -76,12 +78,16 @@ class WickedMapView @JvmOverloads constructor(
             val zBefore = camera.zoom
             camera.scaleAround(sf, d.focusX, d.focusY)
             val zAfter = camera.zoom
-            Log.d(TAG, "scale: factor=$sf pivot=(${d.focusX},${d.focusY}) zoom $zBefore -> $zAfter")
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                Log.d(TAG, "scale: factor=$sf pivot=(${d.focusX},${d.focusY}) zoom $zBefore -> $zAfter")
+            }
             return true
         }
 
         override fun onScaleEnd(d: ScaleGestureDetector) {
-            Log.d(TAG, "scale end: zoom=${camera.zoom} center=(${camera.centerLat},${camera.centerLon})")
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                Log.d(TAG, "scale end: zoom=${camera.zoom} center=(${camera.centerLat},${camera.centerLon})")
+            }
         }
     })
 
