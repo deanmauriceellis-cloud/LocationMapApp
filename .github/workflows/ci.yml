@@ -29,6 +29,22 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      - name: Set up Node.js (cache-proxy verify step)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: cache-proxy/package-lock.json
+
+      # verifyBundledAssets is a Gradle preBuild dependency (see
+      # app-salem/build.gradle ~L221) — it shells out to
+      # cache-proxy/scripts/verify-bundled-assets.js which requires
+      # better-sqlite3. Install cache-proxy deps before any gradle invocation
+      # so the verify step can read the committed salem_content.db.
+      - name: Install cache-proxy dependencies
+        working-directory: cache-proxy
+        run: npm ci --no-audit --no-fund
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
@@ -37,6 +53,7 @@ jobs:
       # which exist on the CI runner. The bundled salem_content.db checked
       # into the repo is canonical for CI verification — the publish chain
       # is the operator-machine refresh path, not the build path.
+      # verifyBundledAssets still runs (reads the committed asset).
       - name: Build debug
         run: ./gradlew :app-salem:assembleDebug -PskipPublishChain --no-daemon --stacktrace
 
