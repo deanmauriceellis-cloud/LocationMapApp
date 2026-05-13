@@ -9,6 +9,15 @@ android {
     namespace 'com.example.wickedsalemwitchcitytour'
     compileSdk 35
 
+    // S256 — install-time Asset Pack for salem_tiles.sqlite (262 MB).
+    // Moves the tile DB out of the base AAB to keep the base under Google
+    // Play's 200 MB compressed-download ceiling while preserving offline-
+    // from-install UX. At runtime install-time pack assets are merged into
+    // the app's AssetManager — OfflineTileManager continues to use
+    // context.assets.open("salem_tiles.sqlite") with no code change.
+    // Pack module: :app-salem-tiles-pack
+    assetPacks = [":app-salem-tiles-pack"]
+
     defaultConfig {
         applicationId "com.destructiveaigurus.katrinasmysticvisitorsguide"
         minSdk 26

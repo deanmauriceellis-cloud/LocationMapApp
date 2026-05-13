@@ -2,12 +2,19 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-12 — **Session 255 (V1 health audit Waves 1+2 shipped + MBTA key removed + Lenovo field-validation green).** Validated the S254 audit plan against current code (3 stale/misattributed items, 2 new findings), then executed corrected Wave 1 + Wave 2 in one session vs plan estimate of ~3 sessions. **Wave 1** (`c947e97`, 9 files): manifest `largeHeap=true` + `allowBackup=false`, Gradle heap 2 → 4 GB, 4 × `scope.cancel()` wired into `SalemMainActivity.onDestroy`, 3 scale-gesture `Log.d` sites gated, new `feedback_publish_chain_manual_after_admin_edits.md` memory. **Wave 2** (`99f6741`, 13 files): dead-table drop (5.9 → 5.07 MB bundle, no Room schema bump), **hardcoded MBTA key removed + cache-proxy `/mbta/upstream/*` passthrough** with raw-query fixup commit `e2270f4` (Express qs parser was collapsing `filter[route]=Red` into nested obj — switched to `req.originalUrl` raw query), HeroAssetLoader two-pass `inSampleSize`, `:routing-jvm:test` 4/10 → 10/10, lint-baseline.xml + `abortOnError=true`, SHIP-CHECKLIST.md, .github/workflows/ci.yml. Full credential audit: zero hardcoded keys in Android source / release APK strings. **Lenovo HNY0CY0W field-validation green** — 20 min uptime PID 8603, 117k TCP stream entries, zero E-level events, walk-sim 320/1887 steps clean (multiple DWELL exits on TTS idle per S244), 569 MB PSS well within `largeHeap` ceiling, all parked-service paths SUPPRESSED by V1 gate. One in-flight diagnosis (Lye-Tapley Shoe Shop didn't narrate) traced to operator's 20 m geofence vs 33–39 m walk distance — not a code bug; operator self-classified "my bad, I didn't set the flags right". Wave 2 #13 (`hero/` cleanup) **deferred** — S239 audit reported "385 dead" but PG has 949 live `image_asset LIKE 'hero/%'` references. New memory `feedback_lenovo_is_v1_minimum_spec.md`: Lenovo TB305FU is V1 floor; demote Lenovo-edge W-level findings to "noted not blocking" until Pixel 8 lands. Full detail: `docs/session-logs/session-255-2026-05-12.md`.
+**Last updated:** 2026-05-13 — **Session 256 (V1 health audit Wave 3 shipped — Install-time Asset Pack for salem_tiles.sqlite + first androidTest + Lenovo field-validate green).** New `:app-salem-tiles-pack` Gradle module with `com.android.asset-pack` plugin and `install-time` delivery; `salem_tiles.sqlite` (262 MB) git-moved out of `:app-salem`'s base assets. Zero code changes to `OfflineTileManager.kt` — install-time pack assets merge into the app's `AssetManager` namespace at runtime, so `context.assets.openFd("salem_tiles.sqlite")` keeps working. Confirmed via Lenovo logcat (PID 3527): `Extracting salem_tiles.sqlite (asset=274313216)` → `Archive verified: Salem-Custom=715841`. Build verified across `:app-salem-tiles-pack:assemble`, `:app-salem:assembleDebug`, `:app-salem:bundleRelease`, `bundletool build-apks` (universal + split + device-targeted), and `bundletool install-apks --device-id=HNY0CY0W`. **AAB sizes: base APK 55.2 MB compressed (was 374 MB); asset pack 261.6 MB; total compressed download 125 MB.** Base is well under Play's 200 MB ceiling; pack sits in the 2 GB asset-pack ceiling. **Cliff 1 — CLOSED at build level + field-verified on Lenovo TB305FU.** All three V1 ship-cliffs are now resolved — AAB is upload-eligible pending operator-side legal items. New `app-salem/src/androidTest/.../SalemContentDatabaseMigrationTest.kt` (first androidTest in the repo, 2/2 pass on Lenovo via `:app-salem:connectedDebugAndroidTest`) — asserts asset's `room_master_table.identity_hash` matches v19 hash + minimum row counts on all 12 Room-managed tables. Wave 3 closed in 1 session vs plan estimate of 3-4 sessions. Full detail: `docs/session-logs/session-256-2026-05-12.md`.
 
-**V1 ship-cliff status post-S255:**
-- Cliff 1 (AAB 316 MB vs Play Store 200 MB compressed ceiling) — **still open**, Wave 3 (Install-time Asset Pack for `salem_tiles.sqlite`) is the unblocker
+**V1 ship-cliff status post-S256:**
+- Cliff 1 (AAB 316 MB vs Play Store 200 MB compressed ceiling) — **CLOSED** (S256 Wave 3, install-time Asset Pack)
 - Cliff 2 (no `largeHeap` + 60° tilt OOM risk) — **CLOSED** (S255 Wave 1)
 - Cliff 3 (`allowBackup=true` paid-offline contradiction) — **CLOSED** (S255 Wave 1)
+
+**Workflow change (S256, applies to all future builds with asset packs):** standalone APKs installed via `adb install` will NOT contain `salem_tiles.sqlite` (install-time pack assets ship only through the AAB → Play / bundletool pipeline). For local field-testing use:
+```
+bundletool build-apks --bundle=app-salem-release.aab --output=salem.apks --connected-device --device-id=HNY0CY0W
+bundletool install-apks --apks=salem.apks --device-id=HNY0CY0W
+```
+The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_rebake.md`) is preserved — the uninstall step still applies; the install step swaps to `bundletool install-apks`. bundletool jar at `~/.local/bin/bundletool.jar` (1.17.2).
 
 **Recent context — for per-session detail see `SESSION-LOG.md`:** S254 was a pure-planning V1 health audit (5 parallel agents, 23-decision ledger, 5-wave plan written at `docs/plans/v1-health-audit-2026-05-12.md`). S253 shipped tilt-mode lateral wedge fill + `forceFlatDraw` default flip + content refresh. S252 shipped TigerBase CONUS basemap pipeline Z3-Z12 (post-V1, lawyer-gated). S251 closed MBTA-missing-on-Lenovo bug + diagnosed `ufw allow 4300/tcp` firewall flap. S250 closed Lenovo SuperAdmin actually-reaching-network bug (UI-surface gates + Android API 28+ CLEARTEXT permit). S249 shipped Lenovo SuperAdmin toolbar toggle + `:core` manifest-leak fix (release APK now bit-clean — zero INTERNET/ACCESS_NETWORK_STATE). S248 shipped web SuperAdmin tab. S247/S246 swept Destructive AI Gurus, LLC across 340 files / About dialog. S245 backfilled the LLC entity into privacy policy + STATE.
 
@@ -38,13 +45,17 @@
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S256+ next-session docket (post-S255 — Waves 1+2 closed)
+### S257+ next-session docket (post-S256 — Waves 1+2+3 closed; AAB upload-eligible)
 
-**Recommended S256 opener: Wave 3 ship-unlock (~3-4 sessions) OR content authoring depending on operator priority. Full plan + remaining waves + decision ledger in `docs/plans/v1-health-audit-2026-05-12.md`.**
+**Recommended S257 opener: Wave 4 (Spanish i18n, ~2-3 sessions) OR content authoring depending on operator priority. Full plan + remaining waves + decision ledger in `docs/plans/v1-health-audit-2026-05-12.md`.**
 
-- **Wave 3 (Play Store unlocker, the actual ship gate):** Install-time Asset Pack for `salem_tiles.sqlite` (262 MB) — new `app-salem-tiles-pack` module + Play Asset Delivery wiring + `AssetPackManager` integration in `OfflineTileManager.kt` + `bundle { ... }` block in `app-salem/build.gradle`. Asset Pack install progress UI in `OfflineTileManager.kt:75-85`. New `app-salem/src/androidTest/.../SalemContentDatabaseMigrationTest.kt` (identityHash check + row-count smoke before any v20 schema bump).
-- **Wave 4 i18n (~2-3 sessions, new V1 scope):** externalize 29 hardcoded Toast strings + any survey-found user-facing literals → `app-salem/src/main/res/values/strings.xml`; build `values-es/strings.xml` (Spanish UI); locale switcher in Settings + locale-aware TTS engine selection (`TextToSpeech.setLanguage(Locale.forLanguageTag("es-ES"))` with fallback in `NarrationManager.kt:107`); narration stays English V1; smoke-test on Lenovo with `adb shell setprop persist.sys.locale es-ES`.
+- **Wave 4 i18n (~2-3 sessions, V1 scope):** externalize 29 hardcoded Toast strings + any survey-found user-facing literals → `app-salem/src/main/res/values/strings.xml`; build `values-es/strings.xml` (Spanish UI); locale switcher in Settings + locale-aware TTS engine selection (`TextToSpeech.setLanguage(Locale.forLanguageTag("es-ES"))` with fallback in `NarrationManager.kt:107`); narration stays English V1; smoke-test on Lenovo with `adb shell setprop persist.sys.locale es-ES`.
 - **Wave 5 (no V1 code):** write `docs/plans/post-v1-architecture-decomposition.md` — SalemMainActivity 18,623-LOC monolith ViewModel-extraction plan + Manager/Repository consolidation rules + estimated 3–4 week post-V1 refactor scope.
+
+**Wave 3 leftovers / next steps:**
+- **Operator field-walk validation of the asset-pack build on Lenovo** — full Salem walk to confirm tile rendering at z16-z19, tilt 30/45/60°, MBTA SuperAdmin path still exercises cleanly through cache-proxy passthrough. The asset pack was end-to-end verified via OfflineTileManager logs + 2/2 androidTest pass, but a real walk hasn't happened yet on this APK.
+- **Optional Wave 3 polish:** swap `OfflineTileManager` to point osmdroid directly at the asset pack's `AssetPackManager.getPackLocation("salem_tiles_pack").assetsPath()` — skips the ~1.8s first-launch copy to externalFilesDir + saves 262 MB external storage. Requires `com.google.android.play:asset-delivery` dependency. Deferred since the current copy-based path works.
+- **AAB signing for upload** — `bundleRelease` is currently signing with the debug keystore (bundletool default when run via CLI). Operator-side: confirm `~/.gradle/gradle.properties` keystore properties resolve when signing for actual Play Console upload (SHIP-CHECKLIST.md item).
 
 **Wave 2 leftovers (still open):**
 
@@ -65,7 +76,9 @@
 - **WEB SuperAdmin tab field-validation** — refresh http://localhost:4302/admin → Super Admin → Test each of the 8 cards.
 - **Optional SuperAdmin icon swap** — currently `@drawable/ic_debug`; one-line change at `toolbar_two_row.xml:117`.
 
-**Closed this session (S255):** S254 Wave 1 (largeHeap, allowBackup, gradle heap, 4 × scope.cancel, log gating, manual-publish-chain memory) + Wave 2 (dead-table drop, MBTA key removal + `/mbta/upstream/*` cache-proxy passthrough, lint baseline, `:routing-jvm:test` 10/10 was 4/10, HeroAssetLoader inSampleSize, SHIP-CHECKLIST.md, .github/workflows/ci.yml); S252 hardcoded MBTA key + S251/S252 api-v3 direct-leak; S253 manual-publish-chain memory + field-validate-higher-tilts.
+**Closed this session (S256):** S254 Wave 3 — Install-time Asset Pack for `salem_tiles.sqlite` (`:app-salem-tiles-pack` module, settings.gradle include, app-salem assetPacks wiring, verify-bundled-assets.js path bump, ASSETS-MANIFEST.md doc); first androidTest in the repo (`SalemContentDatabaseMigrationTest`, 2/2 pass on Lenovo, closes Wave 3 decision #15); Lenovo field-validate via bundletool install-apks; Cliff 1 (AAB > 200 MB ceiling) — all three V1 ship-cliffs now closed.
+
+**Closed S255:** S254 Wave 1 (largeHeap, allowBackup, gradle heap, 4 × scope.cancel, log gating, manual-publish-chain memory) + Wave 2 (dead-table drop, MBTA key removal + `/mbta/upstream/*` cache-proxy passthrough, lint baseline, `:routing-jvm:test` 10/10 was 4/10, HeroAssetLoader inSampleSize, SHIP-CHECKLIST.md, .github/workflows/ci.yml); S252 hardcoded MBTA key + S251/S252 api-v3 direct-leak; S253 manual-publish-chain memory + field-validate-higher-tilts.
 
 ### S245+ docket (older carry-forwards — many still relevant, some may be obsolete)
 
@@ -164,7 +177,7 @@
 | **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
 | **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 253. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
+**Sessions completed:** 256. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
 
 ---
 
@@ -172,7 +185,7 @@
 
 - **PG `salem_pois`:** 2,037 live (S253 refresh — net −5 from S241's 2,042) + 87 soft-deleted (S241 mass-edit dropped live count by 28 — dupe cleanup + recategorizations + soft-deletes via the new spreadsheet round-trip; S216 dedup history: 220 dead hard-deleted + 43 live cluster losers hard-deleted + 1 Gardner-Pingree dup, all merged before delete; further trim through S221+). 484 reclassified `HISTORICAL_BUILDINGS` → `HISTORICAL_LANDMARKS` (curated buildings now 105). `historical_note` column dropped S216; content lifted to `description` (143 POIs touched, 0 gaps).
 - **Room DB:** at `app-salem/src/main/assets/salem_content.db`, **v19 schema** (S227), identity_hash `745afa3eb4ce04bd7873671ea297b6e0`. Witch Trials intact (npc_bios 49 / articles 16 / newspapers 202). 4 tours / 73 legs (S224). v11 (S186) `is_civic_poi`. v12 (S192) `historical_narration`. v13 (S193) `is_historical_tour`. v14 (S195) `is_historical_property`. v15 (S198) dropped `body_points` from WitchTrialsNewspaper. v16 (S216) dropped `historical_note` from SalemPoi. v17 (S219) added `narration_subtopics` JSONB to SalemPoi. v18 (S226) added 6 haunt columns (`haunt_sprite_id` + 4 tuning ints + `haunt_enabled`). v19 (S227) added `haunt_duration_s` REAL.
-- **APK:** **374 MB debug** (S234 — bumped 161 → 374 MB by the +10mi q=60 tile expansion to 261.7 MB embedded `salem_tiles.sqlite`). `poi-icons/` at 544 MB is the pre-Play-Store audit target. AAB Asset Pack / dynamic-delivery story for the bigger bundle owed to S235+.
+- **APK / AAB:** S256 reorganized into base + asset pack. **Debug APK 95 MB** (was 374 MB pre-S256), **Release AAB 129 MB total** (`base-master.apk` 55.2 MB compressed + `salem_tiles_pack-master.apk` 261.6 MB compressed). `bundletool get-size total` = 125 MB compressed download. Base APK well under Play Store's 200 MB compressed ceiling; asset pack sits in the 2 GB pack ceiling. AAB is upload-eligible. `poi-icons/` at 544 MB is still the next pre-Play-Store size target.
 - **Assets manifest:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js`.
 
 ---

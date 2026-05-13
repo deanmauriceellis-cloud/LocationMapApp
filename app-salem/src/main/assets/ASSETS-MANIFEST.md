@@ -39,11 +39,24 @@ Required Room `identity_hash` at v19: **`745afa3eb4ce04bd7873671ea297b6e0`**. Bu
 
 **S255 — dead tables dropped from publish chain:** `salem_businesses` (861 rows), `narration_points` (817), `tour_pois` (45). Not in `@Database(entities=…)` since the pre-S242 module deletion; never read at runtime. `publish-salem-pois.js` now DROPs them on every bake. ~1 MB asset reclaim.
 
-### `salem_tiles.sqlite` — Offline map tiles (~90 MB)
+### `salem_tiles.sqlite` — Offline map tiles (262 MB) — **lives in `app-salem-tiles-pack/` as of S256**
 
 osmdroid-format tile cache. Single `tiles` table, schema: `(key INTEGER, provider TEXT, tile BLOB, PRIMARY KEY(key, provider))`. Required minimum: **5,000 tile rows** covering downtown Salem zoom 16-19 (per `feedback_tile_zoom_levels.md`).
 
 Source: `cache-proxy/scripts/bundle-offline-tiles.js` (or equivalent per operator). If this file is absent or empty, the map renders blank.
+
+**S256 — moved to install-time Asset Pack.** Path is now `app-salem-tiles-pack/src/main/assets/salem_tiles.sqlite`, not `app-salem/src/main/assets/`. Reason: V1 AAB exceeded Google Play's 200 MB compressed download ceiling. install-time Asset Packs (a) keep the base AAB under the ceiling (Play allows the pack as a separate up-to-2GB component) and (b) preserve the offline-from-install UX — pack is downloaded with the base APK at install time, no first-launch "downloading map" screen. At runtime install-time pack assets are merged into the app's `AssetManager`, so `OfflineTileManager` continues to use `context.assets.open("salem_tiles.sqlite")` with no code change. Verify script + pack module: `cache-proxy/scripts/verify-bundled-assets.js` (path updated), `app-salem-tiles-pack/build.gradle`, `app-salem-tiles-pack/src/main/AndroidManifest.xml`.
+
+**Not tracked in git (S256).** The 262 MB blob exceeds GitHub's 100 MB file-size limit and is a generated build artifact regardless. `.gitignore` excludes both the asset pack path and the `tools/tile-bake/dist/` staging path. **To regenerate on a fresh clone:**
+
+```
+cd tools/tile-bake
+# Regenerate salem-custom.mbtiles from source (Mapnik / Planetiler — see bake-parallel.js)
+node merge-into-bundle.js              # writes tools/tile-bake/dist/salem_tiles.sqlite
+cp dist/salem_tiles.sqlite ../../app-salem-tiles-pack/src/main/assets/
+```
+
+The bake takes ~30 minutes wall-clock on a recent machine; intermediate `salem-custom.mbtiles` is the slow part. Operator typically keeps the bundle warm and rebakes only when the tile source / bbox / zoom range changes (last bake S234, expanded to +10 mi q=60 at 261.7 MB). Verify post-copy with `node cache-proxy/scripts/verify-bundled-assets.js` (asserts 5000+ rows + provider=`Salem-Custom`).
 
 ### `tours/*.json` — Pre-computed OSRM walking routes (~400 KB)
 

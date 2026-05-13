@@ -71,9 +71,13 @@ docs/archive/poi-icons-unused-styles_archived_*/**/*.jpg
 # docs/PRIVACY-POLICY-V1.md + the operating-entity memory.
 LegalDocuments/
 
-# S167: pipeline staging copy of salem_tiles.sqlite.
-# The canonical copy that ships lives at app-salem/src/main/assets/salem_tiles.sqlite
-# and IS committed — fresh clones need it to build a working APK. The staging
-# copy under tools/tile-bake/dist/ is just the output of trim-to-salem.py and
-# can always be regenerated.
+# S256: salem_tiles.sqlite (262 MB) is NOT tracked in git — exceeds
+# GitHub's 100 MB blob limit and is a generated build artifact anyway. It
+# lives at app-salem-tiles-pack/src/main/assets/salem_tiles.sqlite locally
+# (consumed by the install-time Asset Pack module) and at tools/tile-bake/
+# dist/salem_tiles.sqlite (pipeline staging). Both are regenerable; see
+# tools/tile-bake/merge-into-bundle.js (canonical bake), then copy the
+# output into app-salem-tiles-pack/src/main/assets/ before
+# :app-salem:bundleRelease. ASSETS-MANIFEST.md documents the procedure.
 tools/tile-bake/dist/salem_tiles.sqlite
+app-salem-tiles-pack/src/main/assets/salem_tiles.sqlite

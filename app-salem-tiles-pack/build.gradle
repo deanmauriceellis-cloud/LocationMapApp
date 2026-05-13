@@ -1,0 +1,30 @@
+// S256 — Install-time Asset Pack for salem_tiles.sqlite (262 MB).
+//
+// Reason: V1 AAB ships at ~316 MB total assets which exceeds Google Play's
+// 200 MB compressed AAB ceiling. Moving the tile SQLite into an install-time
+// Asset Pack keeps the base AAB under the ceiling while preserving the
+// from-install offline UX (install-time packs are downloaded with the app —
+// no first-launch "downloading map" screen, no post-install fast-follow gap).
+//
+// At runtime, install-time pack assets are merged into the app's AssetManager,
+// so OfflineTileManager continues to call context.assets.open("salem_tiles.sqlite")
+// unchanged. No AssetPackManager API call required for install-time mode.
+//
+// Pack name (referenced by app-salem/build.gradle's assetPacks block and at
+// runtime by AssetPackManager if we ever switch to fast-follow / on-demand):
+//   salem_tiles_pack
+//
+// To swap delivery mode later (fast-follow / on-demand), change the
+// deliveryType in src/main/AndroidManifest.xml AND switch OfflineTileManager
+// to use AssetPackManager.getPackLocation(...).assetsPath() for file lookup.
+
+plugins {
+    id 'com.android.asset-pack'
+}
+
+assetPack {
+    packName = "salem_tiles_pack"
+    dynamicDelivery {
+        deliveryType = "install-time"
+    }
+}

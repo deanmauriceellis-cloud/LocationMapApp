@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    S256 — Asset pack manifest for salem_tiles.sqlite.
+
+    The split attribute MUST match the assetPack.packName in build.gradle.
+    The dist:delivery type matches the dynamicDelivery block in build.gradle.
+
+    install-time = downloaded with the base app on install; assets are
+    available immediately on first launch with no AssetPackManager API needed.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:dist="http://schemas.android.com/apk/distribution"
+    package="com.destructiveaigurus.katrinasmysticvisitorsguide.tilespack"
+    split="salem_tiles_pack">
+
+    <dist:module dist:type="asset-pack">
+        <dist:fusing dist:include="true" />
+        <dist:delivery>
+            <dist:install-time />
+        </dist:delivery>
+    </dist:module>
+
+</manifest>

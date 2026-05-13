@@ -126,7 +126,11 @@ if (!fs.existsSync(CONTENT_DB)) {
 }
 
 // ── salem_tiles.sqlite ────────────────────────────────────────────────────
-const TILES_DB = path.join(ASSETS, 'salem_tiles.sqlite');
+// S256: moved out of app-salem/src/main/assets/ into the
+// app-salem-tiles-pack install-time Asset Pack. Path updated; same schema /
+// row / provider checks apply.
+const TILES_PACK_ASSETS = path.resolve(__dirname, '../../app-salem-tiles-pack/src/main/assets');
+const TILES_DB = path.join(TILES_PACK_ASSETS, 'salem_tiles.sqlite');
 if (!fs.existsSync(TILES_DB)) {
   fail(`missing file: ${TILES_DB}`);
 } else {
