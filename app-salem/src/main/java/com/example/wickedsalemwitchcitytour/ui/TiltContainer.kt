@@ -78,8 +78,11 @@ class TiltContainer @JvmOverloads constructor(
     private var dirty = true
 
     private var extraTopPx: Int = 0
+    private var extraSidePx: Int = 0
     private var savedMapHeight: Int = ViewGroup.LayoutParams.MATCH_PARENT
     private var savedMapTopMargin: Int = 0
+    private var savedMapWidth: Int = ViewGroup.LayoutParams.MATCH_PARENT
+    private var savedMapLeftMargin: Int = 0
     private var savedClipChildren: Boolean = true
 
     // S237 — sprite overlay reference, set by SalemMainActivity right after the
@@ -215,42 +218,72 @@ class TiltContainer @JvmOverloads constructor(
         val mv = findMapView() ?: return
         val lp = mv.layoutParams as? MarginLayoutParams ?: return
         val containerH = height
-        if (containerH <= 0) return  // not measured yet; onSizeChanged will retry
+        val containerW = width
+        if (containerH <= 0 || containerW <= 0) return  // not measured yet; onSizeChanged will retry
 
         if (tiltDeg <= 0f) {
-            if (extraTopPx != 0) {
+            if (extraTopPx != 0 || extraSidePx != 0) {
                 lp.height = savedMapHeight
                 lp.topMargin = savedMapTopMargin
+                lp.width = savedMapWidth
+                lp.leftMargin = savedMapLeftMargin
                 mv.layoutParams = lp
                 clipChildren = savedClipChildren
                 extraTopPx = 0
+                extraSidePx = 0
                 if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
                     com.example.locationmapapp.util.DebugLogger.d(
                         TAG,
-                        "applyMapExtension RESTORE: tilt=0° lp.height=${lp.height} topMargin=${lp.topMargin} extraTopPx=0",
+                        "applyMapExtension RESTORE: tilt=0° lp.height=${lp.height} topMargin=${lp.topMargin} " +
+                            "lp.width=${lp.width} leftMargin=${lp.leftMargin} extra(top,side)=(0,0)",
                     )
                 }
             }
             return
         }
 
-        val targetExtra = (containerH * EXTRA_TOP_FRACTION).toInt()
-        if (targetExtra == extraTopPx) return
+        val targetTop = (containerH * EXTRA_TOP_FRACTION).toInt()
+        // S253 — tilt-proportional LATERAL overhang. The pinch matrix
+        // (rebuildMatrix) carves triangular wedges off the LEFT and RIGHT
+        // edges of the trapezoid for y in [topY, h]. EXTRA_TOP_FRACTION's
+        // upward extension does not reach those side wedges. Extending the
+        // MapView LATERALLY lets the perspective matrix extrapolate src
+        // x<0 (and x>w) into them. Required overhang per side to fully
+        // fill the wedge at its top tip (dst y = topY):
+        //     Δ = (0.5·t / (1 - t)) · containerW
+        // Capped at EXTRA_SIDE_CAP to bound tile-fetch cost at extreme
+        // tilts. clamp on t at 0.85 (matches rebuildMatrix) prevents
+        // division-by-zero / asymptote near 90°.
+        val t = (tiltDeg / 90f).coerceIn(0f, 0.85f)
+        val sideRatio = (0.5f * t / (1f - t).coerceAtLeast(0.0001f))
+            .coerceAtMost(EXTRA_SIDE_CAP)
+        val targetSide = (containerW * sideRatio).toInt()
+
+        if (targetTop == extraTopPx && targetSide == extraSidePx) return
 
         val mvHBefore = mv.height
-        if (extraTopPx == 0) {
+        val mvWBefore = mv.width
+        if (extraTopPx == 0 && extraSidePx == 0) {
             // First entry into tilted state — capture flat-mode params for restore.
             savedMapHeight = lp.height
             savedMapTopMargin = lp.topMargin
+            savedMapWidth = lp.width
+            savedMapLeftMargin = lp.leftMargin
             savedClipChildren = clipChildren
             clipChildren = false
         }
-        extraTopPx = targetExtra
-        // S233 — SYMMETRIC extension: half above, half below the natural
-        // TiltContainer bounds (see KDoc). Tile-fetch uses the full MapView
-        // bbox naturally; default View pivot lines up with operator.
-        lp.height = containerH + targetExtra
-        lp.topMargin = -targetExtra / 2
+        extraTopPx = targetTop
+        extraSidePx = targetSide
+        // S233 — SYMMETRIC vertical extension: half above, half below the
+        // natural TiltContainer bounds (see KDoc). Tile-fetch uses the full
+        // MapView bbox naturally; default View pivot lines up with operator.
+        lp.height = containerH + targetTop
+        lp.topMargin = -targetTop / 2
+        // S253 — SYMMETRIC lateral extension: equal overhang on each side
+        // via negative leftMargin keeps the MapView geometric center on
+        // the TiltContainer center (matches the vertical-extension pivot).
+        lp.width = containerW + 2 * targetSide
+        lp.leftMargin = -targetSide
         mv.layoutParams = lp
         // S242 — force a measure/layout pass after extending. Setting
         // layoutParams alone leaves the new height pending until the next
@@ -261,9 +294,11 @@ class TiltContainer @JvmOverloads constructor(
         if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
             com.example.locationmapapp.util.DebugLogger.d(
                 TAG,
-                "applyMapExtension EXTEND: tilt=${tiltDeg.toInt()}° containerH=$containerH " +
-                    "targetExtra=${targetExtra}px lp.height=${lp.height} topMargin=${lp.topMargin} " +
-                    "mv.height_before=$mvHBefore (post-requestLayout pending next measure)",
+                "applyMapExtension EXTEND: tilt=${tiltDeg.toInt()}° " +
+                    "container=${containerW}x${containerH} " +
+                    "target(top,side)=(${targetTop}px,${targetSide}px) " +
+                    "lp=${lp.width}x${lp.height} margin(top,left)=(${lp.topMargin},${lp.leftMargin}) " +
+                    "mv_before=${mvWBefore}x${mvHBefore} (post-requestLayout pending next measure)",
             )
         }
     }
@@ -482,6 +517,17 @@ class TiltContainer @JvmOverloads constructor(
         // the wedge area. So 5.0 here gives ~2.5×containerH of wedge fill.
         // Tile cost: ~6× (1 + 5). Lenovo handles fine; Pixel 7a trivial.
         private const val EXTRA_TOP_FRACTION = 5.0f
+
+        // S253 — cap on lateral overhang per side, as a fraction of
+        // containerW. Required overhang to fully fill the side wedge is
+        // 0.5·t/(1-t)·containerW, which goes asymptotic near max tilt
+        // (75°). Cap at 1.5 means at most 4× total MapView width (1 + 2·1.5).
+        // Combined with the 6× vertical extension, peak tile area is 24×
+        // at extreme tilts — still well below the Lenovo's bundled-tile
+        // bitmap budget at moderate zooms; if it chunks, dial down.
+        // At tilt=42° (current debug-FAB default) sideRatio≈0.44 → mv.width≈1.88×
+        // and total tile area ≈ 11.3× containerArea.
+        private const val EXTRA_SIDE_CAP = 1.5f
 
         // Trapezoid top-edge factor: at max tilt the trapezoid's top sits at
         // dst y = h * TOPY_FACTOR * t. 0.6 keeps the perspective vanishing

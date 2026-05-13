@@ -57,12 +57,14 @@ class BillboardMarker(mv: MapView) : Marker(mv) {
 
         /**
          * S251 — when true, the [tiltActive] early-return is bypassed and base
-         * draw always runs. Default true in debug so operators can confirm
-         * whether tilt suppression is the cause of "invisible markers" reports.
-         * Release leaves it false (release also strips the entire field via R8
-         * because BuildConfig.DEBUG is false everywhere it's read).
+         * draw always runs. Kept as a runtime toggle for diagnostic use; the
+         * S251 default of `BuildConfig.DEBUG` was reverted in S253 because it
+         * caused every debug tilt session to double-render — flat pills laid
+         * on the ground in pass-1 + upright billboards in pass-2 (operator
+         * screenshot at z17 + tilt=42°). Set to true at runtime via a hidden
+         * gesture or via adb shell `setprop` if needed for diagnosis.
          */
-        @Volatile @JvmStatic var forceFlatDraw: Boolean = BuildConfig.DEBUG
+        @Volatile @JvmStatic var forceFlatDraw: Boolean = false
 
         // ── 1Hz draw-count instrumentation (DEBUG only) ─────────────────────
         private val drawn = java.util.concurrent.atomic.AtomicInteger(0)
