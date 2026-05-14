@@ -127,19 +127,24 @@ class MainViewModel @Inject constructor(
 
     // ── Location ──────────────────────────────────────────────────────────────
 
-    private var currentIntervalMs: Long = 60_000L
+    // S264: high-zoom map is sensitive to small movement — default to 1 Hz.
+    private var currentIntervalMs: Long = 1_000L
 
     /** Called by SalemMainActivity after location permission is confirmed. Safe to call multiple times. */
     fun onPermissionGranted() {
         if (locationJob?.isActive == true) {
             DebugLogger.w(TAG, "onPermissionGranted() — location already running, skip")
+            // Ensure mode is GPS — caller may have been MANUAL (e.g. walk-sim
+            // exit) and the live subscription is still alive. Flipping the
+            // mode lets the next real fix update _currentLocation.
+            if (_locationMode.value != LocationMode.GPS) _locationMode.value = LocationMode.GPS
             return
         }
         DebugLogger.i(TAG, "onPermissionGranted() — starting GMS location flow")
         _locationMode.value = LocationMode.GPS
-        currentIntervalMs = 60_000L
+        currentIntervalMs = 1_000L
         locationJob = viewModelScope.launch {
-            locationManager.getLocationUpdates(intervalMs = 60_000L, minIntervalMs = 30_000L)
+            locationManager.getLocationUpdates(intervalMs = 1_000L, minIntervalMs = 500L)
                 .collect { loc ->
                     DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
                     if (_locationMode.value == LocationMode.GPS) {
@@ -167,6 +172,10 @@ class MainViewModel @Inject constructor(
         currentIntervalMs = intervalMs
         if (locationManager.updateRequestParams(intervalMs, minIntervalMs)) return
         // No live subscription to update — start one fresh.
+        // S264: the fallback path used to race walk-sim's setManualLocation
+        // (which called stopLocationPolling), killing the new flow within
+        // ~14ms before the first fix. setManualLocation no longer tears
+        // down the subscription, so this fallback is rarely hit.
         locationJob?.cancel()
         locationJob = viewModelScope.launch {
             locationManager.getLocationUpdates(intervalMs = intervalMs, minIntervalMs = minIntervalMs)
@@ -202,11 +211,27 @@ class MainViewModel @Inject constructor(
     fun setManualLocation(point: GeoPoint) {
         _currentLocation.value = LocationUpdate(point, null, null, 0f)
         _locationMode.value = LocationMode.MANUAL
-        // S126: when entering MANUAL, fully tear down the GMS provider so the
-        // hardware stops polling and no late GPS emission can race past the
-        // gate and snap the map back to the user's real location.
-        stopLocationPolling()
+        // S264: do NOT tear down the GMS subscription here. The locationMode
+        // gate in the GPS update collector (line ~145) already drops real
+        // fixes while MANUAL is set, so the map can't drift. Killing the
+        // subscription on every setManualLocation call (walk-sim emits one
+        // ~1Hz) raced the tour engine's restartLocationUpdates() and left
+        // a stuck/zombie state when walk-sim stopped (see trip diagnosis
+        // 2026-05-13 — pixel8-trip/). Recovery on walk-sim exit is now an
+        // explicit flip via endManualMode(); no resubscribe required.
         DebugLogger.i(TAG, "Manual location: ${point.latitude}, ${point.longitude}")
+    }
+
+    /**
+     * S264: explicit MANUAL→GPS transition without re-subscribing.
+     * Called by SalemMainActivity.stopWalkSim() so the next real GPS fix
+     * lands in _currentLocation immediately (subscription stays alive
+     * across walk-sim under the S264 contract).
+     */
+    fun endManualMode() {
+        if (_locationMode.value == LocationMode.GPS) return
+        DebugLogger.i(TAG, "endManualMode() — MANUAL → GPS (subscription stays alive)")
+        _locationMode.value = LocationMode.GPS
     }
 
     /** Fires a one-shot last-known-location query to centre the map before the first periodic update. */

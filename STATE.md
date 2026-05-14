@@ -2,25 +2,20 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-13 — **Session 263 (Pixel 8 added to test fleet as primary device — Android 16 / SDK 36, serial `41231FDJH0018J`; Lenovo TB305FU retained as min-spec floor. Debug AAB built + installed via bundletool with asset pack delivering `salem_tiles.sqlite`. Surfaced V1 ship-blocker: zero portrait resources in the app — no `layout-port/`, no `values-sw600dp/`, single landscape-implicit layout set against Lenovo natural orientation; Pixel 8 portrait shows FAB collisions with navbar insets, oversized cards, fullscreen-dialog clipping, etc. Operator decision: **full multi-form-factor V1 — both phones AND tablets, both portrait AND landscape.** Lock-landscape shortcut declined. Explore agent ran 7-section UI inventory (15 layouts, 43 dialog entry points, 11 fullscreen dialogs, 3 custom views). Plan parked at `docs/plans/pixel8-portrait-support.md` — 6 phases (A: smoke test → B: core layouts → C: dialog triage → D: programmatic UI → E: splash letterbox → F: tablet + cross-device validation), ~10 sessions estimated. All 5 plan decisions confirmed: tablet portrait required, phone landscape required, splash letterbox not regen, dialog audit triage-only, keep configChanges + add `onConfigurationChanged`. 3 memories updated/added (new `reference_pixel8_test_device.md`; updated `feedback_lenovo_is_v1_minimum_spec.md` + `feedback_lenovo_over_emulator.md` with new device-priority order). No app code shipped. V1 ship-cliff status unchanged (all 3 closed). ~80 days to 2026-08-01 ship; 7 days to Form TX deadline 2026-05-20. **S264 opener: Phase A — operator-driven Pixel 8 visual smoke test, screenshot every UI surface in both orientations, output `docs/pixel8-portrait-survey/MATRIX.md`.).** **Session 262 (preceding): S261 parked plan executed — `align-asset-schema-to-room.js` per-entity DROP+CREATE+INDEX+INSERT now wrapped in a single `db.transaction()` so partial failure rolls back to pre-DROP state instead of shipping an empty table; all 5 verification steps green: smoke run identical, row-count parity OK across all 12 entities + room_master_table, identity hash `745afa3eb4ce04bd7873671ea297b6e0` + `user_version=19` preserved, `verify-bundled-assets.js` 23 OK / 0 warn / 0 fail, idempotent on second run; ~16 LOC delta in one file, no new deps; operator next: re-evaluate path).** **Session 261 (preceding):** Operator: *"same audit lens again, re-evaluate everything"* → *"put this into explore and plan mode — we do nothing unless we validate the solution"* → *"I want plan to be written to a file and we investigate it next session"*. Re-ran the S260 4-agent lens with refinement-hunting brief; surfaced 9 candidate items (2 bugs, 4 content, 3 admin-UX). Entered plan mode + 3 parallel validation agents. **Bug #1 misdiagnosed by prior audit:** `align-asset-schema-to-room.js` line 109 is `function main()` — SYNCHRONOUS, not async; siblings (`publish-salem-pois.js`, `publish-tours.js`, `publish-tour-legs.js`) are all `async function main()` and need `.catch()` because they return promises — the align script doesn't have the silent-fail bug, sync exceptions exit non-zero with stack trace + Gradle Exec fails correctly. Real concern is the unprotected DROP+CREATE+INDEX sequence at lines 78-82 — if CREATE throws after DROP committed, in-memory row snapshot is lost on crash and next run ships an empty table. Fix corrected to "wrap per-entity DROP+CREATE+INDEX+INSERT in `db.transaction()` so partial failure rolls back to pre-DROP state" (~15 LOC delta). **Bug #2 declined** — operator: *"Super Admin is for lawyer view — I like it but I have to confirm I don't violate laws"* — Super Admin + TigerBase admin tabs stay visible (lawyer demos of parked V1+ features; web admin is localhost+Basic-Auth+operator-only anyway). **Content counts corrected via psql** (agents were sloppy): <50-char short_narration **66 not 86**; empty `narration_subtopics` confirmed **221/580**; >900-char historical **14 not 15**; populated subtopics include 25 figure / 7 manual / 1 fact (not "only adjacent_poi"). Underlying refinement targets real but deferred to multi-session authoring docket. Plan parked at `docs/plans/s261-align-asset-schema-hardening.md`. No code shipped. **S260 (preceding):** full-confidence audit pass (4 parallel Explore agents, all dimensions ship-grade); two new feedback memories (hero revisit / dedup manual). Operator: *"Explore everything — tell me with full confidence that we are on the right path."* Dispatched 4 parallel Explore agents covering V1 offline ship-gate, AAB build chain, PG content state, and cache-proxy + web + routing-jvm health. **Verdict: engineering ship-grade across the board.** V1 offline gate enforced at 6 layers (manifest strip, BuildDefaults const, FeatureFlags inline, SuperAdminMode 3-tier, R8 DCE, MBTA LAN passthrough); Room v19 identity hash `745afa3eb4ce04bd7873671ea297b6e0` matches across schema file + `@Database` annotation + asset DB `room_master_table` + androidTest; AAB 129 MB compressed (under 200 MB Play ceiling); signing wired to real upload keystore at `~/keys/wickedsalem-upload.jks` via gradle.properties — NOT debug fallback (STATE note about debug signing was stale; bundleRelease gradle task itself signs properly with `WICKED_SALEM_KEYSTORE_PATH`); `:routing-jvm` 10/10 parity (re-run); cache-proxy S259 robustness verified (4-arg error middleware, unhandledRejection / uncaughtException, graceful shutdown drain); Lint tab grown 15 → **25 instant checks + 1 on-demand**; web admin has **11 tabs** (POIs / Tours / Witch Trials / Lint / Geocodes / Field Edits / Audit / Splash Tree / Mass Edit / Super Admin / TigerBase). Content first-cut numbers looked alarming (69% missing short_narration, 84% missing historical_narration) but drill-down within the tour-gated subset (`is_tour_poi ∪ is_historical_property ∪ is_civic_poi` = 580 POIs) showed **98% short-narration coverage** — the headline gap was almost entirely commercial POIs (shopping/food/offices/healthcare) that don't narrate by design. One real fillable gap: ~102 HISTORICAL_LANDMARKS missing `historical_narration` (78% → 100% target). Operator clarifications converted into 2 new feedback memories: `feedback_hero_revisit_later.md` (hero/image migration is OLD work planned for full revisit later — don't flag as ship blocker) + `feedback_dedup_is_manual.md` (POI dedup/soft-delete cleanup is manual operator work via Lint tab — don't propose automation; don't flag soft-delete counts as ship blockers). Both indexed in `MEMORY.md`. Operator close: *"This is what is it is — we manage it as best as we can"* and *"we will do one more revisit next session."* **No code shipped.** **S259 (preceding):** whole-codebase health sweep + 4 real fixes + 11 Dr. K POI drafts brought into version control.
+**Last updated:** 2026-05-13 — **Session 264 (GPS-flakiness root-cause fix shipped + on-road validation green).** Operator drove the freshly-installed S263 debug build and returned "GPS is hung up, was very flakey... when I restart it will work again". Pivoted from S264's planned Phase A portrait smoke test to a full GPS root-cause investigation. Pulled `dumpsys location` (GNSS chip healthy — 407 fixes / 7.4% failure / 4.4 m mean accuracy / CN0 45.5 dB-Hz; but `gps provider: ProviderRequest[OFF], mStarted=false changed +10m39s ago`), 22 MB app debug log, 1592-row journey DB, and 1056 recon-camera bursts. Diagnosed 4 root causes: (1) **60-sec default GPS rate** hardcoded in `MainViewModel.kt:140` from the S126 battery-conservative era — too slow for high-zoom tracking; (2) **walk-sim race** — `setManualLocation()` called `stopLocationPolling()` on every walk-sim tick, killing tour-engine's fresh fast Flow within 14 ms (operator's mis-tapped Walk button was enough to strand the app); (3) **zombie callback leak** in `LocationManager.kt` — `awaitClose { removeLocationUpdates }` could fire before the `requestLocationUpdates` Task finished registering, leaving ghost callbacks alive forever (trip log evidence: two concurrent `onLocationResult #234`/`#57` counter series fighting); (4) **`stopWalkSim()` never restored `_locationMode = GPS`** — after walk-sim stops the cascade left the app in MANUAL with dead subscription. Patched ~40 LOC across 3 files: `MainViewModel.kt` (default `1_000L / 500L`, removed `stopLocationPolling` from `setManualLocation`, new `endManualMode()`, idempotent `onPermissionGranted`), `SalemMainActivity.kt` (all 3 `stopWalkSim*` variants call `viewModel.endManualMode()`), `LocationManager.kt` (`registerCompleted` / `cancelArrivedBeforeRegister` flags clean up late-registered zombies). First build failed with `@Volatile`-on-local-var; dropped to plain `var` (both flags touched only on Main looper). Built debug AAB (28 s green), uninstalled previous, bundletool installed on Pixel 8. Operator took the patched build on a drive. **Five health checks all green:** single `onLocationResult` counter `#1 → #1202` monotonic (was two concurrent series on broken trip); ZERO Flow-cancellation events (was 30+); subscription registered exactly once for the entire 23-min drive; 9× `restartLocationUpdates` all took the in-place `updateRequestParams` happy path (no fresh-launch fallback); journey-table density 1202 fixes / 23 min ≈ 52/min ≈ **1 Hz sustained** (was 4-20 fixes/min on broken trip; max gap 14 s during between-tour 30-s slots, by design — broken trip had a 47.5-min total dropout). Operator close: *"I took the app for a drive, much better, check the logs"*. Phase A portrait smoke test rolls to S265 opener. V1 ship-cliff status unchanged (all 3 closed). ~80 days to 2026-08-01 ship; 7 days to Form TX deadline 2026-05-20. **Preceding sessions (S263 Pixel 8 onboarding + portrait plan; S262 align-asset-schema atomic rebuild; S261 plan-write only; S260 full-confidence audit; S259 health sweep + Dr. K POI drafts) detail in SESSION-LOG.md.**
 
-### State as of S256 close
+### V1 ship-cliff status (all closed)
 
-New `:app-salem-tiles-pack` Gradle module with `com.android.asset-pack` plugin and `install-time` delivery; `salem_tiles.sqlite` (262 MB) git-moved out of `:app-salem`'s base assets. Zero code changes to `OfflineTileManager.kt` — install-time pack assets merge into the app's `AssetManager` namespace at runtime, so `context.assets.openFd("salem_tiles.sqlite")` keeps working. Confirmed via Lenovo logcat (PID 3527): `Extracting salem_tiles.sqlite (asset=274313216)` → `Archive verified: Salem-Custom=715841`. Build verified across `:app-salem-tiles-pack:assemble`, `:app-salem:assembleDebug`, `:app-salem:bundleRelease`, `bundletool build-apks` (universal + split + device-targeted), and `bundletool install-apks --device-id=HNY0CY0W`. **AAB sizes: base APK 55.2 MB compressed (was 374 MB); asset pack 261.6 MB; total compressed download 125 MB.** Base is well under Play's 200 MB ceiling; pack sits in the 2 GB asset-pack ceiling. **Cliff 1 — CLOSED at build level + field-verified on Lenovo TB305FU.** All three V1 ship-cliffs are now resolved — AAB is upload-eligible pending operator-side legal items. New `app-salem/src/androidTest/.../SalemContentDatabaseMigrationTest.kt` (first androidTest in the repo, 2/2 pass on Lenovo via `:app-salem:connectedDebugAndroidTest`) — asserts asset's `room_master_table.identity_hash` matches v19 hash + minimum row counts on all 12 Room-managed tables. Wave 3 closed in 1 session vs plan estimate of 3-4 sessions. Full detail: `docs/session-logs/session-256-2026-05-12.md`.
+- Cliff 1 (AAB > 200 MB Play ceiling) — **CLOSED S256** (install-time Asset Pack: base 55.2 MB / pack 261.6 MB / total compressed download 125 MB; well under both ceilings)
+- Cliff 2 (no `largeHeap` + 60° tilt OOM risk) — **CLOSED S255**
+- Cliff 3 (`allowBackup=true` vs paid-offline) — **CLOSED S255**
 
-**V1 ship-cliff status post-S256:**
-- Cliff 1 (AAB 316 MB vs Play Store 200 MB compressed ceiling) — **CLOSED** (S256 Wave 3, install-time Asset Pack)
-- Cliff 2 (no `largeHeap` + 60° tilt OOM risk) — **CLOSED** (S255 Wave 1)
-- Cliff 3 (`allowBackup=true` paid-offline contradiction) — **CLOSED** (S255 Wave 1)
-
-**Workflow change (S256, applies to all future builds with asset packs):** standalone APKs installed via `adb install` will NOT contain `salem_tiles.sqlite` (install-time pack assets ship only through the AAB → Play / bundletool pipeline). For local field-testing use:
+**Build/install workflow with asset packs:** standalone `adb install` does NOT include `salem_tiles.sqlite`. Use bundletool:
 ```
-bundletool build-apks --bundle=app-salem-release.aab --output=salem.apks --connected-device --device-id=HNY0CY0W
-bundletool install-apks --apks=salem.apks --device-id=HNY0CY0W
+bundletool build-apks --bundle=<aab> --connected-device --device-id=<serial>
+bundletool install-apks --apks=<apks> --device-id=<serial>
 ```
-The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_rebake.md`) is preserved — the uninstall step still applies; the install step swaps to `bundletool install-apks`. bundletool jar at `~/.local/bin/bundletool.jar` (1.17.2).
-
-**Recent context — for per-session detail see `SESSION-LOG.md`:** S254 was a pure-planning V1 health audit (5 parallel agents, 23-decision ledger, 5-wave plan written at `docs/plans/v1-health-audit-2026-05-12.md`). S253 shipped tilt-mode lateral wedge fill + `forceFlatDraw` default flip + content refresh. S252 shipped TigerBase CONUS basemap pipeline Z3-Z12 (post-V1, lawyer-gated). S251 closed MBTA-missing-on-Lenovo bug + diagnosed `ufw allow 4300/tcp` firewall flap. S250 closed Lenovo SuperAdmin actually-reaching-network bug (UI-surface gates + Android API 28+ CLEARTEXT permit). S249 shipped Lenovo SuperAdmin toolbar toggle + `:core` manifest-leak fix (release APK now bit-clean — zero INTERNET/ACCESS_NETWORK_STATE). S248 shipped web SuperAdmin tab. S247/S246 swept Destructive AI Gurus, LLC across 340 files / About dialog. S245 backfilled the LLC entity into privacy policy + STATE.
+The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_rebake.md`) is preserved — uninstall step still applies; install step swaps to `bundletool install-apks`. bundletool jar at `~/.local/bin/bundletool.jar` (1.17.2).
 
 ---
 
@@ -49,11 +44,15 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S264+ next-session docket (post-S263 — Pixel 8 added, portrait plan parked)
+### S265+ next-session docket (post-S264 — GPS fix shipped, portrait plan still parked)
 
-**S263 closed:** Pixel 8 added to test fleet (`41231FDJH0018J`, Android 16); debug AAB installed via bundletool with asset pack. Surfaced V1 ship-blocker — zero portrait resources, app was Lenovo-landscape-implicit. Operator decision: full multi-form-factor V1. Plan parked at `docs/plans/pixel8-portrait-support.md` (~10 sessions across 6 phases); all 5 plan decisions confirmed via AskUserQuestion. 3 memory files written/updated. No app code shipped.
+**S264 closed:** GPS-flakiness root-cause fix shipped + on-road validated. 4 root causes (60-sec default rate / walk-sim race / zombie callback leak / stopWalkSim doesn't restore GPS mode) patched across `MainViewModel.kt`, `SalemMainActivity.kt`, `LocationManager.kt` (~40 LOC, no new deps). On-road drive: 1 Hz sustained, single counter `#1 → #1202`, zero Flow cancellations, single registration for the whole 23-min drive. Pivoted from planned Phase A portrait smoke test — that rolls to S265.
 
-**S264 opener: Phase A from the portrait plan** — operator-driven Pixel 8 visual smoke test. Walk every UI surface (every menu, dialog, sheet, FAB cluster, screen state) in BOTH landscape and portrait on the Pixel 8 (auto-rotate first needs enabling per S263 diagnosis). Screenshot into `docs/pixel8-portrait-survey/<surface>-<orient>.png`. Output: `docs/pixel8-portrait-survey/MATRIX.md` annotating each surface as `OK / minor / major / blocker` per orientation. Drives Phase B-D scope.
+**S265 opener: Phase A from the portrait plan** — operator-driven Pixel 8 visual smoke test. Walk every UI surface (every menu, dialog, sheet, FAB cluster, screen state) in BOTH landscape and portrait on the Pixel 8 (auto-rotate first needs enabling per S263 diagnosis). Screenshot into `docs/pixel8-portrait-survey/<surface>-<orient>.png`. Output: `docs/pixel8-portrait-survey/MATRIX.md` annotating each surface as `OK / minor / major / blocker` per orientation. Drives Phase B-D scope.
+
+**Optional S265 follow-ups on S264 GPS work:**
+- Investigate the 5-task-restart cycle observed in the original trip's 19:36-19:45 window (no longer happening on the new build per single-PID drive log — but underlying cause not nailed; may have been a downstream symptom of the same race).
+- Watch for the `Cancel-before-register detected` warn-log on field walks — if it ever fires, confirm the zombie cleanup path works as designed and isn't itself producing follow-on issues.
 
 **Remaining docket (held behind portrait work):** Wave 4 (Spanish i18n, ~2-3 sessions) / content authoring docket (66 short narrations, 221 missing subtopics, 14 oversized historicals, ~5-10 pre-1860 landmark backfills) / admin UX polish (Mass Edit re-export-stale button, Field Edits sync error mapping, Mass Edit success toast) / Wave 5 post-V1 arch decomp doc. These resume after the portrait plan reaches Phase F or is otherwise paused.
 
@@ -62,16 +61,9 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 - **Wave 4 i18n (~2-3 sessions, V1 scope):** externalize 29 hardcoded Toast strings + any survey-found user-facing literals → `app-salem/src/main/res/values/strings.xml`; build `values-es/strings.xml` (Spanish UI); locale switcher in Settings + locale-aware TTS engine selection (`TextToSpeech.setLanguage(Locale.forLanguageTag("es-ES"))` with fallback in `NarrationManager.kt:107`); narration stays English V1; smoke-test on Lenovo with `adb shell setprop persist.sys.locale es-ES`.
 - **Wave 5 (no V1 code):** write `docs/plans/post-v1-architecture-decomposition.md` — SalemMainActivity 18,623-LOC monolith ViewModel-extraction plan + Manager/Repository consolidation rules + estimated 3–4 week post-V1 refactor scope.
 
-**Wave 3 leftovers / next steps:**
-- **Operator field-walk validation of the asset-pack build on Lenovo** — full Salem walk to confirm tile rendering at z16-z19, tilt 30/45/60°, MBTA SuperAdmin path still exercises cleanly through cache-proxy passthrough. The asset pack was end-to-end verified via OfflineTileManager logs + 2/2 androidTest pass, but a real walk hasn't happened yet on this APK.
-- **Optional Wave 3 polish:** swap `OfflineTileManager` to point osmdroid directly at the asset pack's `AssetPackManager.getPackLocation("salem_tiles_pack").assetsPath()` — skips the ~1.8s first-launch copy to externalFilesDir + saves 262 MB external storage. Requires `com.google.android.play:asset-delivery` dependency. Deferred since the current copy-based path works.
-- **AAB signing for upload** — `bundleRelease` is currently signing with the debug keystore (bundletool default when run via CLI). Operator-side: confirm `~/.gradle/gradle.properties` keystore properties resolve when signing for actual Play Console upload (SHIP-CHECKLIST.md item).
+**Wave 3 leftovers:** operator field-walk validation of asset-pack build on Lenovo (z16-z19 + tilt 30/45/60° + MBTA SuperAdmin path through cache-proxy — verified via OfflineTileManager logs + 2/2 androidTest but no real walk yet); optional `OfflineTileManager` swap to `AssetPackManager.getPackLocation` direct (skips ~1.8s copy + saves 262 MB external — needs `play:asset-delivery` dep); AAB signing-for-upload verification (`~/.gradle/gradle.properties` keystore props vs CLI debug-fallback per SHIP-CHECKLIST.md).
 
-**Wave 2 leftovers (still open):**
-
-- **`hero/` dir migration audit (deferred from Wave 2 #13).** S239 audit said "385 dead at runtime" but PG has **949 live `salem_pois.image_asset LIKE 'hero/%'` references**. Audit which are actually rendered (shadowed by `heroes/<slug>` priority-0 vs really used by PoiHeroResolver tier logic), migrate active ones to `heroes/<slug>.webp`, then drop `hero/`. ~13.4 MB potential reclaim.
-- **Bump cache-proxy on operator dev-box** to load the S255 `/mbta/upstream/*` route — restarted manually mid-S255 (PID 1976458); operator should add a systemd / pm2 unit so it survives reboots.
-- **Field-validate Wave 1+2 build on Lenovo through SuperAdmin toggle.** S255 walk-sim ran clean but operator never toggled SuperAdmin so the new `/mbta/upstream/*` passthrough wasn't exercised on-device. Toggle and watch `tail -F /tmp/salem-stream.log` for `MbtaRepo` HTTP logs hitting the cache-proxy.
+**Wave 2 leftovers:** `hero/` dir migration audit (S239 said "385 dead" but PG has 949 live `image_asset LIKE 'hero/%'`; per `feedback_hero_revisit_later.md` this is parked for full revisit later — don't flag as ship blocker); bump cache-proxy on dev-box for the S255 `/mbta/upstream/*` route via systemd/pm2; field-validate Wave 1+2 build on Lenovo through SuperAdmin toggle (S255 walk-sim ran clean but SuperAdmin not exercised on-device).
 
 **Carry from prior sessions (still open):**
 
@@ -86,53 +78,25 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 - **WEB SuperAdmin tab field-validation** — refresh http://localhost:4302/admin → Super Admin → Test each of the 8 cards.
 - **Optional SuperAdmin icon swap** — currently `@drawable/ic_debug`; one-line change at `toolbar_two_row.xml:117`.
 
-**Closed this session (S256):** S254 Wave 3 — Install-time Asset Pack for `salem_tiles.sqlite` (`:app-salem-tiles-pack` module, settings.gradle include, app-salem assetPacks wiring, verify-bundled-assets.js path bump, ASSETS-MANIFEST.md doc); first androidTest in the repo (`SalemContentDatabaseMigrationTest`, 2/2 pass on Lenovo, closes Wave 3 decision #15); Lenovo field-validate via bundletool install-apks; Cliff 1 (AAB > 200 MB ceiling) — all three V1 ship-cliffs now closed.
+### S245+ aged backlog (rendering / content / tools — referenced when in scope)
 
-**Closed S255:** S254 Wave 1 (largeHeap, allowBackup, gradle heap, 4 × scope.cancel, log gating, manual-publish-chain memory) + Wave 2 (dead-table drop, MBTA key removal + `/mbta/upstream/*` cache-proxy passthrough, lint baseline, `:routing-jvm:test` 10/10 was 4/10, HeroAssetLoader inSampleSize, SHIP-CHECKLIST.md, .github/workflows/ci.yml); S252 hardcoded MBTA key + S251/S252 api-v3 direct-leak; S253 manual-publish-chain memory + field-validate-higher-tilts.
+- **Rendering:** RollingGrassOverlay green-patches on Bluestacks; sprite field-walk near bridge POI; field-validate S238 perspective at z19/z20 + tilt 30/36/42/48°; first-frame layout race in `applyMapExtension` (post-extension `mv.requestLayout()`); cold-start tile-decode spike (Choreographer 1134ms); optional overlay culling / batched Overlay perf candidates.
+- **Content:** lint review of 51-POI newly-renderable set; Sweet Boba regression; Layers menu category gap (FOOD_DRINK/SHOPPING toggles don't gate narration overlay); tilt-mode odds-and-ends (S239); splash variants (32 TODO in `docs/SPLASH-ANNOUNCEMENTS-V1.md`); POI/path alignment review of 1962-photo session; Find menu tile + hero review.
+- **Tools:** TTS-settings deep-link reliability; SheetJS CVE audit; cascading subcategory pick-list; field-edit UPDATE/CREATE loops; Rapid Recon fresh-walk 1 Hz tick + true-north; auto-fire camera field-test.
 
-### S245+ docket (older carry-forwards — many still relevant, some may be obsolete)
+### Other carry-forwards (lower priority — pull when in scope)
 
-**Rendering / animation:**
-- RollingGrassOverlay vivid-green-patches on Bluestacks (`RollingGrassOverlay.kt:37` — x86 Skia stroke difference).
-- Sprite path field-walk near bridge POI (haunt skeleton).
-- Field-walk validation of S238 perspective fix at z19/z20 + tilt 30/36/42/48° in motion.
-- First-frame layout race in `applyMapExtension` (one-frame snap on tilt entry; fix: `mv.requestLayout()` post-extension).
-- Residual cold-start tile-decode spike (one Choreographer 1134ms on first tilt entry; canvas-level breakdown if drag chunky).
-- Optional perf candidates (only if needed): overlay culling to perspective trapezoid; batched custom Overlay replacing 600 Markers.
-
-**Content / authoring:**
-- Lint review of 51-POI newly-renderable set (`default_visible=true AND NOT is_narrated AND NOT is_tour_poi AND NOT is_civic_poi AND NOT is_historical_property`).
-- Sweet Boba regression check (still render + narrate template-synthesized text).
-- Layers menu category gap — FOOD_DRINK / SHOPPING toggles don't gate narration overlay (only `histLandmark` + `civic` prefs read in `loadNarrationPointMarkers`).
-- Operator-mentioned tilt-mode odds and ends (deferred S239).
-- Author splash variants in Splash Tree editor (32 TODO stubs in `docs/SPLASH-ANNOUNCEMENTS-V1.md`).
-- POI/path-alignment review of the 1962-photo Salem-trip session (`/mnt/sdb-images/LMASalemPictures/session-20260507-160007-1962photos/`).
-- Find menu tile review (16 visible cells + Favorites; `FIND_HIDE_IN_V1` excludes FUEL_CHARGING/TRANSIT/PARKING/EMERGENCY); subcategory grid drill-down (`showFindSubtypeGrid` at `SalemMainActivityFind.kt:606`); hero picture review (`res/drawable-nodpi/find_tile_<id>.jpg` + `PoiHeroResolver`); POI detail click-through review (`showPoiDetailDialog` + `PoiDetailSheet` post-S224-cleanup coherence).
-
-**Tools / process:**
-- TTS-settings deep-link reliability (`Settings.ACTION_ACCESSIBILITY_SETTINGS` fallback when `com.android.settings.TTS_SETTINGS` missing).
-- SheetJS prototype-pollution audit (`xlsx@0.18.5` known CVEs; admin is Basic-Auth + localhost-only so acceptable).
-- Cascading subcategory pick-list (Excel `INDIRECT` if operator finds the flat 170-subcat list annoying).
-- Field-edit field-validate UPDATE/CREATE loops; Rapid Recon fresh-walk 1 Hz tick + true-north validation; Auto-fire camera field-test (300 ms `AUTO_FIRE_SETTLE_MS`).
-
-### Other carry-forwards (lower priority)
-
-- **Operator field-validation** of S221 detour, S220 subtopic content, S217 BusinessLabel + FAB override; **S220 lint cleanup** for spurious `is_tour_poi=true` rows; **borderline-historical commercial opt-in audit** (Hawthorne Hotel etc.).
-- **Tier 3 disk reclaim** (~4.4 GB): `tools/poi-icons/`, `tools/hero-triptych/output-full/`, `tools/tile-bake/data/sources/`, `cache-proxy/out/l3-essex/`, `docs/archive/poi-icons-unused-styles_*/`. **`.gitignore` audit**: `overnight-runs/`, `cache-proxy/poi-cache.json`, `cache-proxy/cache-data.json`, `web/dist`, `web/tsconfig.tsbuildinfo`, `docs/bake-tests/`.
-- **John Ward House tour-leg fix**, **HISTORICAL_LANDMARKS icon+hero regen**, **`description` content rebuild post-`historical_note`-merge**, **Dequeue 40 m staleness drop align with `geofence_radius_m`** (all S216).
-- **S215 suspicious-leg graph investigation** — Dr. K 13/14, WD1 3/6/10/11.
-- **PoiDetailSheet/Find further cleanup** (S224): `enterFilterAndMapMode`/`exitFilterAndMapMode` clearXXX/stopXXX no-ops still in source. **CLAUDE.md "Pinned" block cleanup** — references Room v11 / S186-S188 state; actual schema is v17.
-
-### Open backlog (older items, still pending)
-
-- **Speed-aware queue cap** (S206 carry) — at >15 mph, replace queued narration items rather than appending; alternative: switch to SHORT tier at high speed. Pick + ship.
-- **DensityTour 0-stop design question** (S206) — auto-fall-back to Explore at tour start, or refuse to start a 0-stop tour. Decide + ship.
-- **Cross-repo Salem commit owed** (S204→S205→S206) — `Salem/cmd/genbiographies/main.go` + 3 hand-edited bio JSONs need committing in the Salem repo. Operator-driven.
-- **Rebuild signed AAB + 30-min Lenovo smoke** — first signed AAB since S180. V1 gating checklist (Visit Website handoff, Find Reviews/Comments hidden, toolbar gating, webcam "View Live" hidden, recon camera DEBUG-only — verify BuildDefaults retail posture in release).
-- **Operator field-walk validation** (S204) — GPS-OBS heartbeat + Witch Trials bios + full TTS-gated dwell on real POI traversal during wife's Salem walks.
-- **Drive regression in airplane mode** (#20) — validate offline posture under real GPS load.
-- **#9 Re-author 5 polyline tours via web admin** (S185, operator-driven).
-- **#6 McIntire content drain** (S200, operator hand-author).
+- **Operator field-validation** of S221 detour / S220 subtopic content / S217 BusinessLabel + FAB override; S220 lint cleanup for spurious `is_tour_poi=true`; borderline-historical commercial opt-in audit.
+- **Tier 3 disk reclaim** (~4.4 GB): `tools/poi-icons/`, `tools/hero-triptych/output-full/`, `tools/tile-bake/data/sources/`, `cache-proxy/out/l3-essex/`, `docs/archive/poi-icons-unused-styles_*/`. `.gitignore` audit: `overnight-runs/`, `cache-proxy/poi-cache.json`, `cache-proxy/cache-data.json`, `web/dist`, `web/tsconfig.tsbuildinfo`, `docs/bake-tests/`.
+- **S216 follow-ups:** John Ward House tour-leg fix; HISTORICAL_LANDMARKS icon+hero regen; description rebuild post-historical_note-merge; dequeue 40m staleness vs `geofence_radius_m`.
+- **S215 suspicious-leg graph investigation:** Dr. K 13/14, WD1 3/6/10/11.
+- **PoiDetailSheet/Find cleanup (S224):** `enterFilterAndMapMode/exitFilterAndMapMode` clearXXX/stopXXX no-ops; CLAUDE.md "Pinned" block references stale Room v11 (actual v19).
+- **Speed-aware queue cap (S206):** at >15 mph replace queued items or switch to SHORT tier — pick + ship.
+- **DensityTour 0-stop decision (S206):** auto-fall-back to Explore or refuse to start.
+- **Cross-repo Salem commit (S204→S206):** `Salem/cmd/genbiographies/main.go` + 3 hand-edited bio JSONs — operator-driven.
+- **Rebuild signed AAB + 30-min Lenovo smoke** (first signed AAB since S180; V1 gating checklist).
+- **Operator field-walks (S204):** GPS-OBS heartbeat + Witch Trials bios + full TTS-gated dwell; **drive regression in airplane mode** (#20).
+- **Operator content:** re-author 5 polyline tours via web admin (S185); McIntire content drain (S200).
 
 ### S205+ — V1 feature additions (priority order, KEPT for V1)
 
@@ -148,10 +112,9 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 - **Pre-launch beta** — small, 2–3 friendly-eyes testers (not the 5–10 program).
 - **iOS port** — scope effort/timing now, decide later.
 
-### Marketing (operator-led, content-only sessions before Aug 1)
+### Marketing (operator-led, before Aug 1)
 
-- **Channel:** Salem Chamber of Commerce + local-first.
-- **Asset packet** — drafted in a content-only session before Aug 1: 1-page sell sheet, feature graphic, 3-5 hero screenshots, 2-paragraph press blurb. Operator provides photos + final approval; I draft text + screenshot frames.
+Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell sheet, feature graphic, 3-5 hero screenshots, 2-para press blurb) drafted in a content-only session — operator provides photos + final approval, I draft text + screenshot frames.
 
 ---
 
@@ -187,7 +150,7 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 | **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
 | **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 263. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
+**Sessions completed:** 264. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
 
 ---
 

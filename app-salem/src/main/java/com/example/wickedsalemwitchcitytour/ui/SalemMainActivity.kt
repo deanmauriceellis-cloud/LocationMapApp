@@ -2253,6 +2253,10 @@ class SalemMainActivity : AppCompatActivity() {
         narrationGeofenceManager.walkSimMode = false
         binding.btnWalkSim.text = "Walk"
         binding.btnWalkSim.setBackgroundResource(R.drawable.zoom_toggle_bg)
+        // S264: walk-sim left _locationMode = MANUAL; the GMS subscription
+        // is still alive (subscribe-stays-alive contract). Flip the mode
+        // back so the next real fix updates the map without a resubscribe.
+        viewModel.endManualMode()
         DebugLogger.i("SalemMainActivity", "Walk sim stopped")
         if (BuildConfig.DEBUG) {
             com.example.wickedsalemwitchcitytour.wickedmap.MapDebugDumper.dumpNow(binding.mapView, "walk-sim-stop")
@@ -2277,6 +2281,7 @@ class SalemMainActivity : AppCompatActivity() {
         walkSimJob = null
         walkSimRunning = false
         narrationGeofenceManager.walkSimMode = false
+        viewModel.endManualMode()  // S264
     }
 
     /**
@@ -2291,6 +2296,7 @@ class SalemMainActivity : AppCompatActivity() {
         walkSimRunning = false
         narrationGeofenceManager.walkSimMode = false
         j?.cancelAndJoin()
+        viewModel.endManualMode()  // S264
     }
 
     /**

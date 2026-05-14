@@ -141,10 +141,27 @@ class LocationManager @Inject constructor(
         activeIntervalMs = intervalMs
         activeMinIntervalMs = minIntervalMs
 
+        // S264: zombie-callback race fix. The trip diagnosis on 2026-05-13
+        // showed callbacks getting "stuck" registered with GMS because the
+        // Flow could be cancelled (awaitClose calls removeLocationUpdates)
+        // BEFORE the requestLocationUpdates Task finished registering.
+        // Order seen by GMS: remove → register → ... ghost callback alive.
+        // The two flags below let us catch that case: if cancellation arrived
+        // first, the success listener cleans up the late registration.
+        // Both flags are touched only on the Main looper (addOnSuccessListener
+        // default + awaitClose on the collecting coroutine) — no volatile.
+        var registerCompleted = false
+        var cancelArrivedBeforeRegister = false
+
         fusedClient
             .requestLocationUpdates(request, callback, Looper.getMainLooper())
             .addOnSuccessListener {
+                registerCompleted = true
                 DebugLogger.i(TAG, "requestLocationUpdates registered successfully")
+                if (cancelArrivedBeforeRegister) {
+                    DebugLogger.w(TAG, "Cancel-before-register detected — cleaning up late registration to prevent zombie callback")
+                    fusedClient.removeLocationUpdates(callback)
+                }
             }
             .addOnFailureListener { e ->
                 // ─────────────────────────────────────────────────────────────
@@ -172,7 +189,9 @@ class LocationManager @Inject constructor(
 
         awaitClose {
             DebugLogger.i(TAG, "Flow cancelled — removing location updates " +
-                    "after $updateCount updates received")
+                    "after $updateCount updates received " +
+                    "(registerCompleted=$registerCompleted)")
+            if (!registerCompleted) cancelArrivedBeforeRegister = true
             fusedClient.removeLocationUpdates(callback)
             if (activeCallback === callback) {
                 activeCallback = null
