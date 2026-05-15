@@ -424,7 +424,22 @@ class AppBarMenuManager(
         root.addView(makeCheckbox("Ambient POIs (Parks + Education)",   AudioControl.isAmbientEnabled())    { AudioControl.setAmbientEnabled(it) })
         root.addView(makeCheckbox("Businesses (Shops & Services)",      AudioControl.isBusinessesEnabled()) { AudioControl.setBusinessesEnabled(it) })
 
-        // Divider
+        // Linger and Listen divider + toggle
+        root.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                topMargin = dp(12); bottomMargin = dp(8)
+            }
+            setBackgroundColor(Color.parseColor("#22000000"))
+        })
+        root.addView(TextView(context).apply {
+            text = "Historical deep-dive"
+            textSize = 13f
+            setTextColor(Color.parseColor("#888888"))
+            setPadding(dp(2), 0, 0, dp(4))
+        })
+        root.addView(makeCheckbox("Linger and Listen", AudioControl.isLingerAndListenEnabled()) { AudioControl.setLingerAndListenEnabled(it) })
+
+        // Detail-level divider
         root.addView(View(context).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
                 topMargin = dp(12); bottomMargin = dp(8)

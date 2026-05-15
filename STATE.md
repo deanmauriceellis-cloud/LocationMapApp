@@ -2,7 +2,7 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-14 — **Session 266 (web-admin services restarted + post-edit POI publish chain run + debug AAB clean-installed on Pixel 8 + Lenovo).** Operator: *"start the web admin tool services"* → *"I've made changes to POIs - can we upload a new version of the application/database to the Lenovo and the Pixel?"*. Started cache-proxy (:4300) and Vite (:4302) in background; SalemIntelligence (:8089) intentionally down per S214 hard gate. Ran the manual publish chain per `feedback_publish_chain_manual_after_admin_edits.md`: `publish-salem-pois.js` (PG 2039 → SQLite 2039 / 930 visible / 1987 narrated / 74 silent), `publish-tours.js` (4 tours), `publish-tour-legs.js` (73 legs), `align-asset-schema-to-room.js` (12 entities aligned, identity_hash `745afa3eb4ce04bd7873671ea297b6e0` re-stamped, user_version 19). Built debug AAB via `:app-salem:bundleDebug -PskipPublishChain` (BUILD SUCCESSFUL in 18s, 132 MB). **Pixel 8 (`41231FDJH0018J`)** install clean: uninstall → `bundletool build-apks --connected-device` → `install-apks` → verified `firstInstallTime == lastUpdateTime == 2026-05-14 20:12:05`. **Lenovo (`HNY0CY0W`)** hit `Failure [DELETE_FAILED_INTERNAL_ERROR]` on first uninstall and bundletool then did an in-place update (violated WAL-safety rule); recovered with `am force-stop` + `pm clear` + retry uninstall → success, then re-ran `bundletool install-apks` → `firstInstallTime == lastUpdateTime == 2026-05-14 20:13:06` (true clean install). The S265 in-progress narration banner Kotlin/XML changes (`narration_bottom_sheet.xml`, `SalemMainActivity.kt`, `SalemMainActivityNarration.kt`, `SalemMainActivityTour.kt`) rode along in this build and are now testable on Pixel 8 portrait. V1 ship-cliff status unchanged (all 3 closed). ~78 days to 2026-08-01 ship; 6 days to Form TX deadline 2026-05-20. **Preceding sessions (S265 narration banner Surface 1 paused mid-flight; S264 GPS root-cause fix; S263 Pixel 8 onboarding + portrait plan; S262 align-asset-schema atomic rebuild; S261 plan-write only) detail in SESSION-LOG.md.**
+**Last updated:** 2026-05-15 — **Session 267.** Shipped Linger and Listen toggle (3-file edit; gates `narration_subtopics` body-queueing behind primary `historical_narration`; default OFF). Mined ~50 hr Lenovo TCP log for felt-latency causes — surfaced 4 hot spots (DEBUG-only `MapDebugDumper` 374-448 ms freeze every 10s; zero viewport cull on `BillboardMarker.draw()`; Main-thread proximity scan over ~2,000 POIs every GPS tick; TTS trigger itself fine ~16-29 ms). Attempted to remove the "Tour: 4/9 — POI" status-line write that duplicates the bottom banner — visually verified gone but the `View.GONE` toggle in `StatusLineManager.refresh()` thrashed AppBarLayout/CoordinatorLayout/MapView measurement → cold-start ANRs → reverted all 5 files; pre-S267 code re-confirmed working on Lenovo. Operator clarified the stops-based UI is leftover technical debt from a prior architecture (tours are now polyline + ambient geofence narration); Explore-agent inventoried 4 user-visible UIs still consuming `TourEngine.stops[]` plus a real `restoreIfSaved` resume bug. Wrote `docs/plans/poi-passport-replaces-tour-stops.md` — replaces all 4 with a **POI Passport** (PG filters → baked `poi_passport` table → persisted visited/heard in `user_data.db` → single `PassportSheet` UI + web admin sub-tab). Linger and Listen re-applied + clean-installed on Lenovo (`firstInstallTime == lastUpdateTime == 2026-05-15 16:37:32`). V1 ship-cliff status unchanged. ~77 days to 2026-08-01 ship; 5 days to Form TX deadline 2026-05-20. Full detail in `docs/session-logs/session-267-2026-05-14.md`.
 
 ### V1 ship-cliff status (all closed)
 
@@ -44,14 +44,17 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S267+ next-session docket (post-S266 — POI publish + AAB clean-installed on both devices, S265 narration banner changes ride along)
+### S268 opener: POI Passport architecture decision
 
-**S266 closed:** Web admin services restarted. Manual publish chain run after operator's web-admin POI edits. Debug AAB (132 MB) clean-installed on Pixel 8 (`41231FDJH0018J`, 20:12:05) and Lenovo (`HNY0CY0W`, 20:13:06) via bundletool. Lenovo first uninstall returned `DELETE_FAILED_INTERNAL_ERROR` and bundletool fell back to in-place update (violated WAL-safety rule); recovered with `am force-stop` + `pm clear` + retry uninstall before re-running `install-apks`. The S265 in-progress narration banner Kotlin/XML changes (peek-height shrink + tap-to-expand into PoiDetailSheet + dedicated TTS-non-stopping Dismiss button) rode along in this build and are now testable on Pixel 8 portrait.
+Read `docs/plans/poi-passport-replaces-tour-stops.md`, answer the 7 open questions (per-tour vs global, parameter list, completion-dialog fate, stamp design, reset, persistence scope, sequencing vs Aug 1 ship), decide implement-in-S268 vs stage-for-V1.0.1. Also: operator field-validate Linger and Listen on a real walk (POI must have both `historical_narration` + `narration_subtopics`) — confirm subtopic bodies queue, header text not spoken, cancel works.
 
-**S267 opener: field-validate the deployed build on both devices.**
-1. Confirm operator's POI edits render correctly on Pixel 8 + Lenovo (no missing markers, no incorrect categorization, no narration silences on POIs that should narrate).
-2. Validate S265 narration banner shrink on Pixel 8 portrait — peek ≤ 20 % screen height, tap-anywhere-on-card opens full PoiDetailSheet, Dismiss button hides card without stopping TTS. If behavior matches operator spec, commit the S265 changes properly. If not, iterate on `narration_bottom_sheet.xml` + `SalemMainActivity.kt` / `SalemMainActivityNarration.kt` / `SalemMainActivityTour.kt`.
-3. After Surface 1 validates clean, decide: continue per-surface fix-and-screenshot iteration on Pixel 8 portrait (operator-driven), or pivot to the broader Phase A portrait survey from `docs/plans/pixel8-portrait-support.md`.
+**S267 latency-fix carry-forwards (not addressed):**
+- DEBUG-only ~30 min each: drop `MapDebugDumper` auto-cadence 10s → 60s; coalesce `refreshNarrationIcons` 3-bucket → single pass.
+- Ships to release: `BillboardMarker` viewport-cull check before `super.draw()` (~1-2 hr); off-thread proximity scan `checkPosition()` → Default dispatcher (~2-4 hr, more invasive — defer until simpler fixes prove insufficient).
+
+**S266 carry-forwards still open:** field-validate POI edits render on both devices; validate S265 narration banner shrink on Pixel 8 portrait; then continue per-surface portrait iteration or pivot to broader Phase A survey from `docs/plans/pixel8-portrait-support.md`.
+
+**Misc:** Lenovo `enabled=3` (DISABLED_USER) mystery — possibly Zui launcher quirk after S266 in-place-install WAL violation; `pm enable` recovers.
 
 **Phase A portrait smoke test (still owed from S264/S265):** operator-driven Pixel 8 visual smoke test — walk every UI surface (every menu, dialog, sheet, FAB cluster, screen state) in BOTH landscape and portrait on the Pixel 8 (auto-rotate first needs enabling per S263 diagnosis). Screenshot into `docs/pixel8-portrait-survey/<surface>-<orient>.png`. Output: `docs/pixel8-portrait-survey/MATRIX.md` annotating each surface as `OK / minor / major / blocker` per orientation. Drives Phase B-D scope.
 
@@ -74,13 +77,9 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 
 **Carry from prior sessions (still open):**
 
-- **Wire Android-side SuperAdmin-gated TigerBase basemap source (S252 TASK #15).** Post-V1, lawyer-gated. Data exists at `10.0.0.229:4300/tigerbase/<layer>/{z}/{x}/{y}?scope=conus` (5 layers Z3-Z12 baked, web preview verified). Android-side wiring deferred — new osmdroid TileSource (or 5 stacked overlays) gated on `SuperAdminMode.allowNetwork == true` AND outside-Salem geofence (so Witchy stays the default inside Salem).
-- **TigerBase optional polish:** pack CONUS Z3-Z12 to PMTiles (~1 min each layer, ~33% disk reclaim, range-request friendly); recompress old Z3-Z10 tiles with `method=6` for ~5-10% size win; decide whether to ship Z13/Z14 (Z13 ~12 hr bake, Z14 ~50 hr — Z12 is the practical detail wall for TigerLine source).
-- **Radar tiles still bypass the cache-proxy.** `SalemMainActivityRadar.kt:52,127` calls `mesonet.agron.iastate.edu` direct. Acceptable since IEM is canonical NEXRAD source so cache-proxy would just pass-through, but worth documenting (or moving behind proxy for purity).
-- **Persist the `ufw allow 4300/tcp` + `4301/tcp` rules on dev-box** — operator opened interactively at S251 close. Verify via `sudo ufw status numbered`; should survive reboot.
-- **WeatherRepository defense-in-depth (optional)** — bump `connectTimeout` 15s → 45s + retry-on-cold-connect for cleaner UX on transient wifi/ARP hiccups.
-- **PREF_MBTA_BUS_STOPS still defaults FALSE** — flip in Transit submenu if you want ~7,900 bus-stop markers; sticky thereafter via S251 `kickDeferredSuperAdminFetches()`.
-- **Auto-start the TCP collector** at boot via systemd unit so operator doesn't re-launch `python3 /tmp/salem-collector.py` after every dev-box reboot.
+- TigerBase Android wiring (S252 TASK #15) — SuperAdmin+outside-Salem-gated; data live at `10.0.0.229:4300/tigerbase/<layer>/{z}/{x}/{y}?scope=conus` (5 layers Z3-Z12 baked); osmdroid TileSource or 5 stacked overlays. Optional polish: PMTiles pack (~33% reclaim), Z3-Z10 recompress `method=6` (~5-10%), Z13/Z14 decision.
+- Radar tiles bypass cache-proxy (`SalemMainActivityRadar.kt:52,127` → `mesonet.agron.iastate.edu` direct; acceptable but document).
+- Persist `ufw allow 4300/tcp` + `4301/tcp` on dev-box; auto-start TCP collector via systemd; `WeatherRepository` connectTimeout bump 15s → 45s + cold-connect retry (optional); `PREF_MBTA_BUS_STOPS` defaults FALSE (Transit submenu to enable).
 - **Operator field-validation of parked services on Lenovo via SuperAdmin** (Aircraft / Radar / Webcams / METAR — same hook path as the MBTA one we just verified).
 - **WEB SuperAdmin tab field-validation** — refresh http://localhost:4302/admin → Super Admin → Test each of the 8 cards.
 - **Optional SuperAdmin icon swap** — currently `@drawable/ic_debug`; one-line change at `toolbar_two_row.xml:117`.
@@ -93,17 +92,14 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 
 ### Other carry-forwards (lower priority — pull when in scope)
 
-- **Operator field-validation** of S221 detour / S220 subtopic content / S217 BusinessLabel + FAB override; S220 lint cleanup for spurious `is_tour_poi=true`; borderline-historical commercial opt-in audit.
-- **Tier 3 disk reclaim** (~4.4 GB): `tools/poi-icons/`, `tools/hero-triptych/output-full/`, `tools/tile-bake/data/sources/`, `cache-proxy/out/l3-essex/`, `docs/archive/poi-icons-unused-styles_*/`. `.gitignore` audit: `overnight-runs/`, `cache-proxy/poi-cache.json`, `cache-proxy/cache-data.json`, `web/dist`, `web/tsconfig.tsbuildinfo`, `docs/bake-tests/`.
-- **S216 follow-ups:** John Ward House tour-leg fix; HISTORICAL_LANDMARKS icon+hero regen; description rebuild post-historical_note-merge; dequeue 40m staleness vs `geofence_radius_m`.
-- **S215 suspicious-leg graph investigation:** Dr. K 13/14, WD1 3/6/10/11.
-- **PoiDetailSheet/Find cleanup (S224):** `enterFilterAndMapMode/exitFilterAndMapMode` clearXXX/stopXXX no-ops; CLAUDE.md "Pinned" block references stale Room v11 (actual v19).
-- **Speed-aware queue cap (S206):** at >15 mph replace queued items or switch to SHORT tier — pick + ship.
-- **DensityTour 0-stop decision (S206):** auto-fall-back to Explore or refuse to start.
-- **Cross-repo Salem commit (S204→S206):** `Salem/cmd/genbiographies/main.go` + 3 hand-edited bio JSONs — operator-driven.
-- **Rebuild signed AAB + 30-min Lenovo smoke** (first signed AAB since S180; V1 gating checklist).
-- **Operator field-walks (S204):** GPS-OBS heartbeat + Witch Trials bios + full TTS-gated dwell; **drive regression in airplane mode** (#20).
-- **Operator content:** re-author 5 polyline tours via web admin (S185); McIntire content drain (S200).
+- Operator field-validation: S221 detour / S220 subtopic content / S217 BusinessLabel + FAB override; spurious `is_tour_poi=true` lint cleanup; borderline-historical commercial opt-in audit.
+- Tier 3 disk reclaim ~4.4 GB (poi-icons / hero-triptych / tile-bake / l3-essex / unused-style archives) + `.gitignore` audit (overnight-runs, poi-cache.json, cache-data.json, web/dist, tsconfig.tsbuildinfo, docs/bake-tests).
+- S216 follow-ups: John Ward House tour-leg fix, HISTORICAL_LANDMARKS icon+hero regen, description rebuild post-historical_note merge, dequeue 40m staleness vs `geofence_radius_m`.
+- S215 suspicious-leg graph: Dr. K 13/14, WD1 3/6/10/11.
+- PoiDetailSheet/Find cleanup (S224): clearXXX/stopXXX no-ops; CLAUDE.md "Pinned" Room version stale (v11 → v19).
+- S206: speed-aware queue cap (>15 mph), DensityTour 0-stop fallback decision; Operator-driven Salem cross-repo commit (`genbiographies/main.go` + 3 hand-edited bios).
+- Rebuild signed AAB + 30-min Lenovo smoke (first since S180); operator field-walks (S204): GPS-OBS heartbeat + Witch Trials bios + airplane-mode drive regression.
+- Operator content: re-author 5 polyline tours via web admin (S185); McIntire content drain (S200).
 
 ### S205+ — V1 feature additions (priority order, KEPT for V1)
 
@@ -112,12 +108,9 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 3. **Tour-completion certificate (PDF on-device)** — end-of-tour souvenir with route + triggered POIs + date + Salem-themed border. Zero network. ~2-3 days.
 4. **Salem Heritage Trail polyline tour — YELLOW, not red** (the trail was repainted yellow). Hand-trace via admin or import official KML if available. ~1 day. See memory `reference_salem_heritage_trail_yellow.md`.
 
-### V1 features deferred / killed (S201 decisions)
+### V1 features deferred / killed (S201)
 
-- **Bark hero voice clips** — SKIPPED. Ship Android TTS only (operator does ongoing QC listen-tests).
-- **Hotel B2B partnerships** — post-launch only.
-- **Pre-launch beta** — small, 2–3 friendly-eyes testers (not the 5–10 program).
-- **iOS port** — scope effort/timing now, decide later.
+Bark hero voice clips SKIPPED (Android TTS only); Hotel B2B partnerships post-launch; Pre-launch beta small (2-3 friendly eyes); iOS port TBD.
 
 ### Marketing (operator-led, before Aug 1)
 
@@ -133,10 +126,9 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 ## Architectural pivots & rule changes (recent → older)
 
-- **2026-05-10 (S241):** Mass-Edit POI workflow live. `cache-proxy/lib/admin-mass-edit.js` exposes 3 routes (export/import/apply) under `/admin/salem/pois/*-spreadsheet`; new admin Tooling tab `MassEditTab.tsx` drives end-to-end round-trip. `is_deleted` promoted to a writable "intent" column with bespoke soft-delete / restore apply path mirroring the canonical SQL in admin-pois.js DELETE + POST /restore. 24 enum-bound columns get in-cell pick-list dropdowns via OOXML `<dataValidations>` XML injection (post-write JSZip patcher — SheetJS community writer doesn't emit them natively). New runtime deps in cache-proxy: `xlsx@0.18.5`, `multer@2.1.1`, `jszip@3.10.1`.
-- **2026-05-01 (S216):** Bundle of 4 changes — `HISTORICAL_LANDMARKS` split off from `HISTORICAL_BUILDINGS` (MASSGIS-only rows reclassified, gated by existing Layers toggle, default off; curated buildings always narrate in tour mode); `historical_note` column dropped (Room v15→v16, content consolidated into `description`); auto-bake publish chain wired into Gradle preBuild (S180/S185 carry-forward done; escape hatch `-PskipPublishChain`); walk-sim onboarding owns the directions session via `TourViewModel.startTour(skipOnboarding=false)` flag (drift-reroute loop can no longer paint green polyline over per-leg overlays).
-- **2026-05-04 (S224):** **Session-start protocol amended lean → lean+state.** STATE.md and the most recent live log are now mandatory at session start (in addition to auto-loaded CLAUDE.md + MEMORY.md). Older logs / SESSION-LOG.md / OMEN files stay on-demand. Memory `feedback_session_protocol.md` rewritten.
-- **2026-05-04 (S224):** **`enqueueNarration` cancel-stamp scoped to direct-play.** Walk-sim queue stall (Lappin Park → Rockafellas) was caused by unconditional `narrationCancelForPoiAtMs` bump in `enqueueNarration` colliding with the S146 cancel-for-POI Idle-suppression guard within 500ms of a previously-playing POI's natural Idle. Stamp + newspaper-cancel now only fire on the direct-play branch.
+- **2026-05-10 (S241):** Mass-Edit POI workflow live (`admin-mass-edit.js`, `MassEditTab.tsx`, export/import/apply round-trip; `is_deleted` writable; 24 enum dropdowns via OOXML dataValidations injection; deps `xlsx`, `multer`, `jszip`).
+- **2026-05-01 (S216):** `HISTORICAL_LANDMARKS` split from `HISTORICAL_BUILDINGS` (Layers-toggle gated); `historical_note` column dropped (Room v15→v16, lifted into `description`); auto-bake publish chain wired into Gradle preBuild (`-PskipPublishChain` escape); walk-sim onboarding owns directions session.
+- **2026-05-04 (S224):** Session-start protocol amended lean → lean+state — `STATE.md` + most-recent live log mandatory. `enqueueNarration` cancel-stamp scoped to direct-play (fixed walk-sim queue stall from S146 Idle-guard collision).
 - **Older pivots (S180–S185, 2026-04-23 → 04-26):** V1 manifest stripped of network permissions + R8-stripped feature gates (`feedback_v1_no_external_contact.md`); tours are polyline-only with PG as sole source of truth; asset schema must be Room-canonical via `align-asset-schema-to-room.js`; `feedback_tour_routing_is_content_not_engineering.md`; OSM policy restored to S178 surgical-only allowlist. Full text in `SESSION-LOG-ARCHIVE.md`.
 - **Earlier pivots (S157/S158/S171/S175/S178, 2026-04-23 → 04-25):** MassGIS L3 ingest, Witchy basemap, WickedMap engine prototype, on-device TIGER router, wharf-walkway osm_id allowlist. Detail in archive.
 
@@ -157,7 +149,7 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 | **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
 | **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
 
-**Sessions completed:** 266. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
+**Sessions completed:** 267. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
 
 ---
 
@@ -183,11 +175,10 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 ## OMEN Open Items
 
-1. **NOTE-L014 / OMEN-008 — Privacy Policy** — V1-minimal Posture A shipped S145 at `docs/PRIVACY-POLICY-V1.md`. Full OMEN-008 draft pending OMEN review.
-2. **NOTE-L015 — SalemCommercial cutover** — PARKED POST-V1 per operator S145.
-3. **Cross-project: SalemIntelligence anomaly relay** — `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md` (ANOM-001, ANOM-002).
-4. **NOTE-L019 restrooms_zombie.png regen** (LOW) — no deadline.
-5. **9-dot menu witchy backgrounds** — PARKED S146.
+1. NOTE-L014 / OMEN-008 — Privacy Policy V1-minimal Posture A shipped S145 (`docs/PRIVACY-POLICY-V1.md`); full OMEN-008 draft pending OMEN review.
+2. NOTE-L015 SalemCommercial cutover — PARKED POST-V1 (S145).
+3. Cross-project SalemIntelligence anomaly relay — `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md` (ANOM-001, ANOM-002).
+4. NOTE-L019 restrooms_zombie.png regen (LOW); 9-dot menu witchy backgrounds PARKED S146.
 
 ---
 

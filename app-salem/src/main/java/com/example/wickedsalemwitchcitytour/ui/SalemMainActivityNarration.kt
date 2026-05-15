@@ -1049,6 +1049,24 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
                 voiceId,
             )
         }
+        // Linger and Listen: queue each subtopic body after the main narration.
+        // Fires when the pref is on AND the POI has both historical_narration
+        // and subtopics. Header text is intentionally skipped — body only.
+        if (com.example.wickedsalemwitchcitytour.audio.AudioControl.isLingerAndListenEnabled()
+            && !point.historicalNarration.isNullOrBlank()
+            && !rawText.isNullOrBlank()
+            && !point.narrationSubtopics.isNullOrBlank()) {
+            val subtopics = parseSubtopics(point.narrationSubtopics, "LingerListen", point.id)
+            subtopics.forEach { subtopic ->
+                tourViewModel.speakTaggedNarration(
+                    "poi_narration",
+                    subtopic.body,
+                    point.name,
+                    voiceId,
+                )
+            }
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) DebugLogger.d("NARR-LINGER", "Linger+Listen: queued ${subtopics.size} subtopics for ${point.name}")
+        }
         updateQueueIndicator()
         refreshProximityDockFromQueue()
     } else {

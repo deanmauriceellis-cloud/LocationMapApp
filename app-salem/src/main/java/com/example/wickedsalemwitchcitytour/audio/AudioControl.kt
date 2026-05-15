@@ -39,11 +39,12 @@ object AudioControl {
 
     private const val PREFS_NAME = "audio_control_v1"
 
-    private const val PREF_ORACLE      = "oracle_on"
-    private const val PREF_MEANINGFUL  = "meaningful_on"
-    private const val PREF_AMBIENT     = "ambient_on"
-    private const val PREF_BUSINESSES  = "businesses_on"
-    private const val PREF_DETAIL      = "detail_level"
+    private const val PREF_ORACLE            = "oracle_on"
+    private const val PREF_MEANINGFUL        = "meaningful_on"
+    private const val PREF_AMBIENT           = "ambient_on"
+    private const val PREF_BUSINESSES        = "businesses_on"
+    private const val PREF_DETAIL            = "detail_level"
+    private const val PREF_LINGER_AND_LISTEN = "linger_and_listen"
 
     enum class Group { MEANINGFUL, AMBIENT, BUSINESSES }
 
@@ -88,7 +89,8 @@ object AudioControl {
     // retail, etc. should only narrate once the user explicitly opts in via
     // the Audio Control popup. Oracle + Meaningful + Ambient remain default-on
     // so the historic-tour experience fires out of the box.
-    fun isBusinessesEnabled(): Boolean = requirePrefs().getBoolean(PREF_BUSINESSES, false)
+    fun isBusinessesEnabled(): Boolean     = requirePrefs().getBoolean(PREF_BUSINESSES, false)
+    fun isLingerAndListenEnabled(): Boolean = requirePrefs().getBoolean(PREF_LINGER_AND_LISTEN, false)
 
     // S168: install default flipped from STANDARD → DEEP so first-launch users
     // hear `long_narration` (falling back to short when long is missing). They
@@ -106,7 +108,8 @@ object AudioControl {
     }
     fun setMeaningfulEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_MEANINGFUL, on).apply(); notifyListeners() }
     fun setAmbientEnabled(on: Boolean)    { requirePrefs().edit().putBoolean(PREF_AMBIENT, on).apply(); notifyListeners() }
-    fun setBusinessesEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_BUSINESSES, on).apply(); notifyListeners() }
+    fun setBusinessesEnabled(on: Boolean)     { requirePrefs().edit().putBoolean(PREF_BUSINESSES, on).apply(); notifyListeners() }
+    fun setLingerAndListenEnabled(on: Boolean) { requirePrefs().edit().putBoolean(PREF_LINGER_AND_LISTEN, on).apply(); notifyListeners() }
 
     fun setDetailLevel(level: DetailLevel) {
         requirePrefs().edit().putInt(PREF_DETAIL, level.ordinal).apply()
