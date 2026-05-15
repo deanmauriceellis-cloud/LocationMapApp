@@ -269,6 +269,12 @@ interface MenuEventListener {
     /** Open the tour selection / active tour UI. */
     fun onTourRequested()
 
+    /**
+     * S268 — open the POI Passport sheet (per-user list of POIs they've heard).
+     * Default no-op so non-Salem hosts can compile without overriding.
+     */
+    fun onPassportRequested() {}
+
     /** Open the events calendar (Haunted Happenings, exhibits, seasonal). */
     fun onEventsRequested()
 

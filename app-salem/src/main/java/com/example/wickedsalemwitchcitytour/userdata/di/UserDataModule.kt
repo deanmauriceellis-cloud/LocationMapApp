@@ -12,8 +12,10 @@ package com.example.wickedsalemwitchcitytour.userdata.di
 import android.content.Context
 import androidx.room.Room
 import com.example.wickedsalemwitchcitytour.userdata.dao.GpsTrackPointDao
+import com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
 import com.example.wickedsalemwitchcitytour.userdata.dao.PoiEncounterDao
 import com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase
+import com.example.wickedsalemwitchcitytour.userdata.db.UserDataMigrations
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,8 +39,10 @@ object UserDataModule {
             // REMOVED — every future schema bump must register a real Room Migration
             // object via .addMigrations(...). Without this discipline, paying users
             // lose their POI encounter history on every app update.
-            // Schema is locked at v2; the next bump (v3) is the first one that must
-            // add a Migration. See UserDataDatabase.kt for the contract.
+            // Schema history:
+            //   v2 (S110) — added poi_encounters
+            //   v3 (S268) — added passport_visit
+            .addMigrations(UserDataMigrations.MIGRATION_2_3)
             .build()
 
     @Provides
@@ -48,4 +52,8 @@ object UserDataModule {
     @Provides
     fun providePoiEncounterDao(db: UserDataDatabase): PoiEncounterDao =
         db.poiEncounterDao()
+
+    @Provides
+    fun providePassportVisitDao(db: UserDataDatabase): PassportVisitDao =
+        db.passportVisitDao()
 }

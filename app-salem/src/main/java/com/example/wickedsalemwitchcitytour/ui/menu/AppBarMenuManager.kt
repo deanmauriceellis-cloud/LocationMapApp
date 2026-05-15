@@ -181,6 +181,7 @@ class AppBarMenuManager(
         aboutIcon: ImageView? = null,
         cameraIcon: ImageView? = null,
         gpsBurstIcon: ImageView? = null,
+        passportIcon: ImageView? = null,
         alertsBadge: TextView? = null,
         layersBadge: TextView? = null
     ): SlimToolbarRefs {
@@ -231,6 +232,13 @@ class AppBarMenuManager(
         aboutIcon?.let { icon ->
             icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
             icon.setOnClickListener { menuEventListener.onAboutRequested() }
+        }
+
+        // S268 — Passport icon (witch hat). Opens PassportSheet with the
+        // operator-authored POI list + the user's lifetime "heard" log.
+        passportIcon?.let { icon ->
+            icon.imageTintList = ColorStateList.valueOf(Color.WHITE)
+            icon.setOnClickListener { menuEventListener.onPassportRequested() }
         }
 
         // Camera icon — recon photo with full GPS+compass EXIF

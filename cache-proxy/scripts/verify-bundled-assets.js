@@ -34,7 +34,31 @@ const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 //   v17 (S219) — added narration_subtopics JSONB to SalemPoi (scrollable storytelling subtopic cards on POI detail sheet)
 //   v18 (S226) — added haunt_sprite_id + 5 haunt_* tuning columns to SalemPoi (admin-driven sprite peek)
 //   v19 (S227) — added haunt_duration_s REAL to SalemPoi (per-fire dance length)
-const ROOM_IDENTITY_HASH_V19 = '745afa3eb4ce04bd7873671ea297b6e0';
+//   v20 (S268) — added PoiPassport entity (poi_passport table) for the POI Passport feature
+//
+// S268 — read the latest hash + version dynamically from the schemas dir so
+// this constant stops drifting against @Database(version) bumps. Matches the
+// pattern publish-tour-legs.js uses (see lines 51-70 there). Falls back to
+// the literal v20 hash if the dir is unreadable for whatever reason.
+const SCHEMAS_DIR = path.resolve(
+  __dirname,
+  '../../app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase'
+);
+function readLatestRoomIdentity() {
+  try {
+    const files = fs.readdirSync(SCHEMAS_DIR).filter((f) => /^\d+\.json$/.test(f));
+    if (!files.length) return null;
+    files.sort((a, b) => parseInt(b) - parseInt(a));
+    const file = files[0];
+    const data = JSON.parse(fs.readFileSync(path.join(SCHEMAS_DIR, file), 'utf8'));
+    return { version: parseInt(file), hash: data.database.identityHash };
+  } catch (e) {
+    return null;
+  }
+}
+const LATEST_ROOM = readLatestRoomIdentity();
+const ROOM_IDENTITY_HASH_V20 = (LATEST_ROOM && LATEST_ROOM.hash) || '837ec05ad90541fa76a8a413a06394e0';
+const ROOM_VERSION = (LATEST_ROOM && LATEST_ROOM.version) || 20;
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -61,6 +85,10 @@ const REQUIRED_ROOM_TABLES = [
   { table: 'salem_witch_trials_newspapers', minRows: 200  },
   { table: 'salem_witch_trials_npc_bios',   minRows: 49   },
   { table: 'salem_witch_trials_articles',   minRows: 16   },
+  // S268 — poi_passport may legitimately be empty (operator hasn't authored any
+  // filters yet). minRows=0 keeps the table-existence check (will fail loudly
+  // if Room v20 didn't land) without requiring filter authorship before build.
+  { table: 'poi_passport',                  minRows: 0    },
   { table: 'room_master_table',             minRows: 1    },
 ];
 
@@ -109,14 +137,15 @@ if (!fs.existsSync(CONTENT_DB)) {
         pass(`salem_content.db: ${table} = ${n} rows (>= ${minRows})`);
       }
     }
-    // Identity hash check
+    // Identity hash check — compared against the latest hash read dynamically
+    // from the schemas/ directory (or the literal v20 fallback).
     const master = db.prepare('SELECT identity_hash FROM room_master_table WHERE id=42').get();
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
-    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V19) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V19} (v19)`);
+    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V20) {
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V20} (v${ROOM_VERSION})`);
     } else {
-      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v19)`);
+      pass(`salem_content.db: identity_hash = ${master.identity_hash} (v${ROOM_VERSION})`);
     }
   } catch (e) {
     fail(`salem_content.db: open/query failed: ${e.message}`);

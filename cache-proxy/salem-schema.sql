@@ -553,3 +553,52 @@ CREATE INDEX IF NOT EXISTS idx_swtn_date          ON salem_witch_trials_newspape
 CREATE INDEX IF NOT EXISTS idx_swtn_phase         ON salem_witch_trials_newspapers (crisis_phase);
 CREATE INDEX IF NOT EXISTS idx_swtn_active        ON salem_witch_trials_newspapers (id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_swtn_admin_dirty   ON salem_witch_trials_newspapers (admin_dirty) WHERE admin_dirty = TRUE;
+
+-- ════════════════════════════════════════════════════════════════════
+-- POI Passport (S268) — operator-tunable filters that generate per-user
+-- lists of POIs to "stamp" as the user walks past or taps each one.
+--
+-- Two tables:
+--   salem_passport_filters  — one row per operator-defined filter
+--                             (Default Salem Walking, Heritage Trail, …).
+--                             tour_id NULL = global passport; non-NULL =
+--                             per-tour passport bound to that tour.
+--   salem_passport_pois     — derived per-filter POI list, populated by
+--                             cache-proxy/scripts/publish-poi-passport.js
+--                             from each filter's parameters against
+--                             salem_pois. Baked into the Room poi_passport
+--                             table at v20.
+--
+-- The user's actual visit log lives in user_data.db (passport_visit table,
+-- Room v3) and is keyed by poi_id only — never by passport_id. Per-tour
+-- passports just render the global visit log against their filtered list.
+-- ════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS salem_passport_filters (
+  id                            TEXT PRIMARY KEY,                          -- slug, e.g. 'default_salem_walking', 'heritage_trail'
+  name                          TEXT NOT NULL,                              -- 'Default Salem Walking', 'Heritage Trail'
+  tour_id                       TEXT REFERENCES salem_tours(id) ON DELETE CASCADE,  -- NULL = global passport
+  categories                    TEXT[] NOT NULL DEFAULT '{}',               -- e.g. {HISTORICAL_BUILDINGS,HISTORICAL_LANDMARKS,WORSHIP,CIVIC}
+  require_historical_narration  BOOLEAN NOT NULL DEFAULT TRUE,
+  min_geofence_radius_m         INTEGER NOT NULL DEFAULT 0,
+  min_year_established          INTEGER,                                    -- NULL = no floor
+  max_year_established          INTEGER,                                    -- NULL = no ceiling
+  sort_order                    INTEGER NOT NULL DEFAULT 0,
+  created_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_salem_passport_filters_tour
+  ON salem_passport_filters (tour_id) WHERE tour_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS salem_passport_pois (
+  filter_id      TEXT NOT NULL REFERENCES salem_passport_filters(id) ON DELETE CASCADE,
+  poi_id         TEXT NOT NULL REFERENCES salem_pois(id) ON DELETE CASCADE,
+  display_order  INTEGER NOT NULL,
+  PRIMARY KEY (filter_id, poi_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_salem_passport_pois_filter
+  ON salem_passport_pois (filter_id, display_order);
+CREATE INDEX IF NOT EXISTS idx_salem_passport_pois_poi
+  ON salem_passport_pois (poi_id);

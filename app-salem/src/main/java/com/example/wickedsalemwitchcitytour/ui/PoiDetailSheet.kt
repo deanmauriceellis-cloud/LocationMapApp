@@ -31,12 +31,15 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
+import com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import org.json.JSONObject
 
 /**
@@ -77,6 +80,11 @@ import org.json.JSONObject
 class PoiDetailSheet : DialogFragment() {
 
     private val tourViewModel: TourViewModel by activityViewModels()
+
+    /** S268 — POI Passport visit log. Stamped when this sheet actually queues
+     *  narration (only the non-stripped path in [queueSheetReadThrough]).
+     *  Stripped POIs read the name only and do NOT count as a "heard." */
+    @Inject internal lateinit var passportVisitDao: PassportVisitDao
 
     private lateinit var poi: SalemPoi
 
@@ -686,6 +694,18 @@ class PoiDetailSheet : DialogFragment() {
         // sheet, regardless of POI. Prevents audio-vs-view mismatch when
         // the user opens a second sheet before the first's read finishes.
         tourViewModel.cancelSheetReading(SHEET_TAG_PREFIX)
+
+        // S268 — stamp the POI Passport. Reaching this function means a real
+        // narrated POI is about to read; the stripped path doesn't get here.
+        // Fire-and-forget on IO; failure never blocks narration.
+        val stampPoiId = poi.id
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                passportVisitDao.recordHeard(stampPoiId, System.currentTimeMillis())
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "passport recordHeard failed id=$stampPoiId: ${e.message}")
+            }
+        }
 
         val name = poi.name
 

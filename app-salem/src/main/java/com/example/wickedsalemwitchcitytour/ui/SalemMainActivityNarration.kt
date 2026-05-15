@@ -314,6 +314,16 @@ internal fun SalemMainActivity.initNarrationSystem() {
                     DebugLogger.i("SalemMainActivity",
                         "ENTRY: ${event.point.name} (${event.distanceM.toInt()}m)")
                     enqueueNarration(event.point, jumpToFront = false)
+                    // S268 — stamp the POI Passport. Fire-and-forget on IO; failure
+                    // never blocks narration.
+                    val poiId = event.point.id
+                    lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            passportVisitDao.recordHeard(poiId, System.currentTimeMillis())
+                        } catch (e: Exception) {
+                            DebugLogger.w("SalemMainActivity", "passport recordHeard failed id=$poiId: ${e.message}")
+                        }
+                    }
                 }
             }
         }

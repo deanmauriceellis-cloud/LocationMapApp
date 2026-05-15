@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
+  Module: ic_passport_witch_hat.xml
+
+  S268 — Witch-hat icon for the POI Passport feature.
+  Used as the toolbar entry-point icon and as the stamp icon in the
+  PassportSheet row list (filled = heard, hollow = unheard via tint).
+
+  Both states use the same VectorDrawable: tint with `?attr/colorOnSurface`
+  + alpha for "filled," tint white-outline-only via state-list for "hollow."
+  Operator chose this look in S268; one SVG covers both states.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?android:attr/colorControlNormal">
+
+    <!-- Hat brim (wide, curves up at the edges) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M2.5,17.5
+                          C2.5,16.5 3.5,16 4.5,16
+                          L19.5,16
+                          C20.5,16 21.5,16.5 21.5,17.5
+                          C21.5,18.5 20.5,19 19.5,19
+                          L4.5,19
+                          C3.5,19 2.5,18.5 2.5,17.5
+                          Z" />
+
+    <!-- Hat cone (tapered, slight lean to the right for character) -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M13.5,2.5
+                          L17,16
+                          L7,16
+                          L11,5
+                          C11.5,3.5 12.5,2.5 13.5,2.5
+                          Z" />
+
+    <!-- Hat band -->
+    <path
+        android:fillColor="#000000"
+        android:fillAlpha="0.6"
+        android:pathData="M8,14.5 L16.5,14.5 L16.7,16 L7.7,16 Z" />
+
+    <!-- Small buckle on the band -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M11.5,14.7 L13,14.7 L13,15.7 L11.5,15.7 Z" />
+
+</vector>

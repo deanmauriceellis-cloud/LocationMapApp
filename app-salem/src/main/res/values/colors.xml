@@ -8,6 +8,9 @@
   strictly prohibited.
 -->
 <resources>
+    <!-- S268 — POI Passport stamp tint (heard). Antique gold matches colorAccent. -->
+    <color name="passport_stamp_filled">#E7CDA0</color>
+
     <!-- Salem palette — dark, atmospheric, historic -->
     <color name="colorPrimary">#2D1B4E</color>         <!-- Deep purple -->
     <color name="colorPrimaryDark">#1A0F2E</color>     <!-- Darker purple -->

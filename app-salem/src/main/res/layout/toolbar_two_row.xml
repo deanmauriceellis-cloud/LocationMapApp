@@ -232,6 +232,21 @@
             android:contentDescription="About"
             android:tooltipText="About" />
 
+        <!-- S268 — POI Passport. Opens PassportSheet (per-user "heard" list). -->
+        <ImageView
+            android:id="@+id/toolbarPassportIcon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_passport_witch_hat"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginStart="8dp"
+            android:contentDescription="Passport — POIs you've heard"
+            android:tooltipText="Passport" />
+
         <!-- S168 — single speaker button: tap = cancel/replay, long-press = audio popup -->
         <ImageView
             android:id="@+id/toolbarAudioIcon"

@@ -156,6 +156,19 @@ class SalemMainActivity : AppCompatActivity() {
     @Inject
     internal lateinit var poiEncounterTracker: com.example.wickedsalemwitchcitytour.userdata.PoiEncounterTracker
 
+    /**
+     * S268 — POI Passport visit log. UPSERTed on every narration play (geofence
+     * ENTRY in [SalemMainActivityNarration] + sheet narration in
+     * [PoiDetailSheet]). Drives the filled/hollow stamp state in
+     * [com.example.wickedsalemwitchcitytour.ui.PassportSheet].
+     *
+     * Lives in [com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase]
+     * v3 — paid-user history survives upgrades via MIGRATION_2_3 (strict, no
+     * destructive fallback per S180 lockdown).
+     */
+    @Inject
+    internal lateinit var passportVisitDao: com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
+
     /** S175: Salem on-device walking router. Lazy-loads `assets/routing/salem-routing-graph.sqlite`. */
     @Inject
     internal lateinit var salemRouterProvider: com.example.wickedsalemwitchcitytour.routing.SalemRouterProvider
@@ -747,6 +760,7 @@ class SalemMainActivity : AppCompatActivity() {
             aboutIcon      = binding.root.findViewById(R.id.toolbarAboutIcon),
             cameraIcon     = binding.root.findViewById(R.id.toolbarCameraIcon),
             gpsBurstIcon   = binding.root.findViewById(R.id.toolbarGpsBurstIcon),
+            passportIcon   = binding.root.findViewById(R.id.toolbarPassportIcon),
             alertsBadge    = binding.root.findViewById(R.id.alertsBadge),
             layersBadge    = binding.root.findViewById(R.id.layersBadge)
         )
@@ -4812,6 +4826,12 @@ class SalemMainActivity : AppCompatActivity() {
             resetIdleTimer()
             DebugLogger.i("SalemMainActivity", "onAboutRequested")
             showAboutDialog()
+        }
+
+        override fun onPassportRequested() {
+            resetIdleTimer()
+            DebugLogger.i("SalemMainActivity", "onPassportRequested")
+            PassportSheet.show(supportFragmentManager)
         }
 
         // ── Top-bar Camera (recon photos) ─────────────────────────────────────
