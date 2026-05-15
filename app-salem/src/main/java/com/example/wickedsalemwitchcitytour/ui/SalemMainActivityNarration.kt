@@ -1461,6 +1461,30 @@ internal fun SalemMainActivity.showNewspaperSheet(
     }
     sheet.findViewById<View>(R.id.btnDirections)?.visibility = View.GONE
     sheet.findViewById<View>(R.id.btnGeofence)?.visibility = View.GONE
+
+    // S265: cap banner ≤ 20% screen + wire dismiss (hides without stopping TTS).
+    capBannerHeight(sheet)
+    sheet.findViewById<View>(R.id.btnDismiss)?.apply {
+        visibility = View.VISIBLE
+        setOnClickListener {
+            DebugLogger.i("SalemMainActivity", "NEWSPAPER DISMISS — hiding banner, TTS continues")
+            sheet.visibility = View.GONE
+        }
+    }
+}
+
+/** S265: cap the narration banner to 20% of screen height so it never dominates portrait. */
+private fun SalemMainActivity.capBannerHeight(sheet: View) {
+    val screenH = resources.displayMetrics.heightPixels
+    val capPx = (screenH * 0.20).toInt()
+    val lp = sheet.layoutParams
+    if (lp.height != capPx) {
+        lp.height = capPx
+        sheet.layoutParams = lp
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            DebugLogger.d("SalemMainActivity", "banner height cap=${capPx}px (20% of ${screenH}px)")
+        }
+    }
 }
 
 /**
@@ -1623,6 +1647,19 @@ internal fun SalemMainActivity.showNarrationSheet(point: SalemPoi) {
     }
     sheet.findViewById<View>(R.id.btnGeofence)?.setOnClickListener {
         toggleGeofenceOverlay(point)
+    }
+
+    // S265: cap banner ≤ 20% screen + wire dismiss (hides without stopping TTS).
+    capBannerHeight(sheet)
+    sheet.findViewById<View>(R.id.btnDismiss)?.apply {
+        visibility = View.VISIBLE
+        setOnClickListener {
+            DebugLogger.i("SalemMainActivity",
+                "BANNER DISMISS id=${point.id} name=${point.name} — hiding, TTS continues")
+            sheet.visibility = View.GONE
+            // Force map redraw after sheet hides — layout change can confuse overlay positions.
+            binding.mapView.postDelayed({ binding.mapView.invalidate() }, 100)
+        }
     }
 }
 

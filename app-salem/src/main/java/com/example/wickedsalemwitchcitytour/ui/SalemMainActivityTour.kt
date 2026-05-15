@@ -1866,6 +1866,68 @@ internal fun SalemMainActivity.applyHeadingUpRotation() {
 }
 
 /**
+ * S265 — When heading-up is active, the user's position should sit ~70 %
+ * down the screen (instead of dead-centered) so the world unfolds ahead of
+ * them. Implementation: shift the GEO point the map centers on forward
+ * along the movement bearing by 20 % of the map height (in meters at the
+ * current zoom). The user's marker still draws at the user's real geo
+ * coordinates — only the camera center moves — so every renderer
+ * (BillboardMarker base draw, TiltContainer pass-2, polylines, etc.) sees a
+ * normal centered map and renders the cursor correctly.
+ *
+ * Returns the geo to animate the map to. When heading-up is off OR no
+ * movement bearing is yet known, returns [userPoint] unchanged.
+ */
+internal fun SalemMainActivity.leadPointForCamera(userPoint: GeoPoint): GeoPoint {
+    if (!isHeadingUpMode()) return userPoint
+    val bearing = getLastMovementBearing() ?: return userPoint
+    val map = binding.mapView
+    // S265 — under tilt, `map.height` is extended ~6× via EXTRA_TOP_FRACTION
+    // (TiltContainer.applyMapExtension). The tilt matrix and the on-screen
+    // visible area both operate in TILT-CONTAINER coords, not extended
+    // mapView coords. Use the container's height as the reference.
+    val containerH = binding.tiltContainer.height.toDouble()
+    if (containerH <= 0.0) return userPoint
+    val mpp = org.osmdroid.util.TileSystem.GroundResolution(
+        userPoint.latitude, map.zoomLevelDouble
+    )
+    if (mpp <= 0.0 || mpp.isNaN() || mpp.isInfinite()) return userPoint
+
+    // Target cursor at 70% of VISIBLE container area (minus narration-banner
+    // when it's up). Invert TiltContainer's centerline y-mapping:
+    //   t      = (tiltDeg / 90).coerceIn(0, 0.85)
+    //   topY   = containerH * 0.6 * t
+    //   y_post = topY + (y_src / containerH) * (containerH - topY)
+    //   ⇒ y_src = (y_post - topY) * containerH / (containerH - topY)
+    val banner = binding.root.findViewById<android.view.View>(R.id.narrationSheet)
+    val bannerH = if (banner != null && banner.visibility == android.view.View.VISIBLE) banner.height else 0
+    val visibleH = (containerH - bannerH).coerceAtLeast(1.0)
+
+    val tiltDeg = try { binding.tiltContainer.getTiltDegrees() } catch (_: Exception) { 0f }
+    val t = (tiltDeg / 90f).coerceIn(0f, 0.85f).toDouble()
+    val topY = containerH * 0.6 * t
+
+    val targetPostY = 0.70 * visibleH
+    val denom = (containerH - topY).coerceAtLeast(1.0)
+    val ySrc = (targetPostY - topY) * containerH / denom
+    val leadPx = (ySrc - containerH / 2.0).coerceAtLeast(0.0)
+    if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+        DebugLogger.d(
+            "LEAD-PT",
+            "tilt=${tiltDeg.toInt()}° containerH=${containerH.toInt()} banner=$bannerH " +
+                "visibleH=${visibleH.toInt()} topY=${topY.toInt()} " +
+                "targetPostY=${targetPostY.toInt()} ySrc=${ySrc.toInt()} " +
+                "leadPx=${leadPx.toInt()} bearing=${bearing.toInt()}° " +
+                "zoom=${"%.1f".format(map.zoomLevelDouble)} mpp=${"%.2f".format(mpp)}"
+        )
+    }
+    if (leadPx <= 0.5) return userPoint
+
+    val leadMeters = leadPx * mpp
+    return userPoint.destinationPoint(leadMeters, bearing)
+}
+
+/**
  * S115: Called from the heading-up toggle click handler to apply the current
  * best-available heading immediately, so the user doesn't have to wait for
  * the next GPS fix or sensor tick to see the map rotate. Delegates to the
@@ -1889,6 +1951,9 @@ internal fun SalemMainActivity.applyHeadingUpRotationImmediate() {
         return
     }
     applyHeadingUpRotation()
+    // S265 — re-center on the lead-point immediately so the cursor jumps to
+    // 70 % screen Y on toggle-ON without waiting for the next GPS fix.
+    lastGpsPoint?.let { binding.mapView.controller.animateTo(leadPointForCamera(it)) }
 }
 
 /**
@@ -1902,6 +1967,10 @@ internal fun SalemMainActivity.resetHeadingUpRotation() {
     lastProcessedMoveBearing = null  // S234 — clear fast-path cache
     binding.mapView.setMapOrientation(0f)
     binding.mapView.invalidate()
+    // S265 — heading-up turned OFF; snap back to user's actual location on
+    // next GPS fix. lastGpsPoint may be stale by one fix but the next tick
+    // calls animateTo() via the GPS observer.
+    lastGpsPoint?.let { binding.mapView.controller.animateTo(it) }
 }
 
 /**

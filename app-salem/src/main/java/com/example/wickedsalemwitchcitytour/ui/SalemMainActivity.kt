@@ -3520,12 +3520,14 @@ class SalemMainActivity : AppCompatActivity() {
                         fromSplash = false
                     } else {
                         DebugLogger.i("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — initial center zoom=${BuildDefaults.DEFAULT_ZOOM}")
-                        binding.mapView.controller.animateTo(point)
+                        // S265 — lead-point camera in heading-up; no-op when north-up.
+                        binding.mapView.controller.animateTo(leadPointForCamera(point))
                         binding.mapView.controller.setZoom(BuildDefaults.DEFAULT_ZOOM)
                     }
                 } else {
-                    // Continuous GPS follow — keep map centered on user
-                    binding.mapView.controller.animateTo(point)
+                    // Continuous GPS follow — keep map centered on user (or
+                    // a lead-point ahead of them when heading-up; see S265).
+                    binding.mapView.controller.animateTo(leadPointForCamera(point))
                     DebugLogger.d("SalemMainActivity", "currentLocation → lat=${point.latitude} lon=${point.longitude} — following (speed=${speedMph?.let { "%.1f".format(it) } ?: "?"}mph)")
                 }
             } else {
@@ -3565,7 +3567,7 @@ class SalemMainActivity : AppCompatActivity() {
                 lastPoiFetchPoint = point
                 lastApiCallTime = now
                 if (followedVehicleId == null) {
-                    binding.mapView.controller.animateTo(point)
+                    binding.mapView.controller.animateTo(leadPointForCamera(point))
                 }
                 binding.mapView.postDelayed({ loadCachedPoisForVisibleArea() }, 500)
                 scheduleSilentFill(point, 2000)
