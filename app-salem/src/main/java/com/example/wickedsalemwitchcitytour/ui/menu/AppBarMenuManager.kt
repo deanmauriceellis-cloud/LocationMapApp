@@ -421,6 +421,47 @@ class AppBarMenuManager(
             }
         }
 
+        // ── S272: TTS master switch (sits ABOVE all source toggles) ─────────
+        // Above-the-fold: one explicit kill switch for narration. The gate in
+        // NarrationManager.enqueue() consults AudioControl.isTtsEffectivelyOn()
+        // and silences everything when this is OFF, including in-screen Speak
+        // taps that normally bypass the source-group gates.
+        //
+        // When the device has no usable TTS output (Bluetooth SCO-only / hearing
+        // aid that won't accept STREAM_MUSIC, or the engine itself failed to
+        // initialize), the checkbox is greyed and disabled per operator option (b):
+        // the user's preference is preserved so narration resumes automatically
+        // once routing recovers.
+        root.addView(TextView(context).apply {
+            text = "Sound"
+            textSize = 13f
+            setTextColor(Color.parseColor("#888888"))
+            setPadding(dp(2), 0, 0, dp(4))
+        })
+        val masterCheckbox = makeCheckbox(
+            "Narration sound",
+            AudioControl.isTtsMasterEnabled()
+        ) { AudioControl.setTtsMasterEnabled(it) }
+        root.addView(masterCheckbox)
+
+        if (!AudioControl.isTtsAvailable()) {
+            masterCheckbox.isEnabled = false
+            masterCheckbox.alpha = 0.45f
+            root.addView(TextView(context).apply {
+                text = "TTS unavailable on current audio output"
+                textSize = 11f
+                setTextColor(Color.parseColor("#888888"))
+                setPadding(dp(26), 0, 0, dp(4))
+            })
+        }
+
+        root.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                topMargin = dp(12); bottomMargin = dp(8)
+            }
+            setBackgroundColor(Color.parseColor("#22000000"))
+        })
+
         root.addView(TextView(context).apply {
             text = "What gets narrated"
             textSize = 13f

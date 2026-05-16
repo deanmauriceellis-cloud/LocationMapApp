@@ -107,6 +107,7 @@ class NarrationManager @Inject constructor(
             val result = tts?.setLanguage(Locale.US)
             ttsReady = result != TextToSpeech.LANG_MISSING_DATA &&
                        result != TextToSpeech.LANG_NOT_SUPPORTED
+            AudioControl.setEngineReady(ttsReady)
             DebugLogger.i(TAG, "ttsReady ← $ttsReady (onInit SUCCESS, setLanguage result=$result)")
             tts?.setSpeechRate(speechRate)
 
@@ -186,6 +187,7 @@ class NarrationManager @Inject constructor(
             }
         } else {
             ttsReady = false
+            AudioControl.setEngineReady(false)
             DebugLogger.e(TAG, "TTS init failed: status=$status — ttsReady ← false")
         }
     }
@@ -195,6 +197,7 @@ class NarrationManager @Inject constructor(
         tts?.shutdown()
         tts = null
         ttsReady = false
+        AudioControl.setEngineReady(false)
         DebugLogger.i(TAG, "ttsReady ← false (shutdown)")
         DebugLogger.i(TAG, "TTS shutdown")
     }
@@ -450,6 +453,17 @@ class NarrationManager @Inject constructor(
     // ── Queue Management ────────────────────────────────────────────────
 
     private fun enqueue(segment: NarrationSegment) {
+        // S272 — TTS master gate. Sits ABOVE every other gate, including the
+        // userInitiated exemption, so the long-press menu's master switch
+        // silences in-screen Speak buttons too. Also short-circuits when the
+        // engine isn't ready or the active audio output can't accept TTS
+        // (Bluetooth SCO-only / hearing aid). The popup greys the master
+        // checkbox out in the unavailable case so the user knows why.
+        if (!AudioControl.isTtsEffectivelyOn()) {
+            DebugLogger.d(TAG, "TTS master OFF or unavailable — dropping ${segment.id} (master=${AudioControl.isTtsMasterEnabled()} avail=${AudioControl.isTtsAvailable()})")
+            return
+        }
+
         if (!shouldSpeak()) {
             DebugLogger.d(TAG, "Phone silent/vibrate — skipping: ${segment.id}")
             return

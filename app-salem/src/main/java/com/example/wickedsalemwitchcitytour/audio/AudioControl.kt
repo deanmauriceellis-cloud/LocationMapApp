@@ -45,6 +45,11 @@ object AudioControl {
     private const val PREF_BUSINESSES        = "businesses_on"
     private const val PREF_DETAIL            = "detail_level"
     private const val PREF_LINGER_AND_LISTEN = "linger_and_listen"
+    // S272 — TTS master switch: single explicit kill above all source toggles.
+    // Default ON; persisted. The runtime availability flag (engineReady &&
+    // routeUsable) is NOT persisted — it's pushed from NarrationManager.onInit
+    // and SalemMainActivity's AudioDeviceCallback.
+    private const val PREF_TTS_MASTER        = "tts_master_on"
 
     enum class Group { MEANINGFUL, AMBIENT, BUSINESSES }
 
@@ -69,6 +74,12 @@ object AudioControl {
      */
     @Volatile
     private var showAllOverride: Boolean = false
+
+    // S272 — runtime TTS availability tracked as two distinct signals so the
+    // engine-ready push from NarrationManager and the route-usable push from
+    // SalemMainActivity's AudioDeviceCallback do not clobber each other.
+    @Volatile private var engineReady: Boolean = false
+    @Volatile private var routeUsable: Boolean = true  // optimistic on cold start
 
     fun init(context: Context) {
         if (prefs != null) return
@@ -166,6 +177,39 @@ object AudioControl {
     }
 
     fun isOracleSpeechEnabled(): Boolean = isOracleEnabled()
+
+    // ── S272: TTS master mute + runtime availability ────────────────────
+    fun isTtsMasterEnabled(): Boolean = requirePrefs().getBoolean(PREF_TTS_MASTER, true)
+
+    fun setTtsMasterEnabled(on: Boolean) {
+        requirePrefs().edit().putBoolean(PREF_TTS_MASTER, on).apply()
+        com.example.locationmapapp.util.DebugLogger.i("AudioControl", "TTS master → $on")
+        notifyListeners()
+    }
+
+    /** True iff engine is initialized AND a TTS-friendly audio output exists. */
+    fun isTtsAvailable(): Boolean = engineReady && routeUsable
+
+    /** Pushed by NarrationManager on TTS init success/failure/shutdown. */
+    fun setEngineReady(ready: Boolean) {
+        if (engineReady == ready) return
+        val before = isTtsAvailable()
+        engineReady = ready
+        com.example.locationmapapp.util.DebugLogger.i("AudioControl", "engineReady → $ready (avail before=$before after=${isTtsAvailable()})")
+        if (before != isTtsAvailable()) notifyListeners()
+    }
+
+    /** Pushed by SalemMainActivity's AudioDeviceCallback on output device changes. */
+    fun setRouteUsable(usable: Boolean) {
+        if (routeUsable == usable) return
+        val before = isTtsAvailable()
+        routeUsable = usable
+        com.example.locationmapapp.util.DebugLogger.i("AudioControl", "routeUsable → $usable (avail before=$before after=${isTtsAvailable()})")
+        if (before != isTtsAvailable()) notifyListeners()
+    }
+
+    /** Effective gate consulted by NarrationManager: master ON AND TTS path usable. */
+    fun isTtsEffectivelyOn(): Boolean = isTtsMasterEnabled() && isTtsAvailable()
 
     // ── Listener registration ───────────────────────────────────────────
     fun addListener(l: ChangeListener)    { if (!listeners.contains(l)) listeners.add(l) }

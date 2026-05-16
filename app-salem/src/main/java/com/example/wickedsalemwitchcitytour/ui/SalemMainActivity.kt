@@ -343,6 +343,12 @@ class SalemMainActivity : AppCompatActivity() {
     /** S243: auto-dump every 10s while resumed. Debug-only. */
     private var autoDumpJob: kotlinx.coroutines.Job? = null
 
+    /** S272: AudioDeviceCallback that pushes route-usability into AudioControl
+     *  so the long-press menu's master switch greys out when the active audio
+     *  output can't accept TTS (Bluetooth SCO-only / hearing aid). Registered
+     *  in onCreate after setupAudioSpeaker; unregistered in onDestroy. */
+    private var ttsRouteCallback: android.media.AudioDeviceCallback? = null
+
     internal val metarMarkers      = mutableListOf<Marker>()
     internal val poiMarkers        = mutableMapOf<String, MutableList<Marker>>()
     internal val clusterMarkers    = mutableListOf<Marker>()
@@ -827,6 +833,12 @@ class SalemMainActivity : AppCompatActivity() {
         )
         DebugLogger.i("SalemMainActivity", "S168 speaker icon wired (cancel/replay + popup long-press)")
 
+        // S272: track audio output devices so AudioControl.routeUsable reflects
+        // whether a TTS-friendly sink is reachable. Pushed into AudioControl so
+        // the long-press menu's master switch can grey out when the only output
+        // is Bluetooth SCO / a hearing aid that won't accept STREAM_MUSIC.
+        setupTtsRouteWatcher()
+
         setupMap()
         buildFabSpeedDial()
         initNarrationSystem()
@@ -1062,8 +1074,66 @@ class SalemMainActivity : AppCompatActivity() {
         stopAutoMapDump()
         DebugLogger.i("SalemMainActivity","onPause()")
     }
+    /**
+     * S272: register an [android.media.AudioDeviceCallback] so AudioControl
+     * knows whether a TTS-friendly output device exists. The callback fires on
+     * add + remove; we also seed the initial state with one synchronous scan
+     * so the long-press menu reflects reality even before the first device
+     * event.
+     *
+     * TTS routes through STREAM_MUSIC. These types accept STREAM_MUSIC
+     * reliably; if at least one is present, TTS will play audibly. If the
+     * only output is BLUETOOTH_SCO / HEARING_AID (no STREAM_MUSIC route),
+     * we mark unavailable.
+     */
+    private fun setupTtsRouteWatcher() {
+        val am = getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+        val cb = object : android.media.AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                refreshTtsRoute(am)
+            }
+            override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                refreshTtsRoute(am)
+            }
+        }
+        am.registerAudioDeviceCallback(cb, null)
+        ttsRouteCallback = cb
+        refreshTtsRoute(am)
+    }
+
+    private fun refreshTtsRoute(am: android.media.AudioManager) {
+        val outputs = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+        val ttsFriendly = setOf(
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER,
+            android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_USB_DEVICE,
+            android.media.AudioDeviceInfo.TYPE_DOCK,
+            android.media.AudioDeviceInfo.TYPE_HDMI,
+        )
+        val usable = outputs.any { it.type in ttsFriendly }
+        com.example.wickedsalemwitchcitytour.audio.AudioControl.setRouteUsable(usable)
+        if (BuildConfig.DEBUG) {
+            DebugLogger.d("SalemMainActivity",
+                "TTS route refresh — outputs=[${outputs.joinToString { it.type.toString() }}] usable=$usable")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        // S272: unregister the AudioDeviceCallback before dropping the
+        // activity reference. Leaving it registered would leak the callback
+        // (AudioManager keeps a strong ref).
+        ttsRouteCallback?.let { cb ->
+            (getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager)
+                ?.unregisterAudioDeviceCallback(cb)
+        }
+        ttsRouteCallback = null
         // S255: shutdown DebugEndpoints' walkScope before dropping the
         // reference. stop() halts new HTTP requests, but walk coroutines
         // already spawned would otherwise keep emitting setManualLocation
