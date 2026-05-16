@@ -37,6 +37,7 @@ import { MassEditTab } from './MassEditTab'
 import { SuperAdminTab } from './SuperAdminTab'
 import TigerBaseTab from './TigerBaseTab'
 import { PassportTab } from './PassportTab'
+import { ReconTriageTab } from './ReconTriageTab'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -923,6 +924,8 @@ export function AdminLayout() {
         <TigerBaseTab />
       ) : view === 'passport' ? (
         <PassportTab />
+      ) : view === 'recon' ? (
+        <ReconTriageTab />
       ) : view === 'tours' ? (
         <div className="flex-1 flex min-h-0">
           <aside className="w-80 border-r border-slate-300 bg-white flex flex-col min-h-0">

@@ -16,6 +16,20 @@
  *   GET    /admin/burst-photos/:id/exif    — parsed EXIF as JSON
  *   DELETE /admin/burst-photos/:id         — move to <session>/.deleted/ (recoverable)
  *
+ * S270 — Recon triage layer (bulk cull):
+ *   GET    /admin/burst-photos/sessions/:session/kept
+ *                                          — { kept: ['id1', ...] } from <session>/.kept.json
+ *   POST   /admin/burst-photos/sessions/:session/kept   { id, kept: bool }
+ *                                          — toggle and persist keep flag
+ *   POST   /admin/burst-photos/sessions/:session/commit-cull
+ *                                          — move every photo NOT in .kept.json to .deleted/
+ *                                            (atomic-ish; thumbs follow); reset .kept.json
+ *                                            return { kept, culled, errors }
+ *   GET    /admin/burst-photos/devices     — `adb devices` parsed
+ *   POST   /admin/burst-photos/pull        — { deviceSerial } → adb pull then python
+ *                                            organizer; streams progress as SSE events
+ *                                            (data: <json line>\n\n)
+ *
  * Identifier scheme: base64url(`<session>/<filename>`). Path traversal is
  * blocked by validating that the resolved file path stays under ROOT_DIR.
  *
@@ -26,6 +40,7 @@ const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-burst-phot
 
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const exifr = require('exifr');
 const sharp = require('sharp');
 
@@ -134,6 +149,40 @@ function invalidateCache() {
   LIST_CACHE = null;
 }
 
+// ── Keep-flag persistence (S270 — Recon triage bulk-cull) ──────────────────
+// Per-session `<session>/.kept.json` shape: { kept: ['<base64url-id>', ...] }.
+// Triage UX: operator opens a session in ReconTriageTab, clicks tiles to mark
+// keepers, then hits "Commit Cull" — every photo NOT in the kept set is moved
+// to <session>/.deleted/. This is the inverse of the existing per-photo DELETE
+// endpoint and matches the operator's stated workflow ("pictures are cheap;
+// we evolve by selecting better and better things as we delete the junk").
+
+function sessionDirSafe(session) {
+  // Mirror decodeId's traversal guard for session-only operations.
+  if (typeof session !== 'string' || !session.startsWith('session-')) return null;
+  const full = path.resolve(ROOT_DIR, session);
+  const rootResolved = path.resolve(ROOT_DIR);
+  if (!full.startsWith(rootResolved + path.sep)) return null;
+  if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) return null;
+  return full;
+}
+
+function readKeptSet(sessionFull) {
+  const keptPath = path.join(sessionFull, '.kept.json');
+  if (!fs.existsSync(keptPath)) return new Set();
+  try {
+    const raw = JSON.parse(fs.readFileSync(keptPath, 'utf8'));
+    return new Set(Array.isArray(raw?.kept) ? raw.kept : []);
+  } catch (_e) {
+    return new Set();
+  }
+}
+
+function writeKeptSet(sessionFull, set) {
+  const keptPath = path.join(sessionFull, '.kept.json');
+  fs.writeFileSync(keptPath, JSON.stringify({ kept: Array.from(set) }, null, 2));
+}
+
 module.exports = function(app, _deps) {
   app.get('/admin/burst-photos', (_req, res) => {
     try {
@@ -238,5 +287,166 @@ module.exports = function(app, _deps) {
       console.error('[admin-burst-photos] delete failed:', err);
       res.status(500).json({ error: String(err.message || err) });
     }
+  });
+
+  // S270 — Recon triage: read the kept-flag set for a session.
+  app.get('/admin/burst-photos/sessions/:session/kept', (req, res) => {
+    const sessionFull = sessionDirSafe(req.params.session);
+    if (!sessionFull) return res.status(400).json({ error: 'bad session' });
+    res.json({ session: req.params.session, kept: Array.from(readKeptSet(sessionFull)) });
+  });
+
+  // S270 — Recon triage: toggle the kept-flag for one photo.
+  app.post('/admin/burst-photos/sessions/:session/kept', (req, res) => {
+    const sessionFull = sessionDirSafe(req.params.session);
+    if (!sessionFull) return res.status(400).json({ error: 'bad session' });
+    const { id, kept } = req.body || {};
+    if (typeof id !== 'string' || typeof kept !== 'boolean') {
+      return res.status(400).json({ error: 'body must be { id: string, kept: boolean }' });
+    }
+    // Validate the id resolves to a real file in this session.
+    const decoded = decodeId(id);
+    if (!decoded || decoded.session !== req.params.session) {
+      return res.status(400).json({ error: 'id does not belong to this session' });
+    }
+    const set = readKeptSet(sessionFull);
+    if (kept) set.add(id); else set.delete(id);
+    writeKeptSet(sessionFull, set);
+    res.json({ ok: true, kept: Array.from(set), count: set.size });
+  });
+
+  // S270 — Recon triage: bulk-cull. Every undeleted .jpg in <session>/ that is
+  // NOT in .kept.json gets moved to <session>/.deleted/. Thumbs follow. The
+  // .kept.json file is reset to {kept:[]} after a successful pass so a second
+  // round of curation starts from a clean slate (the survivors are obviously
+  // already kept — they're still in the session dir).
+  app.post('/admin/burst-photos/sessions/:session/commit-cull', (req, res) => {
+    const sessionFull = sessionDirSafe(req.params.session);
+    if (!sessionFull) return res.status(400).json({ error: 'bad session' });
+    const session = req.params.session;
+    try {
+      const keptSet = readKeptSet(sessionFull);
+      const trashDir   = path.join(sessionFull, '.deleted');
+      const trashThumb = path.join(trashDir, '.thumbs');
+      const thumbDir   = path.join(sessionFull, '.thumbs');
+      if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
+
+      const uniqName = (target) => {
+        if (!fs.existsSync(target)) return target;
+        const ext = path.extname(target);
+        const base = target.slice(0, -ext.length);
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        return `${base}.${stamp}${ext}`;
+      };
+
+      let kept = 0;
+      let culled = 0;
+      const errors = [];
+
+      for (const name of fs.readdirSync(sessionFull)) {
+        if (!name.endsWith('.jpg')) continue;
+        if (name.startsWith('.')) continue; // skip dotfiles / .thumbs/ / .deleted/
+        const id = encodeId(session, name);
+        if (keptSet.has(id)) { kept++; continue; }
+        try {
+          const src = path.join(sessionFull, name);
+          fs.renameSync(src, uniqName(path.join(trashDir, name)));
+          const thumbPath = path.join(thumbDir, name);
+          if (fs.existsSync(thumbPath)) {
+            if (!fs.existsSync(trashThumb)) fs.mkdirSync(trashThumb, { recursive: true });
+            try { fs.renameSync(thumbPath, uniqName(path.join(trashThumb, name))); }
+            catch (_e) { /* best-effort */ }
+          }
+          culled++;
+        } catch (e) {
+          errors.push({ name, error: String(e.message || e) });
+        }
+      }
+
+      // Reset kept set — survivors are obvious by virtue of still being in
+      // the session dir, and the operator probably wants a clean slate for
+      // the next pass.
+      writeKeptSet(sessionFull, new Set());
+      invalidateCache();
+      res.json({ ok: true, session, kept, culled, errors });
+    } catch (err) {
+      console.error('[admin-burst-photos] commit-cull failed:', err);
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  // S270 — Recon triage: list adb devices.
+  app.get('/admin/burst-photos/devices', (_req, res) => {
+    const child = spawn('adb', ['devices'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '';
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { err += d; });
+    child.on('error', e => res.status(500).json({ error: 'adb spawn failed: ' + e.message }));
+    child.on('close', code => {
+      if (code !== 0) return res.status(500).json({ error: 'adb exit ' + code, stderr: err });
+      // Parse "List of devices attached\n<serial>\t<state>\n..."
+      const devices = out.split('\n').slice(1)
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith('*'))
+        .map(l => {
+          const [serial, state] = l.split(/\s+/);
+          return { serial, state };
+        })
+        .filter(d => d.serial);
+      res.json({ devices });
+    });
+  });
+
+  // S270 — Recon triage: adb pull from device + run python organizer.
+  // Streams progress as Server-Sent Events. Each event is one JSON line:
+  //   { stage: 'pull'|'organize'|'done'|'error', line?: string, summary?: object }
+  app.post('/admin/burst-photos/pull', (req, res) => {
+    const { deviceSerial } = req.body || {};
+    if (typeof deviceSerial !== 'string' || !/^[A-Za-z0-9._:-]+$/.test(deviceSerial)) {
+      return res.status(400).json({ error: 'bad deviceSerial' });
+    }
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
+    const stagingRoot = '/tmp/lmasalem-stage';
+    const stagingSrc  = path.join(stagingRoot, 'WickedSalemRecon');
+    try {
+      if (!fs.existsSync(stagingRoot)) fs.mkdirSync(stagingRoot, { recursive: true });
+      // Wipe any prior staging so the organizer doesn't see stale frames.
+      if (fs.existsSync(stagingSrc)) fs.rmSync(stagingSrc, { recursive: true, force: true });
+    } catch (e) {
+      send({ stage: 'error', line: 'staging prep failed: ' + e.message });
+      return res.end();
+    }
+
+    send({ stage: 'pull', line: `adb -s ${deviceSerial} pull /sdcard/Pictures/WickedSalemRecon/ ${stagingRoot}/` });
+    const pull = spawn('adb', ['-s', deviceSerial, 'pull', '/sdcard/Pictures/WickedSalemRecon/', stagingRoot + '/'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    pull.stdout.on('data', d => send({ stage: 'pull', line: d.toString().trim() }));
+    pull.stderr.on('data', d => send({ stage: 'pull', line: d.toString().trim() }));
+    pull.on('error', e => { send({ stage: 'error', line: 'adb spawn failed: ' + e.message }); res.end(); });
+    pull.on('close', code => {
+      if (code !== 0) {
+        send({ stage: 'error', line: `adb pull exited ${code}` });
+        return res.end();
+      }
+      // Run organizer.
+      const organizerPath = path.join(__dirname, '..', '..', 'tools', 'pull-and-organize-burst-photos.py');
+      send({ stage: 'organize', line: `python3 ${organizerPath}` });
+      const org = spawn('python3', [organizerPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+      org.stdout.on('data', d => send({ stage: 'organize', line: d.toString().trimEnd() }));
+      org.stderr.on('data', d => send({ stage: 'organize', line: d.toString().trimEnd() }));
+      org.on('error', e => { send({ stage: 'error', line: 'organizer spawn failed: ' + e.message }); res.end(); });
+      org.on('close', orgCode => {
+        invalidateCache();
+        send({ stage: 'done', line: `organizer exit ${orgCode}`, summary: { organizerExit: orgCode } });
+        res.end();
+      });
+    });
   });
 };
