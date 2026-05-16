@@ -36,7 +36,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_passport_witch_hat"
-            android:tint="#E7CDA0"
+            app:tint="#E7CDA0"
             android:contentDescription="Passport" />
 
         <TextView
@@ -69,7 +69,7 @@
             android:layout_height="40dp"
             android:padding="8dp"
             android:src="@android:drawable/ic_menu_more"
-            android:tint="#F4EDE0"
+            app:tint="#F4EDE0"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
@@ -81,7 +81,7 @@
             android:layout_height="40dp"
             android:padding="8dp"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
-            android:tint="#F4EDE0"
+            app:tint="#F4EDE0"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
