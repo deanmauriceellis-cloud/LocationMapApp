@@ -20,6 +20,7 @@
 // progress when revisiting.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toastError } from '../lib/toast'
 
 interface GeocodeMismatchItem {
   entity_type: 'poi'
@@ -105,7 +106,7 @@ export function GeocodesTab({ onOpenPoi, onShowPoiOnMap, onOpenGeocodes }: Geoco
       // progress bar without a polling delay.
       await fetchStatus()
     } catch (e) {
-      window.alert(`Failed to start pass: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Failed to start pass: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setRunBusy(false)
     }

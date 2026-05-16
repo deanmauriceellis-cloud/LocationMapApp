@@ -1595,8 +1595,8 @@ interface ConflictAnalysis {
 }
 
 function analyzeGeocodeConflict(
-  storedLat: number, storedLng: number, storedAddress: string | null,
-  candLat: number, candLng: number, candRating: number,
+  _storedLat: number, _storedLng: number, storedAddress: string | null,
+  _candLat: number, _candLng: number, candRating: number,
   candNormalizedAddress: string, distanceM: number,
 ): ConflictAnalysis {
   const ratingHint =

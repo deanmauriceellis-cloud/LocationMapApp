@@ -1,4 +1,12 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://10.0.0.4:4300'
+// S271: fallback was hardcoded `http://10.0.0.4:4300` (S231 era), which leaks
+// operator-specific LAN config into anyone else's dev environment. Default to
+// localhost and surface the missing env var visibly so unconfigured deploys
+// are loud, not silently wrong.
+if (!import.meta.env.VITE_API_URL && typeof window !== 'undefined') {
+  // eslint-disable-next-line no-console
+  console.warn('[api] VITE_API_URL not set — defaulting to http://localhost:4300. Set VITE_API_URL in .env.local to target a different host.')
+}
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4300'
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

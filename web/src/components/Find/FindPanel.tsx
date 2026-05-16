@@ -28,12 +28,12 @@ interface Props {
 }
 
 export function FindPanel({
-  open, lat, lon,
+  open, lat: _lat, lon: _lon,
   searchResults, searchLoading, searchHint,
   categoryCounts, countsTotal,
   onSearch, onClearSearch, onLoadCounts,
   onFindByCategory, onSelectResult, onFilterAndMap,
-  onClose,
+  onClose: _onClose,
   favoriteCount, favoriteResults, onShowFavorites,
 }: Props) {
   const [view, setView] = useState<View>('categories')

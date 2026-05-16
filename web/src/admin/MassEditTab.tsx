@@ -8,6 +8,7 @@
 //
 // Companion backend: cache-proxy/lib/admin-mass-edit.js
 import { useCallback, useMemo, useState } from 'react'
+import { toastError } from '../lib/toast'
 
 interface CellChange {
   column: string
@@ -123,7 +124,7 @@ export function MassEditTab() {
   const handleRequestApply = useCallback(() => {
     if (!importResp) return
     if (approvals.size === 0) {
-      alert('No cells approved. Tick at least one row before Apply.')
+      toastError('No cells approved. Tick at least one row before Apply.')
       return
     }
     setConfirmOpen(true)

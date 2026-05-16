@@ -9,6 +9,7 @@
 // truth-of-record without changing them.
 
 import { useCallback, useEffect, useState } from 'react'
+import { toastError } from '../lib/toast'
 
 interface GeocodePoi {
   id: string
@@ -194,7 +195,7 @@ export function GeocodeCandidatesModal({
       onChanged()
       await fetchCandidates() // refresh distances
     } catch (e) {
-      window.alert(`Override failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Override failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusyAction(null)
     }
@@ -239,7 +240,7 @@ export function GeocodeCandidatesModal({
       )
       if (!delRes.ok) {
         const body = await delRes.json().catch(() => ({}))
-        window.alert(
+        toastError(
           `Focal POI was updated, but soft-deleting "${dupe.name}" failed: ` +
           `${body.error || `${delRes.status} ${delRes.statusText}`}`,
         )
@@ -247,7 +248,7 @@ export function GeocodeCandidatesModal({
       onChanged()
       await fetchCandidates()
     } catch (e) {
-      window.alert(`Action failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Action failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusyAction(null)
     }
@@ -257,7 +258,7 @@ export function GeocodeCandidatesModal({
   const softDeleteDupe = useCallback(async (dupe: DuplicatePoi) => {
     if (!data) return
     if (dupe.deleted_at) {
-      window.alert(`"${dupe.name}" is already soft-deleted.`)
+      toastError(`"${dupe.name}" is already soft-deleted.`)
       return
     }
     if (!window.confirm(
@@ -277,7 +278,7 @@ export function GeocodeCandidatesModal({
       onChanged()
       await fetchCandidates()
     } catch (e) {
-      window.alert(`Soft-delete failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Soft-delete failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusyAction(null)
     }
@@ -303,7 +304,7 @@ export function GeocodeCandidatesModal({
       onChanged()
       await fetchCandidates()
     } catch (e) {
-      window.alert(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusyAction(null)
     }

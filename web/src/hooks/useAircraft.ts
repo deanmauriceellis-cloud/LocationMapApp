@@ -63,7 +63,7 @@ export function useAircraft() {
     }
   }, [])
 
-  const startAutoRefresh = useCallback((bbox: BboxParams) => {
+  const startAutoRefresh = useCallback((_bbox: BboxParams) => {
     if (refreshRef.current) clearInterval(refreshRef.current)
     refreshRef.current = setInterval(() => {
       const b = lastBboxRef.current

@@ -266,7 +266,7 @@ function SaveCancelBar({ onSave, onCancel, saving }: { onSave: () => void; onCan
 
 // ─── Article list ───────────────────────────────────────────────────────────
 
-interface ListProps<T> {
+interface ListProps {
   editingId: string | null
   editFields: Record<string, string>
   onEdit: (id: string, fields: Record<string, string>) => void
@@ -278,7 +278,7 @@ interface ListProps<T> {
 
 function ArticleList({
   articles, editingId, editFields, onEdit, onFieldChange, onSave, onCancel, saving,
-}: ListProps<WtArticle> & { articles: WtArticle[] }) {
+}: ListProps & { articles: WtArticle[] }) {
   return (
     <table className="w-full text-sm">
       <thead className="bg-slate-50 sticky top-0 z-10">
@@ -331,7 +331,7 @@ function ArticleList({
 
 function BioList({
   bios, editingId, editFields, onEdit, onFieldChange, onSave, onCancel, saving,
-}: ListProps<WtBio> & { bios: WtBio[] }) {
+}: ListProps & { bios: WtBio[] }) {
   return (
     <table className="w-full text-sm">
       <thead className="bg-slate-50 sticky top-0 z-10">
@@ -401,7 +401,7 @@ const PHASE_LABELS: Record<number, string> = {
 
 function NewspaperList({
   newspapers, editingId, editFields, onEdit, onFieldChange, onSave, onCancel, saving,
-}: ListProps<WtNewspaper> & { newspapers: WtNewspaper[] }) {
+}: ListProps & { newspapers: WtNewspaper[] }) {
   return (
     <table className="w-full text-sm">
       <thead className="bg-slate-50 sticky top-0 z-10">

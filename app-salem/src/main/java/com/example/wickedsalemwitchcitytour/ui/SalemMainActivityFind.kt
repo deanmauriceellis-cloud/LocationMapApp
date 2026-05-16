@@ -1791,6 +1791,19 @@ internal fun SalemMainActivity.showGoToLocationDialog() {
         val query = input.text.toString().trim()
         if (query.isEmpty()) {
             toast("Enter a location to search")
+        } else if (com.example.locationmapapp.util.SuperAdminMode.networkBlocked(
+                "SalemMainActivity", "geocode($query)")) {
+            // S271: defense-in-depth call-site gate per feedback_v1_gate_at_call_site.md.
+            // OfflineModeInterceptor on geocodeClient already throws at transport
+            // layer, but this short-circuits before showing a spinner.
+            resultsContainer.removeAllViews()
+            val gatedView = TextView(this).apply {
+                text = "Geocoder is offline in V1 (enable SuperAdmin → Network to use)"
+                textSize = 14f
+                setTextColor(Color.argb(255, 255, 100, 100))
+                setPadding(0, dp(12), 0, 0)
+            }
+            resultsContainer.addView(gatedView)
         } else {
             resultsContainer.removeAllViews()
             val searching = TextView(this).apply {

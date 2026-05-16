@@ -12,6 +12,7 @@
 // and writes a NEW audit row marking the original as reverted.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toastError, toastSuccess } from '../lib/toast'
 
 type AuditAction = 'INSERT' | 'UPDATE' | 'DELETE'
 
@@ -227,14 +228,14 @@ export function AuditTab() {
       })
       const d = await r.json()
       if (!r.ok) {
-        window.alert(`Revert failed: ${d.error || r.status}\n\n${d.detail || ''}`)
+        toastError(`Revert failed: ${d.error || r.status}\n\n${d.detail || ''}`)
       } else {
-        window.alert(`Reverted. New audit id: ${d.revert_audit_id ?? '?'}`)
+        toastSuccess(`Reverted. New audit id: ${d.revert_audit_id ?? '?'}`)
         fetchRows()
         fetchStats()
       }
     } catch (e) {
-      window.alert(`Revert failed: ${(e as Error).message}`)
+      toastError(`Revert failed: ${(e as Error).message}`)
     } finally {
       setRevertingId(null)
     }

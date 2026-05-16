@@ -25,7 +25,7 @@ The `adb uninstall && adb install` pattern (per `feedback_adb_install_after_db_r
 
 ## TOP PRIORITY — V1 launch triage (operator-confirmed 2026-04-29; revised S203 close 2026-04-30)
 
-> **Internal ship target: 2026-08-01** (89 days). One month tighter than the prior Sept 1 anchor in CLAUDE.md / strategic docs. Salem 400+ peak attendance is October 2026.
+> **Internal ship target: 2026-08-01** (77 days as of 2026-05-16). One month tighter than the prior Sept 1 anchor. Salem 400+ peak attendance is October 2026.
 
 ### Operator-side legal / business (in flight)
 
@@ -106,22 +106,19 @@ S270 shipped Recon Layer 1 (bulk-cull photo triage tool). **S271 carries forward
 - **WEB SuperAdmin tab field-validation** — refresh http://localhost:4302/admin → Super Admin → Test each of the 8 cards.
 - **Optional SuperAdmin icon swap** — currently `@drawable/ic_debug`; one-line change at `toolbar_two_row.xml:117`.
 
-### S245+ aged backlog (rendering / content / tools — referenced when in scope)
-
-- **Rendering:** RollingGrassOverlay green-patches on Bluestacks; sprite field-walk near bridge POI; field-validate S238 perspective at z19/z20 + tilt 30/36/42/48°; first-frame layout race in `applyMapExtension` (post-extension `mv.requestLayout()`); cold-start tile-decode spike (Choreographer 1134ms); optional overlay culling / batched Overlay perf candidates.
-- **Content:** lint review of 51-POI newly-renderable set; Sweet Boba regression; Layers menu category gap (FOOD_DRINK/SHOPPING toggles don't gate narration overlay); tilt-mode odds-and-ends (S239); splash variants (32 TODO in `docs/SPLASH-ANNOUNCEMENTS-V1.md`); POI/path alignment review of 1962-photo session; Find menu tile + hero review.
-- **Tools:** TTS-settings deep-link reliability; SheetJS CVE audit; cascading subcategory pick-list; field-edit UPDATE/CREATE loops; Rapid Recon fresh-walk 1 Hz tick + true-north; auto-fire camera field-test.
-
 ### Other carry-forwards (lower priority — pull when in scope)
+
+S245+ aged backlog (Rendering / Content / Tools — 26-55 sessions stale by S271) moved to `docs/archive/STATE_carryforwards_removed_2026-05-16.md`.
+
 
 - Operator field-validation: S221 detour / S220 subtopic content / S217 BusinessLabel + FAB override; spurious `is_tour_poi=true` lint cleanup; borderline-historical commercial opt-in audit.
 - Tier 3 disk reclaim ~4.4 GB (poi-icons / hero-triptych / tile-bake / l3-essex / unused-style archives) + `.gitignore` audit (overnight-runs, poi-cache.json, cache-data.json, web/dist, tsconfig.tsbuildinfo, docs/bake-tests).
 - S216 follow-ups: John Ward House tour-leg fix, HISTORICAL_LANDMARKS icon+hero regen, description rebuild post-historical_note merge, dequeue 40m staleness vs `geofence_radius_m`.
 - S215 suspicious-leg graph: Dr. K 13/14, WD1 3/6/10/11.
-- PoiDetailSheet/Find cleanup (S224): clearXXX/stopXXX no-ops; CLAUDE.md "Pinned" Room version stale (v11 → v19).
+- PoiDetailSheet/Find cleanup (S224): clearXXX/stopXXX no-ops.
 - S206: speed-aware queue cap (>15 mph), DensityTour 0-stop fallback decision; Operator-driven Salem cross-repo commit (`genbiographies/main.go` + 3 hand-edited bios).
-- Rebuild signed AAB + 30-min Lenovo smoke (first since S180); operator field-walks (S204): GPS-OBS heartbeat + Witch Trials bios + airplane-mode drive regression.
-- Operator content: re-author 5 polyline tours via web admin (S185); McIntire content drain (S200).
+
+Carry-forwards 70+ sessions stale (Rebuild-AAB-since-S180, GPS-OBS heartbeat, re-author 5 deleted Kotlin tours, McIntire content drain) moved to `docs/archive/STATE_carryforwards_removed_2026-05-16.md` (S271).
 
 ### S205+ — V1 feature additions (priority order, KEPT for V1)
 
@@ -142,7 +139,9 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 ## Older backlog (S159–S200, TRIAGED S203)
 
-**V1 (open):** McIntire content hand-author (S200); re-author 5 deleted Kotlin tours in PG (S185, operator); GPS + V1-offline drive regression (S161, operator). **V1.0.1:** multi-admin auth + actor-from-session (S196); PoiEditDialog inline history panel (S196); `year_established` backfill on 500+ HIST_BLDG rows (S192); DirectionsSession JVM tests; POI location verifier batch-run (S162); Witchy tile-bake bbox extension for Beverly (S159); water animation tuning (S172). **V2:** driving mode (S195, V1 walking-only); routing-jvm Option 2 + walk-sim cleanup (S179); osmdroid → WickedMapView migration; MHC hidden-POI companion importer (S163).
+**V1.0.1:** multi-admin auth + actor-from-session (S196); PoiEditDialog inline history panel (S196); `year_established` backfill on 500+ HIST_BLDG rows (S192); DirectionsSession JVM tests; POI location verifier batch-run (S162); Witchy tile-bake bbox extension for Beverly (S159); water animation tuning (S172). **V2:** driving mode (S195, V1 walking-only); routing-jvm Option 2 + walk-sim cleanup (S179); MHC hidden-POI companion importer (S163).
+
+V1-open content carry-forwards 70+ sessions stale moved to `docs/archive/STATE_carryforwards_removed_2026-05-16.md` (S271); osmdroid → WickedMapView migration archived alongside (de-facto abandoned for V1).
 
 ---
 
@@ -153,34 +152,22 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 - **2026-05-16 (S270):** Recon photo triage tool Layer 1 (bulk-cull) shipped on top of S229/S231 burst-photos infra. New `web/src/admin/ReconTriageTab.tsx` admin tab; `cache-proxy/lib/admin-burst-photos.js` extended with persistent `.kept.json` per-session keep-flag, atomic `commit-cull` (move-everything-unkept to `.deleted/`), `adb devices` lister, and SSE-streaming `adb pull` + python-organizer endpoint. Zero new dependencies. End-to-end smoke verified.
 - **2026-05-15 (S269):** POI Passport architecture matured to **pool ∩ proximity** model. Global passport (`default_salem_walking`) defines the "pool" via filter SQL (categories + flags + min broadcast radius + year range); per-tour passports are walk-derived snapshots of `pool ∩ polyline-proximity`, edited via the new Tour-editor walk dialog. Recompute is destructive (operator-confirmed: "wipes everything; manual edits persist until next wipe"). Tour metadata is now fully derived: `recomputeTourMetadata` rebuilds `stop_count + distance_km + estimated_minutes` from `salem_tour_legs + salem_tour_stops` on every mutation + on PATCH (operator-supplied values get overwritten). New "stamps" UX: Android tour cards + web admin tour list both show passport-bound POI count instead of legacy `stop_count` (free polyline waypoints). New `auto_bake` column on `salem_passport_filters` separates filter-driven (auto-bake, global pool only) from operator-curated (manual, per-tour) rows. Five Lenovo bundletool installs in one session.
 - **2026-05-04 (S224):** Session-start protocol amended lean → lean+state — `STATE.md` + most-recent live log mandatory. `enqueueNarration` cancel-stamp scoped to direct-play (fixed walk-sim queue stall from S146 Idle-guard collision).
-- **Older pivots (S180–S185, 2026-04-23 → 04-26):** V1 manifest stripped of network permissions + R8-stripped feature gates (`feedback_v1_no_external_contact.md`); tours are polyline-only with PG as sole source of truth; asset schema must be Room-canonical via `align-asset-schema-to-room.js`; `feedback_tour_routing_is_content_not_engineering.md`; OSM policy restored to S178 surgical-only allowlist. Full text in `SESSION-LOG-ARCHIVE.md`.
-- **Earlier pivots (S157/S158/S171/S175/S178, 2026-04-23 → 04-25):** MassGIS L3 ingest, Witchy basemap, WickedMap engine prototype, on-device TIGER router, wharf-walkway osm_id allowlist. Detail in archive.
+- **Older pivots (S157-S185, 2026-04-23 → 04-26):** V1 manifest stripped of network permissions; tours polyline-only with PG source of truth; asset schema Room-canonical via `align-asset-schema-to-room.js`; MassGIS L3 / Witchy basemap / WickedMap prototype / on-device TIGER router / wharf-walkway osm_id allowlist. Detail in `SESSION-LOG-ARCHIVE.md`.
 
 ---
 
-## Phase Status
+## Phase Status (V1 lens)
 
-| Phase | Status | Notes |
-|---|---|---|
-| 1-9 + 9A+ + 9T (8/9) | COMPLETE | Core dev, offline foundation, ambient narration |
-| **9P.A / 9P.B / 9U / 9X** | COMPLETE | Admin UI, unified POI table, Witch Trials feature |
-| **9Y** MassGIS+TigerLine Overlay Integration | PARTIAL | L3 parcels + assess ingested (S157). Schema extended (S156). v9 cascade (S159). Outstanding: 9Y.3 enrichment script, 9Y.9 polygon geofence runtime, 9Y.Overlay osmdroid dynamic overlays. |
-| **9Z** Historical Maps Time-Slider | PLANNED | V1 year slate: 1890, 1906, 1950, 1957 Sanborn. |
-| **9Q** Salem Domain Content Bridge | DEFERRED — consumes 9Y data | building→POI translation. |
-| **9R** Historic Tour Mode | DEFERRED — consumes 9Y data | opt-in chapter-based 1692 tour. |
-| **10** Production readiness | First signed AAB built (S180); commercial chores remain | Firebase, photos, DB hardening, emulator verification. |
-| **11** Branding, ASO, Play Store | Quality over schedule per operator | Salem 400+ Oct 2026 aspirational, not hard. |
-| **Cross-project** TigerLine | Phase 2 stalled (2026-04-21) | LMA no longer blocked on tile delivery. |
-| **Cross-project** SalemIntelligence | Phase 1 KB live at :8089 | 1,830 POIs / 1,770 narrated. |
+Phases 1-9 + 9A+ + 9P.A/B + 9T + 9U + 9X: **COMPLETE**. Phase 10 (production readiness): first signed AAB built S180, asset-pack reorg S256, ship-cliffs 1/2/3 closed. Phase 11 (ASO/Play Store): operator-led, post-AAB-upload. **9Y/9Z/9Q/9R deferred** (V1.0.1+, no V1 ship dependency). Cross-project TigerLine stalled 2026-04-21; SalemIntelligence PAUSED S214.
 
-**Sessions completed:** 270. **Internal ship target: 2026-08-01** (operator-confirmed S201). Salem 400+ peak attendance October 2026 (~1M visitors).
+**Sessions completed:** 270. **Internal ship target: 2026-08-01.**
 
 ---
 
 ## POI Inventory (refreshed S180 from live PG)
 
-- **PG `salem_pois`:** 2,037 live (S253 refresh — net −5 from S241's 2,042) + 87 soft-deleted (S241 mass-edit dropped live count by 28 — dupe cleanup + recategorizations + soft-deletes via the new spreadsheet round-trip; S216 dedup history: 220 dead hard-deleted + 43 live cluster losers hard-deleted + 1 Gardner-Pingree dup, all merged before delete; further trim through S221+). 484 reclassified `HISTORICAL_BUILDINGS` → `HISTORICAL_LANDMARKS` (curated buildings now 105). `historical_note` column dropped S216; content lifted to `description` (143 POIs touched, 0 gaps).
-- **Room DB:** at `app-salem/src/main/assets/salem_content.db`, **v20 schema** (S268), identity_hash `837ec05ad90541fa76a8a413a06394e0`. Witch Trials intact (npc_bios 49 / articles 16 / newspapers 202). 4 tours / 73 legs (S224). **5 passports / 797 baked POIs (S269)** — 1 global Whole-Salem pool (447 POIs filtered through categories + historical_narration + min_geofence_radius_m=10) + 4 walk-derived per-tour passports (49 / 72 / 188 / 41) authored as `pool ∩ proximity` via the Tour-editor walk dialog. v11 (S186) `is_civic_poi`. v12 (S192) `historical_narration`. v13 (S193) `is_historical_tour`. v14 (S195) `is_historical_property`. v15 (S198) dropped `body_points` from WitchTrialsNewspaper. v16 (S216) dropped `historical_note` from SalemPoi. v17 (S219) added `narration_subtopics` JSONB to SalemPoi. v18 (S226) added 6 haunt columns. v19 (S227) added `haunt_duration_s` REAL. v20 (S268) added `PoiPassport` entity (`poi_passport` table). **UserDataDatabase** also bumped v2 → v3 (S268) with `passport_visit` table + hand-written `MIGRATION_2_3` (strict, no destructive fallback per S180 lockdown). **PG schema** also gained `salem_passport_filters.auto_bake BOOLEAN` (S269 — distinguishes filter-driven from operator-curated rows for `publish-poi-passport.js`).
+- **PG `salem_pois`:** 2,039 live (S271 refresh — net +2 from S270's 2,037). 87 soft-deleted (per `feedback_dedup_is_manual.md`, soft-deletes are operator-managed via Lint tab; `WHERE deleted_at IS NULL` filter in `publish-salem-pois.js:206` keeps them out of the asset DB). 484 reclassified `HISTORICAL_BUILDINGS` → `HISTORICAL_LANDMARKS` (curated buildings now 105). `historical_note` column dropped S216; content lifted to `description`.
+- **Room DB:** `app-salem/src/main/assets/salem_content.db`, **v20** (S268), identity_hash `837ec05ad90541fa76a8a413a06394e0`. Witch Trials intact (npc_bios 49 / articles 16 / newspapers 202). 4 tours / 73 legs (S224). **5 passports / 797 baked POIs (S269)** — 1 global Whole-Salem pool (447 POIs filtered via categories + historical_narration + min_geofence_radius_m=10) + 4 walk-derived per-tour passports (49 / 72 / 188 / 41) authored as `pool ∩ proximity`. **UserDataDatabase v2 → v3 (S268)** with `passport_visit` table + hand-written `MIGRATION_2_3` (strict, no destructive fallback per S180 lockdown). **PG schema** gained `salem_passport_filters.auto_bake BOOLEAN` (S269). v11-v20 column-history archived in session logs.
 - **APK / AAB:** S256 reorganized into base + asset pack. **Debug APK 95 MB** (was 374 MB pre-S256), **Release AAB 129 MB total** (`base-master.apk` 55.2 MB compressed + `salem_tiles_pack-master.apk` 261.6 MB compressed). `bundletool get-size total` = 125 MB compressed download. Base APK well under Play Store's 200 MB compressed ceiling; asset pack sits in the 2 GB pack ceiling. AAB is upload-eligible. `poi-icons/` at 544 MB is still the next pre-Play-Store size target.
 - **Assets manifest:** `app-salem/src/main/assets/ASSETS-MANIFEST.md` + `cache-proxy/scripts/verify-bundled-assets.js`.
 
@@ -199,26 +186,14 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 ## OMEN Open Items
 
-1. NOTE-L014 / OMEN-008 — Privacy Policy V1-minimal Posture A shipped S145 (`docs/PRIVACY-POLICY-V1.md`); full OMEN-008 draft pending OMEN review.
-2. NOTE-L015 SalemCommercial cutover — PARKED POST-V1 (S145).
-3. Cross-project SalemIntelligence anomaly relay — `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md` (ANOM-001, ANOM-002).
-4. NOTE-L019 restrooms_zombie.png regen (LOW); 9-dot menu witchy backgrounds PARKED S146.
+1. NOTE-L014 / OMEN-008 — Privacy Policy V1-minimal Posture A shipped S145 (`docs/PRIVACY-POLICY-V1.md`); full OMEN-008 draft pending. NOTE-L015 SalemCommercial cutover PARKED POST-V1.
+2. SalemIntelligence anomaly relay — `~/Development/OMEN/reports/locationmapapp/S153-si-anomalies-relay-2026-04-20.md` (ANOM-001, ANOM-002). NOTE-L019 restrooms_zombie.png regen LOW.
 
 ---
 
 ## Pointers to detail
 
-| What | Where |
-|---|---|
-| **Topic-indexed lookup of prior work** | **`MASTER_SESSION_REFERENCE.md`** |
-| Recent session summaries (rolling window) | `SESSION-LOG.md` |
-| Older session summaries | `SESSION-LOG-ARCHIVE.md` |
-| Live conversation logs | `docs/session-logs/session-NNN-YYYY-MM-DD.md` |
-| Active multi-phase plans | `docs/plans/` |
-| SalemIntelligence integration | `~/Development/SalemIntelligence/docs/lma-*.md` |
-| Architecture, tech stack | `CLAUDE.md` and the codebase itself |
-| Legal/compliance | `GOVERNANCE.md` |
-| Patentable innovations | `IP.md` |
-| Monetization strategy | `COMMERCIALIZATION.md` |
-| UX/architecture decisions | `DESIGN-REVIEW.md` |
-| Older STATE.md content | `docs/archive/STATE_removed_2026-04-09.md` (and `_removed_2026-04-21.md`) |
+- **Topic-indexed lookup of prior work:** `MASTER_SESSION_REFERENCE.md`
+- **Sessions:** `SESSION-LOG.md` (rolling 10) / `SESSION-LOG-ARCHIVE.md` (older) / `docs/session-logs/session-NNN-*.md` (live)
+- **Plans:** `docs/plans/` (active) / `docs/archive/` (older + removed STATE content)
+- **Architecture / tech stack:** `CLAUDE.md` + codebase. **Legal:** `GOVERNANCE.md`. **IP:** `IP.md`. **Commercial:** `COMMERCIALIZATION.md`. **UX/arch decisions:** `DESIGN-REVIEW.md`.

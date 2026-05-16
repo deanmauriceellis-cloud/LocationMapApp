@@ -30,7 +30,7 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         WitchTrialsNewspaper::class,
         PoiPassport::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 abstract class SalemContentDatabase : RoomDatabase() {

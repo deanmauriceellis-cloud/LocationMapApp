@@ -35,11 +35,12 @@ const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 //   v18 (S226) — added haunt_sprite_id + 5 haunt_* tuning columns to SalemPoi (admin-driven sprite peek)
 //   v19 (S227) — added haunt_duration_s REAL to SalemPoi (per-fire dance length)
 //   v20 (S268) — added PoiPassport entity (poi_passport table) for the POI Passport feature
+//   v21 (S271) — added 7 indices to SalemPoi (is_narrated, is_tour_poi, is_civic_poi, is_historical_property, category, district, subcategory) to remove the per-second full-scan on findNarrated()
 //
 // S268 — read the latest hash + version dynamically from the schemas dir so
 // this constant stops drifting against @Database(version) bumps. Matches the
 // pattern publish-tour-legs.js uses (see lines 51-70 there). Falls back to
-// the literal v20 hash if the dir is unreadable for whatever reason.
+// the literal v21 hash if the dir is unreadable for whatever reason.
 const SCHEMAS_DIR = path.resolve(
   __dirname,
   '../../app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase'
@@ -57,8 +58,8 @@ function readLatestRoomIdentity() {
   }
 }
 const LATEST_ROOM = readLatestRoomIdentity();
-const ROOM_IDENTITY_HASH_V20 = (LATEST_ROOM && LATEST_ROOM.hash) || '837ec05ad90541fa76a8a413a06394e0';
-const ROOM_VERSION = (LATEST_ROOM && LATEST_ROOM.version) || 20;
+const ROOM_IDENTITY_HASH_LATEST = (LATEST_ROOM && LATEST_ROOM.hash) || '19fcd8e4347d88e9da1a50aef2734bc9';
+const ROOM_VERSION = (LATEST_ROOM && LATEST_ROOM.version) || 21;
 
 // Required Room tables with minimum row counts. A table with fewer rows than
 // listed is treated as a failure (empty/partially-populated = same crash).
@@ -142,8 +143,8 @@ if (!fs.existsSync(CONTENT_DB)) {
     const master = db.prepare('SELECT identity_hash FROM room_master_table WHERE id=42').get();
     if (!master) {
       fail('salem_content.db: room_master_table row id=42 missing');
-    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_V20) {
-      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_V20} (v${ROOM_VERSION})`);
+    } else if (master.identity_hash !== ROOM_IDENTITY_HASH_LATEST) {
+      fail(`salem_content.db: identity_hash is ${master.identity_hash}, expected ${ROOM_IDENTITY_HASH_LATEST} (v${ROOM_VERSION})`);
     } else {
       pass(`salem_content.db: identity_hash = ${master.identity_hash} (v${ROOM_VERSION})`);
     }

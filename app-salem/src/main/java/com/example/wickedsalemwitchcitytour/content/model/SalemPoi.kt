@@ -11,6 +11,7 @@ package com.example.wickedsalemwitchcitytour.content.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -18,10 +19,27 @@ import androidx.room.PrimaryKey
  * Replaces the three legacy tables (tour_pois, salem_businesses, narration_points)
  * in PG; coexists with them in Room until consumer migration is complete.
  *
- * 2,190 rows: 817 narrated + 133 business-only + 26 tour-only + 1,214 BCS imports.
- * All data is bundled offline in the APK — no server calls at runtime.
+ * 2,039 rows (S271 refresh) bundled offline in the APK — no server calls at runtime.
+ *
+ * Indices added Room v21 (S271): the hot narration path
+ * `SalemPoiDao.findNarrated()` runs per-second and was full-scanning. Single-column
+ * indices on `is_narrated` + the three OR-clause flags + the three taxonomy columns
+ * cover every multi-column WHERE filter in `SalemPoiDao`. Composite index would be
+ * marginally better for the leading `(is_narrated, default_visible)` pair but the
+ * OR clauses make the optimizer fall back to individual lookups anyway.
  */
-@Entity(tableName = "salem_pois")
+@Entity(
+    tableName = "salem_pois",
+    indices = [
+        Index(value = ["is_narrated"]),
+        Index(value = ["is_tour_poi"]),
+        Index(value = ["is_civic_poi"]),
+        Index(value = ["is_historical_property"]),
+        Index(value = ["category"]),
+        Index(value = ["district"]),
+        Index(value = ["subcategory"])
+    ]
+)
 data class SalemPoi(
     @PrimaryKey val id: String,
     val name: String,

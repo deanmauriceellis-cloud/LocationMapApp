@@ -58,21 +58,10 @@ interface PreviewResult {
   sample: PreviewSamplePoi[]
 }
 
+import { fetchJson } from '../lib/fetchJson'
+
 const ENDPOINT = '/api/admin/salem/passports'
 const VALID_ID_RE = /^[a-z0-9_]+$/
-
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, { credentials: 'same-origin', ...(init ?? {}) })
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`
-    try {
-      const body = await res.json()
-      if (body?.error) msg = `${res.status} ${body.error}`
-    } catch { /* not json */ }
-    throw new Error(msg)
-  }
-  return (await res.json()) as T
-}
 
 const EMPTY_DRAFT: Draft = {
   id: '',

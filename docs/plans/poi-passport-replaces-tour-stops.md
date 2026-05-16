@@ -1,7 +1,7 @@
 # POI Passport — replaces tour-stop UI
 
-**Status:** Proposal — for next-session exploration. No code yet.
-**Drafted:** 2026-05-15 (S267 close)
+**Status:** Shipped S268-S269 through Slice 4 (destructive). Slice 5 (operator field walk + PassportSheet empty-state polish + Pixel 8 portrait toolbar fit + MASTER_SESSION_REFERENCE polish) deferred — see STATE.md S271 docket.
+**Drafted:** 2026-05-15 (S267 close); **status updated S271 (2026-05-16)**.
 **Driver:** Operator confirmed all four runtime "tour stops" UIs are leftover from a prior architecture that "isn't even working correctly" and should be killed. Replace with a persisted **POI Passport** — a per-user list of historically-narrated POIs flagged as visited/heard, regeneratable from the web admin portal under operator-defined parameters.
 
 ---

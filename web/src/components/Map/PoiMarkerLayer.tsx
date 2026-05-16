@@ -44,15 +44,6 @@ export function PoiMarkerLayer({ pois, clusters, filterResults, onPoiClick }: Pr
     [pois]
   )
 
-  // Build a set of filter result keys for fast lookup
-  const filterKeys = useMemo(() => {
-    if (!isFilterMode) return null
-    const keys = new Set<string>()
-    for (const r of filterResults!) {
-      keys.add(`${r.type}-${r.id}`)
-    }
-    return keys
-  }, [filterResults, isFilterMode])
 
   if (isFilterMode) {
     return (

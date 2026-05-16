@@ -51,20 +51,9 @@ interface TourTreeProps {
   onTourModeFilterChange: (next: { tourPois: boolean; histLandmark: boolean; civic: boolean }) => void
 }
 
-const ENDPOINT = '/api/admin/salem/tours'
+import { fetchJson } from '../lib/fetchJson'
 
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, { credentials: 'same-origin', ...(init ?? {}) })
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`
-    try {
-      const body = await res.json()
-      if (body?.error) msg = `${res.status} ${body.error}`
-    } catch { /* not json */ }
-    throw new Error(msg)
-  }
-  return (await res.json()) as T
-}
+const ENDPOINT = '/api/admin/salem/tours'
 
 export function TourTree({
   selectedTourId,

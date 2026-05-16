@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { toastSuccess } from '../lib/toast'
 
 interface BurstPhoto {
   id: string
@@ -91,18 +92,23 @@ export function ReconTriageTab() {
     setActiveSession(biggest.session)
   }, [sessions, activeSession])
 
-  // Refetch kept set when session changes.
+  // Refetch kept set when session changes. S271: AbortController upgrade so
+  // the in-flight request actually cancels on rapid session switches (was a
+  // cancelled-flag pattern that let stale fetches complete then no-op).
   useEffect(() => {
     if (!activeSession) { setKept(new Set()); return }
-    let cancelled = false
-    fetch(`${API}/sessions/${encodeURIComponent(activeSession)}/kept`, { credentials: 'same-origin' })
+    const ac = new AbortController()
+    fetch(`${API}/sessions/${encodeURIComponent(activeSession)}/kept`, {
+      credentials: 'same-origin',
+      signal: ac.signal,
+    })
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((body: { kept: string[] }) => {
-        if (cancelled) return
-        setKept(new Set(body.kept ?? []))
+      .then((body: { kept: string[] }) => setKept(new Set(body.kept ?? [])))
+      .catch(e => {
+        if ((e as Error)?.name === 'AbortError') return
+        setError((e as Error).message ?? String(e))
       })
-      .catch(e => { if (!cancelled) setError((e as Error).message ?? String(e)) })
-    return () => { cancelled = true }
+    return () => ac.abort()
   }, [activeSession])
 
   const photosForSession = useMemo(
@@ -148,7 +154,7 @@ export function ReconTriageTab() {
       setKept(new Set())
       setConfirmOpen(false)
       await refetchList()
-      window.alert(`Cull done: ${body.kept} kept, ${body.culled} culled${body.errors?.length ? ` (${body.errors.length} errors)` : ''}`)
+      toastSuccess(`Cull done: ${body.kept} kept, ${body.culled} culled${body.errors?.length ? ` (${body.errors.length} errors)` : ''}`)
     } catch (e) {
       setError((e as Error).message ?? String(e))
     } finally {

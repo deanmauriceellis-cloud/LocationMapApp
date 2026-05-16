@@ -412,6 +412,15 @@ module.exports = function(app, _deps) {
 
     const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
+    // S271: track subprocess handles so we can kill them if the client
+    // disconnects mid-stream. Without this, closing the admin tab leaves
+    // `adb pull` and the python organizer running orphan in the background.
+    let pull = null, org = null;
+    res.on('close', () => {
+      try { if (pull && pull.exitCode === null) pull.kill('SIGTERM'); } catch (_) { /* noop */ }
+      try { if (org  && org.exitCode  === null) org.kill('SIGTERM'); }  catch (_) { /* noop */ }
+    });
+
     const stagingRoot = '/tmp/lmasalem-stage';
     const stagingSrc  = path.join(stagingRoot, 'WickedSalemRecon');
     try {
@@ -424,8 +433,10 @@ module.exports = function(app, _deps) {
     }
 
     send({ stage: 'pull', line: `adb -s ${deviceSerial} pull /sdcard/Pictures/WickedSalemRecon/ ${stagingRoot}/` });
-    const pull = spawn('adb', ['-s', deviceSerial, 'pull', '/sdcard/Pictures/WickedSalemRecon/', stagingRoot + '/'], {
+    // S271: 10-minute hard cap on adb pull (worst-case 2000-photo session ~3 min).
+    pull = spawn('adb', ['-s', deviceSerial, 'pull', '/sdcard/Pictures/WickedSalemRecon/', stagingRoot + '/'], {
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 600_000,
     });
     pull.stdout.on('data', d => send({ stage: 'pull', line: d.toString().trim() }));
     pull.stderr.on('data', d => send({ stage: 'pull', line: d.toString().trim() }));
@@ -438,7 +449,8 @@ module.exports = function(app, _deps) {
       // Run organizer.
       const organizerPath = path.join(__dirname, '..', '..', 'tools', 'pull-and-organize-burst-photos.py');
       send({ stage: 'organize', line: `python3 ${organizerPath}` });
-      const org = spawn('python3', [organizerPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+      // S271: 5-minute cap on organizer (EXIF + classify + move ~1700 photos in <30s normally).
+      org = spawn('python3', [organizerPath], { stdio: ['ignore', 'pipe', 'pipe'], timeout: 300_000 });
       org.stdout.on('data', d => send({ stage: 'organize', line: d.toString().trimEnd() }));
       org.stderr.on('data', d => send({ stage: 'organize', line: d.toString().trimEnd() }));
       org.on('error', e => { send({ stage: 'error', line: 'organizer spawn failed: ' + e.message }); res.end(); });

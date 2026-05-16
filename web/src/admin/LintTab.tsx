@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PoiRow } from './PoiTree'
 import { AutoCategorizeModal } from './AutoCategorizeModal'
+import { toastError } from '../lib/toast'
 
 // ─── Types matching cache-proxy/lib/admin-lint.js ───────────────────────────
 
@@ -182,7 +183,7 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes,
       await fetchLint()
       await fetchSuppressions()
     } catch (e) {
-      window.alert(`Suppress failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Suppress failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [fetchLint, fetchSuppressions])
 
@@ -196,7 +197,7 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes,
       await fetchLint()
       await fetchSuppressions()
     } catch (e) {
-      window.alert(`Unsuppress failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Unsuppress failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [fetchLint, fetchSuppressions])
 
@@ -248,7 +249,7 @@ export function LintTab({ onOpenPoi, onShowPoiOnMap, onOpenTour, onOpenGeocodes,
       }
       void pollAddrStatus()
     } catch (e) {
-      window.alert(`Failed to start address-geocode pass: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Failed to start address-geocode pass: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [pollAddrStatus])
 

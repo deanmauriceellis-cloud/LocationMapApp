@@ -84,26 +84,13 @@ const POLYLINE_BORDER = '#052e16'
 const POI_SELECTED = '#2563eb'   // blue — currently in editing list
 const POI_UNCHECKED = '#94a3b8'  // slate — pool POI, in-radius, unchecked
 const POI_FAR = '#fbbf24'        // amber — pool POI, out of radius (visible if toggle on)
-const POI_ORPHAN = '#dc2626'     // red — saved but no longer in pool (drop-warning)
+// red `#dc2626` reserved for orphan markers — not currently rendered (S271).
 
 function metresToFeet(m: number): number {
   return m * 3.28084
 }
 
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, { credentials: 'same-origin', ...(init ?? {}) })
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`
-    try {
-      const body = await res.json()
-      if (body?.error) msg = body.error
-    } catch {
-      /* fallthrough */
-    }
-    throw new Error(msg)
-  }
-  return (await res.json()) as T
-}
+import { fetchJson } from '../lib/fetchJson'
 
 /** Re-fit the map to the tour polyline + in-radius POIs on first load. */
 function FitToContent({ polyline, pois }: { polyline: { lat: number; lng: number }[]; pois: Candidate[] }) {
@@ -177,10 +164,6 @@ export function WalkPassportDialog({ tourId, tourName, onClose, onSaved }: WalkP
   }, [candidates])
   const inRadius = useMemo(
     () => candidates.filter((c) => c.min_distance_m <= radius),
-    [candidates, radius],
-  )
-  const outRadius = useMemo(
-    () => candidates.filter((c) => c.min_distance_m > radius),
     [candidates, radius],
   )
   // POIs in the saved/editing list that aren't in the current candidate
@@ -520,7 +503,7 @@ export function WalkPassportDialog({ tourId, tourName, onClose, onSaved }: WalkP
                   )
                 })}
                 {/* Orphan markers (saved but pool-excluded) drawn in red. */}
-                {orphanedSelected.map((id) => null)}
+                {orphanedSelected.map((_id) => null)}
               </MapContainer>
             )}
             {/* Legend */}

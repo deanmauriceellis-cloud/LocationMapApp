@@ -38,6 +38,8 @@ import { SuperAdminTab } from './SuperAdminTab'
 import TigerBaseTab from './TigerBaseTab'
 import { PassportTab } from './PassportTab'
 import { ReconTriageTab } from './ReconTriageTab'
+import { Toaster } from 'sonner'
+import { toastError } from '../lib/toast'
 
 const ORACLE_POLL_MS = 30_000
 
@@ -170,7 +172,7 @@ export function AdminLayout() {
       handleGeocodeChanged()
       setGeocodePreview(null)
     } catch (e) {
-      window.alert(`Move failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Move failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [geocodePreview, handleGeocodeChanged])
   const handleGeocodePreviewIgnore = useCallback(async () => {
@@ -199,7 +201,7 @@ export function AdminLayout() {
       }
       setGeocodePreview(null)
     } catch (e) {
-      window.alert(`Ignore failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Ignore failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [geocodePreview])
   const handleGeocodePreviewCancel = useCallback(() => {
@@ -226,7 +228,7 @@ export function AdminLayout() {
       handleGeocodeChanged()
       setGeocodePreview(null)
     } catch (e) {
-      window.alert(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [geocodePreview, handleGeocodeChanged])
   const handleGeocodePreviewEditAddress = useCallback(() => {
@@ -459,7 +461,7 @@ export function AdminLayout() {
         setAddStopMode('none')
         setTourRefreshKey((k) => k + 1)
       } catch (e) {
-        window.alert(`Could not add waypoint: ${e instanceof Error ? e.message : String(e)}`)
+        toastError(`Could not add waypoint: ${e instanceof Error ? e.message : String(e)}`)
       }
     },
     [activeTour],
@@ -489,7 +491,7 @@ export function AdminLayout() {
         setAddStopMode('none')
         setTourRefreshKey((k) => k + 1)
       } catch (e) {
-        window.alert(`Could not add POI as stop: ${e instanceof Error ? e.message : String(e)}`)
+        toastError(`Could not add POI as stop: ${e instanceof Error ? e.message : String(e)}`)
       }
     },
     [activeTour],
@@ -620,7 +622,7 @@ export function AdminLayout() {
   const handleLintOpenPoi = useCallback(async (poiId: string) => {
     const poi = await resolvePoi(poiId)
     if (!poi) {
-      window.alert(`Could not load POI ${poiId} — it may have been hard-deleted.`)
+      toastError(`Could not load POI ${poiId} — it may have been hard-deleted.`)
       return
     }
     setPoiFlyToMinZoom(20)
@@ -635,7 +637,7 @@ export function AdminLayout() {
   ) => {
     const poi = await resolvePoi(poiId)
     if (!poi) {
-      window.alert(`Could not load POI ${poiId} — it may have been hard-deleted.`)
+      toastError(`Could not load POI ${poiId} — it may have been hard-deleted.`)
       return
     }
     setLintIdFilter(new Set(checkPoiIds))
@@ -658,12 +660,12 @@ export function AdminLayout() {
       if (!res.ok) {
         let msg = `${res.status} ${res.statusText}`
         try { const b = await res.json(); if (b?.error) msg = `${res.status} ${b.error}` } catch {}
-        window.alert(`Validate failed: ${msg}`)
+        toastError(`Validate failed: ${msg}`)
         return
       }
       const body = await res.json() as { status: 'proposed' | 'no_match'; warnings?: string[] }
       if (body.status === 'no_match') {
-        window.alert(`Tiger returned no match for this POI's address.${body.warnings?.length ? '\n' + body.warnings.join('\n') : ''}`)
+        toastError(`Tiger returned no match for this POI's address.${body.warnings?.length ? '\n' + body.warnings.join('\n') : ''}`)
         return
       }
       // Refetch fresh POI row so proposalReview has lat_proposed/lng_proposed.
@@ -672,7 +674,7 @@ export function AdminLayout() {
         { credentials: 'same-origin' },
       )
       if (!fresh.ok) {
-        window.alert(`Validate succeeded but failed to refetch POI ${poiId}.`)
+        toastError(`Validate succeeded but failed to refetch POI ${poiId}.`)
         return
       }
       const updated = (await fresh.json()) as PoiRow
@@ -684,7 +686,7 @@ export function AdminLayout() {
       setEditOpen(false)
       handleEnterProposalReview(updated)
     } catch (e) {
-      window.alert(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Validate failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [handleEnterProposalReview])
 
@@ -698,12 +700,12 @@ export function AdminLayout() {
       if (!res.ok) {
         let msg = `${res.status} ${res.statusText}`
         try { const b = await res.json(); if (b?.error) msg = b.message ? `${b.error}: ${b.message}` : `${res.status} ${b.error}` } catch {}
-        window.alert(`Google validate failed: ${msg}`)
+        toastError(`Google validate failed: ${msg}`)
         return
       }
       const body = await res.json() as { status: 'proposed' | 'no_match'; warnings?: string[] }
       if (body.status === 'no_match') {
-        window.alert(`Google returned no match.${body.warnings?.length ? '\n' + body.warnings.join('\n') : ''}`)
+        toastError(`Google returned no match.${body.warnings?.length ? '\n' + body.warnings.join('\n') : ''}`)
         return
       }
       const fresh = await fetch(
@@ -711,7 +713,7 @@ export function AdminLayout() {
         { credentials: 'same-origin' },
       )
       if (!fresh.ok) {
-        window.alert(`Google validate succeeded but failed to refetch POI ${poiId}.`)
+        toastError(`Google validate succeeded but failed to refetch POI ${poiId}.`)
         return
       }
       const updated = (await fresh.json()) as PoiRow
@@ -723,7 +725,7 @@ export function AdminLayout() {
       setEditOpen(false)
       handleEnterProposalReview(updated)
     } catch (e) {
-      window.alert(`Google validate failed: ${e instanceof Error ? e.message : String(e)}`)
+      toastError(`Google validate failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [handleEnterProposalReview])
 
@@ -815,6 +817,7 @@ export function AdminLayout() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-100 text-slate-900">
+      <Toaster richColors position="top-right" duration={5000} />
       {/* Header */}
       <header className="flex items-center gap-3 px-4 h-12 bg-slate-800 text-slate-100 shadow">
         <h1 className="text-base font-semibold tracking-wide mr-2">
@@ -1062,7 +1065,7 @@ export function AdminLayout() {
           setGeocodeModalPoiId(null)
           const poi = await resolvePoi(id)
           if (!poi) {
-            window.alert(`Could not load POI ${id} — it may have been hard-deleted.`)
+            toastError(`Could not load POI ${id} — it may have been hard-deleted.`)
             return
           }
           setPoiFlyToMinZoom(20)
@@ -1073,7 +1076,7 @@ export function AdminLayout() {
           setGeocodeModalPoiId(null)
           const sourcePoi = await resolvePoi(sourcePoiId)
           if (!sourcePoi) {
-            window.alert(`Could not load POI ${sourcePoiId}.`)
+            toastError(`Could not load POI ${sourcePoiId}.`)
             return
           }
           setSelectedPoi({ poi: sourcePoi })
@@ -1086,7 +1089,7 @@ export function AdminLayout() {
           const all = [focalId, ...dupeIds]
           const focal = await resolvePoi(focalId)
           if (!focal) {
-            window.alert(`Could not load focal POI ${focalId}.`)
+            toastError(`Could not load focal POI ${focalId}.`)
             return
           }
           setLintIdFilter(new Set(all))

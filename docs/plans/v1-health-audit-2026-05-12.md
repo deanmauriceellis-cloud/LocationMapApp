@@ -2,6 +2,8 @@
 
 **Source session:** S253 (2026-05-12). Audit run while operator was filling historical content. Five parallel Explore agents covered build/packaging, V1 offline gate, runtime memory/rendering, Room/DB/asset health, and code-health/architecture. Findings + decisions consolidated here for S254+ review.
 
+**Status update S271 (2026-05-16):** Waves 1-3 shipped (S253-S256 + ship-cliff closures). Wave 4 i18n parked per STATE.md. Wave 5 (post-V1 decomp doc) written S271 at `docs/plans/post-v1-architecture-decomposition.md`.
+
 **Scope rule:** V1 only. Internal ship target 2026-08-01. Post-V1 items flagged but not in execution waves except as planning artifacts.
 
 ---

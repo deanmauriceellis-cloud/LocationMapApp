@@ -749,7 +749,7 @@ export function PoiEditDialog({
   // button then commits if the operator likes the proposal.
   const [validateBusy, setValidateBusy] = useState(false)
   const [validateError, setValidateError] = useState<string | null>(null)
-  const [validateInfo, setValidateInfo] = useState<string | null>(null)
+  const [, setValidateInfo] = useState<string | null>(null)
   // S218 — Same flow as Validate via TigerLine but hits Google Places API.
   const [googleBusy, setGoogleBusy] = useState(false)
 

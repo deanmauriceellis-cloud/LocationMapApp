@@ -1,5 +1,7 @@
 # S261 — align-asset-schema partial-failure hardening
 
+**Status:** DONE — shipped S262 (atomic DROP+CREATE+INDEX+INSERT inside `db.transaction()`). Status update S271 (2026-05-16). Candidate for `docs/archive/` after this PR.
+
 ## Context
 
 The Room asset DB at `app-salem/src/main/assets/salem_content.db` is rebuilt by `cache-proxy/scripts/align-asset-schema-to-room.js` as the final step of the publish chain (`publish-salem-pois.js` → `publish-tours.js` → `publish-tour-legs.js` → **align-asset-schema-to-room.js**). Per S185 the alignment is required so Room's `TableInfo.equals` comparison doesn't trigger `fallbackToDestructiveMigration` (wiping every row) on first launch.
