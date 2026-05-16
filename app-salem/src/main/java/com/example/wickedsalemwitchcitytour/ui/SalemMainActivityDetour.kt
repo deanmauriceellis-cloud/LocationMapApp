@@ -175,10 +175,17 @@ private fun SalemMainActivity.rejoinAt(
     }
     val rejoinTarget: GeoPoint = when (target) {
         TourViewModel.ReturnTarget.NEAREST_POINT -> nearestPointOnPath(from, tourPoints)
+        // S269 — "Back to last stop" anchors on the nearest baked leg-end
+        // vertex on the active tour's polyline. Pre-S269 this read
+        // `activeTour.progress.currentStopIndex` to pick a point from
+        // `tourPoints`, but the stops-progress shed and `currentStopIndex`
+        // were ripped out alongside the four dead stops-based UIs. The new
+        // helper [TourEngine.currentLegEndForDetourAnchor] walks the legs
+        // cached on the active tour. Falls back to the closest tour-points
+        // entry when no legs are baked.
         TourViewModel.ReturnTarget.LAST_STOP -> {
-            val activeTour = state.activeTour
-            val idx = activeTour.progress.currentStopIndex.coerceIn(0, tourPoints.size - 1)
-            tourPoints[idx]
+            tourViewModel.currentLegEndForDetourAnchor(from.latitude, from.longitude)
+                ?: nearestPointOnPath(from, tourPoints)
         }
     }
     lifecycleScope.launch {

@@ -14,11 +14,11 @@ import android.content.SharedPreferences
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.SalemContentRepository
+import com.example.wickedsalemwitchcitytour.content.dao.PoiPassportDao
 import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.content.model.TourStop
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,11 +35,21 @@ private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module Tour
  * Tour Engine — manages the lifecycle of a guided walking tour.
  *
  * Responsibilities:
- *   - Load tour + stops + POIs from SalemContentRepository
- *   - Track progress (current stop, completed/skipped, distance)
- *   - Support advance, skip, reorder, add/remove stops
- *   - Pause/resume with SharedPreferences persistence
+ *   - Load tour + baked legs + passport POIs from SalemContentRepository
+ *   - Track elapsed time + cumulative distance
+ *   - Pause / resume / detour with SharedPreferences persistence
+ *   - Fire [TourState.Completed] when every POI in the tour's passport has
+ *     been heard (S269 — visit-count vs passport-count comparison; one-shot
+ *     latch per session)
  *   - Emit TourState flow for UI observation
+ *
+ * S269 — stops-progress machinery removed. The four leftover stops-based
+ * UIs (top HUD banner, Active Tour dialog, completion-stats body, numbered
+ * polyline pins) and their backing state (`currentStopIndex`,
+ * `completedStops`, `skippedStops`, advance/skip/add/remove/reorder) are
+ * gone. Tour membership now flows through `poi_passport` (built from
+ * operator-authored filter in the web admin); visit state flows through
+ * `passport_visit` (POI-keyed lifetime log).
  */
 @Singleton
 class TourEngine @Inject constructor(
@@ -47,18 +57,16 @@ class TourEngine @Inject constructor(
     private val geofenceManager: TourGeofenceManager,
     private val narrationManager: NarrationManager,
     private val narrationGeofenceManager: NarrationGeofenceManager,
+    private val poiPassportDao: PoiPassportDao,
+    private val passportVisitDao: PassportVisitDao,
     @ApplicationContext private val context: Context
 ) {
     private val TAG = "TourEngine"
     private val PREFS_NAME = "tour_engine_prefs"
     private val KEY_ACTIVE_TOUR_ID = "active_tour_id"
-    private val KEY_CURRENT_STOP_INDEX = "current_stop_index"
-    private val KEY_COMPLETED_STOPS = "completed_stops"
-    private val KEY_SKIPPED_STOPS = "skipped_stops"
     private val KEY_START_TIME = "start_time"
     private val KEY_DISTANCE_WALKED = "distance_walked"
     private val KEY_ELAPSED_BEFORE_PAUSE = "elapsed_before_pause"
-    private val KEY_CUSTOM_STOP_ORDER = "custom_stop_order"
     // S221 — detour persistence keys. Presence of KEY_DETOUR_POI_ID under an
     // already-paused tour means we should restore as TourState.Detour rather
     // than TourState.Paused, and the activity should re-render the floating
@@ -70,7 +78,6 @@ class TourEngine @Inject constructor(
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val gson = Gson()
 
     private val _tourState = MutableStateFlow<TourState>(TourState.Idle)
     val tourState: StateFlow<TourState> = _tourState.asStateFlow()
@@ -91,15 +98,25 @@ class TourEngine @Inject constructor(
     /** Cached all-POIs list for ambient mode. */
     private var allPoisCache: List<TourPoi>? = null
 
+    /**
+     * S269 — one-shot latch. Flipped to true the first time
+     * [maybeCompleteFromPassport] observes a full sweep; flipped back to
+     * false in [startTour] / [endTour] so a subsequent tour can complete
+     * again. Lives on the engine (not on [ActiveTour]) so it isn't part of
+     * the immutable state snapshot consumed by the UI.
+     */
+    private var completionFiredThisSession: Boolean = false
+
     // ── Tour Lifecycle ─────────────────────────────────────────────────────
 
     /**
      * Start a pre-defined tour by ID.
-     * Loads tour metadata, stops (ordered), and full TourPoi objects.
+     * Loads tour metadata, baked legs, and the passport POI list.
      */
     suspend fun startTour(tourId: String) {
         DebugLogger.i(TAG, "startTour($tourId)")
         _tourState.value = TourState.Loading
+        completionFiredThisSession = false
 
         try {
             val tour = repository.getTourById(tourId)
@@ -108,22 +125,56 @@ class TourEngine @Inject constructor(
                 return
             }
 
-            // S185: a tour can be polyline-only — its stops table holds
-            // internal authoring waypoints (poi_id NULL) that we deliberately
-            // exclude from the asset DB. Such tours render their `tour_legs`
-            // overlay; narration is driven by POI geofences independently.
-            // Don't error on empty stops — let the player run as a
-            // line-on-the-ground.
+            // S185: every authored tour is polyline-only — `stops` rows in the
+            // asset carry poi_id NULL, so we keep the list for parity with
+            // TourGeofenceManager.loadStops but never derive tour-membership
+            // from it. See memory rule `feedback_tour_stops_not_poi_anchored.md`.
             val stops = repository.getTourStops(tourId)
             val pois = repository.getTourPois(tourId)
+            val legs = try {
+                repository.getTourLegs(tourId)
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "startTour: failed to read tour_legs for $tourId: ${e.message}")
+                emptyList()
+            }
+
+            // S269 — passport binding. Tour-membership for V1 lives here.
+            val passportId = try {
+                poiPassportDao.findPassportIdForTour(tourId)
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "startTour: passport lookup failed for $tourId: ${e.message}")
+                null
+            }
+            val passportPoiIds: Set<String> = if (passportId != null) {
+                try {
+                    poiPassportDao.findByPassport(passportId).map { it.poiId }.toSet()
+                } catch (e: Exception) {
+                    DebugLogger.w(TAG, "startTour: passport POI load failed for $passportId: ${e.message}")
+                    emptySet()
+                }
+            } else {
+                emptySet()
+            }
+            if (passportId == null) {
+                DebugLogger.i(TAG, "Tour '$tourId' has no passport authored — completion trigger disabled")
+            } else {
+                DebugLogger.i(TAG, "Tour '$tourId' bound to passport '$passportId' (${passportPoiIds.size} POIs)")
+            }
 
             val progress = TourProgress(
                 tourId = tourId,
-                currentStopIndex = 0,
                 startTimeMs = System.currentTimeMillis()
-            ).also { it.totalStopCount = stops.size }
+            )
 
-            val activeTour = ActiveTour(tour, stops, pois, progress)
+            val activeTour = ActiveTour(
+                tour = tour,
+                stops = stops,
+                pois = pois,
+                legs = legs,
+                progress = progress,
+                passportId = passportId,
+                passportPoiIds = passportPoiIds,
+            )
             _tourState.value = TourState.Active(activeTour)
             persistProgress(activeTour)
             geofenceManager.loadStops(stops, pois)
@@ -147,129 +198,11 @@ class TourEngine @Inject constructor(
                 DebugLogger.i(TAG, "Historical Narration Mode ENABLED for '${tour.name}'")
             }
 
-            DebugLogger.i(TAG, "Tour started: ${tour.name} — ${stops.size} stops")
+            DebugLogger.i(TAG, "Tour started: ${tour.name} — ${legs.size} legs, ${passportPoiIds.size} passport POIs")
         } catch (e: Exception) {
             DebugLogger.e(TAG, "startTour failed: ${e.message}", e)
             _tourState.value = TourState.Error("Failed to start tour: ${e.message}")
         }
-    }
-
-    /** Advance to the next stop, marking the current one as completed. */
-    fun advanceToNextStop() {
-        val current = activeOrNull() ?: return
-        val progress = current.progress
-        val nextIndex = progress.currentStopIndex + 1
-
-        if (nextIndex >= current.stops.size) {
-            endTour()
-            return
-        }
-
-        val distanceDelta = calcDistanceBetweenStops(current, progress.currentStopIndex, nextIndex)
-        val newProgress = progress.copy(
-            currentStopIndex = nextIndex,
-            completedStops = progress.completedStops + progress.currentStopIndex,
-            totalDistanceWalkedM = progress.totalDistanceWalkedM + distanceDelta
-        ).also { it.totalStopCount = current.stops.size }
-
-        val updated = current.copy(progress = newProgress)
-        _tourState.value = TourState.Active(updated)
-        persistProgress(updated)
-
-        DebugLogger.i(TAG, "Advanced to stop $nextIndex/${current.stops.size}: ${updated.currentPoi?.name}")
-    }
-
-    /** Skip the current stop without marking it completed. */
-    fun skipStop() {
-        val current = activeOrNull() ?: return
-        val progress = current.progress
-        val nextIndex = progress.currentStopIndex + 1
-
-        if (nextIndex >= current.stops.size) {
-            endTour()
-            return
-        }
-
-        val newProgress = progress.copy(
-            currentStopIndex = nextIndex,
-            skippedStops = progress.skippedStops + progress.currentStopIndex
-        ).also { it.totalStopCount = current.stops.size }
-
-        val updated = current.copy(progress = newProgress)
-        _tourState.value = TourState.Active(updated)
-        persistProgress(updated)
-
-        DebugLogger.i(TAG, "Skipped stop ${progress.currentStopIndex}, now at $nextIndex: ${updated.currentPoi?.name}")
-    }
-
-    /** Reorder the remaining stops (does not affect completed/skipped). */
-    fun reorderStops(newStopOrder: List<TourStop>) {
-        val current = activeOrNull() ?: return
-
-        // Keep completed/skipped stops in their original positions, replace the rest
-        val updated = current.copy(stops = newStopOrder)
-        _tourState.value = TourState.Active(updated)
-        persistProgress(updated)
-        persistCustomStopOrder(newStopOrder.map { it.poiId })
-
-        DebugLogger.i(TAG, "Stops reordered — ${newStopOrder.size} stops")
-    }
-
-    /** Add a POI as a new stop after the current position. */
-    suspend fun addStop(poiId: String) {
-        val current = activeOrNull() ?: return
-        val poi = repository.getTourPoiById(poiId) ?: run {
-            DebugLogger.w(TAG, "addStop: POI not found: $poiId")
-            return
-        }
-
-        // Create a synthetic TourStop
-        val newStop = TourStop(
-            tourId = current.tour.id,
-            poiId = poiId,
-            stopOrder = current.progress.currentStopIndex + 1,
-            transitionNarration = "Next, we'll visit ${poi.name}.",
-            walkingMinutesFromPrev = null,
-            distanceMFromPrev = null
-        )
-
-        val mutableStops = current.stops.toMutableList()
-        val mutablePois = current.pois.toMutableList()
-        mutableStops.add(current.progress.currentStopIndex + 1, newStop)
-        if (mutablePois.none { it.id == poiId }) mutablePois.add(poi)
-
-        val newProgress = current.progress.also { it.totalStopCount = mutableStops.size }
-        val updated = current.copy(stops = mutableStops, pois = mutablePois, progress = newProgress)
-        _tourState.value = TourState.Active(updated)
-        persistProgress(updated)
-
-        DebugLogger.i(TAG, "Added stop: ${poi.name} at position ${current.progress.currentStopIndex + 1}")
-    }
-
-    /** Remove a POI from the tour (cannot remove the current stop). */
-    fun removeStop(poiId: String) {
-        val current = activeOrNull() ?: return
-        val stopIndex = current.stops.indexOfFirst { it.poiId == poiId }
-        if (stopIndex < 0 || stopIndex == current.progress.currentStopIndex) {
-            DebugLogger.w(TAG, "removeStop: cannot remove current or missing stop: $poiId")
-            return
-        }
-
-        val mutableStops = current.stops.toMutableList()
-        mutableStops.removeAt(stopIndex)
-
-        // Adjust currentStopIndex if we removed a stop before it
-        val adjustedIndex = if (stopIndex < current.progress.currentStopIndex)
-            current.progress.currentStopIndex - 1 else current.progress.currentStopIndex
-
-        val newProgress = current.progress.copy(currentStopIndex = adjustedIndex)
-            .also { it.totalStopCount = mutableStops.size }
-
-        val updated = current.copy(stops = mutableStops, progress = newProgress)
-        _tourState.value = TourState.Active(updated)
-        persistProgress(updated)
-
-        DebugLogger.i(TAG, "Removed stop: $poiId — ${mutableStops.size} stops remain")
     }
 
     /** Pause the tour. Preserves elapsed time so it doesn't count pause time. */
@@ -277,7 +210,6 @@ class TourEngine @Inject constructor(
         val current = activeOrNull() ?: return
         val elapsed = System.currentTimeMillis() - current.progress.startTimeMs + current.progress.elapsedMs
         val pausedProgress = current.progress.copy(elapsedMs = elapsed)
-            .also { it.totalStopCount = current.stops.size }
         val updated = current.copy(progress = pausedProgress)
         _tourState.value = TourState.Paused(updated)
         persistProgress(updated)
@@ -292,7 +224,7 @@ class TourEngine @Inject constructor(
         val activeTour = state.activeTour
         val newProgress = activeTour.progress.copy(
             startTimeMs = System.currentTimeMillis()
-        ).also { it.totalStopCount = activeTour.stops.size }
+        )
 
         val updated = activeTour.copy(progress = newProgress)
         _tourState.value = TourState.Active(updated)
@@ -322,8 +254,8 @@ class TourEngine @Inject constructor(
         val prevCivic = narrationGeofenceManager.currentTourAllowCivic()
 
         // Reuse pauseTour's persistence path — it writes the underlying
-        // active-tour keys (current stop, completed, elapsed, etc.) and
-        // emits TourState.Paused. We then overwrite with TourState.Detour.
+        // active-tour keys (start time, distance, elapsed) and emits
+        // TourState.Paused. We then overwrite with TourState.Detour.
         pauseTour()
         prefs.edit()
             .putString(KEY_DETOUR_POI_ID, detourPoiId)
@@ -339,7 +271,7 @@ class TourEngine @Inject constructor(
             activeTour = current.copy(
                 progress = current.progress.copy(
                     elapsedMs = System.currentTimeMillis() - current.progress.startTimeMs + current.progress.elapsedMs
-                ).also { it.totalStopCount = current.stops.size }
+                )
             ),
             detourPoiId = detourPoiId,
             detourPoiName = detourPoiName,
@@ -403,20 +335,91 @@ class TourEngine @Inject constructor(
     /** True iff a detour is currently active. */
     fun isDetourActive(): Boolean = _tourState.value is TourState.Detour
 
+    // ── Detour anchor (S269) ──────────────────────────────────────────────
+
+    /**
+     * S269 — return the leg-end vertex on the active tour's polyline that's
+     * geographically closest to the supplied user location. Used by the
+     * "Back to last stop" rejoin path in [SalemMainActivityDetour] in place
+     * of the deleted `currentStopIndex`-driven anchor.
+     *
+     * Walks every leg's anchor pair: the leg-end (`to_lat`/`to_lng`) anchors
+     * are the canonical "stops" of a polyline-only tour, since they're the
+     * vertices the operator hand-curated to land at meaningful destinations.
+     *
+     * Returns null when there's no active tour, no baked legs, or every leg
+     * is missing both from/to anchors.
+     */
+    fun currentLegEndForDetourAnchor(userLat: Double, userLng: Double): GeoPoint? {
+        val current = activeOrPausedOrNull() ?: return null
+        var best: GeoPoint? = null
+        var bestD = Double.MAX_VALUE
+        for (leg in current.legs) {
+            val candidates = listOfNotNull(
+                leg.toLat?.let { lat -> leg.toLng?.let { lng -> GeoPoint(lat, lng) } },
+                leg.fromLat?.let { lat -> leg.fromLng?.let { lng -> GeoPoint(lat, lng) } },
+            )
+            for (p in candidates) {
+                val d = haversineM(userLat, userLng, p.latitude, p.longitude)
+                if (d < bestD) {
+                    bestD = d
+                    best = p
+                }
+            }
+        }
+        return best
+    }
+
+    // ── Passport completion trigger (S269) ────────────────────────────────
+
+    /**
+     * S269 — called from the narration ENTRY path in [SalemMainActivityNarration]
+     * after a [passportVisitDao.recordHeard] UPSERT lands. If every POI in
+     * the active tour's passport has now been heard, transitions
+     * [TourState.Active] → [TourState.Completed] exactly once per session.
+     *
+     * No-op when there's no active tour, the tour has no passport bound,
+     * completion already fired this session, or the count is incomplete.
+     */
+    suspend fun maybeCompleteFromPassport() {
+        if (completionFiredThisSession) return
+        val current = activeOrNull() ?: return
+        val ids = current.passportPoiIds
+        if (ids.isEmpty()) return
+        val heard = try {
+            passportVisitDao.countHeardAmong(ids.toList())
+        } catch (e: Exception) {
+            DebugLogger.w(TAG, "maybeCompleteFromPassport: count failed: ${e.message}")
+            return
+        }
+        if (heard < ids.size) return
+        DebugLogger.i(TAG, "Passport completion: ${heard}/${ids.size} heard — firing TourState.Completed")
+        completionFiredThisSession = true
+        endTour()
+    }
+
     /** End the tour and emit completion summary. */
-    fun endTour() {
+    suspend fun endTour() {
         val current = activeOrPausedOrNull() ?: return
-        val elapsed = when (val state = _tourState.value) {
+        val elapsed = when (_tourState.value) {
             is TourState.Active -> System.currentTimeMillis() - current.progress.startTimeMs + current.progress.elapsedMs
             is TourState.Paused -> current.progress.elapsedMs
             else -> 0L
         }
 
+        val passportHeard = if (current.passportPoiIds.isEmpty()) 0
+                            else try {
+                                passportVisitDao.countHeardAmong(current.passportPoiIds.toList())
+                            } catch (e: Exception) {
+                                DebugLogger.w(TAG, "endTour: heard-count failed: ${e.message}")
+                                0
+                            }
+
         val summary = TourSummary(
             tourName = current.tour.name,
-            totalStops = current.stops.size,
-            completedStops = current.progress.completedStops.size,
-            skippedStops = current.progress.skippedStops.size,
+            passportId = current.passportId,
+            passportTotal = current.passportPoiIds.size,
+            passportHeard = passportHeard,
             totalTimeMs = elapsed,
             totalDistanceM = current.progress.totalDistanceWalkedM
         )
@@ -438,7 +441,7 @@ class TourEngine @Inject constructor(
         DebugLogger.i(TAG, "Tour Mode DISABLED (tour ended)")
 
         DebugLogger.i(TAG, "Tour ended: ${summary.tourName} — " +
-                "${summary.completedStops}/${summary.totalStops} stops, ${summary.totalTimeMinutes} min")
+                "${summary.passportHeard}/${summary.passportTotal} stamps, ${summary.totalTimeMinutes} min")
     }
 
     /** Dismiss the completed state and return to idle. */
@@ -497,7 +500,15 @@ class TourEngine @Inject constructor(
         ambientHintedPois.clear()
     }
 
-    /** React to a geofence event with auto-narration. */
+    /**
+     * React to a geofence event with auto-narration.
+     *
+     * S269 — the maybeAdvanceOnEntry(...) call from the ENTRY branch is gone
+     * along with the rest of the stops-progress shed. Tour-completion is now
+     * driven by [maybeCompleteFromPassport], called from the narration
+     * ENTRY hook in [SalemMainActivityNarration] after each passport visit
+     * is recorded.
+     */
     private fun handleGeofenceEvent(event: TourGeofenceEvent) {
         // S125: Historical Mode routes tour-stop narration through
         // NarrationGeofenceManager instead — it honors the whitelist,
@@ -521,12 +532,6 @@ class TourEngine @Inject constructor(
             }
             GeofenceEventType.ENTRY -> {
                 if (!skipDirectNarration) narrationManager.speakLongNarration(event.poi)
-                // S125: Auto-advance the tour HUD when the walker reaches
-                // the current stop's POI. Previously the index only moved
-                // on an explicit Next tap, so the overnight walker completed
-                // the Heritage Trail with the HUD stuck at "Tour: 1/10 —
-                // Unknown" for the full 41 minutes.
-                maybeAdvanceOnEntry(event.poi.id)
             }
             GeofenceEventType.EXIT -> {
                 if (!skipDirectNarration) {
@@ -534,21 +539,6 @@ class TourEngine @Inject constructor(
                 }
             }
         }
-    }
-
-    /**
-     * S125: If the entered POI matches the current stop's POI, advance.
-     * No-op when no tour is active or the match fails (walker may be
-     * passing a prior/later stop out of sequence — we never jump the
-     * index non-monotonically from a geofence event).
-     */
-    private fun maybeAdvanceOnEntry(poiId: String) {
-        val current = activeOrNull() ?: return
-        val idx = current.progress.currentStopIndex
-        val expected = current.stops.getOrNull(idx)?.poiId ?: return
-        if (expected != poiId) return
-        DebugLogger.i(TAG, "Auto-advance on ENTRY: stop $idx/${current.stops.size} poi=$poiId")
-        advanceToNextStop()
     }
 
     // ── Custom Tour Builder ──────────────────────────────────────────────
@@ -565,6 +555,7 @@ class TourEngine @Inject constructor(
             return
         }
         _tourState.value = TourState.Loading
+        completionFiredThisSession = false
 
         val optimized = optimizeRoute(selectedPois)
         val totalDistKm = totalRouteDistanceKm(optimized)
@@ -603,11 +594,24 @@ class TourEngine @Inject constructor(
 
         val progress = TourProgress(
             tourId = tour.id,
-            currentStopIndex = 0,
             startTimeMs = System.currentTimeMillis()
-        ).also { it.totalStopCount = stops.size }
+        )
 
-        val activeTour = ActiveTour(tour, stops, optimized, progress)
+        // Custom tours derive their "passport" implicitly from the selected
+        // POI ids — visit-driven completion fires when every selected POI
+        // has been heard. No author-side filter row in salem_passport_filters
+        // is required.
+        val passportPoiIds = optimized.map { it.id }.toSet()
+
+        val activeTour = ActiveTour(
+            tour = tour,
+            stops = stops,
+            pois = optimized,
+            legs = emptyList(),
+            progress = progress,
+            passportId = null,
+            passportPoiIds = passportPoiIds,
+        )
         _tourState.value = TourState.Active(activeTour)
         persistProgress(activeTour)
         geofenceManager.loadStops(stops, optimized)
@@ -720,38 +724,49 @@ class TourEngine @Inject constructor(
 
         try {
             val tour = repository.getTourById(savedTourId) ?: return false
-            var stops = repository.getTourStops(savedTourId)
+            val stops = repository.getTourStops(savedTourId)
             val pois = repository.getTourPois(savedTourId)
-
-            // Restore custom stop order if it was modified
-            val customOrderJson = prefs.getString(KEY_CUSTOM_STOP_ORDER, null)
-            if (customOrderJson != null) {
-                val customOrder: List<String> = gson.fromJson(
-                    customOrderJson, object : TypeToken<List<String>>() {}.type
-                )
-                stops = customOrder.mapNotNull { poiId ->
-                    stops.firstOrNull { it.poiId == poiId }
-                }
+            val legs = try {
+                repository.getTourLegs(savedTourId)
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "restoreIfSaved: failed to read tour_legs: ${e.message}")
+                emptyList()
             }
-
-            val completedStops: Set<Int> = prefs.getStringSet(KEY_COMPLETED_STOPS, emptySet())
-                ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
-
-            val skippedStops: Set<Int> = prefs.getStringSet(KEY_SKIPPED_STOPS, emptySet())
-                ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+            val passportId = try {
+                poiPassportDao.findPassportIdForTour(savedTourId)
+            } catch (e: Exception) {
+                DebugLogger.w(TAG, "restoreIfSaved: passport lookup failed: ${e.message}")
+                null
+            }
+            val passportPoiIds: Set<String> = if (passportId != null) {
+                try {
+                    poiPassportDao.findByPassport(passportId).map { it.poiId }.toSet()
+                } catch (e: Exception) {
+                    emptySet()
+                }
+            } else {
+                emptySet()
+            }
 
             val progress = TourProgress(
                 tourId = savedTourId,
-                currentStopIndex = prefs.getInt(KEY_CURRENT_STOP_INDEX, 0),
-                completedStops = completedStops,
-                skippedStops = skippedStops,
                 startTimeMs = System.currentTimeMillis(),
                 totalDistanceWalkedM = prefs.getFloat(KEY_DISTANCE_WALKED, 0f).toDouble(),
                 elapsedMs = prefs.getLong(KEY_ELAPSED_BEFORE_PAUSE, 0L)
-            ).also { it.totalStopCount = stops.size }
+            )
 
-            val activeTour = ActiveTour(tour, stops, pois, progress)
+            val activeTour = ActiveTour(
+                tour = tour,
+                stops = stops,
+                pois = pois,
+                legs = legs,
+                progress = progress,
+                passportId = passportId,
+                passportPoiIds = passportPoiIds,
+            )
             geofenceManager.loadStops(stops, pois)
+            // Restoring is a fresh session — let the completion latch arm again.
+            completionFiredThisSession = false
 
             // S221 — if a detour was in progress, restore as TourState.Detour
             // so the floating banner re-renders. Otherwise, plain Paused.
@@ -767,7 +782,7 @@ class TourEngine @Inject constructor(
                 TourState.Paused(activeTour)
             }
 
-            DebugLogger.i(TAG, "Restored tour: ${tour.name} at stop ${progress.currentStopIndex}/${stops.size}")
+            DebugLogger.i(TAG, "Restored tour: ${tour.name} (${legs.size} legs, ${passportPoiIds.size} passport POIs)")
             return true
         } catch (e: Exception) {
             DebugLogger.e(TAG, "Failed to restore tour: ${e.message}", e)
@@ -778,45 +793,14 @@ class TourEngine @Inject constructor(
 
     // ── Query helpers ────────────────────────────────────────────────────
 
-    /** Get the current stop's TourPoi, or null if no tour is active. */
-    fun getCurrentPoi(): TourPoi? = activeOrPausedOrNull()?.currentPoi
-
-    /** Get the GeoPoint for a stop index. */
-    fun getStopLocation(stopIndex: Int): GeoPoint? {
-        val current = activeOrPausedOrNull() ?: return null
-        val stop = current.stops.getOrNull(stopIndex) ?: return null
-        val poi = current.pois.firstOrNull { it.id == stop.poiId } ?: return null
-        return GeoPoint(poi.lat, poi.lng)
-    }
-
-    /** Get all stop GeoPoints for drawing the route polyline. */
+    /** Get all stop GeoPoints for drawing the route polyline. Post-S190
+     *  most tours have polyline-only stops (all-NULL poi_id) so this returns
+     *  empty for them — callers fall back to the baked-legs path. */
     fun getAllStopLocations(): List<GeoPoint> {
         val current = activeOrPausedOrNull() ?: return emptyList()
         return current.stops.mapNotNull { stop ->
             current.pois.firstOrNull { it.id == stop.poiId }?.let { GeoPoint(it.lat, it.lng) }
         }
-    }
-
-    /** Distance in meters from the user's current GPS to a specific stop. */
-    fun distanceToStop(stopIndex: Int): Double? {
-        val location = lastLocation ?: return null
-        val stopPoint = getStopLocation(stopIndex) ?: return null
-        return haversineM(location.latitude, location.longitude, stopPoint.latitude, stopPoint.longitude)
-    }
-
-    /** True if the user is within the geofence radius of the given stop. */
-    fun isWithinGeofence(stopIndex: Int): Boolean {
-        val current = activeOrPausedOrNull() ?: return false
-        val distance = distanceToStop(stopIndex) ?: return false
-        val stop = current.stops.getOrNull(stopIndex) ?: return false
-        val poi = current.pois.firstOrNull { it.id == stop.poiId } ?: return false
-        return distance <= poi.geofenceRadiusM
-    }
-
-    /** Check if user is within geofence of the current stop. */
-    fun isAtCurrentStop(): Boolean {
-        val current = activeOrNull() ?: return false
-        return isWithinGeofence(current.progress.currentStopIndex)
     }
 
     // ── Private helpers ──────────────────────────────────────────────────
@@ -834,34 +818,12 @@ class TourEngine @Inject constructor(
         else -> null
     }
 
-    private fun calcDistanceBetweenStops(tour: ActiveTour, fromIndex: Int, toIndex: Int): Double {
-        val fromStop = tour.stops.getOrNull(fromIndex) ?: return 0.0
-        val toStop = tour.stops.getOrNull(toIndex) ?: return 0.0
-
-        // Use pre-computed distance if available
-        toStop.distanceMFromPrev?.let { return it.toDouble() }
-
-        // Otherwise calculate from GPS coordinates
-        val fromPoi = tour.pois.firstOrNull { it.id == fromStop.poiId } ?: return 0.0
-        val toPoi = tour.pois.firstOrNull { it.id == toStop.poiId } ?: return 0.0
-        return haversineM(fromPoi.lat, fromPoi.lng, toPoi.lat, toPoi.lng)
-    }
-
     private fun persistProgress(activeTour: ActiveTour) {
         prefs.edit()
             .putString(KEY_ACTIVE_TOUR_ID, activeTour.tour.id)
-            .putInt(KEY_CURRENT_STOP_INDEX, activeTour.progress.currentStopIndex)
-            .putStringSet(KEY_COMPLETED_STOPS, activeTour.progress.completedStops.map { it.toString() }.toSet())
-            .putStringSet(KEY_SKIPPED_STOPS, activeTour.progress.skippedStops.map { it.toString() }.toSet())
             .putLong(KEY_START_TIME, activeTour.progress.startTimeMs)
             .putFloat(KEY_DISTANCE_WALKED, activeTour.progress.totalDistanceWalkedM.toFloat())
             .putLong(KEY_ELAPSED_BEFORE_PAUSE, activeTour.progress.elapsedMs)
-            .apply()
-    }
-
-    private fun persistCustomStopOrder(poiIds: List<String>) {
-        prefs.edit()
-            .putString(KEY_CUSTOM_STOP_ORDER, gson.toJson(poiIds))
             .apply()
     }
 

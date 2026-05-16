@@ -617,8 +617,13 @@ class PoiDetailSheet : DialogFragment() {
         val state = tourViewModel.tourState.value
         val activeTour = (state as? com.example.wickedsalemwitchcitytour.tour.TourState.Active)?.activeTour
             ?: return
-        // Skip if this sheet is showing the current tour stop itself.
-        if (activeTour.currentPoi?.id == poi.id) return
+        // S269 — skip if this POI is already a passport member of the
+        // active tour. Pre-S269 the guard read `activeTour.currentPoi`
+        // (the currently-pointed stop), which is gone with the stops shed;
+        // the passport membership check is the right replacement because
+        // "is this POI part of the tour" is the question we actually want
+        // to answer when deciding whether a detour button is appropriate.
+        if (poi.id in activeTour.passportPoiIds) return
         // Already on a detour? Hide; one detour at a time.
         if (tourViewModel.isDetourActive()) return
 
@@ -702,6 +707,10 @@ class PoiDetailSheet : DialogFragment() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 passportVisitDao.recordHeard(stampPoiId, System.currentTimeMillis())
+                // S269 — same completion-trigger hook as the geofence ENTRY
+                // path: if this stamp completes the active tour's passport,
+                // the engine fires TourState.Completed once per session.
+                tourViewModel.maybeCompletePassportTour()
             } catch (e: Exception) {
                 DebugLogger.w(TAG, "passport recordHeard failed id=$stampPoiId: ${e.message}")
             }

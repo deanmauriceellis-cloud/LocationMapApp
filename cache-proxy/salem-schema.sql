@@ -584,9 +584,24 @@ CREATE TABLE IF NOT EXISTS salem_passport_filters (
   min_year_established          INTEGER,                                    -- NULL = no floor
   max_year_established          INTEGER,                                    -- NULL = no ceiling
   sort_order                    INTEGER NOT NULL DEFAULT 0,
+  -- S269 — when FALSE, publish-poi-passport.js preserves the existing
+  -- salem_passport_pois rows for this filter instead of regenerating from
+  -- the category/year/etc parameters. Drives the "Build Passport from Walk"
+  -- flow in the Tour editor: candidates are derived from the tour's
+  -- polyline + each POI's geofence radius, edited by the operator, and
+  -- written directly to salem_passport_pois. The publish bake still copies
+  -- those rows into the SQLite poi_passport table.
+  auto_bake                     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- S269 — idempotent forward-migration so existing dev installs pick up
+-- auto_bake without needing a fresh psql run of this file. Cache-proxy
+-- module init (admin-passport.js) ALSO runs this ALTER on startup so
+-- developers who never re-source schema files still get the column.
+ALTER TABLE salem_passport_filters
+  ADD COLUMN IF NOT EXISTS auto_bake BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_salem_passport_filters_tour
   ON salem_passport_filters (tour_id) WHERE tour_id IS NOT NULL;

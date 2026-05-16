@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PoiRow } from './PoiTree'
 import { isMassgisHistorical } from './PoiTree'
+import { WalkPassportDialog } from './WalkPassportDialog'
 import type {
   ComputeRouteResponse,
   TourDetailResponse,
@@ -423,8 +424,13 @@ export function TourTree({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-slate-800 truncate">{t.name}</span>
+                  {/* S269 — surface stamp count (passport_poi_count) as the
+                      headline number; fall back to stops_actual when no
+                      passport is authored yet. */}
                   <span className="text-xs text-slate-500 tabular-nums shrink-0">
-                    {t.stops_actual}
+                    {t.passport_poi_count != null
+                      ? `${t.passport_poi_count} stamp${t.passport_poi_count === 1 ? '' : 's'}`
+                      : `${t.stops_actual} pts`}
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5 truncate">
@@ -910,6 +916,8 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
   const [seasonal, setSeasonal] = useState(Boolean(tour.seasonal))
   const [isHistoricalTour, setIsHistoricalTour] = useState(Boolean(tour.is_historical_tour))
   const [sortOrder, setSortOrder] = useState(String(tour.sort_order ?? 0))
+  const [walkDialogOpen, setWalkDialogOpen] = useState(false)
+  const [walkSaveToast, setWalkSaveToast] = useState<string | null>(null)
   const lastIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -963,6 +971,54 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
         Tour metadata
       </summary>
       <div className="px-3 py-2 space-y-2 text-xs">
+        {/* S269 — Build Passport from Walk. Opens a modal that walks the
+         *  tour's baked polyline, lists every POI with historical_narration
+         *  whose distance from the path is within an adjustable radius, and
+         *  saves the operator-edited list as this tour's passport. */}
+        <div className="flex items-start gap-2 px-2 py-2 bg-amber-50 border border-amber-200 rounded">
+          <div className="flex-1">
+            <div className="text-xs font-semibold text-amber-900">
+              Walk-derived Passport
+              {/* S269 — passport_poi_count is the canonical "stamps" count.
+                  stop_count (free polyline waypoints) stays in the form
+                  below for legacy reference but is no longer the headline. */}
+              {tour.passport_poi_count != null ? (
+                <span className="ml-2 text-amber-800 font-normal">
+                  · {tour.passport_poi_count} stamp{tour.passport_poi_count === 1 ? '' : 's'}
+                </span>
+              ) : (
+                <span className="ml-2 text-amber-700 font-normal italic">· not yet authored</span>
+              )}
+            </div>
+            <div className="text-[11px] text-amber-800">
+              Find every historically-narrated POI within range of this tour's
+              polyline, preview on the map, and save as the tour's passport.
+            </div>
+            {walkSaveToast ? (
+              <div className="text-[11px] text-green-700 mt-1">{walkSaveToast}</div>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setWalkDialogOpen(true)}
+            className="text-xs px-3 py-1 rounded bg-amber-600 text-white hover:bg-amber-500 whitespace-nowrap"
+          >
+            Build from walk
+          </button>
+        </div>
+        {walkDialogOpen ? (
+          <WalkPassportDialog
+            tourId={tour.id}
+            tourName={tour.name}
+            onClose={() => setWalkDialogOpen(false)}
+            onSaved={(result) => {
+              setWalkSaveToast(
+                `Saved ${result.poi_count} POI${result.poi_count === 1 ? '' : 's'} as ${result.filter_id}. Re-run the publish chain to bake into the APK.`,
+              )
+              setWalkDialogOpen(false)
+            }}
+          />
+        ) : null}
         <Field label="ID" value={tour.id} mono readOnly />
         <Field label="Name">
           <input

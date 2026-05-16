@@ -189,15 +189,29 @@ class TourViewModel @Inject constructor(
         private const val ONBOARD_THRESHOLD_M = 50.0
     }
 
-    fun advanceToNextStop() = tourEngine.advanceToNextStop()
-
-    fun skipStop() = tourEngine.skipStop()
-
     fun pauseTour() = tourEngine.pauseTour()
 
     fun resumeTour() = tourEngine.resumeTour()
 
-    fun endTour() = tourEngine.endTour()
+    /**
+     * End the tour from a user-initiated control. The engine work is
+     * suspend (S269 — it queries `passport_visit` to build the completion
+     * summary), so we launch on [viewModelScope]; observers of [tourState]
+     * see [TourState.Completed] once the coroutine lands.
+     */
+    fun endTour() {
+        viewModelScope.launch { tourEngine.endTour() }
+    }
+
+    /**
+     * S269 — called from the narration ENTRY hook after a passport visit is
+     * recorded. Engine checks whether every POI in the active tour's
+     * passport has been heard and fires [TourState.Completed] exactly once
+     * per session if so.
+     */
+    fun maybeCompletePassportTour() {
+        viewModelScope.launch { tourEngine.maybeCompleteFromPassport() }
+    }
 
     fun dismissCompletion() = tourEngine.dismissCompletion()
 
@@ -246,11 +260,14 @@ class TourViewModel @Inject constructor(
     /** True iff a detour is in progress. */
     fun isDetourActive(): Boolean = tourEngine.isDetourActive()
 
-    fun addStop(poiId: String) {
-        viewModelScope.launch { tourEngine.addStop(poiId) }
-    }
-
-    fun removeStop(poiId: String) = tourEngine.removeStop(poiId)
+    /**
+     * S269 — anchor for the "Back to last stop" rejoin path. Returns the
+     * baked leg-end vertex on the active tour's polyline that's closest to
+     * the supplied user location, or null if there's no active tour / no
+     * legs cached.
+     */
+    fun currentLegEndForDetourAnchor(userLat: Double, userLng: Double): GeoPoint? =
+        tourEngine.currentLegEndForDetourAnchor(userLat, userLng)
 
     fun onLocationUpdate(point: GeoPoint) {
         tourEngine.onLocationUpdate(point)
@@ -280,15 +297,9 @@ class TourViewModel @Inject constructor(
 
     // ── Query helpers ────────────────────────────────────────────────────
 
+    /** Post-S190 most tours are polyline-only so this returns empty for
+     *  them; consumers (detour fallback, tour preview) gracefully degrade. */
     fun getAllStopLocations(): List<GeoPoint> = tourEngine.getAllStopLocations()
-
-    fun getStopLocation(index: Int): GeoPoint? = tourEngine.getStopLocation(index)
-
-    fun distanceToStop(index: Int): Double? = tourEngine.distanceToStop(index)
-
-    fun isAtCurrentStop(): Boolean = tourEngine.isAtCurrentStop()
-
-    fun getCurrentPoi(): TourPoi? = tourEngine.getCurrentPoi()
 
     // ── Narration controls ──────────────────────────────────────────────
 
@@ -310,12 +321,6 @@ class TourViewModel @Inject constructor(
     var autoNarrationEnabled: Boolean
         get() = narrationManager.autoNarrationEnabled
         set(value) { narrationManager.autoNarrationEnabled = value }
-
-    /** Manually trigger narration for the current stop. */
-    fun narrateCurrentStop() {
-        val poi = tourEngine.getCurrentPoi() ?: return
-        narrationManager.speakLongNarration(poi)
-    }
 
     /** Speak a specific POI's narration on demand. */
     fun narratePoi(poi: TourPoi) {
@@ -349,26 +354,6 @@ class TourViewModel @Inject constructor(
     fun getDirectionsTo(destination: GeoPoint) {
         val from = tourEngine.lastLocation ?: return
         viewModelScope.launch { computeAndApplyRoute(from, destination) }
-    }
-
-    /** Get walking directions to the current tour stop. */
-    fun getDirectionsToCurrentStop() {
-        val stopLocation = tourEngine.getCurrentPoi()?.let { GeoPoint(it.lat, it.lng) } ?: return
-        getDirectionsTo(stopLocation)
-    }
-
-    /** Get multi-stop route preview for the entire active tour. */
-    fun getFullTourRoute() {
-        val points = tourEngine.getAllStopLocations()
-        if (points.size < 2) return
-        viewModelScope.launch {
-            // S179: tour geometry comes from the live bundled-graph router —
-            // same engine as point-to-point directions. Pre-baked tour_legs
-            // / routeToNext is no longer consulted at runtime.
-            _walkingRoute.value = walkingDirections.getMultiStopRoute(points)
-            // Multi-stop preview has no single destination → no live session.
-            directionsSession = null
-        }
     }
 
     /**

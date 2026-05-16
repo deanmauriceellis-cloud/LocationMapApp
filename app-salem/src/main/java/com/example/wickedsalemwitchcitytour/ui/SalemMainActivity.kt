@@ -169,6 +169,13 @@ class SalemMainActivity : AppCompatActivity() {
     @Inject
     internal lateinit var passportVisitDao: com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
 
+    /** S269 — passport metadata reads. Used by the tour-selection card to
+     *  surface "X stamps" (passport-bound POI count) in place of the legacy
+     *  "X stops" (free-waypoint count, meaningless post-S190 since stops are
+     *  polyline-only anchors). */
+    @Inject
+    internal lateinit var poiPassportDao: com.example.wickedsalemwitchcitytour.content.dao.PoiPassportDao
+
     /** S175: Salem on-device walking router. Lazy-loads `assets/routing/salem-routing-graph.sqlite`. */
     @Inject
     internal lateinit var salemRouterProvider: com.example.wickedsalemwitchcitytour.routing.SalemRouterProvider
@@ -1789,11 +1796,12 @@ class SalemMainActivity : AppCompatActivity() {
             val next = tiltSteps[(curIdx + 1) % tiltSteps.size]
             binding.tiltContainer.setTiltDegrees(next)
             tiltPrefs.edit().putFloat(MenuPrefs.PREF_TILT_3D_DEG, next).apply()
-            // Yank any narration / tour-HUD bars sitting inside the
-            // TiltContainer so they don't sit warped on the perspective plane.
+            // Yank any narration bar sitting inside the TiltContainer so it
+            // doesn't sit warped on the perspective plane. (S269 — the
+            // matching `removeTourHud()` call is gone with the tour HUD
+            // itself.)
             if (next > 0f) {
                 removeNarrationBar()
-                removeTourHud()
             }
             Toast.makeText(this, "3D tilt: ${next.toInt()}°", Toast.LENGTH_SHORT).show()
         }
@@ -4831,7 +4839,17 @@ class SalemMainActivity : AppCompatActivity() {
         override fun onPassportRequested() {
             resetIdleTimer()
             DebugLogger.i("SalemMainActivity", "onPassportRequested")
-            PassportSheet.show(supportFragmentManager)
+            // S269 — toolbar tap during an active tour pins the sheet to
+            // that tour's passport (operator: "if I am in a tour, it should
+            // automatically take me to passport"). Outside of a tour we
+            // pass null and the sheet defaults to the first passport.
+            val activePid = when (val s = tourViewModel.tourState.value) {
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> s.activeTour.passportId
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> s.activeTour.passportId
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Detour -> s.activeTour.passportId
+                else -> null
+            }
+            PassportSheet.show(supportFragmentManager, activePid)
         }
 
         // ── Top-bar Camera (recon photos) ─────────────────────────────────────

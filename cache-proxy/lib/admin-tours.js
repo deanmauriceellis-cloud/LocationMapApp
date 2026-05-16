@@ -161,14 +161,28 @@ module.exports = function(app, deps) {
   // ─── GET /admin/salem/tours ─────────────────────────────────────────────────
   app.get('/admin/salem/tours', requirePg, async (_req, res) => {
     try {
+      // S269 — passport_poi_count is the canonical "user-facing stamp count"
+      // for this tour: rows in salem_passport_pois under the auto_bake=false
+      // filter bound to this tour. stop_count stays for legacy reasons but
+      // is no longer surfaced as the headline number.
       const { rows } = await pgPool.query(`
         SELECT t.id, t.name, t.theme, t.description, t.estimated_minutes,
                t.distance_km, t.stop_count, t.difficulty, t.seasonal,
                t.icon_asset, t.sort_order, t.is_historical_tour, t.updated_at,
-               COUNT(s.stop_id)::int AS stops_actual
+               COUNT(s.stop_id)::int AS stops_actual,
+               pp_pf.id AS passport_id,
+               pp_pf.poi_count AS passport_poi_count
           FROM salem_tours t
      LEFT JOIN salem_tour_stops s ON s.tour_id = t.id
-      GROUP BY t.id
+     LEFT JOIN LATERAL (
+                SELECT pf.id,
+                       (SELECT COUNT(*)::int FROM salem_passport_pois pp WHERE pp.filter_id = pf.id) AS poi_count
+                  FROM salem_passport_filters pf
+                 WHERE pf.tour_id = t.id AND pf.auto_bake = FALSE
+              ORDER BY pf.updated_at DESC
+                 LIMIT 1
+              ) pp_pf ON TRUE
+      GROUP BY t.id, pp_pf.id, pp_pf.poi_count
       ORDER BY t.sort_order ASC NULLS LAST, t.name ASC
       `);
       res.json({ count: rows.length, tours: rows });
@@ -186,11 +200,24 @@ module.exports = function(app, deps) {
         return res.status(400).json({ error: 'tour_id is required' });
       }
 
+      // S269 — same passport_poi_count enrichment as the list endpoint, so
+      // the metadata form can render "X stamps" instead of "X stops".
       const tourQ = await pgPool.query(
-        `SELECT id, name, theme, description, estimated_minutes, distance_km,
-                stop_count, difficulty, seasonal, icon_asset, sort_order,
-                is_historical_tour, updated_at
-           FROM salem_tours WHERE id = $1`,
+        `SELECT t.id, t.name, t.theme, t.description, t.estimated_minutes, t.distance_km,
+                t.stop_count, t.difficulty, t.seasonal, t.icon_asset, t.sort_order,
+                t.is_historical_tour, t.updated_at,
+                pp_pf.id AS passport_id,
+                pp_pf.poi_count AS passport_poi_count
+           FROM salem_tours t
+      LEFT JOIN LATERAL (
+                 SELECT pf.id,
+                        (SELECT COUNT(*)::int FROM salem_passport_pois pp WHERE pp.filter_id = pf.id) AS poi_count
+                   FROM salem_passport_filters pf
+                  WHERE pf.tour_id = t.id AND pf.auto_bake = FALSE
+               ORDER BY pf.updated_at DESC
+                  LIMIT 1
+               ) pp_pf ON TRUE
+          WHERE t.id = $1`,
         [tourId]
       );
       if (!tourQ.rows.length) return res.status(404).json({ error: 'Tour not found' });
@@ -425,13 +452,57 @@ module.exports = function(app, deps) {
         setParts.push(`${f} = $${idx++}`);
         values.push(body[f]);
       }
-      if (!setParts.length) return res.status(400).json({ error: 'no updatable fields' });
+      // S269 — empty body is now valid: "save with no field changes" is the
+      // operator's signal to force a metadata recompute (refresh distance /
+      // time / stop_count from current legs + stops). Same path applies when
+      // every supplied field was outside TOUR_UPDATABLE — we still recompute
+      // before returning, so the admin sees fresh derived values either way.
       setParts.push(`updated_at = NOW()`);
       values.push(tourId);
-      const { rows } = await pgPool.query(
-        `UPDATE salem_tours SET ${setParts.join(', ')} WHERE id = $${idx} RETURNING *`,
-        values
-      );
+      const setSql = setParts.length > 1
+        ? `UPDATE salem_tours SET ${setParts.join(', ')} WHERE id = $${idx}`
+        : `UPDATE salem_tours SET updated_at = NOW() WHERE id = $1`;
+      const setArgs = setParts.length > 1 ? values : [tourId];
+      const client = await pgPool.connect();
+      let rows;
+      try {
+        await client.query('BEGIN');
+        await client.query(setSql, setArgs);
+        // S269 — recompute derived fields (distance_km, estimated_minutes,
+        // stop_count) from the underlying legs + stops, OVERWRITING any
+        // operator-supplied values for those columns. The operator's request
+        // ("metadata updated when I save it needs to be computed") promotes
+        // these columns to fully-derived state: even if the operator types a
+        // value in the form, the canonical answer comes from the legs/stops
+        // tables. distance_km/estimated_minutes stay in TOUR_UPDATABLE for
+        // backward-compat with seed scripts but are immediately recomputed.
+        await recomputeTourMetadata(client, tourId);
+        // S269 — return the same shape as GET so the admin form sees
+        // passport_poi_count refresh after Save.
+        const out = await client.query(
+          `SELECT t.*,
+                  pp_pf.id AS passport_id,
+                  pp_pf.poi_count AS passport_poi_count
+             FROM salem_tours t
+        LEFT JOIN LATERAL (
+                   SELECT pf.id,
+                          (SELECT COUNT(*)::int FROM salem_passport_pois pp WHERE pp.filter_id = pf.id) AS poi_count
+                     FROM salem_passport_filters pf
+                    WHERE pf.tour_id = t.id AND pf.auto_bake = FALSE
+                 ORDER BY pf.updated_at DESC
+                    LIMIT 1
+                 ) pp_pf ON TRUE
+            WHERE t.id = $1`,
+          [tourId]
+        );
+        rows = out.rows;
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
       if (!rows.length) return res.status(404).json({ error: 'Tour not found' });
       res.json(rows[0]);
     } catch (err) {
@@ -462,16 +533,46 @@ module.exports = function(app, deps) {
     }
   });
 
-  // Helper: keep salem_tours.stop_count in sync after add/delete/reorder.
-  async function syncStopCount(client, tourId) {
+  // S269 — recompute all derived metadata on salem_tours from its underlying
+  // legs + stops. Replaces the older `syncStopCount` (which only refreshed
+  // stop_count) and the inline `UPDATE salem_tours SET distance_km ...` that
+  // used to live in the compute-route endpoint. Call this after any mutation
+  // that touches salem_tour_legs or salem_tour_stops so the operator sees
+  // fresh distance / time / count on the metadata form without having to
+  // re-trigger compute-route manually.
+  //
+  // Sources of truth:
+  //   - stop_count        ← COUNT(salem_tour_stops)
+  //   - distance_km       ← SUM(salem_tour_legs.distance_m) / 1000, rounded 2dp
+  //   - estimated_minutes ← SUM(salem_tour_legs.duration_s) / 60, rounded int
+  //
+  // Tours with no baked legs (freshly-created or stops-only) get
+  // distance_km=0 and estimated_minutes=0 — accurate, not stale.
+  async function recomputeTourMetadata(client, tourId) {
+    // node-postgres can't infer $1's type when the placeholder appears in
+    // multiple correlated subqueries, so we add an explicit ::text cast.
     await client.query(
       `UPDATE salem_tours
-          SET stop_count = (SELECT COUNT(*) FROM salem_tour_stops WHERE tour_id = $1),
-              updated_at = NOW()
-        WHERE id = $1`,
+          SET stop_count        = COALESCE((SELECT COUNT(*)::int FROM salem_tour_stops WHERE tour_id = $1::text), 0),
+              distance_km       = COALESCE(
+                                    ROUND(((SELECT SUM(distance_m) FROM salem_tour_legs WHERE tour_id = $1::text) / 1000.0)::numeric, 2),
+                                    0
+                                  )::real,
+              estimated_minutes = COALESCE(
+                                    ROUND((SELECT SUM(duration_s) FROM salem_tour_legs WHERE tour_id = $1::text) / 60.0)::int,
+                                    0
+                                  ),
+              updated_at        = NOW()
+        WHERE id = $1::text`,
       [tourId]
     );
   }
+
+  // Back-compat alias for the older internal helper name. Pre-S269 call sites
+  // wanted stop_count only; the full recompute is a strict superset (also
+  // updates distance/time, both correctly reflecting an empty legs table for
+  // stops-only tours), so the rename is safe.
+  const syncStopCount = recomputeTourMetadata;
 
   // ─── POST /admin/salem/tours/:tour_id/stops ────────────────────────────────
   // Add a waypoint. Body: { poi_id?, lat?, lng?, name?, stop_order?,
@@ -917,17 +1018,13 @@ module.exports = function(app, deps) {
           ]
         );
       }
-      // Roll up totals onto salem_tours so the list view stays accurate.
+      // S269 — single source of truth: recomputeTourMetadata derives
+      // distance_km, estimated_minutes, AND stop_count off the just-written
+      // legs and current stops. Replaces the older inline UPDATE that
+      // touched only distance_km + estimated_minutes.
       let totalM = 0, totalS = 0;
       for (const leg of legs) { totalM += leg.distance_m; totalS += leg.duration_s; }
-      await client.query(
-        `UPDATE salem_tours
-            SET distance_km = $1,
-                estimated_minutes = $2,
-                updated_at = NOW()
-          WHERE id = $3`,
-        [Math.round((totalM / 1000) * 100) / 100, Math.round(totalS / 60), tourId]
-      );
+      await recomputeTourMetadata(client, tourId);
       await client.query('COMMIT');
 
       // S190 — final summary log.
@@ -1077,6 +1174,11 @@ module.exports = function(app, deps) {
           WHERE tour_id = $1 AND leg_order = $2`,
         [tourId, legOrder]
       );
+      // S269 — single-leg recompute changes the tour's total distance + time.
+      // Recompute salem_tours metadata so the operator sees the new totals
+      // immediately on the metadata form without having to re-trigger the
+      // full compute-route.
+      await recomputeTourMetadata(client, tourId);
       // S190 — attach the diagnostics block + endpoint labels so the admin
       // tool can show the operator the detour ratio for the leg they just
       // recomputed without having to read it out of the proxy log.

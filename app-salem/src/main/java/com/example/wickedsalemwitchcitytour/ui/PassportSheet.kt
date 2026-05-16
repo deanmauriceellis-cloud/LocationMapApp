@@ -35,6 +35,7 @@ import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.dao.PoiPassportDao
 import com.example.wickedsalemwitchcitytour.content.model.PoiPassport
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
+import com.example.wickedsalemwitchcitytour.tour.TourState
 import com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -143,6 +144,13 @@ class PassportSheet : DialogFragment() {
         overflowView.setOnClickListener { showOverflowMenu(it) }
         pickerView.setOnClickListener { showPassportPickerMenu(it) }
 
+        // S269 — caller-supplied target passport (e.g. tour-completion CTA
+        // hands us the just-ended tour's passportId; toolbar tap during an
+        // active tour passes the active tour's passportId). When null we
+        // fall back to the first passport from the bake.
+        val argPid = arguments?.getString(ARG_PASSPORT_ID)
+        if (!argPid.isNullOrBlank()) activePassportId = argPid
+
         loadAll()
     }
 
@@ -222,10 +230,30 @@ class PassportSheet : DialogFragment() {
 
     private fun showOverflowMenu(anchor: View) {
         val popup = PopupMenu(requireContext(), anchor)
-        popup.menu.add(0, MENU_RESET, 0, "Reset all stamps")
+        // S269 — when a tour is in flight (Active / Paused / Detour), the
+        // sheet picks up the canonical "End tour" action here. Reads the
+        // engine state through SalemMainActivity.tourViewModel; absent or
+        // Idle states omit the entry. Operator-confirmed: more in-tour
+        // actions will land here later.
+        val activity = (requireActivity() as? SalemMainActivity)
+        val tourActive = when (activity?.tourViewModel?.tourState?.value) {
+            is TourState.Active, is TourState.Paused, is TourState.Detour -> true
+            else -> false
+        }
+        if (tourActive) {
+            popup.menu.add(0, MENU_END_TOUR, 0, "End tour")
+        }
+        popup.menu.add(0, MENU_RESET, 1, "Reset all stamps")
         popup.setOnMenuItemClickListener { item ->
-            if (item.itemId == MENU_RESET) confirmReset()
-            true
+            when (item.itemId) {
+                MENU_END_TOUR -> {
+                    activity?.tourViewModel?.endTour()
+                    dismissAllowingStateLoss()
+                    true
+                }
+                MENU_RESET -> { confirmReset(); true }
+                else -> false
+            }
         }
         popup.show()
     }
@@ -367,13 +395,25 @@ class PassportSheet : DialogFragment() {
     companion object {
         private const val TAG = "PassportSheet"
         private const val TAG_SHOW = "passport_sheet"
+        private const val ARG_PASSPORT_ID = "arg_passport_id"
         private const val MENU_RESET = 1
+        private const val MENU_END_TOUR = 2
         private const val TYPE_HEADER = 0
         private const val TYPE_POI = 1
 
-        fun show(fragmentManager: FragmentManager) {
+        /**
+         * S269 — `passportId` lets the caller pin the sheet to a specific
+         * passport on open (e.g. tour-completion CTA → the just-ended tour's
+         * passport; toolbar tap during an active tour → the active tour's
+         * passport). Pass null (or omit) for "first passport in the bake".
+         */
+        fun show(fragmentManager: FragmentManager, passportId: String? = null) {
             (fragmentManager.findFragmentByTag(TAG_SHOW) as? PassportSheet)?.dismissAllowingStateLoss()
-            PassportSheet().show(fragmentManager, TAG_SHOW)
+            val sheet = PassportSheet()
+            if (!passportId.isNullOrBlank()) {
+                sheet.arguments = Bundle().apply { putString(ARG_PASSPORT_ID, passportId) }
+            }
+            sheet.show(fragmentManager, TAG_SHOW)
         }
     }
 }

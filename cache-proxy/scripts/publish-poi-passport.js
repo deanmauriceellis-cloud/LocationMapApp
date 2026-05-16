@@ -84,12 +84,31 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function fetchFilters(client) {
+  // S269 — auto_bake gates whether the bake regenerates this filter's
+  // salem_passport_pois rows from filter SQL (TRUE) or preserves whatever
+  // the operator wrote there via the walk-derived dialog (FALSE). The
+  // column is added by an idempotent ALTER in admin-passport.js module
+  // init, so older PG snapshots that haven't been touched by the proxy
+  // yet may not have it. COALESCE keeps the script backwards-compatible.
   const { rows } = await client.query(
     `SELECT id, name, tour_id, categories, require_historical_narration,
             min_geofence_radius_m, min_year_established, max_year_established,
-            sort_order
+            sort_order,
+            COALESCE(auto_bake, TRUE) AS auto_bake
        FROM salem_passport_filters
    ORDER BY sort_order ASC, name ASC`,
+  );
+  return rows;
+}
+
+async function loadExistingPois(client, filterId) {
+  const { rows } = await client.query(
+    `SELECT p.id, p.name, p.category, p.lat, p.lng
+       FROM salem_passport_pois pp
+       JOIN salem_pois p ON p.id = pp.poi_id
+      WHERE pp.filter_id = $1
+   ORDER BY pp.display_order ASC`,
+    [filterId],
   );
   return rows;
 }
@@ -198,10 +217,23 @@ async function main() {
     }
 
     for (const f of filters) {
-      const pois = await matchPois(client, f);
-      filtersWithPois.push({ filter: f, pois });
+      // S269 — auto_bake=false filters carry an operator-authored POI list
+      // (walk-derived dialog). Read salem_passport_pois directly instead of
+      // re-running the filter SQL, then skip the bakeToPg step for them so
+      // the existing rows are preserved.
+      let pois;
+      let source;
+      if (f.auto_bake === false) {
+        pois = await loadExistingPois(client, f.id);
+        source = 'manual';
+      } else {
+        pois = await matchPois(client, f);
+        source = 'filter';
+      }
+      filtersWithPois.push({ filter: f, pois, source });
       console.log(
         `  ${f.id.padEnd(30)} ${pois.length.toString().padStart(4)} POIs` +
+        `  [${source}]` +
         (f.tour_id ? `  (tour: ${f.tour_id})` : '  (global)'),
       );
     }
@@ -212,15 +244,17 @@ async function main() {
       return;
     }
 
-    // Write to PG (always)
+    // Write to PG (only for auto_bake=true filters; manual filters keep
+    // whatever was authored via the walk-derived dialog).
     await client.query('BEGIN');
     let pgTotal = 0;
-    for (const { filter, pois } of filtersWithPois) {
+    for (const { filter, pois, source } of filtersWithPois) {
+      if (source === 'manual') continue;
       const n = await bakeToPg(client, filter, pois);
       pgTotal += n;
     }
     await client.query('COMMIT');
-    console.log(`\nPG salem_passport_pois: ${pgTotal} rows written across ${filters.length} filter(s)`);
+    console.log(`\nPG salem_passport_pois: ${pgTotal} rows written across auto-bake filters (manual filters preserved)`);
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
     throw err;

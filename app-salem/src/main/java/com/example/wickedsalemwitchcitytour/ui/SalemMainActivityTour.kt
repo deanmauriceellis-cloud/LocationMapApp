@@ -81,7 +81,6 @@ internal var tourCurrentLegIdx: Int = -1
 internal val tourStopMarkers = mutableListOf<Marker>()
 internal val tourTurnMarkers = mutableListOf<Marker>()
 internal var narrationBarView: View? = null
-internal var tourHudView: View? = null
 internal var welcomeShown = false
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -272,10 +271,12 @@ internal fun SalemMainActivity.showWelcomeDialog() {
 
 @SuppressLint("SetTextI18n")
 internal fun SalemMainActivity.showTourSelectionDialog() {
-    // Check if a tour is already active — show resume dialog instead
+    // S269 — if a tour is in progress, offer Passport / End / Cancel rather
+    // than the pre-S269 stops-progress "Active Tour" management dialog
+    // (which was the first of the four dead surfaces this session deletes).
     val currentState = tourViewModel.tourState.value
     if (currentState is TourState.Active || currentState is TourState.Paused) {
-        showActiveTourDialog()
+        showTourInProgressDialog()
         return
     }
 
@@ -347,9 +348,25 @@ internal fun SalemMainActivity.showTourSelectionDialog() {
         tourViewModel.availableTours.collectLatest { tours ->
             if (tours.isEmpty()) return@collectLatest
             val allPois = tourViewModel.allPois.value
+            // S269 — pre-fetch passport-poi-counts off the IO thread so the
+            // tour-card chip can render "X stamps" instead of the legacy
+            // "X stops" (which counts polyline-only free waypoints — a
+            // meaningless number post-S190). Map<tour_id, poi_count>;
+            // tours without a bound passport fall back to stop_count
+            // inside buildTourCard.
+            val stampCounts: Map<String, Int> = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    poiPassportDao.listPassports()
+                        .filter { it.tour_id != null }
+                        .associate { it.tour_id!! to it.poi_count }
+                }
+            } catch (e: Exception) {
+                DebugLogger.w("SalemMainActivityTour", "passport count load failed: ${e.message}")
+                emptyMap()
+            }
             runOnUiThread {
                 listLayout.removeAllViews()
-                populateTourList(listLayout, tours, allPois, dp, dialog)
+                populateTourList(listLayout, tours, allPois, stampCounts, dp, dialog)
             }
         }
     }
@@ -361,6 +378,7 @@ private fun SalemMainActivity.populateTourList(
     listLayout: LinearLayout,
     tours: List<Tour>,
     allPois: List<TourPoi>,
+    stampCounts: Map<String, Int>,
     dp: (Int) -> Int,
     dialog: Dialog
 ) {
@@ -374,19 +392,19 @@ private fun SalemMainActivity.populateTourList(
     if (heritageTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Featured — Salem Heritage Trail", dp))
         for (tour in heritageTours) {
-            listLayout.addView(buildTourCard(tour, dp, dialog, featured = true))
+            listLayout.addView(buildTourCard(tour, stampCounts[tour.id], dp, dialog, featured = true))
         }
     }
     if (witchTrialsTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Salem Witch Trials", dp))
         for (tour in witchTrialsTours) {
-            listLayout.addView(buildTourCard(tour, dp, dialog))
+            listLayout.addView(buildTourCard(tour, stampCounts[tour.id], dp, dialog))
         }
     }
     if (otherTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Extended Tours", dp))
         for (tour in otherTours) {
-            listLayout.addView(buildTourCard(tour, dp, dialog))
+            listLayout.addView(buildTourCard(tour, stampCounts[tour.id], dp, dialog))
         }
     }
 
@@ -520,6 +538,11 @@ private fun SalemMainActivity.categoryToggle(
 @SuppressLint("SetTextI18n")
 private fun SalemMainActivity.buildTourCard(
     tour: Tour,
+    /** S269 — passport-bound POI count for this tour, or null when no
+     *  walk-derived passport is authored for it. Drives the headline chip
+     *  ("X stamps" vs. legacy "X stops"). Pre-fetched off the IO thread by
+     *  the caller so the card-build path stays synchronous. */
+    stampCount: Int?,
     dp: (Int) -> Int,
     parentDialog: Dialog,
     featured: Boolean = false
@@ -597,7 +620,12 @@ private fun SalemMainActivity.buildTourCard(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { marginEnd = dp(6) }
         }
-        statsRow.addView(statChip("${tour.stopCount} stops"))
+        // S269 — show "X stamps" when the tour has a walk-derived passport
+        // bound to it; otherwise fall back to the legacy "X stops" (count
+        // of free polyline waypoints). Operator: "we care about the
+        // stamps/POI, not the stops".
+        val countLabel = if (stampCount != null) "$stampCount stamps" else "${tour.stopCount} stops"
+        statsRow.addView(statChip(countLabel))
         statsRow.addView(statChip("${tour.estimatedMinutes} min"))
         statsRow.addView(statChip("%.1f km".format(tour.distanceKm)))
         statsRow.addView(statChip(tour.difficulty.replaceFirstChar { it.uppercase() }))
@@ -630,175 +658,61 @@ private fun SalemMainActivity.buildTourCard(
     }
 }
 
+
 // ═════════════════════════════════════════════════════════════════════════════
-// ACTIVE TOUR DIALOG (when user taps Tours while a tour is running)
+// TOUR-IN-PROGRESS DIALOG (S269)
+//
+// Surfaces when the user taps Tours while a tour is already running. The
+// pre-S269 surface was a full stops-progress management dialog (current
+// stop, completed/skipped counts, advance/skip/pause/end buttons, per-stop
+// status list); all of that backed onto state that no longer exists. The
+// replacement is a compact passport-centric chooser.
 // ═════════════════════════════════════════════════════════════════════════════
 
 @SuppressLint("SetTextI18n")
-internal fun SalemMainActivity.showActiveTourDialog() {
-    val activeTour = when (val state = tourViewModel.tourState.value) {
-        is TourState.Active -> state.activeTour
-        is TourState.Paused -> state.activeTour
+internal fun SalemMainActivity.showTourInProgressDialog() {
+    val activeTourName = when (val state = tourViewModel.tourState.value) {
+        is TourState.Active -> state.activeTour.tour.name
+        is TourState.Paused -> state.activeTour.tour.name
         else -> return
     }
     val isPaused = tourViewModel.tourState.value is TourState.Paused
 
-    val density = resources.displayMetrics.density
-    val dp = { v: Int -> (v * density).toInt() }
-
-    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-
-    val root = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Color.parseColor(SALEM_DARK))
-        setPadding(dp(16), dp(12), dp(16), dp(16))
-    }
-
-    // Header
-    val headerRow = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-    }
-    headerRow.addView(TextView(this).apply {
-        text = activeTour.tour.name
-        textSize = 18f
-        setTextColor(Color.parseColor(SALEM_GOLD))
-        setTypeface(null, Typeface.BOLD)
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-    })
-    headerRow.addView(TextView(this).apply {
-        text = "\u2715"
-        textSize = 20f
-        setTextColor(Color.WHITE)
-        setPadding(dp(12), 0, dp(4), 0)
-        setOnClickListener { dialog.dismiss() }
-    })
-    root.addView(headerRow)
-
-    // Progress
-    root.addView(TextView(this).apply {
-        val p = activeTour.progress
-        text = "Stop ${p.currentStopIndex + 1} of ${activeTour.stops.size} — " +
-                "${p.completedStops.size} completed, ${p.skippedStops.size} skipped"
-        textSize = 13f
-        setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-        setPadding(0, dp(8), 0, dp(4))
-    })
-
-    // Progress bar
-    root.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-        max = activeTour.stops.size
-        progress = activeTour.progress.completedStops.size
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(6)
-        ).apply { topMargin = dp(4); bottomMargin = dp(12) }
-    })
-
-    // Current stop info
-    val currentPoi = activeTour.currentPoi
-    if (currentPoi != null) {
-        root.addView(TextView(this).apply {
-            text = "Current: ${currentPoi.name}"
-            textSize = 15f
-            setTextColor(Color.parseColor(SALEM_TEXT))
-            setTypeface(null, Typeface.BOLD)
-        })
-        if (currentPoi.address.isNotBlank()) {
-            root.addView(TextView(this).apply {
-                text = currentPoi.address
-                textSize = 12f
-                setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-                setPadding(0, dp(2), 0, dp(4))
-            })
-        }
-        val dist = tourViewModel.distanceToStop(activeTour.progress.currentStopIndex)
-        if (dist != null) {
-            root.addView(TextView(this).apply {
-                text = if (dist < 1000) "%.0f m away".format(dist)
-                       else "%.1f km away".format(dist / 1000)
-                textSize = 12f
-                setTextColor(Color.parseColor(SALEM_GOLD))
-                setPadding(0, 0, 0, dp(8))
-            })
-        }
-    }
-
-    // Stop list in a scroll view
-    val stopScroll = ScrollView(this).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+    val builder = android.app.AlertDialog.Builder(this)
+        .setTitle(activeTourName)
+        .setMessage(
+            if (isPaused) "Tour paused. What would you like to do?"
+            else "Tour in progress. What would you like to do?"
         )
-    }
-    val stopList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-    for ((i, stop) in activeTour.stops.withIndex()) {
-        val poi = activeTour.pois.firstOrNull { it.id == stop.poiId } ?: continue
-        val isCompleted = i in activeTour.progress.completedStops
-        val isSkipped = i in activeTour.progress.skippedStops
-        val isCurrent = i == activeTour.progress.currentStopIndex
-
-        val color = when {
-            isCompleted -> COLOR_COMPLETED
-            isCurrent -> COLOR_CURRENT
-            isSkipped -> SALEM_TEXT_DIM
-            else -> SALEM_TEXT
+    builder.setPositiveButton("Open Passport") { dlg, _ ->
+        dlg.dismiss()
+        // S269 — open the sheet pre-pinned to the active tour's passport
+        // (not whatever the bake's first row happens to be). passportId is
+        // null when the tour has no passport authored yet — sheet falls
+        // back to its default behavior.
+        val activePid = when (val s = tourViewModel.tourState.value) {
+            is TourState.Active -> s.activeTour.passportId
+            is TourState.Paused -> s.activeTour.passportId
+            else -> null
         }
-        val prefix = when {
-            isCompleted -> "\u2713 "
-            isSkipped -> "\u2014 "
-            isCurrent -> "\u25B6 "
-            else -> "${i + 1}. "
-        }
-        stopList.addView(TextView(this).apply {
-            text = "$prefix${poi.name}"
-            textSize = 13f
-            setTextColor(Color.parseColor(color))
-            if (isCurrent) setTypeface(null, Typeface.BOLD)
-            setPadding(dp(4), dp(3), dp(4), dp(3))
-        })
+        com.example.wickedsalemwitchcitytour.ui.PassportSheet.show(supportFragmentManager, activePid)
     }
-    stopScroll.addView(stopList)
-    root.addView(stopScroll)
-
-    // Action buttons row
-    val btnRow = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER
-        setPadding(0, dp(12), 0, 0)
-    }
-
-    fun actionBtn(label: String, bgColor: String, onClick: () -> Unit): TextView =
-        TextView(this).apply {
-            text = label
-            textSize = 13f
-            setTextColor(Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable().apply {
-                setColor(Color.parseColor(bgColor))
-                cornerRadius = dp(6).toFloat()
-            }
-            background = bg
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(6)
-            }
-            setOnClickListener { onClick() }
-        }
-
     if (isPaused) {
-        btnRow.addView(actionBtn("Resume", "#4CAF50") { dialog.dismiss(); tourViewModel.resumeTour() })
+        builder.setNeutralButton("Resume") { dlg, _ ->
+            dlg.dismiss()
+            tourViewModel.resumeTour()
+        }
     } else {
-        btnRow.addView(actionBtn("Next", COLOR_CURRENT) { dialog.dismiss(); tourViewModel.advanceToNextStop() })
-        btnRow.addView(actionBtn("Skip", "#FF9800") { dialog.dismiss(); tourViewModel.skipStop() })
-        btnRow.addView(actionBtn("Pause", "#9E9E9E") { dialog.dismiss(); tourViewModel.pauseTour() })
+        builder.setNeutralButton("Pause") { dlg, _ ->
+            dlg.dismiss()
+            tourViewModel.pauseTour()
+        }
     }
-    btnRow.addView(actionBtn("End", "#F44336") { dialog.dismiss(); tourViewModel.endTour() })
-
-    root.addView(btnRow)
-
-    dialog.setContentView(root)
-    dialog.show()
+    builder.setNegativeButton("End tour") { dlg, _ ->
+        dlg.dismiss()
+        tourViewModel.endTour()
+    }
+    builder.show()
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -815,7 +729,6 @@ internal fun SalemMainActivity.observeTourState() {
             when (state) {
                 is TourState.Idle -> {
                     clearTourOverlays()
-                    removeTourHud()
                     clearDetourVisuals()
                 }
                 is TourState.Loading -> {
@@ -823,30 +736,27 @@ internal fun SalemMainActivity.observeTourState() {
                 }
                 is TourState.Active -> {
                     drawTourRoute(state.activeTour)
-                    updateTourHud(state.activeTour)
-                    val poi = state.activeTour.currentPoi
-                    val stopNum = state.activeTour.progress.currentStopIndex + 1
-                    val total = state.activeTour.stops.size
+                    // S269 — status-line tag is the tour name now. Pre-S269 it
+                    // read "$stopNum/$total — currentPoi" off currentStopIndex;
+                    // that machinery is gone with the stops shed.
                     statusLineManager.set(
                         StatusLineManager.Priority.TOUR,
-                        "Tour: $stopNum/$total — ${poi?.name ?: "Unknown"}"
+                        "Tour: ${state.activeTour.tour.name}"
                     )
                     clearDetourVisuals()
                 }
                 is TourState.Paused -> {
-                    val poi = state.activeTour.currentPoi
                     statusLineManager.set(
                         StatusLineManager.Priority.TOUR,
-                        "Tour paused — ${poi?.name ?: "Unknown"}"
+                        "Tour paused — ${state.activeTour.tour.name}"
                     )
                     clearDetourVisuals()
                 }
                 is TourState.Detour -> {
-                    // S221 — keep the tour overlay + HUD up so the operator
-                    // can still see where the tour goes; layer the orange
-                    // detour route + persistent banner on top.
+                    // S221 — keep the tour overlay up so the user can still
+                    // see where the tour goes; layer the orange detour route
+                    // + persistent banner on top.
                     drawTourRoute(state.activeTour)
-                    updateTourHud(state.activeTour)
                     statusLineManager.set(
                         StatusLineManager.Priority.TOUR,
                         "Detour → ${state.detourPoiName}"
@@ -855,14 +765,12 @@ internal fun SalemMainActivity.observeTourState() {
                 }
                 is TourState.Completed -> {
                     clearTourOverlays()
-                    removeTourHud()
                     statusLineManager.clear(StatusLineManager.Priority.TOUR)
                     clearDetourVisuals()
                     showTourCompletionDialog(state.summaryStats)
                 }
                 is TourState.Error -> {
                     clearTourOverlays()
-                    removeTourHud()
                     statusLineManager.clear(StatusLineManager.Priority.TOUR)
                     clearDetourVisuals()
                     Toast.makeText(this@observeTourState, state.message, Toast.LENGTH_LONG).show()
@@ -1000,10 +908,11 @@ private fun SalemMainActivity.showNarrationBar(state: NarrationState) {
         Toast.makeText(this, "Speed: ${newSpeed}x", Toast.LENGTH_SHORT).show()
     })
 
-    // Insert narration bar above the tour HUD (below map, above HUD)
+    // S269 — tour HUD removed, so the narration bar simply lands at the
+    // bottom of the map container. (Pre-S269 we calculated an index that
+    // would slot the bar above tourHudView so they stacked correctly.)
     val parent = binding.mapView.parent as? ViewGroup ?: return
-    val hudIndex = tourHudView?.let { parent.indexOfChild(it) } ?: parent.childCount
-    parent.addView(bar, hudIndex)
+    parent.addView(bar)
     narrationBarView = bar
 }
 
@@ -1107,40 +1016,12 @@ internal suspend fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
         }
     }
 
-    // Numbered stop markers — drawn above the polyline regardless of
-    // whether the router produced geometry, so the user always sees the
-    // ordered tour stops on the map.
-    for ((i, stop) in activeTour.stops.withIndex()) {
-        val poi = activeTour.pois.firstOrNull { it.id == stop.poiId } ?: continue
-        val isCompleted = i in activeTour.progress.completedStops
-        val isSkipped = i in activeTour.progress.skippedStops
-        val isCurrent = i == activeTour.progress.currentStopIndex
-
-        val color = when {
-            isCompleted -> Color.parseColor(COLOR_COMPLETED)
-            isCurrent -> Color.parseColor(COLOR_CURRENT)
-            else -> Color.parseColor(COLOR_UPCOMING)
-        }
-
-        val marker = BillboardMarker(binding.mapView).apply {
-            position = GeoPoint(poi.lat, poi.lng)
-            title = "${i + 1}. ${poi.name}"
-            snippet = when {
-                isCompleted -> "Completed"
-                isSkipped -> "Skipped"
-                isCurrent -> "Current stop"
-                else -> "Upcoming"
-            }
-            icon = MarkerIconHelper.createNumberedCircle(this@drawTourRoute, i + 1, color)
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            setOnMarkerClickListener { m, _ ->
-                showTourStopDetail(poi, i, activeTour)
-                true
-            }
-        }
-        binding.mapView.overlays.add(marker)
-        tourStopMarkers.add(marker)
-    }
+    // S269 — numbered stop markers ripped out alongside the stops-progress
+    // shed. Post-S190 tours are polyline-only (every stop carries
+    // poi_id == null), so the loop was iterating over a list whose entries
+    // had no rendering anchor to begin with. The polyline (single or
+    // per-leg) above is now the only on-map representation of an active
+    // tour; the POI Passport sheet surfaces tour-membership instead.
 
     binding.mapView.invalidate()
 }
@@ -1292,269 +1173,6 @@ internal fun SalemMainActivity.applyTourLegHighlightFor(point: GeoPoint) {
         "Active tour leg → $idx (was $prev)")
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// TOUR HUD — bottom bar showing current stop + controls
-// ═════════════════════════════════════════════════════════════════════════════
-
-@SuppressLint("SetTextI18n")
-internal fun SalemMainActivity.updateTourHud(activeTour: ActiveTour) {
-    removeTourHud()
-
-    // S232 — same suppression as showNarrationBar: TourHud is a child of the
-    // TiltContainer (binding.mapView.parent) and would get warped under tilt.
-    if (BuildDefaults.TILT_3D_ENABLED && binding.tiltContainer.getTiltDegrees() > 0f) return
-
-    val density = resources.displayMetrics.density
-    val dp = { v: Int -> (v * density).toInt() }
-    val poi = activeTour.currentPoi ?: return
-
-    val hud = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        setBackgroundColor(Color.parseColor("#E8${SALEM_PURPLE.removePrefix("#")}"))
-        setPadding(dp(12), dp(8), dp(12), dp(8))
-        layoutParams = ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-    }
-
-    // Stop info (left side)
-    val infoLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-    }
-    infoLayout.addView(TextView(this).apply {
-        val n = activeTour.progress.currentStopIndex + 1
-        text = "Stop $n/${activeTour.stops.size}: ${poi.name}"
-        textSize = 13f
-        setTextColor(Color.parseColor(SALEM_GOLD))
-        setTypeface(null, Typeface.BOLD)
-        maxLines = 1
-    })
-    val dist = tourViewModel.distanceToStop(activeTour.progress.currentStopIndex)
-    if (dist != null) {
-        infoLayout.addView(TextView(this).apply {
-            text = if (dist < 1000) "%.0f m".format(dist) else "%.1f km".format(dist / 1000)
-            textSize = 11f
-            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-        })
-    }
-    hud.addView(infoLayout)
-
-    // Action buttons (right side)
-    fun hudBtn(label: String, onClick: () -> Unit): TextView = TextView(this).apply {
-        text = label
-        textSize = 11f
-        setTextColor(Color.WHITE)
-        gravity = Gravity.CENTER
-        val bg = GradientDrawable().apply {
-            setColor(Color.parseColor("#44FFFFFF"))
-            cornerRadius = dp(4).toFloat()
-        }
-        background = bg
-        setPadding(dp(8), dp(4), dp(8), dp(4))
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { marginStart = dp(4) }
-        setOnClickListener { onClick() }
-    }
-
-    hud.addView(hudBtn("Next") { tourViewModel.advanceToNextStop() })
-    hud.addView(hudBtn("Skip") { tourViewModel.skipStop() })
-    hud.addView(hudBtn("Info") { showActiveTourDialog() })
-
-    // Add HUD at the bottom of the map container
-    val parent = binding.mapView.parent as? ViewGroup ?: return
-    parent.addView(hud)
-    tourHudView = hud
-}
-
-internal fun SalemMainActivity.removeTourHud() {
-    tourHudView?.let {
-        (it.parent as? ViewGroup)?.removeView(it)
-    }
-    tourHudView = null
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// TOUR STOP DETAIL — tap a numbered marker
-// ═════════════════════════════════════════════════════════════════════════════
-
-@SuppressLint("SetTextI18n")
-internal fun SalemMainActivity.showTourStopDetail(poi: TourPoi, stopIndex: Int, activeTour: ActiveTour) {
-    val density = resources.displayMetrics.density
-    val dp = { v: Int -> (v * density).toInt() }
-
-    val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-
-    val root = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Color.parseColor(SALEM_DARK))
-        setPadding(dp(16), dp(12), dp(16), dp(16))
-    }
-
-    // Header
-    val headerRow = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-    }
-    headerRow.addView(TextView(this).apply {
-        text = "${stopIndex + 1}. ${poi.name}"
-        textSize = 18f
-        setTextColor(Color.parseColor(SALEM_GOLD))
-        setTypeface(null, Typeface.BOLD)
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-    })
-    headerRow.addView(TextView(this).apply {
-        text = "\u2715"
-        textSize = 20f
-        setTextColor(Color.WHITE)
-        setPadding(dp(12), 0, dp(4), 0)
-        setOnClickListener { dialog.dismiss() }
-    })
-    root.addView(headerRow)
-
-    // Address
-    if (poi.address.isNotBlank()) {
-        root.addView(TextView(this).apply {
-            text = poi.address
-            textSize = 13f
-            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-            setPadding(0, dp(4), 0, dp(4))
-        })
-    }
-
-    // Category + period
-    val metaLine = buildList {
-        add(poi.category)
-        poi.historicalPeriod?.let { add(it) }
-    }.joinToString(" \u2022 ")
-    root.addView(TextView(this).apply {
-        text = metaLine
-        textSize = 12f
-        setTextColor(Color.parseColor(SALEM_GOLD))
-        setPadding(0, 0, 0, dp(8))
-    })
-
-    // Description / narration
-    val scroll = ScrollView(this).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        )
-    }
-    val descLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-
-    // S154: strip AI-generated description for non-licensed commercial tour
-    // stops. TourPoi is a projection without merchant_tier, so use the
-    // category-only gate — safe for V1 (no merchants licensed yet).
-    val stripped = PoiContentPolicy.shouldStripByCategory(poi.category)
-    if (!stripped) {
-        poi.description?.let {
-            descLayout.addView(TextView(this).apply {
-                text = it
-                textSize = 14f
-                setTextColor(Color.parseColor(SALEM_TEXT))
-                setPadding(0, 0, 0, dp(8))
-            })
-        }
-    }
-
-    // Admission / hours / contact
-    poi.admissionInfo?.let {
-        descLayout.addView(infoRow(dp, "Admission", it))
-    }
-    poi.hours?.let {
-        descLayout.addView(infoRow(dp, "Hours", it))
-    }
-    poi.phone?.let {
-        descLayout.addView(infoRow(dp, "Phone", it))
-    }
-    poi.website?.let {
-        descLayout.addView(infoRow(dp, "Website", it))
-    }
-    if (poi.requiresTransportation) {
-        descLayout.addView(TextView(this).apply {
-            text = "\u26A0 This site requires transportation (not walkable from downtown Salem)"
-            textSize = 12f
-            setTextColor(Color.parseColor("#FF9800"))
-            setPadding(0, dp(6), 0, 0)
-        })
-    }
-
-    scroll.addView(descLayout)
-    root.addView(scroll)
-
-    // Action buttons row
-    val actionBtnRow = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        setPadding(0, dp(8), 0, 0)
-    }
-
-    fun detailBtn(label: String, bgColor: String, weight: Float = 1f, onClick: () -> Unit): TextView =
-        TextView(this).apply {
-            text = label
-            textSize = 14f
-            setTextColor(if (bgColor == SALEM_GOLD) Color.parseColor(SALEM_DARK) else Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable().apply {
-                setColor(Color.parseColor(bgColor))
-                cornerRadius = dp(6).toFloat()
-            }
-            background = bg
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight).apply {
-                marginEnd = dp(6)
-            }
-            setOnClickListener { onClick() }
-        }
-
-    // Show on Map
-    actionBtnRow.addView(detailBtn("Show on Map", SALEM_GOLD) {
-        dialog.dismiss()
-        binding.mapView.controller.animateTo(GeoPoint(poi.lat, poi.lng), 17.0, 800L)
-    })
-
-    // Walk Here — get walking directions
-    actionBtnRow.addView(detailBtn("Walk Here", SALEM_SURFACE) {
-        dialog.dismiss()
-        walkTo(GeoPoint(poi.lat, poi.lng))
-    })
-
-    // Narrate — speak the long narration on demand. Hidden for stripped
-    // commercial POIs (S154): their "narration" is just name+address, which
-    // the user already sees, so the on-demand button adds nothing.
-    if (poi.longNarration != null && !stripped) {
-        actionBtnRow.addView(detailBtn("\uD83D\uDD0A Narrate", SALEM_SURFACE) {
-            tourViewModel.narratePoi(poi)
-        })
-    }
-
-    root.addView(actionBtnRow)
-
-    dialog.setContentView(root)
-    dialog.show()
-}
-
-private fun SalemMainActivity.infoRow(dp: (Int) -> Int, label: String, value: String): LinearLayout =
-    LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        setPadding(0, dp(2), 0, dp(2))
-        addView(TextView(this@infoRow).apply {
-            text = "$label: "
-            textSize = 12f
-            setTextColor(Color.parseColor(SALEM_TEXT_DIM))
-            setTypeface(null, Typeface.BOLD)
-        })
-        addView(TextView(this@infoRow).apply {
-            text = value
-            textSize = 12f
-            setTextColor(Color.parseColor(SALEM_TEXT))
-        })
-    }
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TOUR COMPLETION DIALOG
@@ -1575,9 +1193,11 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
         gravity = Gravity.CENTER_HORIZONTAL
     }
 
-    // Title
+    // Title — S269 chooses copy by whether every passport POI was heard.
+    val isFullComplete = summary.passportTotal > 0 &&
+                         summary.passportHeard >= summary.passportTotal
     root.addView(TextView(this).apply {
-        text = "Tour Complete!"
+        text = if (isFullComplete) "Tour Complete!" else "Tour Ended"
         textSize = 24f
         setTextColor(Color.parseColor(SALEM_GOLD))
         setTypeface(null, Typeface.BOLD)
@@ -1612,35 +1232,75 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
         })
     }
 
-    statLine("Stops completed", "${summary.completedStops} / ${summary.totalStops}")
-    statLine("Stops skipped", "${summary.skippedStops}")
+    // S269 — passport-aware stats. Pre-S269 this read
+    // `completedStops` / `skippedStops` / `completionPercent` off
+    // [TourSummary]; those counters are gone with the stops shed. The new
+    // primary number is `passportHeard / passportTotal` — how many of the
+    // tour's curated passport POIs the walker actually heard. Tours
+    // without a passport authored (e.g. legacy custom-builder tours where
+    // the engine derives the passport from the selected POIs) still get
+    // a sensible total because [TourEngine.startCustomTour] seeds
+    // `passportPoiIds` from the selection.
+    val isPartial = summary.passportTotal > 0 && summary.passportHeard < summary.passportTotal
+    statLine(
+        if (isPartial) "Stamps collected" else "Tour stamps",
+        "${summary.passportHeard} / ${summary.passportTotal}"
+    )
     statLine("Time", "${summary.totalTimeMinutes} minutes")
     statLine("Distance", if (summary.totalDistanceM < 1000) "%.0f m".format(summary.totalDistanceM)
                           else "%.1f km".format(summary.totalDistanceM / 1000))
-    statLine("Completion", "${summary.completionPercent}%")
+    if (summary.passportTotal > 0) {
+        statLine("Completion", "${summary.completionPercent}%")
+    }
 
-    // Dismiss button
-    root.addView(TextView(this).apply {
-        text = "Done"
-        textSize = 16f
-        setTextColor(Color.parseColor(SALEM_DARK))
-        setTypeface(null, Typeface.BOLD)
-        gravity = Gravity.CENTER
-        val bg = GradientDrawable().apply {
-            setColor(Color.parseColor(SALEM_GOLD))
-            cornerRadius = dp(6).toFloat()
-        }
-        background = bg
-        setPadding(dp(24), dp(12), dp(24), dp(12))
+    // S269 — primary CTA opens the Passport sheet for the just-ended tour.
+    // Secondary CTA dismisses + returns to Idle. Pre-S269 the dialog had a
+    // single "Done" button; now we lead with discovery of the passport so
+    // the walker sees which stamps they got and which they missed.
+    val ctaRow = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(0, dp(20), 0, 0)
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(20) }
-        setOnClickListener {
+        )
+    }
+    fun ctaBtn(label: String, bgColor: String, textColor: String, weight: Float, onClick: () -> Unit): TextView =
+        TextView(this).apply {
+            text = label
+            textSize = 15f
+            setTextColor(Color.parseColor(textColor))
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            val bg = GradientDrawable().apply {
+                setColor(Color.parseColor(bgColor))
+                cornerRadius = dp(6).toFloat()
+            }
+            background = bg
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight).apply {
+                marginEnd = dp(6)
+            }
+            setOnClickListener { onClick() }
+        }
+    if (summary.passportTotal > 0) {
+        ctaRow.addView(ctaBtn("Open Passport", SALEM_GOLD, SALEM_DARK, 1.6f) {
             dialog.dismiss()
             tourViewModel.dismissCompletion()
-        }
+            // S269 — pin the sheet to the just-ended tour's passport. The
+            // engine carries it on TourSummary.passportId; falls back to
+            // the bake's first passport when null.
+            com.example.wickedsalemwitchcitytour.ui.PassportSheet.show(
+                supportFragmentManager,
+                summary.passportId,
+            )
+        })
+    }
+    ctaRow.addView(ctaBtn("Done", SALEM_SURFACE, SALEM_TEXT, 1f) {
+        dialog.dismiss()
+        tourViewModel.dismissCompletion()
     })
+    root.addView(ctaRow)
 
     dialog.setContentView(root)
     dialog.show()

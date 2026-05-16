@@ -10,6 +10,7 @@
 package com.example.wickedsalemwitchcitytour.tour
 
 import com.example.wickedsalemwitchcitytour.content.model.Tour
+import com.example.wickedsalemwitchcitytour.content.model.TourLeg
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.content.model.TourStop
 
@@ -35,55 +36,48 @@ enum class TourTheme(val displayName: String) {
     }
 }
 
-/** Progress tracking for an active tour. */
+/**
+ * S269 — runtime progress carried across an active tour.
+ *
+ * Pre-S269 this carried `currentStopIndex` + `completedStops` + `skippedStops`
+ * to drive the stops-based HUD / Active-Tour dialog / completion stats. All
+ * four of those surfaces were ripped out in S269 in favour of the POI
+ * Passport (see `docs/plans/poi-passport-replaces-tour-stops.md`); the only
+ * progress the runtime still tracks is time + cumulative distance, both
+ * trivially derivable from start-time and accumulated GPS deltas.
+ */
 data class TourProgress(
     val tourId: String,
-    val currentStopIndex: Int = 0,
-    val completedStops: Set<Int> = emptySet(),
-    val skippedStops: Set<Int> = emptySet(),
     val startTimeMs: Long = System.currentTimeMillis(),
     val totalDistanceWalkedM: Double = 0.0,
-    val elapsedMs: Long = 0L
-) {
-    val isComplete: Boolean
-        get() = completedStops.size + skippedStops.size >= totalStopCount
+    val elapsedMs: Long = 0L,
+)
 
-    var totalStopCount: Int = 0
-        internal set
-
-    val completionPercent: Int
-        get() = if (totalStopCount == 0) 0
-                else (completedStops.size * 100) / totalStopCount
-}
-
-/** A fully-loaded tour with its stops, POIs, and live progress. */
+/**
+ * A fully-loaded tour with its baked legs, POIs, and live progress.
+ *
+ * Post-S190 every authored tour is polyline-only — [stops] is preserved as a
+ * field for parity with [TourGeofenceManager.loadStops] but every entry has
+ * `poiId == null`, so consumers must never derive tour-membership by joining
+ * on stops (see memory rule `feedback_tour_stops_not_poi_anchored.md`).
+ * [legs] is the canonical geometry source; [passportPoiIds] is the canonical
+ * tour-membership source.
+ */
 data class ActiveTour(
     val tour: Tour,
     val stops: List<TourStop>,
     val pois: List<TourPoi>,
-    val progress: TourProgress
-) {
-    val currentStop: TourStop?
-        get() = stops.getOrNull(progress.currentStopIndex)
-
-    val currentPoi: TourPoi?
-        get() {
-            val stop = currentStop ?: return null
-            return pois.firstOrNull { it.id == stop.poiId }
-        }
-
-    val nextStop: TourStop?
-        get() = stops.getOrNull(progress.currentStopIndex + 1)
-
-    val nextPoi: TourPoi?
-        get() {
-            val stop = nextStop ?: return null
-            return pois.firstOrNull { it.id == stop.poiId }
-        }
-
-    val remainingStops: Int
-        get() = stops.size - (progress.completedStops.size + progress.skippedStops.size)
-}
+    /** Pre-baked polyline geometry. Used at runtime by the detour anchor
+     *  helper and by the route overlay. */
+    val legs: List<TourLeg>,
+    val progress: TourProgress,
+    /** `salem_passport_filters.id` for this tour's passport, or null when no
+     *  passport is authored. */
+    val passportId: String?,
+    /** POIs in the tour's passport, in display order. Drives the visit-count
+     *  vs total comparison that fires [TourState.Completed] in S269. */
+    val passportPoiIds: Set<String>,
+)
 
 /** Observable state emitted by TourEngine. */
 sealed class TourState {
@@ -120,17 +114,24 @@ sealed class TourState {
     data class Error(val message: String) : TourState()
 }
 
-/** Summary stats shown at tour completion. */
+/**
+ * S269 — summary shown at tour completion. Passport-aware: replaces the
+ * pre-S269 stops-based counters with `passportHeard / passportTotal` so the
+ * completion dialog reflects how many of the tour's curated POIs the walker
+ * actually heard. [passportId] is non-null whenever the just-ended tour had
+ * a passport bound to it, and lets the completion dialog open the
+ * PassportSheet pre-filtered to that passport.
+ */
 data class TourSummary(
     val tourName: String,
-    val totalStops: Int,
-    val completedStops: Int,
-    val skippedStops: Int,
+    val passportId: String?,
+    val passportTotal: Int,
+    val passportHeard: Int,
     val totalTimeMs: Long,
-    val totalDistanceM: Double
+    val totalDistanceM: Double,
 ) {
     val completionPercent: Int
-        get() = if (totalStops == 0) 0 else (completedStops * 100) / totalStops
+        get() = if (passportTotal == 0) 0 else (passportHeard * 100) / passportTotal
 
     val totalTimeMinutes: Int
         get() = (totalTimeMs / 60_000).toInt()
