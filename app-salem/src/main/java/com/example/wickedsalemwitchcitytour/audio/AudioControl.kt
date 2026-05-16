@@ -154,24 +154,42 @@ object AudioControl {
     }
 
     fun isPoiSpeechEnabled(categoryRaw: String?): Boolean {
-        if (showAllOverride) return true
-        return when (groupForCategory(categoryRaw)) {
+        // S273: Show-All-POI override no longer bypasses audio-group gates.
+        // Operator intent: "Show me everything around me, but if I unchecked
+        // Ships & Services, don't NARRATE businesses." Visibility and audio
+        // are independent concerns — showAllOverride still bypasses the
+        // tour/layers visibility gates (see NarrationGeofenceManager.kt:262
+        // and SalemMainActivityNarration.kt:973), but audio routing always
+        // respects the user's per-group toggle.
+        val group = groupForCategory(categoryRaw)
+        val enabled = when (group) {
             Group.MEANINGFUL -> isMeaningfulEnabled()
             Group.AMBIENT    -> isAmbientEnabled()
             Group.BUSINESSES -> isBusinessesEnabled()
         }
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.d(
+                "AudioControl",
+                "isPoiSpeechEnabled cat=$categoryRaw group=$group enabled=$enabled " +
+                    "(showAll=$showAllOverride meaningful=${isMeaningfulEnabled()} " +
+                    "ambient=${isAmbientEnabled()} businesses=${isBusinessesEnabled()})"
+            )
+        }
+        return enabled
     }
 
     /** S217 — true when the "Show All POIs" FAB is on (operator override). */
     fun isShowAllOverride(): Boolean = showAllOverride
 
-    /** S217 — pushed from SalemMainActivity when the FAB or tour state changes. */
+    /** S217 — pushed from SalemMainActivity when the FAB or tour state changes.
+     *  S273: scope narrowed — visibility-only bypass; audio-group gates still apply. */
     fun setShowAllOverride(on: Boolean) {
         if (showAllOverride == on) return
         showAllOverride = on
         com.example.locationmapapp.util.DebugLogger.i(
             "AudioControl",
-            "Show-All-POI override → $on (bypasses tour/layers/audio-group gates)"
+            "Show-All-POI override → $on (bypasses tour/layers VISIBILITY only; " +
+                "audio group gates still apply)"
         )
         notifyListeners()
     }

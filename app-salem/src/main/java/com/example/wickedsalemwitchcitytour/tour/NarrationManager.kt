@@ -459,13 +459,25 @@ class NarrationManager @Inject constructor(
         // engine isn't ready or the active audio output can't accept TTS
         // (Bluetooth SCO-only / hearing aid). The popup greys the master
         // checkbox out in the unavailable case so the user knows why.
+        //
+        // S273 — every silent-drop path below MUST emit a synthetic
+        // Speaking→Idle pulse via [emitSyntheticComplete] before returning,
+        // not a bare `return`. The Activity's narrationState collector
+        // (SalemMainActivityNarration.kt:340) advances `currentNarration` and
+        // drains the per-POI `narrationQueue` on Idle transitions; without
+        // the pulse the walk-sim TTS-gated dwell loop sees `state=Idle &&
+        // queueNonEmpty` and sits for the 180 s safety cap on every step
+        // that fired a geofence ENTRY while muted. Operator-reported S273:
+        // master-mute + walk-sim → walker stalls every few steps.
         if (!AudioControl.isTtsEffectivelyOn()) {
-            DebugLogger.d(TAG, "TTS master OFF or unavailable — dropping ${segment.id} (master=${AudioControl.isTtsMasterEnabled()} avail=${AudioControl.isTtsAvailable()})")
+            DebugLogger.d(TAG, "TTS master OFF or unavailable — synthetic complete for ${segment.id} (master=${AudioControl.isTtsMasterEnabled()} avail=${AudioControl.isTtsAvailable()})")
+            emitSyntheticComplete(segment)
             return
         }
 
         if (!shouldSpeak()) {
-            DebugLogger.d(TAG, "Phone silent/vibrate — skipping: ${segment.id}")
+            DebugLogger.d(TAG, "Phone silent/vibrate — synthetic complete for ${segment.id}")
+            emitSyntheticComplete(segment)
             return
         }
 
@@ -473,22 +485,40 @@ class NarrationManager @Inject constructor(
         // S197 — explicit user-initiated taps bypass the gate; the speaker-menu
         // toggles are intended to mute AMBIENT / auto-triggered narration only,
         // not the in-screen Speak button (Witch-Trials article, POI sheet).
+        // S273 — symmetric debug log on every gate decision (allow + drop) so
+        // a field operator can read logcat and see exactly why a given POI
+        // narrated or didn't. AudioControl.isPoiSpeechEnabled emits its own
+        // per-category trace; this layer just records the per-segment outcome.
         if (!segment.userInitiated) {
             when (segment.kind) {
                 NarrationKind.POI -> {
-                    if (!AudioControl.isPoiSpeechEnabled(segment.category)) {
-                        DebugLogger.d(TAG, "AudioControl gate: POI group muted (cat=${segment.category}) — dropping ${segment.id}")
+                    val allowed = AudioControl.isPoiSpeechEnabled(segment.category)
+                    if (!allowed) {
+                        DebugLogger.d(TAG, "AudioControl gate: POI group muted (cat=${segment.category}) — synthetic complete for ${segment.id}")
+                        emitSyntheticComplete(segment)
                         return
+                    } else if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                        DebugLogger.d(TAG, "AudioControl gate: POI group ALLOWED (cat=${segment.category}) — proceeding with ${segment.id}")
                     }
                 }
                 NarrationKind.ORACLE -> {
-                    if (!AudioControl.isOracleSpeechEnabled()) {
-                        DebugLogger.d(TAG, "AudioControl gate: Oracle muted — dropping ${segment.id}")
+                    val allowed = AudioControl.isOracleSpeechEnabled()
+                    if (!allowed) {
+                        DebugLogger.d(TAG, "AudioControl gate: Oracle muted — synthetic complete for ${segment.id}")
+                        emitSyntheticComplete(segment)
                         return
+                    } else if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                        DebugLogger.d(TAG, "AudioControl gate: Oracle ALLOWED — proceeding with ${segment.id}")
                     }
                 }
-                null -> { /* legacy / transition / quote — no gate */ }
+                null -> {
+                    if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                        DebugLogger.d(TAG, "AudioControl gate: legacy/no-kind — proceeding unchecked with ${segment.id}")
+                    }
+                }
             }
+        } else if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            DebugLogger.d(TAG, "AudioControl gate: userInitiated bypass — proceeding with ${segment.id}")
         }
 
         queue.addLast(segment)
@@ -513,6 +543,26 @@ class NarrationManager @Inject constructor(
             playNext()
         } else {
             DebugLogger.d(TAG, "enqueue queued behind current (state=${stateNow::class.simpleName}, queue=${queue.size}, current=${currentSegment?.id})")
+        }
+    }
+
+    /**
+     * S273 — fire a Speaking→Idle state pulse so observers see a "completion"
+     * event for a segment that was dropped before reaching the TTS engine
+     * (master mute / silent ringer / category-group mute). Idle is posted via
+     * the main Handler instead of synchronously assigned: StateFlow conflates
+     * rapid changes and dedupes, so a synchronous `Speaking → Idle` round-trip
+     * collapses to no observable change when the prior value was already Idle
+     * — which is exactly the steady state during walk-sim. Posting separates
+     * the two emissions across Main-queue ticks, giving the collector a
+     * chance to process Speaking before the value settles back on Idle.
+     * Witnessed S273: master-mute + walk-sim → walker stalls every step
+     * because the dwell loop never saw an Idle transition.
+     */
+    private fun emitSyntheticComplete(segment: NarrationSegment) {
+        _state.value = NarrationState.Speaking(segment)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            _state.value = NarrationState.Idle
         }
     }
 

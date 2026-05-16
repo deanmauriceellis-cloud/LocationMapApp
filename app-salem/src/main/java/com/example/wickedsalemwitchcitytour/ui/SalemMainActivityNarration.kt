@@ -1009,8 +1009,20 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         // cycle re-fired Rockafellas. The cancel of newspaper_1692 also moves
         // here for the same reason: only kill the newspaper when we're about
         // to direct-play; queue-only adds let any in-flight newspaper finish.
-        narrationCancelForPoiAtMs = System.currentTimeMillis()
-        tourViewModel.cancelSegmentsWithTag("newspaper_1692")
+        //
+        // S273: gate on master-mute state. When TTS is muted (master off or
+        // route unavailable), speakTaggedNarration will be silently dropped
+        // by NarrationManager and the synthetic Speaking→Idle pulse fires
+        // within ~75 ms. Stamping the cancel timestamp here would put that
+        // legitimate Idle inside the 500 ms suppression window and
+        // currentNarration would stick to the dropped POI, growing the
+        // narrationQueue on every subsequent ENTRY and pinning the walk-sim
+        // dwell loop for the 180 s safety cap every step. Also no audible
+        // newspaper to kill while muted, so skipping the cancel is benign.
+        if (com.example.wickedsalemwitchcitytour.audio.AudioControl.isTtsEffectivelyOn()) {
+            narrationCancelForPoiAtMs = System.currentTimeMillis()
+            tourViewModel.cancelSegmentsWithTag("newspaper_1692")
+        }
 
         if (jumpToFront && wasInterruptingPriorPoi) {
             DebugLogger.i("NARR-QUEUE",
@@ -1045,24 +1057,32 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
         //   3. BRIEF fallback → "You are at {name}." orientation hint.
         // Prior behavior played BOTH the "You are at X" hint AND the body,
         // so every POI produced two back-to-back clips.
+        // S273: pass point.category so NarrationManager's AudioControl group
+        // gate can classify the segment. Without it the segment lands with
+        // category=null, groupForCategory(null) → MEANINGFUL, and unchecking
+        // "Ships & Services" in the speaker popup has no effect on
+        // restaurants / hotels / shops / bars.
         when {
             stripped -> tourViewModel.speakTaggedHint(
                 "poi_narration",
                 PoiContentPolicy.strippedAnnouncement(point),
                 point.name,
                 voiceId,
+                point.category,
             )
             !rawText.isNullOrBlank() -> tourViewModel.speakTaggedNarration(
                 "poi_narration",
                 rawText,
                 point.name,
                 voiceId,
+                point.category,
             )
             else -> tourViewModel.speakTaggedHint(
                 "poi_narration",
                 "You are at ${point.name}.",
                 point.name,
                 voiceId,
+                point.category,
             )
         }
         // Linger and Listen: queue each subtopic body after the main narration.
@@ -1079,6 +1099,7 @@ internal fun SalemMainActivity.enqueueNarration(point: SalemPoi, jumpToFront: Bo
                     subtopic.body,
                     point.name,
                     voiceId,
+                    point.category,
                 )
             }
             if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) DebugLogger.d("NARR-LINGER", "Linger+Listen: queued ${subtopics.size} subtopics for ${point.name}")
@@ -1292,24 +1313,30 @@ internal suspend fun SalemMainActivity.playNextNarration() {
         //   2. Historical / body text from getNarrationForPass — respects
         //      historicalMode (historical_note) and detailLevel (long → short).
         //   3. BRIEF fallback → "You are at {name}." orientation hint.
+        // S273: pass point.category so the POI group gate in NarrationManager
+        // can route to MEANINGFUL / AMBIENT / BUSINESSES correctly. Same fix
+        // as the PLAY DIRECT path in enqueueNarration above.
         when {
             stripped -> tourViewModel.speakTaggedHint(
                 "poi_narration",
                 PoiContentPolicy.strippedAnnouncement(point),
                 point.name,
                 voiceId,
+                point.category,
             )
             !rawText.isNullOrBlank() -> tourViewModel.speakTaggedNarration(
                 "poi_narration",
                 rawText,
                 point.name,
                 voiceId,
+                point.category,
             )
             else -> tourViewModel.speakTaggedHint(
                 "poi_narration",
                 "You are at ${point.name}.",
                 point.name,
                 voiceId,
+                point.category,
             )
         }
     } else {
