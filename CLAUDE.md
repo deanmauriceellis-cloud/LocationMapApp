@@ -1,8 +1,25 @@
 # LocationMapApp v1.5 — Claude Code Context
 
 > **LocationMapApp v1.5** — A multi-module Android/Web mapping platform. The primary product
-> is **WickedSalemWitchCityTour**, a GPS-guided Salem, MA tourist app with historical content,
-> geofence-triggered narration, and walking directions.
+> is **Katrina's Mystic Visitors Guide - Salem** (the V1 paid product, formerly
+> "WickedSalemWitchCityTour" — see Naming below), a GPS-guided Salem, MA tourist app with
+> historical content, geofence-triggered narration, and walking directions.
+
+---
+
+## Naming (read this before any `adb` / package work)
+
+The same product wears four different names depending on which layer you're touching. They are intentionally not aligned:
+
+| Layer | Name | Notes |
+|---|---|---|
+| **User-facing brand** | **Katrina's Mystic Visitors Guide - Salem** | `app-salem/src/main/res/values/strings.xml:app_name`. Public brand, post-S245 LLC rebrand. |
+| **Android `applicationId`** | `com.destructiveaigurus.katrinasmysticvisitorsguide` | What `adb` / `bundletool` / Play Store sees. Use this for `pm list packages`, uninstall, etc. |
+| **Kotlin / Java namespace** | `com.example.wickedsalemwitchcitytour` | Code package + Room schema dir (`app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase/`). Intentionally NOT renamed — refactor risk is high; touched everywhere. |
+| **Gradle module** | `:app-salem` | What `./gradlew` targets. |
+| **Codebase / repo slug** | `WickedSalemWitchCityTour` / `LocationMapApp_v1.5` | Legacy names; appear in older docs, plans, memory files. |
+
+**Common footgun:** `adb -s <serial> uninstall com.example.wickedsalemwitchcitytour` will return `DELETE_FAILED_INTERNAL_ERROR` because that package doesn't exist on the device — the real installed package is `com.destructiveaigurus.katrinasmysticvisitorsguide`.
 
 ---
 
@@ -18,7 +35,7 @@
   4. `node cache-proxy/scripts/publish-poi-passport.js` (S268)
   5. `node cache-proxy/scripts/align-asset-schema-to-room.js` (MUST run last — auto-discovers latest `app-salem/schemas/<DB>/<v>.json`, stamps Room `identity_hash` + `PRAGMA user_version`, rewrites every Room-managed table via canonical `createSql`. Skipping triggers `fallbackToDestructiveMigration` on first launch and wipes the asset.)
   Auxiliary scripts (run on-demand for specific content updates, not every bake): `publish-1692-newspapers.js`, `publish-witch-trials.js`, `publish-witch-trials-to-sqlite.js`, `publish-splash-tree.js`.
-- **Room schema export:** `app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase/<version>.json`. Regenerate via `./gradlew :app-salem:kspDebugKotlin -x verifyBundledAssets` after any `@Database(version = N)` bump. Current: **v20**, identity_hash `837ec05ad90541fa76a8a413a06394e0` (S268).
+- **Room schema export:** `app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase/<version>.json`. Regenerate via `./gradlew :app-salem:kspDebugKotlin -x verifyBundledAssets` after any `@Database(version = N)` bump. Current: **v21**, identity_hash `19fcd8e4347d88e9da1a50aef2734bc9` (S271).
 - **Install workflow (asset packs, S256):** standalone `adb install` does NOT include `salem_tiles.sqlite`. Use:
   ```
   bundletool build-apks --bundle=<aab> --connected-device --device-id=<serial>
@@ -165,7 +182,7 @@ If OMEN needs any of that, it can read the live log directly — the path is in 
 
 - Reference `GOVERNANCE.md` for full legal/compliance framework (56KB, lawyer-ready)
 - Reference `DESIGN-REVIEW.md` for UX/architecture decisions
-- Reference `IP.md` for intellectual property register (14 patentable innovations)
+- Reference `IP.md` for V1 IP register (copyright + Form TX status + V1-novel patentable-angle backlog — pre-pivot 14-innovation register archived 2026-04-29)
 - Reference `COMMERCIALIZATION.md` for monetization strategy
 - **COPPA compliance required** before Play Store submission (age gate)
 - **No hardcoded credentials** in APK or tracked files
@@ -179,7 +196,7 @@ If OMEN needs any of that, it can read the live log directly — the path is in 
 - **Android app** — Kotlin, Hilt DI, OkHttp, osmdroid, Room SQLite, targeting API 34
 - **Web app** — React 19, TypeScript, Vite, Leaflet, Tailwind CSS (`web/`)
 - **Cache proxy** — Node.js/Express on port 4300 (`cache-proxy/`)
-- **PostgreSQL** — `locationmapapp` DB, 9 `salem_*` tables
+- **PostgreSQL** — `locationmapapp` DB, 25 `salem_*` tables (live; includes legacy `*_legacy` + production passport/witch-trials/poi/tour tables)
 - **Multi-module monorepo** — `:core` (shared), `:app-salem` (WickedSalemWitchCityTour), `:routing-jvm` (shared Dijkstra + parity tests). (S242: pre-pivot `:app` and `:salem-content` modules deleted as dead code.)
 
 ---
@@ -243,4 +260,4 @@ Under the amended startup rule (2026-05-04, S224): `CLAUDE.md` + `MEMORY.md` aut
 
 **No master plan** — deleted 2026-04-23 (S161); pre-park snapshot lives at `docs/archive/Parked_WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md`. Do not treat it as a plan-of-record.
 
-_Document Version: 0.3.0 — Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._
+_Document Version: 0.4.0 — Naming-disambiguation block added (S272 lint, 2026-05-16). Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._
