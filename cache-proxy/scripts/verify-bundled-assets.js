@@ -23,6 +23,19 @@ const Database = require('better-sqlite3');
 
 const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
 
+// S272 — CI mode. GitHub Actions sets CI=true automatically. The runner
+// doesn't have the four large gitignored asset paths
+// (`salem_tiles.sqlite` 207MB, `poi-icons/` 544MB, `hero/`, `heroes/`),
+// so their physical-presence checks are demoted to warnings on CI.
+// The committed `salem_content.db` (Room schema + content) is still
+// hard-checked — that's the only artifact CI can actually verify.
+// Local operator runs (CI unset) still hard-check everything.
+const CI_MODE = process.env.CI === 'true';
+function failOrWarnOnCi(msg) {
+  if (CI_MODE) warnings.push(`[CI-skipped] ${msg}`);
+  else failures.push(msg);
+}
+
 // Latest Room schema hash. Bump alongside @Database(version = N) — read from
 // app-salem/schemas/.../<N>.json after kspDebugKotlin regenerates it.
 //   v11 (S186) — added is_civic_poi to SalemPoi
@@ -99,13 +112,23 @@ const REQUIRED_ROOM_TABLES = [
 const REQUIRED_TOUR_ROUTES = [];
 
 // Required top-level asset directories that must exist and be non-empty.
-const REQUIRED_NONEMPTY_DIRS = [
+// S272: poi-icons (544MB), hero/, and heroes/ are gitignored and absent on
+// CI runners. CI_MODE filters them out — the warning emitted at the bottom
+// of this block names what was skipped.
+const REQUIRED_NONEMPTY_DIRS_FULL = [
   'poi-icons',
   'poi-circle-icons',
   'hero',
   'heroes',
   'portraits',
 ];
+const CI_SKIPPED_DIRS = new Set(['poi-icons', 'hero', 'heroes']);
+const REQUIRED_NONEMPTY_DIRS = CI_MODE
+  ? REQUIRED_NONEMPTY_DIRS_FULL.filter((d) => !CI_SKIPPED_DIRS.has(d))
+  : REQUIRED_NONEMPTY_DIRS_FULL;
+
+// Emit a warning per skipped dir so CI logs explicitly enumerate what was
+// not verified. Deferred until `warnings` is declared below.
 
 const failures = [];
 const warnings = [];
@@ -114,6 +137,13 @@ const ok = [];
 function fail(msg)  { failures.push(msg); }
 function warn(msg)  { warnings.push(msg); }
 function pass(msg)  { ok.push(msg); }
+
+// S272 — surface CI-mode skip enumeration now that `warnings` exists.
+if (CI_MODE) {
+  for (const d of CI_SKIPPED_DIRS) {
+    warnings.push(`[CI-skipped] required dir not verified: ${d}/ (gitignored, local-only)`);
+  }
+}
 
 // ── salem_content.db ──────────────────────────────────────────────────────
 const CONTENT_DB = path.join(ASSETS, 'salem_content.db');
@@ -162,7 +192,10 @@ if (!fs.existsSync(CONTENT_DB)) {
 const TILES_PACK_ASSETS = path.resolve(__dirname, '../../app-salem-tiles-pack/src/main/assets');
 const TILES_DB = path.join(TILES_PACK_ASSETS, 'salem_tiles.sqlite');
 if (!fs.existsSync(TILES_DB)) {
-  fail(`missing file: ${TILES_DB}`);
+  // S272: salem_tiles.sqlite is 207MB and gitignored. CI demotes the
+  // missing-file check to a warning; local builds still hard-fail (the
+  // operator bakes the file into the asset-pack module before each AAB).
+  failOrWarnOnCi(`missing file: ${TILES_DB}`);
 } else {
   let db;
   try {
@@ -316,6 +349,9 @@ if (fs.existsSync(WT_PORTRAITS)) {
 
 // ── report ────────────────────────────────────────────────────────────────
 console.log('\n=== Bundled Assets Verification ===');
+if (CI_MODE) {
+  console.log('  MODE  CI (gitignored asset paths demoted to warnings — see [CI-skipped] entries)');
+}
 for (const m of ok)       console.log(`  OK    ${m}`);
 for (const m of warnings) console.log(`  WARN  ${m}`);
 for (const m of failures) console.log(`  FAIL  ${m}`);
