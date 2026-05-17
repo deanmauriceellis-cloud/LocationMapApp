@@ -63,5 +63,13 @@ data class CollectionEntry(
     @ColumnInfo(name = "poi_name") val poiName: String,
     @ColumnInfo(name = "poi_lat") val poiLat: Double,
     @ColumnInfo(name = "poi_lng") val poiLng: Double,
-    @ColumnInfo(name = "poi_category") val poiCategory: String
+    @ColumnInfo(name = "poi_category") val poiCategory: String,
+
+    // ── Katrina's Collection ghost (S275 — Phase 2) ──
+    // Denormalized from salem_pois so CollectionSheet renders the badge grid
+    // entirely off this one table without joining back at runtime. NULL for
+    // non-HIST_BLDG entries (Phase 2 generated 107 paired portraits only).
+    @ColumnInfo(name = "ghost_asset_a") val ghostAssetA: String? = null,
+    @ColumnInfo(name = "ghost_asset_b") val ghostAssetB: String? = null,
+    @ColumnInfo(name = "ghost_frame")   val ghostFrame:  String? = null
 )

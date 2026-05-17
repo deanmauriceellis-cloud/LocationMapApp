@@ -13,6 +13,8 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.content.DialogInterface
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -28,6 +30,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.locationmapapp.util.DebugLogger
@@ -75,14 +78,24 @@ class CollectionSheet : DialogFragment() {
     /** All collection summaries baked in salem_content.db. Loaded once on open. */
     private var allCollections: List<CollectionEntryDao.CollectionSummary> = emptyList()
 
-    /** Rows for the currently-displayed collection, flat for the RecyclerView adapter. */
+    /** Rows for the list view (existing: category headers + POI rows). */
     private val rows = mutableListOf<RowItem>()
+
+    /** Rows for the badge grid (S275: HIST_BLDG-filtered, flat, displayOrder-sorted). */
+    private val gridRows = mutableListOf<CollectionEntry>()
+
+    /** Visited POI ids in the active collection — used by both views. */
+    private var heardIdsForGrid: Set<String> = emptySet()
 
     private lateinit var titleView: TextView
     private lateinit var counterView: TextView
     private lateinit var pickerView: TextView
     private lateinit var emptyView: TextView
     private lateinit var listView: RecyclerView
+    private lateinit var gridView: RecyclerView
+    private lateinit var tabList: TextView
+    private lateinit var tabBadges: TextView
+    private lateinit var tabIndicator: View
     private lateinit var overflowView: ImageView
     private lateinit var closeView: ImageView
 
@@ -134,11 +147,29 @@ class CollectionSheet : DialogFragment() {
         pickerView   = view.findViewById(R.id.collectionPicker)
         emptyView    = view.findViewById(R.id.collectionEmpty)
         listView     = view.findViewById(R.id.collectionList)
+        gridView     = view.findViewById(R.id.collectionGrid)
+        tabList      = view.findViewById(R.id.tabList)
+        tabBadges    = view.findViewById(R.id.tabBadges)
+        tabIndicator = view.findViewById(R.id.tabIndicator)
         overflowView = view.findViewById(R.id.collectionOverflow)
         closeView    = view.findViewById(R.id.collectionClose)
 
         listView.layoutManager = LinearLayoutManager(requireContext())
         listView.adapter = adapter
+
+        // S275 — badge grid: 3-up on phones, 4-6 on wider screens.
+        val widthDp = resources.configuration.screenWidthDp
+        val spanCount = when {
+            widthDp >= 840 -> 6
+            widthDp >= 720 -> 5
+            widthDp >= 600 -> 4
+            else           -> 3
+        }
+        gridView.layoutManager = GridLayoutManager(requireContext(), spanCount)
+        gridView.adapter = gridAdapter
+
+        tabList.setOnClickListener { showTab(showBadges = false) }
+        tabBadges.setOnClickListener { showTab(showBadges = true) }
 
         closeView.setOnClickListener { dismissAllowingStateLoss() }
         overflowView.setOnClickListener { showOverflowMenu(it) }
@@ -161,15 +192,20 @@ class CollectionSheet : DialogFragment() {
             val snapshot = withContext(Dispatchers.IO) {
                 val collections = collectionEntryDao.listCollections()
                 if (collections.isEmpty()) {
-                    LoadSnapshot(emptyList(), null, emptyList(), 0, 0)
+                    LoadSnapshot(emptyList(), null, emptyList(), 0, 0, emptyList(), emptySet())
                 } else {
                     val pid = activeCollectionId ?: collections.first().collection_id
                     val (rows, heard, total) = buildRowsForCollection(pid)
-                    LoadSnapshot(collections, pid, rows, heard, total)
+                    val (ghosts, heardGhosts) = buildGridForCollection(pid)
+                    LoadSnapshot(collections, pid, rows, heard, total, ghosts, heardGhosts)
                 }
             }
             allCollections = snapshot.collections
             activeCollectionId = snapshot.activePid
+            gridRows.clear()
+            gridRows.addAll(snapshot.gridRows)
+            heardIdsForGrid = snapshot.gridHeard
+            gridAdapter.notifyDataSetChanged()
             applyState(snapshot.rows, snapshot.heardCount, snapshot.totalCount)
         }
     }
@@ -201,6 +237,15 @@ class CollectionSheet : DialogFragment() {
             }
         }
         return RowResult(result, heardIds.size, pois.size)
+    }
+
+    /** S275 — Side data path for the badge grid. HIST_BLDG only, sorted by displayOrder. */
+    private suspend fun buildGridForCollection(collectionId: String): Pair<List<CollectionEntry>, Set<String>> {
+        val all = collectionEntryDao.findByCollection(collectionId)
+        val ghosts = all.filter { !it.ghostAssetA.isNullOrBlank() }.sortedBy { it.displayOrder }
+        val heard  = if (ghosts.isEmpty()) emptySet()
+                     else poiVisitDao.listHeardAmong(ghosts.map { it.poiId }).toSet()
+        return ghosts to heard
     }
 
     private fun applyState(newRows: List<RowItem>, heard: Int, total: Int) {
@@ -325,20 +370,31 @@ class CollectionSheet : DialogFragment() {
     }
 
     private inner class PoiVh(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val stamp: ImageView = itemView.findViewById(R.id.rowVisited)
-        private val name: TextView = itemView.findViewById(R.id.rowName)
-        private val detail: TextView = itemView.findViewById(R.id.rowDetail)
+        private val portrait: ImageView = itemView.findViewById(R.id.rowPortrait)
+        private val frame:    ImageView = itemView.findViewById(R.id.rowFrame)
+        private val name:     TextView  = itemView.findViewById(R.id.rowName)
+        private val detail:   TextView  = itemView.findViewById(R.id.rowDetail)
         fun bind(p: RowItem.Poi) {
             name.text = p.entry.poiName
+
+            // S275 — same rules as the badge grid: portrait+frame, 2% B-swap,
+            // greyscale until caught, frame always full color. Non-HIST_BLDG
+            // rows have null ghost assets and show an empty 64dp box.
+            val portraitBmp = GhostResolver.pickPortrait(
+                itemView.context, p.entry.ghostAssetA, p.entry.ghostAssetB
+            )
+            portrait.setImageBitmap(portraitBmp)
+            portrait.colorFilter = if (p.heard) null else GREYSCALE_FILTER
+            portrait.alpha       = if (p.heard) 1.0f else UNCOLLECTED_ALPHA
+            // S275 — frame only appears once you've caught the ghost (catch reward).
+            frame.setImageBitmap(GhostResolver.load(itemView.context, p.entry.ghostFrame))
+            frame.alpha = if (p.heard) 1.0f else 0.0f
+
             if (p.heard) {
-                stamp.alpha = 1.0f
-                stamp.setColorFilter(ContextCompat.getColor(itemView.context, R.color.collection_entry_visited))
                 val dateStr = SimpleDateFormat("MMM d, yyyy", Locale.US).format(Date(p.firstHeardAtMs))
                 detail.text = "Heard ${p.heardCount}× · first $dateStr"
                 detail.setTextColor(0xFFA89D85.toInt())
             } else {
-                stamp.alpha = 0.25f
-                stamp.setColorFilter(0xFFA89D85.toInt())
                 detail.text = "Unheard"
                 detail.setTextColor(0xFF7C8085.toInt())
             }
@@ -384,6 +440,8 @@ class CollectionSheet : DialogFragment() {
         val rows: List<RowItem>,
         val heardCount: Int,
         val totalCount: Int,
+        val gridRows: List<CollectionEntry>,
+        val gridHeard: Set<String>,
     )
 
     private data class RowResult(
@@ -391,6 +449,75 @@ class CollectionSheet : DialogFragment() {
         val heardCount: Int,
         val totalCount: Int,
     )
+
+    // ── S275: Badge grid (augments the list view via the tab bar) ───────
+
+    private fun showTab(showBadges: Boolean) {
+        listView.visibility = if (showBadges) View.GONE else View.VISIBLE
+        gridView.visibility = if (showBadges) View.VISIBLE else View.GONE
+        tabList.setTextColor(if (showBadges) 0xFFA89D85.toInt() else 0xFFF4EDE0.toInt())
+        tabBadges.setTextColor(if (showBadges) 0xFFF4EDE0.toInt() else 0xFFA89D85.toInt())
+        // Slide the underline indicator under the active tab.
+        val parent = tabIndicator.parent as? androidx.constraintlayout.widget.ConstraintLayout
+        parent?.let {
+            val anchor = if (showBadges) tabBadges else tabList
+            (tabIndicator.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams).apply {
+                startToStart = anchor.id
+                endToEnd = anchor.id
+                tabIndicator.layoutParams = this
+            }
+        }
+    }
+
+    private val gridAdapter = object : RecyclerView.Adapter<TileVh>() {
+        override fun getItemCount(): Int = gridRows.size
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TileVh {
+            val li = LayoutInflater.from(parent.context)
+            return TileVh(li.inflate(R.layout.item_collection_tile, parent, false))
+        }
+        override fun onBindViewHolder(holder: TileVh, position: Int) {
+            holder.bind(gridRows[position])
+        }
+    }
+
+    /**
+     * S275 — Badge tile: portrait + frame overlay + caption.
+     *
+     * View-state rules:
+     *   - Collected (heard): full color portrait + frame, caption 100%.
+     *   - Uncollected: portrait greyscaled via ColorMatrix saturation=0,
+     *     frame STAYS FULL COLOR (operator-stated S275), caption dims to 60%.
+     *   - On every bind: 2% roll picks the B (smirk) portrait instead of A.
+     *   - Tap → existing POI Detail sheet.
+     */
+    private inner class TileVh(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val portrait: ImageView = itemView.findViewById(R.id.tilePortrait)
+        private val frame:    ImageView = itemView.findViewById(R.id.tileFrame)
+        private val nameView: TextView  = itemView.findViewById(R.id.tileName)
+        private val metaView: TextView  = itemView.findViewById(R.id.tileMeta)
+
+        fun bind(entry: CollectionEntry) {
+            val heard = entry.poiId in heardIdsForGrid
+            nameView.text = entry.poiName
+            metaView.text = prettyCategory(entry.poiCategory)
+
+            val portraitBmp = GhostResolver.pickPortrait(
+                itemView.context, entry.ghostAssetA, entry.ghostAssetB
+            )
+            portrait.setImageBitmap(portraitBmp)
+            portrait.colorFilter = if (heard) null else GREYSCALE_FILTER
+            portrait.alpha       = if (heard) 1.0f else UNCOLLECTED_ALPHA
+
+            // S275 — frame only appears once you've caught the ghost (catch reward).
+            frame.setImageBitmap(GhostResolver.load(itemView.context, entry.ghostFrame))
+            frame.alpha = if (heard) 1.0f else 0.0f
+
+            nameView.alpha = if (heard) 1.0f else 0.6f
+            metaView.alpha = if (heard) 1.0f else 0.6f
+
+            itemView.setOnClickListener { openPoiDetail(entry.poiId) }
+        }
+    }
 
     companion object {
         private const val TAG = "CollectionSheet"
@@ -400,6 +527,16 @@ class CollectionSheet : DialogFragment() {
         private const val MENU_END_TOUR = 2
         private const val TYPE_HEADER = 0
         private const val TYPE_POI = 1
+
+        /** S275 — pre-built saturation-zero filter for uncollected portrait greyscale. */
+        private val GREYSCALE_FILTER: ColorMatrixColorFilter =
+            ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+
+        /** S275 — additional 50% brightness dim on uncollected portraits.
+         *  Sits on top of GREYSCALE_FILTER. Frame stays at 1.0 alpha so it
+         *  still reads as a clearly-bordered tile. Operator-stated: "degrade
+         *  the brightness of the badges not gained by 50%". */
+        private const val UNCOLLECTED_ALPHA: Float = 0.5f
 
         /**
          * S269 — `collectionId` lets the caller pin the sheet to a specific

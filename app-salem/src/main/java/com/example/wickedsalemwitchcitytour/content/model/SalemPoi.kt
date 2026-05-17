@@ -100,6 +100,14 @@ data class SalemPoi(
     @ColumnInfo(name = "origin_story") val originStory: String? = null,
     @ColumnInfo(name = "image_asset") val imageAsset: String? = null,
     @ColumnInfo(name = "custom_icon_asset") val customIconAsset: String? = null,
+
+    // ── Katrina's Collection ghost (S275 — Phase 2) ──
+    // Paired portraits + frame overlay slug. Populated for HIST_BLDG only; NULL otherwise.
+    // Paths follow image_asset convention (full asset-relative path with extension).
+    @ColumnInfo(name = "ghost_asset_a") val ghostAssetA: String? = null,
+    @ColumnInfo(name = "ghost_asset_b") val ghostAssetB: String? = null,
+    @ColumnInfo(name = "ghost_frame")   val ghostFrame:  String? = null,
+
     @ColumnInfo(name = "action_buttons") val actionButtons: String? = null,
 
     // ── BCS enrichment (JSON text) ──

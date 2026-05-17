@@ -30,7 +30,7 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         WitchTrialsNewspaper::class,
         CollectionEntry::class
     ],
-    version = 22,
+    version = 23,
     exportSchema = true
 )
 abstract class SalemContentDatabase : RoomDatabase() {

@@ -110,6 +110,58 @@
         app:layout_constraintTop_toBottomOf="@id/collectionHeader"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- S275 — tab bar to switch between the list view (existing) and the
+         badge grid (new). Sits below the collection picker chip. -->
+    <LinearLayout
+        android:id="@+id/collectionTabs"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:background="#16151B"
+        app:layout_constraintTop_toBottomOf="@id/collectionPicker"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tabList"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textColor="#F4EDE0"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="List" />
+
+        <TextView
+            android:id="@+id/tabBadges"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textColor="#A89D85"
+            android:textSize="13sp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="Badges" />
+
+    </LinearLayout>
+
+    <!-- Thin amber underline that slides under the active tab. -->
+    <View
+        android:id="@+id/tabIndicator"
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:background="#E7CDA0"
+        app:layout_constraintTop_toBottomOf="@id/collectionTabs"
+        app:layout_constraintStart_toStartOf="@id/tabList"
+        app:layout_constraintEnd_toEndOf="@id/tabList" />
+
     <!-- Empty state (shown when no collection rows are baked yet) -->
     <TextView
         android:id="@+id/collectionEmpty"
@@ -121,12 +173,12 @@
         android:textSize="14sp"
         android:visibility="gone"
         android:text="No collections authored yet.\n\nUse the web admin Collections tab to create a filter, then re-run the publish chain."
-        app:layout_constraintTop_toBottomOf="@id/collectionPicker"
+        app:layout_constraintTop_toBottomOf="@id/tabIndicator"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
 
-    <!-- The list itself -->
+    <!-- The list view (existing — category headers + POI rows). -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/collectionList"
         android:layout_width="match_parent"
@@ -134,7 +186,24 @@
         android:paddingBottom="32dp"
         android:clipToPadding="false"
         android:scrollbars="vertical"
-        app:layout_constraintTop_toBottomOf="@id/collectionPicker"
+        app:layout_constraintTop_toBottomOf="@id/tabIndicator"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <!-- S275 — the badge grid view (new — 3-up portraits + frame overlays).
+         Visibility toggled by the tabs. HIST_BLDG-filtered. -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/collectionGrid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="32dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/tabIndicator"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />

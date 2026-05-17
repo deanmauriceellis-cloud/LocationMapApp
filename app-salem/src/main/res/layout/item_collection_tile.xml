@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5 — S275 (Katrina's Collection Phase 3)
+  Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
+
+  Single badge tile for the CollectionSheet grid. Each tile = square portrait
+  box (portrait img + frame overlay stacked) + caption (name + meta).
+  Used by [CollectionSheet.kt] with GridLayoutManager (3 cols phone / 5-6 tablet).
+
+  IMPORTANT (S275 lesson): the root MUST be ConstraintLayout for the inner
+  square aspect (layout_constraintDimensionRatio="1:1") to actually apply.
+  Wrapping in a LinearLayout collapses the box to zero height.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="6dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Square portrait box: portrait + frame stacked, 1:1 aspect. -->
+    <ImageView
+        android:id="@+id/tilePortrait"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:scaleType="centerCrop"
+        android:background="#0A0A0A"
+        android:contentDescription="@null"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintDimensionRatio="1:1" />
+
+    <ImageView
+        android:id="@+id/tileFrame"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:scaleType="fitXY"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        app:layout_constraintTop_toTopOf="@id/tilePortrait"
+        app:layout_constraintBottom_toBottomOf="@id/tilePortrait"
+        app:layout_constraintStart_toStartOf="@id/tilePortrait"
+        app:layout_constraintEnd_toEndOf="@id/tilePortrait" />
+
+    <TextView
+        android:id="@+id/tileName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="#F4EDE0"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:gravity="center_horizontal"
+        app:layout_constraintTop_toBottomOf="@id/tilePortrait"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:text="Hawthorne House" />
+
+    <TextView
+        android:id="@+id/tileMeta"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="#A89D85"
+        android:textSize="10sp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:gravity="center_horizontal"
+        app:layout_constraintTop_toBottomOf="@id/tileName"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        tools:text="1804" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

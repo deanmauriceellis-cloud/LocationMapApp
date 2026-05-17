@@ -373,6 +373,15 @@ CREATE TABLE IF NOT EXISTS salem_pois (
   custom_icon_asset      TEXT,
   action_buttons         JSONB DEFAULT '[]',
 
+  -- ── Katrina's Collection ghost (S275 — Phase 2) ─────────────────
+  -- ghost_asset_a/b: paired portraits (A normal, B fourth-wall-break smirk).
+  -- ghost_frame:     border overlay slug (8 self-contained PNGs in frames/).
+  -- Populated for HIST_BLDG category POIs from the S275 SD batch; NULL otherwise.
+  -- Paths follow image_asset convention: full asset-relative path with extension.
+  ghost_asset_a          TEXT,
+  ghost_asset_b          TEXT,
+  ghost_frame            TEXT,
+
   -- ── SalemIntelligence enrichment ────────────────────────────────
   intel_entity_id        TEXT,                            -- BCS entity_id FK for v2 online features
   secondary_categories   JSONB DEFAULT '[]',
@@ -645,3 +654,12 @@ BEGIN
     EXECUTE 'ALTER TABLE salem_collection_entries RENAME COLUMN filter_id TO collection_id';
   END IF;
 END $$;
+
+-- S275 — idempotent forward-migration for Katrina's Collection Phase 2 ghost
+-- columns on salem_pois. Safe to re-run; no-ops once the columns exist.
+-- Cache-proxy startup also re-runs these via admin module init so dev installs
+-- pick up the columns without needing a fresh psql run of this file.
+ALTER TABLE salem_pois
+  ADD COLUMN IF NOT EXISTS ghost_asset_a TEXT,
+  ADD COLUMN IF NOT EXISTS ghost_asset_b TEXT,
+  ADD COLUMN IF NOT EXISTS ghost_frame   TEXT;

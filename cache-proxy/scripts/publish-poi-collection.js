@@ -103,7 +103,8 @@ async function fetchFilters(client) {
 
 async function loadExistingPois(client, filterId) {
   const { rows } = await client.query(
-    `SELECT p.id, p.name, p.category, p.lat, p.lng
+    `SELECT p.id, p.name, p.category, p.lat, p.lng,
+            p.ghost_asset_a, p.ghost_asset_b, p.ghost_frame
        FROM salem_collection_entries pp
        JOIN salem_pois p ON p.id = pp.poi_id
       WHERE pp.collection_id = $1
@@ -116,7 +117,8 @@ async function loadExistingPois(client, filterId) {
 async function matchPois(client, filter) {
   const { whereSql, joinSql, args } = buildFilterQuery(filter);
   const sql = `
-    SELECT p.id, p.name, p.category, p.lat, p.lng
+    SELECT p.id, p.name, p.category, p.lat, p.lng,
+           p.ghost_asset_a, p.ghost_asset_b, p.ghost_frame
       FROM salem_pois p
       ${joinSql}
      WHERE ${whereSql}
@@ -168,10 +170,12 @@ function bakeToSqlite(db, filtersWithPois) {
   const insert = db.prepare(`
     INSERT INTO collection_entry (
       collection_id, collection_name, tour_id, poi_id, display_order,
-      poi_name, poi_lat, poi_lng, poi_category
+      poi_name, poi_lat, poi_lng, poi_category,
+      ghost_asset_a, ghost_asset_b, ghost_frame
     ) VALUES (
       @collection_id, @collection_name, @tour_id, @poi_id, @display_order,
-      @poi_name, @poi_lat, @poi_lng, @poi_category
+      @poi_name, @poi_lat, @poi_lng, @poi_category,
+      @ghost_asset_a, @ghost_asset_b, @ghost_frame
     )
   `);
 
@@ -190,6 +194,11 @@ function bakeToSqlite(db, filtersWithPois) {
           poi_lat: p.lat,
           poi_lng: p.lng,
           poi_category: p.category,
+          // S275 denormalization: ghost paths live on salem_pois; copy onto each
+          // collection_entry row so CollectionSheet renders from one table.
+          ghost_asset_a: p.ghost_asset_a ?? null,
+          ghost_asset_b: p.ghost_asset_b ?? null,
+          ghost_frame:   p.ghost_frame   ?? null,
         });
         inserted += 1;
       }
