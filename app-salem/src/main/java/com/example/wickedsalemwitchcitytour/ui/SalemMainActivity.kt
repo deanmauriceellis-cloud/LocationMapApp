@@ -3674,7 +3674,7 @@ class SalemMainActivity : AppCompatActivity() {
             }
         }
         viewModel.places.observe(this) { (layerId, places) ->
-            DebugLogger.i("SalemMainActivity", "places → ${places.size} results layerId=$layerId")
+            DebugLogger.i("SalemMainActivity", "places → ${places.size} results layerId=$layerId (filterAndMapActive=$filterAndMapActive findFilterActive=$findFilterActive)")
             if (layerId == "bbox") {
                 if (places.size > 5000) {
                     DebugLogger.i("SalemMainActivity", "POI count ${places.size} > 5000 — suppressing display")
@@ -4129,19 +4129,43 @@ class SalemMainActivity : AppCompatActivity() {
      *  Server returns clusters at wide zoom levels, individual POIs when zoomed in. */
     internal fun loadCachedPoisForVisibleArea() {
         val bb = binding.mapView.boundingBox
+        DebugLogger.d("FilterMap", "loadCachedPoisForVisibleArea() bbox=[${"%.4f".format(bb.latSouth)},${"%.4f".format(bb.lonWest)} → ${"%.4f".format(bb.latNorth)},${"%.4f".format(bb.lonEast)}] (filterAndMapActive=$filterAndMapActive findFilterActive=$findFilterActive) — caller=${Thread.currentThread().stackTrace.getOrNull(3)?.let { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" } ?: "?"}")
         viewModel.loadCachedPoisForBbox(bb.latSouth, bb.lonWest, bb.latNorth, bb.lonEast)
     }
 
 
 
     internal fun clearPoiMarkers(layerId: String) {
+        val count = poiMarkers[layerId]?.size ?: 0
+        DebugLogger.d("FilterMap", "clearPoiMarkers('$layerId') removing $count markers (filterAndMapActive=$filterAndMapActive findFilterActive=$findFilterActive)")
         poiMarkers[layerId]?.forEach { binding.mapView.overlays.remove(it) }
         poiMarkers[layerId]?.clear()
         binding.mapView.invalidate()
     }
 
+    /** S276 — true source of POI visibility on the map is the narration-marker
+     *  system (cache-backed, ~580 markers), NOT poiMarkers. Search/filter-map
+     *  mode needs to hide them while still in the map view, then restore. */
+    internal var tourPausedBySearch: Boolean = false
+
+    /** Detach every narration marker from the map view, preserving
+     *  [narrationMarkerCache] so they can be re-attached cheaply on exit. */
+    internal fun detachAllNarrationMarkers() {
+        val before = narrationMarkersOnOverlay.size
+        for (id in narrationMarkersOnOverlay) {
+            narrationMarkerCache[id]?.let { binding.mapView.overlays.remove(it.first) }
+        }
+        narrationMarkersOnOverlay.clear()
+        narrationMarkers.clear()
+        DebugLogger.d("FilterMap", "detachAllNarrationMarkers() removed $before markers (cache preserved at ${narrationMarkerCache.size} entries)")
+        binding.mapView.invalidate()
+    }
+
     /** Clear ALL POI markers from every layer at once. */
     internal fun clearAllPoiMarkers() {
+        val breakdown = poiMarkers.entries.joinToString(",") { "${it.key}=${it.value.size}" }
+        val total = poiMarkers.values.sumOf { it.size }
+        DebugLogger.d("FilterMap", "clearAllPoiMarkers() removing $total markers across ${poiMarkers.size} layers [$breakdown] (filterAndMapActive=$filterAndMapActive findFilterActive=$findFilterActive)")
         poiMarkers.values.forEach { list ->
             list.forEach { binding.mapView.overlays.remove(it) }
         }
@@ -4150,6 +4174,7 @@ class SalemMainActivity : AppCompatActivity() {
 
     /** Replace all POI markers with only the given viewport results. */
     internal fun replaceAllPoiMarkers(places: List<com.example.locationmapapp.data.model.PlaceResult>) {
+        DebugLogger.d("FilterMap", "replaceAllPoiMarkers(places=${places.size}) (filterAndMapActive=$filterAndMapActive findFilterActive=$findFilterActive) — about to clear+rebuild")
         clearAllPoiMarkers()
         if (places.isEmpty()) {
             binding.mapView.invalidate()

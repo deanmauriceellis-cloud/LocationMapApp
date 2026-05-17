@@ -112,6 +112,134 @@ internal object FuzzySearchEngine {
         "museum"          to listOf("museums"),
         "museums"         to listOf("museum"),
         "tours"           to listOf("tour"),
+
+        // --- Wave 2 tourist-query expansion (S276) ---
+        // Humorous / Salem-brand / Halloween / paranormal
+        "witchy"          to listOf("witch", "witchcraft"),
+        "witchcraft"      to listOf("witch", "witchy"),
+        "spooky"          to listOf("witch", "ghost", "haunted", "witchcraft"),
+        "haunted"         to listOf("ghost", "witch"),
+        "ghost"           to listOf("haunted", "witch"),
+        "ghosts"          to listOf("ghost", "haunted"),
+        "occult"          to listOf("witch", "witchcraft", "crystal"),
+        "magic"           to listOf("witch", "witchcraft", "crystal"),
+        "magical"         to listOf("witch", "witchcraft"),
+        "halloween"       to listOf("witch", "ghost", "haunted"),
+        "scary"           to listOf("ghost", "haunted"),
+        "creepy"          to listOf("ghost", "haunted"),
+        "paranormal"      to listOf("ghost", "haunted", "witch"),
+        "supernatural"    to listOf("ghost", "haunted", "witch"),
+        "crystal"         to listOf("witchcraft", "witch"),
+        "crystals"        to listOf("crystal", "witchcraft", "witch"),
+        "psychic"         to listOf("witch", "witchcraft"),
+        "tarot"           to listOf("witch", "witchcraft"),
+        "warlock"         to listOf("witch", "witchcraft"),
+
+        // Parking
+        "parking"         to listOf("garage"),
+        "garage"          to listOf("parking"),
+
+        // Transport / transit
+        "transport"       to listOf("mbta", "ferry", "train", "bus", "station"),
+        "transportation"  to listOf("mbta", "ferry", "train", "bus", "station"),
+        "transit"         to listOf("mbta", "bus", "train"),
+        "train"           to listOf("mbta", "rail", "station"),
+        "trains"          to listOf("mbta", "train"),
+        "subway"          to listOf("mbta", "train", "station"),
+        "bus"             to listOf("mbta", "transit"),
+        "buses"           to listOf("bus", "mbta"),
+        "ferry"           to listOf("boat", "terminal"),
+        "ferries"         to listOf("ferry", "boat"),
+        "boat"            to listOf("ferry", "marina"),
+        "boats"           to listOf("boat", "ferry", "marina"),
+        "mbta"            to listOf("train", "bus", "rail", "station"),
+        "rail"            to listOf("mbta", "train"),
+        "commuter"        to listOf("mbta", "train", "rail"),
+        "taxi"            to listOf("cab", "uber", "ride"),
+        "uber"            to listOf("taxi", "cab", "ride"),
+        "lyft"            to listOf("taxi", "cab", "uber"),
+        "cab"             to listOf("taxi", "uber"),
+        "rideshare"       to listOf("taxi", "uber", "lyft", "cab"),
+
+        // Bathroom / restroom (some categories may be data-gap until authored)
+        "bathroom"        to listOf("restroom", "toilet", "washroom"),
+        "bathrooms"       to listOf("restroom", "toilet"),
+        "restroom"        to listOf("bathroom", "toilet"),
+        "restrooms"       to listOf("bathroom", "toilet"),
+        "toilet"          to listOf("restroom", "bathroom"),
+        "toilets"         to listOf("restroom", "bathroom"),
+        "washroom"        to listOf("restroom", "bathroom"),
+        "wc"              to listOf("restroom", "bathroom", "toilet"),
+
+        // Cannabis / pot
+        "pot"             to listOf("cannabis", "dispensary", "marijuana", "weed"),
+        "weed"            to listOf("cannabis", "dispensary", "marijuana"),
+        "marijuana"       to listOf("cannabis", "dispensary"),
+        "dispensary"      to listOf("cannabis"),
+        "cannabis"        to listOf("dispensary"),
+
+        // Tobacco / smoke / vape
+        "smoke"           to listOf("tobacco", "vape", "smokeshop"),
+        "smokes"          to listOf("tobacco", "vape", "smokeshop"),
+        "smokeshop"       to listOf("tobacco", "vape", "smoke"),
+        "headshop"        to listOf("tobacco", "vape", "smoke", "cannabis"),
+        "vape"            to listOf("tobacco", "smoke"),
+        "vapes"           to listOf("tobacco", "smoke", "vape"),
+        "cigar"           to listOf("tobacco", "smoke"),
+        "cigars"          to listOf("tobacco", "smoke"),
+        "cigarette"       to listOf("tobacco", "smoke"),
+        "cigarettes"      to listOf("tobacco", "smoke"),
+        "tobacco"         to listOf("smoke", "vape"),
+
+        // Florist / flowers
+        "florist"         to listOf("flower", "flowers"),
+        "florists"        to listOf("flower", "flowers"),
+        "flower"          to listOf("florist", "flowers"),
+        "flowers"         to listOf("florist", "flower"),
+
+        // Pharmacy / drugstore
+        "pharmacy"        to listOf("drugstore", "drug", "cvs", "walgreens"),
+        "pharmacies"      to listOf("pharmacy", "drugstore", "cvs", "walgreens"),
+        "drugstore"       to listOf("pharmacy", "drug", "cvs", "walgreens"),
+        "drugstores"      to listOf("drugstore", "pharmacy", "drug"),
+        "drug"            to listOf("pharmacy", "drugstore", "cvs", "walgreens"),
+        "meds"            to listOf("pharmacy", "drugstore"),
+        "medicine"        to listOf("pharmacy", "drugstore"),
+        "prescription"    to listOf("pharmacy", "drug", "drugstore"),
+        "cvs"             to listOf("pharmacy"),
+        "walgreens"       to listOf("pharmacy"),
+
+        // Emergency / urgent care
+        "emergency"       to listOf("hospital", "urgent", "er"),
+        "urgent"          to listOf("clinic", "hospital", "emergency"),
+        "er"              to listOf("emergency", "hospital"),
+        "ambulance"       to listOf("hospital", "emergency"),
+
+        // Gas / fuel
+        "gas"             to listOf("fuel", "gasoline"),
+        "fuel"            to listOf("gas", "gasoline"),
+        "gasoline"        to listOf("gas", "fuel"),
+        "petrol"          to listOf("gas", "fuel", "gasoline"),
+
+        // Groceries / supermarket
+        "groceries"       to listOf("grocery", "supermarket", "market"),
+        "grocery"         to listOf("supermarket", "market"),
+        "supermarket"     to listOf("grocery", "market"),
+        "supermarkets"    to listOf("supermarket", "grocery", "market"),
+        "market"          to listOf("grocery", "supermarket"),
+
+        // Souvenirs / gifts
+        "souvenir"        to listOf("gift", "gifts", "souvenirs"),
+        "souvenirs"       to listOf("gift", "gifts", "souvenir"),
+        "gift"            to listOf("souvenir", "gifts"),
+        "gifts"           to listOf("gift", "souvenir"),
+        "merch"           to listOf("gift", "souvenir", "shop"),
+
+        // Money / banking
+        "atm"             to listOf("bank", "cash"),
+        "cash"            to listOf("bank", "atm"),
+        "bank"            to listOf("atm"),
+        "banks"           to listOf("bank", "atm"),
     )
 
     fun search(

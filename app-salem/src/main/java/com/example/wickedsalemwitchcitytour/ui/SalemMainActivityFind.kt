@@ -1588,6 +1588,22 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
     filterAndMapResults = results
     filterAndMapLabel = label
     DebugLogger.i("SalemMainActivity", "enterFilterAndMapMode: $label (${results.size} results)")
+    DebugLogger.d("FilterMap", "ENTER mode label='$label' results=${results.size} cachePoiJob.active=${cachePoiJob?.isActive ?: false} populateJob.active=${populateJob?.isActive ?: false} idlePopulateJob.active=${idlePopulateJob?.isActive ?: false} overlays.size(pre)=${binding.mapView.overlays.size}")
+
+    // S276 — search is its own mode. If a tour is running, pause it so the
+    // route overlays drop and the user sees a clean search-result map; on
+    // exit-without-pick we'll auto-resume.
+    val tourStateAtEnter = tourViewModel.tourState.value
+    if (tourStateAtEnter is com.example.wickedsalemwitchcitytour.tour.TourState.Active) {
+        DebugLogger.d("FilterMap", "ENTER pausing active tour '${tourStateAtEnter.activeTour.tour.name}' for search")
+        tourViewModel.pauseTour()
+        tourPausedBySearch = true
+    } else {
+        tourPausedBySearch = false
+        DebugLogger.d("FilterMap", "ENTER tour state was ${tourStateAtEnter::class.simpleName} — no pause needed")
+    }
+    // Paused state alone doesn't auto-clear route polylines; do it explicitly.
+    clearTourOverlays()
 
     // Stop all background jobs
     stopSilentFill()
@@ -1616,6 +1632,10 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
 
     // Clear ALL overlays except GPS marker
     clearAllPoiMarkers()
+    // S276 — narration markers live in their own cache-backed system, NOT
+    // in poiMarkers. Without this detach, the ~580 narration POIs stay on
+    // the map and 'Filter and Map' becomes 'Filter and Pile-On'.
+    detachAllNarrationMarkers()
     clearTrainMarkers(); clearSubwayMarkers(); clearBusMarkers()
     clearStationMarkers(); clearBusStopMarkers()
     clearAircraftMarkers()
@@ -1636,6 +1656,10 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
             snippet = buildPlaceSnippet(place)
             relatedObject = place
             setOnMarkerClickListener { _, _ ->
+                DebugLogger.d("FilterMap", "marker click (PICK): '${place.name}' lat=${place.lat} lon=${place.lon} filterAndMapActive=$filterAndMapActive tourPausedBySearch=$tourPausedBySearch — exiting filter-map, keeping tour paused if it was")
+                // S276 — pick = leave tour paused; chip in status line is the resume affordance.
+                tourPausedBySearch = false
+                exitFilterAndMapMode()
                 openPoiDetailFromPlace(place)
                 true
             }
@@ -1643,6 +1667,7 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
         poiMarkers.getOrPut("filter-map") { mutableListOf() }.add(m)
         binding.mapView.overlays.add(m)
     }
+    DebugLogger.d("FilterMap", "ENTER mode added ${places.size} filter-map markers. overlays.size(post-add)=${binding.mapView.overlays.size} poiMarkers.layers=${poiMarkers.keys.joinToString(",")} filter-map.size=${poiMarkers["filter-map"]?.size ?: 0}")
 
     // Keep current position, start at zoom 18 and zoom out until results are visible
     val center = binding.mapView.mapCenter
@@ -1673,6 +1698,7 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
 internal fun SalemMainActivity.exitFilterAndMapMode() {
     if (!filterAndMapActive) return
     DebugLogger.i("SalemMainActivity", "exitFilterAndMapMode")
+    DebugLogger.d("FilterMap", "EXIT mode. overlays.size(pre)=${binding.mapView.overlays.size} filter-map markers=${poiMarkers["filter-map"]?.size ?: 0}")
 
     filterAndMapActive = false
     filterAndMapResults = emptyList()
@@ -1684,8 +1710,11 @@ internal fun SalemMainActivity.exitFilterAndMapMode() {
     // Clear filter-map markers
     clearPoiMarkers("filter-map")
 
-    // Restore normal POI display
+    // S276 — bbox-layer restore + narration-marker re-attach. The narration
+    // re-attach is the load-bearing one: ~580 markers are reattached from the
+    // warm cache (no allocation) so the city repopulates immediately.
     loadCachedPoisForVisibleArea()
+    loadNarrationPointMarkers()
 
     // Restore radar if it was on
     if (savedRadarWasOn) {
@@ -1698,6 +1727,21 @@ internal fun SalemMainActivity.exitFilterAndMapMode() {
     val zoom = binding.mapView.zoomLevelDouble
     poiLabelsShowing = zoom >= 18.0
     refreshPoiMarkerIcons()
+
+    // S276 — auto-resume tour if WE paused it on enter AND no pick happened.
+    // Pick-path flips tourPausedBySearch=false before calling exit, so this
+    // branch leaves the tour Paused and the new clickable status-line chip
+    // becomes the resume affordance.
+    if (tourPausedBySearch) {
+        val nowState = tourViewModel.tourState.value
+        if (nowState is com.example.wickedsalemwitchcitytour.tour.TourState.Paused) {
+            DebugLogger.d("FilterMap", "EXIT auto-resuming tour '${nowState.activeTour.tour.name}' (paused by search, no pick)")
+            tourViewModel.resumeTour()
+        } else {
+            DebugLogger.d("FilterMap", "EXIT tourPausedBySearch=true but state is ${nowState::class.simpleName} — not resuming")
+        }
+        tourPausedBySearch = false
+    }
 
     // Other layers (transit, aircraft, webcams, METAR, geofences) will
     // naturally restore on the next scroll/zoom event based on current prefs

@@ -746,10 +746,16 @@ internal fun SalemMainActivity.observeTourState() {
                     clearDetourVisuals()
                 }
                 is TourState.Paused -> {
+                    // S276 — Paused status line is the persistent Resume affordance.
+                    // Tap to flip back to Active; observeTourState will then redraw
+                    // the route polyline.
                     statusLineManager.set(
                         StatusLineManager.Priority.TOUR,
-                        "Tour paused — ${state.activeTour.tour.name}"
-                    )
+                        "▶ Resume — ${state.activeTour.tour.name}"
+                    ) {
+                        DebugLogger.d("FilterMap", "Resume chip tapped — resuming tour '${state.activeTour.tour.name}'")
+                        tourViewModel.resumeTour()
+                    }
                     clearDetourVisuals()
                 }
                 is TourState.Detour -> {
