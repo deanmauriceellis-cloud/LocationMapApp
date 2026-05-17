@@ -47,8 +47,9 @@ function failOrWarnOnCi(msg) {
 //   v17 (S219) — added narration_subtopics JSONB to SalemPoi (scrollable storytelling subtopic cards on POI detail sheet)
 //   v18 (S226) — added haunt_sprite_id + 5 haunt_* tuning columns to SalemPoi (admin-driven sprite peek)
 //   v19 (S227) — added haunt_duration_s REAL to SalemPoi (per-fire dance length)
-//   v20 (S268) — added PoiPassport entity (poi_passport table) for the POI Passport feature
+//   v20 (S268) — added PoiPassport entity (poi_passport table) for the POI Passport feature [renamed S274]
 //   v21 (S271) — added 7 indices to SalemPoi (is_narrated, is_tour_poi, is_civic_poi, is_historical_property, category, district, subcategory) to remove the per-second full-scan on findNarrated()
+//   v22 (S274) — renamed PoiPassport entity → CollectionEntry (table poi_passport → collection_entry, columns passport_id/_name → collection_id/_name) as part of Katrina's Collection rebrand
 //
 // S268 — read the latest hash + version dynamically from the schemas dir so
 // this constant stops drifting against @Database(version) bumps. Matches the
@@ -99,10 +100,10 @@ const REQUIRED_ROOM_TABLES = [
   { table: 'salem_witch_trials_newspapers', minRows: 200  },
   { table: 'salem_witch_trials_npc_bios',   minRows: 49   },
   { table: 'salem_witch_trials_articles',   minRows: 16   },
-  // S268 — poi_passport may legitimately be empty (operator hasn't authored any
+  // S268 — collection_entry may legitimately be empty (operator hasn't authored any
   // filters yet). minRows=0 keeps the table-existence check (will fail loudly
   // if Room v20 didn't land) without requiring filter authorship before build.
-  { table: 'poi_passport',                  minRows: 0    },
+  { table: 'collection_entry',                  minRows: 0    },
   { table: 'room_master_table',             minRows: 1    },
 ];
 

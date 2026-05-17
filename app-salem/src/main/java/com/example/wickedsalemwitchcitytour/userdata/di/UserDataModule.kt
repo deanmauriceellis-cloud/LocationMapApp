@@ -12,8 +12,8 @@ package com.example.wickedsalemwitchcitytour.userdata.di
 import android.content.Context
 import androidx.room.Room
 import com.example.wickedsalemwitchcitytour.userdata.dao.GpsTrackPointDao
-import com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
 import com.example.wickedsalemwitchcitytour.userdata.dao.PoiEncounterDao
+import com.example.wickedsalemwitchcitytour.userdata.dao.PoiVisitDao
 import com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase
 import com.example.wickedsalemwitchcitytour.userdata.db.UserDataMigrations
 import dagger.Module
@@ -42,7 +42,11 @@ object UserDataModule {
             // Schema history:
             //   v2 (S110) — added poi_encounters
             //   v3 (S268) — added passport_visit
-            .addMigrations(UserDataMigrations.MIGRATION_2_3)
+            //   v4 (S274) — renamed passport_visit → poi_visit (Katrina's Collection rebrand)
+            .addMigrations(
+                UserDataMigrations.MIGRATION_2_3,
+                UserDataMigrations.MIGRATION_3_4,
+            )
             .build()
 
     @Provides
@@ -54,6 +58,6 @@ object UserDataModule {
         db.poiEncounterDao()
 
     @Provides
-    fun providePassportVisitDao(db: UserDataDatabase): PassportVisitDao =
-        db.passportVisitDao()
+    fun providePoiVisitDao(db: UserDataDatabase): PoiVisitDao =
+        db.poiVisitDao()
 }

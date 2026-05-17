@@ -230,9 +230,9 @@ require('./lib/admin-pois')(app, deps);
 // Admin Tour write endpoints (S174) — gated by /admin Basic Auth
 require('./lib/admin-tours')(app, deps);
 
-// Admin Passport endpoints (S268) — operator-tunable filters that generate
-// per-user POI Passports replacing the four stops-based tour UIs.
-require('./lib/admin-passport')(app, deps);
+// Admin Collection endpoints (S268) — operator-tunable filters that generate
+// per-user Katrina's Collections replacing the four stops-based tour UIs.
+require('./lib/admin-collection')(app, deps);
 
 // Admin Witch Trials content endpoints (Phase 9X.7) — gated by /admin Basic Auth
 require('./lib/admin-witch-trials')(app, deps);

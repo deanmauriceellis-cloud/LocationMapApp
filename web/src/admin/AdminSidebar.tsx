@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 export type AdminView =
   | 'pois'
   | 'tours'
-  | 'passport'
+  | 'collection'
   | 'witch-trials'
   | 'lint'
   | 'geocodes'
@@ -48,7 +48,7 @@ const GROUPS: SidebarGroup[] = [
     items: [
       { id: 'pois',         label: 'POIs',         icon: '📍', title: 'Salem POIs — tree + map editor' },
       { id: 'tours',        label: 'Tours',        icon: '🗺', title: 'Tours, stops, walking legs' },
-      { id: 'passport',     label: 'Passports',    icon: '🎫', title: 'POI Passport filters — operator-tunable POI lists, user stamps on hearing the narration' },
+      { id: 'collection',     label: 'Collections',    icon: '🎫', title: 'Katrina's Collection filters — operator-tunable POI lists, user visits on hearing the narration' },
       { id: 'witch-trials', label: 'Witch Trials', icon: '🪦', title: '1692 figures, articles, newspapers' },
     ],
   },

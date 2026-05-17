@@ -60,7 +60,7 @@ data class TourProgress(
  * field for parity with [TourGeofenceManager.loadStops] but every entry has
  * `poiId == null`, so consumers must never derive tour-membership by joining
  * on stops (see memory rule `feedback_tour_stops_not_poi_anchored.md`).
- * [legs] is the canonical geometry source; [passportPoiIds] is the canonical
+ * [legs] is the canonical geometry source; [collectionPoiIds] is the canonical
  * tour-membership source.
  */
 data class ActiveTour(
@@ -71,12 +71,12 @@ data class ActiveTour(
      *  helper and by the route overlay. */
     val legs: List<TourLeg>,
     val progress: TourProgress,
-    /** `salem_passport_filters.id` for this tour's passport, or null when no
-     *  passport is authored. */
-    val passportId: String?,
-    /** POIs in the tour's passport, in display order. Drives the visit-count
+    /** `salem_collections.id` for this tour's collection, or null when no
+     *   collection is authored. */
+    val collectionId: String?,
+    /** POIs in the tour's collection, in display order. Drives the visit-count
      *  vs total comparison that fires [TourState.Completed] in S269. */
-    val passportPoiIds: Set<String>,
+    val collectionPoiIds: Set<String>,
 )
 
 /** Observable state emitted by TourEngine. */
@@ -115,23 +115,23 @@ sealed class TourState {
 }
 
 /**
- * S269 — summary shown at tour completion. Passport-aware: replaces the
- * pre-S269 stops-based counters with `passportHeard / passportTotal` so the
+ * S269 — summary shown at tour completion. Collection-aware: replaces the
+ * pre-S269 stops-based counters with `entriesVisited / entryTotal` so the
  * completion dialog reflects how many of the tour's curated POIs the walker
- * actually heard. [passportId] is non-null whenever the just-ended tour had
- * a passport bound to it, and lets the completion dialog open the
- * PassportSheet pre-filtered to that passport.
+ * actually heard. [collectionId] is non-null whenever the just-ended tour had
+ * a  collection bound to it, and lets the completion dialog open the
+ * CollectionSheet pre-filtered to that collection.
  */
 data class TourSummary(
     val tourName: String,
-    val passportId: String?,
-    val passportTotal: Int,
-    val passportHeard: Int,
+    val collectionId: String?,
+    val entryTotal: Int,
+    val entriesVisited: Int,
     val totalTimeMs: Long,
     val totalDistanceM: Double,
 ) {
     val completionPercent: Int
-        get() = if (passportTotal == 0) 0 else (passportHeard * 100) / passportTotal
+        get() = if (entryTotal == 0) 0 else (entriesVisited * 100) / entryTotal
 
     val totalTimeMinutes: Int
         get() = (totalTimeMs / 60_000).toInt()

@@ -161,8 +161,8 @@ module.exports = function(app, deps) {
   // ─── GET /admin/salem/tours ─────────────────────────────────────────────────
   app.get('/admin/salem/tours', requirePg, async (_req, res) => {
     try {
-      // S269 — passport_poi_count is the canonical "user-facing stamp count"
-      // for this tour: rows in salem_passport_pois under the auto_bake=false
+      // S269 — collection_entry_count is the canonical "user-facing stamp count"
+      // for this tour: rows in salem_collection_entries under the auto_bake=false
       // filter bound to this tour. stop_count stays for legacy reasons but
       // is no longer surfaced as the headline number.
       const { rows } = await pgPool.query(`
@@ -170,14 +170,14 @@ module.exports = function(app, deps) {
                t.distance_km, t.stop_count, t.difficulty, t.seasonal,
                t.icon_asset, t.sort_order, t.is_historical_tour, t.updated_at,
                COUNT(s.stop_id)::int AS stops_actual,
-               pp_pf.id AS passport_id,
-               pp_pf.poi_count AS passport_poi_count
+               pp_pf.id AS collection_id,
+               pp_pf.poi_count AS collection_entry_count
           FROM salem_tours t
      LEFT JOIN salem_tour_stops s ON s.tour_id = t.id
      LEFT JOIN LATERAL (
                 SELECT pf.id,
-                       (SELECT COUNT(*)::int FROM salem_passport_pois pp WHERE pp.filter_id = pf.id) AS poi_count
-                  FROM salem_passport_filters pf
+                       (SELECT COUNT(*)::int FROM salem_collection_entries pp WHERE pp.collection_id = pf.id) AS poi_count
+                  FROM salem_collections pf
                  WHERE pf.tour_id = t.id AND pf.auto_bake = FALSE
               ORDER BY pf.updated_at DESC
                  LIMIT 1
@@ -200,19 +200,19 @@ module.exports = function(app, deps) {
         return res.status(400).json({ error: 'tour_id is required' });
       }
 
-      // S269 — same passport_poi_count enrichment as the list endpoint, so
+      // S269 — same collection_entry_count enrichment as the list endpoint, so
       // the metadata form can render "X stamps" instead of "X stops".
       const tourQ = await pgPool.query(
         `SELECT t.id, t.name, t.theme, t.description, t.estimated_minutes, t.distance_km,
                 t.stop_count, t.difficulty, t.seasonal, t.icon_asset, t.sort_order,
                 t.is_historical_tour, t.updated_at,
-                pp_pf.id AS passport_id,
-                pp_pf.poi_count AS passport_poi_count
+                pp_pf.id AS collection_id,
+                pp_pf.poi_count AS collection_entry_count
            FROM salem_tours t
       LEFT JOIN LATERAL (
                  SELECT pf.id,
-                        (SELECT COUNT(*)::int FROM salem_passport_pois pp WHERE pp.filter_id = pf.id) AS poi_count
-                   FROM salem_passport_filters pf
+                        (SELECT COUNT(*)::int FROM salem_collection_entries pp WHERE pp.collection_id = pf.id) AS poi_count
+                   FROM salem_collections pf
                   WHERE pf.tour_id = t.id AND pf.auto_bake = FALSE
                ORDER BY pf.updated_at DESC
                   LIMIT 1
@@ -478,16 +478,16 @@ module.exports = function(app, deps) {
         // backward-compat with seed scripts but are immediately recomputed.
         await recomputeTourMetadata(client, tourId);
         // S269 — return the same shape as GET so the admin form sees
-        // passport_poi_count refresh after Save.
+        // collection_entry_count refresh after Save.
         const out = await client.query(
           `SELECT t.*,
-                  pp_pf.id AS passport_id,
-                  pp_pf.poi_count AS passport_poi_count
+                  pp_pf.id AS collection_id,
+                  pp_pf.poi_count AS collection_entry_count
              FROM salem_tours t
         LEFT JOIN LATERAL (
                    SELECT pf.id,
-                          (SELECT COUNT(*)::int FROM salem_passport_pois pp WHERE pp.filter_id = pf.id) AS poi_count
-                     FROM salem_passport_filters pf
+                          (SELECT COUNT(*)::int FROM salem_collection_entries pp WHERE pp.collection_id = pf.id) AS poi_count
+                     FROM salem_collections pf
                     WHERE pf.tour_id = t.id AND pf.auto_bake = FALSE
                  ORDER BY pf.updated_at DESC
                     LIMIT 1

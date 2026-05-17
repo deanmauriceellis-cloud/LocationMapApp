@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PoiRow } from './PoiTree'
 import { isMassgisHistorical } from './PoiTree'
-import { WalkPassportDialog } from './WalkPassportDialog'
+import { WalkCollectionDialog } from './WalkCollectionDialog'
 import type {
   ComputeRouteResponse,
   TourDetailResponse,
@@ -413,12 +413,12 @@ export function TourTree({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-slate-800 truncate">{t.name}</span>
-                  {/* S269 — surface stamp count (passport_poi_count) as the
+                  {/* S269 — surface entry count (collection_entry_count) as the
                       headline number; fall back to stops_actual when no
-                      passport is authored yet. */}
+                      collection is authored yet. */}
                   <span className="text-xs text-slate-500 tabular-nums shrink-0">
-                    {t.passport_poi_count != null
-                      ? `${t.passport_poi_count} stamp${t.passport_poi_count === 1 ? '' : 's'}`
+                    {t.collection_entry_count != null
+                      ? `${t.collection_entry_count} POI${t.collection_entry_count === 1 ? '' : 's'}`
                       : `${t.stops_actual} pts`}
                   </span>
                 </div>
@@ -960,20 +960,20 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
         Tour metadata
       </summary>
       <div className="px-3 py-2 space-y-2 text-xs">
-        {/* S269 — Build Passport from Walk. Opens a modal that walks the
+        {/* S269 — Build Collection from Walk. Opens a modal that walks the
          *  tour's baked polyline, lists every POI with historical_narration
          *  whose distance from the path is within an adjustable radius, and
-         *  saves the operator-edited list as this tour's passport. */}
+         *  saves the operator-edited list as this tour's collection. */}
         <div className="flex items-start gap-2 px-2 py-2 bg-amber-50 border border-amber-200 rounded">
           <div className="flex-1">
             <div className="text-xs font-semibold text-amber-900">
-              Walk-derived Passport
-              {/* S269 — passport_poi_count is the canonical "stamps" count.
+              Walk-derived Collection
+              {/* S269 — collection_entry_count is the canonical "POI count".
                   stop_count (free polyline waypoints) stays in the form
                   below for legacy reference but is no longer the headline. */}
-              {tour.passport_poi_count != null ? (
+              {tour.collection_entry_count != null ? (
                 <span className="ml-2 text-amber-800 font-normal">
-                  · {tour.passport_poi_count} stamp{tour.passport_poi_count === 1 ? '' : 's'}
+                  · {tour.collection_entry_count} POI{tour.collection_entry_count === 1 ? '' : 's'}
                 </span>
               ) : (
                 <span className="ml-2 text-amber-700 font-normal italic">· not yet authored</span>
@@ -981,7 +981,7 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
             </div>
             <div className="text-[11px] text-amber-800">
               Find every historically-narrated POI within range of this tour's
-              polyline, preview on the map, and save as the tour's passport.
+              polyline, preview on the map, and save as the tour's collection.
             </div>
             {walkSaveToast ? (
               <div className="text-[11px] text-green-700 mt-1">{walkSaveToast}</div>
@@ -996,7 +996,7 @@ function TourMetadataForm({ tour, busy, onSave }: TourMetadataFormProps) {
           </button>
         </div>
         {walkDialogOpen ? (
-          <WalkPassportDialog
+          <WalkCollectionDialog
             tourId={tour.id}
             tourName={tour.name}
             onClose={() => setWalkDialogOpen(false)}

@@ -14,11 +14,11 @@ import android.content.SharedPreferences
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.SalemContentRepository
-import com.example.wickedsalemwitchcitytour.content.dao.PoiPassportDao
+import com.example.wickedsalemwitchcitytour.content.dao.CollectionEntryDao
 import com.example.wickedsalemwitchcitytour.content.model.Tour
 import com.example.wickedsalemwitchcitytour.content.model.TourPoi
 import com.example.wickedsalemwitchcitytour.content.model.TourStop
-import com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
+import com.example.wickedsalemwitchcitytour.userdata.dao.PoiVisitDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,11 +35,11 @@ private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module Tour
  * Tour Engine — manages the lifecycle of a guided walking tour.
  *
  * Responsibilities:
- *   - Load tour + baked legs + passport POIs from SalemContentRepository
+ *   - Load tour + baked legs +  collection POIs from SalemContentRepository
  *   - Track elapsed time + cumulative distance
  *   - Pause / resume / detour with SharedPreferences persistence
- *   - Fire [TourState.Completed] when every POI in the tour's passport has
- *     been heard (S269 — visit-count vs passport-count comparison; one-shot
+ *   - Fire [TourState.Completed] when every POI in the tour's collection has
+ *     been heard (S269 — visit-count vs collection-count comparison; one-shot
  *     latch per session)
  *   - Emit TourState flow for UI observation
  *
@@ -47,9 +47,9 @@ private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module Tour
  * UIs (top HUD banner, Active Tour dialog, completion-stats body, numbered
  * polyline pins) and their backing state (`currentStopIndex`,
  * `completedStops`, `skippedStops`, advance/skip/add/remove/reorder) are
- * gone. Tour membership now flows through `poi_passport` (built from
+ * gone. Tour membership now flows through `collection_entry` (built from
  * operator-authored filter in the web admin); visit state flows through
- * `passport_visit` (POI-keyed lifetime log).
+ * `poi_visit` (POI-keyed lifetime log).
  */
 @Singleton
 class TourEngine @Inject constructor(
@@ -57,8 +57,8 @@ class TourEngine @Inject constructor(
     private val geofenceManager: TourGeofenceManager,
     private val narrationManager: NarrationManager,
     private val narrationGeofenceManager: NarrationGeofenceManager,
-    private val poiPassportDao: PoiPassportDao,
-    private val passportVisitDao: PassportVisitDao,
+    private val collectionEntryDao: CollectionEntryDao,
+    private val poiVisitDao: PoiVisitDao,
     @ApplicationContext private val context: Context
 ) {
     private val TAG = "TourEngine"
@@ -100,7 +100,7 @@ class TourEngine @Inject constructor(
 
     /**
      * S269 — one-shot latch. Flipped to true the first time
-     * [maybeCompleteFromPassport] observes a full sweep; flipped back to
+     * [maybeCompleteFromCollection] observes a full sweep; flipped back to
      * false in [startTour] / [endTour] so a subsequent tour can complete
      * again. Lives on the engine (not on [ActiveTour]) so it isn't part of
      * the immutable state snapshot consumed by the UI.
@@ -111,7 +111,7 @@ class TourEngine @Inject constructor(
 
     /**
      * Start a pre-defined tour by ID.
-     * Loads tour metadata, baked legs, and the passport POI list.
+     * Loads tour metadata, baked legs, and the  collection POI list.
      */
     suspend fun startTour(tourId: String) {
         DebugLogger.i(TAG, "startTour($tourId)")
@@ -138,27 +138,27 @@ class TourEngine @Inject constructor(
                 emptyList()
             }
 
-            // S269 — passport binding. Tour-membership for V1 lives here.
-            val passportId = try {
-                poiPassportDao.findPassportIdForTour(tourId)
+            // S269 —  collection binding. Tour-membership for V1 lives here.
+            val collectionId = try {
+                collectionEntryDao.findCollectionIdForTour(tourId)
             } catch (e: Exception) {
-                DebugLogger.w(TAG, "startTour: passport lookup failed for $tourId: ${e.message}")
+                DebugLogger.w(TAG, "startTour:  collection lookup failed for $tourId: ${e.message}")
                 null
             }
-            val passportPoiIds: Set<String> = if (passportId != null) {
+            val collectionPoiIds: Set<String> = if (collectionId != null) {
                 try {
-                    poiPassportDao.findByPassport(passportId).map { it.poiId }.toSet()
+                    collectionEntryDao.findByCollection(collectionId).map { it.poiId }.toSet()
                 } catch (e: Exception) {
-                    DebugLogger.w(TAG, "startTour: passport POI load failed for $passportId: ${e.message}")
+                    DebugLogger.w(TAG, "startTour:  collection POI load failed for $collectionId: ${e.message}")
                     emptySet()
                 }
             } else {
                 emptySet()
             }
-            if (passportId == null) {
-                DebugLogger.i(TAG, "Tour '$tourId' has no passport authored — completion trigger disabled")
+            if (collectionId == null) {
+                DebugLogger.i(TAG, "Tour '$tourId' has no  collection authored — completion trigger disabled")
             } else {
-                DebugLogger.i(TAG, "Tour '$tourId' bound to passport '$passportId' (${passportPoiIds.size} POIs)")
+                DebugLogger.i(TAG, "Tour '$tourId' bound to  collection '$collectionId' (${collectionPoiIds.size} POIs)")
             }
 
             val progress = TourProgress(
@@ -172,8 +172,8 @@ class TourEngine @Inject constructor(
                 pois = pois,
                 legs = legs,
                 progress = progress,
-                passportId = passportId,
-                passportPoiIds = passportPoiIds,
+                collectionId = collectionId,
+                collectionPoiIds = collectionPoiIds,
             )
             _tourState.value = TourState.Active(activeTour)
             persistProgress(activeTour)
@@ -198,7 +198,7 @@ class TourEngine @Inject constructor(
                 DebugLogger.i(TAG, "Historical Narration Mode ENABLED for '${tour.name}'")
             }
 
-            DebugLogger.i(TAG, "Tour started: ${tour.name} — ${legs.size} legs, ${passportPoiIds.size} passport POIs")
+            DebugLogger.i(TAG, "Tour started: ${tour.name} — ${legs.size} legs, ${collectionPoiIds.size}  collection POIs")
         } catch (e: Exception) {
             DebugLogger.e(TAG, "startTour failed: ${e.message}", e)
             _tourState.value = TourState.Error("Failed to start tour: ${e.message}")
@@ -370,30 +370,30 @@ class TourEngine @Inject constructor(
         return best
     }
 
-    // ── Passport completion trigger (S269) ────────────────────────────────
+    // ── Collection completion trigger (S269) ────────────────────────────────
 
     /**
      * S269 — called from the narration ENTRY path in [SalemMainActivityNarration]
-     * after a [passportVisitDao.recordHeard] UPSERT lands. If every POI in
-     * the active tour's passport has now been heard, transitions
+     * after a [poiVisitDao.recordHeard] UPSERT lands. If every POI in
+     * the active tour's collection has now been heard, transitions
      * [TourState.Active] → [TourState.Completed] exactly once per session.
      *
-     * No-op when there's no active tour, the tour has no passport bound,
+     * No-op when there's no active tour, the tour has no  collection bound,
      * completion already fired this session, or the count is incomplete.
      */
-    suspend fun maybeCompleteFromPassport() {
+    suspend fun maybeCompleteFromCollection() {
         if (completionFiredThisSession) return
         val current = activeOrNull() ?: return
-        val ids = current.passportPoiIds
+        val ids = current.collectionPoiIds
         if (ids.isEmpty()) return
         val heard = try {
-            passportVisitDao.countHeardAmong(ids.toList())
+            poiVisitDao.countHeardAmong(ids.toList())
         } catch (e: Exception) {
-            DebugLogger.w(TAG, "maybeCompleteFromPassport: count failed: ${e.message}")
+            DebugLogger.w(TAG, "maybeCompleteFromCollection: count failed: ${e.message}")
             return
         }
         if (heard < ids.size) return
-        DebugLogger.i(TAG, "Passport completion: ${heard}/${ids.size} heard — firing TourState.Completed")
+        DebugLogger.i(TAG, "Collection completion: ${heard}/${ids.size} heard — firing TourState.Completed")
         completionFiredThisSession = true
         endTour()
     }
@@ -407,9 +407,9 @@ class TourEngine @Inject constructor(
             else -> 0L
         }
 
-        val passportHeard = if (current.passportPoiIds.isEmpty()) 0
+        val entriesVisited = if (current.collectionPoiIds.isEmpty()) 0
                             else try {
-                                passportVisitDao.countHeardAmong(current.passportPoiIds.toList())
+                                poiVisitDao.countHeardAmong(current.collectionPoiIds.toList())
                             } catch (e: Exception) {
                                 DebugLogger.w(TAG, "endTour: heard-count failed: ${e.message}")
                                 0
@@ -417,9 +417,9 @@ class TourEngine @Inject constructor(
 
         val summary = TourSummary(
             tourName = current.tour.name,
-            passportId = current.passportId,
-            passportTotal = current.passportPoiIds.size,
-            passportHeard = passportHeard,
+            collectionId = current.collectionId,
+            entryTotal = current.collectionPoiIds.size,
+            entriesVisited = entriesVisited,
             totalTimeMs = elapsed,
             totalDistanceM = current.progress.totalDistanceWalkedM
         )
@@ -441,7 +441,7 @@ class TourEngine @Inject constructor(
         DebugLogger.i(TAG, "Tour Mode DISABLED (tour ended)")
 
         DebugLogger.i(TAG, "Tour ended: ${summary.tourName} — " +
-                "${summary.passportHeard}/${summary.passportTotal} stamps, ${summary.totalTimeMinutes} min")
+                "${summary.entriesVisited}/${summary.entryTotal} visits, ${summary.totalTimeMinutes} min")
     }
 
     /** Dismiss the completed state and return to idle. */
@@ -505,8 +505,8 @@ class TourEngine @Inject constructor(
      *
      * S269 — the maybeAdvanceOnEntry(...) call from the ENTRY branch is gone
      * along with the rest of the stops-progress shed. Tour-completion is now
-     * driven by [maybeCompleteFromPassport], called from the narration
-     * ENTRY hook in [SalemMainActivityNarration] after each passport visit
+     * driven by [maybeCompleteFromCollection], called from the narration
+     * ENTRY hook in [SalemMainActivityNarration] after each  collection visit
      * is recorded.
      */
     private fun handleGeofenceEvent(event: TourGeofenceEvent) {
@@ -597,11 +597,11 @@ class TourEngine @Inject constructor(
             startTimeMs = System.currentTimeMillis()
         )
 
-        // Custom tours derive their "passport" implicitly from the selected
+        // Custom tours derive their "collection" implicitly from the selected
         // POI ids — visit-driven completion fires when every selected POI
-        // has been heard. No author-side filter row in salem_passport_filters
+        // has been heard. No author-side filter row in salem_collections
         // is required.
-        val passportPoiIds = optimized.map { it.id }.toSet()
+        val collectionPoiIds = optimized.map { it.id }.toSet()
 
         val activeTour = ActiveTour(
             tour = tour,
@@ -609,8 +609,8 @@ class TourEngine @Inject constructor(
             pois = optimized,
             legs = emptyList(),
             progress = progress,
-            passportId = null,
-            passportPoiIds = passportPoiIds,
+            collectionId = null,
+            collectionPoiIds = collectionPoiIds,
         )
         _tourState.value = TourState.Active(activeTour)
         persistProgress(activeTour)
@@ -732,15 +732,15 @@ class TourEngine @Inject constructor(
                 DebugLogger.w(TAG, "restoreIfSaved: failed to read tour_legs: ${e.message}")
                 emptyList()
             }
-            val passportId = try {
-                poiPassportDao.findPassportIdForTour(savedTourId)
+            val collectionId = try {
+                collectionEntryDao.findCollectionIdForTour(savedTourId)
             } catch (e: Exception) {
-                DebugLogger.w(TAG, "restoreIfSaved: passport lookup failed: ${e.message}")
+                DebugLogger.w(TAG, "restoreIfSaved:  collection lookup failed: ${e.message}")
                 null
             }
-            val passportPoiIds: Set<String> = if (passportId != null) {
+            val collectionPoiIds: Set<String> = if (collectionId != null) {
                 try {
-                    poiPassportDao.findByPassport(passportId).map { it.poiId }.toSet()
+                    collectionEntryDao.findByCollection(collectionId).map { it.poiId }.toSet()
                 } catch (e: Exception) {
                     emptySet()
                 }
@@ -761,8 +761,8 @@ class TourEngine @Inject constructor(
                 pois = pois,
                 legs = legs,
                 progress = progress,
-                passportId = passportId,
-                passportPoiIds = passportPoiIds,
+                collectionId = collectionId,
+                collectionPoiIds = collectionPoiIds,
             )
             geofenceManager.loadStops(stops, pois)
             // Restoring is a fresh session — let the completion latch arm again.
@@ -782,7 +782,7 @@ class TourEngine @Inject constructor(
                 TourState.Paused(activeTour)
             }
 
-            DebugLogger.i(TAG, "Restored tour: ${tour.name} (${legs.size} legs, ${passportPoiIds.size} passport POIs)")
+            DebugLogger.i(TAG, "Restored tour: ${tour.name} (${legs.size} legs, ${collectionPoiIds.size}  collection POIs)")
             return true
         } catch (e: Exception) {
             DebugLogger.e(TAG, "Failed to restore tour: ${e.message}", e)

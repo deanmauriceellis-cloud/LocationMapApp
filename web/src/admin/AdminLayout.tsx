@@ -36,7 +36,7 @@ import { SplashTreeTab } from './SplashTreeTab'
 import { MassEditTab } from './MassEditTab'
 import { SuperAdminTab } from './SuperAdminTab'
 import TigerBaseTab from './TigerBaseTab'
-import { PassportTab } from './PassportTab'
+import { CollectionTab } from './CollectionTab'
 import { ReconTriageTab } from './ReconTriageTab'
 import { Toaster } from 'sonner'
 import { toastError } from '../lib/toast'
@@ -925,8 +925,8 @@ export function AdminLayout() {
         </div>
       ) : view === 'tigerbase' ? (
         <TigerBaseTab />
-      ) : view === 'passport' ? (
-        <PassportTab />
+      ) : view === 'collection' ? (
+        <CollectionTab />
       ) : view === 'recon' ? (
         <ReconTriageTab />
       ) : view === 'tours' ? (

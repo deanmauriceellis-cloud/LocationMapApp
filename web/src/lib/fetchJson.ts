@@ -7,7 +7,7 @@
  * default to match the rest of the admin tool.
  *
  * S271 — extracted from three identical local implementations in
- * `PassportTab.tsx`, `TourTree.tsx`, and `WalkPassportDialog.tsx` to
+ * `CollectionTab.tsx`, `TourTree.tsx`, and `WalkCollectionDialog.tsx` to
  * cut copy-paste drift.
  */
 export async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {

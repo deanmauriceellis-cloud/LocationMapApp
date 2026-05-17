@@ -271,7 +271,7 @@ internal fun SalemMainActivity.showWelcomeDialog() {
 
 @SuppressLint("SetTextI18n")
 internal fun SalemMainActivity.showTourSelectionDialog() {
-    // S269 — if a tour is in progress, offer Passport / End / Cancel rather
+    // S269 — if a tour is in progress, offer Collection / End / Cancel rather
     // than the pre-S269 stops-progress "Active Tour" management dialog
     // (which was the first of the four dead surfaces this session deletes).
     val currentState = tourViewModel.tourState.value
@@ -348,25 +348,25 @@ internal fun SalemMainActivity.showTourSelectionDialog() {
         tourViewModel.availableTours.collectLatest { tours ->
             if (tours.isEmpty()) return@collectLatest
             val allPois = tourViewModel.allPois.value
-            // S269 — pre-fetch passport-poi-counts off the IO thread so the
-            // tour-card chip can render "X stamps" instead of the legacy
+            // S269 — pre-fetch collection-entry-counts off the IO thread so the
+            // tour-card chip can render "X ghosts" instead of the legacy
             // "X stops" (which counts polyline-only free waypoints — a
             // meaningless number post-S190). Map<tour_id, poi_count>;
-            // tours without a bound passport fall back to stop_count
+            // tours without a bound collection fall back to stop_count
             // inside buildTourCard.
-            val stampCounts: Map<String, Int> = try {
+            val entryCounts: Map<String, Int> = try {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    poiPassportDao.listPassports()
+                    collectionEntryDao.listCollections()
                         .filter { it.tour_id != null }
                         .associate { it.tour_id!! to it.poi_count }
                 }
             } catch (e: Exception) {
-                DebugLogger.w("SalemMainActivityTour", "passport count load failed: ${e.message}")
+                DebugLogger.w("SalemMainActivityTour", "collection count load failed: ${e.message}")
                 emptyMap()
             }
             runOnUiThread {
                 listLayout.removeAllViews()
-                populateTourList(listLayout, tours, allPois, stampCounts, dp, dialog)
+                populateTourList(listLayout, tours, allPois, entryCounts, dp, dialog)
             }
         }
     }
@@ -378,7 +378,7 @@ private fun SalemMainActivity.populateTourList(
     listLayout: LinearLayout,
     tours: List<Tour>,
     allPois: List<TourPoi>,
-    stampCounts: Map<String, Int>,
+    entryCounts: Map<String, Int>,
     dp: (Int) -> Int,
     dialog: Dialog
 ) {
@@ -392,19 +392,19 @@ private fun SalemMainActivity.populateTourList(
     if (heritageTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Featured — Salem Heritage Trail", dp))
         for (tour in heritageTours) {
-            listLayout.addView(buildTourCard(tour, stampCounts[tour.id], dp, dialog, featured = true))
+            listLayout.addView(buildTourCard(tour, entryCounts[tour.id], dp, dialog, featured = true))
         }
     }
     if (witchTrialsTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Salem Witch Trials", dp))
         for (tour in witchTrialsTours) {
-            listLayout.addView(buildTourCard(tour, stampCounts[tour.id], dp, dialog))
+            listLayout.addView(buildTourCard(tour, entryCounts[tour.id], dp, dialog))
         }
     }
     if (otherTours.isNotEmpty()) {
         listLayout.addView(sectionHeader("Extended Tours", dp))
         for (tour in otherTours) {
-            listLayout.addView(buildTourCard(tour, stampCounts[tour.id], dp, dialog))
+            listLayout.addView(buildTourCard(tour, entryCounts[tour.id], dp, dialog))
         }
     }
 
@@ -538,11 +538,11 @@ private fun SalemMainActivity.categoryToggle(
 @SuppressLint("SetTextI18n")
 private fun SalemMainActivity.buildTourCard(
     tour: Tour,
-    /** S269 — passport-bound POI count for this tour, or null when no
-     *  walk-derived passport is authored for it. Drives the headline chip
-     *  ("X stamps" vs. legacy "X stops"). Pre-fetched off the IO thread by
+    /** S269 — collection-bound POI count for this tour, or null when no
+     *  walk-derived collection is authored for it. Drives the headline chip
+     *  ("X ghosts" vs. legacy "X stops"). Pre-fetched off the IO thread by
      *  the caller so the card-build path stays synchronous. */
-    stampCount: Int?,
+    entryCount: Int?,
     dp: (Int) -> Int,
     parentDialog: Dialog,
     featured: Boolean = false
@@ -620,11 +620,11 @@ private fun SalemMainActivity.buildTourCard(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { marginEnd = dp(6) }
         }
-        // S269 — show "X stamps" when the tour has a walk-derived passport
+        // S269 — show "X ghosts" when the tour has a walk-derived collection
         // bound to it; otherwise fall back to the legacy "X stops" (count
         // of free polyline waypoints). Operator: "we care about the
-        // stamps/POI, not the stops".
-        val countLabel = if (stampCount != null) "$stampCount stamps" else "${tour.stopCount} stops"
+        // visits/POI, not the stops".
+        val countLabel = if (entryCount != null) "$entryCount ghosts" else "${tour.stopCount} stops"
         statsRow.addView(statChip(countLabel))
         statsRow.addView(statChip("${tour.estimatedMinutes} min"))
         statsRow.addView(statChip("%.1f km".format(tour.distanceKm)))
@@ -666,7 +666,7 @@ private fun SalemMainActivity.buildTourCard(
 // pre-S269 surface was a full stops-progress management dialog (current
 // stop, completed/skipped counts, advance/skip/pause/end buttons, per-stop
 // status list); all of that backed onto state that no longer exists. The
-// replacement is a compact passport-centric chooser.
+// replacement is a compact collection-centric chooser.
 // ═════════════════════════════════════════════════════════════════════════════
 
 @SuppressLint("SetTextI18n")
@@ -684,18 +684,18 @@ internal fun SalemMainActivity.showTourInProgressDialog() {
             if (isPaused) "Tour paused. What would you like to do?"
             else "Tour in progress. What would you like to do?"
         )
-    builder.setPositiveButton("Open Passport") { dlg, _ ->
+    builder.setPositiveButton("Open Collection") { dlg, _ ->
         dlg.dismiss()
-        // S269 — open the sheet pre-pinned to the active tour's passport
-        // (not whatever the bake's first row happens to be). passportId is
-        // null when the tour has no passport authored yet — sheet falls
+        // S269 — open the sheet pre-pinned to the active tour's collection
+        // (not whatever the bake's first row happens to be). collectionId is
+        // null when the tour has no collection authored yet — sheet falls
         // back to its default behavior.
         val activePid = when (val s = tourViewModel.tourState.value) {
-            is TourState.Active -> s.activeTour.passportId
-            is TourState.Paused -> s.activeTour.passportId
+            is TourState.Active -> s.activeTour.collectionId
+            is TourState.Paused -> s.activeTour.collectionId
             else -> null
         }
-        com.example.wickedsalemwitchcitytour.ui.PassportSheet.show(supportFragmentManager, activePid)
+        com.example.wickedsalemwitchcitytour.ui.CollectionSheet.show(supportFragmentManager, activePid)
     }
     if (isPaused) {
         builder.setNeutralButton("Resume") { dlg, _ ->
@@ -1021,7 +1021,7 @@ internal suspend fun SalemMainActivity.drawTourRoute(activeTour: ActiveTour) {
     // poi_id == null), so the loop was iterating over a list whose entries
     // had no rendering anchor to begin with. The polyline (single or
     // per-leg) above is now the only on-map representation of an active
-    // tour; the POI Passport sheet surfaces tour-membership instead.
+    // tour; the Katrina's Collection sheet surfaces tour-membership instead.
 
     binding.mapView.invalidate()
 }
@@ -1193,9 +1193,9 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
         gravity = Gravity.CENTER_HORIZONTAL
     }
 
-    // Title — S269 chooses copy by whether every passport POI was heard.
-    val isFullComplete = summary.passportTotal > 0 &&
-                         summary.passportHeard >= summary.passportTotal
+    // Title — S269 chooses copy by whether every collection POI was heard.
+    val isFullComplete = summary.entryTotal > 0 &&
+                         summary.entriesVisited >= summary.entryTotal
     root.addView(TextView(this).apply {
         text = if (isFullComplete) "Tour Complete!" else "Tour Ended"
         textSize = 24f
@@ -1232,31 +1232,31 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
         })
     }
 
-    // S269 — passport-aware stats. Pre-S269 this read
+    // S269 — collection-aware stats. Pre-S269 this read
     // `completedStops` / `skippedStops` / `completionPercent` off
     // [TourSummary]; those counters are gone with the stops shed. The new
-    // primary number is `passportHeard / passportTotal` — how many of the
-    // tour's curated passport POIs the walker actually heard. Tours
-    // without a passport authored (e.g. legacy custom-builder tours where
-    // the engine derives the passport from the selected POIs) still get
+    // primary number is `entriesVisited / entryTotal` — how many of the
+    // tour's curated collection POIs the walker actually heard. Tours
+    // without a collection authored (e.g. legacy custom-builder tours where
+    // the engine derives the collection from the selected POIs) still get
     // a sensible total because [TourEngine.startCustomTour] seeds
-    // `passportPoiIds` from the selection.
-    val isPartial = summary.passportTotal > 0 && summary.passportHeard < summary.passportTotal
+    // `collectionPoiIds` from the selection.
+    val isPartial = summary.entryTotal > 0 && summary.entriesVisited < summary.entryTotal
     statLine(
-        if (isPartial) "Stamps collected" else "Tour stamps",
-        "${summary.passportHeard} / ${summary.passportTotal}"
+        if (isPartial) "Ghosts caught" else "Ghosts caught",
+        "${summary.entriesVisited} / ${summary.entryTotal}"
     )
     statLine("Time", "${summary.totalTimeMinutes} minutes")
     statLine("Distance", if (summary.totalDistanceM < 1000) "%.0f m".format(summary.totalDistanceM)
                           else "%.1f km".format(summary.totalDistanceM / 1000))
-    if (summary.passportTotal > 0) {
+    if (summary.entryTotal > 0) {
         statLine("Completion", "${summary.completionPercent}%")
     }
 
-    // S269 — primary CTA opens the Passport sheet for the just-ended tour.
+    // S269 — primary CTA opens the Collection sheet for the just-ended tour.
     // Secondary CTA dismisses + returns to Idle. Pre-S269 the dialog had a
-    // single "Done" button; now we lead with discovery of the passport so
-    // the walker sees which stamps they got and which they missed.
+    // single "Done" button; now we lead with discovery of the collection so
+    // the walker sees which ghosts they caught and which they missed.
     val ctaRow = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         setPadding(0, dp(20), 0, 0)
@@ -1283,16 +1283,16 @@ internal fun SalemMainActivity.showTourCompletionDialog(summary: TourSummary) {
             }
             setOnClickListener { onClick() }
         }
-    if (summary.passportTotal > 0) {
-        ctaRow.addView(ctaBtn("Open Passport", SALEM_GOLD, SALEM_DARK, 1.6f) {
+    if (summary.entryTotal > 0) {
+        ctaRow.addView(ctaBtn("Open Collection", SALEM_GOLD, SALEM_DARK, 1.6f) {
             dialog.dismiss()
             tourViewModel.dismissCompletion()
-            // S269 — pin the sheet to the just-ended tour's passport. The
-            // engine carries it on TourSummary.passportId; falls back to
-            // the bake's first passport when null.
-            com.example.wickedsalemwitchcitytour.ui.PassportSheet.show(
+            // S269 — pin the sheet to the just-ended tour's collection. The
+            // engine carries it on TourSummary.collectionId; falls back to
+            // the bake's first collection when null.
+            com.example.wickedsalemwitchcitytour.ui.CollectionSheet.show(
                 supportFragmentManager,
-                summary.passportId,
+                summary.collectionId,
             )
         })
     }

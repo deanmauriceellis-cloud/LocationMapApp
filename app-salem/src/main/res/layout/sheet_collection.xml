@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LocationMapApp v1.5
+  Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
+  Module: sheet_collection.xml
+
+  S268 — Katrina's Collection sheet. Replaces the four stops-based tour UIs:
+    • top-center HUD banner
+    • Active Tour dialog
+    • tour completion stats body
+    • numbered polyline pins
+  See [CollectionSheet.kt] for behavior and the plan at
+  docs/plans/poi-passport-replaces-tour-stops.md.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0E0E12">
+
+    <!-- Header: title + counter + overflow -->
+    <LinearLayout
+        android:id="@+id/collectionHeader"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp"
+        android:background="#16151B"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_collection_witch_hat"
+            app:tint="#E7CDA0"
+            android:contentDescription="Collection" />
+
+        <TextView
+            android:id="@+id/collectionTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:textColor="#F4EDE0"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end"
+            tools:text="Default Salem Walking"
+            xmlns:tools="http://schemas.android.com/tools" />
+
+        <TextView
+            android:id="@+id/collectionCounter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:textColor="#E7CDA0"
+            android:textSize="14sp"
+            tools:text="12 / 85"
+            xmlns:tools="http://schemas.android.com/tools" />
+
+        <ImageView
+            android:id="@+id/collectionOverflow"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@android:drawable/ic_menu_more"
+            app:tint="#F4EDE0"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Collection options" />
+
+        <ImageView
+            android:id="@+id/collectionClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="#F4EDE0"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Close" />
+    </LinearLayout>
+
+    <!-- Collection picker chip — visible only when more than one collection is baked -->
+    <TextView
+        android:id="@+id/collectionPicker"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="10dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="@android:color/transparent"
+        android:textColor="#A89D85"
+        android:textSize="12sp"
+        android:drawablePadding="6dp"
+        android:visibility="gone"
+        tools:text="Switch collection ▾"
+        tools:visibility="visible"
+        xmlns:tools="http://schemas.android.com/tools"
+        app:layout_constraintTop_toBottomOf="@id/collectionHeader"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Empty state (shown when no collection rows are baked yet) -->
+    <TextView
+        android:id="@+id/collectionEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:gravity="center"
+        android:padding="32dp"
+        android:textColor="#A89D85"
+        android:textSize="14sp"
+        android:visibility="gone"
+        android:text="No collections authored yet.\n\nUse the web admin Collections tab to create a filter, then re-run the publish chain."
+        app:layout_constraintTop_toBottomOf="@id/collectionPicker"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <!-- The list itself -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/collectionList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:paddingBottom="32dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical"
+        app:layout_constraintTop_toBottomOf="@id/collectionPicker"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

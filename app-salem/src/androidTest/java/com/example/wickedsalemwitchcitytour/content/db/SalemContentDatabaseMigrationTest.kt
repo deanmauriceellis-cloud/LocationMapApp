@@ -26,8 +26,8 @@ import org.junit.runner.RunWith
  *   2. `identity_hash` row in `room_master_table` matches the latest hash that
  *      ships in `app-salem/schemas/.../<LATEST>.json` (currently v21, S271).
  *   3. All 13 Room-managed tables exist and have non-zero rows
- *      (`tour_stops` and `poi_passport` are the two allowed zero — declared but
- *      populated lazily / by operator authoring; others have authored content).
+ *      (`tour_stops` and `collection_entry` are the two allowed zero — declared
+ *      but populated lazily / by operator authoring; others have authored content).
  *
  * Wire into CI before any future schema bump. If the asset diverges from
  * the JSON schema this test will be the first to scream — before the app
@@ -56,7 +56,7 @@ class SalemContentDatabaseMigrationTest {
                 assertEquals(
                     "Asset identity_hash drifted — re-run publish chain " +
                         "(publish-salem-pois.js → publish-tours.js → publish-tour-legs.js → " +
-                        "publish-poi-passport.js → align-asset-schema-to-room.js)",
+                        "publish-poi-collection.js → align-asset-schema-to-room.js)",
                     EXPECTED_IDENTITY_HASH_LATEST,
                     hash
                 )
@@ -97,10 +97,11 @@ class SalemContentDatabaseMigrationTest {
         // @Database(version = N) changes.
         //   v19 hash was 745afa3eb4ce04bd7873671ea297b6e0
         //   v20 hash was 837ec05ad90541fa76a8a413a06394e0 (S268)
-        //   v21 hash is  19fcd8e4347d88e9da1a50aef2734bc9 (S271 — added 7 indices on SalemPoi)
-        const val EXPECTED_IDENTITY_HASH_LATEST = "19fcd8e4347d88e9da1a50aef2734bc9"
+        //   v21 hash was 19fcd8e4347d88e9da1a50aef2734bc9 (S271 — added 7 indices on SalemPoi)
+        //   v22 hash is  07f63ead9c5c3c05d87dcb6d54f64ba8 (S274 — PoiPassport → CollectionEntry rename for Katrina's Collection rebrand)
+        const val EXPECTED_IDENTITY_HASH_LATEST = "07f63ead9c5c3c05d87dcb6d54f64ba8"
 
-        // Minimum row counts. `tour_stops` and `poi_passport` are allowed zero
+        // Minimum row counts. `tour_stops` and `collection_entry` are allowed zero
         // (lazily populated / operator-authored). Other floors track the canonical
         // content baked in S224+ and trimmed through S241/S253/S270.
         val REQUIRED_TABLES = mapOf(
@@ -109,7 +110,7 @@ class SalemContentDatabaseMigrationTest {
             "tours" to 1L,
             "tour_legs" to 60L,
             "tour_stops" to 0L,
-            "poi_passport" to 0L,
+            "collection_entry" to 0L,
             "timeline_events" to 20L,
             "primary_sources" to 100L,
             "historical_facts" to 400L,

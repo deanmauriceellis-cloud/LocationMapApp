@@ -232,20 +232,20 @@
             android:contentDescription="About"
             android:tooltipText="About" />
 
-        <!-- S268 — POI Passport. Opens PassportSheet (per-user "heard" list). -->
+        <!-- S268 — Katrina's Collection. Opens CollectionSheet (per-user "heard" list). -->
         <ImageView
-            android:id="@+id/toolbarPassportIcon"
+            android:id="@+id/toolbarCollectionIcon"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="@drawable/ic_passport_witch_hat"
+            android:src="@drawable/ic_collection_witch_hat"
             android:scaleType="centerInside"
             android:padding="4dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
             android:layout_marginStart="8dp"
-            android:contentDescription="Passport — POIs you've heard"
-            android:tooltipText="Passport" />
+            android:contentDescription="Katrina's Collection — POIs you've heard"
+            android:tooltipText="Collection" />
 
         <!-- S168 — single speaker button: tap = cancel/replay, long-press = audio popup -->
         <ImageView

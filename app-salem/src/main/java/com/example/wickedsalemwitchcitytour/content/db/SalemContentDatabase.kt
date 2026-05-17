@@ -28,9 +28,9 @@ import com.example.wickedsalemwitchcitytour.content.model.*
         WitchTrialsArticle::class,
         WitchTrialsNpcBio::class,
         WitchTrialsNewspaper::class,
-        PoiPassport::class
+        CollectionEntry::class
     ],
-    version = 21,
+    version = 22,
     exportSchema = true
 )
 abstract class SalemContentDatabase : RoomDatabase() {
@@ -47,5 +47,5 @@ abstract class SalemContentDatabase : RoomDatabase() {
     abstract fun witchTrialsArticleDao(): WitchTrialsArticleDao
     abstract fun witchTrialsNpcBioDao(): WitchTrialsNpcBioDao
     abstract fun witchTrialsNewspaperDao(): WitchTrialsNewspaperDao
-    abstract fun poiPassportDao(): PoiPassportDao
+    abstract fun collectionEntryDao(): CollectionEntryDao
 }

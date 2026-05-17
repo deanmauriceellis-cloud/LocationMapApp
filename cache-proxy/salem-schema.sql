@@ -555,42 +555,50 @@ CREATE INDEX IF NOT EXISTS idx_swtn_active        ON salem_witch_trials_newspape
 CREATE INDEX IF NOT EXISTS idx_swtn_admin_dirty   ON salem_witch_trials_newspapers (admin_dirty) WHERE admin_dirty = TRUE;
 
 -- ════════════════════════════════════════════════════════════════════
--- POI Passport (S268) — operator-tunable filters that generate per-user
+-- Katrina's Collection (S268; renamed S274) — operator-tunable filters that generate per-user
 -- lists of POIs to "stamp" as the user walks past or taps each one.
 --
--- Two tables:
---   salem_passport_filters  — one row per operator-defined filter
---                             (Default Salem Walking, Heritage Trail, …).
---                             tour_id NULL = global passport; non-NULL =
---                             per-tour passport bound to that tour.
---   salem_passport_pois     — derived per-filter POI list, populated by
---                             cache-proxy/scripts/publish-poi-passport.js
---                             from each filter's parameters against
---                             salem_pois. Baked into the Room poi_passport
---                             table at v20.
+-- Two tables (S274 rename — "Katrina's Collection" rebrand of S268 Passport):
+--   salem_collections          — one row per operator-defined collection
+--                                 (Default Salem Walking, Heritage Trail, …).
+--                                 tour_id NULL = global collection; non-NULL =
+--                                 per-tour collection bound to that tour.
+--   salem_collection_entries   — derived per-collection POI list, populated by
+--                                 cache-proxy/scripts/publish-poi-collection.js
+--                                 from each collection's parameters against
+--                                 salem_pois. Baked into the Room
+--                                 collection_entry table at v22.
 --
--- The user's actual visit log lives in user_data.db (passport_visit table,
--- Room v3) and is keyed by poi_id only — never by passport_id. Per-tour
--- passports just render the global visit log against their filtered list.
+-- The user's actual visit log lives in user_data.db (poi_visit table,
+-- Room v4) and is keyed by poi_id only — never by collection_id. Per-tour
+-- collections just render the global visit log against their filtered list.
+-- HIST_BLDG entries are rendered as "ghosts" in the Android UI; other
+-- entries render as plain visited POIs.
+--
+-- Pre-S274 names: salem_passport_filters → salem_collections;
+-- salem_passport_pois → salem_collection_entries (filter_id → collection_id).
+-- Live PG was renamed via ALTER TABLE in S274; fresh installs use the
+-- CREATE TABLE blocks below. Idempotent post-S274 forward-rename block
+-- at the bottom handles any stragglers that still have old names.
 -- ════════════════════════════════════════════════════════════════════
 
-CREATE TABLE IF NOT EXISTS salem_passport_filters (
+CREATE TABLE IF NOT EXISTS salem_collections (
   id                            TEXT PRIMARY KEY,                          -- slug, e.g. 'default_salem_walking', 'heritage_trail'
   name                          TEXT NOT NULL,                              -- 'Default Salem Walking', 'Heritage Trail'
-  tour_id                       TEXT REFERENCES salem_tours(id) ON DELETE CASCADE,  -- NULL = global passport
+  tour_id                       TEXT REFERENCES salem_tours(id) ON DELETE CASCADE,  -- NULL = global collection
   categories                    TEXT[] NOT NULL DEFAULT '{}',               -- e.g. {HISTORICAL_BUILDINGS,HISTORICAL_LANDMARKS,WORSHIP,CIVIC}
   require_historical_narration  BOOLEAN NOT NULL DEFAULT TRUE,
   min_geofence_radius_m         INTEGER NOT NULL DEFAULT 0,
   min_year_established          INTEGER,                                    -- NULL = no floor
   max_year_established          INTEGER,                                    -- NULL = no ceiling
   sort_order                    INTEGER NOT NULL DEFAULT 0,
-  -- S269 — when FALSE, publish-poi-passport.js preserves the existing
-  -- salem_passport_pois rows for this filter instead of regenerating from
-  -- the category/year/etc parameters. Drives the "Build Passport from Walk"
-  -- flow in the Tour editor: candidates are derived from the tour's
+  -- S269 — when FALSE, publish-poi-collection.js preserves the existing
+  -- salem_collection_entries rows for this collection instead of regenerating
+  -- from the category/year/etc parameters. Drives the "Build Collection from
+  -- Walk" flow in the Tour editor: candidates are derived from the tour's
   -- polyline + each POI's geofence radius, edited by the operator, and
-  -- written directly to salem_passport_pois. The publish bake still copies
-  -- those rows into the SQLite poi_passport table.
+  -- written directly to salem_collection_entries. The publish bake still copies
+  -- those rows into the SQLite collection_entry table.
   auto_bake                     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -598,22 +606,42 @@ CREATE TABLE IF NOT EXISTS salem_passport_filters (
 
 -- S269 — idempotent forward-migration so existing dev installs pick up
 -- auto_bake without needing a fresh psql run of this file. Cache-proxy
--- module init (admin-passport.js) ALSO runs this ALTER on startup so
+-- module init (admin-collection.js) ALSO runs this ALTER on startup so
 -- developers who never re-source schema files still get the column.
-ALTER TABLE salem_passport_filters
+ALTER TABLE salem_collections
   ADD COLUMN IF NOT EXISTS auto_bake BOOLEAN NOT NULL DEFAULT TRUE;
 
-CREATE INDEX IF NOT EXISTS idx_salem_passport_filters_tour
-  ON salem_passport_filters (tour_id) WHERE tour_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_salem_collections_tour
+  ON salem_collections (tour_id) WHERE tour_id IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS salem_passport_pois (
-  filter_id      TEXT NOT NULL REFERENCES salem_passport_filters(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS salem_collection_entries (
+  collection_id  TEXT NOT NULL REFERENCES salem_collections(id) ON DELETE CASCADE,
   poi_id         TEXT NOT NULL REFERENCES salem_pois(id) ON DELETE CASCADE,
   display_order  INTEGER NOT NULL,
-  PRIMARY KEY (filter_id, poi_id)
+  PRIMARY KEY (collection_id, poi_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_salem_passport_pois_filter
-  ON salem_passport_pois (filter_id, display_order);
-CREATE INDEX IF NOT EXISTS idx_salem_passport_pois_poi
-  ON salem_passport_pois (poi_id);
+CREATE INDEX IF NOT EXISTS idx_salem_collection_entries_collection
+  ON salem_collection_entries (collection_id, display_order);
+CREATE INDEX IF NOT EXISTS idx_salem_collection_entries_poi
+  ON salem_collection_entries (poi_id);
+
+-- S274 — idempotent forward-rename block. If an older install still has
+-- the pre-S274 salem_passport_filters / salem_passport_pois tables,
+-- rename them in place to preserve data. Safe to re-run; no-ops once the
+-- rename has happened. The admin-collection.js module init runs the
+-- equivalent block on startup so devs who never re-source this file still
+-- get migrated.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='salem_passport_filters') THEN
+    EXECUTE 'ALTER TABLE salem_passport_filters RENAME TO salem_collections';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='salem_passport_pois') THEN
+    EXECUTE 'ALTER TABLE salem_passport_pois RENAME TO salem_collection_entries';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema='public' AND table_name='salem_collection_entries' AND column_name='filter_id') THEN
+    EXECUTE 'ALTER TABLE salem_collection_entries RENAME COLUMN filter_id TO collection_id';
+  END IF;
+END $$;

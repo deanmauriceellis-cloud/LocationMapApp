@@ -32,10 +32,10 @@ The same product wears four different names depending on which layer you're touc
   1. `node cache-proxy/scripts/publish-salem-pois.js`
   2. `node cache-proxy/scripts/publish-tours.js`
   3. `node cache-proxy/scripts/publish-tour-legs.js`
-  4. `node cache-proxy/scripts/publish-poi-passport.js` (S268)
+  4. `node cache-proxy/scripts/publish-poi-collection.js` (S268; renamed S274 from publish-poi-passport.js — Katrina's Collection rebrand)
   5. `node cache-proxy/scripts/align-asset-schema-to-room.js` (MUST run last — auto-discovers latest `app-salem/schemas/<DB>/<v>.json`, stamps Room `identity_hash` + `PRAGMA user_version`, rewrites every Room-managed table via canonical `createSql`. Skipping triggers `fallbackToDestructiveMigration` on first launch and wipes the asset.)
   Auxiliary scripts (run on-demand for specific content updates, not every bake): `publish-1692-newspapers.js`, `publish-witch-trials.js`, `publish-witch-trials-to-sqlite.js`, `publish-splash-tree.js`.
-- **Room schema export:** `app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase/<version>.json`. Regenerate via `./gradlew :app-salem:kspDebugKotlin -x verifyBundledAssets` after any `@Database(version = N)` bump. Current: **v21**, identity_hash `19fcd8e4347d88e9da1a50aef2734bc9` (S271).
+- **Room schema export:** `app-salem/schemas/com.example.wickedsalemwitchcitytour.content.db.SalemContentDatabase/<version>.json`. Regenerate via `./gradlew :app-salem:kspDebugKotlin -x verifyBundledAssets` after any `@Database(version = N)` bump. Current: **v22**, identity_hash `07f63ead9c5c3c05d87dcb6d54f64ba8` (S274 — PoiPassport → CollectionEntry rename for Katrina's Collection rebrand).
 - **Install workflow (asset packs, S256):** standalone `adb install` does NOT include `salem_tiles.sqlite`. Use:
   ```
   bundletool build-apks --bundle=<aab> --connected-device --device-id=<serial>
@@ -196,7 +196,7 @@ If OMEN needs any of that, it can read the live log directly — the path is in 
 - **Android app** — Kotlin, Hilt DI, OkHttp, osmdroid, Room SQLite, targeting API 34
 - **Web app** — React 19, TypeScript, Vite, Leaflet, Tailwind CSS (`web/`)
 - **Cache proxy** — Node.js/Express on port 4300 (`cache-proxy/`)
-- **PostgreSQL** — `locationmapapp` DB, 25 `salem_*` tables (live; includes legacy `*_legacy` + production passport/witch-trials/poi/tour tables)
+- **PostgreSQL** — `locationmapapp` DB, 25 `salem_*` tables (live; includes legacy `*_legacy` + production collection/witch-trials/poi/tour tables)
 - **Multi-module monorepo** — `:core` (shared), `:app-salem` (WickedSalemWitchCityTour), `:routing-jvm` (shared Dijkstra + parity tests). (S242: pre-pivot `:app` and `:salem-content` modules deleted as dead code.)
 
 ---

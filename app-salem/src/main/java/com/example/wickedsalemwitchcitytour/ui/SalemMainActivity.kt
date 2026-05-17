@@ -157,24 +157,24 @@ class SalemMainActivity : AppCompatActivity() {
     internal lateinit var poiEncounterTracker: com.example.wickedsalemwitchcitytour.userdata.PoiEncounterTracker
 
     /**
-     * S268 — POI Passport visit log. UPSERTed on every narration play (geofence
+     * S268 — Katrina's Collection visit log. UPSERTed on every narration play (geofence
      * ENTRY in [SalemMainActivityNarration] + sheet narration in
-     * [PoiDetailSheet]). Drives the filled/hollow stamp state in
-     * [com.example.wickedsalemwitchcitytour.ui.PassportSheet].
+     * [PoiDetailSheet]). Drives the filled/hollow marker state in
+     * [com.example.wickedsalemwitchcitytour.ui.CollectionSheet].
      *
      * Lives in [com.example.wickedsalemwitchcitytour.userdata.db.UserDataDatabase]
      * v3 — paid-user history survives upgrades via MIGRATION_2_3 (strict, no
      * destructive fallback per S180 lockdown).
      */
     @Inject
-    internal lateinit var passportVisitDao: com.example.wickedsalemwitchcitytour.userdata.dao.PassportVisitDao
+    internal lateinit var poiVisitDao: com.example.wickedsalemwitchcitytour.userdata.dao.PoiVisitDao
 
-    /** S269 — passport metadata reads. Used by the tour-selection card to
-     *  surface "X stamps" (passport-bound POI count) in place of the legacy
+    /** S269 — collection metadata reads. Used by the tour-selection card to
+     *  surface "X ghosts" (collection-bound POI count) in place of the legacy
      *  "X stops" (free-waypoint count, meaningless post-S190 since stops are
      *  polyline-only anchors). */
     @Inject
-    internal lateinit var poiPassportDao: com.example.wickedsalemwitchcitytour.content.dao.PoiPassportDao
+    internal lateinit var collectionEntryDao: com.example.wickedsalemwitchcitytour.content.dao.CollectionEntryDao
 
     /** S175: Salem on-device walking router. Lazy-loads `assets/routing/salem-routing-graph.sqlite`. */
     @Inject
@@ -773,7 +773,7 @@ class SalemMainActivity : AppCompatActivity() {
             aboutIcon      = binding.root.findViewById(R.id.toolbarAboutIcon),
             cameraIcon     = binding.root.findViewById(R.id.toolbarCameraIcon),
             gpsBurstIcon   = binding.root.findViewById(R.id.toolbarGpsBurstIcon),
-            passportIcon   = binding.root.findViewById(R.id.toolbarPassportIcon),
+            collectionIcon   = binding.root.findViewById(R.id.toolbarCollectionIcon),
             alertsBadge    = binding.root.findViewById(R.id.alertsBadge),
             layersBadge    = binding.root.findViewById(R.id.layersBadge)
         )
@@ -4906,20 +4906,20 @@ class SalemMainActivity : AppCompatActivity() {
             showAboutDialog()
         }
 
-        override fun onPassportRequested() {
+        override fun onCollectionRequested() {
             resetIdleTimer()
-            DebugLogger.i("SalemMainActivity", "onPassportRequested")
+            DebugLogger.i("SalemMainActivity", "onCollectionRequested")
             // S269 — toolbar tap during an active tour pins the sheet to
-            // that tour's passport (operator: "if I am in a tour, it should
-            // automatically take me to passport"). Outside of a tour we
-            // pass null and the sheet defaults to the first passport.
+            // that tour's collection (operator: "if I am in a tour, it should
+            // automatically take me to collection"). Outside of a tour we
+            // pass null and the sheet defaults to the first collection.
             val activePid = when (val s = tourViewModel.tourState.value) {
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> s.activeTour.passportId
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> s.activeTour.passportId
-                is com.example.wickedsalemwitchcitytour.tour.TourState.Detour -> s.activeTour.passportId
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Active -> s.activeTour.collectionId
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Paused -> s.activeTour.collectionId
+                is com.example.wickedsalemwitchcitytour.tour.TourState.Detour -> s.activeTour.collectionId
                 else -> null
             }
-            PassportSheet.show(supportFragmentManager, activePid)
+            CollectionSheet.show(supportFragmentManager, activePid)
         }
 
         // ── Top-bar Camera (recon photos) ─────────────────────────────────────

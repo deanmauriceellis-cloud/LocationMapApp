@@ -18,14 +18,14 @@ export interface TourSummary {
   updated_at: string
   /** COUNT(*) over salem_tour_stops, computed live; may diverge from stop_count. */
   stops_actual: number
-  /** S269 — passport-bound POI count for this tour (rows in
-   *  salem_passport_pois for the auto_bake=false filter where tour_id matches).
-   *  This is the canonical "number of stamps" the user collects on this tour;
+  /** S269 — collection-bound POI count for this tour (rows in
+   *  salem_collection_entries for the auto_bake=false filter where tour_id matches).
+   *  This is the canonical "number of POIs in the collection" the user collects on this tour;
    *  stop_count counts free polyline waypoints and is meaningless to the user
-   *  post-S190. Null when no walk-derived passport has been authored yet. */
-  passport_poi_count: number | null
-  /** S269 — id of the walk-derived passport bound to this tour, if any. */
-  passport_id: string | null
+   *  post-S190. Null when no walk-derived collection has been authored yet. */
+  collection_entry_count: number | null
+  /** S269 — id of the walk-derived collection bound to this tour, if any. */
+  collection_id: string | null
 }
 
 export interface TourStop {

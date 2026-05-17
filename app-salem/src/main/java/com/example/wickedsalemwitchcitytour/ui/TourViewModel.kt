@@ -195,7 +195,7 @@ class TourViewModel @Inject constructor(
 
     /**
      * End the tour from a user-initiated control. The engine work is
-     * suspend (S269 — it queries `passport_visit` to build the completion
+     * suspend (S269 — it queries `poi_visit` to build the completion
      * summary), so we launch on [viewModelScope]; observers of [tourState]
      * see [TourState.Completed] once the coroutine lands.
      */
@@ -204,13 +204,13 @@ class TourViewModel @Inject constructor(
     }
 
     /**
-     * S269 — called from the narration ENTRY hook after a passport visit is
+     * S269 — called from the narration ENTRY hook after a  collection visit is
      * recorded. Engine checks whether every POI in the active tour's
-     * passport has been heard and fires [TourState.Completed] exactly once
+     *  collection has been heard and fires [TourState.Completed] exactly once
      * per session if so.
      */
-    fun maybeCompletePassportTour() {
-        viewModelScope.launch { tourEngine.maybeCompleteFromPassport() }
+    fun maybeCompleteCollectionTour() {
+        viewModelScope.launch { tourEngine.maybeCompleteFromCollection() }
     }
 
     fun dismissCompletion() = tourEngine.dismissCompletion()

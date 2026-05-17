@@ -314,20 +314,20 @@ internal fun SalemMainActivity.initNarrationSystem() {
                     DebugLogger.i("SalemMainActivity",
                         "ENTRY: ${event.point.name} (${event.distanceM.toInt()}m)")
                     enqueueNarration(event.point, jumpToFront = false)
-                    // S268 — stamp the POI Passport. Fire-and-forget on IO; failure
+                    // S268 — record the visit in Katrina's Collection. Fire-and-forget on IO; failure
                     // never blocks narration.
                     val poiId = event.point.id
                     lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         try {
-                            passportVisitDao.recordHeard(poiId, System.currentTimeMillis())
+                            poiVisitDao.recordHeard(poiId, System.currentTimeMillis())
                             // S269 — after the visit lands, ask the engine
-                            // whether every POI in the active tour's passport
+                            // whether every POI in the active tour's collection
                             // has now been heard. One-shot per session; engine
-                            // no-ops if no tour is active / no passport is
+                            // no-ops if no tour is active / no collection is
                             // bound / already fired.
-                            tourViewModel.maybeCompletePassportTour()
+                            tourViewModel.maybeCompleteCollectionTour()
                         } catch (e: Exception) {
-                            DebugLogger.w("SalemMainActivity", "passport recordHeard failed id=$poiId: ${e.message}")
+                            DebugLogger.w("SalemMainActivity", "visit recordHeard failed id=$poiId: ${e.message}")
                         }
                     }
                 }

@@ -89,5 +89,5 @@ object SalemModule {
     @Provides fun provideWitchTrialsNpcBioDao(db: SalemContentDatabase): WitchTrialsNpcBioDao = db.witchTrialsNpcBioDao()
     @Provides fun provideWitchTrialsNewspaperDao(db: SalemContentDatabase): WitchTrialsNewspaperDao = db.witchTrialsNewspaperDao()
 
-    @Provides fun providePoiPassportDao(db: SalemContentDatabase): PoiPassportDao = db.poiPassportDao()
+    @Provides fun provideCollectionEntryDao(db: SalemContentDatabase): CollectionEntryDao = db.collectionEntryDao()
 }
