@@ -211,7 +211,14 @@ class CollectionSheet : DialogFragment() {
     }
 
     private suspend fun buildRowsForCollection(collectionId: String): RowResult {
+        // S278: List tab matches the Badges tab — ghost-eligible only. The broader
+        // collection pool may include HISTORICAL_LANDMARKS / attractions / other
+        // walkable POIs, but V1 ghost scope is HIST_BLDG only. Non-ghost rows in the
+        // List were showing empty 64dp portrait boxes which read as "broken" not
+        // "future scope". See feedback_ghosts_not_stops.md — user-facing count is
+        // catchable-ghosts, not pool size.
         val pois = collectionEntryDao.findByCollection(collectionId)
+            .filter { !it.ghostAssetA.isNullOrBlank() }
         if (pois.isEmpty()) return RowResult(emptyList(), 0, 0)
         val heardIds = poiVisitDao.listHeardAmong(pois.map { it.poiId }).toSet()
 

@@ -17,6 +17,7 @@ Asset paths follow image_asset convention: full asset-relative path with extensi
 
 Re-runnable. Same hash + same manifest = same result.
 """
+import argparse
 import hashlib
 import json
 import os
@@ -29,7 +30,7 @@ import psycopg2
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED_FILE = REPO_ROOT / "cache-proxy" / "data" / "ghost-personas-seed.json"
 ENV_FILE = REPO_ROOT / "cache-proxy" / ".env"
-MANIFEST = Path.home() / "AI-Studio" / "ghost-batch-v1" / "manifest.json"
+DEFAULT_MANIFEST = Path.home() / "AI-Studio" / "ghost-batch-v1" / "manifest.json"
 
 
 def load_database_url() -> str:
@@ -48,10 +49,21 @@ def derive_frame_slug(slug: str, frame_slugs: list[str]) -> str:
 
 
 def main() -> None:
-    if not MANIFEST.exists():
-        sys.exit(f"No manifest at {MANIFEST} — run generate-ghost-portraits.py --from-pg first")
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--manifest",
+        type=Path,
+        default=DEFAULT_MANIFEST,
+        help=f"manifest.json from a generate-ghost-portraits.py --from-pg run "
+             f"(default: {DEFAULT_MANIFEST})",
+    )
+    args = ap.parse_args()
+    manifest_path = args.manifest
 
-    manifest = json.loads(MANIFEST.read_text())
+    if not manifest_path.exists():
+        sys.exit(f"No manifest at {manifest_path} — run generate-ghost-portraits.py --from-pg first")
+
+    manifest = json.loads(manifest_path.read_text())
     seed = json.loads(SEED_FILE.read_text())
     frame_slugs = [f["slug"] for f in seed["frames"]]
 
@@ -78,8 +90,8 @@ def main() -> None:
     print(f"[manifest] {len(rows)} ghost rows to populate")
 
     # Persist the enriched manifest so frame_slug is canonical for future runs.
-    MANIFEST.write_text(json.dumps(manifest, indent=2))
-    print(f"[manifest] frame_slug enriched in place: {MANIFEST}")
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    print(f"[manifest] frame_slug enriched in place: {manifest_path}")
 
     with psycopg2.connect(load_database_url()) as conn, conn.cursor() as cur:
         updated = 0

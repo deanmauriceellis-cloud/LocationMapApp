@@ -1,0 +1,520 @@
+{
+  "abbott_street_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Abbott Street Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "alice_parker_home": {
+    "_confidence": 0.7,
+    "_name": "Alice Parker Home Site",
+    "_si_clue": "lma_desc='alice parker'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial wronged accused witch (gallows-bound)"
+  },
+  "armory_park": {
+    "_confidence": 0.85,
+    "_name": "Armory Park",
+    "_si_clue": "lma_name='armory'",
+    "_year": null,
+    "profession": "militia officer with musket"
+  },
+  "bewitched_sculpture_samantha_statue": {
+    "_confidence": 0.85,
+    "_name": "Bewitched Sculpture \u2013 Samantha Statue",
+    "_si_clue": "lma_name='samantha statue'",
+    "_year": 1960,
+    "profession": "Hollywood TV witch in cocktail dress"
+  },
+  "blue_anchor_tavern": {
+    "_confidence": 0.85,
+    "_name": "Blue Anchor Tavern Site",
+    "_si_clue": "lma_name='tavern'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial tavern-keeper"
+  },
+  "broad_street_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Broad Street Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": 1655,
+    "profession": "1690s puritan colonial weathered sexton (gravedigger)"
+  },
+  "castle_dismal": {
+    "_confidence": 0.7,
+    "_name": "Castle Dismal (Manning House)",
+    "_si_clue": "lma_desc='nathaniel hawthorne'",
+    "_year": 1800,
+    "profession": "Federal-era brooding novelist with quill"
+  },
+  "central_wharf": {
+    "_confidence": 0.85,
+    "_name": "Central Wharf",
+    "_si_clue": "lma_name='wharf'",
+    "_year": 1790,
+    "profession": "Federal-era merchant sea-captain"
+  },
+  "charlotte_forten_park": {
+    "_confidence": 0.85,
+    "_name": "Charlotte Forten Park",
+    "_si_clue": "lma_name='charlotte forten'",
+    "_year": 1837,
+    "profession": "antebellum Victorian schoolteacher abolitionist"
+  },
+  "charter_street_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Charter Street Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": 1637,
+    "profession": "1690s puritan colonial weathered sexton (gravedigger)"
+  },
+  "chestnut_street": {
+    "_confidence": 0.7,
+    "_name": "Chestnut Street Historic District",
+    "_si_clue": "lma_desc='samuel mcintire'",
+    "_year": null,
+    "profession": "master woodcarver"
+  },
+  "custom_house": {
+    "_confidence": 0.85,
+    "_name": "Custom House",
+    "_si_clue": "lma_name='custom house'",
+    "_year": 1815,
+    "profession": "Federal-era customs officer with ledger"
+  },
+  "derby_beebee_summer_house_8490e9": {
+    "_confidence": 0.7,
+    "_name": "Derby-Beebee Summer House",
+    "_si_clue": "lma_desc='samuel mcintire'",
+    "_year": null,
+    "profession": "master woodcarver"
+  },
+  "derby_powderhouse_wharf": {
+    "_confidence": 0.85,
+    "_name": "Derby Powderhouse Wharf",
+    "_si_clue": "lma_name='powderhouse'",
+    "_year": null,
+    "profession": "powder-house keeper"
+  },
+  "derby_wharf": {
+    "_confidence": 0.85,
+    "_name": "Derby Wharf",
+    "_si_clue": "lma_name='wharf'",
+    "_year": 1762,
+    "profession": "early 18th-century colonial merchant sea-captain"
+  },
+  "derby_wharf_light_station_2": {
+    "_confidence": 0.85,
+    "_name": "Derby Wharf Light Station",
+    "_si_clue": "lma_name='light station'",
+    "_year": 1871,
+    "profession": "late-Victorian lighthouse keeper"
+  },
+  "first_church_1692_site": {
+    "_confidence": 0.85,
+    "_name": "First Church Meetinghouse 1692 Site",
+    "_si_clue": "lma_name='meetinghouse'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial puritan minister"
+  },
+  "fort_lee": {
+    "_confidence": 0.85,
+    "_name": "Fort Lee",
+    "_si_clue": "lma_name='fort '",
+    "_year": 1776,
+    "profession": "early 18th-century colonial fort gunner with cannon"
+  },
+  "fort_pickering": {
+    "_confidence": 0.85,
+    "_name": "Fort Pickering",
+    "_si_clue": "lma_name='fort '",
+    "_year": 1863,
+    "profession": "antebellum Victorian fort gunner with cannon"
+  },
+  "friends_burial_ground_quaker_cemetary": {
+    "_confidence": 0.85,
+    "_name": "Friends Burial Ground Quaker Cemetary",
+    "_si_clue": "lma_name='burial ground'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "friendship_of_salem": {
+    "_confidence": 0.7,
+    "_name": "Friendship of Salem",
+    "_si_clue": "lma_desc='friendship of salem'",
+    "_year": 1797,
+    "profession": "Federal-era merchant sea-captain"
+  },
+  "gardner_pingree_house": {
+    "_confidence": 0.7,
+    "_name": "Gardner-Pingree House",
+    "_si_clue": "lma_desc='nathaniel hawthorne'",
+    "_year": 1800,
+    "profession": "Federal-era brooding novelist with quill"
+  },
+  "gedney_house": {
+    "_confidence": 0.7,
+    "_name": "Gedney House",
+    "_si_clue": "bartholomew gedney presided over the salem witch trials.",
+    "_year": 1665,
+    "profession": "1690s puritan colonial witch-trial magistrate"
+  },
+  "greenlawn_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Greenlawn Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "harmony_grove_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Harmony Grove Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "hathaway_house": {
+    "_confidence": 0.7,
+    "_name": "Hathaway House",
+    "_si_clue": "lma_desc='nathaniel hawthorne'",
+    "_year": 1668,
+    "profession": "1690s puritan colonial brooding novelist with quill"
+  },
+  "hawkes_house": {
+    "_confidence": 0.7,
+    "_name": "Hawkes House",
+    "_si_clue": "lma_desc='samuel mcintire'",
+    "_year": 1801,
+    "profession": "Federal-era master woodcarver"
+  },
+  "hawthorne_statue": {
+    "_confidence": 0.85,
+    "_name": "Nathaniel Hawthorne Statue",
+    "_si_clue": "lma_name='hawthorne'",
+    "_year": 1925,
+    "profession": "early-20th-century brooding novelist with quill"
+  },
+  "hb_17a0faa50744": {
+    "_confidence": 0.85,
+    "_name": "East Church",
+    "_si_clue": "original_use=church",
+    "_year": null,
+    "profession": "puritan minister"
+  },
+  "hb_6603e8b176ed": {
+    "_confidence": 0.85,
+    "_name": "Lye - Tapley Shoe Shop",
+    "_si_clue": "lma_name='shoe shop'",
+    "_year": null,
+    "profession": "cordwainer (shoemaker)"
+  },
+  "historic_central_wharf_2": {
+    "_confidence": 0.85,
+    "_name": "Historic Central Wharf",
+    "_si_clue": "lma_name='wharf'",
+    "_year": null,
+    "profession": "merchant sea-captain"
+  },
+  "historic_derby_wharf": {
+    "_confidence": 0.85,
+    "_name": "Historic Derby Wharf",
+    "_si_clue": "lma_name='wharf'",
+    "_year": 1791,
+    "profession": "Federal-era merchant sea-captain"
+  },
+  "howard_street_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Howard Street Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial weathered sexton (gravedigger)"
+  },
+  "joshua_ward_house": {
+    "_confidence": 0.7,
+    "_name": "Joshua Ward House",
+    "_si_clue": "lma_desc='samuel mcintire'",
+    "_year": 1784,
+    "profession": "Federal-era master woodcarver"
+  },
+  "mcintire_historic_district": {
+    "_confidence": 0.85,
+    "_name": "McIntire Historic District",
+    "_si_clue": "lma_name='mcintire'",
+    "_year": 1780,
+    "profession": "Federal-era master woodcarver"
+  },
+  "monumental_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Monumental Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "narbonne_house": {
+    "_confidence": 0.95,
+    "_name": "Narbonne House",
+    "_si_clue": "the narbonne house is considered a witness to the 1692 witch trials.",
+    "_year": 1675,
+    "profession": "1690s puritan colonial witch-trial magistrate"
+  },
+  "nathaniel_bowditch_house": {
+    "_confidence": 0.85,
+    "_name": "Nathaniel Bowditch House",
+    "_si_clue": "lma_name='bowditch'",
+    "_year": 1802,
+    "profession": "Federal-era navigator with sextant and almanac"
+  },
+  "nathaniel_hawthornes_birthplace": {
+    "_confidence": 0.85,
+    "_name": "Nathaniel Hawthorne's Birthplace",
+    "_si_clue": "lma_name='hawthorne'",
+    "_year": 1804,
+    "profession": "Federal-era brooding novelist with quill"
+  },
+  "old_south_trask_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Old South Trask Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "peabody_essex_museum_2": {
+    "_confidence": 0.6,
+    "_name": "Peabody Essex Museum",
+    "_si_clue": "museum that held the salem witch trial documents from 1980.",
+    "_year": 1626,
+    "profession": "1690s puritan colonial witch-trial magistrate"
+  },
+  "peabody_essex_museum_3": {
+    "_confidence": 0.7,
+    "_name": "Peabody Essex Museum",
+    "_si_clue": "lma_desc='mcintire'",
+    "_year": null,
+    "profession": "master woodcarver"
+  },
+  "pedrick_store_house": {
+    "_confidence": 0.95,
+    "_name": "Pedrick Store House",
+    "_si_clue": "original_use=store house",
+    "_year": 1770,
+    "profession": "early 18th-century colonial shopkeeper"
+  },
+  "peirce_nichols_house": {
+    "_confidence": 0.7,
+    "_name": "Peirce-Nichols House",
+    "_si_clue": "lma_desc='samuel mcintire'",
+    "_year": 1782,
+    "profession": "Federal-era master woodcarver"
+  },
+  "prescott_memorial_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Prescott Memorial Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "proctors_ledge_memorial": {
+    "_confidence": 0.85,
+    "_name": "Proctor's Ledge Memorial",
+    "_si_clue": "lma_name='proctor's ledge'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial wronged accused witch (gallows-bound)"
+  },
+  "public_stores": {
+    "_confidence": 0.9,
+    "_name": "Public Stores",
+    "_si_clue": "original_use=warehouse",
+    "_year": null,
+    "profession": "merchant sea-captain"
+  },
+  "rebecca_nurse_homestead": {
+    "_confidence": 0.7,
+    "_name": "Rebecca Nurse Homestead",
+    "_si_clue": "lma_desc='rebecca nurse'",
+    "_year": null,
+    "profession": "wronged accused witch (gallows-bound)"
+  },
+  "red_s_sandwich_shop": {
+    "_confidence": 0.55,
+    "_name": "Red\u2019s Sandwich Shop",
+    "_si_clue": "captain cook departed from sandwich.",
+    "_year": 1945,
+    "profession": "early-20th-century merchant sea-captain"
+  },
+  "roger_conant_statue": {
+    "_confidence": 0.85,
+    "_name": "Roger Conant Statue",
+    "_si_clue": "lma_name='conant'",
+    "_year": 1626,
+    "profession": "1690s puritan colonial puritan founder in cloak"
+  },
+  "saint_marys_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Saint Marys Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "salem": {
+    "_confidence": 0.55,
+    "_name": "Salem",
+    "_si_clue": "author whose work is critically analyzed in the source.",
+    "_year": 1626,
+    "profession": "1690s puritan colonial brooding novelist with quill"
+  },
+  "salem_common_2": {
+    "_confidence": 0.6,
+    "_name": "Salem Common",
+    "_si_clue": "the salem common was a location for public humiliation during the salem witch trials of 1692.",
+    "_year": 1637,
+    "profession": "1690s puritan colonial witch-trial magistrate"
+  },
+  "salem_jail_site": {
+    "_confidence": 0.85,
+    "_name": "Old Salem Jail Site",
+    "_si_clue": "lma_name='jail'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial weary jailer with iron keys"
+  },
+  "salem_maritime_national_historic_park_central_wharf": {
+    "_confidence": 0.85,
+    "_name": "Salem Maritime National Historic Park / Central Wharf",
+    "_si_clue": "lma_name='wharf'",
+    "_year": null,
+    "profession": "merchant sea-captain"
+  },
+  "salem_maritime_national_historic_site": {
+    "_confidence": 0.8,
+    "_name": "Salem Maritime National Historic Site",
+    "_si_clue": "derby wharf is a component of the salem maritime national historic site.",
+    "_year": 1938,
+    "profession": "early-20th-century merchant sea-captain"
+  },
+  "salem_maritime_national_historical_park": {
+    "_confidence": 0.85,
+    "_name": "Salem Maritime National Historical Park",
+    "_si_clue": "a witness house to the 1692 witch trials within the park.",
+    "_year": 1938,
+    "profession": "early-20th-century witch-trial magistrate"
+  },
+  "salem_public_library": {
+    "_confidence": 0.7,
+    "_name": "Salem Public Library",
+    "_si_clue": "lma_desc='mcintire'",
+    "_year": 1889,
+    "profession": "late-Victorian master woodcarver"
+  },
+  "salem_witch_trials_memorial": {
+    "_confidence": 0.85,
+    "_name": "Salem Witch Trials Memorial",
+    "_si_clue": "lma_name='witch trials memorial'",
+    "_year": null,
+    "profession": "wronged accused witch (gallows-bound)"
+  },
+  "scale_house": {
+    "_confidence": 0.85,
+    "_name": "Scale House",
+    "_si_clue": "lma_name='ale house'",
+    "_year": 1829,
+    "profession": "Federal-era tavern-keeper"
+  },
+  "scarlet_letter_house": {
+    "_confidence": 0.85,
+    "_name": "14 Mall Street (Scarlet Letter House)",
+    "_si_clue": "lma_name='scarlet letter'",
+    "_year": 1847,
+    "profession": "antebellum Victorian brooding novelist with quill"
+  },
+  "ship_tavern_site": {
+    "_confidence": 0.85,
+    "_name": "Ship Tavern Site",
+    "_si_clue": "lma_name='tavern'",
+    "_year": 1692,
+    "profession": "1690s puritan colonial tavern-keeper"
+  },
+  "the_burying_point_2": {
+    "_confidence": 0.85,
+    "_name": "The Burying Point",
+    "_si_clue": "lma_name='burying point'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "the_first_church_location_baac36": {
+    "_confidence": 0.85,
+    "_name": "The First Church Location",
+    "_si_clue": "lma_name='first church'",
+    "_year": null,
+    "profession": "puritan minister"
+  },
+  "the_first_muster": {
+    "_confidence": 0.85,
+    "_name": "The First Muster",
+    "_si_clue": "lma_name='muster'",
+    "_year": 1637,
+    "profession": "1690s puritan colonial militia officer with musket"
+  },
+  "the_house_of_the_seven_gables_3": {
+    "_confidence": 0.85,
+    "_name": "The House of the Seven Gables",
+    "_si_clue": "lma_name='seven gables'",
+    "_year": 1910,
+    "profession": "early-20th-century brooding novelist with quill"
+  },
+  "the_salem_inn_2": {
+    "_confidence": 0.85,
+    "_name": "The Salem Inn",
+    "_si_clue": "lma_name=' inn'",
+    "_year": 1800,
+    "profession": "Federal-era tavern-keeper"
+  },
+  "the_witch_house_at_salem": {
+    "_confidence": 0.85,
+    "_name": "The Witch House at Salem",
+    "_si_clue": "lma_name='witch house'",
+    "_year": 1650,
+    "profession": "1690s puritan colonial witch-trial magistrate"
+  },
+  "washington_arch": {
+    "_confidence": 0.85,
+    "_name": "Washington Arch",
+    "_si_clue": "lma_name='washington arch'",
+    "_year": 1630,
+    "profession": "stoic stone-watcher"
+  },
+  "waterside_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Waterside Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "west_india_goods_store": {
+    "_confidence": 0.9,
+    "_name": "West India Goods Store",
+    "_si_clue": "original_use=retail shop",
+    "_year": null,
+    "profession": "shopkeeper"
+  },
+  "wilson_cemetery": {
+    "_confidence": 0.85,
+    "_name": "Wilson Cemetery",
+    "_si_clue": "lma_name='cemetery'",
+    "_year": null,
+    "profession": "weathered sexton (gravedigger)"
+  },
+  "witch_trials_memorial": {
+    "_confidence": 0.85,
+    "_name": "Witch Trials Memorial",
+    "_si_clue": "lma_name='witch trials memorial'",
+    "_year": null,
+    "profession": "wronged accused witch (gallows-bound)"
+  },
+  "world_war_ii_memorial": {
+    "_confidence": 0.85,
+    "_name": "World War II Memorial",
+    "_si_clue": "lma_name='world war'",
+    "_year": null,
+    "profession": "stoic stone-watcher"
+  }
+}
