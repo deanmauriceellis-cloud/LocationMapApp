@@ -564,7 +564,7 @@ module.exports = function(app, deps) {
                 min_geofence_radius_m, min_year_established, max_year_established
            FROM salem_collections
           WHERE tour_id IS NULL
-       ORDER BY (id = 'default_salem_walking') DESC, sort_order ASC, name ASC
+       ORDER BY sort_order ASC, name ASC
           LIMIT 1`,
       );
       const pool = poolQ.rows[0] || null;

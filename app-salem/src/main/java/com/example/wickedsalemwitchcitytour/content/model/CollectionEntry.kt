@@ -45,10 +45,10 @@ import androidx.room.Index
     ]
 )
 data class CollectionEntry(
-    /** Matches `salem_collections.id` — e.g. `default_salem_walking`. */
+    /** Matches `salem_collections.id` — e.g. `tour_drks_001_walk_passport`. */
     @ColumnInfo(name = "collection_id") val collectionId: String,
 
-    /** Denormalized collection name for header display ("Default Salem Walking"). */
+    /** Denormalized collection name for header display ("Dr. K's Tour — Walk-derived Passport"). */
     @ColumnInfo(name = "collection_name") val collectionName: String,
 
     /** Optional `salem_tours.id` if this collection is bound to a tour; NULL = global. */
