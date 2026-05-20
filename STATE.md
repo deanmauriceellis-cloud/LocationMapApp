@@ -2,17 +2,17 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-19 — **Session 282.** LongWalkTour walk-sim full-route HB coverage report on Lenovo (2,619 steps / 59 TTS dwells / 130 GPS samples / `tools/s281_hb_coverage_v2.py`): **48 HBs in range, 46 announced, 2 missed.** Diagnosed both: **(1)** `14 Mall Street (Scarlet Letter House)` — content-authoring gate (PG row had `is_narrated=0` despite 781 chars `historical_narration` + 812 `long_narration`; the DAO `WHERE (is_narrated = 1 OR ...)` excluded it from the narration pool entirely). **Fixed this session** — PG `UPDATE salem_pois SET is_narrated=true WHERE id='scarlet_letter_house'`, full 5-script publish chain re-ran clean (Narrated 1987→1988, identity_hash `4db15f...` unchanged), debug AAB rebuilt in 16 s, bundletool install on Pixel 8 + Lenovo. Commit `9a4e23a`. **(2)** `Paul Revere's Bell` — real runtime miss, root cause not provable from this session's log (filter lacked NARR-GEO / NARR-GATE). Both Bell and Armory Park are `is_narrated=1`, ~15 m apart; Armory fired ENTRY at step ~1024 but Bell never appears in any `NARR-QUEUE` line. Stream filter for the next walk extended to `WALK-SIM|NarrationMgr|NARR-QUEUE|NARR-STATE|NARR-GEO|NARR-GATE` to distinguish scanner-never-fired-ENTRY from enqueue-silently-SKIPped. Also confirmed the dwell mechanism (`SalemMainActivity.kt:2284-2316`) is NOT the cause — it correctly freezes the walker on `Speaking || queueNonEmpty` and exits only on `TTS idle && queue empty`; during dwell, `setManualLocation(point)` re-fires every 1 s so the scanner re-runs each tick and other in-range POIs get a fresh ENTRY chance every second. Latent fragility flagged (not actioned): `events.collectLatest` at `SalemMainActivityNarration.kt:307` is safe today because `enqueueNarration` is synchronous, but a future change making it suspending would silently drop concurrent ENTRYs. Full detail in `docs/session-logs/session-282-2026-05-18.md`.
+**Last updated:** 2026-05-19 — **Session 283.** Chatbot V1 scoped end-to-end (on-device, rule-based, POI facts only, distance-sorted). Operator declared scope as `"Where is the Phillips House?"` / `"Where can I find pizza?"` / `"What are pizza places close to me?"`. Recommended SQLite FTS5 over hand-rolled inverted index. Locked 7 design decisions across 3 AskUserQuestion rounds: dedicated full-screen Find screen via drawer menu / FTS5 + Levenshtein-name fuzzy fallback / locations + short blurb inline AND direct-answer for high-confidence name queries / all 2,039 active POIs indexed (name + category + subcategory + description + short_description) / GPS-unavailable falls back to alphabetical sort / synonyms deferred to post-v1 / drawer entry near top. Wrote `docs/plans/Chatbot_V1.md` (~150 lines) capturing locked scope + 7 open items for operator pondering (Phase 0 recall spike as gate, FTS bake hook placement, Room v23→v24 rotation discipline, Hawthorne disambiguation edge case for direct-answer threshold, default radius, drawer placement, empty-input state) + 6 implementation phases + 5 risks + explicit out-of-scope list. **Phase 0 is the recommended first action when implementation kicks off:** 5-min PG query against ~15 tourist-staple keywords against the proposed FTS columns to validate the synonyms-deferral assumption before any code. Plan parked for operator pondering. Net code-side change this session: zero — discussion + plan doc only. No PG / Room / Android / web / cache-proxy / publish chain / device installs touched. Full detail in `docs/session-logs/session-283-2026-05-19.md`.
+
+### Prior — S282 (2026-05-18)
+
+LongWalkTour walk-sim full-route HB coverage on Lenovo (2,619 steps / 59 TTS dwells / 130 GPS samples / `tools/s281_hb_coverage_v2.py`): **48 HBs in range, 46 announced, 2 missed.** Diagnosed both: **(1)** `14 Mall Street (Scarlet Letter House)` — content-authoring gate (PG row had `is_narrated=0` despite 781 chars `historical_narration` + 812 `long_narration`; the DAO `WHERE (is_narrated = 1 OR ...)` excluded it from the narration pool entirely). **Fixed S282** — PG `UPDATE salem_pois SET is_narrated=true WHERE id='scarlet_letter_house'`, full 5-script publish chain re-ran clean (Narrated 1987→1988, identity_hash `4db15f...` unchanged), debug AAB rebuilt in 16 s, bundletool install on Pixel 8 + Lenovo. Commit `9a4e23a`. **(2)** `Paul Revere's Bell` — real runtime miss, root cause not provable from S282's log (filter lacked NARR-GEO / NARR-GATE). Both Bell and Armory Park are `is_narrated=1`, ~15 m apart; Armory fired ENTRY at step ~1024 but Bell never appears in any `NARR-QUEUE` line. Stream filter for the next walk extended to `WALK-SIM|NarrationMgr|NARR-QUEUE|NARR-STATE|NARR-GEO|NARR-GATE` to distinguish scanner-never-fired-ENTRY from enqueue-silently-SKIPped. Confirmed the dwell mechanism (`SalemMainActivity.kt:2284-2316`) is NOT the cause. Latent fragility flagged (not actioned): `events.collectLatest` at `SalemMainActivityNarration.kt:307` is safe today because `enqueueNarration` is synchronous, but a future change making it suspending would silently drop concurrent ENTRYs.
 
 ### Prior — S281 (2026-05-18)
 
 Publish chain (5/5) + bundletool install on Pixel 8 + Lenovo — S279's architectural changes (3 tours / Dr. K's-default / no Whole-Salem global pool / no TOUR_0001) brought to-device. Asset DB rebuilt to Room v23 (`4db15f...`), 2,039 POIs / 3 tours / 59 legs / 309 collection entries. HISTORICAL_BUILDINGS coverage spot-check on LongWalkTour walk-sim (1887 steps / Lenovo) attempted — logcat ring buffer was only 256 KiB so 78% of the walk was unrecoverable; captured 22% window (steps 1540–1880 / 36 GPS samples) showed 7 in range / 7 announced / 0 missed. Bumped Lenovo logcat buffer 256 KiB → 16 MiB to unblock S282's full-route capture. `tools/s281_hb_coverage_v2.py` preserved.
 
-### Prior — S280 (2026-05-18)
-
-~45-min exploratory pass: SI-clued category audit shipped + scrapped within session. `tools/category-audit.py` (~470 LOC) used SI's `/api/intel/poi-export` (1,560 entities) with a two-pass primary→secondary refine + LOW_CONFIDENCE_HINT demotion; produced `.ods` spreadsheet. 83% noise — scrapped. Reusable mechanics: SI primary_category ~18-value enum mapped, set-membership token matching > substring, 80m + name 0.55 threshold gives clean SI↔LMA join. Net code-side change: zero.
-
-### Older prior-session blocks pruned 2026-05-19 (S282) for the 200-line cap; see `SESSION-LOG.md` for S273–S279 + `docs/session-logs/` for full detail.
+### Older prior-session blocks pruned 2026-05-19 (S283) for the 200-line cap; see `SESSION-LOG.md` for S274–S280 + `docs/session-logs/` for full detail.
 
 ### V1 ship-cliffs (all closed)
 
@@ -22,7 +22,7 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 ## TOP PRIORITY — V1 launch triage (operator-confirmed 2026-04-29; revised S203 close 2026-04-30)
 
-> **Internal ship target: 2026-08-01** (73 days as of 2026-05-19). One month tighter than the prior Sept 1 anchor. Salem 400+ peak attendance is October 2026.
+> **Internal ship target: 2026-08-01** (72 days as of 2026-05-19). One month tighter than the prior Sept 1 anchor. Salem 400+ peak attendance is October 2026.
 
 ### Operator-side legal / business (in flight)
 
@@ -45,11 +45,11 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S283 opener (operator-declared at S282 close)
+### S284 opener (parked at S283 close)
 
-**Next-session work:** *"a chatbot that can answer simple questions"*. Scope unspecified — surface (Android app vs. web admin vs. something else), target user (operator vs. end-user vs. operator's staff), implementation envelope (on-device rule-based vs. server LLM), and question domain (POI facts / Salem history / app help / something else) all open. **DO NOT assume against the V1 offline / no-LLM rules** (`feedback_v1_no_external_contact.md`, `project_v1_offline_only.md`) — this may be post-V1, web-admin-only, or a rule-based on-device responder; ask scope before any implementation.
+**Chatbot V1 plan parked for operator pondering.** `docs/plans/Chatbot_V1.md` is the authoritative scope doc — all 13 locked decisions + 7 open items + 6-phase implementation roadmap live there. **Phase 0 recall spike** is the recommended first action when operator gives the go-ahead: 5-min PG query over ~15 tourist-staple keywords (pizza, coffee, beer, ATM, restroom, parking, ice cream, bathroom, sushi, witch trials, ...) against `name + category + subcategory + description + short_description` columns to validate the synonyms-deferral assumption. The 7 open items include the Hawthorne disambiguation edge case (uniqueness rule for direct-answer triggering), FTS bake hook placement (fold into `align-asset-schema-to-room.js` vs. new standalone script), and a few smaller calls. Wait for operator to finish pondering before kickoff.
 
-**S282 carry-forward (Paul Revere's Bell miss):** next walk-sim should be captured against the extended filter `WALK-SIM|NarrationMgr|NARR-QUEUE|NARR-STATE|NARR-GEO|NARR-GATE` (`grep -v WickedAnim`). Re-run `tools/s281_hb_coverage_v2.py` and grep the captured `NARR-GEO` lines around step ~1024-1140 for the Bell's `ENTRY` (or absence) — distinguishes scanner-never-saw-it from enqueue-silently-skipped. Lenovo logcat buffer is still 16 MiB (persists until reboot).
+**S282 carry-forward (Paul Revere's Bell miss) still standing:** next walk-sim should be captured against the extended filter `WALK-SIM|NarrationMgr|NARR-QUEUE|NARR-STATE|NARR-GEO|NARR-GATE` (`grep -v WickedAnim`). Re-run `tools/s281_hb_coverage_v2.py` and grep the captured `NARR-GEO` lines around step ~1024-1140 for the Bell's `ENTRY` (or absence) — distinguishes scanner-never-saw-it from enqueue-silently-skipped. Lenovo logcat buffer is still 16 MiB (persists until reboot).
 
 ### S271 opener: Recon Layer 2 + Passport S5 still owed
 
@@ -159,7 +159,7 @@ V1-open content carry-forwards 70+ sessions stale moved to `docs/archive/STATE_c
 
 Phases 1-9 + 9A+ + 9P.A/B + 9T + 9U + 9X: **COMPLETE**. Phase 10 (production readiness): first signed AAB built S180, asset-pack reorg S256, ship-cliffs 1/2/3 closed. Phase 11 (ASO/Play Store): operator-led, post-AAB-upload. **9Y/9Z/9Q/9R deferred** (V1.0.1+, no V1 ship dependency). Cross-project TigerLine stalled 2026-04-21; SalemIntelligence PAUSED S214.
 
-**Sessions completed:** 282. **Internal ship target: 2026-08-01.**
+**Sessions completed:** 283. **Internal ship target: 2026-08-01.**
 
 ---
 
