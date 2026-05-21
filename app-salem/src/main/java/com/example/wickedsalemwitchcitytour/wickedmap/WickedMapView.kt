@@ -112,6 +112,22 @@ class WickedMapView @JvmOverloads constructor(
         Log.i(TAG, "attached TileArchive")
     }
 
+    /**
+     * S286 P3 — seed the camera from an external source (e.g. when entering
+     * the WickedMap prototype from SalemMainActivity, so the historical
+     * overlay lands at the operator's current view rather than the
+     * prototype's hardcoded default). MapCamera clamps lat/lon/zoom to its
+     * configured limits internally.
+     */
+    fun setCamera(lat: Double, lon: Double, zoom: Double) {
+        synchronized(camera) {
+            camera.centerLat = lat.coerceIn(camera.minLat, camera.maxLat)
+            camera.centerLon = lon.coerceIn(camera.minLon, camera.maxLon)
+            camera.zoom = zoom.coerceIn(camera.minZoom, camera.maxZoom)
+        }
+        Log.i(TAG, "setCamera($lat, $lon, $zoom) → applied")
+    }
+
     fun addOverlay(overlay: MapOverlay) {
         overlays.add(overlay)
         Log.i(TAG, "added overlay: ${overlay::class.simpleName}")

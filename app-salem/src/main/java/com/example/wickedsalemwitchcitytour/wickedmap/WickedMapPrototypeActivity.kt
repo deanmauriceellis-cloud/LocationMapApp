@@ -122,6 +122,16 @@ class WickedMapPrototypeActivity : AppCompatActivity(), HistoricalMapsBottomShee
 
         archive = TileArchive(af).also { mapView.attachArchive(it) }
 
+        // S286 P3 — seed camera from caller (SalemMainActivity passes its
+        // current center+zoom so the historical overlay lands where the
+        // operator is, not at the hardcoded Salem Common default).
+        if (intent.hasExtra(EXTRA_LAT) && intent.hasExtra(EXTRA_LON)) {
+            val lat = intent.getDoubleExtra(EXTRA_LAT, 42.5222)
+            val lon = intent.getDoubleExtra(EXTRA_LON, -70.8967)
+            val zoom = intent.getDoubleExtra(EXTRA_ZOOM, 17.0)
+            mapView.setCamera(lat, lon, zoom)
+        }
+
         // Restore last picker selection. Default year=1851, opacity=70 so a
         // fresh install still shows something interesting.
         val startYear = HistoricalMapsBottomSheet.readYear(this)
@@ -174,5 +184,11 @@ class WickedMapPrototypeActivity : AppCompatActivity(), HistoricalMapsBottomShee
         super.onDestroy()
         archive?.close()
         historicalArchive?.close()
+    }
+
+    companion object {
+        const val EXTRA_LAT = "wickedmap.lat"
+        const val EXTRA_LON = "wickedmap.lon"
+        const val EXTRA_ZOOM = "wickedmap.zoom"
     }
 }

@@ -2951,7 +2951,19 @@ class SalemMainActivity : AppCompatActivity() {
             // S171 — WickedMap prototype: custom 2D map engine + animated water/cemetery overlays.
             // Launches the standalone prototype activity so it can be tested in-context from the
             // running Salem app (without leaving SalemMainActivity's state).
-            FabDef("WickedMap",    R.drawable.ic_debug,         "#1B5E20") { startActivity(Intent(this, com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity::class.java)) }
+            FabDef("WickedMap",    R.drawable.ic_debug,         "#1B5E20") {
+                // S286 P3 — pass current osmdroid center+zoom so the WickedMap
+                // prototype lands where the operator is, not the hardcoded
+                // Salem Common default.
+                val center = binding.mapView.mapCenter
+                val zoom = binding.mapView.zoomLevelDouble
+                startActivity(
+                    Intent(this, com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity::class.java)
+                        .putExtra(com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity.EXTRA_LAT, center.latitude)
+                        .putExtra(com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity.EXTRA_LON, center.longitude)
+                        .putExtra(com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity.EXTRA_ZOOM, zoom)
+                )
+            }
         )
 
         val container = binding.fabMenu

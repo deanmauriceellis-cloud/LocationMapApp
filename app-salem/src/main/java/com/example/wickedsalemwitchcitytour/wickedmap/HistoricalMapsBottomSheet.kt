@@ -149,12 +149,13 @@ class HistoricalMapsBottomSheet : BottomSheetDialogFragment() {
         const val KEY_OPACITY = "opacity_pct" // 0..100
 
         // (label, providerYearOrNull, available)
+        // S286 Phase 3: all 4 historical years baked (coarse 4-corner georef).
         private val YEARS = listOf(
             Triple("None", null, true),
             Triple("1851 McIntyre", "1851", true),
-            Triple("1874 Hopkins", "1874", false),
-            Triple("1906 Sanborn", "1906", false),
-            Triple("1911 Walker", "1911", false),
+            Triple("1874 Hopkins", "1874", true),
+            Triple("1906 Sanborn", "1906", true),
+            Triple("1911 Walker", "1911", true),
         )
 
         fun readYear(ctx: Context): String? =
