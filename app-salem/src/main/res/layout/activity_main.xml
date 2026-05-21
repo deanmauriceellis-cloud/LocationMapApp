@@ -270,14 +270,21 @@
         android:gravity="end"
         android:visibility="gone" />
 
-    <!-- Main FAB trigger -->
+    <!-- Main FAB trigger.
+         S286 P2: bottom margin 100dp → 160dp; replaced `layout_margin="16dp"`
+         (which silently clobbered `layout_marginBottom`) with explicit
+         per-side margins. On Lenovo TB305FU landscape the narration-sheet
+         peek (occupies y=728-800 on the 800-tall display) was clipping
+         fabMain to a sliver. -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabMain"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="100dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="160dp"
         android:src="@android:drawable/ic_menu_add"
         app:tint="@android:color/white" />
 

@@ -5,6 +5,7 @@
 
 package com.example.wickedsalemwitchcitytour.wickedmap
 
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
@@ -19,11 +20,17 @@ import java.io.File
  * the salem_tiles.sqlite archive extracted to external files dir by
  * OfflineTileManager on app start. Self-contained: no osmdroid, no Hilt DI,
  * no shared state with SalemMainActivity.
+ *
+ * S286 Phase 2: hosts the historical-map FAB picker. Pick a year (1851 /
+ * 1874 / 1906 / 1911 / None) + opacity; selections persist in
+ * SharedPreferences("historical_maps") and survive activity recreate.
  */
-class WickedMapPrototypeActivity : AppCompatActivity() {
+class WickedMapPrototypeActivity : AppCompatActivity(), HistoricalMapsBottomSheet.Listener {
 
     private var archive: TileArchive? = null
+    private var archiveFile: File? = null
     private var historicalArchive: TileArchive? = null
+    private val historicalOverlay = HistoricalTileOverlay()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +55,7 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val label = TextView(this).apply {
-            text = "WickedMap prototype — 1851 McIntyre @ 70% (S286 P1)"
+            text = "WickedMap prototype — historical-map picker (S286 P2)"
             setTextColor(0xFFFFFFFF.toInt())
         }
         val closeBtn = Button(this).apply {
@@ -57,11 +64,7 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
         }
         hud.addView(
             label,
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f,
-            )
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         )
         hud.addView(
             closeBtn,
@@ -78,25 +81,54 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
             )
         )
 
-        setContentView(root)
-
-        val archiveFile = File(getExternalFilesDir(null), "salem_tiles.sqlite")
-        if (!archiveFile.exists()) {
-            // Fallback: extract from assets if OfflineTileManager hasn't run yet.
-            assets.open("salem_tiles.sqlite").use { input ->
-                archiveFile.outputStream().use { out -> input.copyTo(out) }
+        // Picker FAB — bottom-right, small. Drawn programmatically so the
+        // prototype stays single-file. Uses a tinted background drawable +
+        // an emoji glyph so we don't need a new vector asset for Phase 2.
+        val pickerFab = TextView(this).apply {
+            text = "🗺"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFFFFFF.toInt())
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xFF1B5E20.toInt())
+                setStroke(dp(2), 0xFFFFC107.toInt())
+            }
+            elevation = dp(6).toFloat()
+            setOnClickListener {
+                HistoricalMapsBottomSheet().also { sheet ->
+                    sheet.setListener(this@WickedMapPrototypeActivity)
+                    sheet.show(supportFragmentManager, HistoricalMapsBottomSheet.TAG)
+                }
             }
         }
-
-        archive = TileArchive(archiveFile).also {
-            mapView.attachArchive(it)
+        val pickerLp = FrameLayout.LayoutParams(dp(56), dp(56)).apply {
+            gravity = Gravity.BOTTOM or Gravity.END
+            marginEnd = dp(16)
+            bottomMargin = dp(24)
         }
+        root.addView(pickerFab, pickerLp)
 
-        // S286 Phase 1: hardcoded 1851 McIntyre overlay at 70% opacity to
-        // smoke-test the historical-maps pipeline end-to-end. UI picker (FAB
-        // + bottom-sheet) lands in Phase 2.
-        historicalArchive = TileArchive(archiveFile, "Historical-1851")
-        mapView.addOverlay(HistoricalTileOverlay(historicalArchive, opacityAlpha = 178))
+        setContentView(root)
+
+        val af = File(getExternalFilesDir(null), "salem_tiles.sqlite")
+        if (!af.exists()) {
+            // Fallback: extract from assets if OfflineTileManager hasn't run yet.
+            assets.open("salem_tiles.sqlite").use { input ->
+                af.outputStream().use { out -> input.copyTo(out) }
+            }
+        }
+        archiveFile = af
+
+        archive = TileArchive(af).also { mapView.attachArchive(it) }
+
+        // Restore last picker selection. Default year=1851, opacity=70 so a
+        // fresh install still shows something interesting.
+        val startYear = HistoricalMapsBottomSheet.readYear(this)
+        val startOpacityPct = HistoricalMapsBottomSheet.readOpacityPercent(this)
+        applyYear(startYear)
+        historicalOverlay.opacityAlpha = percentToAlpha(startOpacityPct)
+        mapView.addOverlay(historicalOverlay)
 
         PolygonLibrary.load(this)
         val water = PolygonLibrary.byKind("water")
@@ -104,6 +136,39 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
         mapView.addOverlay(AnimatedWaterOverlay(water))
         mapView.addOverlay(FireflyOverlay(cemeteries))
     }
+
+    override fun onHistoricalYearChanged(year: String?) {
+        applyYear(year)
+    }
+
+    override fun onHistoricalOpacityChanged(percent: Int) {
+        historicalOverlay.opacityAlpha = percentToAlpha(percent)
+    }
+
+    /**
+     * Swap the historical overlay's underlying TileArchive to a new year, or
+     * null it out when the picker chooses "None". Closes the previous archive
+     * to release its SQLite handle + LruCache.
+     */
+    private fun applyYear(year: String?) {
+        val af = archiveFile ?: return
+        val prev = historicalArchive
+        if (year == null) {
+            historicalOverlay.archive = null
+            historicalArchive = null
+        } else {
+            val next = TileArchive(af, "Historical-$year")
+            historicalOverlay.archive = next
+            historicalArchive = next
+        }
+        prev?.close()
+    }
+
+    private fun percentToAlpha(pct: Int): Int =
+        (pct.coerceIn(0, 100) * 255 / 100)
+
+    private fun dp(v: Int): Int =
+        (v * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
         super.onDestroy()
