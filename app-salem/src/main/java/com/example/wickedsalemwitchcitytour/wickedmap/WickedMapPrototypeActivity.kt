@@ -6,7 +6,10 @@
 package com.example.wickedsalemwitchcitytour.wickedmap
 
 import android.os.Bundle
+import android.view.Gravity
+import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
@@ -20,6 +23,7 @@ import java.io.File
 class WickedMapPrototypeActivity : AppCompatActivity() {
 
     private var archive: TileArchive? = null
+    private var historicalArchive: TileArchive? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,17 +38,42 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
             )
         )
 
-        // HUD label so we know we're in the prototype.
-        val label = TextView(this).apply {
-            text = "WickedMap prototype — pan/pinch, water animates"
-            setTextColor(0xFFFFFFFF.toInt())
+        // HUD bar (label + Close button) so we know we're in the prototype
+        // and can get back out. S286 P1 added the Close — Lenovo gesture-nav
+        // doesn't surface a back affordance here.
+        val hud = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0x88000000.toInt())
-            setPadding(24, 16, 24, 16)
+            setPadding(24, 16, 16, 16)
+            gravity = Gravity.CENTER_VERTICAL
         }
-        root.addView(
+        val label = TextView(this).apply {
+            text = "WickedMap prototype — 1851 McIntyre @ 70% (S286 P1)"
+            setTextColor(0xFFFFFFFF.toInt())
+        }
+        val closeBtn = Button(this).apply {
+            text = "Close"
+            setOnClickListener { finish() }
+        }
+        hud.addView(
             label,
+            LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f,
+            )
+        )
+        hud.addView(
+            closeBtn,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        )
+        root.addView(
+            hud,
             FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
             )
         )
@@ -63,6 +92,12 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
             mapView.attachArchive(it)
         }
 
+        // S286 Phase 1: hardcoded 1851 McIntyre overlay at 70% opacity to
+        // smoke-test the historical-maps pipeline end-to-end. UI picker (FAB
+        // + bottom-sheet) lands in Phase 2.
+        historicalArchive = TileArchive(archiveFile, "Historical-1851")
+        mapView.addOverlay(HistoricalTileOverlay(historicalArchive, opacityAlpha = 178))
+
         PolygonLibrary.load(this)
         val water = PolygonLibrary.byKind("water")
         val cemeteries = PolygonLibrary.byKind("cemetery")
@@ -73,5 +108,6 @@ class WickedMapPrototypeActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         archive?.close()
+        historicalArchive?.close()
     }
 }

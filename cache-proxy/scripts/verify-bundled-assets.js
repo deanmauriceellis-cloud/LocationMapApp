@@ -211,17 +211,19 @@ if (!fs.existsSync(TILES_DB)) {
       } else {
         pass(`salem_tiles.sqlite: tiles = ${n} rows (>= 5000)`);
       }
-      // S203 / S167 carry-forward — Witchy is the only basemap shipping (S175).
-      // Any tile row with a different provider is a stale bake from the
-      // pre-S175 three-basemap era and should fail the build. Expected:
-      // exactly one provider == 'Salem-Custom'.
-      const ALLOWED_PROVIDERS = new Set(['Salem-Custom']);
+      // S203 / S167 carry-forward — Witchy is the only modern basemap shipping
+      // (S175). S286 adds Historical-YYYY providers for the FAB-picker
+      // historical-maps overlay; year suffix must be 4 digits (1700-2099).
+      // Anything else is a stale bake from the pre-S175 three-basemap era and
+      // should fail the build.
+      const HISTORICAL_RE = /^Historical-(17|18|19|20)\d{2}$/;
+      const isAllowed = (name) => name === 'Salem-Custom' || HISTORICAL_RE.test(name);
       const providers = db.prepare(
         'SELECT provider, COUNT(*) AS c FROM tiles GROUP BY provider'
       ).all();
-      const stale = providers.filter((p) => !ALLOWED_PROVIDERS.has(p.provider));
+      const stale = providers.filter((p) => !isAllowed(p.provider));
       if (stale.length > 0) {
-        fail(`salem_tiles.sqlite: stale providers in bake: ${stale.map((s) => `${s.provider}=${s.c}`).join(', ')} (expected only 'Salem-Custom')`);
+        fail(`salem_tiles.sqlite: stale providers in bake: ${stale.map((s) => `${s.provider}=${s.c}`).join(', ')} (expected 'Salem-Custom' or 'Historical-YYYY')`);
       } else if (!providers.some((p) => p.provider === 'Salem-Custom')) {
         fail(`salem_tiles.sqlite: 'Salem-Custom' provider missing — bake is incomplete`);
       } else {
