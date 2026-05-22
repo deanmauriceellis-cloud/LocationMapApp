@@ -216,7 +216,7 @@ if (!fs.existsSync(TILES_DB)) {
       // historical-maps overlay; year suffix must be 4 digits (1700-2099).
       // Anything else is a stale bake from the pre-S175 three-basemap era and
       // should fail the build.
-      const HISTORICAL_RE = /^Historical-(17|18|19|20)\d{2}$/;
+      const HISTORICAL_RE = /^Historical-(1[6-9]\d{2}|20\d{2})$/;
       const isAllowed = (name) => name === 'Salem-Custom' || HISTORICAL_RE.test(name);
       const providers = db.prepare(
         'SELECT provider, COUNT(*) AS c FROM tiles GROUP BY provider'

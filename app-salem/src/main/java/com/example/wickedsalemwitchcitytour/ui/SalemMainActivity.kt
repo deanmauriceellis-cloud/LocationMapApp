@@ -225,6 +225,16 @@ class SalemMainActivity : AppCompatActivity() {
     private var salemLocationBall: SalemLocationBallOverlay? = null
 
     /**
+     * S287: historical-map overlay (1692/1700/1851/1911) rendered above the
+     * Salem-Custom basemap. Backed by a single [com.example.wickedsalemwitchcitytour.wickedmap.TileArchive]
+     * instance that swaps providers when the picker changes year. Driven by
+     * [applyHistoricalOverlaySelection].
+     */
+    private var historicalOverlay: com.example.wickedsalemwitchcitytour.wickedmap.OsmdroidHistoricalOverlay? = null
+    private var historicalArchive: com.example.wickedsalemwitchcitytour.wickedmap.TileArchive? = null
+    private var historicalArchiveProvider: String? = null
+
+    /**
      * S172: WickedMap animation overlays (whitecaps over water polygons,
      * ghostly orbs over cemeteries) hosted inside the osmdroid MapView via
      * [WickedAnimationOverlay] until the full WickedMapView migration lands.
@@ -2906,6 +2916,133 @@ class SalemMainActivity : AppCompatActivity() {
         toast("Location mode: ${viewModel.locationMode.value}")
     }
 
+    /**
+     * S287 — historical-map picker outcome handler.
+     *
+     * The picker dialog writes the chosen year to SharedPreferences before
+     * invoking this; we (a) reflect it in the top-center opacity bar and
+     * (b) seed the slider from the persisted opacity. The actual osmdroid
+     * historical-tile overlay rendering is wired in the next session — for
+     * now this just controls the UI affordance so the picker→map flow feels
+     * complete.
+     */
+    private fun applyHistoricalOverlaySelection(year: String?) {
+        val bar = findViewById<android.widget.LinearLayout>(R.id.histOpacityBar)
+        val prefs = getSharedPreferences(
+            com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.PREFS,
+            MODE_PRIVATE,
+        )
+
+        if (BuildConfig.DEBUG) {
+            DebugLogger.d("HistoricalOv", "applyHistoricalOverlaySelection(year=$year) — prefs=$prefs")
+        }
+
+        if (year == null) {
+            // Remove the overlay entirely.
+            historicalOverlay?.let { ov ->
+                binding.mapView.overlays.remove(ov)
+                if (BuildConfig.DEBUG) DebugLogger.d("HistoricalOv", "removed overlay; overlays=${binding.mapView.overlays.size}")
+            }
+            historicalOverlay = null
+            historicalArchive?.close()
+            historicalArchive = null
+            historicalArchiveProvider = null
+            bar?.visibility = View.GONE
+            binding.mapView.invalidate()
+            return
+        }
+
+        val opacityPct = prefs.getInt(
+            com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.KEY_OPACITY,
+            70,
+        ).coerceIn(0, 100)
+        val alpha = (opacityPct * 255 / 100).coerceIn(0, 255)
+        val targetProvider = "Historical-$year"
+
+        // Swap archive if year changed.
+        if (historicalArchiveProvider != targetProvider) {
+            historicalArchive?.close()
+            val archiveFile = java.io.File(getExternalFilesDir(null), "salem_tiles.sqlite")
+            if (BuildConfig.DEBUG) {
+                DebugLogger.d(
+                    "HistoricalOv",
+                    "loading archive provider=$targetProvider from ${archiveFile.absolutePath} (exists=${archiveFile.exists()} size=${if (archiveFile.exists()) archiveFile.length() else -1L})",
+                )
+            }
+            historicalArchive = try {
+                com.example.wickedsalemwitchcitytour.wickedmap.TileArchive(archiveFile, targetProvider)
+            } catch (e: Exception) {
+                DebugLogger.w("HistoricalOv", "TileArchive open failed for $targetProvider: ${e.message}")
+                null
+            }
+            historicalArchiveProvider = targetProvider
+        }
+
+        // Create or refresh the overlay, ensuring it's positioned ABOVE the
+        // basemap but BELOW POI markers / polylines (insert near the bottom
+        // of the overlays list).
+        var ov = historicalOverlay
+        if (ov == null) {
+            ov = com.example.wickedsalemwitchcitytour.wickedmap.OsmdroidHistoricalOverlay(
+                archive = historicalArchive,
+                opacityAlpha = alpha,
+            )
+            // Insert just above the basemap (which is the MapView's tile-provider, not
+            // an overlay) but below everything else by adding at index 0.
+            binding.mapView.overlays.add(0, ov)
+            historicalOverlay = ov
+            if (BuildConfig.DEBUG) {
+                DebugLogger.d(
+                    "HistoricalOv",
+                    "created overlay; overlays.size=${binding.mapView.overlays.size} alpha=$alpha provider=$targetProvider",
+                )
+            }
+        } else {
+            ov.archive = historicalArchive
+            ov.opacityAlpha = alpha
+            if (BuildConfig.DEBUG) {
+                DebugLogger.d(
+                    "HistoricalOv",
+                    "updated overlay; provider=$targetProvider alpha=$alpha (kept index in overlays.size=${binding.mapView.overlays.size})",
+                )
+            }
+        }
+
+        // Top-center opacity bar UI.
+        val yearLabel = findViewById<android.widget.TextView>(R.id.histOpacityYear)
+        val slider = findViewById<android.widget.SeekBar>(R.id.histOpacityBarSlider)
+        val label = findViewById<android.widget.TextView>(R.id.histOpacityBarLabel)
+
+        yearLabel?.text = year
+        slider?.progress = opacityPct
+        label?.text = "${opacityPct}%"
+        bar?.visibility = View.VISIBLE
+
+        slider?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                val pct = progress.coerceIn(0, 100)
+                label?.text = "${pct}%"
+                val newAlpha = (pct * 255 / 100).coerceIn(0, 255)
+                historicalOverlay?.opacityAlpha = newAlpha
+                binding.mapView.invalidate()
+                if (BuildConfig.DEBUG && fromUser) {
+                    DebugLogger.d("HistoricalOv", "slider → pct=$pct alpha=$newAlpha")
+                }
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {
+                val pct = sb?.progress ?: 70
+                prefs.edit().putInt(
+                    com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.KEY_OPACITY,
+                    pct,
+                ).apply()
+                if (BuildConfig.DEBUG) DebugLogger.d("HistoricalOv", "slider released — persisted pct=$pct")
+            }
+        })
+
+        binding.mapView.invalidate()
+    }
+
     /** FAB quick-toggle for aircraft layer — mirrors the menu toggle logic. */
     internal fun toggleAircraftFromFab() {
         val prefs = getSharedPreferences("app_bar_menu_prefs", MODE_PRIVATE)
@@ -2948,21 +3085,21 @@ class SalemMainActivity : AppCompatActivity() {
             FabDef("GPS / Manual", R.drawable.ic_gps,           "#37474F") { toggleLocationMode() },
             FabDef("Debug Log",    R.drawable.ic_debug,         "#424242") { startActivity(Intent(this, DebugLogActivity::class.java)) },
             FabDef("Voices",       R.drawable.ic_debug,         "#6A1B9A") { startActivity(Intent(this, com.example.wickedsalemwitchcitytour.debug.VoiceTestActivity::class.java)) },
-            // S171 — WickedMap prototype: custom 2D map engine + animated water/cemetery overlays.
-            // Launches the standalone prototype activity so it can be tested in-context from the
-            // running Salem app (without leaving SalemMainActivity's state).
+            // S287 — WickedMap FAB opens the historical-map picker dialog.
+            // Tap a tile → dialog dismisses + the production map shows the
+            // top-center opacity bar (the overlay itself is wired in next
+            // session — tonight's scope is smooth UI flow).
             FabDef("WickedMap",    R.drawable.ic_debug,         "#1B5E20") {
-                // S286 P3 — pass current osmdroid center+zoom so the WickedMap
-                // prototype lands where the operator is, not the hardcoded
-                // Salem Common default.
-                val center = binding.mapView.mapCenter
-                val zoom = binding.mapView.zoomLevelDouble
-                startActivity(
-                    Intent(this, com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity::class.java)
-                        .putExtra(com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity.EXTRA_LAT, center.latitude)
-                        .putExtra(com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity.EXTRA_LON, center.longitude)
-                        .putExtra(com.example.wickedsalemwitchcitytour.wickedmap.WickedMapPrototypeActivity.EXTRA_ZOOM, zoom)
-                )
+                val sheet = com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet()
+                sheet.setListener(object : com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.Listener {
+                    override fun onHistoricalYearChanged(year: String?) {
+                        applyHistoricalOverlaySelection(year)
+                    }
+                    override fun onHistoricalOpacityChanged(percent: Int) {
+                        // Sheet doesn't show a slider anymore, but interface kept for API stability.
+                    }
+                })
+                sheet.show(supportFragmentManager, com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.TAG)
             }
         )
 

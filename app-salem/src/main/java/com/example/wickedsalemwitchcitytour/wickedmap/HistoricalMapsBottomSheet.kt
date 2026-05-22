@@ -5,6 +5,7 @@
 
 package com.example.wickedsalemwitchcitytour.wickedmap
 
+import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -12,27 +13,28 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.SeekBar
 import android.widget.TextView
+import androidx.fragment.app.DialogFragment
 import com.example.wickedsalemwitchcitytour.R
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import java.io.IOException
 
 /**
- * Historical-map year + opacity picker (S286 Phase 2).
+ * Historical-map overlay picker — full-screen dialog (S287 redesign).
  *
- * Per-row card model: a tap toggles between "None" and one of the available
- * Historical-YYYY providers. Opacity slider runs 0..100%, mapped to paint
- * alpha 0..255 on the consuming overlay. Selections persist in
- * SharedPreferences("historical_maps") and are restored when the host
- * activity re-creates the sheet.
+ * Tile-tap commits, no "Use this" button (per
+ * feedback_no_confirm_button_when_tap_is_unambiguous.md). Vertical list of
+ * 5 full-thumbnail cards (None + 4 historical years). Tap a card → emit
+ * year to listener → dismiss.
  *
- * Phase 2 ships with 1851 tiles only — the 1874/1906/1911 cards are visible
- * but marked unavailable so the operator can confirm the picker UX before
- * Phase 3 bakes the remaining maps.
+ * Opacity slider lives on the WickedMap canvas itself; not part of the
+ * picker. Class name retained for git-history continuity (was a
+ * BottomSheetDialogFragment in S286/early S287).
  */
-class HistoricalMapsBottomSheet : BottomSheetDialogFragment() {
+class HistoricalMapsBottomSheet : DialogFragment() {
 
     interface Listener {
         fun onHistoricalYearChanged(year: String?)   // null = None
@@ -43,6 +45,17 @@ class HistoricalMapsBottomSheet : BottomSheetDialogFragment() {
 
     fun setListener(l: Listener) { listener = l }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NORMAL, android.R.style.Theme_Black_NoTitleBar)
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val dlg = super.onCreateDialog(savedInstanceState)
+        dlg.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        return dlg
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -51,95 +64,147 @@ class HistoricalMapsBottomSheet : BottomSheetDialogFragment() {
         return inflater.inflate(R.layout.sheet_historical_maps, container, false)
     }
 
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         val prefs = requireContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val currentYear = prefs.getString(KEY_YEAR, null)
-        val currentOpacity = prefs.getInt(KEY_OPACITY, 70).coerceIn(0, 100)
 
-        val row = view.findViewById<LinearLayout>(R.id.histYearRow)
-        val slider = view.findViewById<SeekBar>(R.id.histOpacitySlider)
-        val opacityLabel = view.findViewById<TextView>(R.id.histOpacityLabel)
+        val column = view.findViewById<LinearLayout>(R.id.histTileColumn)
         val closeBtn = view.findViewById<Button>(R.id.histCloseBtn)
 
-        val cards = mutableListOf<View>()
-        YEARS.forEach { (label, year, available) ->
-            val card = buildCard(label, year, available, year == currentYear)
+        TILES.forEach { tile ->
+            val card = buildTile(tile, selected = tile.year == currentYear)
             card.setOnClickListener {
-                if (!available && year != null) return@setOnClickListener
-                cards.forEach { c -> highlightCard(c, c === card) }
-                prefs.edit().putString(KEY_YEAR, year).apply()
-                listener?.onHistoricalYearChanged(year)
+                if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                    com.example.locationmapapp.util.DebugLogger.d(
+                        "HistoricalPicker",
+                        "tile tap → year=${tile.year} title='${tile.title}' (was=$currentYear)",
+                    )
+                }
+                prefs.edit().putString(KEY_YEAR, tile.year).apply()
+                listener?.onHistoricalYearChanged(tile.year)
+                dismiss()
             }
-            row.addView(card)
-            cards.add(card)
+            column.addView(card)
         }
-
-        slider.progress = currentOpacity
-        opacityLabel.text = "${currentOpacity}%"
-        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val pct = progress.coerceIn(0, 100)
-                opacityLabel.text = "${pct}%"
-                listener?.onHistoricalOpacityChanged(pct)
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {
-                prefs.edit().putInt(KEY_OPACITY, sb?.progress ?: 70).apply()
-            }
-        })
 
         closeBtn.setOnClickListener { dismiss() }
     }
 
-    private fun buildCard(label: String, year: String?, available: Boolean, selected: Boolean): View {
+    private fun buildTile(tile: TileSpec, selected: Boolean): View {
         val ctx = requireContext()
-        val card = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
-            val lp = LinearLayout.LayoutParams(dp(96), dp(72))
-            lp.marginEnd = dp(8)
+
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+            lp.topMargin = dp(8)
             layoutParams = lp
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-            background = cardBackground(selected, available)
-            isClickable = available || year == null
-            isFocusable = isClickable
+            background = tileBackground(selected)
+            setPadding(dp(10), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
         }
-        val labelView = TextView(ctx).apply {
-            text = label
-            setTextColor(if (available || year == null) Color.WHITE else 0xFF888888.toInt())
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
-        }
-        card.addView(labelView)
-        if (!available && year != null) {
-            val tag = TextView(ctx).apply {
-                text = "soon"
-                setTextColor(0xFFAAAAAA.toInt())
-                textSize = 11f
-                gravity = android.view.Gravity.CENTER
+
+        // Thumbnail
+        val thumb = ImageView(ctx).apply {
+            val lp = LinearLayout.LayoutParams(dp(140), dp(96))
+            lp.marginEnd = dp(14)
+            layoutParams = lp
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = thumbBackground()
+            clipToOutline = true
+            if (tile.assetName != null) {
+                try {
+                    ctx.assets.open("historical-thumbs/${tile.assetName}").use { ins ->
+                        setImageBitmap(android.graphics.BitmapFactory.decodeStream(ins))
+                    }
+                } catch (e: IOException) {
+                    setImageResource(android.R.color.darker_gray)
+                }
+            } else {
+                setImageResource(android.R.color.transparent)
             }
-            card.addView(tag)
         }
-        return card
+        row.addView(thumb)
+
+        // Text column
+        val textCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            lp.gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = lp
+        }
+
+        textCol.addView(TextView(ctx).apply {
+            text = tile.title
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        })
+
+        textCol.addView(TextView(ctx).apply {
+            text = tile.source
+            setTextColor(0xFFC9B87A.toInt())
+            textSize = 12f
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+            lp.topMargin = dp(3)
+            layoutParams = lp
+        })
+
+        textCol.addView(TextView(ctx).apply {
+            text = tile.description
+            setTextColor(0xCCFFFFFF.toInt())
+            textSize = 12f
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+            lp.topMargin = dp(4)
+            layoutParams = lp
+        })
+
+        row.addView(textCol)
+        return row
     }
 
-    private fun highlightCard(card: View, selected: Boolean) {
-        val available = card.isClickable
-        card.background = cardBackground(selected, available)
-    }
+    private fun tileBackground(selected: Boolean): GradientDrawable =
+        GradientDrawable().apply {
+            cornerRadius = dp(10).toFloat()
+            setStroke(dp(2), if (selected) 0xFFFFC107.toInt() else 0x33FFFFFF.toInt())
+            setColor(if (selected) 0x33FFC107.toInt() else 0x33000000)
+        }
 
-    private fun cardBackground(selected: Boolean, available: Boolean): GradientDrawable {
-        val bg = GradientDrawable()
-        bg.cornerRadius = dp(8).toFloat()
-        bg.setStroke(dp(2), if (selected) 0xFFFFC107.toInt() else 0x66FFFFFF.toInt())
-        bg.setColor(if (!available) 0x33000000 else if (selected) 0x55FFC107.toInt() else 0x44000000)
-        return bg
-    }
+    private fun thumbBackground(): GradientDrawable =
+        GradientDrawable().apply {
+            cornerRadius = dp(6).toFloat()
+            setColor(0xFF1a1812.toInt())
+        }
 
     private fun dp(v: Int): Int =
         (v * resources.displayMetrics.density).toInt()
+
+    data class TileSpec(
+        val title: String,
+        val source: String,
+        val description: String,
+        val year: String?,
+        val assetName: String?,
+    )
 
     companion object {
         const val TAG = "HistoricalMapsSheet"
@@ -148,14 +213,42 @@ class HistoricalMapsBottomSheet : BottomSheetDialogFragment() {
         const val KEY_YEAR = "year"           // null = None / disabled
         const val KEY_OPACITY = "opacity_pct" // 0..100
 
-        // (label, providerYearOrNull, available)
-        // S286 Phase 3: all 4 historical years baked (coarse 4-corner georef).
-        private val YEARS = listOf(
-            Triple("None", null, true),
-            Triple("1851 McIntyre", "1851", true),
-            Triple("1874 Hopkins", "1874", true),
-            Triple("1906 Sanborn", "1906", true),
-            Triple("1911 Walker", "1911", true),
+        private val TILES = listOf(
+            TileSpec(
+                title = "None — modern map only",
+                source = "WickedMap basemap",
+                description = "Hide the historical overlay; show modern Salem streets, buildings, and shoreline only.",
+                year = null,
+                assetName = "thumb_modern.webp",
+            ),
+            TileSpec(
+                title = "1692 — Salem Village",
+                source = "William P. Upham · BPL Leventhal",
+                description = "Witch-trials-era Salem Village (modern Danvers). Pan north to see Upham's reconstructed village.",
+                year = "1692",
+                assetName = "thumb_1692.webp",
+            ),
+            TileSpec(
+                title = "1700 — Part of Salem",
+                source = "Phillips / Perley · U. of Virginia",
+                description = "Reconstructed downtown Salem c. 1700. North & South Rivers, Mill Pond, Castle Hill Neck.",
+                year = "1700",
+                assetName = "thumb_1700.webp",
+            ),
+            TileSpec(
+                title = "1851 — McIntyre City Map",
+                source = "Henry McIntyre · BPL Leventhal",
+                description = "High-detail mid-19th-century city map. 8-GCP precision georef — sits cleanly on modern streets.",
+                year = "1851",
+                assetName = "thumb_1851.webp",
+            ),
+            TileSpec(
+                title = "1911 — Walker Atlas",
+                source = "Walker Lithography · BPL Leventhal",
+                description = "Pre-Great-Salem-Fire (1914) city composite. Last view of Salem before the downtown rebuild.",
+                year = "1911",
+                assetName = "thumb_1911.webp",
+            ),
         )
 
         fun readYear(ctx: Context): String? =

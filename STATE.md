@@ -2,13 +2,13 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-21 — **Session 286.** Drove the S285 historical-maps plan from Phase 1 through Phase 3+3.5+3.6 in one extended session — all live on Lenovo TB305FU. **Phase 1** (commit `b8c02fb`): 1851 McIntyre v2 POC tiles (12,450 PNG) merged into `salem_tiles.sqlite` as `provider='Historical-1851'`; new `HistoricalTileOverlay : MapOverlay` (per-provider TileArchive instance, no LRU thrashing); wired into `WickedMapPrototypeActivity` via `addOverlay()` (paint order basemap → historical → atmosphere respects `feedback_basemap_priority_over_animation.md`); `verify-bundled-assets.js` allowlist extended to `Historical-(17|18|19|20)\d{2}`. Operator confirmed *"I like it and it is entertaining"* on Lenovo. FPS 12-14 at z16 flagged as PNG-decode-bound. Premise-correction caught (`feedback_diagnose_before_changing.md`): production map in `SalemMainActivity` is still osmdroid, not WickedMap — operator chose option 2 *"WickedMap is the base, use what we need to support it"*, so picker UI lives only in the WickedMap prototype until the future osmdroid→WickedMap migration. **Phase 2** (commit `bdcd1f7`): programmatic 🗺 picker FAB + `sheet_historical_maps.xml` BottomSheetBehavior + `HistoricalMapsBottomSheet.kt` (5 year cards, opacity slider, SharedPreferences persistence, year-tap mutates overlay.archive + opacity drag mutates opacityAlpha live). Material Slider crashed under prototype's AppCompat theme → swapped to stock `android.widget.SeekBar`. Surfaced + fixed a pre-existing Lenovo landscape bug: `fabMain` ~80% buried under narration sheet peek — `layout_margin="16dp"` was clobbering `layout_marginBottom="100dp"` despite XML order. Replaced with explicit per-side margins + bumped bottom to 160dp; uiautomator confirmed `fabMain.bounds` moved from `[1259,719][1322,782]` → `[1259,557][1322,620]` (108px clearance above sheet). **Phase 3** (commit `72b4ee0`): operator *"I want more maps!"* + chose Coarse 4-corner georef via AskUserQuestion. Surveyed atlas plates — Hopkins **plate_05** city overview, Sanborn **p002** color-coded key map (JP2→JPG via gdal_translate), Walker **plate_05** City of Salem Index Map. `tools/historical-maps/bake_coarse.sh` stamped each map onto shared Salem bbox `(N=42.555 S=42.495 W=-70.965 E=-70.845)` via TPS warp + gdal2tiles z14-z19 + `xyz_to_mbtiles.py` + `merge-historical-into-bundle.js`. Tile counts: 1874=31791 / 1906=39318 / 1911=31791. Picker unlocked all 4 years. salem_tiles.sqlite ballooned to **2.4 GB** → bundletool install hit Android v3 sig parser overflow. **Phase 3.5 (WebP)**: operator *"Let's compress all the images!"* — `webp_compress_historical.py` Pillow multiprocessing pool, quality=70 method=6 per `feedback_webp_lossy_beats_lossless_for_basemap.md`. Converted 115,350 historical tiles in **201s, 2036 MB → 141 MB (93.1% smaller)**. salem_tiles.sqlite 2.4 GB → 444 MB. AAB 982 MB → 282 MB. Stale apks-set caught (cached 2.5 GB pre-compression) and rebuilt → install succeeded with `split_salem_tiles_pack.apk` carrying compressed tiles. **Phase 3.6**: operator *"the tab is there and it takes me to salem, not where I am currently on the map"* — `WickedMapView.setCamera(lat,lon,zoom)` + 3 Intent extras (EXTRA_LAT/LON/ZOOM); SalemMainActivity FAB launcher reads `binding.mapView.mapCenter + zoomLevelDouble` from osmdroid. Camera clamps to WickedMap's bounds (z16-z19, Salem bbox `42.475-42.600 N / -70.760--70.960 W`). Pixel 8 still carries the older Phase 2 build from earlier in S286.
+**Last updated:** 2026-05-21 — **Session 287.** Operator-driven refactor of S286's historical-map feature into an in-place production-map flow + new map set + complete picker UX rewrite + osmdroid overlay rendering. **Map set rebalanced**: dropped 1874 Hopkins + 1906 Sanborn from V1 picker; baked **1692 Salem Village (Upham)** with Danvers bbox (49,100 tiles after pyramid) and **1700 Part of Salem (Phillips/Perley)** with downtown bbox (28,747 tiles); kept 1851 McIntyre (precision) + 1911 Walker. `verify-bundled-assets.js` regex widened to `Historical-(1[6-9]\d{2}|20\d{2})`. `MapCamera.maxLat` 42.600→42.625 so Danvers extent isn't clipped. WebP-compressed all 4 historical providers across `salem_tiles.sqlite` (122,088 tiles, 306 MB → 97 MB, -68.3%, 171s); final salem_tiles.sqlite **444 MB → 385 MB net** with 2 new maps added. **Picker UX rewritten twice in-session**: pivot 1 — operator pushed back on the per-tile "Use this" button (*"We don't need to go through the motions ... waste of a screen"*) → tap-tile-itself commits + new memory `feedback_no_confirm_button_when_tap_is_unambiguous.md`. Pivot 2 — `BottomSheetDialogFragment` → fullscreen `DialogFragment` for cleaner 5-tile review (header + ✕, no bottom-sheet peek). Thumbnails baked for all 5 tiles including `thumb_modern.webp` extracted from 9 stitched z=15 Salem-Custom tiles centered on Salem Common (for the "None" tile). **In-place osmdroid overlay shipped**: new `OsmdroidHistoricalOverlay.kt` is a custom `org.osmdroid.views.overlay.Overlay` that reuses the existing `TileArchive` class (the WickedMap engine's reader) to draw historical tiles directly on the production map at overlay index 0; picker now opens the dialog from `SalemMainActivity` (no `WickedMapPrototypeActivity` hop), tile-tap calls `applyHistoricalOverlaySelection(year)` which swaps the archive, mutates `opacityAlpha`, calls `mapView.invalidate()`. Top-center opacity-pill UI added to `activity_main.xml` (year-label + SeekBar + percent), only shown when an overlay is active. Verbose `BuildConfig.DEBUG` logging added (`HistoricalPicker` / `HistoricalOv` / `OsmdroidHistOv`). Field-confirmed on Lenovo (operator: *"wow, impressive, some maps are distorted that will will fix next session"*); logcat over 60s shows 96.9% tile-cache hit, nullDecodes=0, missingHits=0, 4690 frames drawn. Coarse-georef distortion + Buildings-Outline top-layer (so buildings remain visible at 100% overlay opacity) parked for S288 per operator scope-back (*"strike that - it is good enought"*).
 
-### Prior — S285 (2026-05-20, closed 2026-05-21)
+### Prior — S286 (2026-05-21)
 
-Operator pivot off the carry-forward docket into historical-maps reconnaissance + POC + plan. Inventory ~5 GB at `~/Development/SalemIntelligence/data/historical_maps/` + downloaded 11 items / 477 MB to `/mnt/sdb-images/HistoricalMapsSample/`. 1851 McIntyre POC end-to-end with 8-GCP TPS warp — operator: *"looks good"*. Plan at `~/.claude/plans/groovy-launching-popcorn.md` — 5 phases / ~6 sessions / 4 maps for V1 (1851/1874/1906/1911). Net code-side change S285: zero in the Android repo.
+Drove S285's historical-maps plan Phase 1→3.6 in one extended session — `HistoricalTileOverlay` + `HistoricalMapsBottomSheet` (BottomSheet picker) + 4-map coarse-georef bake (1851 / 1874 / 1906 / 1911) + WebP compression (115,350 tiles in 201s, 2036 MB → 141 MB) + camera-passthrough from SalemMainActivity → WickedMap prototype. Surfaced + fixed a pre-existing Lenovo landscape bug: `fabMain` ~80% buried under narration sheet peek (`layout_margin="16dp"` clobbered `marginBottom="100dp"`). Commits `b8c02fb` (P1), `bdcd1f7` (P2), `72b4ee0` (P3+P5+P6).
 
-### Older prior-session blocks pruned 2026-05-21 (S285+S286) for the 200-line cap; see `SESSION-LOG.md` for S277–S286 + `docs/session-logs/` for full detail.
+### Older prior-session blocks pruned 2026-05-21 (S285+S286+S287) for the 200-line cap; see `SESSION-LOG.md` for S278–S287 + `docs/session-logs/` for full detail.
 
 ### V1 ship-cliffs (all closed)
 
@@ -41,17 +41,21 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S287 opener (parked at S286 close)
+### S288 opener (parked at S287 close)
 
-**NEW — Historical-map georef precision pass.** Phases 1-3+3.5+3.6 shipped on Lenovo: 4 maps (1851/1874/1906/1911) live in picker, WebP-compressed 93%, camera passthrough from SalemMainActivity. Coarse 4-corner georef means alignment errors 50-100m at z18-19 — operator scope-acknowledged. Next pass: hand-pick 8-15 GCPs per map (1851 v2 precision pattern from S285) to bring Hopkins / Sanborn / Walker to Washington-Street-in-the-right-place accuracy. Sanborn p002 may need different corner anchors than the wide-area Hopkins/Walker since it covers downtown only.
+**NEW — Buildings-Outline top-layer.** Operator wanted modern building outlines to remain visible even when the historical overlay is at 100% opacity (logs confirmed alpha=255 fully covers Salem-Custom basemap including buildings). Bake `tools/tile-bake/osm-buildings-salem.geojsonl` (471 features, lon -70.96..-70.83 / lat 42.47..42.55) into a stroke-only `provider='Buildings-Outline'` tile set in `salem_tiles.sqlite` (z16-z19 to match Salem-Custom range). Add as a 3rd osmdroid overlay above `OsmdroidHistoricalOverlay` (so it draws on top of any historical overlay). Always-on, no opacity control. Estimated ~25 MB after WebP, ~half-session. Architecture pattern: same `TileArchive(file, "Buildings-Outline")` + new `OsmdroidBuildingsOverlay` mirroring `OsmdroidHistoricalOverlay`.
 
-**Plan original Phase 4 partly done** — `verify-bundled-assets.js` extended in S286 P1. Still owed: asset bake hook in `CLAUDE.md` publish chain documentation, `ASSETS-MANIFEST.md` Historical Maps section, `feedback_historical_maps_pd_only.md` memory.
+**Historical-map georef precision pass.** Operator confirmed *"some maps are distorted"*. Re-warp 1700 Phillips + 1692 Upham + 1911 Walker with hand-picked 8-15 GCPs each (1851 v2 process from S285) to bring alignment from ±50-100m (coarse 4-corner) down to street-level. 1692 in particular needs careful anchor selection — Salem Village (Danvers) doesn't have many modern landmarks visible on the Upham reconstruction.
+
+**Restore-on-restart.** `applyHistoricalOverlaySelection` not called from `SalemMainActivity.onCreate`, so a previously-selected year doesn't re-apply across app restart (slider hidden, no overlay). Easy fix: read pref + call applyHistoricalOverlaySelection in onCreate post-mapView-ready.
+
+**Pixel 8 needs the S287 build** — currently carries S286 P2 build. Re-bundletool when in scope.
+
+**Plan original Phase 4 partly done** — `verify-bundled-assets.js` regex extended in S286 P1 + S287 (now covers 1692). Still owed: asset bake hook in `CLAUDE.md` publish chain documentation, `ASSETS-MANIFEST.md` Historical Maps section.
 
 **Plan original Phase 5** — operator field-walk around Salem Common switching through all 4 maps still owed. Validates alignment + on-the-ground UX.
 
 **WickedMap clamps** — `MapCamera.minZoom=16.0` and Salem bbox clamp affect operators entering WickedMap from a zoomed-out or out-of-bbox production view. Acceptable for V1 scope; consider widening if it bites.
-
-**Pixel 8 needs the S286 P3+P5+P6 build** — currently carries S286 P2 build. Re-bundletool when in scope.
 
 **Chatbot V1 plan still parked.** `docs/plans/Chatbot_V1.md` — Phase 0 recall spike is the first action when operator gives the go-ahead.
 
@@ -61,35 +65,9 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 **Node 20 → Node 24 GitHub Actions deprecation** lands 2026-06-02 (~12 days). Cheap one-line workflow bump (`.github/workflows/ci.yml`) when in scope.
 
-### S271 opener: Recon Layer 2 + Passport S5 still owed
+### Older opener carry-forwards (S266–S271)
 
-S270 shipped Recon Layer 1 (bulk-cull photo triage tool). **S271 carries forward two parallel tracks:**
-
-**Recon Layer 2** — Extend `web/src/admin/BurstPhotosOverlay.tsx` (already 80% built since S229/S231) so the geo cluster pins read the same `.kept.json` keep-flag state (kept = amber pins, unkept = slate); add POI-proximity filter chips (nearest-3 POIs within 50 m via PG lookup); add "Attach to POI" / "Drop" / "Defer" decisions for the curated set; possibly create new `salem_recon_photos` PG table (`id, source_filename, captured_at, lat, lng, heading_true, speed_kmh, poi_id NULLABLE, decision, created_at`) for the post-triage curated photo set that feeds downstream POI hero/gallery work.
-
-**Passport S5** (carried forward from S269, untouched in S270):
-
-1. **Operator field walk** on Lenovo (or Pixel 8 — both attached, the S268-build APK on Pixel 8 needs a fresh bundletool install to carry the S269 code). Smoke flow: tap witch-hat icon outside a tour → Whole-Salem (447 hollow stamps); start a tour → witch-hat now opens that tour's passport (49 / 72 / 188 / 41 hollow stamps); walk a few POIs → stamps fill + status-line shows "Tour: <name>"; full pass through a tour → "Tour Complete!" dialog auto-fires with "X / X stamps" + Open Passport CTA; tap End mid-tour → "Tour Ended" dialog with partial stats; overflow ⋮ → "End tour" item visible during active tour; passport-picker dropdown lets you switch between the 5 baked passports.
-2. **PassportSheet empty-state polish** — when a filter yields 0 POIs, show better messaging than the current empty list.
-3. **Pixel 8 portrait toolbar fit** check (9 icons including witch-hat).
-4. **Memory + doc polish** — already-saved memory files: `feedback_passport_pool_intersect_proximity.md` + `feedback_stamps_not_stops.md`. STATE.md / SESSION-LOG.md updates done at S269 close. MASTER_SESSION_REFERENCE.md update is the last polish item.
-
-**S269 carry-forwards still open:**
-
-- The pre-pivot `default_salem_walking` filter holds operator-set `min_geofence_radius_m=10`. If you want to broaden/narrow, edit it in PassportTab and rerun `node cache-proxy/scripts/publish-poi-passport.js && node cache-proxy/scripts/align-asset-schema-to-room.js` then bundletool install.
-- The Passports tab still exposes `min_geofence_radius_m` on per-tour passport rows where it's effectively dead (auto_bake=false skips filter SQL). Could simplify the tab UI to hide the field on tour-bound rows OR drop per-tour rows from the tab entirely (authoring lives in the Tour editor now). Deferred.
-- `passport_poi_count` is computed via `LEFT JOIN LATERAL` on every GET — fast at current scale (5 passports). Future: denormalized column on salem_tours if scale demands.
-- Linger and Listen (S267) field walk to validate subtopic body queueing still owed.
-
-**S267 latency-fix carry-forwards (untouched in S269):**
-- DEBUG-only ~30 min each: drop `MapDebugDumper` auto-cadence 10s → 60s; coalesce `refreshNarrationIcons` 3-bucket → single pass.
-- Ships to release: `BillboardMarker` viewport-cull check before `super.draw()` (~1-2 hr); off-thread proximity scan `checkPosition()` → Default dispatcher (~2-4 hr, more invasive — defer until simpler fixes prove insufficient).
-
-**S268 carry-forwards still open:** MIGRATION_2_3 verification (the v2→v3 upgrade path is exercised only on in-place install over the pre-S268 build — every install since S268 has been `adb uninstall && bundletool install-apks` which skips it).
-
-**S266 carry-forwards still open:** field-validate POI edits render on both devices; validate S265 narration banner shrink on Pixel 8 portrait; then continue per-surface portrait iteration or pivot to broader Phase A survey from `docs/plans/pixel8-portrait-support.md`.
-
-**Misc:** Lenovo `enabled=3` (DISABLED_USER) mystery — possibly Zui launcher quirk after S266 in-place-install WAL violation; `pm enable` recovers.
+Recon Layer 2 + Passport S5 + S267/S268 latency/migration backlog + S266 portrait validation are now in `docs/archive/STATE_openers_removed_2026-05-21.md`. Pull from there if any of those threads re-enter scope.
 
 **Phase A portrait smoke test (still owed from S264/S265):** operator-driven Pixel 8 visual smoke test — walk every UI surface (every menu, dialog, sheet, FAB cluster, screen state) in BOTH landscape and portrait on the Pixel 8 (auto-rotate first needs enabling per S263 diagnosis). Screenshot into `docs/pixel8-portrait-survey/<surface>-<orient>.png`. Output: `docs/pixel8-portrait-survey/MATRIX.md` annotating each surface as `OK / minor / major / blocker` per orientation. Drives Phase B-D scope.
 
@@ -165,7 +143,7 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 Phases 1-9 + 9A+ + 9P.A/B + 9T + 9U + 9X: **COMPLETE**. Phase 10 (production readiness): first signed AAB built S180, asset-pack reorg S256, ship-cliffs 1/2/3 closed. Phase 11 (ASO/Play Store): operator-led, post-AAB-upload. **9Y/9Z/9Q/9R deferred** (V1.0.1+, no V1 ship dependency). Cross-project TigerLine stalled 2026-04-21; SalemIntelligence PAUSED S214.
 
-**Sessions completed:** 286. **Internal ship target: 2026-08-01.**
+**Sessions completed:** 287. **Internal ship target: 2026-08-01.**
 
 ---
 

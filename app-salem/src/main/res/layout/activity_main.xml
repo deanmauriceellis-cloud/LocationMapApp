@@ -62,6 +62,54 @@
 
     </com.example.wickedsalemwitchcitytour.ui.TiltContainer>
 
+    <!-- S287 — Historical-map opacity slider, top-center.
+         Shown only when an overlay year is selected via the picker. -->
+    <LinearLayout
+        android:id="@+id/histOpacityBar"
+        android:layout_width="320dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="72dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/zoom_bubble_bg"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:elevation="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/histOpacityYear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:minWidth="48dp" />
+
+        <SeekBar
+            android:id="@+id/histOpacityBarSlider"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:max="100"
+            android:progress="70" />
+
+        <TextView
+            android:id="@+id/histOpacityBarLabel"
+            android:layout_width="44dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="70%"
+            android:textColor="@android:color/white"
+            android:textSize="13sp" />
+    </LinearLayout>
+
     <!-- Custom zoom slider (right edge, vertically centered) -->
     <LinearLayout
         android:id="@+id/zoomSliderContainer"

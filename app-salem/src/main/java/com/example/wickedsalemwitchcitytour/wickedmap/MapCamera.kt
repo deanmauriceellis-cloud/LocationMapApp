@@ -23,7 +23,7 @@ class MapCamera(
     val minZoom: Double = 16.0,
     val maxZoom: Double = 19.0,
     val minLat: Double = 42.475,
-    val maxLat: Double = 42.600,
+    val maxLat: Double = 42.625,
     val minLon: Double = -70.960,
     val maxLon: Double = -70.760,
 ) {
