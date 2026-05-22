@@ -1447,6 +1447,25 @@ class SalemMainActivity : AppCompatActivity() {
                 }
             }, 6000L)
         }
+
+        // S288 — restore last-picked historical overlay across app restart.
+        // The picker writes KEY_YEAR ("year") + KEY_OPACITY ("opacity_pct") to
+        // SharedPreferences "historical_maps". If a year is persisted, apply it
+        // once the mapView is laid out so the overlay + opacity pill are restored
+        // exactly as the operator left them.
+        binding.mapView.post {
+            val savedYear = getSharedPreferences(
+                com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.PREFS,
+                MODE_PRIVATE,
+            ).getString(
+                com.example.wickedsalemwitchcitytour.wickedmap.HistoricalMapsBottomSheet.KEY_YEAR,
+                null,
+            )
+            if (savedYear != null) {
+                if (BuildConfig.DEBUG) DebugLogger.d("HistoricalOv", "restore-on-restart: applying saved year=$savedYear")
+                applyHistoricalOverlaySelection(savedYear)
+            }
+        }
         // Low-zoom Salem location ball. Bundled tiles start at z16; this
         // overlay gives the user visual context when zoomed out past that.
         // Added at index 0 so POI markers / GPS dot / routes draw over it

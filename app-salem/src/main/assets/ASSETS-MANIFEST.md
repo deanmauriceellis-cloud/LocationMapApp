@@ -58,6 +58,18 @@ cp dist/salem_tiles.sqlite ../../app-salem-tiles-pack/src/main/assets/
 
 The bake takes ~30 minutes wall-clock on a recent machine; intermediate `salem-custom.mbtiles` is the slow part. Operator typically keeps the bundle warm and rebakes only when the tile source / bbox / zoom range changes (last bake S234, expanded to +10 mi q=60 at 261.7 MB). Verify post-copy with `node cache-proxy/scripts/verify-bundled-assets.js` (asserts 5000+ rows + provider=`Salem-Custom`).
 
+**Historical-map providers in `salem_tiles.sqlite` (S288 close):** beyond the modern `Salem-Custom` provider, the same DB also carries one row-set per historical year, accessed at runtime via the picker FAB → `OsmdroidHistoricalOverlay`:
+
+| Provider | Tiles | Notes |
+|---|---|---|
+| `Historical-1692` | 15,364 | Upham 1866 reconstruction of Salem Village 1692. S288 precision pass: 6 GCPs (Parris parsonage, Salem Village Meeting House, Rebecca Nurse Homestead, John Proctor house, Endicott Pear / Orchard Farm, Rev. John Hale house — corrected anchor coords). TPS warp + cutline clip to GCP convex hull + 500m buffer. |
+| `Historical-1700` | 28,747 | Phillips/Perley downtown Salem reconstruction. S287 coarse 4-corner. Precision pass owed. |
+| `Historical-1851` | 12,450 | McIntyre city map. S285 v2 process: 4 Washington Square corner GCPs + 4 outer anchors. Operator-confirmed alignment good. |
+| `Historical-1911` | 31,791 | Walker atlas plate 05. S287 coarse 4-corner. Precision pass owed. |
+| `Salem-Custom` | 715,841 | Modern basemap (default). |
+
+Picker entry in `HistoricalMapsBottomSheet.YEARS` must be updated to add a new year + tile thumbnail must be generated under `app-salem/src/main/assets/historical-thumbs/thumb_<year>.webp`. Full per-map bake pipeline lives in `tools/historical-maps/` — see CLAUDE.md "Historical-map bake pipeline" subsection under Key Paths.
+
 ### `tours/*.json` — Pre-computed OSRM walking routes (~400 KB)
 
 Required files (one per `tours.id` in the DB):
