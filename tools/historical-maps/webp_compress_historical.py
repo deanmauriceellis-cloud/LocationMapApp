@@ -22,6 +22,11 @@ DB = "/home/witchdoctor/Development/LocationMapApp_v1.5/tools/tile-bake/dist/sal
 QUALITY = 70
 METHOD = 6
 PROC_COUNT = max(1, (os.cpu_count() or 4) - 2)
+# Optional CLI: --provider Historical-1692  → only that single provider.
+# Default (no arg): all Historical-* providers.
+PROVIDER_FILTER = None
+if "--provider" in sys.argv:
+    PROVIDER_FILTER = sys.argv[sys.argv.index("--provider") + 1]
 
 
 def encode_one(args):
@@ -50,20 +55,29 @@ def main():
 
     src = sqlite3.connect(DB)
     cur = src.cursor()
-    counts = cur.execute(
-        "SELECT provider, COUNT(*) FROM tiles WHERE provider LIKE 'Historical-%' GROUP BY provider"
-    ).fetchall()
+    if PROVIDER_FILTER:
+        print(f"Scope: provider = '{PROVIDER_FILTER}'")
+        counts = cur.execute(
+            "SELECT provider, COUNT(*) FROM tiles WHERE provider = ? GROUP BY provider",
+            (PROVIDER_FILTER,),
+        ).fetchall()
+    else:
+        print("Scope: all Historical-* providers")
+        counts = cur.execute(
+            "SELECT provider, COUNT(*) FROM tiles WHERE provider LIKE 'Historical-%' GROUP BY provider"
+        ).fetchall()
     print("Before:")
     for prov, n in counts:
         print(f"  {prov}: {n} tiles")
     total = sum(n for _, n in counts)
     if total == 0:
-        sys.exit("No Historical-* rows; nothing to do.")
+        sys.exit("No matching rows; nothing to do.")
     print(f"Total to convert: {total}")
 
-    cur.execute(
-        "SELECT key, provider, tile FROM tiles WHERE provider LIKE 'Historical-%'"
-    )
+    if PROVIDER_FILTER:
+        cur.execute("SELECT key, provider, tile FROM tiles WHERE provider = ?", (PROVIDER_FILTER,))
+    else:
+        cur.execute("SELECT key, provider, tile FROM tiles WHERE provider LIKE 'Historical-%'")
     rows = cur.fetchall()
     src.close()
 
