@@ -51,7 +51,7 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 **GPS "follow until manual pan" — S288 demo-prep follow-up.** Dead-zone tightened + initial-center-on-user landed at S288 close (commit `7471b99`), but the **full "until overridden" behavior is still incomplete** — currently the map re-centers on every GPS fix forever. Need a `userPannedSinceFix` flag wired to MapView touch listener so manual pan pauses auto-follow until user explicitly re-centers (FAB button, double-tap, etc.). Demo workaround in place: tell user not to pan.
 
-**Restore-on-restart.** `applyHistoricalOverlaySelection` not called from `SalemMainActivity.onCreate`, so a previously-selected year doesn't re-apply across app restart (slider hidden, no overlay). Easy fix: read pref + call applyHistoricalOverlaySelection in onCreate post-mapView-ready.
+**Restore-on-restart — RESOLVED at S288 post-close (commit `1660ce0`).** `SalemMainActivity.onCreate` now reads `SharedPreferences("historical_maps")."year"` after mapView layout and calls `applyHistoricalOverlaySelection(savedYear)` if non-null. Code change only, not installed on devices yet (demo build holds); operator can rebuild post-demo to pick up the feature.
 
 **Plan original Phase 4 partly done** — `verify-bundled-assets.js` regex extended in S286 P1 + S287 (now covers 1692). Still owed: asset bake hook in `CLAUDE.md` publish chain documentation, `ASSETS-MANIFEST.md` Historical Maps section.
 
