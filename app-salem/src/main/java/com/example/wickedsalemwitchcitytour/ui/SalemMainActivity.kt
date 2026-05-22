@@ -1424,16 +1424,28 @@ class SalemMainActivity : AppCompatActivity() {
                 controller.setCenter(SalemBounds.SAMANTHA_STATUE)
             }
         }
-        // Splash fallback: if no GPS fix within 3s, zoom to Salem center
+        // Splash fallback: if no GPS fix within 6s, zoom to Salem center as a placeholder.
+        //
+        // S288 — extended 3s → 6s and DROPPED `initialCenterDone = true` from this path.
+        // The old behavior set initialCenterDone=true after the splash zoom, which meant
+        // a GPS fix that arrived after 3s would just enter the "continuous follow" path
+        // (animateTo per fix). That's cosmetically fine when accuracy is good, but with
+        // poor cold-start accuracy + dead-zone gating, the cursor never visibly recenters
+        // on the user — they stay parked on Samantha Statue.
+        //
+        // New rule: splash fallback shows Salem center as a visual placeholder, but does
+        // NOT mark the initial center as done. The first real GPS fix STILL runs the
+        // performCinematicZoom path centered on the user — i.e. when the user starts
+        // outdoors, the GPS centers on them. Auto-follow continues until manual pan
+        // (TODO: wire pan-override flag).
         if (fromSplash) {
             binding.mapView.postDelayed({
                 if (!initialCenterDone && fromSplash) {
-                    DebugLogger.i("SalemMainActivity", "Splash fallback — no GPS fix, zooming to Samantha statue")
+                    DebugLogger.i("SalemMainActivity", "Splash fallback — no GPS fix yet, placeholder zoom to Samantha statue (still expecting GPS-driven recenter on first fix)")
                     performCinematicZoom(SalemBounds.SAMANTHA_STATUE)
-                    fromSplash = false
-                    initialCenterDone = true
+                    // Intentionally NOT setting initialCenterDone here.
                 }
-            }, 3000L)
+            }, 6000L)
         }
         // Low-zoom Salem location ball. Bundled tiles start at z16; this
         // overlay gives the user visual context when zoomed out past that.
@@ -3681,7 +3693,11 @@ class SalemMainActivity : AppCompatActivity() {
             //    needing mode-specific logic. Bypassed in MANUAL mode (walk simulator) so
             //    every position update renders.
             val isManual = viewModel.locationMode.value == com.example.wickedsalemwitchcitytour.ui.LocationMode.MANUAL
-            val deadZoneMeters = (update.accuracy * 2f).coerceIn(5f, 100f)
+            // S288 tighten — was coerceIn(5f, 100f) but a Pixel 8 with 25-31m indoor
+            // accuracy produced a 60m dead zone that froze the cursor for normal walking.
+            // Ceiling 15m means worst-case the user has to take ~3 normal walking strides
+            // before the cursor catches up; outdoor accuracy (<8m) lands well below this.
+            val deadZoneMeters = (update.accuracy * 2f).coerceIn(5f, 15f)
             if (!initialCenterDone) {
                 // First fix always processes — fall through
             } else if (!isManual && distanceBetween(lastGpsPoint, point) < deadZoneMeters) {
