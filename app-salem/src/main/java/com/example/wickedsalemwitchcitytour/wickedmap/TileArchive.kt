@@ -58,17 +58,26 @@ class TileArchive(archiveFile: File, private val provider: String = "Salem-Custo
         }
 
         val cursor = db.rawQuery(
-            "SELECT tile FROM tiles WHERE key = ? AND provider = ? LIMIT 1",
+            "SELECT tile, length(tile) FROM tiles WHERE key = ? AND provider = ? LIMIT 1",
             arrayOf(key.toString(), provider)
         )
         try {
             if (cursor.moveToFirst()) {
                 val blob = cursor.getBlob(0)
+                val blobLen = cursor.getInt(1)
                 val bmp = BitmapFactory.decodeByteArray(blob, 0, blob.size)
                 if (bmp != null) {
                     cache.put(key, bmp)
                     decoded++
                     decodedBytes += bmp.allocationByteCount.toLong()
+                    // S289 verbose: log first decode per (z,x,y) so we can correlate
+                    // which tiles in which area are being served.
+                    if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                        com.example.locationmapapp.util.DebugLogger.d(
+                            "TileArchive",
+                            "DECODE $provider z=$z x=$x y=$y blob=$blobLen B",
+                        )
+                    }
                     maybeLogSummary()
                     return bmp
                 } else {
@@ -84,7 +93,18 @@ class TileArchive(archiveFile: File, private val provider: String = "Salem-Custo
         } finally {
             cursor.close()
         }
-        synchronized(missing) { missing.add(key) }
+        // S289 verbose: log first MISS per (z,x,y) so we see exactly which tile keys
+        // are being requested by the overlay/basemap path but don't exist in the DB.
+        val firstMiss: Boolean
+        synchronized(missing) {
+            firstMiss = missing.add(key)
+        }
+        if (firstMiss && com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.d(
+                "TileArchive",
+                "MISS $provider z=$z x=$x y=$y (no row)",
+            )
+        }
         maybeLogSummary()
         return null
     }

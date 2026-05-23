@@ -93,10 +93,11 @@ private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module Sale
  * back to 19 if the pixelation ever feels worse than the marker-overlap.
  */
 internal const val MAP_MAX_OVERZOOM = 20.0
-/** S168 — Salem basemap only ships tiles for z16-19 (operator confirmed: "we
- *  don't support zooms 1-13"). Lock the map floor to z14 so the slider, pinch,
- *  and zoom buttons can't scroll into tile-less territory. */
-internal const val MAP_MIN_ZOOM = 14.0
+/** S289 — was z14 (S168 floor when basemap had no z<14 tiles). S289 baked
+ *  downsampled z11-z13 overviews so the slider/pinch/buttons can now zoom out
+ *  to z11 for wider regional context (Salem + Beverly + Peabody + Danvers all
+ *  visible at once). Anything below z11 still has no tiles. */
+internal const val MAP_MIN_ZOOM = 11.0
 
 /** Minimum time a candidate GPS interval must persist before the picker
  *  commits to it. Eliminates thrashing when speed drifts across thresholds.

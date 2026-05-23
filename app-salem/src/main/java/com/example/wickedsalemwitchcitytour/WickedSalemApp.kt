@@ -11,6 +11,7 @@ package com.example.wickedsalemwitchcitytour
 
 import android.app.Application
 import com.example.locationmapapp.util.DebugLogger
+import com.example.wickedsalemwitchcitytour.BuildConfig
 import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import com.example.wickedsalemwitchcitytour.util.SplashVoice
 import com.example.wickedsalemwitchcitytour.util.TcpLogStreamer
@@ -48,6 +49,14 @@ class WickedSalemApp : Application() {
         Configuration.getInstance().apply {
             load(applicationContext, PreferenceManager.getDefaultSharedPreferences(applicationContext))
             userAgentValue = "WickedSalemWitchCityTour/1.0 (Android)"
+            // S289 verbose: turn on osmdroid's internal debug logs (debug-only). This
+            // exposes archive-provider hits/misses + tile cache evictions + downloader
+            // failures (which should be zero in offline mode). Stripped in release.
+            if (BuildConfig.DEBUG) {
+                isDebugMode = true
+                isDebugMapView = true
+                isDebugTileProviders = true
+            }
         }
 
         // 3. Extract bundled offline tiles to osmdroid base path on first launch.
