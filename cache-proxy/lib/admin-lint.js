@@ -275,6 +275,35 @@ async function checkHistCuratedNotTour(pgPool) {
   ));
 }
 
+// S291 — a HISTORICAL_BUILDINGS row whose data_source contains "massgis" gets
+// shunted into the synthetic "POI Hist. Landmark" bucket by the admin tree/map
+// (PoiTree.isMassgisHistorical → categoryFilterMatches), so it vanishes from the
+// "Historic Buildings" filter even though its DB category is HISTORICAL_BUILDINGS.
+// Post-S216 the real MassGIS imports live under category=HISTORICAL_LANDMARKS, so
+// this synthetic bucket should be empty — any hit is a building that slipped the
+// S216 reclassification (e.g. Plummer Hall, S291) and is now hidden from the
+// operator. Fix is to either recategorize to HISTORICAL_LANDMARKS or clear the
+// "massgis" provenance (e.g. manual_curated) so it returns to Historic Buildings.
+async function checkHistBldgMassgisSource(pgPool) {
+  const params = [ITEM_CAP];
+  const suppress = suppressionClause('hist_bldg_massgis_source', params);
+  const { rows } = await pgPool.query(`
+    SELECT id, name, lat, lng, data_source
+    FROM salem_pois
+    WHERE deleted_at IS NULL
+      AND category = 'HISTORICAL_BUILDINGS'
+      AND lower(COALESCE(data_source,'')) LIKE '%massgis%'
+      ${suppress}
+    ORDER BY name
+    LIMIT $1
+  `, params);
+  return rows.map(r => poiItem(r,
+    `Historical Building has "massgis" data_source (${r.data_source}) — the admin map/tree files it under "POI Hist. Landmark", so it's hidden from the "Historic Buildings" filter.`,
+    `Open the editor: either change Category to Historical Landmarks (where MassGIS imports belong post-S216), or change data_source to a curated value (e.g. "manual_curated") so it shows under Historic Buildings.`,
+    { data_source: r.data_source },
+  ));
+}
+
 async function checkHistPre1860NoHistoricalNarration(pgPool) {
   const params = [ITEM_CAP];
   const suppress = suppressionClause('hist_pre1860_no_historical_narration', params);
@@ -900,6 +929,7 @@ const CHECKS = [
   { id: 'hist_bldg_missing_year',    label: 'Historical Buildings missing year_established',category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingYear },
   { id: 'hist_bldg_missing_narration', label: 'Historical Buildings with no narration text', category: 'Historical Buildings', severity: 'warn',  run: checkHistBldgMissingNarration },
   { id: 'hist_curated_not_tour',     label: 'Curated Historical Buildings missing tour flag', category: 'Historical Buildings', severity: 'warn',  run: checkHistCuratedNotTour },
+  { id: 'hist_bldg_massgis_source',  label: 'Historical Buildings with "massgis" source (hidden from Historic Buildings filter)', category: 'Historical Buildings', severity: 'warn', run: checkHistBldgMassgisSource },
   { id: 'hist_pre1860_no_historical_narration', label: 'Pre-1860 Historical Buildings missing historical narration', category: 'Historical Buildings', severity: 'warn', run: checkHistPre1860NoHistoricalNarration },
   { id: 'historical_narration_needs_refinement', label: 'Historical narration needs refinement (quality issues)', category: 'Historical Buildings', severity: 'warn', run: checkHistoricalNarrationNeedsRefinement },
   { id: 'civic_flag_mismatch',       label: 'is_civic_poi=true but category ≠ CIVIC',     category: 'Tour gates', severity: 'error', run: checkCivicFlagMismatch },
