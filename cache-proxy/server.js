@@ -90,11 +90,12 @@ app.get('/admin/whoami', (req, res) => {
   '/admin/salem/field-edits',
   '/admin/splash',
   '/admin/super-admin',
-  '/admin/tiles',
   '/admin/burst-photos',
   '/cache/stats',
   '/cache/clear',
 ].forEach((prefix) => app.use(prefix, adminAuth.requireFullAdmin));
+// NOTE: /admin/tiles is intentionally NOT blocked — it serves the read-only
+// basemap the POI-editor map needs, so a historian must be able to fetch it.
 
 // ── Build shared deps object ─────────────────────────────────────────────────
 const deps = {
