@@ -8,7 +8,7 @@
 
 Drove OMEN-025 Phase 1 through every code-unblocked tier in one session: the stateless activation **Worker** (`worker-activate/` — contract, HMAC nonce, Play Integrity decode + pure verdict, router; 25 tests), the Android **network path** (`ActivationHostGuard`/`HttpClientFactory`/`Api`), and the **Session-6 core** (`PlayIntegrityClient` requestHash byte-matched to the Worker, `ActivationManager` state machine, flags). 46 Android JVM tests + 25 Worker tests, all green; `ACTIVATION_HANDSHAKE_ENABLED=false` so zero runtime behavior change. Also wrote `AndroidSecurity.md` (engineering continuity reference) + `AndroidSecurity_20260524.pdf` (15-page operator/counsel assessment incl. the full session-by-session plan) and synced the plan doc. Deploy + S6 UI/wiring + S7 rollout remain gated on the three operator credentials (Cloudflare token, Google SA JSON, Play Console track).
 
-Full session detail: `docs/session-logs/session-296-2026-05-24.md`. Commit: `<pending>`.
+Full session detail: `docs/session-logs/session-296-2026-05-24.md`. Commit: `78f9bb7`.
 
 ## Session 295: 2026-05-24 — OMEN-025 anti-piracy Phase 1 Session 3: runtime `ContentManifestVerifier` (Android) + JVM tests
 
