@@ -79,9 +79,11 @@ const LS_GROUPS    = 'admin.sidebar.groups'
 interface AdminSidebarProps {
   view: AdminView
   onViewChange: (v: AdminView) => void
+  // S290 — 'historian' sees only the POIs tab; 'admin' (default) sees everything.
+  role?: 'admin' | 'historian'
 }
 
-export function AdminSidebar({ view, onViewChange }: AdminSidebarProps) {
+export function AdminSidebar({ view, onViewChange, role = 'admin' }: AdminSidebarProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_COLLAPSED) === '1' } catch { return false }
   })
@@ -104,11 +106,20 @@ export function AdminSidebar({ view, onViewChange }: AdminSidebarProps) {
     setOpenGroups(prev => ({ ...prev, [name]: !prev[name] }))
   }, [])
 
+  // S290 — a historian only ever edits POI content, so collapse the rail to the
+  // single POIs item. The backend enforces the same scope regardless of UI.
+  const groups = useMemo<SidebarGroup[]>(() => {
+    if (role !== 'historian') return GROUPS
+    return GROUPS
+      .map(g => ({ ...g, items: g.items.filter(it => it.id === 'pois') }))
+      .filter(g => g.items.length > 0)
+  }, [role])
+
   // When collapsed, every item shows regardless of group expand state — the
   // group concept only matters in the expanded view as a visual divider.
   const flatItems = useMemo(
-    () => GROUPS.flatMap(g => g.items),
-    [],
+    () => groups.flatMap(g => g.items),
+    [groups],
   )
 
   return (
@@ -144,7 +155,7 @@ export function AdminSidebar({ view, onViewChange }: AdminSidebarProps) {
             ))}
           </ul>
         ) : (
-          GROUPS.map(group => (
+          groups.map(group => (
             <div key={group.name} className="mb-1.5">
               <button
                 type="button"

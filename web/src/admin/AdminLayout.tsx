@@ -21,6 +21,7 @@ import {
 import { AdminMap } from './AdminMap'
 import { PoiEditDialog, type CategoryRow, type SubcategoryRow } from './PoiEditDialog'
 import { PoiCreateDialog } from './PoiCreateDialog'
+import { HistorianPoiDialog } from './HistorianPoiDialog'
 import { WitchTrialsPanel } from './WitchTrialsPanel'
 import { TourTree, type AddStopMode } from './TourTree'
 import type { TourLeg, TourStop, TourSummary } from './tourTypes'
@@ -51,6 +52,29 @@ type OraclePillState =
 export function AdminLayout() {
   // View toggle (POIs vs Witch Trials)
   const [view, setView] = useState<AdminView>('pois')
+
+  // S290 — which admin role authenticated. The portal uses browser Basic Auth,
+  // so we ask the backend who we are. 'historian' is restricted to POI content
+  // editing; default 'admin' keeps the full portal (and is the fallback if the
+  // whoami call fails, preserving the prior single-admin behaviour).
+  const [role, setRole] = useState<'admin' | 'historian'>('admin')
+  useEffect(() => {
+    let alive = true
+    void fetch('/api/admin/whoami', { credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(body => {
+        if (alive && body && (body.role === 'historian' || body.role === 'admin')) {
+          setRole(body.role)
+        }
+      })
+      .catch(() => { /* keep default 'admin' */ })
+    return () => { alive = false }
+  }, [])
+  const isHistorian = role === 'historian'
+  // A historian only ever has the POIs view; force it if state drifts.
+  useEffect(() => {
+    if (isHistorian && view !== 'pois') setView('pois')
+  }, [isHistorian, view])
 
   // Category filter — click a category node in PoiTree to hide all POIs not
   // in that category. Click the same category again to clear.
@@ -828,15 +852,18 @@ export function AdminLayout() {
 
         {view === 'pois' && (
           <>
-            <button
-              type="button"
-              onClick={handleEnterAddPoiMode}
-              disabled={addPoiMode}
-              title="Click to enter place-mode, then click the map to drop a new POI"
-              className="px-3 py-1 text-sm rounded bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {addPoiMode ? '+ New POI…' : '+ New POI'}
-            </button>
+            {/* S290 — create / publish / burst-photo controls are full-admin only. */}
+            {!isHistorian && (
+              <button
+                type="button"
+                onClick={handleEnterAddPoiMode}
+                disabled={addPoiMode}
+                title="Click to enter place-mode, then click the map to drop a new POI"
+                className="px-3 py-1 text-sm rounded bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {addPoiMode ? '+ New POI…' : '+ New POI'}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleHighlightDuplicates}
@@ -844,25 +871,29 @@ export function AdminLayout() {
             >
               Highlight Duplicates
             </button>
-            <button
-              type="button"
-              onClick={handlePublish}
-              className="px-3 py-1 text-sm rounded bg-emerald-700 hover:bg-emerald-600 transition-colors"
-            >
-              Publish
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowBurstPhotos(v => !v)}
-              title="Overlay GPS-burst photo pins on the map (POI/path alignment QC)"
-              className={`px-3 py-1 text-sm rounded transition-colors ${
-                showBurstPhotos
-                  ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                  : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-              }`}
-            >
-              Photos: {showBurstPhotos ? 'ON' : 'OFF'}
-            </button>
+            {!isHistorian && (
+              <button
+                type="button"
+                onClick={handlePublish}
+                className="px-3 py-1 text-sm rounded bg-emerald-700 hover:bg-emerald-600 transition-colors"
+              >
+                Publish
+              </button>
+            )}
+            {!isHistorian && (
+              <button
+                type="button"
+                onClick={() => setShowBurstPhotos(v => !v)}
+                title="Overlay GPS-burst photo pins on the map (POI/path alignment QC)"
+                className={`px-3 py-1 text-sm rounded transition-colors ${
+                  showBurstPhotos
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+                }`}
+              >
+                Photos: {showBurstPhotos ? 'ON' : 'OFF'}
+              </button>
+            )}
           </>
         )}
 
@@ -881,7 +912,7 @@ export function AdminLayout() {
 
       {/* Body — sidebar (left) + view content (right) */}
       <div className="flex-1 flex min-h-0">
-        <AdminSidebar view={view} onViewChange={setView} />
+        <AdminSidebar view={view} onViewChange={setView} role={role} />
         {view === 'witch-trials' ? (
         <div className="flex-1 min-h-0">
           <WitchTrialsPanel />
@@ -1114,22 +1145,35 @@ export function AdminLayout() {
         onClose={handleCreatePoiClose}
       />
 
-      {/* Edit dialog (POI view only) */}
-      <PoiEditDialog
-        open={editOpen}
-        poi={selectedPoi?.poi ?? null}
-        knownCategories={knownCategories}
-        categories={categories}
-        subcategories={subcategories}
-        onTaxonomyChanged={refetchTaxonomy}
-        oracleAvailable={oraclePill.kind === 'ready'}
-        onOracleRefresh={refreshOracleStatus}
-        onSaved={handlePoiSaved}
-        onDeleted={handlePoiDeleted}
-        onClose={handleEditClose}
-        onShowDirections={handleShowDirections}
-        onEnterProposalReview={handleEnterProposalReview}
-      />
+      {/* Edit dialog (POI view only). S290 — a historian gets the restricted
+          HistorianPoiDialog (content + category + flags only); the full admin
+          dialog is rendered unchanged for the 'admin' role. */}
+      {isHistorian ? (
+        <HistorianPoiDialog
+          open={editOpen}
+          poi={selectedPoi?.poi ?? null}
+          categories={categories}
+          subcategories={subcategories}
+          onSaved={handlePoiSaved}
+          onClose={handleEditClose}
+        />
+      ) : (
+        <PoiEditDialog
+          open={editOpen}
+          poi={selectedPoi?.poi ?? null}
+          knownCategories={knownCategories}
+          categories={categories}
+          subcategories={subcategories}
+          onTaxonomyChanged={refetchTaxonomy}
+          oracleAvailable={oraclePill.kind === 'ready'}
+          onOracleRefresh={refreshOracleStatus}
+          onSaved={handlePoiSaved}
+          onDeleted={handlePoiDeleted}
+          onClose={handleEditClose}
+          onShowDirections={handleShowDirections}
+          onEnterProposalReview={handleEnterProposalReview}
+        />
+      )}
     </div>
   )
 }

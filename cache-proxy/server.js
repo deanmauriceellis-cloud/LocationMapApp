@@ -66,6 +66,36 @@ app.get('/admin/ping', (req, res) => {
   res.json({ ok: true, route: '/admin/ping' });
 });
 
+// /admin/whoami (S290) — lets the web admin discover which role authenticated
+// (full 'admin' vs restricted 'historian') so it can gate tabs + fields. Sits
+// behind requireBasicAuth above, so req.adminRole is already set.
+app.get('/admin/whoami', (req, res) => {
+  res.json({ role: req.adminRole });
+});
+
+// Historian role-gate (S290) — block the restricted 'historian' login from every
+// admin feature except POI content editing. Mounted here (after requireBasicAuth,
+// before the route modules register) so it runs first on these prefixes. The
+// 'admin' role passes through untouched. POI + category routes are intentionally
+// NOT blocked wholesale — they carry finer per-route guards in their own modules
+// (admin-pois.js scopes the historian's editable fields; admin-categories.js
+// leaves GET open for the dropdowns but guards taxonomy writes).
+[
+  '/admin/salem/tours',
+  '/admin/salem/collections',
+  '/admin/salem/witch-trials',
+  '/admin/salem/lint',
+  '/admin/salem/auto-categorize',
+  '/admin/salem/audit',
+  '/admin/salem/field-edits',
+  '/admin/splash',
+  '/admin/super-admin',
+  '/admin/tiles',
+  '/admin/burst-photos',
+  '/cache/stats',
+  '/cache/clear',
+].forEach((prefix) => app.use(prefix, adminAuth.requireFullAdmin));
+
 // ── Build shared deps object ─────────────────────────────────────────────────
 const deps = {
   pgPool,
@@ -73,6 +103,7 @@ const deps = {
   io,
   // Admin auth
   requireBasicAuth: adminAuth.requireBasicAuth,
+  requireFullAdmin: adminAuth.requireFullAdmin,
   // Config
   JWT_SECRET: config.JWT_SECRET,
   JWT_ACCESS_EXPIRY: config.JWT_ACCESS_EXPIRY,

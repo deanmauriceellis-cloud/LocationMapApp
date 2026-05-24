@@ -63,7 +63,9 @@ function normalizeColor(raw) {
 }
 
 module.exports = function(app, deps) {
-  const { pgPool, requirePg } = deps;
+  const { pgPool, requirePg, requireFullAdmin } = deps;
+  // S290 — GET routes stay open so the historian's POI-edit dropdowns populate;
+  // taxonomy writes (creating categories/subcategories) are full-admin only.
 
   // ─── GET /admin/salem/categories ─────────────────────────────────────────
   app.get('/admin/salem/categories', requirePg, async (_req, res) => {
@@ -92,7 +94,7 @@ module.exports = function(app, deps) {
   //   created category will not have a pref toggle until that side is
   //   updated. That's intentional — the operator can flip is_civic_poi /
   //   is_tour_poi flags to control visibility for new categories.
-  app.post('/admin/salem/categories', requirePg, async (req, res) => {
+  app.post('/admin/salem/categories', requirePg, requireFullAdmin, async (req, res) => {
     const body = req.body || {};
     const label = typeof body.label === 'string' ? body.label.trim() : '';
     if (!label || label.length > 60) {
@@ -174,7 +176,7 @@ module.exports = function(app, deps) {
   // Body: { category_id, label }
   // - id is derived as `${category_id}__${slug}`, slug from label.
   // - display_order is MAX+1 within that category.
-  app.post('/admin/salem/subcategories', requirePg, async (req, res) => {
+  app.post('/admin/salem/subcategories', requirePg, requireFullAdmin, async (req, res) => {
     const body = req.body || {};
     const categoryId = typeof body.category_id === 'string' ? body.category_id.trim() : '';
     const label = typeof body.label === 'string' ? body.label.trim() : '';

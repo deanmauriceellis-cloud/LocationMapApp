@@ -2,15 +2,23 @@
  * LocationMapApp v1.5
  * Copyright (c) 2026 Destructive AI Gurus, LLC. All rights reserved.
  *
- * Admin Basic Auth middleware (Phase 9P.3).
+ * Admin Basic Auth middleware (Phase 9P.3; multi-role S290).
  *
  * Reads ADMIN_USER and ADMIN_PASS from environment. Mounted on /admin/* and
  * on /cache/clear (the latent unauthenticated admin route from S96 survey).
  * Returns 401 + WWW-Authenticate: Basic on missing/wrong credentials.
  *
+ * S290 — second optional credential ADMIN_HISTORIAN_USER / ADMIN_HISTORIAN_PASS
+ * maps to the restricted 'historian' role (POI content editing only). When a
+ * request authenticates, req.adminRole is set to 'admin' or 'historian'. The
+ * historian creds are OPTIONAL — if unset, only the full-admin login exists and
+ * behaviour is unchanged. requireFullAdmin() gates the routes off-limits to a
+ * historian; filterHistorianViolations() enforces the editable-field whitelist.
+ *
  * Uses crypto.timingSafeEqual to avoid timing attacks during comparison.
  *
- * Hard-fails at startup if either env var is unset — see ensureConfigured().
+ * Hard-fails at startup if the primary ADMIN_USER/ADMIN_PASS is unset — see
+ * ensureConfigured(). Historian creds are not required for startup.
  */
 const MODULE_ID = '(C) Destructive AI Gurus, LLC, 2026 - Module admin-auth.js';
 
@@ -85,16 +93,60 @@ function requireBasicAuth(req, res, next) {
     return challenge(res, 'Authentication required');
   }
 
-  const userOk = constantTimeEqual(creds.user, expectedUser);
-  const passOk = constantTimeEqual(creds.pass, expectedPass);
-
-  // Always evaluate both comparisons (no short-circuit) so failure timing is
-  // independent of which field was wrong.
-  if (!(userOk && passOk)) {
+  const role = resolveRole(creds);
+  if (!role) {
     return challenge(res, 'Invalid credentials');
   }
 
+  // Authoritative role marker consumed by requireFullAdmin() and the per-route
+  // historian field guard. 'admin' = full access; 'historian' = restricted.
+  req.adminRole = role;
   next();
+}
+
+/**
+ * Compare supplied { user, pass } against the configured credential pairs and
+ * return the matched role ('admin' | 'historian') or null on no match.
+ *
+ * Both comparisons in each pair are always evaluated (no short-circuit) so
+ * failure timing is independent of which field was wrong. The historian pair is
+ * only considered when both of its env vars are set.
+ */
+function resolveRole(creds) {
+  const adminUserOk = constantTimeEqual(creds.user, process.env.ADMIN_USER);
+  const adminPassOk = constantTimeEqual(creds.pass, process.env.ADMIN_PASS);
+  if (adminUserOk && adminPassOk) return 'admin';
+
+  const histUser = process.env.ADMIN_HISTORIAN_USER;
+  const histPass = process.env.ADMIN_HISTORIAN_PASS;
+  if (histUser && histPass) {
+    const histUserOk = constantTimeEqual(creds.user, histUser);
+    const histPassOk = constantTimeEqual(creds.pass, histPass);
+    if (histUserOk && histPassOk) return 'historian';
+  }
+
+  return null;
+}
+
+/**
+ * Express middleware: reject with 403 unless the request authenticated as the
+ * full 'admin' role. Mounted (in server.js + per-route) on everything a
+ * historian must not touch. Assumes requireBasicAuth ran first and set
+ * req.adminRole.
+ */
+function requireFullAdmin(req, res, next) {
+  if (req.adminRole === 'admin') return next();
+  return res.status(403).json({ error: 'Insufficient permissions' });
+}
+
+/**
+ * Pure helper: return the list of keys in `body` that are NOT in `allowedSet`.
+ * Used by the historian PUT guard to reject out-of-scope field edits. Empty
+ * array means the body is fully within scope.
+ */
+function filterHistorianViolations(body, allowedSet) {
+  if (!body || typeof body !== 'object') return [];
+  return Object.keys(body).filter((k) => !allowedSet.has(k));
 }
 
 /**
@@ -119,8 +171,11 @@ function ensureConfigured() {
 
 module.exports = {
   requireBasicAuth,
+  requireFullAdmin,
   ensureConfigured,
   // exported for unit tests
   constantTimeEqual,
   parseBasicAuth,
+  resolveRole,
+  filterHistorianViolations,
 };

@@ -66,6 +66,19 @@ export const UPDATABLE_FIELDS = [
   'no_overwrite',
 ] as const
 
+// S290 — fields the 'historian' role may edit. Mirror of HISTORIAN_EDITABLE_FIELDS
+// in cache-proxy/lib/admin-pois.js (the backend is the authoritative guard; this
+// set drives which inputs/tabs the dialog shows a historian). Narrations +
+// descriptions + category + all boolean flags.
+export const HISTORIAN_EDITABLE_FIELDS: ReadonlySet<string> = new Set([
+  'short_narration', 'long_narration', 'historical_narration', 'narration_subtopics',
+  'description', 'short_description', 'custom_description', 'origin_story',
+  'category', 'subcategory',
+  'is_tour_poi', 'is_narrated', 'default_visible', 'is_civic_poi', 'seasonal',
+  'requires_transportation', 'wheelchair_accessible', 'location_truth_of_record',
+  'haunt_enabled', 'no_overwrite',
+])
+
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
 // when populating defaults. Mirror of admin-pois.js JSONB_FIELDS.
 export const JSONB_FIELDS: ReadonlySet<string> = new Set([

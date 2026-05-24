@@ -659,10 +659,14 @@ const upload = multer({
 // ─── Module export ───────────────────────────────────────────────────────────
 
 module.exports = function(app, deps) {
-  const { pgPool, requirePg } = deps;
+  const { pgPool, requirePg, requireFullAdmin } = deps;
+
+  // S290 — mass-edit is full-admin only. These routes share the
+  // /admin/salem/pois/... prefix (so the historian role-gate in server.js can't
+  // catch them by prefix); guard each one directly.
 
   // ─── GET /admin/salem/pois/export-spreadsheet ────────────────────────────
-  app.get('/admin/salem/pois/export-spreadsheet', requirePg, async (req, res) => {
+  app.get('/admin/salem/pois/export-spreadsheet', requirePg, requireFullAdmin, async (req, res) => {
     try {
       // S241 update: include soft-deleted rows so operator can filter/group
       // by is_deleted in the spreadsheet. Apply path still refuses to update
@@ -711,6 +715,7 @@ module.exports = function(app, deps) {
   // ─── POST /admin/salem/pois/import-spreadsheet (multipart) ───────────────
   app.post('/admin/salem/pois/import-spreadsheet',
     requirePg,
+    requireFullAdmin,
     upload.single('file'),
     async (req, res) => {
       let cleanupPath = null;
@@ -781,7 +786,7 @@ module.exports = function(app, deps) {
   // Body: { approvals: [{ poi_id, column, new }] }
   //   `new` matches the shape emitted by the import endpoint — strings for
   //   text/boolean/numeric/date (parsed server-side), null to clear.
-  app.post('/admin/salem/pois/apply-mass-edit', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/apply-mass-edit', requirePg, requireFullAdmin, async (req, res) => {
     const body = req.body || {};
     const approvals = Array.isArray(body.approvals) ? body.approvals : null;
     if (!approvals) {

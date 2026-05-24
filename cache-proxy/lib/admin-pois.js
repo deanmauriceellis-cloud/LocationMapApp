@@ -142,6 +142,23 @@ const NO_OVERWRITE_PROTECTED_FIELDS = new Set([
   'year_established',
 ]);
 
+// S290 — fields a 'historian' role may edit via PUT. Narrations + descriptions
+// + category/subcategory + all boolean flags (operator-confirmed). Any PUT body
+// key outside this set is rejected (403) for a historian; the 'admin' role is
+// unrestricted. Mirror of HISTORIAN_EDITABLE_FIELDS in web/src/admin/poiAdminFields.ts.
+const HISTORIAN_EDITABLE_FIELDS = new Set([
+  // Narrations
+  'short_narration', 'long_narration', 'historical_narration', 'narration_subtopics',
+  // Descriptions
+  'description', 'short_description', 'custom_description', 'origin_story',
+  // Category
+  'category', 'subcategory',
+  // Flags (all 10 boolean columns)
+  'is_tour_poi', 'is_narrated', 'default_visible', 'is_civic_poi', 'seasonal',
+  'requires_transportation', 'wheelchair_accessible', 'location_truth_of_record',
+  'haunt_enabled', 'no_overwrite',
+]);
+
 // Columns that hold JSONB and must be JSON.stringify'd before binding.
 const JSONB_FIELDS = new Set([
   'hours', 'action_buttons',
@@ -250,7 +267,7 @@ function buildUpdateClause(body) {
 // ─── Module export ───────────────────────────────────────────────────────────
 
 module.exports = function(app, deps) {
-  const { pgPool, requirePg } = deps;
+  const { pgPool, requirePg, requireFullAdmin } = deps;
 
   // S244 — idempotent column bootstrap. `no_overwrite` protects authored
   // narration / description content from programmatic clobber. PG 9.6+
@@ -486,7 +503,7 @@ module.exports = function(app, deps) {
   // of the name + a 6-char random suffix when absent). All other UPDATABLE_FIELDS
   // accepted. data_source defaults to 'admin_create' so these rows are
   // distinguishable from BCS / massgis_mhc / unified_migration imports.
-  app.post('/admin/salem/pois', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois', requirePg, requireFullAdmin, async (req, res) => {
     try {
       const body = req.body;
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -595,6 +612,20 @@ module.exports = function(app, deps) {
       const id = getId(req, res);
       if (!id) return;
 
+      // S290 — historian role may only edit the content/category/flag whitelist.
+      // Reject the whole request if the body carries any out-of-scope field, so
+      // a restricted user can never silently no-op an attempted edit.
+      if (req.adminRole === 'historian' && req.body && typeof req.body === 'object') {
+        const violations = Object.keys(req.body).filter((k) => !HISTORIAN_EDITABLE_FIELDS.has(k));
+        if (violations.length > 0) {
+          return res.status(403).json({
+            error: 'Historian role cannot edit these fields',
+            code: 'HISTORIAN_FIELD_FORBIDDEN',
+            forbidden_fields: violations,
+          });
+        }
+      }
+
       const { setSql, values, error } = buildUpdateClause(req.body);
       if (error) return res.status(400).json({ error });
 
@@ -645,7 +676,7 @@ module.exports = function(app, deps) {
   });
 
   // ─── POST /admin/salem/pois/:id/move — lat/lng only ──────────────────────
-  app.post('/admin/salem/pois/:id/move', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/:id/move', requirePg, requireFullAdmin, async (req, res) => {
     try {
       const id = getId(req, res);
       if (!id) return;
@@ -703,7 +734,7 @@ module.exports = function(app, deps) {
   // operator drag the proposed pin before accepting; the dragged position is
   // sent in the body and committed instead of the stored lat_proposed. Without
   // a body, behavior is unchanged from S162.
-  app.post('/admin/salem/pois/:id/accept-proposed-location', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/:id/accept-proposed-location', requirePg, requireFullAdmin, async (req, res) => {
     try {
       const id = getId(req, res);
       if (!id) return;
@@ -768,7 +799,7 @@ module.exports = function(app, deps) {
   // S218: Operator clicked Cancel in the proposal-review panel. Clears the
   // proposal columns and resets location_status to 'unverified' so the next
   // Validate run starts clean. Does NOT touch live lat/lng.
-  app.post('/admin/salem/pois/:id/discard-proposed-location', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/:id/discard-proposed-location', requirePg, requireFullAdmin, async (req, res) => {
     try {
       const id = getId(req, res);
       if (!id) return;
@@ -810,7 +841,7 @@ module.exports = function(app, deps) {
   //   400 { error: 'no_address' }                   — POI has no usable address
   //   404 { error: 'Not found' }
   //   409 { error: 'POI is soft-deleted' }
-  app.post('/admin/salem/pois/:id/validate-location-tiger', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/:id/validate-location-tiger', requirePg, requireFullAdmin, async (req, res) => {
     let tigerClient = null;
     const reqStart = Date.now();
     try {
@@ -1039,7 +1070,7 @@ module.exports = function(app, deps) {
   // Requires GOOGLE_GEOCODE_API_KEY env var. Same Salem-area sanity filter
   // as the Tiger flow (15 km from Salem center) so wrong-town matches don't
   // write a bogus proposal.
-  app.post('/admin/salem/pois/:id/geocode-via-google', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/:id/geocode-via-google', requirePg, requireFullAdmin, async (req, res) => {
     const reqStart = Date.now();
     try {
       const id = getId(req, res);
@@ -1211,7 +1242,7 @@ module.exports = function(app, deps) {
   });
 
   // ─── DELETE /admin/salem/pois/:id — soft delete ──────────────────────────
-  app.delete('/admin/salem/pois/:id', requirePg, async (req, res) => {
+  app.delete('/admin/salem/pois/:id', requirePg, requireFullAdmin, async (req, res) => {
     try {
       const id = getId(req, res);
       if (!id) return;
@@ -1239,7 +1270,7 @@ module.exports = function(app, deps) {
   });
 
   // ─── POST /admin/salem/pois/:id/restore — undo soft delete ───────────────
-  app.post('/admin/salem/pois/:id/restore', requirePg, async (req, res) => {
+  app.post('/admin/salem/pois/:id/restore', requirePg, requireFullAdmin, async (req, res) => {
     try {
       const id = getId(req, res);
       if (!id) return;
