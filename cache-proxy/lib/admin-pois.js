@@ -159,6 +159,14 @@ const HISTORIAN_EDITABLE_FIELDS = new Set([
   'haunt_enabled', 'no_overwrite',
 ]);
 
+// S290 — narration + description fields. When a historian edits any of these,
+// the POI's data_source provenance is stamped to 'Historian' (the "how it was
+// authored" annotation). Flag/category-only edits do not re-attribute the source.
+const HISTORIAN_CONTENT_FIELDS = new Set([
+  'short_narration', 'long_narration', 'historical_narration', 'narration_subtopics',
+  'description', 'short_description', 'custom_description', 'origin_story',
+]);
+
 // Columns that hold JSONB and must be JSON.stringify'd before binding.
 const JSONB_FIELDS = new Set([
   'hours', 'action_buttons',
@@ -654,20 +662,56 @@ module.exports = function(app, deps) {
         }
       }
 
+      // S290 — attribute the change. The audit trigger reads app.actor /
+      // app.source (SET LOCAL, no param binding — escape literals manually).
+      // Historian edits log actor='Historian'; admin edits log actor='admin'
+      // (previously both were uninstrumented/null). Historian content edits
+      // (narration/description) also stamp the POI's data_source provenance to
+      // 'Historian' — the "how it was authored" annotation. data_source is NOT
+      // in the historian field whitelist, so it can only be set this way; the
+      // historian cannot spoof an arbitrary provenance string.
+      const isHistorian = req.adminRole === 'historian';
+      const actor = isHistorian ? 'Historian' : (req.adminRole || 'admin');
+      const source = isHistorian ? 'admin-ui:historian' : 'admin-ui';
+      const stampProvenance = isHistorian &&
+        Object.keys(req.body).some((k) => HISTORIAN_CONTENT_FIELDS.has(k));
+
+      const setParts = [setSql];
+      if (stampProvenance) {
+        values.push('Historian');
+        setParts.push(`data_source = $${values.length}`);
+      }
       values.push(id);
+      const idIdx = values.length;
+
+      const escapeLiteral = (v) => `'${String(v).replace(/'/g, "''")}'`;
       // S125: stamp admin_dirty on every admin field edit so bulk rebuild
       // scripts (re-narrate, re-icon, re-geofence) can find POIs that
       // changed via the operator tool. Bulk scripts themselves MUST NOT
       // flip this flag — admin_dirty tracks human edits only.
-      const { rows } = await pgPool.query(
-        `UPDATE salem_pois
-            SET ${setSql},
-                admin_dirty = TRUE,
-                admin_dirty_at = NOW()
-          WHERE id = $${values.length}
-          RETURNING *`,
-        values
-      );
+      const client = await pgPool.connect();
+      let rows;
+      try {
+        await client.query('BEGIN');
+        await client.query(`SET LOCAL "app.actor" = ${escapeLiteral(actor)}`);
+        await client.query(`SET LOCAL "app.source" = ${escapeLiteral(source)}`);
+        const r = await client.query(
+          `UPDATE salem_pois
+              SET ${setParts.join(', ')},
+                  admin_dirty = TRUE,
+                  admin_dirty_at = NOW()
+            WHERE id = $${idIdx}
+            RETURNING *`,
+          values
+        );
+        await client.query('COMMIT');
+        rows = r.rows;
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
       res.json(rows[0]);
     } catch (err) {
       console.error('[AdminPois] update error:', err.message);
