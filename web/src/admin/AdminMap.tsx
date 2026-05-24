@@ -316,6 +316,9 @@ interface AdminMapProps {
    *  /mnt/sdb-images/LMASalemPictures/ on the map as red pins. Click a pin →
    *  modal with image + EXIF + Delete. Toolbar toggle in AdminLayout. */
   showBurstPhotos?: boolean
+  /** S290 — when false (historian role), POI markers are not draggable so a
+   *  POI cannot be moved from the map. Defaults to true (full admin). */
+  canMovePois?: boolean
 }
 
 export interface PendingStopMove {
@@ -333,6 +336,9 @@ interface MarkerLayerProps {
   selectedKey: string | null
   onPoiSelect: (selection: PoiSelection) => void
   onDragEnd: (move: PendingMove) => void
+  /** S290 — false for the restricted 'historian' role: markers are not
+   *  draggable, so POIs cannot be moved from the map. */
+  canMove: boolean
 }
 
 function MarkerLayer({
@@ -340,6 +346,7 @@ function MarkerLayer({
   selectedKey,
   onPoiSelect,
   onDragEnd,
+  canMove,
 }: MarkerLayerProps) {
   const map = useMap()
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
@@ -408,7 +415,7 @@ function MarkerLayer({
           poi.name as string | undefined,
           labelsActiveRef.current
         ),
-        draggable: true,
+        draggable: canMove,
         autoPan: true,
         title: `${poi.category || '—'}: ${poi.name}`,
       })
@@ -417,21 +424,24 @@ function MarkerLayer({
         onPoiSelect({ poi })
       })
 
-      let dragOrigin = { lat: poi.lat, lng: poi.lng }
-      marker.on('dragstart', () => {
-        const ll = marker.getLatLng()
-        dragOrigin = { lat: ll.lat, lng: ll.lng }
-      })
-      marker.on('dragend', () => {
-        const ll = marker.getLatLng()
-        if (ll.lat === dragOrigin.lat && ll.lng === dragOrigin.lng) return
-        onDragEnd({
-          poi,
-          from: dragOrigin,
-          to: { lat: ll.lat, lng: ll.lng },
-          marker,
+      // S290 — only wire drag-to-move when the role may move POIs.
+      if (canMove) {
+        let dragOrigin = { lat: poi.lat, lng: poi.lng }
+        marker.on('dragstart', () => {
+          const ll = marker.getLatLng()
+          dragOrigin = { lat: ll.lat, lng: ll.lng }
         })
-      })
+        marker.on('dragend', () => {
+          const ll = marker.getLatLng()
+          if (ll.lat === dragOrigin.lat && ll.lng === dragOrigin.lng) return
+          onDragEnd({
+            poi,
+            from: dragOrigin,
+            to: { lat: ll.lat, lng: ll.lng },
+            marker,
+          })
+        })
+      }
 
       allMarkers.push(marker)
       markersByKeyRef.current.set(key, {
@@ -455,7 +465,7 @@ function MarkerLayer({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pois, map])
+  }, [pois, map, canMove])
 
   const previousSelectedKeyRef = useRef<string | null>(null)
   useEffect(() => {
@@ -2108,6 +2118,7 @@ export function AdminMap({
   proposalReview,
   onProposalDrag,
   showBurstPhotos = false,
+  canMovePois = true,
 }: AdminMapProps) {
   // S188 — geocode-preview view mode. `focusMap` hides every POI marker
   // outside the cluster; `showAll` renders every Tiger candidate at once.
@@ -2494,6 +2505,7 @@ export function AdminMap({
           selectedKey={selectedKey}
           onPoiSelect={effectiveOnPoiSelect}
           onDragEnd={handleDragEnd}
+          canMove={canMovePois}
         />
         {addStopMode !== 'free' && !addPoiMode && (
           <ParcelHitTest pois={filteredPois ?? []} onPoiSelect={effectiveOnPoiSelect} />

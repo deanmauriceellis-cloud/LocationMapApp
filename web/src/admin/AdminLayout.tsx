@@ -994,6 +994,7 @@ export function AdminLayout() {
               categoryFilter={mapCategoryFilter}
               onClearCategoryFilter={() => setMapCategoryFilter(null)}
               categories={categories}
+              canMovePois={!isHistorian}
               activeTour={activeTour}
               tourModeFilter={tourModeFilter}
               tourStops={tourStops}
@@ -1062,6 +1063,7 @@ export function AdminLayout() {
                 onCancelAddPoiMode={handleCancelAddPoiMode}
                 onMapClickAddPoi={handleMapClickAddPoi}
                 showBurstPhotos={showBurstPhotos}
+                canMovePois={!isHistorian}
               />
               {proposalReview && (
                 <ProposalReviewPanel
