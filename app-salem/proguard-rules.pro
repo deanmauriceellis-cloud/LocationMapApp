@@ -94,6 +94,19 @@
 -dontwarn javax.inject.**
 
 # -----------------------------------------------------------------------------
+# OMEN-025 Phase 1 — purchase validation + content integrity (S293)
+# -----------------------------------------------------------------------------
+# Activation models are serialized by Gson by field name — keep them verbatim.
+-keep class com.example.locationmapapp.activation.** { *; }
+# Play Integrity (StandardIntegrityManager + token provider).
+-keep class com.google.android.play.core.integrity.** { *; }
+-dontwarn com.google.android.play.core.integrity.**
+# EncryptedSharedPreferences / MasterKey rely on Tink under the hood.
+-keep class androidx.security.crypto.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn com.google.crypto.tink.**
+
+# -----------------------------------------------------------------------------
 # JVM-only deps leaking from :routing-jvm (sqlite-jdbc + its slf4j dep).
 # Android uses Room/SQLite directly; the JDBC driver is only used by the
 # parity test JVM module (JdbcRoutingBundleLoader). R8 sees these classes

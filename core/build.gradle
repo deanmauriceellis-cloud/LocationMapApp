@@ -62,6 +62,14 @@ dependencies {
     // Gson
     implementation 'com.google.code.gson:gson:2.10.1'
 
+    // OMEN-025 Phase 1 — purchase validation + content integrity.
+    // Play Integrity: server-verified appLicensingVerdict (the activation anchor).
+    implementation 'com.google.android.play:integrity:1.4.0'
+    // EncryptedSharedPreferences for the locally-signed activation receipt.
+    // (1.1.0-alpha is the de-facto build for API 26+; the device-key detached
+    // signature is the real tamper-evidence — the prefs encryption is belt.)
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
     // JTS (spatial indexing, point-in-polygon, geometry ops)
     implementation 'org.locationtech.jts:jts-core:1.19.0'
 

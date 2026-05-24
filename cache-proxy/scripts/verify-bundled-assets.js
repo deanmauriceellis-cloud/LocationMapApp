@@ -19,6 +19,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const Database = require('better-sqlite3');
 
 const ASSETS = path.resolve(__dirname, '../../app-salem/src/main/assets');
@@ -347,6 +348,92 @@ if (fs.existsSync(WT_PORTRAITS)) {
     warn(`commercial-hero check skipped: ${e.message}`);
   } finally {
     if (db) db.close();
+  }
+}
+
+// ── content-manifest.json + signature (S293, OMEN-025 Phase 1, Layer 2) ─────
+// Produced by sign-content-manifest.js (runs AFTER align). Catches a stale
+// manifest (assets re-baked but signer not re-run) and proves the committed
+// res/raw public key actually verifies the shipped signature — the exact
+// invariant the Android ContentManifestVerifier relies on at runtime.
+//
+// Absence is a WARNING for now: the Android side does not consume the manifest
+// until a later OMEN-025 session. Flip absent→fail once activation ships.
+{
+  const MANIFEST = path.join(ASSETS, 'content-manifest.json');
+  const SIG = path.join(ASSETS, 'content-manifest.sig');
+  const PUBKEY_DER = path.resolve(
+    __dirname,
+    '../../app-salem/src/main/res/raw/content_manifest_pubkey.der'
+  );
+
+  if (!fs.existsSync(MANIFEST)) {
+    warn('content-manifest.json absent — run sign-content-manifest.js (OMEN-025 Layer 2 not yet baked)');
+  } else {
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+    } catch (e) {
+      fail(`content-manifest.json: parse failed: ${e.message}`);
+      manifest = null;
+    }
+
+    if (manifest) {
+      // (1) internal consistency — manifestHash == canonical hash of files[]
+      const canonical = JSON.stringify(
+        (manifest.files || [])
+          .slice()
+          .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+          .map((f) => ({ path: f.path, sha256: f.sha256, bytes: f.bytes }))
+      );
+      const recomputed = crypto.createHash('sha256').update(canonical).digest('hex');
+      if (recomputed !== manifest.manifestHash) {
+        fail(`content-manifest.json: manifestHash ${manifest.manifestHash} != recomputed ${recomputed}`);
+      } else {
+        pass(`content-manifest.json: manifestHash self-consistent (${recomputed.slice(0, 16)}…)`);
+      }
+
+      // (2) every in-scope file's current SHA-256 matches the manifest
+      for (const f of manifest.files || []) {
+        const p = path.join(ASSETS, f.path);
+        if (!fs.existsSync(p)) {
+          fail(`content-manifest: listed file missing on disk: ${f.path}`);
+          continue;
+        }
+        const cur = crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+        if (cur !== f.sha256) {
+          fail(`content-manifest: ${f.path} sha256 drifted — re-run sign-content-manifest.js (manifest=${f.sha256.slice(0, 12)}… disk=${cur.slice(0, 12)}…)`);
+        } else {
+          pass(`content-manifest: ${f.path} hash matches disk`);
+        }
+      }
+
+      // (3) signature verifies against the committed res/raw public key
+      if (!fs.existsSync(SIG)) {
+        // CI emits the manifest unsigned (no offline private key) — warn there,
+        // fail locally (the operator must sign before shipping).
+        failOrWarnOnCi('content-manifest.sig absent — manifest is unsigned');
+      } else if (!fs.existsSync(PUBKEY_DER)) {
+        fail(`content_manifest_pubkey.der missing at ${PUBKEY_DER}`);
+      } else {
+        try {
+          const pub = crypto.createPublicKey({
+            key: fs.readFileSync(PUBKEY_DER),
+            format: 'der',
+            type: 'spki',
+          });
+          const sig = Buffer.from(fs.readFileSync(SIG, 'utf8').trim(), 'base64');
+          const okSig = crypto.verify('sha256', fs.readFileSync(MANIFEST), pub, sig);
+          if (okSig) {
+            pass('content-manifest.sig: RSA/SHA-256 signature verifies against committed res/raw pubkey');
+          } else {
+            fail('content-manifest.sig: signature does NOT verify against committed res/raw pubkey (stale sig or wrong key)');
+          }
+        } catch (e) {
+          fail(`content-manifest.sig: verification error: ${e.message}`);
+        }
+      }
+    }
   }
 }
 

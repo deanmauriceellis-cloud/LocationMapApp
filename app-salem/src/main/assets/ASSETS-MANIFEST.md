@@ -110,6 +110,15 @@ Directory exists but is empty as of S153. The 49 npc_bio rows reference portrait
 
 Loaded by `WitchTrialsNewspaper.kt` at some paths. Since S130, the authoritative source is the `salem_witch_trials_newspapers` table. This file can be removed once the legacy code paths are deleted — **do not delete until a grep of `salem_1692_newspapers.json` shows zero code references.**
 
+### `content-manifest.json` + `content-manifest.sig` — signed content integrity manifest (S293, OMEN-025 Phase 1, Layer 2)
+
+Produced by `cache-proxy/scripts/sign-content-manifest.js` (runs **last** in the publish chain, after `align-asset-schema-to-room.js`). The manifest is a SHA-256 fingerprint of the **in-scope** content assets, signed with the operator's offline RSA-2048 private key (`~/keys/content-manifest.pem`). The app embeds the matching public key (`res/raw/content_manifest_pubkey.der`) and, at runtime, verifies the detached signature and recomputes the in-scope hashes. A bare hash is patchable; a *signed* manifest is not — a tamperer can't forge valid hashes without the private key.
+
+- **In-scope (hashed + runtime-verified every launch):** `salem_content.db` (the high-value tamper anchor — all paid POI/narration/witch-trials content), `splash_tree_v1.json`, `us_places_v1.sqlite`. ~7.6 MB total → sub-second hash even on the Lenovo min-spec floor. `tours/*.json` are deliberately excluded (legacy since S185 — runtime reads tour geometry from the `tour_legs` Room table).
+- **`unverifiedLarge` (presence + size only, NOT runtime-hashed in Phase 1):** `salem_tiles.sqlite` (354 MB, in the asset pack), `heroes/`, `hero/`, `poi-icons/`. Per-launch SHA-256 of 354 MB is multi-second jank on low-end phones; the Phase-1 threat is "is this an unmodified content build," and `salem_content.db` is the high-value target. The Android side verifies these in full **once at activation time** (caching a signed flag); Phase 2 can opt into chunked hashing without a manifest-format change.
+- **`manifestHash`** = SHA-256 over the canonical (sorted) `files` array — stable across rebuilds with identical content. This is the value the activation handshake echoes to the stateless verifier (Worker `EXPECTED_MANIFEST_HASHES`).
+- **CI:** GitHub Actions (`CI=true`) has no offline private key, so the manifest ships **unsigned** with a warning; the signed `.sig` is produced only on the operator's release bake. `verify-bundled-assets.js` checks the signature against the committed public key when present (hard-fail on mismatch; CI-warn on sig-absence).
+
 ## How to verify before an APK build
 
 ```bash
