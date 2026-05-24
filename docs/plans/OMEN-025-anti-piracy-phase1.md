@@ -106,12 +106,12 @@ The stateless HMAC nonce cannot enforce single-use; anti-replay leans on Play In
 7. ◻ (carry) on-device DeviceKeyManager round-trip — StrongBox (Pixel 8) / TEE (Lenovo); instrumented tier.
 8. ◻ (carry) full `:app-salem:bundleRelease` assemble-check.
 
-### Session 3 — Content manifest verifier (Android) — ◻ NEXT (cleared)
-1. ◻ Public-key load path — read `res/raw/content_manifest_pubkey.der` → `PublicKey` (`SHA256withRSA`).
-2. ◻ `core/.../activation/ContentManifestVerifier.kt` — verify `.sig` over `content-manifest.json` with the embedded pubkey.
-3. ◻ Tiered hashing (D4) — `verifyCheap()` (in-scope files, every launch) + `verifyFull()` (incl. `unverifiedLarge`, at activation only); stream large files via `DigestInputStream`.
-4. ◻ JVM unit tests (OMEN-004 #3, part 1) — sig-valid / sig-invalid / byte-flipped-asset / stale-manifest.
-5. ◻ Benchmark `verifyCheap` cost on Pixel 8 + Lenovo (instrumented) — confirm sub-second.
+### Session 3 — Content manifest verifier (Android) — ✅ DONE (S295, code+tests; on-device benchmark carried)
+1. ✅ Public-key load path — `KeyFactory("RSA")` + `X509EncodedKeySpec` over the SPKI DER; production read via `forAndroidAssets(context, R.raw.content_manifest_pubkey)` (app passes the resId; `:core` stays decoupled from `:app-salem`'s R).
+2. ✅ `core/.../activation/ContentManifestVerifier.kt` — `Signature("SHA256withRSA")` verifies `.sig` over the EXACT `content-manifest.json` bytes (read verbatim, never reserialized), then parses the now-trusted manifest.
+3. ✅ Tiered hashing (D4) — `verifyCheap()` (sig + recompute in-scope file SHA-256 + canonical `manifestHash` self-consistency, every launch) + `verifyFull()` (adds bulk-asset presence/size via injectable `largeAssetStat`; tile DB in the asset pack stays Phase-2-deferred → `largeVerified=false` but pass). Large files streamed via `DigestInputStream`. Pure-JVM-testable: all inputs are injected lambdas/bytes, no `Context`/`AssetManager`/`android.util.Log` on the verified path.
+4. ✅ JVM unit tests (OMEN-004 #3, part 1) — `core/src/test/.../ContentManifestVerifierTest.kt`, **9 tests, 0 failures**: sig-valid / sig-invalid / byte-flipped-asset / stale-manifestHash / tampered-manifest-body / empty-sig / verifyFull size-match (+tile-DB-deferred) / verifyFull size-drift / **canonical-hash == real build value `978937…`** (the contract that the on-device `manifestHash` equals the Worker's `EXPECTED_MANIFEST_HASHES`).
+5. ◻ (carry, instrumented tier) Benchmark `verifyCheap` on Pixel 8 + Lenovo — confirm sub-second (5 MB SHA-256; best done when Session 6 wires it into the activation flow, alongside S2's deferred on-device key round-trip).
 
 ### Session 4 — Activation Worker (LMA repo, `*.workers.dev`) — ◻ (code unblocked; deploy gated)
 1. ◻ Write the **endpoint contract** (`/nonce`, `/activate {integrity_token, content_manifest_hash}`, request/response shapes, `EXPECTED_MANIFEST_HASHES` current+previous, error semantics) → hand to OMEN (NOTE-L023 #2 response).
