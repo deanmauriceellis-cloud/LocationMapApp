@@ -852,18 +852,18 @@ export function AdminLayout() {
 
         {view === 'pois' && (
           <>
-            {/* S290 — create / publish / burst-photo controls are full-admin only. */}
-            {!isHistorian && (
-              <button
-                type="button"
-                onClick={handleEnterAddPoiMode}
-                disabled={addPoiMode}
-                title="Click to enter place-mode, then click the map to drop a new POI"
-                className="px-3 py-1 text-sm rounded bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {addPoiMode ? '+ New POI…' : '+ New POI'}
-              </button>
-            )}
+            {/* S291 — "+ New POI" is open to the historian (they author new POIs,
+                placing them at create; backend scopes the create body to
+                HISTORIAN_CREATABLE_FIELDS). Publish / burst-photo stay full-admin. */}
+            <button
+              type="button"
+              onClick={handleEnterAddPoiMode}
+              disabled={addPoiMode}
+              title="Click to enter place-mode, then click the map to drop a new POI"
+              className="px-3 py-1 text-sm rounded bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {addPoiMode ? '+ New POI…' : '+ New POI'}
+            </button>
             <button
               type="button"
               onClick={handleHighlightDuplicates}
@@ -912,7 +912,10 @@ export function AdminLayout() {
 
       {/* Body — sidebar (left) + view content (right) */}
       <div className="flex-1 flex min-h-0">
-        <AdminSidebar view={view} onViewChange={setView} role={role} />
+        {/* S291 — a historian only ever has the POIs view, so the single-item
+            sidebar is dead weight; drop it entirely and let the content reclaim
+            the width. Admin keeps the full nav. */}
+        {!isHistorian && <AdminSidebar view={view} onViewChange={setView} role={role} />}
         {view === 'witch-trials' ? (
         <div className="flex-1 min-h-0">
           <WitchTrialsPanel />
@@ -1145,6 +1148,7 @@ export function AdminLayout() {
         onTaxonomyChanged={refetchTaxonomy}
         onCreated={handlePoiCreated}
         onClose={handleCreatePoiClose}
+        allowCreateCategory={!isHistorian}
       />
 
       {/* Edit dialog (POI view only). S290 — a historian gets the restricted

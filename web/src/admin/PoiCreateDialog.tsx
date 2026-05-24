@@ -27,6 +27,10 @@ export interface PoiCreateDialogProps {
   subcategories: SubcategoryRow[]
   /** Refetch taxonomy after a successful inline + Add new. */
   onTaxonomyChanged: () => void | Promise<void>
+  /** S291 — gates the inline "+ Add new category" panel. Creating a category
+   *  POSTs to /admin/salem/categories, which is full-admin only, so the
+   *  historian must pick an existing category (default true = admin). */
+  allowCreateCategory?: boolean
   /** POST returned 201; row is the freshly-inserted POI. */
   onCreated: (poi: PoiRow) => void
   onClose: () => void
@@ -41,6 +45,7 @@ export function PoiCreateDialog({
   onTaxonomyChanged,
   onCreated,
   onClose,
+  allowCreateCategory = true,
 }: PoiCreateDialogProps) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
@@ -249,7 +254,7 @@ export function PoiCreateDialog({
                     </option>
                   ))}
               </select>
-              {!addCatOpen && (
+              {allowCreateCategory && !addCatOpen && (
                 <button
                   type="button"
                   onClick={() => setAddCatOpen(true)}
@@ -259,7 +264,7 @@ export function PoiCreateDialog({
                   + Add new category…
                 </button>
               )}
-              {addCatOpen && (
+              {allowCreateCategory && addCatOpen && (
                 <div className="mt-2 p-3 rounded border border-slate-200 bg-slate-50 space-y-2">
                   <div className="flex items-center gap-2">
                     <input

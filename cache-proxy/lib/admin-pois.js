@@ -159,6 +159,18 @@ const HISTORIAN_EDITABLE_FIELDS = new Set([
   'haunt_enabled', 'no_overwrite',
 ]);
 
+// S291 — fields a 'historian' role may set when CREATING a POI. Creating
+// inherently sets a location (name + lat + lng), so those three are allowed on
+// create even though the historian cannot /move an existing POI afterward
+// (operator decision S291: "place at create, can't move after"). Everything
+// else is the same content/category/flag whitelist as edit. Any create-body key
+// outside this set is rejected (403) for a historian. Mirror of
+// HISTORIAN_CREATABLE_FIELDS in web/src/admin/poiAdminFields.ts.
+const HISTORIAN_CREATABLE_FIELDS = new Set([
+  'name', 'lat', 'lng', 'address',
+  ...HISTORIAN_EDITABLE_FIELDS,
+]);
+
 // S290 — narration + description fields. When a historian edits any of these,
 // the POI's data_source provenance is stamped to 'Historian' (the "how it was
 // authored" annotation). Flag/category-only edits do not re-attribute the source.
@@ -511,11 +523,29 @@ module.exports = function(app, deps) {
   // of the name + a 6-char random suffix when absent). All other UPDATABLE_FIELDS
   // accepted. data_source defaults to 'admin_create' so these rows are
   // distinguishable from BCS / massgis_mhc / unified_migration imports.
-  app.post('/admin/salem/pois', requirePg, requireFullAdmin, async (req, res) => {
+  // S291 — create is open to historian (operator: "historian needs to add
+  // POIs"), scoped to HISTORIAN_CREATABLE_FIELDS; admin is unrestricted.
+  app.post('/admin/salem/pois', requirePg, async (req, res) => {
     try {
       const body = req.body;
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return res.status(400).json({ error: 'request body must be a JSON object' });
+      }
+
+      // S291 — historian create field-scope guard. Reject the whole request if
+      // the body carries any key outside the create whitelist (e.g. data_source,
+      // location_status, id), so a restricted user can never set an off-limits
+      // column. Mirrors the PUT guard's all-or-nothing semantics.
+      const isHistorian = req.adminRole === 'historian';
+      if (isHistorian) {
+        const violations = Object.keys(body).filter((k) => !HISTORIAN_CREATABLE_FIELDS.has(k));
+        if (violations.length > 0) {
+          return res.status(403).json({
+            error: 'Historian role cannot set these fields on create',
+            code: 'HISTORIAN_FIELD_FORBIDDEN',
+            forbidden_fields: violations,
+          });
+        }
       }
 
       // ── Required: name, lat, lng, category ───────────────────────────────
@@ -578,11 +608,14 @@ module.exports = function(app, deps) {
         idx++;
       }
 
-      // data_source default for admin-created rows.
+      // data_source default. S291 — historian-created rows are stamped
+      // 'Historian' (the "how authored" provenance, matching the PUT content
+      // stamp); admin-created rows default 'admin_create'. data_source is not in
+      // the historian create whitelist, so the historian can't override this.
       if (!cols.includes('data_source')) {
         cols.push('data_source');
         placeholders.push(`$${idx}`);
-        values.push('admin_create');
+        values.push(isHistorian ? 'Historian' : 'admin_create');
         idx++;
       }
 
@@ -602,7 +635,28 @@ module.exports = function(app, deps) {
       const sql = `INSERT INTO salem_pois (${cols.join(', ')})
                    VALUES (${placeholders.join(', ')})
                    RETURNING *`;
-      const { rows } = await pgPool.query(sql, values);
+
+      // S291 — attribute the insert for the salem_audit_log trigger (SET LOCAL,
+      // no param binding — escape literals manually), mirroring the PUT path.
+      // Historian creates log actor='Historian'; admin creates log actor='admin'.
+      const actor = isHistorian ? 'Historian' : (req.adminRole || 'admin');
+      const source = isHistorian ? 'admin-ui:historian' : 'admin-ui';
+      const escapeLiteral = (v) => `'${String(v).replace(/'/g, "''")}'`;
+      const client = await pgPool.connect();
+      let rows;
+      try {
+        await client.query('BEGIN');
+        await client.query(`SET LOCAL "app.actor" = ${escapeLiteral(actor)}`);
+        await client.query(`SET LOCAL "app.source" = ${escapeLiteral(source)}`);
+        const r = await client.query(sql, values);
+        await client.query('COMMIT');
+        rows = r.rows;
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
       res.status(201).json(rows[0]);
     } catch (err) {
       // FK violation on category / subcategory comes back as code 23503.

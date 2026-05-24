@@ -79,6 +79,16 @@ export const HISTORIAN_EDITABLE_FIELDS: ReadonlySet<string> = new Set([
   'haunt_enabled', 'no_overwrite',
 ])
 
+// S291 — fields the 'historian' role may set when CREATING a POI. Mirror of
+// HISTORIAN_CREATABLE_FIELDS in cache-proxy/lib/admin-pois.js. Creating requires
+// a location, so name + lat + lng are allowed on create even though the historian
+// can't /move a POI afterward (operator decision: "place at create, can't move
+// after"); the rest is the same content/category/flag whitelist as edit.
+export const HISTORIAN_CREATABLE_FIELDS: ReadonlySet<string> = new Set([
+  'name', 'lat', 'lng', 'address',
+  ...HISTORIAN_EDITABLE_FIELDS,
+])
+
 // Columns that hold JSONB and need JSON.parse on form submit / JSON.stringify
 // when populating defaults. Mirror of admin-pois.js JSONB_FIELDS.
 export const JSONB_FIELDS: ReadonlySet<string> = new Set([
