@@ -1,0 +1,28 @@
+# Activation Worker — OMEN-025 Phase 1 (Session 4). Deploys to *.workers.dev.
+# Deploy is operator-gated: needs a scoped Cloudflare API token + the Play
+# Integrity service-account secrets (see CONTRACT.md / README.md). Code is unblocked.
+
+name = "activate-salem"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+# workers.dev subdomain route (no custom DNS). Final host:
+#   https://activate-salem.<account>.workers.dev
+workers_dev = true
+
+[vars]
+PACKAGE_NAME = "com.destructiveaigurus.katrinasmysticvisitorsguide"
+# Paste the manifestHash printed by `node cache-proxy/scripts/sign-content-manifest.js`.
+# Comma-separated current+previous for staged rollout. (Live S275/S281 build value below.)
+EXPECTED_MANIFEST_HASHES = "978937075a140cd9e3bc73e5e1d3773f58fd7ee42126c40fafcb6f2c59233c28"
+NONCE_TTL_MS = "120000"
+TOKEN_MAX_AGE_MS = "300000"
+
+# Secrets (NEVER in this file — `wrangler secret put <NAME>`):
+#   NONCE_SECRET            random >=32 bytes (HMAC nonce key)
+#   SA_CLIENT_EMAIL         Play Integrity service-account email
+#   SA_PRIVATE_KEY          that SA's PKCS8 private key (PEM)
+#   ACTIVATION_SIGNING_KEY  RSA-2048 PKCS8 PEM for the activation assertion (optional)
+#
+# Rate-limiting: Cloudflare native rule (dashboard / API), NOT application state.
+# Retain-nothing: no KV / D1 / Durable Objects / Analytics Engine bindings by design.

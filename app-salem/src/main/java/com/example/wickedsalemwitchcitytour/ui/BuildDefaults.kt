@@ -57,6 +57,21 @@ object BuildDefaults {
     // so the dedicated 3D FAB ships in release/AAB builds.
     const val TILT_3D_ENABLED: Boolean = true
 
+    // OMEN-025 Phase 1 (S296) — activation gate dev affordances, same proven
+    // RECON_DEFAULTS pattern as SUPER_ADMIN_ENABLED (const-folds + R8-strips in
+    // release, identical safety story; see feedback_super_admin_runtime_override_pattern).
+    //
+    // ACTIVATION_BYPASS: debug devices are sideloaded with no real Play verdict,
+    //   so debug bypasses the handshake and goes straight to ACTIVATED. Release/
+    //   AAB hardcodes false → the gate is live and a tampered build actually
+    //   LOCKS (the const folds out, so do NOT assume R8 alone removed it —
+    //   verify via apkanalyzer at S7 per the plan's release-strip proof).
+    // ACTIVATION_TRIPWIRES_LOG_ONLY: debug only logs soft tripwires (installer≠
+    //   Play, signing-cert drift) instead of locking — adb installs trip them
+    //   harmlessly. Release enforces them.
+    const val ACTIVATION_BYPASS:             Boolean = BuildConfig.RECON_DEFAULTS
+    const val ACTIVATION_TRIPWIRES_LOG_ONLY: Boolean = BuildConfig.RECON_DEFAULTS
+
     val DEFAULT_ZOOM:   Double = if (BuildConfig.RECON_DEFAULTS) 19.0 else 18.0
     val FAB_ZOOM_STEP:  Double = 1.0
     val MAGNIFY_LEVEL:  Int    = if (BuildConfig.RECON_DEFAULTS) 1   else 0

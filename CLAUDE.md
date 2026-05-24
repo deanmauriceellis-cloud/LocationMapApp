@@ -213,9 +213,11 @@ LocationMapApp_v1.5/
 ├── routing-jvm/           — Shared Dijkstra walking router + parity tests
 ├── cache-proxy/           — Node.js caching proxy (port 4300)
 ├── web/                   — React 19 + TS admin tool (operator-only)
+├── worker-activate/       — OMEN-025 activation Worker (Cloudflare, *.workers.dev; stateless, retain-nothing)
 ├── docs/session-logs/     — Live conversation logs (crash-recovery)
 ├── docs/                  — Archive, other docs
 ├── STATE.md               — Current project state
+├── AndroidSecurity.md     — OMEN-025 anti-piracy security architecture + resume-when-tokens-arrive reference
 ├── SESSION-LOG.md         — Session history
 ├── GOVERNANCE.md          — Legal/compliance framework
 ├── IP.md                  — Intellectual property register
@@ -260,7 +262,8 @@ Under the amended startup rule (2026-05-04, S224): `CLAUDE.md` + `MEMORY.md` aut
 | `IP.md` | V1 IP register (copyright, Form TX status, V1-novel patentable-angle backlog) | Work touches copyright, trademark, or patent posture — full pre-pivot 14-innovation register archived at `docs/archive/IP_removed_2026-04-29.md` |
 | `COMMERCIALIZATION.md` | V1 commercial posture (pricing, channels, merchant tier, open commercial items) | Work touches monetization, pricing, distribution channels, or merchant tier infrastructure — pre-pivot freemium/social vision archived at `docs/archive/COMMERCIALIZATION_removed_2026-04-29.md` |
 | `DESIGN-REVIEW.md` | Architecture decisions | Work touches a design previously reviewed |
+| `AndroidSecurity.md` | OMEN-025 anti-piracy architecture: crypto contracts (manifestHash/requestHash/receipt sig), key/secret inventory, component status, **resume-when-tokens-arrive playbook** | Any work on activation / Play Integrity / signed manifest / the `worker-activate/` Worker, or resuming OMEN-025 after the Cloudflare/Google/Play-Console credentials arrive |
 
 **No master plan** — deleted 2026-04-23 (S161); pre-park snapshot lives at `docs/archive/Parked_WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md`. Do not treat it as a plan-of-record.
 
-_Document Version: 0.4.0 — Naming-disambiguation block added (S272 lint, 2026-05-16). Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._
+_Document Version: 0.4.1 — `worker-activate/` module + `AndroidSecurity.md` reference added (S296, 2026-05-24, OMEN-025 Phase 1). Naming-disambiguation block added (S272 lint, 2026-05-16). Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._

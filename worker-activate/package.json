@@ -1,0 +1,12 @@
+{
+  "name": "worker-activate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OMEN-025 Phase 1 activation Worker (Play Integrity + signed-manifest handshake). Stateless, retain-nothing.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}

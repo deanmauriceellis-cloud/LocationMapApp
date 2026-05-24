@@ -113,29 +113,31 @@ The stateless HMAC nonce cannot enforce single-use; anti-replay leans on Play In
 4. ✅ JVM unit tests (OMEN-004 #3, part 1) — `core/src/test/.../ContentManifestVerifierTest.kt`, **9 tests, 0 failures**: sig-valid / sig-invalid / byte-flipped-asset / stale-manifestHash / tampered-manifest-body / empty-sig / verifyFull size-match (+tile-DB-deferred) / verifyFull size-drift / **canonical-hash == real build value `978937…`** (the contract that the on-device `manifestHash` equals the Worker's `EXPECTED_MANIFEST_HASHES`).
 5. ◻ (carry, instrumented tier) Benchmark `verifyCheap` on Pixel 8 + Lenovo — confirm sub-second (5 MB SHA-256; best done when Session 6 wires it into the activation flow, alongside S2's deferred on-device key round-trip).
 
-### Session 4 — Activation Worker (LMA repo, `*.workers.dev`) — ◻ (code unblocked; deploy gated)
-1. ◻ Write the **endpoint contract** (`/nonce`, `/activate {integrity_token, content_manifest_hash}`, request/response shapes, `EXPECTED_MANIFEST_HASHES` current+previous, error semantics) → hand to OMEN (NOTE-L023 #2 response).
-2. ◻ `worker-activate/` scaffold in the LMA repo — `wrangler.toml` (workers.dev route, `EXPECTED_MANIFEST_HASHES` var), `src/index.js` router.
-3. ◻ `src/nonce.js` — HMAC time-boxed stateless nonce.
-4. ◻ `src/integrity.js` — SA-JWT mint (Web Crypto) → `decodeIntegrityToken`; read `appLicensingVerdict`/`appRecognitionVerdict`/`deviceIntegrity` + nonce/package checks.
-5. ◻ Retain-nothing banner; no PII logging; Cloudflare native rate-limit rule.
-6. ◻ `wrangler dev` unit tests with a sample token JSON.
+### Session 4 — Activation Worker (LMA repo, `*.workers.dev`) — ✅ steps 1–6 DONE (S296); deploy ⏸
+1. ✅ **Endpoint contract** → `worker-activate/CONTRACT.md` (`/nonce`, `/activate {integrity_token, content_manifest_hash, nonce}`, request/response shapes, error-code table, `EXPECTED_MANIFEST_HASHES` current+previous, `package_name` is Worker-config not client-supplied). Ready to hand to OMEN as the NOTE-L023 #2 response.
+2. ✅ `worker-activate/` scaffold — `wrangler.toml` (workers.dev, `EXPECTED_MANIFEST_HASHES`=live `978937…`/`PACKAGE_NAME`/`NONCE_TTL_MS`/`TOKEN_MAX_AGE_MS` vars), `src/index.js` router, `package.json`, `.gitignore`, `README.md`.
+3. ✅ `src/nonce.js` — 40-byte HMAC time-boxed stateless nonce (`ts‖rand‖HMAC[:16]`), Web Crypto, timing-safe compare + future-skew guard.
+4. ✅ `src/integrity.js` — SA-JWT mint (Web Crypto RSASSA-PKCS1-v1_5 → OAuth2 exchange) → `decodeIntegrityToken`; pure `evaluateVerdict` (license/recognition/device/requestHash/package/freshness); `requestHash` byte-matched to the Android client; optional `signAssertion`.
+5. ✅ Retain-nothing (no KV/D1/DO, no PII logging); Cloudflare native rate-limit documented (`wrangler.toml`).
+6. ✅ `node --test` — **25 tests** (nonce round-trip/expiry/forge/skew; requestHash + full verdict matrix; router via `TEST_MODE` incl. fails-closed-when-TEST_MODE-off→502). `wrangler deploy --dry-run` bundles clean.
 7. ⏸ Deploy to `*.workers.dev` — needs Cloudflare token + Google SA JSON (operator/OMEN).
 
-### Session 5 — Activation network path (Android) — ◻ (waits on Session 4 deploy)
-1. ◻ `ActivationHostGuard` interceptor — exact-host / no-redirect / no-cleartext (no `CertificatePinner`).
-2. ◻ `ActivationHttpClientFactory.kt` — dedicated client, no `OfflineModeInterceptor`.
-3. ◻ `ActivationApi.kt` — `GET /nonce`, `POST /activate`.
-4. ◻ `ActivationManagerTest` scaffolding (OMEN-004 #3, part 2 — state transitions).
-5. ◻ HTTPS + host-guard fails-closed test against the deployed Worker.
+### Session 5 — Activation network path (Android) — ✅ steps 1–3 DONE (S296); 4 → S6, 5 deploy-gated
+1. ✅ `ActivationHostGuard.kt` — exact-host / HTTPS-only / no-redirect interceptor, pure `assertAllowed(HttpUrl)`, no `CertificatePinner`. **6 JVM tests.**
+2. ✅ `ActivationHttpClientFactory.kt` — dedicated client, **no** `OfflineModeInterceptor` (D1), `followRedirects(false)`, placeholder `WORKER_HOST`.
+3. ✅ `ActivationApi.kt` — `fetchNonce()`/`activate()` + models; pure `parseActivateResponse` (Activated/Denied/Retryable matrix). **9 JVM tests.**
+4. ✅ (delivered as part of S6 — `ActivationManagerTest`, since the manager is S6) — state transitions, **19 JVM tests**.
+5. ⏸ HTTPS + host-guard fails-closed test against the *deployed* Worker — deploy-gated.
 
-### Session 6 — Play Integrity + state machine + gate UI — ⏸ (live verdict needs Play Console)
-1. ◻ `PlayIntegrityClient.kt` — `StandardIntegrityManager`, `requestHash = SHA256(nonce‖manifestHash)`.
-2. ◻ `ActivationManager.kt` — ACTIVATED⇄LOCKED; hard violations (sig/device-key/androidId) + soft tripwires (installer/cert/debugger/emulator).
-3. ◻ `BuildDefaults.ACTIVATION_BYPASS` + `ACTIVATION_TRIPWIRES_LOG_ONLY` (= `BuildConfig.RECON_DEFAULTS`).
-4. ◻ `ActivationActivity` + `ActivationViewModel` + `activity_activation.xml` + strings (5 states; hard-block, Retry-only).
-5. ◻ Wiring — `SplashActivity` → `ActivationActivity` → Main; `SalemMainActivity` defensive redirect; `FeatureFlags.ACTIVATION_HANDSHAKE_ENABLED`.
+### Session 6 — Play Integrity + state machine + gate UI — ✅ core DONE (S296); UI/wiring deferred ⏸
+1. ✅ `PlayIntegrityClient.kt` — `StandardIntegrityManager` token request (Android tier) + pure `computeRequestHash = base64url(SHA256(nonce‖manifestHash))`, **byte-matched to the Worker value** (`8DORFCkZ…`, 3 JVM tests). `cloudProjectNumber` placeholder (gated).
+2. ✅ `ActivationManager.kt` — pure `decideLocal` (ACTIVATED/NEEDS_ACTIVATION + hard violations sig/device-key/androidId + soft tripwires installer/cert, log-only-aware) + `decideHandshake` + `buildReceipt`; injected orchestration `evaluateLocal()`/`runHandshake()`. **19 JVM tests.**
+3. ✅ `BuildDefaults.ACTIVATION_BYPASS` + `ACTIVATION_TRIPWIRES_LOG_ONLY` (= `BuildConfig.RECON_DEFAULTS`); `FeatureFlags.ACTIVATION_HANDSHAKE_ENABLED=false` (ships OFF until Worker deployed).
+4. ◻ **(DEFERRED)** `ActivationActivity` + `ActivationViewModel` + `activity_activation.xml` + strings (5 states; hard-block, Retry-only).
+5. ◻ **(DEFERRED)** Wiring — `SplashActivity` → `ActivationActivity` → Main; `SalemMainActivity` defensive redirect; flip `FeatureFlags.ACTIVATION_HANDSHAKE_ENABLED`.
 6. ⏸ Real verdict validation on internal track.
+
+> **S296 note:** the deferred S6 items (4, 5) alter the launch flow and are only meaningfully testable against a deployed Worker on the internal Play track, so they were intentionally held with S7. All S6 logic (decision state machine, requestHash binding, flags) is implemented + unit-tested now. Activation JVM tier = **46 tests** (9 ContentManifestVerifier + 6 HostGuard + 9 ApiParse + 3 PlayIntegrityRequestHash + 19 ActivationManager); Worker = **25 tests**.
 
 ### Session 7 — Offline re-scope + hardening + rollout — ⏸ (Play Console)
 1. ◻ Re-add `INTERNET` + `ACCESS_NETWORK_STATE` to `src/main/AndroidManifest.xml`.
