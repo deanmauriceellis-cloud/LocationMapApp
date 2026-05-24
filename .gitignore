@@ -24,6 +24,18 @@ cache-proxy/geofence-databases/*.db
 cache-proxy/.env
 .env
 .env.local
+# Secrets / signing material — belt-and-suspenders (S292 credential audit).
+# Real keystore lives at ~/keys/, signing props at ~/.gradle/ (both outside repo);
+# these patterns guard against an accidental in-repo copy ever being committed.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+**/google-services.json
+*.env.production
+secrets.json
+credentials.json
 web/node_modules/
 web/dist/
 web/tsconfig.tsbuildinfo
