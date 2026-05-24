@@ -2,21 +2,17 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-23 — **Session 291.** Three web-admin / cache-proxy follow-ups to S290's Historian role; **zero Android/Room/publish-chain/app impact.** (1) **Plummer Hall "disappeared" + new lint** — a `HISTORICAL_BUILDINGS` POI whose `data_source` contains "massgis" is filed into the synthetic "POI Hist. Landmark" bucket by the S190 admin tree/map split, hiding it from the "Historic Buildings" filter; post-S216 the real MassGIS imports live under category `HISTORICAL_LANDMARKS`, so Plummer Hall was the last escapee. Fixed its `data_source` `massgis_mhc`→`manual_curated` (audit-attributed) and added a `hist_bldg_massgis_source` lint (warn) as a tripwire (now 0). Commit `ae3093b`. (2) **Historian can now add POIs** — `POST /admin/salem/pois` opened to the historian, scoped to new `HISTORIAN_CREATABLE_FIELDS` (`name/lat/lng/address` + content/category/flags; 403 otherwise), with `actor='Historian'`/`data_source='Historian'` attribution via an audit-stamping txn (create was previously uninstrumented). Operator decisions: **location = place-at-create, can't move after** (S290 no-move boundary preserved), **any category**. Frontend un-hides "+ New POI", reuses the place-mode → `PoiCreateDialog` → restricted `HistorianPoiDialog` flow, hides the full-admin-only inline category-create. (3) **Historian sidebar dropped** — the single-item "POIs" nav removed; content reclaims the width. `npm test` 9/9; web `tsc -b` + `vite build` clean; live curl matrix verified. Backend is the authoritative boundary throughout. **The 1692 alignment + per-map zoom-envelope + 1700/1851/1911 precision-pass docket was untouched — see S292 opener below.**
+**Last updated:** 2026-05-23 — **Session 292.** Security / credential audit (operator: "security is a priority"); **zero Android/Room/publish-chain/app/PG impact.** Scanned the full codebase + all 574 commits of git history for credentials — **CLEAN, nothing exposed, nothing to delete from GitHub.** Secrets are correctly externalized (`cache-proxy/.env` gitignored; keystore at `~/keys/`; signing props at `~/.gradle/`). Only tracked env-ish files are an all-blank `cache-proxy/.env.example` template, a LAN-URL-only `web/.env.development`, and a build-config-only root `gradle.properties`. Hardening shipped (`95ac85f`): added `*.jks *.keystore *.p12 *.pfx *.pem **/google-services.json *.env.production secrets.json credentials.json` to `.gitignore` (keystore + google-services patterns were the two gaps; no such files in-repo today — guards a future blind `git add`). **NEW carry-forward: operator flagged new OMEN directives to explore — read `~/Development/OMEN/directives/ACTIVE.md` at the top of S293.** The 1692 alignment + per-map zoom-envelope + 1700/1851/1911 precision-pass docket remains untouched (since S289) — see S293 opener below.
+
+### Prior — S291 (2026-05-23) — pruned to one line at S292 close
+
+Three web-admin / cache-proxy follow-ups to S290's Historian role (**zero Android/Room/publish-chain/app impact**): (1) Plummer Hall "disappeared" diagnosis — a `HISTORICAL_BUILDINGS` POI with `data_source` containing "massgis" is shunted into the synthetic "POI Hist. Landmark" bucket; corrected its `data_source` → `manual_curated` + added `hist_bldg_massgis_source` lint tripwire (commit `ae3093b`); (2) historian can now add POIs (`POST /admin/salem/pois` scoped to `HISTORIAN_CREATABLE_FIELDS`, `actor`/`data_source='Historian'`, place-at-create no-move, any category); (3) historian single-item sidebar dropped. Detail in `docs/session-logs/session-291-2026-05-23.md`.
 
 ### Prior — S290 (2026-05-23) — pruned to one line at S291 close
 
 Shipped a **"Historian" restricted admin role** for the web portal (operator's wife authoring POI content): optional 2nd Basic Auth credential (`ADMIN_HISTORIAN_USER/PASS`) → `historian` role, edit-only on narrations/descriptions/category/flags. Backend authoritative (`requireFullAdmin` + PUT field whitelist + role attribution); frontend gates tabs/buttons/dialog/map-drag. Six commits `c6cf932..cfd5fdc`. LAN access **http://10.0.0.229:4302/admin**. Detail in `docs/session-logs/session-290-2026-05-23.md`.
 
-### Prior — S289 (2026-05-22 → 2026-05-23) — pruned to one line at S290 close
-
-1692 raster recovered from an all-transparent S288-end bake (corrected anchors had forced Parris/Meeting House to identical longitude → TPS butterfly fold → cutline ate the content); reverted to 6-GCP S288 mid-bake + Hale Farm correction, baked without cutline. `TileSourceManager.kt:58` Salem-Custom minZoom bug fixed (was 16, DB has z14/z15 → widened to 11; `MAP_MIN_ZOOM` 14→11). New `downsample-overviews.py` fabricated z11-z13 basemap overviews. Architectural pivot: each historical map gets its own zoom envelope — 1692 re-baked **z11-z14 only** (91 tiles; salem_tiles.sqlite 377.9 → 353.3 MB). Detail in `docs/session-logs/session-289-2026-05-22.md`.
-
-### Prior — S288 (2026-05-21 → 2026-05-22) — pruned to one line at S289 close
-
-1692 Upham georef precision passes (3 iterations, ending with hand-corrected anchor coords) + reusable tooling (`mask_to_frame.sh`, `gcp_picker.html`, `points_to_gdal_translate.sh`, `build_cutline.py`, `webp_compress_historical.py --provider`) + Pixel 8 GPS demo-prep (dead-zone tightening + splash-fallback fix). Detail in `SESSION-LOG.md` and the live log. **S289 found the S288-end bake produced all-transparent tiles; recovered with reverted anchors.**
-
-### Older prior-session blocks pruned 2026-05-22 (S285+S286+S287 condensed at S288 close) for the 200-line cap; see `SESSION-LOG.md` for S280–S289 + `docs/session-logs/` for full detail.
+### Older prior-session blocks pruned (S285+S286+S287 condensed 2026-05-22 at S288 close; S288+S289 condensed 2026-05-23 at S292 close) for the 200-line cap; see `SESSION-LOG.md` for S283–S292 + `docs/session-logs/` for full detail. (S289: 1692 raster recovered from all-transparent bake, `TileSourceManager` minZoom bug fixed, per-map zoom-envelope pivot, 1692 re-baked z11-z14 / 91 tiles. S288: 1692 Upham georef precision passes + reusable tooling `mask_to_frame.sh`/`gcp_picker.html`/`points_to_gdal_translate.sh`/`build_cutline.py`/`webp_compress_historical.py` + Pixel 8 GPS demo-prep.)
 
 ### V1 ship-cliffs (all closed)
 
@@ -49,9 +45,11 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S292 opener (parked at S291 close)
+### S293 opener (parked at S292 close)
 
-**S290 + S291 were Historian-role web-portal work — the 1692 docket below is unchanged and resumes.** Carry-forward: operator still owes the **historian browser visual smoke** — log in at http://10.0.0.229:4302/admin with the historian credential and confirm: **no left sidebar** (S291); the compact `HistorianPoiDialog` opens (no Location/Provenance/Danger tabs); markers non-draggable; a save attributes `actor='Historian'` + `data_source='Historian'`; **"+ New POI" places a pin → opens the restricted dialog → creates with `data_source='Historian'`** (S291). Existing pre-S290 audit rows keep their null actor (only new edits are instrumented).
+**NEW (operator, S292 close): new OMEN directives to explore.** Read `~/Development/OMEN/directives/ACTIVE.md` (+ `~/Development/OMEN/notes/locationmapapp.md` if relevant) at the top of S293, before other docket work, and surface anything that applies to current LMA scope.
+
+**S290–S292 were Historian-role + security-audit detours — the 1692 docket below is unchanged and resumes.** Carry-forward: operator still owes the **historian browser visual smoke** — log in at http://10.0.0.229:4302/admin with the historian credential and confirm: **no left sidebar** (S291); the compact `HistorianPoiDialog` opens (no Location/Provenance/Danger tabs); markers non-draggable; a save attributes `actor='Historian'` + `data_source='Historian'`; **"+ New POI" places a pin → opens the restricted dialog → creates with `data_source='Historian'`** (S291). Existing pre-S290 audit rows keep their null actor (only new edits are instrumented).
 
 **1692 alignment iteration.** S289 final bake: 6 GCPs, no cutline, z11-z14 envelope, 91 tiles, on Lenovo. Owed: visual validation walk through all 4 zoom levels in Salem Village + judgement on whether 6-GCP TPS is "good enough for Upham" or whether more free picks are warranted. Operator can add more GCPs via the picker — free-pick mode is wired in (click Upham → click Leaflet → auto-numbered #100+).
 
@@ -161,7 +159,7 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 Phases 1-9 + 9A+ + 9P.A/B + 9T + 9U + 9X: **COMPLETE**. Phase 10 (production readiness): first signed AAB built S180, asset-pack reorg S256, ship-cliffs 1/2/3 closed. Phase 11 (ASO/Play Store): operator-led, post-AAB-upload. **9Y/9Z/9Q/9R deferred** (V1.0.1+, no V1 ship dependency). Cross-project TigerLine stalled 2026-04-21; SalemIntelligence PAUSED S214.
 
-**Sessions completed:** 290. **Internal ship target: 2026-08-01.**
+**Sessions completed:** 292. **Internal ship target: 2026-08-01.**
 
 ---
 
