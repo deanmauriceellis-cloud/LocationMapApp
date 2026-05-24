@@ -61,10 +61,14 @@ object PoiActionSynthesizer {
         // where merchant-supplied hours would render as authored business
         // info under a tier-gated path. Also fixes the "Hours · null" leak
         // that surfaced when poi.hours was the literal string "null".
+        // S294: Directions is now a dedicated, always-present button on the
+        // sheet (PoiDetailSheet.bindDirectionsButton) — every POI can be walked
+        // to. It is intentionally NOT synthesized here anymore to avoid a
+        // duplicate button. (The admin override path still honors an explicit
+        // "directions" entry in actionButtons JSON.)
         return buildList {
             poi.website?.takeIf { it.isNotBlank() }?.let { add(Action.VisitWebsite(it)) }
             poi.phone?.takeIf { it.isNotBlank() }?.let { add(Action.Call(it)) }
-            add(Action.Directions(poi.lat, poi.lng))
         }
     }
 

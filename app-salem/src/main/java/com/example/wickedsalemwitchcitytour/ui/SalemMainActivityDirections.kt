@@ -34,9 +34,9 @@ import org.osmdroid.views.overlay.Polyline
 @Suppress("unused")
 private const val MODULE_ID = "(C) Destructive AI Gurus, LLC, 2026 - Module SalemMainActivityDirections.kt"
 
-private const val DIR_ROUTE_COLOR = "#22C55E"    // Green (S175 — operator)
-private const val DIR_ROUTE_BORDER = "#15803D"   // Darker green
-private const val DIR_COMPLETED_COLOR = "#6622C55E" // Faded green
+private const val DIR_ROUTE_COLOR = "#FFD60A"    // Yellow (S294 — operator; high-visibility directions path)
+private const val DIR_ROUTE_BORDER = "#5C4600"   // Dark amber border for legibility
+private const val DIR_COMPLETED_COLOR = "#66FFD60A" // Faded yellow
 
 // S176 P3c — out-of-Salem simulated origin.
 // MBTA Salem Commuter Rail Station (Bridge St / Riley Plaza area).

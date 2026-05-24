@@ -198,6 +198,27 @@
                 android:focusable="true"
                 android:visibility="gone" />
 
+            <!-- Directions (S294 — universal walk-there button). Shown on every
+                 POI: the full/narrated sheet already synthesizes Directions in
+                 "Things You Can Do"; this dedicated button is wired on the
+                 stripped commercial path, which hides that container. Routes on
+                 the bundled Salem walking graph (host.walkTo) — a routing
+                 function, not content, so no PG-13 / merchant-tier conflict. -->
+            <TextView
+                android:id="@+id/btnDirections"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/narration_btn_primary_bg"
+                android:text="Directions"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone" />
+
             <!-- Divider (hidden in stripped mode) -->
             <View
                 android:id="@+id/divider1"

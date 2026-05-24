@@ -206,12 +206,21 @@ class PoiDetailSheet : DialogFragment() {
             // commercial POIs (lawyer-allowed contact path; ACTION_VIEW handoff
             // requires no permissions and exits the app to system browser).
             bindWebsiteButton(view)
+            // S294: stripped mode hides the "Things You Can Do" container (which
+            // carries Directions in the full path). Surface a dedicated Directions
+            // button so every POI — including unlicensed commercial ones — can be
+            // walked to. Routing only; no narration/merchant content exposed.
+            bindDirectionsButton(view)
             hideNarrativeChrome(view)
             queueStrippedReadThrough()
         } else {
             bindHero(view)
             bindOverview(view)
             bindWebsiteButton(view)
+            // S294: Directions is a universal, prominent button on every POI
+            // (routing function, not content). The synthesized "Things You Can
+            // Do" list no longer carries Directions to avoid a duplicate.
+            bindDirectionsButton(view)
             bindSubtopics(view)
             val sections = bindNarrationSections(view)
             bindActions(view)
@@ -412,6 +421,28 @@ class PoiDetailSheet : DialogFragment() {
         }
     }
 
+    // ── Directions button (S294) ────────────────────────────────────────
+    //
+    // Dedicated walk-there button for the stripped commercial path. The full/
+    // narrated sheet already exposes Directions via the synthesized "Things You
+    // Can Do" list (PoiActionSynthesizer always adds Directions), so this is
+    // wired only where that container is hidden. Same routing target as the
+    // synthesized action: host.walkTo on the bundled Salem graph (straight-line
+    // fallback inside WalkingDirections if the graph isn't loaded).
+    private fun bindDirectionsButton(view: View) {
+        val btn = view.findViewById<TextView>(R.id.btnDirections)
+        btn.visibility = View.VISIBLE
+        btn.setOnClickListener {
+            DebugLogger.i(TAG, "directions clicked id=${poi.id} lat=${poi.lat} lng=${poi.lng}")
+            cancelSheetRead()
+            val host = activity as? SalemMainActivity
+            if (host != null) {
+                host.walkTo(org.osmdroid.util.GeoPoint(poi.lat, poi.lng))
+                dismiss()
+            }
+        }
+    }
+
     // ── Narration sections ──────────────────────────────────────────────
 
     private fun bindNarrationSections(view: View): Quadruple<String?, String?, String?, String?> {
@@ -558,14 +589,13 @@ class PoiDetailSheet : DialogFragment() {
             it is PoiActionSynthesizer.Action.VisitWebsite && poi.website?.isNotBlank() == true
         }
 
+        // S294: Directions moved to its own dedicated button, so this list can
+        // legitimately be empty (e.g. a historic POI with no website/phone).
+        // Hide the whole "Things You Can Do" section rather than showing a
+        // "No additional actions." placeholder.
         if (visibleActions.isEmpty()) {
-            val empty = TextView(requireContext()).apply {
-                text = "No additional actions."
-                textSize = 13f
-                setTextColor(Color.parseColor("#B8AFA0"))
-                setPadding(0, dp(8), 0, 0)
-            }
-            container.addView(empty)
+            view.findViewById<View>(R.id.labelActions)?.visibility = View.GONE
+            container.visibility = View.GONE
             return
         }
 
@@ -651,6 +681,9 @@ class PoiDetailSheet : DialogFragment() {
                 dismiss()
             }
         }
+        // S294: bindActions may have hidden the container when no synthesized
+        // actions exist; the detour button still needs it visible.
+        container.visibility = View.VISIBLE
         container.addView(btn)
     }
 
