@@ -2,11 +2,11 @@
 
 > **Snapshot only.** This file is the current-state pointer. Session-by-session history lives in `SESSION-LOG.md` (last 10 sessions) and `SESSION-LOG-ARCHIVE.md` (older). Live conversation logs are in `docs/session-logs/`. Per-file decisions and code changes are in those logs and in `git log`. Do not let this file grow into a changelog — must stay under 200 lines.
 
-**Last updated:** 2026-05-24 — **Session 296.** **OMEN-025 anti-piracy Phase 1, Sessions 4–6(core)** — drove every code-unblocked tier in one session. **S4 activation Worker** (`worker-activate/`, `*.workers.dev`): frozen endpoint `CONTRACT.md` (NOTE-L023 #2 deliverable), `src/nonce.js` (stateless HMAC nonce), `src/integrity.js` (SA-JWT mint → `decodeIntegrityToken` + pure `evaluateVerdict` + `requestHash`), `src/index.js` router — retain-nothing, no PII logging, 25 `node --test` tests, `wrangler deploy --dry-run` clean. **S5 Android network path**: `ActivationHostGuard` (exact-host/HTTPS-only/no-redirect, no pinning), `ActivationHttpClientFactory` (the one client WITHOUT `OfflineModeInterceptor`, D1), `ActivationApi` (transport + pure `parseActivateResponse` matrix). **S6 core**: `PlayIntegrityClient` (Standard request + pure `computeRequestHash` **byte-matched to the Worker value `8DORFCkZ…`**), `ActivationManager` state machine (pure `decideLocal`/`decideHandshake`/`buildReceipt` + injected orchestration), `FeatureFlags.ACTIVATION_HANDSHAKE_ENABLED=false`, `BuildDefaults.ACTIVATION_BYPASS`/`ACTIVATION_TRIPWIRES_LOG_ONLY`. **Activation JVM tier = 46 tests** (9 verifier + 6 host-guard + 9 api-parse + 3 requestHash + 19 manager), 0 fail; `:app-salem:compileDebugKotlin` green. **Zero runtime behavior change** — flag OFF, no launch wiring, no manifest change. Also wrote `AndroidSecurity.md` (engineering continuity reference) + `AndroidSecurity_20260524.pdf` (15-page operator/counsel assessment + full session-by-session plan; source+builder in `docs/security/`) and synced the plan doc. **Deferred S6** (UI + Splash→Activation→Main wiring + flag flip) and **S7** (manifest INTERNET + apkanalyzer strip-proof + rollout) await the deployed Worker on the internal Play track. **Next = deploy** (gated: Cloudflare token + Google SA JSON), then S6 wiring → S7 → S8 disclosures.
+**Last updated:** 2026-05-25 — **Session 298.** **Graphics redo — art direction phase (planning; no app/PG/code changes).** Operator unparked the long-deferred hero work and widened it to a complete graphics redo. Audited the full estate (3 Explore agents + PG cross-ref): only **13% of POIs have a working hero** (803 dangling `image_asset` refs, dead legacy `hero/` UUID dir + generator, unused `custom_icon_asset`), across 8 stylistically-incoherent classes. Wrote + fully validated **`docs/plans/graphics-art-bible.md`** — LOCKED: ink-comic woodcut house style; muted-period palette + ghost-teal accent (9-swatch hex card v1); Katrina = branding/splash only; hero = 2.25:1 safe-band + `centerCrop` + 20% banner (fit-verified both orientations/devices, both display paths unified). All 8 classes validation-rendered on the 3090 (Forge/DreamShaperXL Turbo), per-class prompt rules captured. Samples/scripts/palette card in `tools/art-bible-samples/`. **Next = execution:** ghost-scope decision; build single-scene woodcut hero generator → pilot ~10 POIs → full ~2,000 run + `fitXY→centerCrop`; retire dead hero system (art-bible §7). See `docs/session-logs/session-298-2026-05-25.md`.
 
-### Prior — S295 (2026-05-24) — pruned to one line at S296 close
+### Prior — OMEN-025 anti-piracy Phase 1 (S293–S296) — still TOP PRIORITY, gated
 
-OMEN-025 Phase 1 Session 3: shipped `core/.../activation/ContentManifestVerifier.kt` (runtime Layer 2 — verifies the RSA `.sig` over verbatim `content-manifest.json`, recomputes canonical `manifestHash` + in-scope hashes, tiered D4); 9 JVM tests incl. the cross-check that the Kotlin canonical hash byte-matches build value `978937…`. Detail in `docs/session-logs/session-295-2026-05-24.md`. (S294: universal yellow Directions button, commit `3132adb`. S293: OMEN-025 kickoff — 8-session plan + S1–S2 signed manifest + `core` foundations `DeviceKeyManager`/`ActivationReceipt`/`ActivationStore`; pinning DROPPED; Worker LMA-owned on `*.workers.dev`.)
+Phase 1 **code-complete through S6 core**, ZERO runtime change (`ACTIVATION_HANDSHAKE_ENABLED=false`). S1–S3 signed content manifest + `core` foundations (`DeviceKeyManager`/`ActivationReceipt`/`ActivationStore`) + runtime `ContentManifestVerifier`; S4 activation Worker (`worker-activate/`, `*.workers.dev`, 25 tests); S5 Android network path (`ActivationHostGuard`/`ActivationHttpClientFactory`/`ActivationApi`); S6 core (`PlayIntegrityClient` requestHash byte-matched to Worker + `ActivationManager` state machine + flags). **46 Android JVM + 25 Worker tests green.** Continuity refs: `AndroidSecurity.md` + `AndroidSecurity_20260524.pdf`. **Gated on 3 operator creds** (Cloudflare token / Google SA JSON / Play Console internal track); then deploy → S6 wiring → S7 → S8. (S294: universal yellow Directions button.)
 
 ### Older prior-session blocks pruned (S285+S286+S287 condensed 2026-05-22 at S288 close; S288+S289 condensed 2026-05-23 at S292 close; S290 Historian-role + S291 web-admin-followups condensed 2026-05-24 at S293 close) for the 200-line cap; see `SESSION-LOG.md` for S284–S293 + `docs/session-logs/` for full detail. (S289: 1692 raster recovered from all-transparent bake, `TileSourceManager` minZoom bug fixed, per-map zoom-envelope pivot, 1692 re-baked z11-z14 / 91 tiles. S288: 1692 Upham georef precision passes + reusable tooling `mask_to_frame.sh`/`gcp_picker.html`/`points_to_gdal_translate.sh`/`build_cutline.py`/`webp_compress_historical.py` + Pixel 8 GPS demo-prep.)
 
@@ -41,11 +41,11 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S298 opener (parked at S297 close)
+### S299 opener (parked at S298 close)
 
-_(S297 was an infra/ops session — recycled the web admin Vite + cache-proxy servers, enabled operator WiFi-machine LAN access via `web/.env.local` + new `scripts/web-admin-firewall.sh` (sudo ufw toggle), diagnosed "WiFi auth issues" as HTTP Basic Auth per-origin scoping. OMEN-025 untouched; everything below still current. Detail: `docs/session-logs/session-297-2026-05-24.md`.)_
+_**Two active threads.** (1) NEW — **Graphics redo** (operator-directed S298): art direction is LOCKED + validated in `docs/plans/graphics-art-bible.md` (ink-comic woodcut · muted-period + ghost-teal palette card v1 · Katrina branding-only · hero 2.25:1 safe-band + centerCrop + 20% banner · all 8 classes sample-validated). **Next = execution:** decide ghost-scope (expand beyond HIST_BLDG?); build single-scene woodcut hero generator (adapt `tools/hero-triptych/`) → pilot ~10 real POIs → full ~2,000 run + `fitXY→centerCrop` in `poi_detail_sheet.xml` + 55%→20% stripped path; then retire the dead hero system (legacy `hero/` dir, 803 dangling `image_asset` refs, `custom_icon_asset`, orphan files — art-bible §7). Samples in `tools/art-bible-samples/`. Forge may still be running on the 3090 (`/tmp/forge-s298.log`). (2) OMEN-025 remains the ship-blocking TOP PRIORITY but is gated on operator creds — see below._
 
-**TOP: OMEN-025 Phase 1 is code-complete through Session 6 core; the path forward is GATED on three operator credentials.** Plan-of-record `docs/plans/OMEN-025-anti-piracy-phase1.md` (synced to S296). Human-readable continuity: `AndroidSecurity.md` + `AndroidSecurity_20260524.pdf`. **Done:** S1–S3 (signed manifest + `core` foundations + verifier), S4 (Worker, 25 tests), S5 (Android network path), S6 core (`PlayIntegrityClient` requestHash byte-match + `ActivationManager` + flags). 46 Android JVM + 25 Worker tests green; `ACTIVATION_HANDSHAKE_ENABLED=false` = no runtime change yet.
+**TOP (ship-blocker): OMEN-025 Phase 1 is code-complete through Session 6 core; the path forward is GATED on three operator credentials.** Plan-of-record `docs/plans/OMEN-025-anti-piracy-phase1.md` (synced to S296). Human-readable continuity: `AndroidSecurity.md` + `AndroidSecurity_20260524.pdf`. **Done:** S1–S3 (signed manifest + `core` foundations + verifier), S4 (Worker, 25 tests), S5 (Android network path), S6 core (`PlayIntegrityClient` requestHash byte-match + `ActivationManager` + flags). 46 Android JVM + 25 Worker tests green; `ACTIVATION_HANDSHAKE_ENABLED=false` = no runtime change yet.
 
 **NEXT, in dependency order (all gated):**
 1. **Deploy the Worker** — needs operator **Cloudflare API token** + **Google Play Integrity service-account JSON** (+ Play Integrity API enabled in the linked GCP project). Set Worker secrets (`NONCE_SECRET`/`SA_*`/optional `ACTIVATION_SIGNING_KEY`), `wrangler deploy`, then wire the real host into `ActivationHttpClientFactory.WORKER_HOST` + the GCP project number into `PlayIntegrityClient`.
@@ -60,33 +60,17 @@ _(S297 was an infra/ops session — recycled the web admin Vite + cache-proxy se
 
 **Carry (S290/S291): historian browser visual smoke** — log in at http://10.0.0.229:4302/admin with the historian credential; confirm no left sidebar, compact `HistorianPoiDialog`, non-draggable markers, save attributes `actor='Historian'`/`data_source='Historian'`, and "+ New POI" creates with `data_source='Historian'`.
 
-**1692 / historical-maps docket (untouched since S289 — resumes after OMEN-025 reaches a pausing point, or per operator direction):**
+**1692 / historical-maps docket (untouched since S289 — resumes after the active threads reach a pausing point, or per operator direction; full detail in `docs/session-logs/` S282/S288/S289):**
 
-**1692 alignment iteration.** S289 final bake: 6 GCPs, no cutline, z11-z14 envelope, 91 tiles, on Lenovo. Owed: visual validation walk through all 4 zoom levels in Salem Village + judgement on whether 6-GCP TPS is "good enough for Upham" or whether more free picks are warranted. Operator can add more GCPs via the picker — free-pick mode is wired in (click Upham → click Leaflet → auto-numbered #100+).
-
-**Per-layer zoom clamps in `HistoricalMapsBottomSheet`.** Architectural follow-up (~30 min). Add `minZoom`/`maxZoom` to each `TileSpec`. `applyHistoricalOverlaySelection` sets `mapView.minZoomLevel/maxZoomLevel` per selection. Off → revert to global z11–z21. Higher value once 1700/1851/1911 are aligned.
-
-**1700 Phillips precision pass.** Same workflow as 1692: mask_to_frame → picker (new anchor list — downtown Salem features: Witch House / First Church / Pickering Wharf / Ward House / Old Jail) → TPS warp → bake at z13-z17 envelope.
-
-**1911 Walker precision pass.** Same workflow. Target z14-z18 envelope. Wider coverage than the others (includes Beverly proper).
-
-**Basemap blank-at-low-zoom — 3 options.** (a) Widen Salem-Custom bake bbox from "+10mi" to ~30mi (covers North Shore + Cape Ann); planetiler re-run, ~30+ min. (b) Wire TigerBase as fallback at z3-z12 (per `project_tigerbase_pipeline.md` baked + web admin preview shipped, Android wiring still pending — task #15 from S252). (c) Live with it — z11 is diagnostic regional context, not display.
-
-**GPS "follow until manual pan" — still owed (carried from S288).** `userPannedSinceFix` flag wired to MapView touch listener (S288 demo workaround was "tell user not to pan"). Dead-zone tightening + initial-center-on-user landed at S288 close.
-
-**1692 cutline-mask post-process (deferred).** gdal's inverse-TPS pixel-space cutline transform keeps self-intersecting; alternative is rasterizing the cutline against the warped TIF directly via PIL/shapely (bypasses gdalwarp entirely). Sidesteps the validity issue and gives a clean Upham-shaped clip. Not blocking — current bake renders fine without it for the operator's "preserve full area" preference.
-
-**Buildings-Outline top-layer — CANCELED** (operator: *"the buildings are good the way they are"*). Removed from docket.
-
-**Plan original Phase 4 partly done** — `verify-bundled-assets.js` regex extended in S286 P1 + S287 (now covers 1692). Still owed: asset bake hook in `CLAUDE.md` publish chain documentation, `ASSETS-MANIFEST.md` Historical Maps section.
-
-**Plan original Phase 5** — operator field-walk around Salem Common switching through all 4 maps still owed. Validates alignment + on-the-ground UX.
-
-**WickedMap clamps** — `MapCamera.minZoom=16.0` and Salem bbox clamp affect operators entering WickedMap from a zoomed-out or out-of-bbox production view. Acceptable for V1 scope; consider widening if it bites.
-
-**Chatbot V1 plan still parked.** `docs/plans/Chatbot_V1.md` — Phase 0 recall spike is the first action when operator gives the go-ahead.
-
-**S282 carry-forward (Paul Revere's Bell miss) still standing:** next walk-sim captured against extended filter `WALK-SIM|NarrationMgr|NARR-QUEUE|NARR-STATE|NARR-GEO|NARR-GATE` (`grep -v WickedAnim`). Re-run `tools/s281_hb_coverage_v2.py` and grep captured `NARR-GEO` lines around step ~1024-1140 for the Bell's `ENTRY` (or absence) — distinguishes scanner-never-saw-it from enqueue-silently-skipped. Lenovo logcat buffer is still 16 MiB.
+- **1692 alignment iteration** — S289 bake (6 GCPs, no cutline, z11-z14, 91 tiles, on Lenovo). Owed: visual validation walk all 4 zooms in Salem Village + judge 6-GCP "good enough" vs more free picks (picker free-pick wired, #100+).
+- **Per-layer zoom clamps in `HistoricalMapsBottomSheet`** (~30 min): `minZoom`/`maxZoom` per `TileSpec`; `applyHistoricalOverlaySelection` sets `mapView` clamps; off → global z11–z21.
+- **1700 Phillips + 1911 Walker precision passes** — same workflow as 1692 (mask_to_frame → picker → TPS warp → bake; 1700 z13-z17 downtown anchors, 1911 z14-z18 incl. Beverly).
+- **Basemap blank-at-low-zoom** — 3 options: widen Salem-Custom bbox to ~30mi (planetiler re-run); wire TigerBase z3-z12 fallback (task #15, Android wiring pending); or live with it.
+- **GPS "follow until manual pan"** (carried S288) — `userPannedSinceFix` flag on MapView touch listener (dead-zone + initial-center landed S288).
+- **1692 cutline-mask post-process (deferred)** — rasterize cutline vs warped TIF via PIL/shapely (bypass gdalwarp self-intersection); not blocking. Buildings-Outline top-layer CANCELED.
+- **Plan Phase 4/5 leftovers** — `verify-bundled-assets.js` regex done (covers 1692); still owed: publish-chain docs + `ASSETS-MANIFEST.md` Historical Maps section; operator field-walk switching all 4 maps.
+- **WickedMap clamps** (`MapCamera.minZoom=16.0` + Salem bbox) — acceptable V1; widen if it bites. **Chatbot V1** parked (`docs/plans/Chatbot_V1.md`, Phase 0 recall spike first).
+- **S282 Paul Revere's Bell miss** — next walk-sim on filter `WALK-SIM|NarrationMgr|NARR-QUEUE|NARR-STATE|NARR-GEO|NARR-GATE`; re-run `tools/s281_hb_coverage_v2.py`, grep `NARR-GEO` ~step 1024-1140 for the Bell's ENTRY.
 
 **S284 device-state note:** S284's `sheet_collection.xml` fix + S285 plan are NOT on field devices (Pixel 8 + Lenovo still carry S282 build). Both cosmetic-only / planning; not blocking the next walk-sim.
 
@@ -170,7 +154,7 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 Phases 1-9 + 9A+ + 9P.A/B + 9T + 9U + 9X: **COMPLETE**. Phase 10 (production readiness): first signed AAB built S180, asset-pack reorg S256, ship-cliffs 1/2/3 closed. Phase 11 (ASO/Play Store): operator-led, post-AAB-upload. **9Y/9Z/9Q/9R deferred** (V1.0.1+, no V1 ship dependency). Cross-project TigerLine stalled 2026-04-21; SalemIntelligence PAUSED S214.
 
-**Sessions completed:** 297. **Internal ship target: 2026-08-01.**
+**Sessions completed:** 298. **Internal ship target: 2026-08-01.**
 
 ---
 
