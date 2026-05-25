@@ -41,7 +41,9 @@ Cliff 1 (Play 200 MB ceiling) closed S256 via install-time Asset Pack; Cliffs 2 
 
 (Per-session detail lives in `SESSION-LOG.md` and `docs/session-logs/`. The "Last updated" para at the top covers this session's headlines.)
 
-### S297 opener (parked at S296 close)
+### S298 opener (parked at S297 close)
+
+_(S297 was an infra/ops session — recycled the web admin Vite + cache-proxy servers, enabled operator WiFi-machine LAN access via `web/.env.local` + new `scripts/web-admin-firewall.sh` (sudo ufw toggle), diagnosed "WiFi auth issues" as HTTP Basic Auth per-origin scoping. OMEN-025 untouched; everything below still current. Detail: `docs/session-logs/session-297-2026-05-24.md`.)_
 
 **TOP: OMEN-025 Phase 1 is code-complete through Session 6 core; the path forward is GATED on three operator credentials.** Plan-of-record `docs/plans/OMEN-025-anti-piracy-phase1.md` (synced to S296). Human-readable continuity: `AndroidSecurity.md` + `AndroidSecurity_20260524.pdf`. **Done:** S1–S3 (signed manifest + `core` foundations + verifier), S4 (Worker, 25 tests), S5 (Android network path), S6 core (`PlayIntegrityClient` requestHash byte-match + `ActivationManager` + flags). 46 Android JVM + 25 Worker tests green; `ACTIVATION_HANDSHAKE_ENABLED=false` = no runtime change yet.
 
@@ -168,7 +170,7 @@ Channel: Salem Chamber of Commerce + local-first. Asset packet (1-page sell shee
 
 Phases 1-9 + 9A+ + 9P.A/B + 9T + 9U + 9X: **COMPLETE**. Phase 10 (production readiness): first signed AAB built S180, asset-pack reorg S256, ship-cliffs 1/2/3 closed. Phase 11 (ASO/Play Store): operator-led, post-AAB-upload. **9Y/9Z/9Q/9R deferred** (V1.0.1+, no V1 ship dependency). Cross-project TigerLine stalled 2026-04-21; SalemIntelligence PAUSED S214.
 
-**Sessions completed:** 296. **Internal ship target: 2026-08-01.**
+**Sessions completed:** 297. **Internal ship target: 2026-08-01.**
 
 ---
 
