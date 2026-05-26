@@ -68,9 +68,9 @@ _Verified-out S299:_ the 4 cemetery-named `HISTORICAL_LANDMARKS` rows are Greenl
 - All commercial categories → ~80 emblems keyed on `category × subcategory` (commercial bucket has ~65 distinct subcategories; category-level fallback where subcategory is null).
 - CIVIC / PARKS_REC / EDUCATION → category emblems.
 
-**POI markers for the bespoke set — LOCKED S299:**
-- **107 HIST_BLDG → reuse Katrina's 107 ghost badges** (already shipped) as their *map markers* — Collection↔map continuity. Bespoke woodcut hero in the detail sheet; badge marks the POI on the map.
-- **17 WORSHIP → woodcut category circle marker** (the planned `poi-circle-icon` class, §4 — a church glyph). No Collection/badge expansion; worship POIs have no ghost badge.
+**POI markers for the bespoke set — LOCKED S299, WIRED S301:**
+- **107 HIST_BLDG → reuse Katrina's 107 ghost badges** as their *map markers* — Collection↔map continuity. Bespoke woodcut hero in the detail sheet; badge marks the POI on the map. **DONE S301** — `MarkerIconHelper.ghostBadge()` (circular center-crop + ink ring) + `narrationIconForZoom(poi)` resolves the badge when `ghost_asset_a` is set. Verified on Pixel 8.
+- **17 WORSHIP → woodcut church-glyph circle marker** (the `poi-circle-icon` class, §4). No Collection/badge expansion; worship POIs have no ghost badge. **DONE S301** — bold woodcut church glyph generated (`tools/art-bible-samples/render_worship_glyph.py`), composited onto a parchment disc + ink ring, written to `poi-circle-icons/worship/place_of_worship.webp` (replaces the pre-redo witch sigil). No code change — the existing `MarkerIconHelper.dot()`→`CIRCLE_ICON_MAP["worship"]` path serves it. _(Other category circle-icons in `poi-circle-icons/` are still pre-redo witch style — §4 "POI circle marker" row remains open for the rest.)_
 
 **Net production run:** 124 bespoke heroes + ~90 shared emblems ≈ **214 images** (was ~2,000 in the S298 first cut — ~9× reduction). See updated §6.
 
