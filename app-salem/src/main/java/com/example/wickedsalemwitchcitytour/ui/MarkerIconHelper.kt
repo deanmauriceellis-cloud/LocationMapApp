@@ -482,6 +482,55 @@ object MarkerIconHelper {
     }
 
     /**
+     * Ghost-badge map marker (art-bible §4.1, S301). Renders a Katrina's
+     * Collection ghost portrait as a circular map marker so the 107 ghost-
+     * eligible historical-building POIs read on the map as the same badge they
+     * carry in the Collection — Collection↔map visual continuity. The portrait
+     * (a 384×384 woodcut) is center-cropped to a circle and ringed with ink
+     * (#0E100F, the locked palette outline) for legibility on the parchment
+     * basemap. Cached by (assetPath, sizePx) via the shared LRU.
+     *
+     * @param portrait decoded ghost portrait bitmap (from [GhostResolver.load])
+     * @param key      stable cache key — pass the asset path
+     */
+    fun ghostBadge(context: Context, portrait: Bitmap, key: String, sizeDp: Int = 28): BitmapDrawable {
+        val density = context.resources.displayMetrics.density
+        val sizePx = (sizeDp * density).toInt().coerceAtLeast(8)
+        val cacheKey = "ghost|$key|$sizePx"
+        cache[cacheKey]?.let { return it }
+
+        val ring = (1.5f * density).coerceAtLeast(1f)
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val cx = sizePx / 2f
+        val cy = sizePx / 2f
+        val radius = cx - ring
+
+        // Center-crop the (square-ish) portrait into the circle.
+        val srcSide = minOf(portrait.width, portrait.height)
+        val srcLeft = (portrait.width - srcSide) / 2
+        val srcTop = (portrait.height - srcSide) / 2
+        val srcRect = Rect(srcLeft, srcTop, srcLeft + srcSide, srcTop + srcSide)
+        val dstRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+
+        canvas.save()
+        canvas.clipPath(Path().apply { addCircle(cx, cy, radius, Path.Direction.CW) })
+        canvas.drawBitmap(portrait, srcRect, dstRect, Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true })
+        canvas.restore()
+
+        // Ink ring — keeps the badge legible against the parchment map.
+        canvas.drawCircle(cx, cy, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = ring
+            color = Color.parseColor("#0E100F")
+        })
+
+        val result = BitmapDrawable(context.resources, bitmap)
+        cache[cacheKey] = result
+        return result
+    }
+
+    /**
      * Cluster circle icon: filled circle with count text centered, sized by count threshold.
      * Matches web app's cluster visualization.
      */

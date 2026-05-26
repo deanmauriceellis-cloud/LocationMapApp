@@ -2788,7 +2788,7 @@ class SalemMainActivity : AppCompatActivity() {
                 // instance — cheap.
                 val zoom = binding.mapView.zoomLevelDouble
                 val addIconData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    toAdd.map { p -> p to narrationIconForZoom(p.category.lowercase(), p.name, zoom) }
+                    toAdd.map { p -> p to narrationIconForZoom(p, zoom) }
                 }
 
                 // Apply removals on main thread (cheap — markers stay in
@@ -2864,10 +2864,34 @@ class SalemMainActivity : AppCompatActivity() {
         else -> 3
     }
 
-    /** Get the right icon for a narration point based on current zoom */
-    private fun narrationIconForZoom(type: String, name: String, zoom: Double): android.graphics.drawable.BitmapDrawable {
+    /** Get the right icon for a narration point based on current zoom.
+     *
+     *  Art-bible §4.1 (S301): the 107 ghost-eligible historical buildings
+     *  (`ghost_asset_a` populated) render their Katrina's Collection badge as
+     *  the map marker — Collection↔map continuity. Everything else keeps the
+     *  category circle-icon / labeled dot. Badge swap is gated purely on the
+     *  asset being present, so it naturally scopes to the 107 HIST_BLDG. */
+    private fun narrationIconForZoom(
+        poi: com.example.wickedsalemwitchcitytour.content.model.SalemPoi,
+        zoom: Double
+    ): android.graphics.drawable.BitmapDrawable {
+        val ghostA = poi.ghostAssetA
+        if (!ghostA.isNullOrBlank()) {
+            val badge = GhostResolver.load(this, ghostA)
+            if (badge != null) {
+                // Badges carry more detail than dots → a touch larger per bucket.
+                val sizeDp = when {
+                    zoom >= 18 -> 40
+                    zoom >= 17 -> 30
+                    zoom >= 15 -> 24
+                    else -> 18
+                }
+                return MarkerIconHelper.ghostBadge(this, badge, ghostA, sizeDp)
+            }
+        }
+        val type = poi.category.lowercase()
         return when {
-            zoom >= 18 -> MarkerIconHelper.labeledDot(this, type, name)
+            zoom >= 18 -> MarkerIconHelper.labeledDot(this, type, poi.name)
             zoom >= 17 -> MarkerIconHelper.dot(this, type, 20)
             zoom >= 15 -> MarkerIconHelper.dot(this, type, 12)
             else -> MarkerIconHelper.dot(this, type, 8)
@@ -2885,7 +2909,7 @@ class SalemMainActivity : AppCompatActivity() {
         // Previously only visible markers were refreshed, leaving edge-of-screen
         // markers stuck at the wrong size when zooming out.
         for ((marker, point) in narrationMarkers) {
-            marker.icon = narrationIconForZoom(point.category.lowercase(), point.name, zoom)
+            marker.icon = narrationIconForZoom(point, zoom)
         }
         lastNarrationIconZoom = bucket
         DebugLogger.i("SalemMainActivity", "refreshNarrationIcons: bucket=$bucket refreshed=${narrationMarkers.size}")
