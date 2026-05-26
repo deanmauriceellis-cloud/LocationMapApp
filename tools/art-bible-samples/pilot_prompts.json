@@ -1,0 +1,74 @@
+[
+  {
+    "id": "charter_street_cemetery",
+    "name": "Charter Street Cemetery",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1637,
+    "prompt": "Charter Street Cemetery, the built 1637 historic burying ground in Salem Massachusetts, rows of leaning colonial slate gravestones, bare gnarled trees, stone wall, faint ghost-teal cyan spectral haze, mostly muted",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "custom_house",
+    "name": "Custom House",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1815,
+    "prompt": "Custom House, a built 1815 stately Federal-style civic building, brick, white cupola, Salem harbor wharf backdrop, distant tall-ship masts in Salem Massachusetts, bare autumn trees, overcast muted daylight, no saturated color",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "howard_street_cemetery",
+    "name": "Howard Street Cemetery",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1692,
+    "prompt": "Howard Street Cemetery, the built 1692 historic burying ground in Salem Massachusetts, rows of leaning colonial slate gravestones, bare gnarled trees, stone wall, faint ghost-teal cyan spectral haze, mostly muted",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "john_ward_house",
+    "name": "John Ward House",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1684,
+    "prompt": "John Ward House, a built 1684 First Period New England architecture, steep pointed gable roof, second-story jetty overhang, dark weathered clapboard, small diamond-pane casement windows, massive central chimney in Salem Massachusetts, bare autumn trees, overcast muted daylight, no saturated color",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "old_town_hall",
+    "name": "Old Town Hall",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1816,
+    "prompt": "Old Town Hall, a built 1816 Federal-style architecture, symmetrical brick facade, white cupola, Salem harbor wharf backdrop, distant tall-ship masts in Salem Massachusetts, bare autumn trees, overcast muted daylight, no saturated color",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "the_witch_house_at_salem",
+    "name": "The Witch House at Salem",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1650,
+    "prompt": "The Witch House at Salem, a built 1650 First Period New England architecture, steep pointed gable roof, second-story jetty overhang, dark weathered clapboard, small diamond-pane casement windows, massive central chimney in Salem Massachusetts, bare autumn trees, faint ghost-teal cyan glow in the windows, eerie, mostly muted",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "first_church_in_salem",
+    "name": "First Church in Salem",
+    "category": "WORSHIP",
+    "year": 1629,
+    "prompt": "First Church in Salem, a built 1629 New England clapboard church, steeple, tall arched windows in Salem Massachusetts, overcast muted daylight, no saturated color",
+    "marker": "woodcut church glyph"
+  },
+  {
+    "id": "grace_episcopal_church",
+    "name": "Grace Episcopal Church",
+    "category": "WORSHIP",
+    "year": null,
+    "prompt": "Grace Episcopal Church, a colonial-era Gothic Revival stone church, pointed-arch windows, square bell tower in Salem Massachusetts, overcast muted daylight, no saturated color",
+    "marker": "woodcut church glyph"
+  },
+  {
+    "id": "saint_vasilios_church",
+    "name": "Saint Vasilios Church",
+    "category": "WORSHIP",
+    "year": null,
+    "prompt": "Saint Vasilios Church, a colonial-era New England clapboard church, steeple, tall arched windows in Salem Massachusetts, overcast muted daylight, no saturated color",
+    "marker": "woodcut church glyph"
+  }
+]

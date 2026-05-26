@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Katrina's Mystic Visitors Guide — Graphics POC (S298–S299)</title>
+<style>
+  :root{
+    --parchment:#EFE6D3; --cream:#F6EFE0; --ink:#0E100F; --charcoal:#2B2720;
+    --grey:#7C766A; --tan:#B39A72; --umber:#4A4136; --teal:#3BBBB0; --deepteal:#1E6E68;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--ink); color:var(--parchment);
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--teal)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+
+  header{
+    border-bottom:3px solid var(--teal);
+    background:
+      repeating-linear-gradient(180deg, rgba(255,255,255,.015) 0 2px, transparent 2px 4px),
+      var(--charcoal);
+    padding:54px 0 38px;
+  }
+  header h1{font-size:34px;letter-spacing:.5px;line-height:1.15}
+  header h1 .teal{color:var(--teal)}
+  header .sub{color:var(--tan);font-size:16px;margin-top:10px}
+  .meta{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{
+    font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11.5px;
+    background:rgba(59,187,176,.12);border:1px solid var(--deepteal);
+    color:var(--teal);padding:4px 10px;border-radius:999px;letter-spacing:.4px;
+  }
+  nav{position:sticky;top:0;z-index:20;background:rgba(14,16,15,.94);
+    backdrop-filter:blur(6px);border-bottom:1px solid var(--umber)}
+  nav .wrap{display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+  nav a{font-family:ui-monospace,monospace;font-size:12px;color:var(--parchment);
+    text-decoration:none;padding:6px 12px;border-radius:6px;border:1px solid transparent}
+  nav a:hover{border-color:var(--deepteal);color:var(--teal)}
+
+  section{padding:48px 0;border-bottom:1px solid var(--umber)}
+  .shead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .shead h2{font-size:25px;color:var(--cream)}
+  .shead .tag{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink);
+    background:var(--teal);padding:3px 9px;border-radius:5px;font-weight:700}
+  .lead{color:var(--tan);max-width:760px;margin:8px 0 26px;font-size:15.5px}
+  .note{background:rgba(179,154,114,.1);border-left:3px solid var(--tan);
+    padding:12px 16px;margin:18px 0;border-radius:0 6px 6px 0;font-size:14.5px;color:var(--parchment)}
+  .note b{color:var(--teal)}
+
+  /* hero pilot grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:24px}
+  .card{background:var(--charcoal);border:1px solid var(--umber);border-radius:10px;
+    overflow:hidden;display:flex;flex-direction:column}
+  .card img{width:100%;display:block;background:var(--parchment);aspect-ratio:2.25/1;object-fit:cover}
+  .card .body{padding:14px 16px 16px}
+  .card h3{font-size:18px;color:var(--cream)}
+  .card .row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 10px}
+  .badge{font-family:ui-monospace,monospace;font-size:10.5px;padding:3px 8px;border-radius:5px;
+    border:1px solid var(--umber);color:var(--tan)}
+  .badge.bldg{border-color:var(--deepteal);color:var(--teal)}
+  .badge.worship{border-color:var(--tan)}
+  .prompt{font-family:ui-monospace,'SF Mono',monospace;font-size:11.5px;color:var(--grey);
+    background:var(--ink);border:1px solid var(--umber);border-radius:6px;padding:10px 12px;
+    line-height:1.55;white-space:pre-wrap}
+  .prompt .mk{color:var(--teal)}
+
+  /* fit demo */
+  .fit{display:grid;grid-template-columns:1fr;gap:26px;margin-top:8px}
+  .fitblock{background:var(--charcoal);border:1px solid var(--umber);border-radius:10px;padding:18px 20px}
+  .fitblock h3{color:var(--cream);font-size:18px;margin-bottom:4px}
+  .fitblock .cap{color:var(--tan);font-size:13px;margin-bottom:14px}
+  .master{border:2px solid var(--teal);border-radius:8px;display:block;width:100%;max-width:560px;margin-bottom:18px}
+  .crops{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .crop figure{background:var(--ink);border:1px solid var(--umber);border-radius:8px;overflow:hidden}
+  .crop img{display:block;width:100%;background:var(--parchment)}
+  .crop figcaption{font-family:ui-monospace,monospace;font-size:11px;color:var(--grey);padding:8px 10px}
+  .crop figcaption b{color:var(--parchment)}
+
+  /* class + samples gallery */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px}
+  .tile{background:var(--charcoal);border:1px solid var(--umber);border-radius:9px;overflow:hidden}
+  .tile img{display:block;width:100%;background:var(--parchment)}
+  .tile .cap{padding:10px 12px}
+  .tile .cap b{display:block;color:var(--cream);font-size:14px}
+  .tile .cap span{font-family:ui-monospace,monospace;font-size:11px;color:var(--tan)}
+
+  /* palette */
+  .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:24px}
+  .sw{border:1px solid var(--umber);border-radius:8px;overflow:hidden;background:var(--charcoal)}
+  .sw .chip{height:74px}
+  .sw .lab{padding:9px 11px}
+  .sw .lab b{display:block;font-size:13.5px;color:var(--cream)}
+  .sw .lab code{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--tan)}
+  .sw .lab .use{font-size:11px;color:var(--grey)}
+  .accent-ring{outline:2px solid var(--teal);outline-offset:-2px}
+  .palcard{max-width:560px;width:100%;border:1px solid var(--umber);border-radius:8px;display:block}
+
+  footer{padding:36px 0 60px;color:var(--grey);font-size:13px}
+  footer code{font-family:ui-monospace,monospace;color:var(--tan)}
+  .legend{font-size:13px;color:var(--grey);margin-top:10px}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <h1>Katrina's Mystic Visitors Guide<br><span class="teal">Graphics Redo — Proof of Concept</span></h1>
+  <div class="sub">Ink-comic woodcut house style · muted-period palette + ghost-teal accent · narration-driven hero generation</div>
+  <div class="meta">
+    <span class="pill">Sessions 298–299</span>
+    <span class="pill">2026-05-25</span>
+    <span class="pill">Forge / DreamShaperXL Turbo</span>
+    <span class="pill">art-bible v0.2</span>
+    <span class="pill">bespoke run: 124</span>
+  </div>
+</div></header>
+
+<nav><div class="wrap">
+  <a href="#pilot">① Hero Pilot</a>
+  <a href="#haunted">★ Haunted Variants</a>
+  <a href="#fit">② Crop Fit</a>
+  <a href="#palette">③ Palette v1</a>
+  <a href="#classes">④ Per-class</a>
+  <a href="#first">⑤ First Samples</a>
+</div></nav>
+
+<section id="pilot"><div class="wrap">
+  <div class="shead"><h2>① Hero Pilot — 9 of 124 bespoke</h2><span class="tag">S299</span></div>
+  <p class="lead">Single-scene woodcut establishing shots at the locked 2.25:1 master (1152×512). Each prompt is
+  <b>mined from the POI's own narration</b> for architectural clues (txt2img only — no reference photos).
+  Buildings get the ghost badge as map marker; worship gets a woodcut church glyph.</p>
+  <div class="note"><b>Validated:</b> style is coherent across all 9 · narration clue-mining makes landmarks
+  recognizable (Old Town Hall, Witch House, Grace Episcopal) · cemetery teal reads spectral, not garish.
+  <br><b>Known dial-in:</b> harbor/wharf setting clue can over-recede the building (see Custom House) — lower its weight for the full run.</div>
+  <div class="grid" id="pilotGrid"></div>
+</div></section>
+
+<section id="haunted"><div class="wrap">
+  <div class="shead"><h2>★ Haunted Variants — Salem Witch-City flavor</h2><span class="tag">S299</span></div>
+  <p class="lead">Operator feedback on the first pilot: too lifelike, missing the haunted-Halloween flavor.
+  This pass keeps the narration-driven subject but swaps daytime for moonlit night, adds fog / gnarled
+  trees / crows / spectral teal, and pushes a bolder graphic woodcut. Compare across each row:
+  <b>Original</b> (overcast daytime) → <b>h1</b> (haunted, cfg 3.5) → <b>h2</b> (max spooky, cfg 4.5).</p>
+  <div class="note"><b>h3 = LOCKED hero mood (S299).</b> Tuned middle: h1's legible LIT building (warm glowing
+  windows, readable architecture) + h2's drama (full moon, gnarled silhouettes, bats, bolder ink), with
+  ghost-teal as a night-sky accent, not a wash. h1/h2 shown for reference.</div>
+  <div id="hauntedWrap" style="display:flex;flex-direction:column;gap:26px"></div>
+</div></section>
+
+<section id="fit"><div class="wrap">
+  <div class="shead"><h2>② Crop Fit — fitXY → centerCrop</h2><span class="tag">S298→S299</span></div>
+  <p class="lead">The detail-sheet hero is a 20%-of-screen-height banner that must survive both portrait and
+  landscape. A single 2.25:1 master with the subject in a centered safe band + <code>centerCrop</code>
+  fits every device box with no stretch. Master (teal border) shown above its real device crops.</p>
+  <div class="fit" id="fitWrap"></div>
+</div></section>
+
+<section id="palette"><div class="wrap">
+  <div class="shead"><h2>③ Palette v1 — LOCKED</h2><span class="tag">S298</span></div>
+  <p class="lead">Muted period base + one signature accent. Hex derived from the approved renders. The two
+  teals (ringed) are the only saturated hues — combined &lt;8% of any image, supernatural/focal only.</p>
+  <div class="palette" id="paletteSwatches"></div>
+  <img class="palcard" src="out_palette/palette_card.png" alt="Woodcut palette card v1">
+</div></section>
+
+<section id="classes"><div class="wrap">
+  <div class="shead"><h2>④ Per-class style proof</h2><span class="tag">S298</span></div>
+  <p class="lead">One sample per remaining asset class — the woodcut direction holds across the whole estate,
+  so the app reads as one branded set.</p>
+  <div class="tiles" id="classTiles"></div>
+</div></section>
+
+<section id="first"><div class="wrap">
+  <div class="shead"><h2>⑤ First validation samples</h2><span class="tag">S298</span></div>
+  <p class="lead">The original direction-validation renders — same subject (Salem Witch House) in three hero
+  aspects plus an icon and a ghost. Confirmed single-banner beats triptych and the woodcut set coheres.</p>
+  <div class="tiles" id="firstTiles"></div>
+</div></section>
+
+<footer><div class="wrap">
+  Static gallery · open directly in a browser (<code>file://</code>) or serve the folder.<br>
+  Source assets in <code>tools/art-bible-samples/</code> · spec in <code>docs/plans/graphics-art-bible.md</code> · bespoke list <code>bespoke-hero-pois.tsv</code>.
+</div></footer>
+
+<script>
+const PILOT = /*__PILOT__*/[
+  {
+    "id": "charter_street_cemetery",
+    "name": "Charter Street Cemetery",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1637,
+    "prompt": "Charter Street Cemetery, the built 1637 historic burying ground in Salem Massachusetts, rows of leaning colonial slate gravestones, bare gnarled trees, stone wall, faint ghost-teal cyan spectral haze, mostly muted",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "custom_house",
+    "name": "Custom House",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1815,
+    "prompt": "Custom House, a built 1815 stately Federal-style civic building, brick, white cupola, Salem harbor wharf backdrop, distant tall-ship masts in Salem Massachusetts, bare autumn trees, overcast muted daylight, no saturated color",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "howard_street_cemetery",
+    "name": "Howard Street Cemetery",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1692,
+    "prompt": "Howard Street Cemetery, the built 1692 historic burying ground in Salem Massachusetts, rows of leaning colonial slate gravestones, bare gnarled trees, stone wall, faint ghost-teal cyan spectral haze, mostly muted",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "john_ward_house",
+    "name": "John Ward House",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1684,
+    "prompt": "John Ward House, a built 1684 First Period New England architecture, steep pointed gable roof, second-story jetty overhang, dark weathered clapboard, small diamond-pane casement windows, massive central chimney in Salem Massachusetts, bare autumn trees, overcast muted daylight, no saturated color",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "old_town_hall",
+    "name": "Old Town Hall",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1816,
+    "prompt": "Old Town Hall, a built 1816 Federal-style architecture, symmetrical brick facade, white cupola, Salem harbor wharf backdrop, distant tall-ship masts in Salem Massachusetts, bare autumn trees, overcast muted daylight, no saturated color",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "the_witch_house_at_salem",
+    "name": "The Witch House at Salem",
+    "category": "HISTORICAL_BUILDINGS",
+    "year": 1650,
+    "prompt": "The Witch House at Salem, a built 1650 First Period New England architecture, steep pointed gable roof, second-story jetty overhang, dark weathered clapboard, small diamond-pane casement windows, massive central chimney in Salem Massachusetts, bare autumn trees, faint ghost-teal cyan glow in the windows, eerie, mostly muted",
+    "marker": "ghost badge"
+  },
+  {
+    "id": "first_church_in_salem",
+    "name": "First Church in Salem",
+    "category": "WORSHIP",
+    "year": 1629,
+    "prompt": "First Church in Salem, a built 1629 New England clapboard church, steeple, tall arched windows in Salem Massachusetts, overcast muted daylight, no saturated color",
+    "marker": "woodcut church glyph"
+  },
+  {
+    "id": "grace_episcopal_church",
+    "name": "Grace Episcopal Church",
+    "category": "WORSHIP",
+    "year": null,
+    "prompt": "Grace Episcopal Church, a colonial-era Gothic Revival stone church, pointed-arch windows, square bell tower in Salem Massachusetts, overcast muted daylight, no saturated color",
+    "marker": "woodcut church glyph"
+  },
+  {
+    "id": "saint_vasilios_church",
+    "name": "Saint Vasilios Church",
+    "category": "WORSHIP",
+    "year": null,
+    "prompt": "Saint Vasilios Church, a colonial-era New England clapboard church, steeple, tall arched windows in Salem Massachusetts, overcast muted daylight, no saturated color",
+    "marker": "woodcut church glyph"
+  }
+];
+const PALETTE = [
+  ["Parchment","#EFE6D3","~45% · paper ground",false],
+  ["Aged Cream","#F6EFE0","~5% · lightest highlight",false],
+  ["Ink Black","#0E100F","~20% · the carved line",false],
+  ["Charcoal","#2B2720","~8% · deep shadow fill",false],
+  ["Weathered Grey","#7C766A","~8% · stone / aged wood",false],
+  ["Aged Wood Tan","#B39A72","~6% · warm timber",false],
+  ["Umber","#4A4136","~4% · deep brown shadow",false],
+  ["Spectral Teal","#3BBBB0","<5% · ghost glow (accent)",true],
+  ["Deep Teal","#1E6E68","<5% · teal shadow (accent)",true],
+];
+const CLASSES = [
+  ["out_classes/icon_parks_rec_512.webp","Parks & Rec icon","poi category emblem"],
+  ["out_classes/icon_food_drink_512.webp","Food & Drink icon","poi category emblem"],
+  ["out_classes/marker_witch_shop_512.webp","Witch-shop marker","circle marker @512"],
+  ["out_classes/marker_witch_shop_96.webp","…at 96px","map-legible downscale"],
+  ["out_classes/marker_witch_shop_48.webp","…at 48px","map-legible downscale"],
+  ["out_classes/splash_katrina_768.webp","Splash — Katrina","branding (teal eyes/hat)"],
+  ["out_classes/portrait_accused_640.webp","Accused portrait","witch-trials figure (no teal)"],
+  ["out_classes/sprite_blackcat_512.webp","Black-cat sprite","ambient animation frame"],
+  ["out_classes/frame_gothic_640.webp","Gothic frame","needs chroma-key cutout"],
+];
+const FIRST = [
+  ["out/hero_A_square_768.webp","Hero — square","768"],
+  ["out/hero_B_banner_800x200.webp","Hero — single banner","800×200 (winner)"],
+  ["out/hero_C_triptych_800x200.webp","Hero — triptych","800×200 (rejected)"],
+  ["out/icon_D_crystal_512.webp","POI icon","512"],
+  ["out/ghost_E_magistrate_512.webp","Ghost — magistrate","512"],
+];
+const FIT = [
+  ["witch_house","The Witch House","out_pilot/hero_the_witch_house_at_salem.webp",[
+    ["out_pilot/hero_the_witch_house_at_salem__pixel_portrait.webp","Pixel 8 portrait","1080×480 · 2.25:1"],
+    ["out_pilot/hero_the_witch_house_at_salem__pixel_landscape.webp","Pixel 8 landscape","2400×216 · 11:1"]]],
+  ["charter","Charter Street Cemetery","out_pilot/hero_charter_street_cemetery.webp",[
+    ["out_pilot/hero_charter_street_cemetery__pixel_portrait.webp","Pixel 8 portrait","1080×480 · 2.25:1"],
+    ["out_pilot/hero_charter_street_cemetery__pixel_landscape.webp","Pixel 8 landscape","2400×216 · 11:1"]]],
+];
+
+function el(html){const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild;}
+
+// haunted comparison (Original | h1 | h2)
+const HAUNT = [
+  ["the_witch_house_at_salem","The Witch House"],
+  ["charter_street_cemetery","Charter Street Cemetery"],
+  ["old_town_hall","Old Town Hall"],
+  ["john_ward_house","John Ward House"],
+];
+const hw=document.getElementById('hauntedWrap');
+HAUNT.forEach(([id,name])=>{
+  const cols=[
+    ["Original — daytime",`out_pilot/hero_${id}.webp`,false],
+    ["h1 — haunted (cfg 3.5)",`out_haunted/hero_${id}_h1.webp`,false],
+    ["h2 — max spooky (cfg 4.5)",`out_haunted/hero_${id}_h2.webp`,false],
+    ["★ h3 — LOCKED (cfg 4.0)",`out_haunted/hero_${id}_h3.webp`,true],
+  ].map(([lab,src,win])=>`<figure style="margin:0;background:var(--ink);border:${win?'2px solid var(--teal)':'1px solid var(--umber)'};border-radius:8px;overflow:hidden">
+    <img loading="lazy" src="${src}" alt="${lab}" style="display:block;width:100%;background:var(--parchment);aspect-ratio:2.25/1;object-fit:cover">
+    <figcaption style="font-family:ui-monospace,monospace;font-size:11px;color:${win?'var(--teal)':'var(--tan)'};padding:7px 10px">${lab}</figcaption></figure>`).join('');
+  hw.appendChild(el(`<div class="fitblock"><h3>${name}</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:10px">${cols}</div></div>`));
+});
+
+// pilot
+const pg=document.getElementById('pilotGrid');
+PILOT.forEach(p=>{
+  const isB=p.category==='HISTORICAL_BUILDINGS';
+  const prompt=p.prompt.replace(/(ghost-teal[^,]*|First Period[^,]*|Federal-style[^,]*|Gothic Revival[^,]*|harbor wharf[^,]*)/g,'<span class="mk">$1</span>');
+  pg.appendChild(el(`<div class="card">
+    <img loading="lazy" src="out_pilot/hero_${p.id}.webp" alt="${p.name}">
+    <div class="body">
+      <h3>${p.name}</h3>
+      <div class="row">
+        <span class="badge ${isB?'bldg':'worship'}">${isB?'HIST_BLDG':'WORSHIP'}</span>
+        <span class="badge">${p.year?('est. '+p.year):'year n/a'}</span>
+        <span class="badge">marker: ${p.marker}</span>
+      </div>
+      <div class="prompt">${prompt}</div>
+    </div></div>`));
+});
+
+// fit
+const fw=document.getElementById('fitWrap');
+FIT.forEach(f=>{
+  const crops=f[3].map(c=>`<div class="crop"><figure><img loading="lazy" src="${c[0]}" alt="${c[1]}">
+    <figcaption><b>${c[1]}</b><br>${c[2]}</figcaption></figure></div>`).join('');
+  fw.appendChild(el(`<div class="fitblock"><h3>${f[1]}</h3>
+    <div class="cap">2.25:1 master (teal border) → simulated device centerCrops</div>
+    <img class="master" loading="lazy" src="${f[2]}" alt="${f[1]} master">
+    <div class="crops">${crops}</div></div>`));
+});
+
+// palette
+const ps=document.getElementById('paletteSwatches');
+PALETTE.forEach(([n,hex,use,acc])=>{
+  ps.appendChild(el(`<div class="sw"><div class="chip ${acc?'accent-ring':''}" style="background:${hex}"></div>
+    <div class="lab"><b>${n}</b><code>${hex}</code><div class="use">${use}</div></div></div>`));
+});
+
+// class + first
+function fillTiles(id,arr){const w=document.getElementById(id);
+  arr.forEach(([src,t,s])=>w.appendChild(el(`<div class="tile"><img loading="lazy" src="${src}" alt="${t}">
+    <div class="cap"><b>${t}</b><span>${s}</span></div></div>`)));}
+fillTiles('classTiles',CLASSES);
+fillTiles('firstTiles',FIRST);
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # LocationMapApp / Katrina's Mystic Visitors Guide — Graphics Art Bible
 
-**Status:** v0.1 — DRAFT (S298, 2026-05-25). Core visual decisions LOCKED with operator; per-class specs are PROPOSED pending sample-render validation.
+**Status:** v0.2 (S299, 2026-05-25). Core visual decisions LOCKED + sample-validated (S298). Hero scope tiered to the merchant model + verified against live PG (S299, §4.1) — bespoke run cut from ~2,000 to **124** (107 HIST_BLDG + 17 WORSHIP).
 **Purpose:** Single source of truth for the full graphics redo. Every asset class regenerates against this so the app reads as one coherent set. Supersedes the incoherent mix audited in S298 (photoreal splash + painterly heroes + ink-comic ghosts + occult-sigil icons).
 
 ---
@@ -49,6 +49,31 @@ Discipline: the two teals **combined** stay under ~8% of any image and appear on
 
 ---
 
+## 4.1 Hero tiering & the merchant model — LOCKED S299
+
+**A bespoke per-POI hero is paid content.** Non-paying commercial POIs do not get one — they share their category/subcategory emblem, which serves as *both* the map marker and the detail-sheet hero. This is already exactly how `PoiHeroResolver` tiers (T0/T1 bespoke → T2 category emblem); the merchant model just decides which POIs are *allowed* a T0/T1 file. A merchant upgrade later swaps a single Tier-2 emblem for a bespoke hero with zero architecture change.
+
+**Bespoke per-POI woodcut heroes — 124, operator-scoped + verified S299** (list: `tools/art-bible-samples/bespoke-hero-pois.tsv`):
+
+| Bucket | Source | Count |
+|---|---|---|
+| Historical Buildings | `category='HISTORICAL_BUILDINGS'` (already includes all 13 historic cemeteries — Charter St / Howard St / The Burying Point etc.) | 107 |
+| Worship | `category='WORSHIP'` | 17 |
+| **Total bespoke** | | **124** |
+
+_Verified-out S299:_ the 4 cemetery-named `HISTORICAL_LANDMARKS` rows are Greenlawn Cemetery **facility buildings** (Garage, Greenhouse Garage, Office, Dickson Chapel), not burying grounds — dropped to shared emblem (operator). The 1 `ENTERTAINMENT` "cemetery" hit was **"Burying Point Productions"** (a business) — excluded. All real historic cemeteries are inside the 107.
+
+**Shared category/subcategory emblems (~90) — marker == hero for everyone else (~1,911 POIs):**
+- The other **460** `HISTORICAL_LANDMARKS` (zero subcategory — undifferentiated) → **one** shared "landmark" emblem for now. _Expand later when subcategorized; operator: "we can always expand later."_
+- All commercial categories → ~80 emblems keyed on `category × subcategory` (commercial bucket has ~65 distinct subcategories; category-level fallback where subcategory is null).
+- CIVIC / PARKS_REC / EDUCATION → category emblems.
+
+**POI markers for the bespoke set — LOCKED S299:**
+- **107 HIST_BLDG → reuse Katrina's 107 ghost badges** (already shipped) as their *map markers* — Collection↔map continuity. Bespoke woodcut hero in the detail sheet; badge marks the POI on the map.
+- **17 WORSHIP → woodcut category circle marker** (the planned `poi-circle-icon` class, §4 — a church glyph). No Collection/badge expansion; worship POIs have no ghost badge.
+
+**Net production run:** 124 bespoke heroes + ~90 shared emblems ≈ **214 images** (was ~2,000 in the S298 first cut — ~9× reduction). See updated §6.
+
 ## 4. Per-class application — PROPOSED (operator to confirm/adjust)
 
 Dimensions & path contracts below are pulled from the S298 runtime-consumer map; the **style/composition** rows are proposals.
@@ -74,7 +99,7 @@ Dimensions & path contracts below are pulled from the S298 runtime-consumer map;
 - **Shared positive base:** `ink-comic woodcut illustration, heavy black ink outlines, flat cel shading, 1692 Salem broadsheet woodcut style, muted period palette parchment cream grey earthy brown charcoal, 2D illustration`
 - **Shared negative base:** `photorealistic, photograph, 3d render, soft airbrush, gradient, painterly, text, typography, letters, watermark, signature, modern objects, bright saturated colors, neon, purple dominant, gore, nude, deformed, low quality`
 - **Per-class scaffold rules (LEARNED S298 — see `tools/art-bible-samples/`):**
-  - **Heroes:** add `hand-printed broadsheet texture`, `centered safe-band composition`. Teal only for supernatural/window-glow; daytime buildings stay muted.
+  - **Heroes — HAUNTED MOOD, LOCKED S299 (variant "h3").** Operator feedback on the first daytime pilot: too lifelike, no Salem Witch-City flavor. Heroes are **moonlit-night, spooky-Halloween storybook** scenes: `bold stylized ink-comic woodcut, thick black ink outlines, flat graphic cel shading, high contrast, moonlit night, full moon, drifting fog, gnarled twisted bare trees in dark silhouette, circling crows and bats, long dramatic shadows`. **The building stays brightly moonlit + legible** (`light cream walls, warm glowing candlelit windows standing out against the dark sky`) — do NOT let it go to black silhouette. **Ghost-teal is a night-sky accent, not a wash** (`ghost-teal cyan moonlight accents in the sky, mostly muted`). Render at **cfg ~4.0, 9 steps**. NEG adds `daytime, bright sunny, cheerful, mundane, realistic, lifelike` + `dark building, black silhouette building, teal building, building in shadow`. DROP `hand-printed broadsheet texture` (it induced gibberish caption text). Keep `subject centered in clear central band` for the centerCrop. Reference generator: `tools/art-bible-samples/render_hero_haunted.py` (STYLE_H3). _Tradeoff accepted: teal exceeds the §2 "<8%" base rule in the night sky — heroes are the sanctioned exception; all other classes keep the restrained palette._
   - **Icons / markers:** **DO NOT** add `broadsheet texture` / `hand-printed` — it induces gibberish typography (food-icon sample grew fake text). Add `single centered, one emblem, simple bold, parchment ground`. Markers: keep detail minimal to read at 48–96 px (validated).
   - **Portraits / mortal figures:** NO teal (correct — sample read as period sepia). Reserve teal for ghosts/supernatural.
   - **Splash / Katrina:** teal accent shines (eyes/hat/wisps) — sample validated.
@@ -88,7 +113,8 @@ All classes rendered and visually confirmed on-style: heroes ✅ (fit-tested bot
 
 | Class | Today | Target |
 |---|---|---|
-| POI heroes | 280 / 2039 working (13%) | all live POIs |
+| POI heroes (bespoke) | 280 / 2039 working (13%) | **124** — 107 HIST_BLDG + 17 WORSHIP (§4.1) |
+| Category/subcategory emblems (marker == hero) | photoreal, partial coverage | **~90** — cover all ~1,911 non-bespoke POIs (§4.1) |
 | Ghosts | 107 (HIST_BLDG only) | decide: expand beyond HIST_BLDG? |
 | POI icons / circle | full category coverage | re-style all |
 | Splash / welcome / find | exists, photoreal/mixed | re-style all |

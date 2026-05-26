@@ -120,3 +120,6 @@ tools/historical-maps/1851/
 tools/historical-maps/1874/
 tools/historical-maps/1906/
 tools/historical-maps/1911/
+
+# S299 graphics pre-redo backups (large, local-only)
+backups/
