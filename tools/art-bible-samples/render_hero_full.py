@@ -45,8 +45,19 @@ def has_text(img, min_conf=0.30, min_chars=3):
     hits = [(t, c) for (_b, t, c) in res if c >= min_conf and len(t.strip()) >= min_chars]
     return (len(hits) > 0), hits
 
+# Subject-specific negative guards (S299): memorials/statues/fountains/sites kept
+# drifting to churches/houses. Block large buildings on those subjects.
+NO_BUILDING_NEG = ", church, steeple, chapel, large building, house, mansion, cathedral, tower"
+def neg_for(prompt):
+    p = prompt.lower()
+    if any(k in p for k in ("stone memorial", "bronze statue", "stone fountain",
+                            "memorial arch", "historic site of", "militia memorial",
+                            "single monument")):
+        return H.NEG_H3 + NO_BUILDING_NEG
+    return H.NEG_H3
+
 def gen(prompt, seed):
-    payload = {"prompt": f"{prompt}, {H.STYLE_H3}", "negative_prompt": H.NEG_H3, "steps": 9,
+    payload = {"prompt": f"{prompt}, {H.STYLE_H3}", "negative_prompt": neg_for(prompt), "steps": 9,
                "cfg_scale": CFG, "sampler_name": "DPM++ SDE", "seed": seed,
                "width": MW, "height": MH,
                "override_settings": {"sd_model_checkpoint": CHECKPOINT}}
@@ -57,6 +68,14 @@ def gen(prompt, seed):
 
 def main():
     pois = json.load(open(HERE / "bespoke_full.json"))
+    # optional subset: --ids a,b,c (forces re-render of just those)
+    only_ids = None
+    for a in sys.argv:
+        if a.startswith("--ids="):
+            only_ids = set(a.split("=", 1)[1].split(","))
+    if only_ids:
+        pois = [p for p in pois if p["id"] in only_ids]
+        globals()["FORCE"] = True
     manifest, t0, done = [], time.time(), 0
     for i, poi in enumerate(pois, 1):
         pid = poi["id"]
@@ -84,7 +103,8 @@ def main():
                          "prompt": prompt, "retries": retries, "clean": clean})
         print(f"[{i}/{len(pois)}] {pid}  retries={retries} clean={clean}  "
               f"({time.time()-t0:.0f}s)", flush=True)
-    json.dump(manifest, open(OUT / "manifest.json", "w"), indent=2)
+    if not only_ids:  # don't clobber the full manifest on a subset re-render
+        json.dump(manifest, open(OUT / "manifest.json", "w"), indent=2)
     print(f"DONE rendered={done} total={len(pois)} in {time.time()-t0:.0f}s -> {OUT}", flush=True)
 
 if __name__ == "__main__":

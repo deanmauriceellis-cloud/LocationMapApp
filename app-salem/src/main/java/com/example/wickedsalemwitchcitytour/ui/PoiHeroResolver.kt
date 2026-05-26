@@ -49,9 +49,9 @@ object PoiHeroResolver {
         // (colonial / literary / maritime / museum / witch-trial house).
         "TOUR_COMPANIES"      to "ghost_tour",
         "HISTORICAL_BUILDINGS" to "historic_house",
-        // S216 split — landmarks reuse the historic_house hero set for now;
-        // operator plans to regenerate distinct landmark imagery later.
-        "HISTORICAL_LANDMARKS" to "historic_house",
+        // S299: landmarks now have their own woodcut category scenes (distinct
+        // monument/marker motif) instead of reusing the historic_house set.
+        "HISTORICAL_LANDMARKS" to "landmarks",
         "FOOD_DRINK"          to "food_drink",
         "LODGING"             to "lodging",
         "ENTERTAINMENT"       to "entertainment",
@@ -66,6 +66,12 @@ object PoiHeroResolver {
         // never registered here — 52 + 5 POIs unnecessarily hit RedPlaceholder.
         "AUTO_SERVICES"       to "auto_services",
         "FINANCE"             to "finance",
+        // S299: previously-unmapped categories (SERVICES 64, APARTMENT 1) hit
+        // RedPlaceholder in retail; now have woodcut category scenes.
+        "SERVICES"            to "services",
+        "APARTMENT_BUILDING"  to "apartment_building",
+        "PARKING"             to "parking",
+        "FUEL_CHARGING"       to "fuel_charging",
     )
 
     /** Cached file listings per folder (filled lazily on first access). */

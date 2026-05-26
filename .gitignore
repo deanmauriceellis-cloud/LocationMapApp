@@ -123,3 +123,12 @@ tools/historical-maps/1911/
 
 # S299 graphics pre-redo backups (large, local-only)
 backups/
+
+# S299: generated art-bible sample renders (large, reproducible from the scripts; like assets/heroes)
+tools/art-bible-samples/out/
+tools/art-bible-samples/out_fit/
+tools/art-bible-samples/out_classes/
+tools/art-bible-samples/out_palette/
+tools/art-bible-samples/out_pilot/
+tools/art-bible-samples/out_haunted/
+tools/art-bible-samples/out_full/

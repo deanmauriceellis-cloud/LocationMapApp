@@ -16,7 +16,7 @@ Style/palette per docs/plans/graphics-art-bible.md:
   - muted period palette; ghost-teal accent ONLY on cemeteries (spectral fog),
     mortal/daytime buildings + churches stay muted (bible §2/§5).
 """
-import base64, hashlib, io, json, time
+import base64, hashlib, io, json, re, time
 from pathlib import Path
 import requests
 from PIL import Image
@@ -127,8 +127,55 @@ def subject_clause(poi):
             kind = denom[0] if denom else "New England clapboard church, steeple, tall arched windows"
         return f"{name}, a {period} {kind} in Salem Massachusetts, {MUTED}"
 
-    # HISTORICAL_BUILDINGS non-cemetery: a base building-kind is ALWAYS present
-    # (mined style clue, else name-shape fallback); material + setting are additive.
+    # S299 fix: HISTORICAL_BUILDINGS contains many NON-building subjects (statues,
+    # memorials, wharves, parks, fountains, arches, historic districts, villages).
+    # Detect those first and render the correct subject — but a building-NOUN in the
+    # name wins (e.g. "Ames Memorial Hall" is a hall, not a memorial monument).
+    nm = name.lower()
+    words = set(re.findall(r"[a-z]+", nm))  # token match avoids "ledger"->ledge, "parker"->park
+    BUILDING_NOUN = {"hall", "house", "church", "building", "store", "tavern", "inn",
+                     "library", "museum", "athenaeum", "center", "centre", "homestead",
+                     "mansion", "cabot", "school", "armory", "powderhouse"}
+    is_building_noun = bool(words & BUILDING_NOUN)
+    if not is_building_noun:
+        light = SPECTRAL if any(k in (nm + blurb.lower()) for k in SPECTRAL_TEXT) else TEAL
+        # ordered: most specific first
+        if "light station" in nm or "lighthouse" in words:
+            return (f"{name}, a historic lighthouse tower at the Salem harbor point, "
+                    f"stone base, lantern room, moored boats, {TEAL}")
+        if "wharf" in words:
+            return (f"{name}, a long weathered wooden wharf jutting into Salem harbor, "
+                    f"moored tall-ship with masts, pilings, drifting fog, {TEAL}")
+        if words & {"statue", "sculpture"}:
+            return (f"a weathered bronze statue of {name.replace(' Statue','').replace(' Sculpture','')} "
+                    f"on a tall stone pedestal in Salem Massachusetts, single monument centered, "
+                    f"bare trees behind, {light}")
+        if "arch" in words:
+            return (f"{name}, a grand carved stone memorial arch spanning a path in Salem, "
+                    f"bare trees, {light}")
+        if "fountain" in words:
+            return (f"{name}, an ornate carved stone fountain in a Salem square, bare trees, {light}")
+        if words & {"memorial", "monument", "ledge"}:
+            return (f"{name}, a solemn stone memorial in Salem Massachusetts, engraved granite "
+                    f"markers, low stone wall, bare gnarled trees, {light}")
+        if "muster" in words:
+            return (f"{name}, a colonial militia memorial monument in Salem, period muster "
+                    f"ground, bare trees, {light}")
+        if words & {"common", "park", "garden"}:
+            return (f"{name}, a moonlit Salem town common green, winding paths, iron fence, "
+                    f"gnarled bare trees, distant rooftops, {TEAL}")
+        if "village" in words:
+            return (f"{name}, a cluster of recreated 1630s colonial timber cottages and a "
+                    f"dugout, dirt paths, palisade, Salem, {TEAL}")
+        if "district" in words:
+            return (f"{name}, a row of historic Salem houses lining a cobblestone street, "
+                    f"Federal and colonial facades, streetscape, bare trees, {TEAL}")
+        if "site" in words:
+            return (f"the historic site of {name.replace(' Site','')} in Salem, an empty "
+                    f"colonial house lot with a stone marker and plaque, bare trees, {light}")
+
+    # building-kind ALWAYS present (mined style clue, else name-shape fallback);
+    # material + setting are additive.
     base = _mine(blurb, STYLE_CLUES, limit=1)
     if not base:
         n = name.lower()

@@ -52,7 +52,7 @@ import org.json.JSONObject
  * audio vs. view.
  *
  * Layout:
- *   - Top 20% of the initial window height: hero image (fitXY stretch)
+ *   - Top 20% of the initial window height: hero image (centerCrop, S299; 2.25:1 woodcut safe-band master)
  *   - Scrollable body: overview row (icon + name + type + address + phone)
  *     + Visit Website button + Overview / About / The Story narrative sections
  *     + "Things You Can Do" action buttons
@@ -246,10 +246,11 @@ class PoiDetailSheet : DialogFragment() {
         val heroOverlay = view.findViewById<TextView>(R.id.heroOverlayLabel)
         val btnClose = view.findViewById<TextView>(R.id.btnClose)
 
-        // Painterly category graphic fills a large hero — ~55% of screen,
-        // then overview + contact fields sit below.
+        // S299: hero banner unified to 20% of screen height across both paths
+        // (was 55% here). Woodcut category emblem now sits in the same 20% band
+        // as the bespoke heroes, centerCrop into the 2.25:1 safe band.
         val screenH = resources.displayMetrics.heightPixels
-        heroContainer.layoutParams.height = (screenH * 0.55).toInt()
+        heroContainer.layoutParams.height = (screenH * 0.20).toInt()
         heroContainer.requestLayout()
 
         heroImage.scaleType = ImageView.ScaleType.CENTER_CROP
