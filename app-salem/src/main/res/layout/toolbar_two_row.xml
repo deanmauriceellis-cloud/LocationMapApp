@@ -105,10 +105,10 @@
                 android:visibility="gone" />
         </FrameLayout>
 
-        <!-- S249 — SuperAdmin mode toggle. Visible only when
-             BuildDefaults.SUPER_ADMIN_ENABLED (debug builds). Tap toggles the
-             runtime override (`SuperAdminMode.allowNetwork`) that bypasses
-             V1_OFFLINE_ONLY for the parked external services
+        <!-- S249 — SuperAdmin mode toggle (user-facing label "Full Explore",
+             S302). Visible only when BuildDefaults.SUPER_ADMIN_ENABLED (debug
+             builds). Tap toggles the runtime override (`SuperAdminMode.allowNetwork`)
+             that bypasses V1_OFFLINE_ONLY for the parked external services
              (weather / MBTA / aircraft / METAR / webcams / radar). -->
         <FrameLayout
             android:id="@+id/toolbarSuperAdminWrap"
@@ -126,9 +126,32 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true"
-                android:contentDescription="SuperAdmin mode (toggle parked V1+ services)"
-                android:tooltipText="SuperAdmin mode (toggle)" />
+                android:contentDescription="Full Explore mode (toggle all capabilities)"
+                android:tooltipText="Full Explore mode (toggle)" />
         </FrameLayout>
+
+        <!-- S302 — "FULL EXPLORE" demo flag. A persistent ghost-teal pill shown
+             only while Full Explore (SuperAdmin) mode is active, so an audience
+             can see the app is in full-capability mode. Tap = toggle off. Lives
+             with the debug-only toggle above; R8-stripped in retail. -->
+        <TextView
+            android:id="@+id/toolbarFullExploreFlag"
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:paddingStart="9dp"
+            android:paddingEnd="9dp"
+            android:text="● FULL EXPLORE"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:background="@drawable/bg_full_explore_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Full Explore mode active — tap to turn off"
+            android:visibility="gone" />
 
         <ImageView
             android:id="@+id/toolbarWeatherIcon"

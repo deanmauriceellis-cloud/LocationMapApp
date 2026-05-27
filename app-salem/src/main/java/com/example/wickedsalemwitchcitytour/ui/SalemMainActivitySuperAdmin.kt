@@ -51,11 +51,17 @@ internal fun SalemMainActivity.wireSuperAdminToolbar() {
 
     wrap.visibility = View.VISIBLE
     refreshSuperAdminIconTint()
+    refreshFullExploreFlag()
+
+    // S302 — the "FULL EXPLORE" demo pill is just another way to hit the same
+    // toggle; tapping it turns the mode off (it's only visible while ON).
+    findViewById<View?>(R.id.toolbarFullExploreFlag)?.setOnClickListener { icon.performClick() }
 
     icon.setOnClickListener {
         val nowOn = !SuperAdminMode.isEnabled()
         SuperAdminMode.setEnabled(nowOn)
         refreshSuperAdminIconTint()
+        refreshFullExploreFlag()
         // S250 — flip slim-toolbar Weather/Alerts icon visibility (the 9-dot
         // grid dropdown rebuilds itself on each open, so it picks up the new
         // state automatically). onCreateOptionsMenu is stubbed so we don't
@@ -68,13 +74,23 @@ internal fun SalemMainActivity.wireSuperAdminToolbar() {
         // stay empty for the whole session.
         if (nowOn) kickDeferredSuperAdminFetches()
         val msg = if (nowOn) {
-            "SuperAdmin: ON — V1+ services unlocked (weather / MBTA / aircraft / radar / webcams). LAN cache-proxy required."
+            "Full Explore: ON — all capabilities unlocked (weather / MBTA / aircraft / radar / webcams). LAN cache-proxy required."
         } else {
-            "SuperAdmin: OFF — back to V1 offline."
+            "Full Explore: OFF — back to V1 offline."
         }
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-        DebugLogger.i(TAG, "SuperAdmin toggled → $nowOn")
+        DebugLogger.i(TAG, "Full Explore (SuperAdmin) toggled → $nowOn")
     }
+}
+
+/**
+ * S302 — show/hide the persistent "FULL EXPLORE" toolbar pill. Visible only
+ * while the mode is active so an audience can see the app is in full-capability
+ * mode. Mirrors [refreshSuperAdminIconTint]'s state source.
+ */
+internal fun SalemMainActivity.refreshFullExploreFlag() {
+    val flag = findViewById<View?>(R.id.toolbarFullExploreFlag) ?: return
+    flag.visibility = if (SuperAdminMode.isEnabled()) View.VISIBLE else View.GONE
 }
 
 /**
