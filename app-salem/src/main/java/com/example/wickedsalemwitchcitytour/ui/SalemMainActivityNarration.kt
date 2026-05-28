@@ -552,20 +552,33 @@ internal suspend fun SalemMainActivity.runSilenceFill() {
         return
     }
 
-    // ── S110 staleness gate ──
+    // ── S110 staleness gate ── (S303: dual-source + derived-speed escape)
     //    Suppress reach-out entirely when GPS is stale. Without
     //    this, the reach-out logic happily searches for the
     //    "nearest unnarrated POI" against a frozen position
     //    and cycles through every POI in the cluster — the
     //    bug that ran the user through downtown Salem while
     //    they were sitting at home.
+    //
+    //    S303 — kept the suppression, but the freshness clock now consults
+    //    both the Activity-observer clock and the ViewModel source-layer
+    //    clock (whichever is fresher), with a derived-speed escape that
+    //    treats consecutive-fix movement as proof the pipeline is alive.
+    //    Pre-S303, the 5/27 procA drive saw NARR-STATE REACH-OUT SUPPRESSED
+    //    while real GPS was flowing every 14s — the Activity observer had
+    //    fallen behind by a few seconds across an onPause/onResume cycle.
+    //    Tied to the same fix as the GPS-OBS heartbeat in
+    //    SalemMainActivity.kt; see motion-sensor-gate-also-bites-pixel-8.
     val now = System.currentTimeMillis()
-    val ageMs = if (lastFixAtMs == 0L) Long.MAX_VALUE else (now - lastFixAtMs)
-    if (ageMs > GPS_STALE_THRESHOLD_MS) {
+    val effectiveFixAtMs = maxOf(lastFixAtMs, viewModel.lastFixAtMs)
+    val ageMs = if (effectiveFixAtMs == 0L) Long.MAX_VALUE else (now - effectiveFixAtMs)
+    val derivedAlive = viewModel.derivedSpeedMps > 0.3f
+    if (ageMs > GPS_STALE_THRESHOLD_MS && !derivedAlive) {
         DebugLogger.w("NARR-STATE",
             "  REACH-OUT SUPPRESSED: GPS stale " +
             "(age=${if (ageMs == Long.MAX_VALUE) "never" else "${ageMs / 1000}s"}, " +
-            "threshold=${GPS_STALE_THRESHOLD_MS / 1000}s)")
+            "threshold=${GPS_STALE_THRESHOLD_MS / 1000}s, " +
+            "derivedSpeed=${"%.2f".format(viewModel.derivedSpeedMps)}mps)")
         clearNarrationHighlight()  // S112+: nothing more coming → no ring
         return
     }

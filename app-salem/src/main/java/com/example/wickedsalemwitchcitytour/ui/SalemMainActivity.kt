@@ -3473,7 +3473,19 @@ class SalemMainActivity : AppCompatActivity() {
             while (true) {
                 kotlinx.coroutines.delay(10_000L)
                 val now = System.currentTimeMillis()
-                if (lastFixAtMs == 0L) {
+                // S303: consult BOTH the Activity's observer-stamped clock
+                // and the ViewModel's source-layer clock. The Activity
+                // observer pauses on lifecycle hiccups (config change, brief
+                // onPause); the ViewModel collector keeps running across
+                // them. Pre-S303, a 7-second onPause during the 5/27 procA
+                // drive (19:10:04→19:10:11) was enough to start a
+                // HEARTBEAT-STALE cascade that suppressed narration for
+                // multiple minutes even though LocationManager was healthy
+                // at ~14s cadence. See
+                // docs/device-pulls/FINDINGS-pixel8-drive-2026-05-27.md.
+                val vmFixAtMs = viewModel.lastFixAtMs
+                val effectiveFixAtMs = maxOf(lastFixAtMs, vmFixAtMs)
+                if (effectiveFixAtMs == 0L) {
                     // Pre-first-fix — log every 30s while we wait
                     if (now - lastStaleLogAt >= 30_000L) {
                         DebugLogger.w("GPS-OBS", "HEARTBEAT no-fix-yet (waiting for first emission)")
@@ -3481,8 +3493,19 @@ class SalemMainActivity : AppCompatActivity() {
                     }
                     continue
                 }
-                val ageMs = now - lastFixAtMs
-                val isStale = ageMs > GPS_STALE_THRESHOLD_MS
+                val ageMs = now - effectiveFixAtMs
+                // S303: secondary alive-signal — if consecutive fixes show
+                // movement, the GPS pipeline is alive regardless of the
+                // observer-vs-source clock skew. Treat as not-stale.
+                val derivedAlive = viewModel.derivedSpeedMps > 0.3f
+                val isStale = ageMs > GPS_STALE_THRESHOLD_MS && !derivedAlive
+                if (BuildConfig.DEBUG && lastFixAtMs > 0L && vmFixAtMs > lastFixAtMs + 5_000L) {
+                    // Activity observer fell behind the source by >5s
+                    // — log once per cycle so the next field pull shows the
+                    // mismatch this fix is correcting for.
+                    DebugLogger.d("GPS-OBS",
+                        "observer-vs-source skew — activity=${(now - lastFixAtMs) / 1000}s viewModel=${(now - vmFixAtMs) / 1000}s derivedSpeed=${"%.2f".format(viewModel.derivedSpeedMps)}mps")
+                }
                 when {
                     // Transition: healthy → stale
                     isStale && !wasStale -> {

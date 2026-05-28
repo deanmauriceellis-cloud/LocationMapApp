@@ -54,6 +54,72 @@ class MainViewModel @Inject constructor(
     private val _currentLocation = MutableLiveData<LocationUpdate>()
     val currentLocation: LiveData<LocationUpdate> = _currentLocation
 
+    /**
+     * S303: location-source-layer freshness clock.
+     *
+     * Stamped inside the LocationManager flow's `.collect { … }` block on
+     * EVERY emission, before the LocationMode gate. Because `viewModelScope`
+     * outlives the Activity (config change, brief onPause, etc.), this
+     * timestamp keeps advancing even when the Activity's `currentLocation`
+     * observer is temporarily not delivering.
+     *
+     * The GPS-OBS heartbeat (`SalemMainActivity.observeViewModel`) and the
+     * narration reach-out staleness gate (`SalemMainActivityNarration:564`)
+     * consume `max(activity.lastFixAtMs, viewModel.lastFixAtMs)` so a healthy
+     * GPS pipeline with a paused activity observer no longer trips
+     * "HEARTBEAT STALE → narration reach-out suppressed".
+     *
+     * Root-cause story: see `docs/device-pulls/FINDINGS-pixel8-drive-2026-05-27.md`
+     * — the 5/27 procA drive logged `W/GPS-OBS: HEARTBEAT STALE` while
+     * `LocationManager.onLocationResult` was firing every ~14s; the
+     * Activity's onPause→onResume across 19:10:04–19:10:11 stranded the
+     * Activity's `lastFixAtMs` even though location flow was healthy.
+     * Memory: `reference_lenovo_motion_sensor_broken.md` (now renamed to
+     * "motion-sensor-gate-also-bites-pixel-8").
+     */
+    @Volatile var lastFixAtMs: Long = 0L
+        private set
+
+    /**
+     * S303: secondary "GPS pipeline really is alive" signal — derived speed
+     * from the last two fixes. Recorded at the same point as [lastFixAtMs]
+     * so it's visible to consumers without re-deriving. Stays 0 until the
+     * second fix arrives. Equivalent to `MotionTracker`'s S154 escape hatch
+     * but pure-GPS (no sensor dependency); 0.3 m/s ≈ slow-walk floor matches
+     * `STATIONARY_FREEZE_RADIUS_M` / `derived-speed escape` in
+     * `SalemMainActivity.kt:3679`.
+     */
+    @Volatile var derivedSpeedMps: Float = 0f
+        private set
+    private var lastFixLat: Double = 0.0
+    private var lastFixLng: Double = 0.0
+    private var lastFixSourceMs: Long = 0L
+
+    /**
+     * S303: shared stamp helper. Called from every LocationManager-flow
+     * collection point and the legacy push path so [lastFixAtMs] /
+     * [derivedSpeedMps] update on every raw fix, regardless of LocationMode
+     * or Activity lifecycle.
+     */
+    private fun stampFixSource(lat: Double, lng: Double) {
+        val now = System.currentTimeMillis()
+        if (lastFixSourceMs > 0L) {
+            val dtS = ((now - lastFixSourceMs).coerceAtLeast(1L)) / 1000.0
+            // Haversine, meters; flat-earth fine at neighborhood scale.
+            val dLat = Math.toRadians(lat - lastFixLat)
+            val dLng = Math.toRadians(lng - lastFixLng)
+            val a = Math.sin(dLat / 2).let { it * it } +
+                Math.cos(Math.toRadians(lastFixLat)) * Math.cos(Math.toRadians(lat)) *
+                Math.sin(dLng / 2).let { it * it }
+            val distM = 2 * 6_371_000.0 * Math.asin(Math.sqrt(a.coerceAtMost(1.0)))
+            derivedSpeedMps = (distM / dtS).toFloat()
+        }
+        lastFixLat = lat
+        lastFixLng = lng
+        lastFixSourceMs = now
+        lastFixAtMs = now
+    }
+
     // When a GPS fix lands outside the Salem bbox, the app pretends the user is
     // at the Samantha statue. Log the substitution once per transition so we
     // can see it in GPS-OBS without spamming on every fix.
@@ -146,6 +212,10 @@ class MainViewModel @Inject constructor(
         locationJob = viewModelScope.launch {
             locationManager.getLocationUpdates(intervalMs = 1_000L, minIntervalMs = 500L)
                 .collect { loc ->
+                    // S303: stamp the source-layer freshness BEFORE the
+                    // mode/dispatch gate so the heartbeat clock keeps ticking
+                    // even while walk-sim's MANUAL mode is masking real GPS.
+                    stampFixSource(loc.latitude, loc.longitude)
                     DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
                     if (_locationMode.value == LocationMode.GPS) {
                         _currentLocation.value = LocationUpdate(
@@ -180,6 +250,9 @@ class MainViewModel @Inject constructor(
         locationJob = viewModelScope.launch {
             locationManager.getLocationUpdates(intervalMs = intervalMs, minIntervalMs = minIntervalMs)
                 .collect { loc ->
+                    // S303: same source-layer stamp as the main collector
+                    // above — keep both paths in sync.
+                    stampFixSource(loc.latitude, loc.longitude)
                     DebugLogger.d(TAG, "GPS update: lat=${loc.latitude} lon=${loc.longitude} acc=${loc.accuracy}m spd=${loc.speed}m/s")
                     if (_locationMode.value == LocationMode.GPS) {
                         _currentLocation.value = LocationUpdate(
@@ -198,6 +271,8 @@ class MainViewModel @Inject constructor(
     fun startLocationUpdates() = onPermissionGranted()
 
     fun onGpsLocationUpdate(location: Location) {
+        // S303: legacy push path also stamps source-layer freshness.
+        stampFixSource(location.latitude, location.longitude)
         if (_locationMode.value == LocationMode.GPS) {
             _currentLocation.value = LocationUpdate(
                 point = clampAndLog(location.latitude, location.longitude, location.accuracy),

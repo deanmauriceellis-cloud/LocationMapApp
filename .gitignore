@@ -133,3 +133,7 @@ tools/art-bible-samples/out_pilot/
 tools/art-bible-samples/out_haunted/
 tools/art-bible-samples/out_full/
 tools/art-bible-samples/out_worship/
+
+# S303: raw device-pull dirs contain operator GPS trails + 27MB+ logs — keep local, don't commit (the FINDINGS-*.md analysis doc IS committed)
+docs/device-pulls/pixel8-*/
+docs/device-pulls/lenovo-*/
