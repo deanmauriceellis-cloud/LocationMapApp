@@ -58,24 +58,8 @@ function readLatestRoomIdentity() {
 }
 const ROOM_IDENTITY = readLatestRoomIdentity();
 
-if (!process.env.DATABASE_URL) {
-  try {
-    const envPath = path.resolve(__dirname, '../.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    for (const line of envContent.split('\n')) {
-      const t = line.trim();
-      if (!t || t.startsWith('#')) continue;
-      const eq = t.indexOf('=');
-      if (eq === -1) continue;
-      const k = t.slice(0, eq).trim();
-      let v = t.slice(eq + 1).trim();
-      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-        v = v.slice(1, -1);
-      }
-      if (!process.env[k]) process.env[k] = v;
-    }
-  } catch (_) {}
-}
+// S304 P0b: load cache-proxy/.env via the shared helper.
+require('../lib/env').loadEnv();
 if (!process.env.DATABASE_URL) {
   console.error('Error: DATABASE_URL is required');
   process.exit(1);
@@ -214,6 +198,11 @@ async function main() {
   console.log(`SQLite: ${SQLITE_PATH}\n`);
 
   const client = await pool.connect();
+  // S304 P0c: track release so the early-return branches below can release the
+  // client BEFORE pool.end() (otherwise pool.end() deadlocks against the
+  // still-checked-out client and the process hangs) without the finally
+  // double-releasing it (pg throws on a double release).
+  let released = false;
   let filters;
   const filtersWithPois = [];
   try {
@@ -221,6 +210,8 @@ async function main() {
     console.log(`PG: ${filters.length} collection filter(s)`);
     if (!filters.length) {
       console.log('No filters to bake. Done.');
+      client.release();
+      released = true;
       await pool.end();
       return;
     }
@@ -249,6 +240,8 @@ async function main() {
 
     if (DRY_RUN) {
       console.log('\nDRY RUN — no writes.');
+      client.release();
+      released = true;
       await pool.end();
       return;
     }
@@ -268,7 +261,7 @@ async function main() {
     try { await client.query('ROLLBACK'); } catch (_) {}
     throw err;
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 
   // Write to SQLite (only if the table exists in the current Room schema)

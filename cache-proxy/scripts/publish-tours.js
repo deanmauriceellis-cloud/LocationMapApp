@@ -30,24 +30,8 @@ const ASSETS_PATH = path.resolve(__dirname, '../../app-salem/src/main/assets/sal
 // S242: write directly to bundled asset (was via the now-deleted `:salem-content` intermediate).
 const SQLITE_PATH = ASSETS_PATH;
 
-if (!process.env.DATABASE_URL) {
-  try {
-    const envPath = path.resolve(__dirname, '../.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    for (const line of envContent.split('\n')) {
-      const t = line.trim();
-      if (!t || t.startsWith('#')) continue;
-      const eq = t.indexOf('=');
-      if (eq === -1) continue;
-      const k = t.slice(0, eq).trim();
-      let v = t.slice(eq + 1).trim();
-      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-        v = v.slice(1, -1);
-      }
-      if (!process.env[k]) process.env[k] = v;
-    }
-  } catch (_) {}
-}
+// S304 P0b: load cache-proxy/.env via the shared helper.
+require('../lib/env').loadEnv();
 if (!process.env.DATABASE_URL) {
   console.error('Error: DATABASE_URL is required');
   process.exit(1);
@@ -108,10 +92,9 @@ async function main() {
   }
   const db = new Database(SQLITE_PATH);
 
-  // Clear existing — full replace semantics
-  const toursDel = db.prepare('DELETE FROM tours').run();
-  const stopsDel = db.prepare('DELETE FROM tour_stops').run();
-  console.log(`Cleared ${toursDel.changes} tours + ${stopsDel.changes} tour_stops from SQLite`);
+  // S304 P0c: the full-replace DELETE now runs inside the insert transaction
+  // below, so a mid-load failure rolls back to the previously populated
+  // tours/tour_stops instead of leaving them empty in the shipped asset.
 
   const insertTour = db.prepare(`
     INSERT INTO tours (
@@ -139,6 +122,9 @@ async function main() {
   `);
 
   const insertAll = db.transaction(() => {
+    const toursDel = db.prepare('DELETE FROM tours').run();
+    const stopsDel = db.prepare('DELETE FROM tour_stops').run();
+    console.log(`Cleared ${toursDel.changes} tours + ${stopsDel.changes} tour_stops from SQLite`);
     for (const t of tours) {
       insertTour.run({
         id: t.id,

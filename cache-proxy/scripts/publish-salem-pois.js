@@ -48,25 +48,9 @@ const SQLITE_PATH = dbIdx !== -1
   ? process.argv[dbIdx + 1]
   : ASSETS_PATH;
 
-if (!process.env.DATABASE_URL) {
-  // Parse .env manually (no dotenv dependency)
-  const envPath = path.resolve(__dirname, '../.env');
-  try {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    for (const line of envContent.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      if (!process.env[key]) process.env[key] = val;
-    }
-  } catch (_) {}
-}
+// S304 P0b: load cache-proxy/.env via the shared helper (replaces the
+// hand-rolled inline parser this script used to carry).
+require('../lib/env').loadEnv();
 if (!process.env.DATABASE_URL) {
   console.error('Error: DATABASE_URL environment variable is required');
   process.exit(1);
@@ -238,20 +222,29 @@ async function main() {
   }
   const db = new Database(SQLITE_PATH);
 
-  // Drop + recreate so schema changes (e.g. S125 has_announce_narration)
-  // take effect. The bundled Room DB is always full-replaced by this
-  // script — no migration logic lives here.
-  db.exec('DROP TABLE IF EXISTS salem_pois');
-  db.exec(CREATE_TABLE_SQL);
-  console.log(`Rebuilt salem_pois table with current schema`);
+  // S304 P0c: wrap the schema replacement (DROP + CREATE + dead-table drops)
+  // in a single transaction so a partial failure can't leave salem_content.db
+  // with a missing salem_pois table baked into the shipped AAB. Mirrors the
+  // align-asset-schema-to-room.js (S262) pattern. The data load below stays in
+  // its own transaction; the chain's fail-fast (publish-all.js) halts before
+  // align/sign if either step throws.
+  const rebuildSchema = db.transaction(() => {
+    // Drop + recreate so schema changes (e.g. S125 has_announce_narration)
+    // take effect. The bundled Room DB is always full-replaced by this
+    // script — no migration logic lives here.
+    db.exec('DROP TABLE IF EXISTS salem_pois');
+    db.exec(CREATE_TABLE_SQL);
 
-  // S255: drop 3 dead tables left over from pre-S242 modules. None are
-  // in SalemContentDatabase's @Database(entities=…), so Room ignores
-  // them at runtime; they were just costing ~1 MB of asset budget. Run
-  // here so the next bake-then-ship sequence purges them.
-  for (const t of ['tour_pois', 'salem_businesses', 'narration_points']) {
-    db.exec(`DROP TABLE IF EXISTS ${t}`);
-  }
+    // S255: drop 3 dead tables left over from pre-S242 modules. None are
+    // in SalemContentDatabase's @Database(entities=…), so Room ignores
+    // them at runtime; they were just costing ~1 MB of asset budget. Run
+    // here so the next bake-then-ship sequence purges them.
+    for (const t of ['tour_pois', 'salem_businesses', 'narration_points']) {
+      db.exec(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
+  rebuildSchema();
+  console.log(`Rebuilt salem_pois table with current schema`);
   console.log(`Dropped 3 dead tables (tour_pois / salem_businesses / narration_points)`);
 
   // Prepare insert

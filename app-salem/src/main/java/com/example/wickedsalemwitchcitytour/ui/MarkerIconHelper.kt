@@ -208,11 +208,22 @@ object MarkerIconHelper {
     )
 
     /**
+     * S304 P0d: pure category → circle-icon asset-path lookup (no Context,
+     * JVM-testable). Lower-cases the category and returns the path stub under
+     * poi-circle-icons/ (without extension), or null if unmapped. Pinned by
+     * MarkerIconHelperLookupTest — it characterises the S216 footgun that
+     * historical_buildings and historical_landmarks intentionally share one
+     * icon, plus the S301 worship-glyph path.
+     */
+    internal fun circleIconAssetPath(category: String): String? =
+        CIRCLE_ICON_MAP[category.lowercase()]
+
+    /**
      * Load a circle icon PNG from assets, scaled to the given size in pixels.
      * Returns null if no matching icon exists for this category.
      */
     private fun loadCircleIcon(context: Context, category: String, sizePx: Int): Bitmap? {
-        val assetPath = CIRCLE_ICON_MAP[category.lowercase()] ?: return null
+        val assetPath = circleIconAssetPath(category) ?: return null
         val fullPath = "poi-circle-icons/$assetPath.webp"
         val key = "$fullPath|$sizePx"
 

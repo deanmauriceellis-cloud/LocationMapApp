@@ -70,24 +70,8 @@ function readLatestRoomIdentity() {
 }
 const ROOM_IDENTITY = readLatestRoomIdentity();
 
-if (!process.env.DATABASE_URL) {
-  try {
-    const envPath = path.resolve(__dirname, '../.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    for (const line of envContent.split('\n')) {
-      const t = line.trim();
-      if (!t || t.startsWith('#')) continue;
-      const eq = t.indexOf('=');
-      if (eq === -1) continue;
-      const k = t.slice(0, eq).trim();
-      let v = t.slice(eq + 1).trim();
-      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-        v = v.slice(1, -1);
-      }
-      if (!process.env[k]) process.env[k] = v;
-    }
-  } catch (_) {}
-}
+// S304 P0b: load cache-proxy/.env via the shared helper.
+require('../lib/env').loadEnv();
 if (!process.env.DATABASE_URL) {
   console.error('Error: DATABASE_URL is required');
   process.exit(1);
@@ -195,8 +179,9 @@ async function main() {
     );
   `);
 
-  const legsDel = db.prepare('DELETE FROM tour_legs').run();
-  console.log(`Cleared ${legsDel.changes} tour_legs from SQLite`);
+  // S304 P0c: the full-replace DELETE now runs inside the insert transaction
+  // below (the CREATE TABLE IF NOT EXISTS above is idempotent + non-destructive,
+  // so it can stay outside), making the clear + reload atomic.
 
   const insertLeg = db.prepare(`
     INSERT INTO tour_legs (
@@ -213,6 +198,8 @@ async function main() {
   `);
 
   const insertAll = db.transaction(() => {
+    const legsDel = db.prepare('DELETE FROM tour_legs').run();
+    console.log(`Cleared ${legsDel.changes} tour_legs from SQLite`);
     for (const l of legs) {
       const geometry = encodeGeometry(l.polyline_json);
       const edgeCount = Array.isArray(l.polyline_json) ? Math.max(0, l.polyline_json.length - 1) : 0;

@@ -83,4 +83,7 @@ dependencies {
     // realtime methods are no-op stubs gated upstream by V1_OFFLINE_ONLY.
 
     testImplementation 'junit:junit:4.13.2'
+    // S304 P0d — mock SharedPreferences for the MenuPrefs S206-mirror
+    // characterization test (mirrors app-salem's test-mock setup).
+    testImplementation 'org.mockito:mockito-core:5.11.0'
 }

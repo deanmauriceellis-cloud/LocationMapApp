@@ -29,7 +29,7 @@ The same product wears four different names depending on which layer you're touc
 - **Content-manifest signing key (S293, OMEN-025 Layer 2):** private RSA-2048 key at `~/keys/content-manifest.pem` (mode 0600, offline, gitignored — distinct from the APK upload keystore; OMEN-002). Public key committed (safe) at `app-salem/src/main/res/raw/content_manifest_pubkey.der` (SPKI DER) — the app embeds it to verify `content-manifest.json`/`.sig` at runtime, and `verify-bundled-assets.js` checks the shipped sig against this same key. Override the private-key path with `$MANIFEST_KEY_PATH`.
 - **AAB / APK artifacts:** `app-salem/build/outputs/bundle/release/app-salem-release.aab` / `apk/release/app-salem-release.apk`.
 - **Build commands:** `./gradlew :app-salem:assembleDebug` (debug APK) / `:app-salem:bundleRelease` (signed AAB) / `:app-salem:assembleRelease` (signed APK).
-- **Android publish chain (must run in order before any debug/release build):**
+- **Android publish chain (must run in order before any debug/release build).** **Preferred (S304): `node cache-proxy/scripts/publish-all.js`** — fail-fast orchestrator that runs all 6 steps below in this exact order and prints the `manifestHash` at the end (`--dry-run` runs steps 1–4 count-only with no writes and skips align/sign for a safe PG-connectivity/wiring check; `--from=N` resumes at step N). The manual 6-step sequence remains the canonical reference order and the fallback when a single step needs isolating:
   1. `node cache-proxy/scripts/publish-salem-pois.js`
   2. `node cache-proxy/scripts/publish-tours.js`
   3. `node cache-proxy/scripts/publish-tour-legs.js`
