@@ -266,4 +266,4 @@ Under the amended startup rule (2026-05-04, S224): `CLAUDE.md` + `MEMORY.md` aut
 
 **No master plan** — deleted 2026-04-23 (S161); pre-park snapshot lives at `docs/archive/Parked_WickedSalemWitchCityTour_MASTER_PLAN_removed_2026-04-23.md`. Do not treat it as a plan-of-record.
 
-_Document Version: 0.4.1 — `worker-activate/` module + `AndroidSecurity.md` reference added (S296, 2026-05-24, OMEN-025 Phase 1). Naming-disambiguation block added (S272 lint, 2026-05-16). Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._
+_Document Version: 0.4.2 — publish-chain Key Paths now point at the `publish-all.js` orchestrator (S304, 2026-05-29, tech-debt Phase 0). `worker-activate/` module + `AndroidSecurity.md` reference added (S296, 2026-05-24, OMEN-025 Phase 1). Naming-disambiguation block added (S272 lint, 2026-05-16). Lean-startup protocol introduced 2026-04-23 (S161). Rolling-window rolled up by Session 111 (2026-04-09). Original by OMEN Session 003 (2026-04-04)._
