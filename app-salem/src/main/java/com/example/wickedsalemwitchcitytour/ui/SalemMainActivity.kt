@@ -351,8 +351,8 @@ class SalemMainActivity : AppCompatActivity() {
      *  while(true) loop's lifecycle ownership readable. */
     private var gpsObsHeartbeatJob: kotlinx.coroutines.Job? = null
 
-    /** S243: auto-dump every 10s while resumed. Debug-only. */
-    private var autoDumpJob: kotlinx.coroutines.Job? = null
+    /** S243: auto-dump every 10s while resumed. Debug-only.
+     *  S305: migrated to jobCoordinator ("autoDump"). */
 
     /** S304 P1a: owns the Activity's named refresh/one-shot jobs (launch(name) /
      *  cancel(name) / cancelAll()). Launches in lifecycleScope so auto-cancel
@@ -404,8 +404,7 @@ class SalemMainActivity : AppCompatActivity() {
     // Status line manager (priority-based, replaces followBanner)
     internal lateinit var statusLineManager: StatusLineManager
 
-    // Debounced cache-only POI loader on map scroll
-    internal var cachePoiJob: Job? = null
+    // Debounced cache-only POI loader on map scroll — migrated to jobCoordinator ("cachePoi") S305
     // Debounced aircraft reload on scroll/zoom
     internal var aircraftReloadJob: Job? = null
 
@@ -1595,8 +1594,7 @@ class SalemMainActivity : AppCompatActivity() {
                 binding.mapView.controller.animateTo(p, targetZoom, null)
                 triggerFullSearch(p)
                 // Programmatic animateTo doesn't fire onScroll — schedule bbox POI refresh
-                cachePoiJob?.cancel()
-                cachePoiJob = lifecycleScope.launch {
+                jobCoordinator.launch("cachePoi") {
                     delay(2000)
                     loadCachedPoisForVisibleArea()
                 }
@@ -1661,8 +1659,8 @@ class SalemMainActivity : AppCompatActivity() {
      * the TCP collector stream rich without flooding it.
      */
     private fun startAutoMapDump() {
-        if (autoDumpJob?.isActive == true) return
-        autoDumpJob = lifecycleScope.launch {
+        if (jobCoordinator.isActive("autoDump")) return
+        jobCoordinator.launch("autoDump") {
             DebugLogger.i("MapDump", "auto-dump scheduler started (10s interval)")
             while (isActive) {
                 kotlinx.coroutines.delay(10_000L)
@@ -1676,8 +1674,7 @@ class SalemMainActivity : AppCompatActivity() {
     }
 
     private fun stopAutoMapDump() {
-        autoDumpJob?.cancel()
-        autoDumpJob = null
+        jobCoordinator.cancel("autoDump")
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1752,8 +1749,7 @@ class SalemMainActivity : AppCompatActivity() {
                 // markers with stale 8px icons need upgrading to labeled dots.
                 refreshNarrationIcons()
                 // Debounce: load cached POIs for visible bbox 500ms after scrolling stops
-                cachePoiJob?.cancel()
-                cachePoiJob = lifecycleScope.launch {
+                jobCoordinator.launch("cachePoi") {
                     delay(500)
                     if (filterAndMapActive) return@launch
                     if (findFilterActive) loadFilteredPois() else loadCachedPoisForVisibleArea()
@@ -3943,8 +3939,7 @@ class SalemMainActivity : AppCompatActivity() {
             } else {
                 // User-initiated search or category restore — data goes to proxy cache.
                 // Trigger a bbox refresh so the newly cached POIs appear on screen.
-                cachePoiJob?.cancel()
-                cachePoiJob = lifecycleScope.launch {
+                jobCoordinator.launch("cachePoi") {
                     delay(2000)
                     loadCachedPoisForVisibleArea()
                 }

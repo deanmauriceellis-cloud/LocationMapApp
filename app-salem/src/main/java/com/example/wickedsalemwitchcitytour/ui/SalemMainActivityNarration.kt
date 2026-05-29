@@ -21,7 +21,6 @@ import com.example.wickedsalemwitchcitytour.content.PoiContentPolicy
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
 import com.example.wickedsalemwitchcitytour.tour.*
 import com.example.wickedsalemwitchcitytour.ui.witchtrials.showWitchTrialsNewspaperDetailDialog
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
@@ -229,7 +228,7 @@ private var dwellPoisPlayed: Int = 0
  */
 private var narrationHighlightInner: Polygon? = null
 private var narrationHighlightOuter: Polygon? = null
-private var narrationHighlightAnimJob: Job? = null
+// narrationHighlightAnimJob migrated to jobCoordinator ("narrationHighlightAnim") S305
 
 /** S112+: visual radius of the inner highlight ring — small, hugs the POI icon. */
 private const val HIGHLIGHT_INNER_RADIUS_M = 5.0
@@ -1900,7 +1899,7 @@ internal fun SalemMainActivity.showNarrationHighlight(point: SalemPoi) {
 
     // Pulse the outer ring's alpha while narration is active.
     // 6-step cycle = 1.8 sec per pulse, alpha cycles 30 → 110 → 30.
-    narrationHighlightAnimJob = lifecycleScope.launch {
+    jobCoordinator.launch("narrationHighlightAnim") {
         var phase = 0
         while (isActive) {
             val targetAlpha = when (phase) {
@@ -1925,8 +1924,7 @@ internal fun SalemMainActivity.showNarrationHighlight(point: SalemPoi) {
  * Safe to call when no highlight is active.
  */
 internal fun SalemMainActivity.clearNarrationHighlight() {
-    narrationHighlightAnimJob?.cancel()
-    narrationHighlightAnimJob = null
+    jobCoordinator.cancel("narrationHighlightAnim")
     narrationHighlightInner?.let { binding.mapView.overlays.remove(it) }
     narrationHighlightOuter?.let { binding.mapView.overlays.remove(it) }
     narrationHighlightInner = null

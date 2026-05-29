@@ -1588,7 +1588,7 @@ internal fun SalemMainActivity.enterFilterAndMapMode(results: List<com.example.l
     filterAndMapResults = results
     filterAndMapLabel = label
     DebugLogger.i("SalemMainActivity", "enterFilterAndMapMode: $label (${results.size} results)")
-    DebugLogger.d("FilterMap", "ENTER mode label='$label' results=${results.size} cachePoiJob.active=${cachePoiJob?.isActive ?: false} populateJob.active=${populateJob?.isActive ?: false} idlePopulateJob.active=${idlePopulateJob?.isActive ?: false} overlays.size(pre)=${binding.mapView.overlays.size}")
+    DebugLogger.d("FilterMap", "ENTER mode label='$label' results=${results.size} cachePoiJob.active=${jobCoordinator.isActive("cachePoi")} populateJob.active=${populateJob?.isActive ?: false} idlePopulateJob.active=${idlePopulateJob?.isActive ?: false} overlays.size(pre)=${binding.mapView.overlays.size}")
 
     // S276 — search is its own mode. If a tour is running, pause it so the
     // route overlays drop and the user sees a clean search-result map; on
@@ -1992,8 +1992,7 @@ internal fun SalemMainActivity.goToLocation(point: GeoPoint, label: String) {
     binding.mapView.controller.animateTo(point, targetZoom, null)
     triggerFullSearch(point)
     // Programmatic animateTo doesn't fire onScroll — schedule bbox POI refresh
-    cachePoiJob?.cancel()
-    cachePoiJob = lifecycleScope.launch {
+    jobCoordinator.launch("cachePoi") {
         delay(2000)
         loadCachedPoisForVisibleArea()
     }

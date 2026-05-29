@@ -9,6 +9,7 @@ import com.example.locationmapapp.util.DebugLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * JobCoordinator — S304 tech-debt Phase 1a.
@@ -25,12 +26,18 @@ import kotlinx.coroutines.launch
  * pattern ~8 jobs hand-rolled), self-eviction on completion, and a single
  * [cancelAll] for onDestroy.
  *
- * Not thread-safe by design — every call site is the Activity's main thread,
- * matching the existing `lifecycleScope.launch { }` usage it replaces.
+ * Call sites are the Activity's main thread (matching the `lifecycleScope.launch`
+ * usage it replaces), but the [invokeOnCompletion] self-evict runs on whatever
+ * thread a job completes on — which is Main today (all jobs are Main-dispatched
+ * via lifecycleScope) but need not be once a future cluster completes inside
+ * `withContext(IO)`. The backing map is therefore a [ConcurrentHashMap] and the
+ * self-evict uses the atomic two-arg `remove(key, value)` so an off-Main
+ * completion can never corrupt the map or race a same-name relaunch (S304
+ * self-review finding).
  */
 class JobCoordinator(private val scope: CoroutineScope) {
 
-    private val jobs = HashMap<String, Job>()
+    private val jobs = ConcurrentHashMap<String, Job>()
 
     /**
      * Launch [block] under [name], first cancelling any prior job registered
@@ -42,9 +49,10 @@ class JobCoordinator(private val scope: CoroutineScope) {
         val job = scope.launch(block = block)
         jobs[name] = job
         // Self-evict on completion so the map / activeCount don't retain dead
-        // jobs. Guard against a newer same-name job having already replaced this
-        // entry (e.g. a rapid relaunch).
-        job.invokeOnCompletion { if (jobs[name] === job) jobs.remove(name) }
+        // jobs. The atomic two-arg remove drops the entry ONLY if this exact job
+        // is still mapped (Job uses identity equals), so a newer same-name job
+        // from a rapid relaunch is never clobbered — and it's safe off-Main.
+        job.invokeOnCompletion { jobs.remove(name, job) }
         return job
     }
 
