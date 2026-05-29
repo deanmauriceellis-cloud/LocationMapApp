@@ -35,14 +35,15 @@ It is **not one bug** — it's a confluence the review pulled apart. When 3D til
 
 ## Recommended fix order (ship-impact × reach × effort)
 
-**Tier 0 — ship-critical, do for Aug 1 (hits 100% of users):**
+**Tier 0 — ship-critical, do for Aug 1 (hits 100% of users): ✅ DONE + on-device-validated (S305).**
 - **#1** move the 370 MB archive copy off the main thread (gate map behind it / stream during splash). Plus the cold-start cluster: **#30** (first-launch-only background verify), **#31** (PlaceResolver off-main), **#32** (PolygonLibrary off-main), **#57** (splash decode).
+- **Shipped** `9ccdca0` (#1+#30: background extraction + splash `awaitReady()` gate + cheap repeat-launch verify) and `086361a` (#32+#13 ambient overlays off-main, #31 PlaceResolver off-main, #57 splash decode off-main). Fresh-install Pixel 8 pass: 370 MB copy 294 ms off-main (no ANR), 2nd-launch verify a 3 ms cheap probe (no scan), ambient overlays async-attach, operator-confirmed splash. (#13 — the ambient-overlay grid scan — folded in with #32 since they share the `setupMap` path. #31 not yet exercised on-device: needs LOCATION granted.)
 
 **Tier 1 — the 3D-tilt OOM regression (your parked item, now scoped):**
 - Geometry/zoom caps **#33 #24 #14**; `onTrimMemory` real eviction **critic-1 #29**; tile-cache sizing **critic-2**; bitmap downsampling **#28 #6 #21 #16 #19 #5**.
 
 **Tier 2 — steady-state perf (battery/jank/GC for every user):**
-- 30 fps unconditional invalidate **#11 #12**; `project()` allocations + culling **#9 #23 #10**; per-fix churn **#3 #17 #18 #35**; off-main cold-start scan **#13**.
+- 30 fps unconditional invalidate **#11 #12**; `project()` allocations + culling **#9 #23 #10**; per-fix churn **#3 #17 #18 #35**. _(#13 off-main cold-start scan — done in Tier 0.)_
 
 **Tier 3 — memory hygiene & correctness (lowers the OOM floor):**
 - Bitmap recycle/LRU sizing **#21 #29 #52 #59**; TTS engine shutdown dead-code **critic-3**; per-fix DB batching **#43**; the remaining lows.
