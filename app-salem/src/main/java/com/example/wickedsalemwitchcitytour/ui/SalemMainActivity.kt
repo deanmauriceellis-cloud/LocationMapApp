@@ -354,6 +354,14 @@ class SalemMainActivity : AppCompatActivity() {
     /** S243: auto-dump every 10s while resumed. Debug-only. */
     private var autoDumpJob: kotlinx.coroutines.Job? = null
 
+    /** S304 P1a: owns the Activity's named refresh/one-shot jobs (launch(name) /
+     *  cancel(name) / cancelAll()). Launches in lifecycleScope so auto-cancel
+     *  stays the backstop; cancelAll() in onDestroy makes teardown explicit. The
+     *  ~24 hand-managed `xxxJob: Job?` fields migrate into this cluster by
+     *  cluster. internal (not private) so the partial-class extension files can
+     *  reach it, like the job fields it replaces. */
+    internal val jobCoordinator by lazy { JobCoordinator(lifecycleScope) }
+
     /** S272: AudioDeviceCallback that pushes route-usability into AudioControl
      *  so the long-press menu's master switch greys out when the active audio
      *  output can't accept TTS (Bluetooth SCO-only / hearing aid). Registered
@@ -527,7 +535,7 @@ class SalemMainActivity : AppCompatActivity() {
     internal val floodOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
     internal val crossingOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
     internal val databaseOverlays = mutableListOf<org.osmdroid.views.overlay.Polygon>()
-    internal var geofenceReloadJob: Job? = null
+    // S304 P1a: geofenceReloadJob migrated into jobCoordinator ("geofenceReload").
     internal var pendingGeofenceRestore = false
     internal var alertPulseAnimation: android.view.animation.AlphaAnimation? = null
 
@@ -1169,6 +1177,11 @@ class SalemMainActivity : AppCompatActivity() {
         // visible to readers.
         gpsObsHeartbeatJob?.cancel()
         gpsObsHeartbeatJob = null
+        // S304 P1a: cancel jobs migrated into the JobCoordinator (currently
+        // geofenceReload; more clusters to follow). lifecycleScope still
+        // backstops; this is the single cancel-all that replaces the per-field
+        // hand cancels as clusters migrate in.
+        jobCoordinator.cancelAll()
         DebugLogger.i("SalemMainActivity","onDestroy()")
     }
 

@@ -92,8 +92,9 @@ internal fun SalemMainActivity.scheduleGeofenceReload() {
         || prefs.getBoolean(MenuPrefs.PREF_CROSSING_OVERLAY, false)
         || geofenceViewModel.hasInstalledDatabases()
     if (!anyEnabled) return
-    geofenceReloadJob?.cancel()
-    geofenceReloadJob = lifecycleScope.launch {
+    // S304 P1a: jobCoordinator.launch cancels any prior "geofenceReload" first
+    // (the debounce that used to be the manual geofenceReloadJob?.cancel()).
+    jobCoordinator.launch("geofenceReload") {
         delay(500)
         loadGeofenceZonesForVisibleArea()
     }
