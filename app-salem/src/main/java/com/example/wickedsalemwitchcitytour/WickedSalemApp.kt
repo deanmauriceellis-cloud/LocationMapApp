@@ -60,7 +60,11 @@ class WickedSalemApp : Application() {
         }
 
         // 3. Extract bundled offline tiles to osmdroid base path on first launch.
-        OfflineTileManager.extractArchiveIfNeeded(applicationContext)
+        //    S305: started on a BACKGROUND thread (was a ~370 MB synchronous
+        //    main-thread copy here — the cold-start ANR, review finding #1).
+        //    SplashActivity gates its handoff to the map on
+        //    OfflineTileManager.awaitReady() so tiles are present before render.
+        OfflineTileManager.startExtraction(applicationContext)
 
         // 4. Warm up the splash TTS engine so SplashActivity can speak without
         //    eating a ~3-4s engine-bind delay on top of its animation budget.

@@ -31,8 +31,12 @@ import com.example.wickedsalemwitchcitytour.splash.PlaceKind
 import com.example.wickedsalemwitchcitytour.splash.PlaceResolver
 import com.example.wickedsalemwitchcitytour.splash.SplashEngine
 import com.example.wickedsalemwitchcitytour.splash.SplashTree
+import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import com.example.wickedsalemwitchcitytour.util.SplashVoice
 import com.google.android.gms.location.LocationServices
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Suppress("unused")
@@ -59,6 +63,13 @@ class SplashActivity : AppCompatActivity() {
         // TTS engine never reports onDone (engine crash, missing voice data, etc).
         private const val SPLASH_SAFETY_CAP_MS = 15_000L
         private const val SPLASH_UTTERANCE_ID = "splash_welcome"
+
+        // S305: hard cap on waiting for the background tile extraction before the
+        // map handoff. On a repeat launch this gate is near-instant (cheap probe);
+        // on a FIRST launch it covers the ~370 MB copy (slow eMMC on the min-spec
+        // Lenovo can take tens of seconds). Bounded so the splash can never hang
+        // forever even if extraction stalls — better a degraded map than a freeze.
+        private const val EXTRACTION_HARD_CAP_MS = 60_000L
 
         // S231 — splash line is now picked from the bundled splash_tree_v1.json
         // decision tree (authored in the web admin Splash Tree tab). This list
@@ -261,6 +272,27 @@ class SplashActivity : AppCompatActivity() {
 
     private fun launchMainActivity() {
         if (!launched.compareAndSet(false, true)) return
+        // S305: gate the handoff to the map on the background tile extraction
+        // (moved off Application.onCreate). On a repeat launch awaitReady() is
+        // near-instant; on a first launch it waits for the ~370 MB copy so the
+        // map never renders before tiles exist. Bounded by EXTRACTION_HARD_CAP_MS.
+        lifecycleScope.launch {
+            if (!OfflineTileManager.isReady()) {
+                // First launch — the copy is still running. Tell the user instead
+                // of leaving a silent, finished-looking splash.
+                findViewById<android.widget.TextView>(R.id.splashSubtitle)?.text =
+                    "Preparing your offline map…"
+            }
+            val ready = withTimeoutOrNull(EXTRACTION_HARD_CAP_MS) { OfflineTileManager.awaitReady() }
+            if (ready != true) {
+                DebugLogger.w("SplashActivity",
+                    "Tile extraction not confirmed ready (result=$ready) at gate — launching anyway")
+            }
+            doLaunchMain()
+        }
+    }
+
+    private fun doLaunchMain() {
         SplashVoice.shutdown()
         DebugLogger.i("SplashActivity", "Splash complete → launching SalemMainActivity")
         val intent = Intent(this, SalemMainActivity::class.java).apply {

@@ -12,6 +12,11 @@ package com.example.wickedsalemwitchcitytour.util
 import android.content.Context
 import androidx.preference.PreferenceManager
 import com.example.locationmapapp.util.DebugLogger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import java.io.File
 
@@ -36,6 +41,17 @@ object OfflineTileManager {
     private const val ARCHIVE_NAME = "salem_tiles.sqlite"
 
     /**
+     * S305 (perf/stability review finding #1, CRITICAL): the ~370 MB archive
+     * copy + verify used to run synchronously inside Application.onCreate — a
+     * multi-second main-thread freeze (cold-start ANR) on first launch and after
+     * every APK update, before the splash even appeared. It now runs on this
+     * background IO scope; callers gate the map handoff via [awaitReady].
+     */
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val ready = CompletableDeferred<Boolean>()
+    @Volatile private var started = false
+
+    /**
      * Set osmdroid's base path to the app's external files directory via
      * SharedPreferences. Must be called BEFORE Configuration.getInstance().load()
      * so that osmdroid picks up the path. This ensures scoped storage compatibility
@@ -53,11 +69,47 @@ object OfflineTileManager {
     }
 
     /**
-     * Ensure the tile archive is present at osmdroid's base path. Copies
-     * from the bundled APK asset on first launch, or when the on-disk
-     * archive's size differs from the asset's size (upgrade detection).
+     * Kick off tile-archive extraction + verification on a background thread.
+     * Idempotent — safe to call once from Application.onCreate. Copies the
+     * bundled APK asset to osmdroid's base path on first launch (or when the
+     * on-disk archive's size differs from the asset's — upgrade detection),
+     * then verifies it. Callers MUST [awaitReady] before rendering the map so
+     * tiles are present (the splash gates its handoff to the map on this).
+     *
+     * S305: replaces the old synchronous `extractArchiveIfNeeded` which blocked
+     * Application.onCreate (the cold-start ANR — review finding #1).
      */
-    fun extractArchiveIfNeeded(context: Context) {
+    fun startExtraction(context: Context) {
+        if (started) return
+        started = true
+        val app = context.applicationContext
+        ioScope.launch {
+            val ok = try {
+                extractAndVerifyBlocking(app)
+            } catch (e: Exception) {
+                DebugLogger.e(TAG, "Tile extraction failed: ${e.message}", e)
+                false
+            }
+            ready.complete(ok)
+        }
+    }
+
+    /**
+     * Suspend until [startExtraction]'s work has finished (success or failure),
+     * returning whether the archive is present + valid. Returns immediately once
+     * complete, so repeat callers and post-extraction launches don't block.
+     * If extraction was never started (e.g. a unit test), returns true (no gate).
+     */
+    suspend fun awaitReady(): Boolean = if (started) ready.await() else true
+
+    /** Non-suspending peek for UX (e.g. show a "preparing" splash hint). */
+    fun isReady(): Boolean = ready.isCompleted
+
+    /**
+     * The actual blocking copy + verify. Runs on [ioScope] (Dispatchers.IO).
+     * Returns true if the archive is present and verifies.
+     */
+    private fun extractAndVerifyBlocking(context: Context): Boolean {
         val basePath = Configuration.getInstance().osmdroidBasePath
         basePath.mkdirs()
         val archive = File(basePath, ARCHIVE_NAME)
@@ -74,57 +126,75 @@ object OfflineTileManager {
 
         if (needsCopy) {
             DebugLogger.i(TAG,
-                "Extracting $ARCHIVE_NAME from APK assets (on-disk=${archive.length()}, asset=$assetSize)"
+                "Extracting $ARCHIVE_NAME from APK assets (on-disk=${archive.length()}, asset=$assetSize) — background"
             )
+            val t0 = System.currentTimeMillis()
             try {
                 context.assets.open(ARCHIVE_NAME).use { input ->
                     archive.outputStream().use { output ->
                         input.copyTo(output, bufferSize = 64 * 1024)
                     }
                 }
-                DebugLogger.i(TAG, "Extracted ${archive.length() / 1024} KB to $archive")
+                DebugLogger.i(TAG,
+                    "Extracted ${archive.length() / 1024} KB in ${System.currentTimeMillis() - t0}ms to $archive")
             } catch (e: Exception) {
                 DebugLogger.e(TAG, "Failed to extract $ARCHIVE_NAME: ${e.message}", e)
-                return
+                return false
             }
         }
 
         val sizeMb = archive.length() / 1024.0 / 1024.0
         DebugLogger.i(TAG, "Tile archive present: ${"%.1f".format(sizeMb)} MB at $archive")
-        verifyArchive(archive)
+        // S305 (#30): the full per-provider GROUP BY scan over the 370 MB DB is
+        // only worth it right after a fresh copy. On a repeat launch a cheap
+        // open + single-row probe confirms the DB is valid without scanning.
+        return if (needsCopy) verifyArchiveFull(archive) else verifyArchiveCheap(archive)
     }
 
     /**
-     * Open the extracted SQLite archive and log tile counts per provider.
-     * This verifies the file is a valid database and the schema is correct.
+     * Full verification after a fresh copy: open the archive and log tile counts
+     * per provider. Confirms it's a valid DB with the expected `tiles` schema.
      */
-    private fun verifyArchive(file: File) {
-        try {
-            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+    private fun verifyArchiveFull(file: File): Boolean {
+        return try {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
                 file.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
-            )
-            val cursor = db.rawQuery(
-                "SELECT provider, COUNT(*) as cnt FROM tiles GROUP BY provider", null
-            )
-            val counts = mutableListOf<String>()
-            while (cursor.moveToNext()) {
-                val provider = cursor.getString(0)
-                val count = cursor.getInt(1)
-                counts.add("$provider=$count")
+            ).use { db ->
+                db.rawQuery(
+                    "SELECT provider, COUNT(*) as cnt FROM tiles GROUP BY provider", null
+                ).use { cursor ->
+                    val counts = mutableListOf<String>()
+                    while (cursor.moveToNext()) {
+                        counts.add("${cursor.getString(0)}=${cursor.getInt(1)}")
+                    }
+                    DebugLogger.i(TAG, "Archive verified (full): ${counts.joinToString(", ")} (${file.length() / 1024}KB)")
+                }
             }
-            cursor.close()
-
-            // Get zoom range
-            val zoomCursor = db.rawQuery(
-                "SELECT MIN(key), MAX(key) FROM tiles", null
-            )
-            zoomCursor.moveToFirst()
-            zoomCursor.close()
-
-            db.close()
-            DebugLogger.i(TAG, "Archive verified: ${counts.joinToString(", ")} (${file.length() / 1024}KB)")
+            true
         } catch (e: Exception) {
-            DebugLogger.e(TAG, "Archive verification failed: ${e.message}", e)
+            DebugLogger.e(TAG, "Archive full verification failed: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Cheap per-launch validity check: open the DB and confirm the `tiles`
+     * table responds to a single-row probe (no full-table scan).
+     */
+    private fun verifyArchiveCheap(file: File): Boolean {
+        return try {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                file.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            ).use { db ->
+                db.rawQuery("SELECT 1 FROM tiles LIMIT 1", null).use { c ->
+                    val ok = c.moveToFirst()
+                    DebugLogger.i(TAG, "Archive present + valid (cheap probe ok=$ok, ${file.length() / 1024}KB)")
+                    ok
+                }
+            }
+        } catch (e: Exception) {
+            DebugLogger.e(TAG, "Archive cheap verification failed: ${e.message}", e)
+            false
         }
     }
 }
