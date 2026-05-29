@@ -241,6 +241,9 @@ class SalemMainActivity : AppCompatActivity() {
      * [WickedAnimationOverlay] until the full WickedMapView migration lands.
      */
     private var wickedAnimationOverlay: WickedAnimationOverlay? = null
+    // S305 (#32+#13): guards the async ambient-overlay build so a second
+    // setupMap() during the off-main window can't double-launch it.
+    private var wickedOverlayInitStarted = false
 
     /**
      * S226: per-POI haunt-effect sprite overlay. Lives inside the same
@@ -1493,40 +1496,58 @@ class SalemMainActivity : AppCompatActivity() {
         // (feedback_basemap_priority_over_animation): roads / paths / buildings
         // / POI markers / GPS dot must render OVER animations. Animations are
         // background atmosphere only.
-        if (wickedAnimationOverlay == null) {
-            PolygonLibrary.load(this)
-            val water = PolygonLibrary.byKind("water")
-            val cemeteries = PolygonLibrary.byKind("cemetery")
-            val parks = PolygonLibrary.byKind("park")
-            val animations = mutableListOf<com.example.wickedsalemwitchcitytour.wickedmap.MapOverlay>()
-            if (water.isNotEmpty()) animations += AnimatedWaterOverlay(water)
-            if (cemeteries.isNotEmpty()) animations += FireflyOverlay(cemeteries)
-            if (parks.isNotEmpty()) animations += RollingGrassOverlay(parks)
+        if (wickedAnimationOverlay == null && !wickedOverlayInitStarted) {
+            wickedOverlayInitStarted = true
+            // S305 (#32 + #13): the 600 KB polygons.json parse AND the heavy
+            // point-in-polygon grid scans inside the AnimatedWaterOverlay /
+            // RollingGrassOverlay constructors used to run synchronously here on
+            // the main thread during onCreate→setupMap (cold-start jank/ANR).
+            // Build them off the main thread, then attach on Main. Animations
+            // are background atmosphere (feedback_basemap_priority_over_animation),
+            // so a frame-late attach is fine; still added at index 0 (bottom).
+            val appCtx = applicationContext
+            lifecycleScope.launch {
+                val built = withContext(Dispatchers.Default) {
+                    PolygonLibrary.load(appCtx)
+                    val water = PolygonLibrary.byKind("water")
+                    val cemeteries = PolygonLibrary.byKind("cemetery")
+                    val parks = PolygonLibrary.byKind("park")
+                    val list = mutableListOf<com.example.wickedsalemwitchcitytour.wickedmap.MapOverlay>()
+                    if (water.isNotEmpty()) list += AnimatedWaterOverlay(water)
+                    if (cemeteries.isNotEmpty()) list += FireflyOverlay(cemeteries)
+                    if (parks.isNotEmpty()) list += RollingGrassOverlay(parks)
+                    list to "water=${water.size} cemeteries=${cemeteries.size} parks=${parks.size}"
+                }
+                if (isFinishing || isDestroyed) return@launch
+                val animations = built.first
+                // S226: per-POI haunt overlay. Always added even if no haunt POIs
+                // are configured today — operator can flip a row in the admin tool
+                // and the next publish-chain bake will populate it. Built on Main
+                // (light — sprite frame decodes happen later via loadHauntConfigsAsync).
+                val sprites = SpriteOverlay(this@SalemMainActivity)
+                spriteOverlay = sprites
+                animations += sprites
+                // S237 — sprites billboard upright in the tilted scene via the
+                // TiltContainer pass-2 path. Tilt-aware short-circuit + back-ref
+                // so the parent can drive the upright draw at the right pixel.
+                sprites.tiltActiveSupplier = {
+                    binding.tiltContainer.getTiltDegrees() > 0f
+                }
+                binding.tiltContainer.spriteOverlayRef = sprites
+                loadHauntConfigsAsync()
 
-            // S226: per-POI haunt overlay. Always added even if no haunt POIs
-            // are configured today — operator can flip a row in the admin tool
-            // and the next publish-chain bake will populate it.
-            val sprites = SpriteOverlay(this)
-            spriteOverlay = sprites
-            animations += sprites
-            // S237 — sprites billboard upright in the tilted scene via the
-            // TiltContainer pass-2 path. Tilt-aware short-circuit + back-ref
-            // so the parent can drive the upright draw at the right pixel.
-            sprites.tiltActiveSupplier = {
-                binding.tiltContainer.getTiltDegrees() > 0f
-            }
-            binding.tiltContainer.spriteOverlayRef = sprites
-            loadHauntConfigsAsync()
-
-            if (animations.isNotEmpty()) {
-                wickedAnimationOverlay = WickedAnimationOverlay(animations)
-                binding.mapView.overlays.add(0, wickedAnimationOverlay)
-                DebugLogger.i(
-                    "SalemMainActivity",
-                    "WickedAnimationOverlay wired — water=${water.size} cemeteries=${cemeteries.size} parks=${parks.size} sprites=on",
-                )
-            } else {
-                DebugLogger.w("SalemMainActivity", "WickedAnimationOverlay skipped — PolygonLibrary returned no water/cemetery/park polygons")
+                if (animations.isNotEmpty()) {
+                    val overlay = WickedAnimationOverlay(animations)
+                    wickedAnimationOverlay = overlay
+                    binding.mapView.overlays.add(0, overlay)
+                    binding.mapView.invalidate()
+                    DebugLogger.i(
+                        "SalemMainActivity",
+                        "WickedAnimationOverlay wired (async, off-main build) — ${built.second} sprites=on",
+                    )
+                } else {
+                    DebugLogger.w("SalemMainActivity", "WickedAnimationOverlay skipped — PolygonLibrary returned no water/cemetery/park polygons")
+                }
             }
         }
         setupZoomSlider()

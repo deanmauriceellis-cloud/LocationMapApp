@@ -35,7 +35,9 @@ import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import com.example.wickedsalemwitchcitytour.util.SplashVoice
 import com.google.android.gms.location.LocationServices
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -125,8 +127,19 @@ class SplashActivity : AppCompatActivity() {
         val textContainer = findViewById<android.view.View>(R.id.splashTextContainer)
 
         val pickedSplash = KATRINA_SPLASHES.random()
-        splashImage.setImageResource(pickedSplash)
         DebugLogger.i("SplashActivity", "Katrina splash picked: resId=$pickedSplash (pool size=${KATRINA_SPLASHES.size})")
+        // S305 (#57): decode the full-screen Katrina JPEG OFF the main thread
+        // (was a ~3.2 MB synchronous main-thread decode via setImageResource,
+        // during the init-heaviest moment). inSampleSize to the display so
+        // oversized sources downsample; ARGB_8888 kept (RGB_565 would band the
+        // moody art). The window background covers the few ms until it lands.
+        lifecycleScope.launch {
+            val bmp = withContext(Dispatchers.Default) { decodeSampledSplash(pickedSplash) }
+            if (!isFinishing && !isDestroyed) {
+                if (bmp != null) splashImage.setImageBitmap(bmp)
+                else splashImage.setImageResource(pickedSplash) // rare decode failure → fall back
+            }
+        }
 
         // Speak the welcome line via the process-scoped SplashVoice engine
         // (warmed up in WickedSalemApp.onCreate). Splash does NOT transition on
@@ -237,17 +250,25 @@ class SplashActivity : AppCompatActivity() {
                         onContextResolved(null)
                         return@addOnSuccessListener
                     }
-                    val place = try {
-                        PlaceResolver.resolve(this, loc.latitude, loc.longitude)
-                    } catch (t: Throwable) {
-                        DebugLogger.e("SplashActivity", "PlaceResolver failed: ${t.message}")
-                        null
+                    // S305 (#31): PlaceResolver.resolve copies a 2.1 MB asset DB +
+                    // runs point-in-polygon queries — was on this (main-thread)
+                    // FusedLocation callback. Do it off the main thread, then pick
+                    // the splash line back on Main (onContextResolved touches TTS/UI).
+                    lifecycleScope.launch {
+                        val ctx = withContext(Dispatchers.Default) {
+                            val place = try {
+                                PlaceResolver.resolve(this@SplashActivity, loc.latitude, loc.longitude)
+                            } catch (t: Throwable) {
+                                DebugLogger.e("SplashActivity", "PlaceResolver failed: ${t.message}")
+                                null
+                            }
+                            LocationContextBuilder.build(
+                                loc,
+                                place?.takeIf { it.kind != PlaceKind.OFFGRID },
+                            )
+                        }
+                        onContextResolved(ctx)
                     }
-                    val ctx = LocationContextBuilder.build(
-                        loc,
-                        place?.takeIf { it.kind != PlaceKind.OFFGRID },
-                    )
-                    onContextResolved(ctx)
                 }
                 .addOnFailureListener { e ->
                     handler.removeCallbacks(timeoutRunnable)
@@ -304,6 +325,33 @@ class SplashActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
+    }
+
+    /**
+     * S305 (#57): decode a full-screen splash drawable downsampled to the
+     * display, keeping ARGB_8888 (the moody art bands in RGB_565). Bounds probe
+     * + power-of-two inSampleSize so an oversized source decodes to ~screen size
+     * instead of full-res. Returns null on failure (caller falls back).
+     */
+    private fun decodeSampledSplash(resId: Int): android.graphics.Bitmap? {
+        return try {
+            val probe = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeResource(resources, resId, probe)
+            val targetH = resources.displayMetrics.heightPixels.coerceAtLeast(1)
+            val targetW = resources.displayMetrics.widthPixels.coerceAtLeast(1)
+            var sample = 1
+            while (probe.outHeight / (sample * 2) >= targetH && probe.outWidth / (sample * 2) >= targetW) {
+                sample *= 2
+            }
+            val opts = android.graphics.BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+            }
+            android.graphics.BitmapFactory.decodeResource(resources, resId, opts)
+        } catch (e: Throwable) {
+            DebugLogger.e("SplashActivity", "splash decode failed: ${e.message}")
+            null
+        }
     }
 
     // Prevent back button from cancelling splash
