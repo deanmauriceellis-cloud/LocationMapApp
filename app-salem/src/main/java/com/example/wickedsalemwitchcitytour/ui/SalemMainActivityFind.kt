@@ -1280,7 +1280,13 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
                 startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
                 })
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                // S305 P5: was a silent empty catch. No dialer (e.g. wifi-only
+                // tablet → ActivityNotFoundException) left the tap doing nothing
+                // with no feedback or log. Now: user toast + field-log breadcrumb.
+                DebugLogger.w("Find", "Phone dial intent failed for '$phone': ${e.message}")
+                toast("No app available to place calls")
+            }
         }
     }
 
@@ -1358,7 +1364,11 @@ internal fun SalemMainActivity.showPoiDetailDialog(result: com.example.locationm
                     startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${result.phone}")).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
                     })
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    // S305 P5: was a silent empty catch (see Phone row above).
+                    DebugLogger.w("Find", "Phone dial intent failed for '${result.phone}': ${e.message}")
+                    toast("No app available to place calls")
+                }
             }
         }
     })
