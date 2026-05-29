@@ -44,13 +44,20 @@ The only genuinely pre-ship-critical work. Independent of the monolith.
 - **0d. Characterization tests for known footguns** (pure logic, cheap, high value): `MenuPrefs` S206 mirror defaults (`histLandmarkPrefDefault`/`civicPrefDefault`) and `MarkerIconHelper` category→asset resolution. These also become the regression net for later phases.
 - **Verify:** `node publish-all.js` dry-run against PG produces a clean signed manifest; `:core`/`:app-salem` unit tests green; cache-proxy starts. No on-device needed (no app code changed). Tag `cleanup-phase0-done`.
 
-## Phase 1 — Cross-cutting infra: JobCoordinator + MarkerController (MEDIUM risk, high leverage)
+## Phase 1 — Cross-cutting infra: JobCoordinator (MEDIUM risk, high leverage)
 
 Tame the leak/race surface *before* moving feature state — this is what makes Phases 3–4 safe.
 
-- **1a. `JobCoordinator`** — owns the 17 refresh `Job`s keyed by name; `register`/`cancel(name)`/`cancelAll()`; single `cancelAll()` call in `onDestroy`. Migrate jobs into it incrementally (one cluster per commit: transit jobs, aircraft jobs, poi/walk jobs...).
-- **1b. `MarkerController`** — owns map-overlay lifecycle: `add(type, marker)`, `clear(type)`, `invalidate()`. Collapses the 5× copy-paste `clearXxxMarkers()` and 3× `addXxxMarker()` patterns. Absorbs `narrationMarkerMutex`.
-- **Verify:** compile + unit; **on-device phase smoke**: GPS walk-sim on Pixel 8 confirms markers add/clear correctly, no leaked refresh loops after backgrounding (check Job logs), narration markers still render. Tag `cleanup-phase1-done`.
+- **1a. `JobCoordinator`** — owns the named refresh/one-shot `Job`s; `launch(name)` (auto cancel-before-relaunch) / `cancel(name)` / `cancelAll()`; single `cancelAll()` call in `onDestroy`. Migrate jobs into it incrementally (one cluster per commit). **DONE S304–S305.** Backing map is `ConcurrentHashMap` with an atomic self-evict (S305). Migrated clusters: `geofenceReload` (S304); `cachePoi`, `autoDump`, `narrationHighlightAnim` (S305). **Deliberately NOT migrated:**
+  - `gpsObsHeartbeatJob` — S303 fix, awaiting real-drive validation; don't muddy it.
+  - **Parked V1-disabled clusters** (transit / aircraft / webcam / metar / weather) — P3 quarantines them; migrating here = double work.
+  - **`walkSim`** — teardown uses `cancelAndJoin()` (the S125 stale-location/"map-bounce" fix) + self-detects cancellation via the field + coordinates with the HTTP walk path via `walkMutex`. JobCoordinator has no join → not a behavior-preserving move. To migrate later: add a `suspend fun cancelAndJoin(name)` to JobCoordinator + replace the `walkSimJob?.isCancelled` self-checks with `coroutineContext`-based checks, as its own reviewed commit.
+  - **populate cluster** (`populate`/`idle`/`probe`/`silentFill`) — recon Overpass-**network** tools; the `xxxJob != null` field is a cross-cluster "is-running" flag whose semantics differ from JobCoordinator's self-evicting `isActive()`; + `idlePopulateState` resume-state. **Moved to P3** (parked-isolation).
+- **1b. `MarkerController` — DEFERRED (S305 operator decision), redistributed to P3 + P4.** The originally-planned scope overlaps later phases and can't safely absorb the narration markers:
+  - The `clear*Marker()`/`add*Marker()` copy-paste it would collapse are overwhelmingly **parked features** (Aircraft / Transit train-subway-bus-station-busStop / Metar) → **folded into P3** (collapse them as part of quarantining, no double work).
+  - The genuinely **retail** overlay surface (tour route ×17, geofences ×7, POI markers, narration ×9, directions ×6, detour ×6) is large + rendering-sensitive (z-order / `bringToFront`) → **folded into P4** retail decomp.
+  - `narrationMarkerJob`/`narrationMarkerMutex` **must NOT be migrated**: the S234 mutex serialization is *deliberately* NOT cancel-before-relaunch (the cancel-and-restart pattern raced and double-attached 600+ markers). JobCoordinator's auto-cancel-prior would reintroduce that race. The mutex is already the correct pattern — leave it.
+- **Verify:** compile + unit; **on-device phase smoke**: GPS walk-sim on Pixel 8 confirms no leaked refresh loops after backgrounding (check Job logs) + narration/geofence/POI paths render. Tag `cleanup-phase1-done`.
 
 ## Phase 2 — Dead `hero/`/icon system retirement (LOW risk, pure subtraction)
 
@@ -66,6 +73,8 @@ Coordinates with the art-bible §7 retirement already on the graphics docket.
 Move each V1-disabled feature out of the Activity into a quarantined `parked/` package, flag-gated, compilable. ~3,300 LOC leaves the monolith surface.
 
 - One feature per commit + sub-tag: Radar → Metar → Webcam → Weather → Aircraft → Transit → Social. Each: move the partial-class file + its ViewModel into `.../parked/<feature>/`, keep the `FeatureFlags.V1_OFFLINE_ONLY` gate at the call site (`feedback_v1_gate_at_call_site`), confirm R8 still strips it in a release build.
+- **Absorbs the parked half of the old "1b MarkerController" (S305):** the copy-paste `clear*Marker()`/`add*Marker()` for Aircraft / Transit (train/subway/bus/station/busStop) / Metar move with their features into `parked/` — collapse the duplication there rather than building a coordinator that gets quarantined anyway.
+- **Absorbs the populate/idle/probe/silentFill recon cluster (S305):** Overpass-network tools, not retail. Move with the recon surface; their `xxxJob != null` "is-running" flags + `idlePopulateState` resume-state stay as-is (not folded into JobCoordinator — semantics differ from self-evicting `isActive()`).
 - **Verify:** debug compile (flag gated off = no behavior); one release `bundleRelease` + `apkanalyzer` confirms the parked code is stripped (no new dex/permissions). On-device: V1 app behaves identically (features stay invisible). Tag `cleanup-phase3-done`.
 
 ## Phase 4 — Migrate active-feature state into existing ViewModels (HIGH risk, the core decomp)
@@ -80,7 +89,7 @@ Order (smallest/least-coupled first to build confidence):
 - **4e. Narration** (1922) into NarrationManager/VM.
 - **4f. Tour** (2012) into TourViewModel — last, most coupled.
 - Add a characterization test per domain before moving its state (capture current observable behavior), so the move is test-guarded.
-- **Verify:** compile + unit per commit; **full on-device smoke walk per sub-phase** (tour start→narration→collection→markers→find). Tag after each: `cleanup-phase4a-done` … `cleanup-phase4f-done`.
+- **Absorbs the retail half of the old "1b MarkerController" (S305):** the rendering-sensitive overlay surface (tour route ×17, geofences ×7, POI markers, narration ×9, directions ×6, detour ×6) is migrated *with each domain's decomp* — e.g. the `MarkerController`/overlay-lifecycle helper, if still wanted, emerges from 4b (Populate→markers) + 4c (Geofences) + 4f (Tour) rather than as a standalone Phase-1 add. `narrationMarkerJob`/`narrationMarkerMutex` stay as the S234 mutex-serialized pattern (do NOT convert to cancel-before-relaunch).
 
 ## Phase 5 — Targeted correctness hardening (LOW–MEDIUM risk)
 
