@@ -12,6 +12,7 @@ package com.example.wickedsalemwitchcitytour.ui
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Matrix
+import com.example.locationmapapp.util.GpuCapability
 import android.graphics.Point
 import android.graphics.Rect
 import android.util.AttributeSet
@@ -121,6 +122,24 @@ class TiltContainer @JvmOverloads constructor(
     }
     private var mapListenerRegistered = false
 
+    // S308 — adaptive software-layer tilt for weak/virtualized GPUs. When the GPU
+    // can't composite the perspective-textured tile surface (GpuCapability not
+    // GOOD), the whole container renders via a software (Skia/CPU) layer while
+    // tilted. Container-sized (screen) bitmap, not the extended MapView, so it's
+    // ~1 screen of ARGB — well under GL_MAX_TEXTURE_SIZE on any real display.
+    private var softwareTiltActive = false
+    private var softwareInvalidatePending = false
+
+    // S308 — hoisted so it can be removeCallbacks'd on tilt-off / detach (an
+    // inline lambda can't be cancelled — removeCallbacks of a fresh lambda is a
+    // no-op). Without cancellation a callback dropped by a detach inside the
+    // ~83ms coalesce window would strand softwareInvalidatePending=true and
+    // freeze the software-layer view on a later re-tilt (weak GPU only).
+    private val softwareInvalidateRunnable = Runnable {
+        softwareInvalidatePending = false
+        invalidate()
+    }
+
     /**
      * S242 — single entry point for "MapView state changed under tilt, please
      * re-record pass-2." Used by the internal MapListener and by external
@@ -129,7 +148,30 @@ class TiltContainer @JvmOverloads constructor(
      * pass-2 doesn't run at tilt=0 anyway.
      */
     fun onMapStateChanged() {
-        if (tiltDeg > 0f) invalidate()
+        if (tiltDeg <= 0f) return
+        if (softwareTiltActive) {
+            // S308 — the software-layer raster is CPU-bound; coalesce per-GPS-fix /
+            // heading-up invalidations to a capped cadence so walk-sim under tilt
+            // doesn't ANR/slideshow on weak hardware. Hardware path stays immediate.
+            if (softwareInvalidatePending) return
+            softwareInvalidatePending = true
+            postDelayed(
+                softwareInvalidateRunnable,
+                (1000L / BuildDefaults.TILT_SOFTWARE_MAX_FPS).coerceAtLeast(1L),
+            )
+        } else {
+            invalidate()
+        }
+    }
+
+    // S308 — close the detach race: if the view detaches with a coalesced
+    // software-path invalidate still queued, drop it and clear the gate so a
+    // fresh attach + re-tilt starts clean (prevents a stranded pending flag on
+    // weak GPUs). GOOD devices never set the flag, so this is a no-op for them.
+    override fun onDetachedFromWindow() {
+        removeCallbacks(softwareInvalidateRunnable)
+        softwareInvalidatePending = false
+        super.onDetachedFromWindow()
     }
 
     fun setTiltDegrees(deg: Float) {
@@ -159,6 +201,36 @@ class TiltContainer @JvmOverloads constructor(
                     mapListenerRegistered = false
                 }
                 applyTiltZoomClamp(mv, nowActive)
+            }
+            // S308 — on weak/virtualized GPUs (BlueStacks, emulators, …) the tilted
+            // basemap tile composite corrupts to magenta because the tiles draw
+            // THROUGH the setPolyToPoly perspective matrix on a HARDWARE canvas (the
+            // GL texture-sample the driver fumbles). Force THIS container (the view
+            // that owns the canvas.concat in dispatchDraw) to a software layer while
+            // tilted so the whole composite rasterizes on Skia/CPU — no GL texture
+            // sampling, corruption gone. GOOD mobile GPUs (Adreno/Mali/…) are never
+            // flagged and stay byte-identical on the hardware fast path. The matrix,
+            // EXTRA_TOP_FRACTION and all extension geometry are UNTOUCHED — coverage
+            // preserved; this swaps only the rasterizer backend.
+            val wantSoftware = nowActive && GpuCapability.needsSoftwareTilt()
+            if (wantSoftware && !softwareTiltActive) {
+                setLayerType(LAYER_TYPE_SOFTWARE, null)
+                softwareTiltActive = true
+            } else if (!wantSoftware && softwareTiltActive) {
+                setLayerType(LAYER_TYPE_HARDWARE, null)
+                softwareTiltActive = false
+                // S308 — cancel any in-flight coalesced invalidate + clear the gate
+                // so a later re-tilt isn't starved by a stale pending flag.
+                removeCallbacks(softwareInvalidateRunnable)
+                softwareInvalidatePending = false
+            }
+            if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+                com.example.locationmapapp.util.DebugLogger.d(
+                    TAG,
+                    "tilt-layer: nowActive=$nowActive verdict=${GpuCapability.verdict} " +
+                        "needsSoftware=${GpuCapability.needsSoftwareTilt()} swActive=$softwareTiltActive " +
+                        "renderer='${GpuCapability.renderer}' maxTex=${GpuCapability.maxTextureSize}",
+                )
             }
         }
         invalidate()

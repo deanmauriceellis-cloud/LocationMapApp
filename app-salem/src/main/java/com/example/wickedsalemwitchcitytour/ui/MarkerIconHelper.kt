@@ -16,6 +16,7 @@ import android.graphics.drawable.Drawable
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import com.example.wickedsalemwitchcitytour.R
+import com.example.wickedsalemwitchcitytour.BuildConfig
 import com.example.locationmapapp.util.DebugLogger
 
 @Suppress("unused")
@@ -63,8 +64,30 @@ object MarkerIconHelper {
      * scale together; cache keys already include the resulting sizePx, so
      * per-device sizes cache independently.
      */
-    fun markerScale(context: Context): Float =
-        (context.resources.configuration.smallestScreenWidthDp / 411f).coerceIn(1f, 2.2f)
+    // S308 debug-only: log the marker-sizing inputs ONCE per distinct
+    // smallestScreenWidthDp (changes only on config change / rotation), so the
+    // hot per-marker path never floods. R8 strips this in release. Added to make
+    // the otherwise-silent markerScale() computation visible while debugging the
+    // BlueStacks (sw720dp @ mdpi) marker-size mismatch — see memory
+    // reference_bluestacks_remote_debug_channel.
+    @Volatile private var loggedScaleSwDp = -1
+
+    fun markerScale(context: Context): Float {
+        val swDp = context.resources.configuration.smallestScreenWidthDp
+        val scale = (swDp / 411f).coerceIn(1f, 2.2f)
+        if (BuildConfig.DEBUG && swDp != loggedScaleSwDp) {
+            loggedScaleSwDp = swDp
+            val dm = context.resources.displayMetrics
+            DebugLogger.d(
+                TAG,
+                "markerScale: swDp=$swDp densityDpi=${dm.densityDpi} density=${dm.density} " +
+                    "screenPx=${dm.widthPixels}x${dm.heightPixels} -> markerScale=$scale " +
+                    "(clamped 1.0..2.2 from swDp/411) effDensity[mDensity]=${dm.density * scale} " +
+                    "POI_GRAPHIC_RENDER_SCALE=$POI_GRAPHIC_RENDER_SCALE"
+            )
+        }
+        return scale
+    }
 
     /** Effective px-per-dp for marker rendering = displayMetrics.density × [markerScale]. */
     private fun mDensity(context: Context): Float =
