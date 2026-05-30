@@ -221,13 +221,13 @@ class HistoricalMapsBottomSheet : DialogFragment() {
                 year = null,
                 assetName = "thumb_modern.webp",
             ),
-            TileSpec(
-                title = "1692 — Salem Village",
-                source = "William P. Upham · BPL Leventhal",
-                description = "Witch-trials-era Salem Village (modern Danvers). Pan north to see Upham's reconstructed village.",
-                year = "1692",
-                assetName = "thumb_1692.webp",
-            ),
+            // S306 — 1692 Salem Village + 1911 Walker Atlas pulled to slim the
+            // bundle (operator: keep 1700 + 1851). Their tiles are removed from
+            // salem_tiles.sqlite (providers Historical-1692/1911) and stored at
+            // tools/tile-bake/dist/historical-removed-1692-1911-20260529.sqlite
+            // (+ full pre-pull backup salem_tiles.sqlite.preS306-all4historical-
+            // 20260529.bak). Re-add = INSERT those provider rows back + restore
+            // the TileSpec entry; no re-georef needed.
             TileSpec(
                 title = "1700 — Part of Salem",
                 source = "Phillips / Perley · U. of Virginia",
@@ -242,13 +242,7 @@ class HistoricalMapsBottomSheet : DialogFragment() {
                 year = "1851",
                 assetName = "thumb_1851.webp",
             ),
-            TileSpec(
-                title = "1911 — Walker Atlas",
-                source = "Walker Lithography · BPL Leventhal",
-                description = "Pre-Great-Salem-Fire (1914) city composite. Last view of Salem before the downtown rebuild.",
-                year = "1911",
-                assetName = "thumb_1911.webp",
-            ),
+            // S306 — 1911 Walker Atlas pulled with 1692 (see note above).
         )
 
         fun readYear(ctx: Context): String? =
