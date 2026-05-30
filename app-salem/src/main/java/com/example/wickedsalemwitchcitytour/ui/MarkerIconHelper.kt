@@ -50,6 +50,26 @@ object MarkerIconHelper {
     // ── Circle icon asset cache (witch-themed POI icons from Stable Diffusion) ──
     private val circleIconCache = mutableMapOf<String, Bitmap?>()
 
+    /**
+     * S306 — device-size-aware marker scale. dp sizing keeps a marker
+     * physically constant, which on a large low-density tablet makes it a tiny
+     * fraction of the screen: a 28dp badge is ~7% of a phone's width
+     * (sw≈411dp @ Pixel 8 420dpi) but only ~2.4% of the Lenovo TB305FU's
+     * (sw=711dp @ 180dpi, a 7.4" tablet showing ~3× the map area). Scale marker
+     * sizes UP on bigger screens so they stay readable on ANY device. Phone-
+     * class (sw≤411dp) = 1.0 (unchanged — Pixel is the reference); ramps with
+     * smallestScreenWidthDp, clamped to 2.2× for very large displays. Folded
+     * into the per-function `density` so the icon, ring, text and padding all
+     * scale together; cache keys already include the resulting sizePx, so
+     * per-device sizes cache independently.
+     */
+    fun markerScale(context: Context): Float =
+        (context.resources.configuration.smallestScreenWidthDp / 411f).coerceIn(1f, 2.2f)
+
+    /** Effective px-per-dp for marker rendering = displayMetrics.density × [markerScale]. */
+    private fun mDensity(context: Context): Float =
+        context.resources.displayMetrics.density * markerScale(context)
+
     /** OSM tag value → asset path under poi-circle-icons/ (without .png) */
     private val CIRCLE_ICON_MAP = mapOf(
         // Food & Drink
@@ -420,7 +440,7 @@ object MarkerIconHelper {
      * Get a marker icon directly from a drawable resource, with optional tint.
      */
     fun get(context: Context, resId: Int, sizeDp: Int = 28, tintColor: Int? = null): BitmapDrawable {
-        val px = (sizeDp * context.resources.displayMetrics.density).toInt()
+        val px = (sizeDp * mDensity(context)).toInt()
         val key = "$resId|$px|${tintColor ?: 0}"
         cache[key]?.let { return it }
 
@@ -447,7 +467,7 @@ object MarkerIconHelper {
      * @param sizeDp icon size — use 12 for dense/low-zoom, 20 for medium, 28 for close-up
      */
     fun dot(context: Context, category: String, sizeDp: Int = 12): BitmapDrawable {
-        val density = context.resources.displayMetrics.density
+        val density = mDensity(context)  // S306 — device-size-aware
         val sizePx = (sizeDp * density).toInt()
         val key = "cdot|$category|$sizePx"
         cache[key]?.let { return it }
@@ -473,7 +493,7 @@ object MarkerIconHelper {
         val key = "dot|$color"
         cache[key]?.let { return it }
 
-        val sizePx = (5 * context.resources.displayMetrics.density).toInt().coerceAtLeast(5)
+        val sizePx = (5 * mDensity(context)).toInt().coerceAtLeast(5)  // S306 — device-size-aware
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val cx = sizePx / 2f
@@ -505,7 +525,7 @@ object MarkerIconHelper {
      * @param key      stable cache key — pass the asset path
      */
     fun ghostBadge(context: Context, portrait: Bitmap, key: String, sizeDp: Int = 28): BitmapDrawable {
-        val density = context.resources.displayMetrics.density
+        val density = mDensity(context)  // S306 — device-size-aware
         val sizePx = (sizeDp * density).toInt().coerceAtLeast(8)
         val cacheKey = "ghost|$key|$sizePx"
         cache[cacheKey]?.let { return it }
@@ -546,7 +566,7 @@ object MarkerIconHelper {
      * Matches web app's cluster visualization.
      */
     fun clusterIcon(context: Context, count: Int, color: Int): BitmapDrawable {
-        val density = context.resources.displayMetrics.density
+        val density = mDensity(context)  // S306 — device-size-aware
         val radiusDp = when {
             count <= 5   -> 16
             count <= 20  -> 20
@@ -622,7 +642,7 @@ object MarkerIconHelper {
      */
     fun labeledDot(context: Context, category: String, name: String): BitmapDrawable {
         val (_, color) = CATEGORY_MAP[category.lowercase()] ?: DEFAULT
-        val density = context.resources.displayMetrics.density
+        val density = mDensity(context)  // S306 — device-size-aware
 
         // Humanize category: "fast_food" → "Fast Food"
         val typeLabel = category.replace('_', ' ')
