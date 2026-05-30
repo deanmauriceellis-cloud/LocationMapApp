@@ -39,14 +39,18 @@ It is **not one bug** — it's a confluence the review pulled apart. When 3D til
 - **#1** move the 370 MB archive copy off the main thread (gate map behind it / stream during splash). Plus the cold-start cluster: **#30** (first-launch-only background verify), **#31** (PlaceResolver off-main), **#32** (PolygonLibrary off-main), **#57** (splash decode).
 - **Shipped** `9ccdca0` (#1+#30: background extraction + splash `awaitReady()` gate + cheap repeat-launch verify) and `086361a` (#32+#13 ambient overlays off-main, #31 PlaceResolver off-main, #57 splash decode off-main). Fresh-install Pixel 8 pass: 370 MB copy 294 ms off-main (no ANR), 2nd-launch verify a 3 ms cheap probe (no scan), ambient overlays async-attach, operator-confirmed splash. (#13 — the ambient-overlay grid scan — folded in with #32 since they share the `setupMap` path. #31 not yet exercised on-device: needs LOCATION granted.)
 
-**Tier 1 — the 3D-tilt OOM regression (your parked item, now scoped):**
-- Geometry/zoom caps **#33 #24 #14**; `onTrimMemory` real eviction **critic-1 #29**; tile-cache sizing **critic-2**; bitmap downsampling **#28 #6 #21 #16 #19 #5**.
+**Tier 1 — the 3D-tilt OOM regression (your parked item): ✅ DONE + Pixel-8-validated, coverage-safe (S306).**
+- **Shipped** `dfbc99b`+`398102a`: **z19 tile-fetch clamp while tilted** (#14, driven from `setTiltDegrees` so FAB + saved-tilt restore both get it — COVERAGE-NEUTRAL: no z20 tiles exist in the bundle, native z19 fills the wedge identically); **ghost(384→192)/hero/dock downsampling** via a shared `SampledAssetDecoder` (#28/#6/#21/#19/#5); **`onTrimMemory` real eviction** of bitmap caches + `clearTileCache()`, no recycle (critic-1/#29).
+- **NOT shrunk (operator's hard constraint):** the wedge-fill geometry caps #33/#24 (`EXTRA_TOP_FRACTION`/`EXTRA_SIDE_CAP`) — REJECTED as written (a blank-space skeptic proved flat-2.5 opens a 13% dark void at 48°). The coverage-SAFE geometry cut = the **angle-proportional top fraction**, moved to Tier 3 (runtime-derived only). osmdroid tile-cache sizing (critic-2) deferred — z19 clamp already removed the z20 approximation layer.
 
-**Tier 2 — steady-state perf (battery/jank/GC for every user):**
-- 30 fps unconditional invalidate **#11 #12**; `project()` allocations + culling **#9 #23 #10**; per-fix churn **#3 #17 #18 #35**. _(#13 off-main cold-start scan — done in Tier 0.)_
+**Tier 2 — steady-state perf / jank: ✅ DONE for the tilt-jank cluster + Pixel-8-validated (S306).**
+- **Shipped** `398102a`: **ambient `WickedAnimationOverlay` suppressed under tilt** (#11/#12 — THE dominant jank driver; the 30fps re-record of the ~25 MP display list stops dead while tilted — verified 0 heartbeats in 14k tilted log lines — and resumes flat); **`dispatchDraw` alloc hoist** (#4/#8/#22/#25, iterate overlays in place + reuse Rect); **narration-pulse-under-tilt guard** (#7); **350ms FAB debounce** (#15, rapid taps → ANR).
+- **STILL OPEN (challenge):** deep-tilt-under-walk-sim ANR — Tier 2 killed the *ambient* churn, but continuous **heading-up/GPS per-fix redraws** under tilt still ANR'd on both devices. Remainder = **#3 #17 #18 #35** (per-fix marker re-add / ungated debug trigger rings / 3+ invalidates) + **#5 heading-up rotation re-record under tilt**; `project()` allocs **#9 #23 #10** also unaddressed.
 
-**Tier 3 — memory hygiene & correctness (lowers the OOM floor):**
-- Bitmap recycle/LRU sizing **#21 #29 #52 #59**; TTS engine shutdown dead-code **critic-3**; per-fix DB batching **#43**; the remaining lows.
+**Tier 3 — geometry cut + memory hygiene (deferred, pending the min-spec Lenovo 48° OOM test):**
+- **Angle-proportional `EXTRA_TOP_FRACTION`** (the coverage-SAFE way to cut the 25 MP viewport at 30–36° where users dwell — skeptic-proven, **runtime-derived from container W/H only**, never a hardcoded table) + optional **z18 deeper clamp** (softer horizon). Take ONLY if the Lenovo still OOMs after Tier 1+2.
+- Bitmap recycle/LRU sizing **#21 #29 #52 #59**; TTS shutdown dead-code **critic-3**; per-fix DB batching **#43**; remaining lows.
+- **Also new (S306): universal device-size-aware marker scaling** shipped (`1a59b1c`, `MarkerIconHelper.markerScale`) — fixes tiny markers on the low-density Lenovo tablet; operator finds it a touch too large → tune the base-dp/scale.
 
 **Note on the deferred `!!` triage:** the active-path `!!` audit folds into Tier 2/3 — but the error-hygiene reviewer found the bigger active-path crash/jank risks are the full-res main-thread bitmap decodes and ungated debug overlays above, not raw `!!`s (most of which are guarded).
 
