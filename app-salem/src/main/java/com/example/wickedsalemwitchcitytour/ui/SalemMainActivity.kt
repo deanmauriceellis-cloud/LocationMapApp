@@ -1206,6 +1206,25 @@ class SalemMainActivity : AppCompatActivity() {
             DebugLogger.i("SalemMainActivity", "onTrimMemory(level=$level) — dropping PolygonLibrary index")
             PolygonLibrary.unload()
         }
+        // S306 (PerfStabilityReview Tier 1, critic-1) — at CRITICAL pressure the
+        // old handler shed only the ~600 KB polygon index while the app held
+        // ~120–150 MB of tiles + tens of MB of bitmaps, so the LMK killed it
+        // instead of letting it recover. Evict the real consumers so CRITICAL
+        // becomes a transient re-decode/re-fetch, not a kill. SAFE: these
+        // clear()/evictAll() drop strong refs only (NO recycle()), so any live
+        // ImageView/overlay keeps its displayed bitmap; tiles re-fetch from the
+        // bundled offline archive (no network — V1-offline-safe). Also fires on
+        // the background TRIM levels (MODERATE/COMPLETE ≥ CRITICAL).
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+            DebugLogger.i("SalemMainActivity", "onTrimMemory(level=$level) — CRITICAL: evicting bitmap + tile caches")
+            GhostResolver.clearCache()
+            PoiHeroResolver.clearCache()
+            MarkerIconHelper.clearCache()
+            if (::binding.isInitialized && !isDestroyed) {
+                binding.mapView.tileProvider.clearTileCache()
+                binding.mapView.invalidate()
+            }
+        }
     }
 
     /**
@@ -1537,7 +1556,11 @@ class SalemMainActivity : AppCompatActivity() {
                 loadHauntConfigsAsync()
 
                 if (animations.isNotEmpty()) {
-                    val overlay = WickedAnimationOverlay(animations)
+                    // S306 — suppress the 30fps ambient re-record while 3D-tilted.
+                    val overlay = WickedAnimationOverlay(
+                        animations,
+                        tiltActiveSupplier = { binding.tiltContainer.getTiltDegrees() > 0f },
+                    )
                     wickedAnimationOverlay = overlay
                     binding.mapView.overlays.add(0, overlay)
                     binding.mapView.invalidate()
@@ -1931,7 +1954,16 @@ class SalemMainActivity : AppCompatActivity() {
         val tiltPrefs = getSharedPreferences(MenuPrefs.PREFS_NAME, MODE_PRIVATE)
         val savedTilt = tiltPrefs.getFloat(MenuPrefs.PREF_TILT_3D_DEG, 0f)
         binding.tiltContainer.setTiltDegrees(savedTilt)
+        // S306 (PerfStabilityReview Tier 2, #15) — debounce rapid 3D-FAB taps.
+        // Each tap re-layouts the ~12600px tilt-extended MapView + refetches
+        // tiles; 4 fast taps stormed the main thread into an ANR. A tap-rate cap
+        // is the safe fix — we deliberately do NOT async the S242 requestLayout
+        // in applyMapExtension (it guards a tile under-fetch race).
+        var lastTiltTapMs = 0L
         binding.btnTilt3d.setOnClickListener {
+            val nowMs = android.os.SystemClock.uptimeMillis()
+            if (nowMs - lastTiltTapMs < 350L) return@setOnClickListener
+            lastTiltTapMs = nowMs
             val cur = binding.tiltContainer.getTiltDegrees()
             val curIdx = tiltSteps.indexOfFirst { kotlin.math.abs(it - cur) < 0.5f }
                 .let { if (it < 0) 0 else it }

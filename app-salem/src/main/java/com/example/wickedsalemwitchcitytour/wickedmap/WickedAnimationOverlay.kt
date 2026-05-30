@@ -31,6 +31,18 @@ class WickedAnimationOverlay(
     private val overlays: List<MapOverlay>,
     /** Target frame interval in ms. ~33ms = 30fps; cheap enough to avoid ANRs. */
     private val frameIntervalMs: Long = 33L,
+    /**
+     * S306 (PerfStabilityReview Tier 2, #11/#12) — when this returns true (3D
+     * tilt engaged) the overlay skips BOTH its draw and its self-invalidate.
+     * The ambient animations are barely visible in the perspective distance but
+     * force a 30fps re-record of the giant tilt-extended display list (~25 MP) —
+     * the dominant tilt-jank driver (measured 61% janky frames). Suppressing
+     * them while tilted is near-invisible to the user and removes that churn
+     * entirely. The setTiltDegrees→0 transition invalidates the MapView, which
+     * re-enters draw() with tiltActive=false and resumes the loop. The lively
+     * map is fully intact in flat/normal use.
+     */
+    private val tiltActiveSupplier: () -> Boolean = { false },
 ) : Overlay() {
 
     private var nextFrameAtMs = 0L
@@ -55,6 +67,9 @@ class WickedAnimationOverlay(
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
         if (overlays.isEmpty()) return
+        // S306 — suppress ambient draw + stop the 30fps self-invalidate while
+        // tilted (re-entered + resumed by the tilt→0 transition's invalidate).
+        if (tiltActiveSupplier()) return
 
         val center = mapView.mapCenter
         val camera = CameraState(

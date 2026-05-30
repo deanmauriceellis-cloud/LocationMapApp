@@ -13,6 +13,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Point
+import android.graphics.Rect
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -94,6 +95,9 @@ class TiltContainer @JvmOverloads constructor(
     // Reused per-frame to avoid allocations in the hot path.
     private val billboardXY = FloatArray(2)
     private val billboardPt = Point()
+    // S306 (Tier 2, #22) — reused across the per-frame tilt marker loop so
+    // copyBounds() doesn't allocate a fresh Rect per marker per frame.
+    private val savedBoundsTmp = Rect()
 
     // S239 — MapListener that invalidates the tilt container on every scroll
     // and zoom event. Without this, View framework updates mv's RenderNode
@@ -154,6 +158,7 @@ class TiltContainer @JvmOverloads constructor(
                     mv.removeMapListener(mapListener)
                     mapListenerRegistered = false
                 }
+                applyTiltZoomClamp(mv, nowActive)
             }
         }
         invalidate()
@@ -303,6 +308,43 @@ class TiltContainer @JvmOverloads constructor(
         }
     }
 
+    /**
+     * S306 (PerfStabilityReview Tier 1) — clamp tile-fetch zoom while tilted.
+     * The bundled basemap maxes at z19 (no z20 tiles exist in salem_tiles.sqlite);
+     * at z20 osmdroid overzooms by upscaling z19 AND allocating a throwaway
+     * approximation bitmap per visible tile — multiplied across the ~13×
+     * tilt-extended viewport, a major slice of the tilt OOM. z19 fills the
+     * wedge IDENTICALLY with native tiles, so this is COVERAGE-NEUTRAL: it
+     * removes only the redundant upscale layer, never a tile (the operator's
+     * no-blank-wedge constraint is untouched). Restored to [MAP_MAX_OVERZOOM]
+     * on tilt-off. Driven from [setTiltDegrees] — the single funnel for both
+     * the 3D FAB and the cold-start saved-tilt restore — so neither path can
+     * bypass it. The grown tile cache is released under real memory pressure
+     * via SalemMainActivity.onTrimMemory (no clear-on-tilt-off, to avoid a
+     * flat-map tile reflow flicker on every toggle). Retail DEFAULT_ZOOM is
+     * 18, so the common case never reaches this clamp; only a user who
+     * manually zoomed to z20 then tilts is nudged to z19 (one step wider,
+     * never blank).
+     */
+    private fun applyTiltZoomClamp(mv: MapView, tiltOn: Boolean) {
+        if (tiltOn) {
+            if (mv.maxZoomLevel > TILT_MAX_FETCH_ZOOM) {
+                mv.maxZoomLevel = TILT_MAX_FETCH_ZOOM
+                if (mv.zoomLevelDouble > TILT_MAX_FETCH_ZOOM) {
+                    mv.controller.setZoom(TILT_MAX_FETCH_ZOOM)
+                }
+            }
+        } else if (mv.maxZoomLevel < MAP_MAX_OVERZOOM) {
+            mv.maxZoomLevel = MAP_MAX_OVERZOOM
+        }
+        if (com.example.wickedsalemwitchcitytour.BuildConfig.DEBUG) {
+            com.example.locationmapapp.util.DebugLogger.d(
+                TAG,
+                "applyTiltZoomClamp tiltOn=$tiltOn maxZoom=${mv.maxZoomLevel} zoom=${mv.zoomLevelDouble}",
+            )
+        }
+    }
+
     override fun dispatchDraw(canvas: Canvas) {
         if (dirty) rebuildMatrix()
         if (tiltDeg <= 0f) {
@@ -328,10 +370,10 @@ class TiltContainer @JvmOverloads constructor(
             spriteOverlayRef?.let { sprites ->
                 drawBillboardedSprites(canvas, mv, sprites)
             }
-            val markers = mv.overlays.filterIsInstance<Marker>()
-            if (markers.isNotEmpty()) {
-                drawBillboardedMarkers(canvas, mv, markers)
-            }
+            // S306 (Tier 2, #4/#8/#25) — iterate overlays in place; the old
+            // filterIsInstance<Marker>() allocated a fresh ~580-element ArrayList
+            // every frame while tilted (~36 MB/min of GC garbage on the OOM path).
+            drawBillboardedMarkers(canvas, mv)
         }
     }
 
@@ -350,7 +392,7 @@ class TiltContainer @JvmOverloads constructor(
         return BILLBOARD_FAR_SCALE + (BILLBOARD_NEAR_SCALE - BILLBOARD_FAR_SCALE) * frac
     }
 
-    private fun drawBillboardedMarkers(canvas: Canvas, mv: MapView, markers: List<Marker>) {
+    private fun drawBillboardedMarkers(canvas: Canvas, mv: MapView) {
         val proj = mv.projection
         val mvLeft = mv.left
         val mvTop = mv.top
@@ -379,8 +421,9 @@ class TiltContainer @JvmOverloads constructor(
         // sizes by the same factor so they appear identical in scale to the
         // sheared pass-1 path's fab-magnified icons.
         val fabScale = mv.scaleX
-        for (m in markers) {
-            if (!m.isEnabled) continue
+        for (o in mv.overlays) {
+            if (o !is Marker || !o.isEnabled) continue
+            val m: Marker = o
             val pos = m.position ?: continue
             val icon = m.icon ?: continue
             proj.toPixels(pos, billboardPt)
@@ -439,10 +482,10 @@ class TiltContainer @JvmOverloads constructor(
             val alphaInt = (markerAlpha * 255f).toInt().coerceIn(0, 255)
             val savedAlpha = icon.alpha
             if (alphaInt != 255) icon.alpha = alphaInt
-            val savedBounds = icon.copyBounds()
+            icon.copyBounds(savedBoundsTmp)  // S306 — into the reused Rect (no per-marker alloc)
             icon.setBounds(left, top, left + drawW, top + drawH)
             icon.draw(canvas)
-            icon.bounds = savedBounds
+            icon.bounds = savedBoundsTmp
             if (alphaInt != 255) icon.alpha = savedAlpha
         }
     }
@@ -505,6 +548,13 @@ class TiltContainer @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "TiltContainer"
+
+        // S306 — tile-fetch zoom ceiling while tilted (see applyTiltZoomClamp).
+        // Matches the basemap's native max (no z20 tiles exist), so clamping
+        // here removes osmdroid's z20 overzoom-approximation bitmaps without
+        // changing what fills the wedge. Restored to MAP_MAX_OVERZOOM (=20) on
+        // tilt-off. NOTE this is a memory clamp, NOT a coverage change.
+        private const val TILT_MAX_FETCH_ZOOM = 19.0
 
         // How much extra height MapView gets while tilted, as a fraction of
         // the TiltContainer's height. SYMMETRIC distribution: half above the

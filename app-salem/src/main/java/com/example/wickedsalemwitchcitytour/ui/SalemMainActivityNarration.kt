@@ -1912,7 +1912,15 @@ internal fun SalemMainActivity.showNarrationHighlight(point: SalemPoi) {
             }
             val outerNow = narrationHighlightOuter ?: break
             outerNow.fillPaint.alpha = targetAlpha
-            binding.mapView.postInvalidate()
+            // S306 (PerfStabilityReview Tier 2, #7) — under 3D tilt, skip the
+            // per-pulse full-MapView invalidate: the ring's alpha breathing is
+            // invisible under the perspective shear, but the invalidate
+            // re-records the ~25 MP tilted display list ~3.3×/sec for the whole
+            // narration (the core walk use case). The paint alpha still updates;
+            // it just repaints on the next natural redraw instead of forcing one.
+            if (binding.tiltContainer.getTiltDegrees() <= 0f) {
+                binding.mapView.postInvalidate()
+            }
             delay(300L)
             phase = (phase + 1) % 6
         }
