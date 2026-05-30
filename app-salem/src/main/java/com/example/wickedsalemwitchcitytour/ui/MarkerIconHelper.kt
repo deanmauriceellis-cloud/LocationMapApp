@@ -1138,5 +1138,16 @@ object MarkerIconHelper {
         return drawable
     }
 
-    fun clearCache() = cache.clear()
+    /**
+     * Drop both icon caches. Called from SalemMainActivity.onTrimMemory at
+     * CRITICAL pressure (S306 — critic-1). The labeled-marker [cache] is a
+     * bounded LinkedHashMap; [circleIconCache] is otherwise unbounded for the
+     * session, so clearing it here is the only release point. Drops strong
+     * refs only (no recycle) — live marker BitmapDrawables on the overlay
+     * keep their bitmap.
+     */
+    fun clearCache() {
+        cache.clear()
+        circleIconCache.clear()
+    }
 }

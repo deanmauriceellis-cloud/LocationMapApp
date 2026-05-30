@@ -10,7 +10,8 @@
 package com.example.wickedsalemwitchcitytour.ui
 
 import android.content.Context
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.util.LruCache
 import android.widget.ImageView
 import com.example.wickedsalemwitchcitytour.R
 import com.example.wickedsalemwitchcitytour.content.model.SalemPoi
@@ -33,6 +34,29 @@ import kotlin.math.abs
  *      no hero image and no category icons exist.
  */
 object PoiHeroResolver {
+
+    /**
+     * S306 (PerfStabilityReview Tier 1) — hero strip is ~screen-width × 20%
+     * height; heroes ship at 1152×512, so [HERO_REQ_W]×[HERO_REQ_H] yields
+     * inSampleSize=1 (no visible downsample) but caps any future oversized
+     * hero. The real win is the LRU below: [applyTo] was decoding the SAME
+     * 2.25 MB hero TWICE per PoiDetailSheet open (bindHero + bindOverview) on
+     * the main thread, uncached. The cache makes it decode once and re-binds
+     * instantly on re-open. Evicted on memory pressure (no recycle → live
+     * ImageViews keep their bitmap).
+     */
+    private const val HERO_REQ_W = 1080
+    private const val HERO_REQ_H = 480
+
+    /** ~8 MB shared LRU of decoded heroes keyed by asset path. */
+    private val heroCache = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
+
+    /** Drop cached hero bitmaps under memory pressure (see SalemMainActivity.onTrimMemory). */
+    fun clearCache() {
+        heroCache.evictAll()
+    }
 
     /**
      * SalemPoi.category (uppercase) → poi-icons folder mapping.
@@ -184,12 +208,13 @@ object PoiHeroResolver {
         val result = resolve(context, poi, forceCategoryFallback)
         when (result) {
             is HeroResult.AssetImage -> {
-                try {
-                    context.assets.open(result.assetPath).use { stream ->
-                        val bitmap = BitmapFactory.decodeStream(stream)
-                        imageView.setImageBitmap(bitmap)
-                    }
-                } catch (_: IOException) {
+                // S306 — sampled decode + LRU (decode-once per open; was 2× full-res).
+                val bitmap = heroCache.get(result.assetPath)
+                    ?: SampledAssetDecoder.decode(context, result.assetPath, HERO_REQ_W, HERO_REQ_H)
+                        ?.also { heroCache.put(result.assetPath, it) }
+                if (bitmap != null) {
+                    imageView.setImageBitmap(bitmap)
+                } else {
                     imageView.setImageResource(R.drawable.poi_hero_placeholder_red)
                     return HeroResult.RedPlaceholder
                 }

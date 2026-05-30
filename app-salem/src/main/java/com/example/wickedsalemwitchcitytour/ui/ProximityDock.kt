@@ -6,9 +6,10 @@
 package com.example.wickedsalemwitchcitytour.ui
 
 import android.content.Context
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -200,15 +201,35 @@ class ProximityDock(private val context: Context, private val rootView: View) {
             icons[abs(point.id.hashCode()) % icons.size]
         }
 
-        try {
-            context.assets.open("poi-icons/$folder/$iconFile").use { stream ->
-                val bitmap = BitmapFactory.decodeStream(stream)
-                imageView.setImageBitmap(bitmap)
-                imageView.clipToOutline = true
-                imageView.outlineProvider = CircularOutlineProvider()
-            }
-        } catch (e: IOException) {
-            // Fallback — no image
+        // S306 (PerfStabilityReview Tier 1) — most poi-icons are 1152×512 WebP
+        // (2.25 MB ARGB) and were decoded full-res, uncached, on the MAIN thread
+        // up to 10× per GPS fix (~22.5 MB transient churn on the walking path)
+        // for a ~48 dp dock circle. Now: sampled to ~DOCK_ICON_PX + a shared
+        // LRU so a queue refresh re-binds from cache instead of re-decoding.
+        val path = "poi-icons/$folder/$iconFile"
+        val bitmap = iconCache.get(path) ?: SampledAssetDecoder
+            .decode(context, path, DOCK_ICON_PX, DOCK_ICON_PX)
+            ?.also { iconCache.put(path, it) }
+        if (bitmap != null) {
+            imageView.setImageBitmap(bitmap)
+            imageView.clipToOutline = true
+            imageView.outlineProvider = CircularOutlineProvider()
+        }
+        // else: missing/undecodable asset — leave the ImageView empty (fallback).
+    }
+
+    companion object {
+        /**
+         * S306 — target px for dock-circle decode. The dock icon is ~48 dp;
+         * 128 px over-covers it at density ≤2.6 and keeps a 1152×512 source at
+         * inSampleSize=4 (→288×128, ~147 KB vs the full 2.25 MB). 128² source
+         * icons return inSampleSize=1 (unchanged).
+         */
+        private const val DOCK_ICON_PX = 128
+
+        /** ~3 MB shared LRU of decoded dock icons keyed by asset path. */
+        private val iconCache = object : LruCache<String, Bitmap>(3 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
         }
     }
 

@@ -11,11 +11,9 @@ package com.example.wickedsalemwitchcitytour.ui
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.LruCache
 import com.example.locationmapapp.util.DebugLogger
 import com.example.wickedsalemwitchcitytour.BuildConfig
-import java.io.IOException
 
 /**
  * S275 — Loads paired ghost portraits + frame overlays for the Katrina's Collection
@@ -44,6 +42,18 @@ object GhostResolver {
     /** Cached for repeated bytecode-stripped log calls. */
     private const val TAG = "GhostResolver"
 
+    /**
+     * S306 (PerfStabilityReview Tier 1) — decode ghost portraits/frames
+     * downsampled to this px ceiling instead of full 384². Ghosts render as
+     * map-marker badges (≤40 dp) and Collection tiles (64 dp); 192 px covers
+     * the largest (64 dp at density 3.0) with no upscale, while a 384² source
+     * decodes at inSampleSize=2 (→192²) = a 4× ARGB cut (576 KB → 144 KB).
+     * This kills the full-res re-decode storm through the 8 MB LRU that the
+     * S299/S301 redo introduced on the tilt hot path. Markers are NOT map
+     * tiles, so this cannot affect 3D wedge fill.
+     */
+    private const val TARGET_PX = 192
+
     /** Probability that a single ghost-view shows the B (smirk) portrait. */
     const val ALT_PROBABILITY: Double = 0.02
 
@@ -60,17 +70,15 @@ object GhostResolver {
     fun load(context: Context, assetPath: String?): Bitmap? {
         if (assetPath.isNullOrBlank()) return null
         cache.get(assetPath)?.let { return it }
-        return try {
-            context.assets.open(assetPath).use { input ->
-                BitmapFactory.decodeStream(input)?.also { bmp ->
-                    cache.put(assetPath, bmp)
-                    if (BuildConfig.DEBUG) DebugLogger.d(TAG, "loaded $assetPath -> ${bmp.width}x${bmp.height}")
-                }
-            }
-        } catch (e: IOException) {
-            if (BuildConfig.DEBUG) DebugLogger.d(TAG, "missing asset: $assetPath (${e.message})")
-            null
+        // S306 — two-pass sampled decode (≤TARGET_PX) instead of full-res.
+        val bmp = SampledAssetDecoder.decode(context, assetPath, TARGET_PX, TARGET_PX)
+        if (bmp != null) {
+            cache.put(assetPath, bmp)
+            if (BuildConfig.DEBUG) DebugLogger.d(TAG, "loaded $assetPath -> ${bmp.width}x${bmp.height} (sampled ≤${TARGET_PX}px)")
+        } else if (BuildConfig.DEBUG) {
+            DebugLogger.d(TAG, "missing/undecodable asset: $assetPath")
         }
+        return bmp
     }
 
     /**
