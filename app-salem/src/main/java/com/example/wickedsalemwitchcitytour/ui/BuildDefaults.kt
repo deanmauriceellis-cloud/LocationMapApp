@@ -57,17 +57,6 @@ object BuildDefaults {
     // so the dedicated 3D FAB ships in release/AAB builds.
     const val TILT_3D_ENABLED: Boolean = true
 
-    // S308 — adaptive tilt rendering for weak/virtualized GPUs (BlueStacks tile
-    // corruption: basemap tiles drawn THROUGH the setPolyToPoly perspective matrix
-    // on a HARDWARE canvas flicker magenta/cyan on virtualized/software GL drivers).
-    // Ships TRUE in RELEASE (NOT RECON-gated) — the safe behavior must reach paying
-    // users on weak/unknown GPUs. GOOD mobile GPUs (Adreno/Mali/…) skip it and keep
-    // the hardware fast path; non-GOOD route the tilted composite through a software
-    // (Skia/CPU) layer (correctness > speed). See GpuCapability.kt +
-    // docs/plans/adaptive-tilt-gpu-fix-2026-05-29.md.
-    const val TILT_SOFTWARE_LAYER_ON_WEAK_GPU: Boolean = true
-    const val TILT_SOFTWARE_MAX_FPS: Int = 12
-
     // OMEN-025 Phase 1 (S296) — activation gate dev affordances, same proven
     // RECON_DEFAULTS pattern as SUPER_ADMIN_ENABLED (const-folds + R8-strips in
     // release, identical safety story; see feedback_super_admin_runtime_override_pattern).

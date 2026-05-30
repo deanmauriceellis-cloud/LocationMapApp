@@ -11,8 +11,6 @@ package com.example.wickedsalemwitchcitytour
 
 import android.app.Application
 import com.example.locationmapapp.util.DebugLogger
-import com.example.locationmapapp.util.GpuCapability
-import com.example.wickedsalemwitchcitytour.ui.BuildDefaults
 import com.example.wickedsalemwitchcitytour.BuildConfig
 import com.example.wickedsalemwitchcitytour.util.OfflineTileManager
 import com.example.wickedsalemwitchcitytour.util.SplashVoice
@@ -35,14 +33,6 @@ class WickedSalemApp : Application() {
         //    drive bug investigation. Pull with `adb pull` after a session.
         DebugLogger.initFileSink(applicationContext)
         DebugLogger.i("WickedSalemApp", "onCreate — file sink wired up")
-
-        // 0b. S308 — probe GPU capability once (off-main, cached) so TiltContainer
-        //     can route the tilted basemap composite through a software layer on
-        //     weak/virtualized GPUs (BlueStacks, emulators, Chromebook ARC, bad
-        //     drivers) where the hardware perspective-textured tile draw corrupts
-        //     to magenta. GOOD mobile GPUs skip it; correctness > speed otherwise.
-        GpuCapability.setAvailable(BuildDefaults.TILT_SOFTWARE_LAYER_ON_WEAK_GPU)
-        GpuCapability.probe(applicationContext)
 
         // 0a. Debug-only TCP log streamer → collector PC running `nc -lk 4301`.
         //     Debug builds only — release/AAB must stay V1-offline per

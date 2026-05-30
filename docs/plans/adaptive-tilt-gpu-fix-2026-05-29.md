@@ -1,5 +1,7 @@
 # Adaptive Tilt-Tile GPU Fix — Implementation Plan (S308, 2026-05-29)
 
+> ⚠️ **STATUS: IMPLEMENTED, SHIPPED (`0b81e7e`), THEN REVERTED (S308 close, 2026-05-30).** On-device testing proved the software-layer approach does **not** fix the BlueStacks corruption: it is **renderer-agnostic texture-memory exhaustion on BlueStacks' virtualized GPU** under the tilt load (OpenGL fails full-screen, DirectX fails partially), and a software layer can't escape it because the HW-accelerated window still GL-composites the CPU bitmap. The premise below (corruption is the perspective composite specifically, fixable by routing tiles through CPU) was WRONG. Kept only as an investigation record. The corruption is NOT app-fixable while keeping HW-accel + the no-blank-wedge rule; real hardware is unaffected. See `docs/session-logs/session-308-2026-05-29.md`.
+
 > Source: design workflow `wf_8de33348-09e` (15 agents, adversarially verified). Problem: on weak/virtualized GPUs (BlueStacks GLES 3.0 canary) the osmdroid basemap **tile** layer corrupts under 3D tilt (magenta #FF00FF / cyan / bare green plane flicker) because tiles are drawn through a `setPolyToPoly` perspective matrix on a hardware-accelerated canvas; Canvas-drawn vector overlays stay perfect. Real devices (Pixel 8, Lenovo) render fine. Constraints: keep tilt on, keep wedge coverage (EXTRA_TOP_FRACTION=5.0 untouched), default-safe on unknown GPUs, no real-device regression, no ANR.
 
 ## Adversarial verdicts (5 strategies)
