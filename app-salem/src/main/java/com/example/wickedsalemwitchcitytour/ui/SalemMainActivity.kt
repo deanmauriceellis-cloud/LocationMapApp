@@ -2937,26 +2937,33 @@ class SalemMainActivity : AppCompatActivity() {
         poi: com.example.wickedsalemwitchcitytour.content.model.SalemPoi,
         zoom: Double
     ): android.graphics.drawable.BitmapDrawable {
+        // S307 — POI marker sizing. Piece 1: ghost badges share the regular POI
+        // size ladder at each zoom bucket (>=18 32dp / >=17 20 / >=15 12 / far 8)
+        // so they render identically — "the effects we do next apply to all".
+        // Piece 2: render all POI graphics 33% smaller via the single knob
+        // MarkerIconHelper.POI_GRAPHIC_RENDER_SCALE (0.67). Because badges == POI
+        // graphics now, one factor shrinks badges, circle-icon dots and labeled-
+        // marker icons equally. markerScale() (device-size) still sits in front.
+        val scale = MarkerIconHelper.POI_GRAPHIC_RENDER_SCALE
         val ghostA = poi.ghostAssetA
         if (!ghostA.isNullOrBlank()) {
             val badge = GhostResolver.load(this, ghostA)
             if (badge != null) {
-                // Badges carry more detail than dots → a touch larger per bucket.
-                val sizeDp = when {
-                    zoom >= 18 -> 40
-                    zoom >= 17 -> 30
-                    zoom >= 15 -> 24
-                    else -> 18
+                val baseDp = when {
+                    zoom >= 18 -> 32
+                    zoom >= 17 -> 20
+                    zoom >= 15 -> 12
+                    else -> 8
                 }
-                return MarkerIconHelper.ghostBadge(this, badge, ghostA, sizeDp)
+                return MarkerIconHelper.ghostBadge(this, badge, ghostA, Math.round(baseDp * scale))
             }
         }
         val type = poi.category.lowercase()
         return when {
-            zoom >= 18 -> MarkerIconHelper.labeledDot(this, type, poi.name)
-            zoom >= 17 -> MarkerIconHelper.dot(this, type, 20)
-            zoom >= 15 -> MarkerIconHelper.dot(this, type, 12)
-            else -> MarkerIconHelper.dot(this, type, 8)
+            zoom >= 18 -> MarkerIconHelper.labeledDot(this, type, poi.name, scale)
+            zoom >= 17 -> MarkerIconHelper.dot(this, type, Math.round(20 * scale))
+            zoom >= 15 -> MarkerIconHelper.dot(this, type, Math.round(12 * scale))
+            else -> MarkerIconHelper.dot(this, type, Math.round(8 * scale))
         }
     }
 

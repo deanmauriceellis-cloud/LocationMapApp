@@ -70,6 +70,19 @@ object MarkerIconHelper {
     private fun mDensity(context: Context): Float =
         context.resources.displayMetrics.density * markerScale(context)
 
+    /**
+     * S307 piece 2 — POI marker GRAPHIC render scale. The operator asked for
+     * all POI markers (ghost badges + circle-icon dots + labeled-marker icons)
+     * to render 33% smaller. This is the single tunable knob: 0.67 = −33%.
+     * Because ghost badges now share the POI size ladder (S307 piece 1), the
+     * same factor shrinks badges and dots equally, so the downstream marker
+     * effects apply uniformly. Applied at the narration call site
+     * ([SalemMainActivity.narrationIconForZoom]) — scoped to POIs; does NOT
+     * touch route / METAR / transit / GPS / system markers. [markerScale]
+     * (device-size awareness) still sits in front of it.
+     */
+    const val POI_GRAPHIC_RENDER_SCALE = 0.67f
+
     /** OSM tag value → asset path under poi-circle-icons/ (without .png) */
     private val CIRCLE_ICON_MAP = mapOf(
         // Food & Drink
@@ -640,7 +653,7 @@ object MarkerIconHelper {
      * Labeled POI marker for high zoom levels (≥18): category type above the dot, name below.
      * Layout (top to bottom): category label → dot → name label
      */
-    fun labeledDot(context: Context, category: String, name: String): BitmapDrawable {
+    fun labeledDot(context: Context, category: String, name: String, iconScale: Float = 1f): BitmapDrawable {
         val (_, color) = CATEGORY_MAP[category.lowercase()] ?: DEFAULT
         val density = mDensity(context)  // S306 — device-size-aware
 
@@ -649,10 +662,14 @@ object MarkerIconHelper {
             .split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         val nameLabel = if (name.isNotBlank()) name else ""
 
-        val key = "ldot|$color|$typeLabel|$nameLabel"
+        val key = "ldot|$color|$typeLabel|$nameLabel|$iconScale"
         cache[key]?.let { return it }
 
-        val iconSizeDp = 32
+        // S307 piece 2 — icon graphic shrinks with [iconScale] (labels stay
+        // legible). At the default 1f this is unchanged; narration passes
+        // POI_GRAPHIC_RENDER_SCALE so the labeled-marker icon matches the
+        // ghost badge / dot size.
+        val iconSizeDp = 32 * iconScale
         val iconSizePx = (iconSizeDp * density).toInt()
 
         val typePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
