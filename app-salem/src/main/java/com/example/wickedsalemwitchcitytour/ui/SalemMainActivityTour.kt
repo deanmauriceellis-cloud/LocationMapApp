@@ -1434,6 +1434,17 @@ private const val HEADING_HYSTERESIS_DEG = 5.0
  *  held back by a 5° gate. */
 private const val HEADING_HYSTERESIS_DEG_REACTIVE = 2.0
 
+/** S309 (#5): Coarser hysteresis applied ONLY while 3D tilt is engaged. Each
+ *  setMapOrientation call forces osmdroid to re-record the entire tilt-extended
+ *  display list (~25 MP at 48°), so a continuous stream of small heading changes
+ *  while walking is the dominant tilt re-record cost — and an ANR contributor
+ *  under walk-sim on both test devices (S306). Under tilt we trade rotation
+ *  granularity for far fewer giant re-records: the map re-orients in ~15° steps
+ *  instead of 5°, so straight-line GPS wobble (<15°) stops re-orienting entirely
+ *  and only real turns rotate the view. Flat map keeps the responsive 5° step.
+ *  Coverage-safe — this changes rotation cadence only, never the wedge geometry. */
+private const val HEADING_HYSTERESIS_DEG_TILTED = 15.0
+
 /**
  * S115: Maximum age of the GPS-derived movement bearing before we fall back
  * to the device orientation sensor. Below this the user is considered to be
@@ -1507,7 +1518,14 @@ internal fun SalemMainActivity.applyHeadingUpRotation() {
             previouslyApplied.toDouble(),
             targetRotation.toDouble()
         )
-        if (delta < HEADING_HYSTERESIS_DEG) {
+        // S309 (#5) — coarser rotation gate while tilted so each turn re-records
+        // the giant tilt-extended display list far less often. See the constant.
+        val hysteresis = if (binding.tiltContainer.getTiltDegrees() > 0f) {
+            HEADING_HYSTERESIS_DEG_TILTED
+        } else {
+            HEADING_HYSTERESIS_DEG
+        }
+        if (delta < hysteresis) {
             // S234 — silent skip. Per-event log was ~100/sec of allocation +
             // GC pressure when stationary; the apply path below still logs.
             return

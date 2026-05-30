@@ -2557,7 +2557,11 @@ class SalemMainActivity : AppCompatActivity() {
             userTriggerRing30?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 30.0)
             userTriggerRing20?.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(point, 20.0)
         }
-        binding.mapView.invalidate()
+        // S309 (#35) — no dedicated invalidate. This DEBUG overlay (debug-gated at
+        // the call site) rides the per-fix GPS-marker / camera-follow invalidate
+        // rather than forcing its own full-MapView redraw — one fewer re-record of
+        // the tilt-extended display list per fix on the walking hot path. The
+        // creation path repaints via the first fix's initial-center animateTo.
     }
 
     internal fun interpolateWalkRoute(points: List<org.osmdroid.util.GeoPoint>, speedMps: Float): List<org.osmdroid.util.GeoPoint> {
@@ -3807,8 +3811,16 @@ class SalemMainActivity : AppCompatActivity() {
                 }
             }
 
-            // S112+: Update the user trigger ring debug overlay (12m/25m/50m) on every fix.
-            updateUserTriggerRings(point)
+            // S112+: Update the user trigger ring debug overlay (20m/30m/40m) on every fix.
+            // S309 (#17/#18) — DEBUG-only. These three concentric discard-radius
+            // circles are a development visualization, not a retail feature, yet
+            // ran ungated in release: ~180 GeoPoint allocations (pointsAsCircle ×3)
+            // + a full mapView.invalidate() on EVERY GPS fix for paying users.
+            // Gate at the call site (feedback_v1_gate_at_call_site); R8 strips the
+            // branch from release so the rings are never created in retail.
+            if (BuildConfig.DEBUG) {
+                updateUserTriggerRings(point)
+            }
 
             // ── 2. Proportional dead zone — drop fixes within 2× reported accuracy ──
             //    S109 fix: replaces the old fixed 100m threshold. At slow downtown driving
@@ -4258,14 +4270,24 @@ class SalemMainActivity : AppCompatActivity() {
     // =========================================================================
 
     internal fun updateGpsMarker(point: GeoPoint) {
-        gpsMarker?.let { binding.mapView.overlays.remove(it) }
-        gpsMarker = BillboardMarker(binding.mapView).apply {
-            position = point
-            icon     = MarkerIconHelper.forCategory(this@SalemMainActivity, "gps", 32)
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            title    = "Current Location"
+        // S309 (#3) — mutate the existing marker's position in place. The old
+        // code removed + re-added the marker to osmdroid's CopyOnWriteArrayList
+        // overlay list on EVERY accepted GPS fix — an O(n) array copy over the
+        // ~620-overlay list per fix on the walking hot path, amplified under 3D
+        // tilt where each redraw re-records the extended display list. Create +
+        // add exactly once; thereafter just move it (the icon/anchor are fixed).
+        val existing = gpsMarker
+        if (existing != null) {
+            existing.position = point
+        } else {
+            gpsMarker = BillboardMarker(binding.mapView).apply {
+                position = point
+                icon     = MarkerIconHelper.forCategory(this@SalemMainActivity, "gps", 32)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title    = "Current Location"
+            }
+            binding.mapView.overlays.add(gpsMarker!!)
         }
-        binding.mapView.overlays.add(gpsMarker!!)
         binding.mapView.invalidate()
     }
 
